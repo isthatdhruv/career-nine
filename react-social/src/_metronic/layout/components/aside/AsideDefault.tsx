@@ -34,25 +34,25 @@ const AsideDefault: FC = () => {
       ref={asideRef}
     >
       {/* begin::Brand */}
-      <div className="aside-logo flex-column-auto" id="kt_aside_logo">
+      <div className="aside-logo flex-column-auto" id="kt_aside_logo" style={{ backgroundColor: 'white' }}>
         {/* begin::Logo */}
         {aside.theme === "dark" && (
           <Link to="/dashboard">
-            <div className="d-flex">
+            <div className="d-flex align-items-center">
               <img
                 alt="Logo"
-                className="h-50px pr-300px logo"
+                className="h-50px logo px-3"
                 src={toAbsoluteUrl("/media/logos/kcc.jpg")}
               />
-              <h3
+              {/* <h3
                 style={{
-                  color: "white",
-                  paddingTop: "13px",
+                  color: "#009ef7",
                   marginLeft: "12px",
+                  marginBottom: "0",
                 }}
               >
-                KCC CRM
-              </h3>
+                CAREER-9 CRM
+              </h3> */}
             </div>
           </Link>
         )}

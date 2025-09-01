@@ -8,9 +8,17 @@ import { useAuth } from "../modules/auth";
 import { DashboardWrapper } from "../pages/dashboard/DashboardWrapper";
 import FacultyRegistrationDetails from "../pages/FacultyRegistration/FacultyRegistrationDetails";
 import FacultyRegistrationForm from "../pages/FacultyRegistration/FacultyRegistrationForm";
-import * as _ from "underscore";
-import { Error500 } from "../modules/errors/components/Error500";
-import { Error401 } from "../modules/errors/components/Error401";
+import { MeasuredQualitiesEditPage } from "../pages/MeasuredQualities/components";
+import MeasuredQualitiesCreatePage from "../pages/MeasuredQualities/components/MeasuredQualitiesCreatePage";
+import { MeasuredQualityTypesEditPage } from "../pages/MeasuredQualityTypes/components";
+import MeasuredQualityTypesCreatePage from "../pages/MeasuredQualityTypes/components/MeasuredQualityTypesCreatePage";
+import QuestionSectionCreatePage from "../pages/QuestionSections/components/QuestionSectionCreatePage";
+import QuestionSectionEditPage from "../pages/QuestionSections/components/QuestionSectionEditPage";
+import QuestionSectionPage from "../pages/QuestionSections/CreateQuestionSection";
+import { ToolEditPage } from "../pages/Tool/components";
+import ToolCreatePage from "../pages/Tool/components/ToolCreatePage";
+// Update these paths to the correct locations of your components
+
 
 const PrivateRoutes = () => {
   const StudentsData = lazy(
@@ -55,7 +63,16 @@ const PrivateRoutes = () => {
 
   // const Compiler = lazy(() => import("../pages/Compiler/compiler"));
 
+  const MeasuredQualityTypes = lazy(() => import("../pages/MeasuredQualityTypes/CreateMeasuredQualityTypes"));
+  const MeasuredQualities = lazy(() => import("../pages/MeasuredQualities/CreateMeasuredQualities"));
+  const Tools = lazy(() => import("../pages/Tool/CreateTool"));
   const College = lazy(() => import("../pages/College/CollegePage"));
+  // Update the import path below to the correct location if the file exists elsewhere
+  const CollegeCreatePage = lazy(() => import("../pages/College/CollegePage"));
+  const CollegeEditPage = lazy(() => import("../pages/College/components/CollegeEditModal"));
+  const AssessmentQuestions = lazy(() => import("../pages/AssesmentQuestions/CreateQuestion"));
+  const QuestionCreatePage = lazy(() => import("../pages/AssesmentQuestions/components/QuestionCreatePage"));
+  const QuestionEditPage = lazy(() => import("../pages/AssesmentQuestions/components/QuestionEditPage"));
   const Board = lazy(() => import("../pages/Board/BoardPage"));
   const Section = lazy(() => import("../pages/Section/SectionPage"));
   const Course = lazy(() => import("../pages/Course/CoursePage"));
@@ -71,6 +88,9 @@ const PrivateRoutes = () => {
   const UniversityResultDashboard = lazy(
     () => import("../pages/UniversityResult/UniversityResultDashboard")
   );
+  // const UniversityAllResultDashboard = lazy(
+  //   () => import("../pages/UniversityResult/UniversityAllResultDashboard")
+  // );
   const [autorized, setAutorized] = useState(false);
   const { currentUser } = useAuth();
   const roles = currentUser?.authorityUrls;
@@ -108,6 +128,17 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
+        {/*
+                <Route
+                  path="/student/university/all-result-dashboard"
+                  element={
+                    <SuspensedView>
+                      <UniversityAllResultDashboard />
+                    </SuspensedView>
+                  }
+                />
+        */}
+        ```
 
         <Route
           path="/student/university/result"
@@ -195,7 +226,7 @@ const PrivateRoutes = () => {
           }
         />
 
-<Route
+        <Route
           path="group"
           element={
             <SuspensedView>
@@ -240,6 +271,146 @@ const PrivateRoutes = () => {
             }
           />
         }
+        <Route
+          path="/college/create"
+          element={
+            <SuspensedView>
+              <CollegeCreatePage  />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/question-sections"
+          element={
+            <SuspensedView>
+              <QuestionSectionPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/question-sections/create"
+          element={
+            <SuspensedView>
+              <QuestionSectionCreatePage setPageLoading={undefined} />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/question-sections/edit/:id"
+          element={
+            <SuspensedView>
+              <QuestionSectionEditPage setPageLoading={undefined} />
+            </SuspensedView>
+          }
+        />
+        {/* <Route
+          path="/college/edit/:id"
+          element={
+            <SuspensedView>
+              <CollegeEditPage  />
+            </SuspensedView>
+          }
+        /> */}
+        <Route
+          path="/assessment-questions"
+          element={
+            <SuspensedView>
+              <AssessmentQuestions />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/assessment-questions/create"
+          element={
+            <SuspensedView>
+              <QuestionCreatePage setPageLoading={undefined} />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/assessment-questions/edit/:id"
+          element={
+            <SuspensedView>
+              <QuestionEditPage setPageLoading={undefined} />
+            </SuspensedView>
+          }
+        />
+
+        <Route
+          path="/tools"
+          element={
+            <SuspensedView>
+              <Tools />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/tools/create"
+          element={
+            <SuspensedView>
+              <ToolCreatePage setPageLoading={undefined} />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/tools/edit/:id"
+          element={
+            <SuspensedView>
+              <ToolEditPage setPageLoading={undefined} />
+            </SuspensedView>
+          }
+        />
+
+        <Route
+          path="/measured-qualities"
+          element={
+            <SuspensedView>
+              <MeasuredQualities />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/measured-qualities/create"
+          element={
+            <SuspensedView>
+              <MeasuredQualitiesCreatePage setPageLoading={undefined} />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/measured-qualities/edit/:id"
+          element={
+            <SuspensedView>
+              <MeasuredQualitiesEditPage setPageLoading={undefined} />
+            </SuspensedView>
+          }
+        />
+
+          <Route
+          path="/measured-quality-types"
+          element={
+            <SuspensedView>
+              <MeasuredQualityTypes />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/measured-quality-types/create"
+          element={
+            <SuspensedView>
+              <MeasuredQualityTypesCreatePage setPageLoading={undefined} />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/measured-quality-types/edit/:id"
+          element={
+            <SuspensedView>
+              <MeasuredQualityTypesEditPage setPageLoading={undefined} />
+            </SuspensedView>
+          }
+        />
+
         <Route
           path="/course"
           element={
@@ -327,7 +498,7 @@ const PrivateRoutes = () => {
         />
 
         {/* Page Not Found */}
-        <Route path="*" element={<Navigate to="/error/404" />} />
+        {/* <Route path="*" element={<Navigate to="/error/404" />} /> */}
       </Route>
     </Routes>
   );
