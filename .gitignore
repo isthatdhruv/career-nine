@@ -1,0 +1,227 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Production builds
+**/build/
+**/dist/
+**/target/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+firebase-debug.log*
+firestore-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# Dependency directories
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env.test
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+
+# Gatsby files
+.cache/
+public
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Temporary folders
+tmp/
+temp/
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Service account keys (IMPORTANT: Never commit these!)
+**/serviceKey.json
+**/service-account-key.json
+**/firebase-adminsdk-*.json
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Spring Boot specific
+**/target/
+**/.mvn/
+**/HELP.md
+**/.springBeans
+**/spring-boot-*.log
+
+# Maven
+**/pom.xml.tag
+**/pom.xml.releaseBackup
+**/pom.xml.versionsBackup
+**/pom.xml.next
+**/release.properties
+**/dependency-reduced-pom.xml
+**/buildNumber.properties
+**/.mvn/timing.properties
+**/.mvn/wrapper/maven-wrapper.jar
+
+# React specific
+**/node_modules/
+**/.next/
+**/.nuxt/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Test files
+test-output/
+coverage/
+.nyc_output/
+
+# Backup files
+*.backup
+*.bak
+*.orig
+
+# macOS specific
+**/.DS_Store
+**/.DS_Store?
+**/._*
+**/.Spotlight-V100
+**/.Trashes
+
+# Windows specific
+**/Thumbs.db
+**/ehthumbs.db
+**/Desktop.ini
+
+# Linux specific
+**/*~
+**/.directory
+
+# Editor and IDE specific
+**/.vscode/
+**/.idea/
+**/*.swp
+**/*.swo
+**/*.tmp
+**/.project
+**/.classpath
+**/.settings/
+
+# Webpack and bundler cache
+**/.cache/
+**/webpack-stats.json
+
+# TypeScript
+**/*.tsbuildinfo
+
+# ESLint cache
+**/.eslintcache
+
+# Prettier cache
+**/.prettier-cache
+
+# IMPORTANT: Keep these files (explicitly not ignored)
+# docker-compose.yml files are important and should be committed
+# !docker-compose.yml
+# !**/docker-compose.yml

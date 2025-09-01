@@ -1,0 +1,251 @@
+spring:
+  profiles:
+    active: dev
+
+server:
+  port: 8080
+  # ssl:
+  #   enabled: true
+  #   key-store: classpath:keystore.p12
+  #   key-store-password: 123456
+  #   key-store-type: PKCS12
+  #   key-alias: mysslcert
+---
+spring:
+  profiles: dev
+  datasource:
+    url: jdbc:mysql://192.168.3.78:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    username: root
+    password: Career-qCsfeuECc3MW
+    
+  jpa:
+    show-sql: true
+    hibernate:
+      naming-strategy: org.hibernate.cfg.EJB3NamingStrategy
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            clientId: 101961828065-ak601ssij07ugrffovuns8v2adrqvtqd.apps.googleusercontent.com
+            clientSecret: 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
+            # redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+            redirectUri: "https://192.168.3.78:8080/oauth2/callback/{registrationId}"
+
+            scope:
+              - email
+              - profile
+              - https://www.googleapis.com/auth/admin.directory.user
+              - https://www.googleapis.com/auth/admin.directory.group
+              - https://www.googleapis.com/auth/admin.directory.orgunit
+          facebook:
+            clientId: 121189305185277
+            clientSecret: 42ffe5aa7379e8326387e0fe16f34132
+            redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+            scope:
+              - email
+              - public_profile
+          github:
+            clientId: d3e47fc2ddd966fa4352
+            clientSecret: 3bc0f6b8332f93076354c2a5bada2f5a05aea60d
+            redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+            scope:
+              - user:email
+              - read:user
+        provider:
+          facebook:
+            authorizationUri: https://www.facebook.com/v3.0/dialog/oauth
+            tokenUri: https://graph.facebook.com/v3.0/oauth/access_token
+            userInfoUri: https://graph.facebook.com/v3.0/me?fields=id,first_name,middle_name,last_name,name,email,verified,is_verified,picture.width(250).height(250)
+
+app:
+  protocol: http
+  name: localhost:3000
+  googleAPIJSON: classpath:google.json
+  fileTempFolder: classpath:temp
+  auth:
+    tokenSecret: 04ca023b39512e46d0c2cf4b48d5aac61d34302994c87ed4eff225dcf3b0a218739f3897051a057f9b846a69ea2927a587044164b7bae5e1306219d50b588cb1
+    tokenExpirationMsec: 864000000
+  cors:
+    allowedOrigins: http://192.168.3.78:3000,http://192.168.3.78:3000,http://localhost:3000,https://localhost:3000,https://localhost:8080,https://192.168.3.78:8080,https://localhost,https://localhost:80,https://staging.student.kccitm.in/,https://student.kccitm.in/,https://erp.aktu.ac.in/,https://leetcode.com
+  oauth2:
+  
+    # After successfully authenticating with the OAuth2 Provider,
+    # we'll be generating an auth token for the user and sending the token to the
+    # redirectUri mentioned by the client in the /oauth2/authorize request.
+    # We're not using cookies because they won't work well in mobile clients.
+    authorizedRedirectUris:
+      - https://student.kccitm.in/oauth2/redirect
+      - https://staging.student.kccitm.in/oauth2/redirect
+      - https://student.kccitm.in/oauth2/redirect
+      - http://192.168.3.78:3000/oauth2/redirect
+      - myandroidapp://oauth2/redirect
+      - http://localhost/oauth2/redirect
+      - http://localhost:80/oauth2/redirect
+      - myiosapp://oauth2/redirect
+      - http://192.168.3.78:3000
+  mandrill: WXX3fC00pJTZgonjnVvkgQ
+  firebase:
+    project-id: career-library
+    service-account-file: firebase-service-account.json
+
+---
+spring:
+  profiles: staging
+  datasource:
+    url: jdbc:mysql://localhost:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    username: root
+    password: Career-qCsfeuECc3MW    # password: Google.com1
+
+  jpa:
+    show-sql: true
+    hibernate:
+      naming-strategy: org.hibernate.cfg.EJB3NamingStrategy
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            clientId: 101961828065-ak601ssij07ugrffovuns8v2adrqvtqd.apps.googleusercontent.com
+            clientSecret: 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
+            # redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+            redirectUri: "https://staging.api.kccitm.in/oauth2/callback/{registrationId}"
+
+            scope:
+              - email
+              - profile
+              - https://www.googleapis.com/auth/admin.directory.user
+              - https://www.googleapis.com/auth/admin.directory.group
+              - https://www.googleapis.com/auth/admin.directory.orgunit
+          facebook:
+            clientId: 121189305185277
+            clientSecret: 42ffe5aa7379e8326387e0fe16f34132
+            redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+            scope:
+              - email
+              - public_profile
+          github:
+            clientId: d3e47fc2ddd966fa4352
+            clientSecret: 3bc0f6b8332f93076354c2a5bada2f5a05aea60d
+            redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+            scope:
+              - user:email
+              - read:user
+        provider:
+          facebook:
+            authorizationUri: https://www.facebook.com/v3.0/dialog/oauth
+            tokenUri: https://graph.facebook.com/v3.0/oauth/access_token
+            userInfoUri: https://graph.facebook.com/v3.0/me?fields=id,first_name,middle_name,last_name,name,email,verified,is_verified,picture.width(250).height(250)
+app:
+  protocol: http
+  name: staging.student.kccitm.in
+  googleAPIJSON: classpath:google.json
+  fileTempFolder: classpath:temp
+  auth:
+    tokenSecret: 04ca023b39512e46d0c2cf4b48d5aac61d34302994c87ed4eff225dcf3b0a218739f3897051a057f9b846a69ea2927a587044164b7bae5e1306219d50b588cb1
+    tokenExpirationMsec: 864000000
+  cors:
+    allowedOrigins: http://localhost:3000,http://localhost:8080,http://localhost,http://localhost:80,https://staging.student.kccitm.in/,https://student.kccitm.in/,https://erp.aktu.ac.in/
+  oauth2:
+    # After successfully authenticating with the OAuth2 Provider,
+    # we'll be generating an auth token for the user and sending the token to the
+    # redirectUri mentioned by the client in the /oauth2/authorize request.
+    # We're not using cookies because they won't work well in mobile clients.
+    authorizedRedirectUris:
+      - https://student.kccitm.in/oauth2/redirect
+      - https://staging.student.kccitm.in/oauth2/redirect
+      - https://student.kccitm.in/oauth2/redirect
+      - http://localhost:3000/oauth2/redirect
+      - myandroidapp://oauth2/redirect
+      - http://localhost/oauth2/redirect
+      - http://localhost:80/oauth2/redirect
+      - myiosapp://oauth2/redirect
+  mandrill: WXX3fC00pJTZgonjnVvkgQ
+---
+spring:
+  profiles: production
+  datasource:
+    url: jdbc:mysql://easylearning.guru:3310/kcc_student?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    username: root
+    password: qCsfeuECc3MW
+    # password: Google.com1
+
+  jpa:
+    show-sql: true
+    hibernate:
+      naming-strategy: org.hibernate.cfg.EJB3NamingStrategy
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            clientId: 701038408648-gnmlifdksik4mqu2as5vpgpe64l8m55b.apps.googleusercontent.com
+            clientSecret: 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
+            # redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+            redirectUri: "https://api.kccitm.in/oauth2/callback/{registrationId}"
+
+            scope:
+              - email
+              - profile
+              - https://www.googleapis.com/auth/admin.directory.user
+              - https://www.googleapis.com/auth/admin.directory.group
+              - https://www.googleapis.com/auth/admin.directory.orgunit
+          facebook:
+            clientId: 121189305185277
+            clientSecret: 42ffe5aa7379e8326387e0fe16f34132
+            redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+            scope:
+              - email
+              - public_profile
+          github:
+            clientId: d3e47fc2ddd966fa4352
+            clientSecret: 3bc0f6b8332f93076354c2a5bada2f5a05aea60d
+            redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+            scope:
+              - user:email
+              - read:user
+        provider:
+          facebook:
+            authorizationUri: https://www.facebook.com/v3.0/dialog/oauth
+            tokenUri: https://graph.facebook.com/v3.0/oauth/access_token
+            userInfoUri: https://graph.facebook.com/v3.0/me?fields=id,first_name,middle_name,last_name,name,email,verified,is_verified,picture.width(250).height(250)
+app:
+  protocol: http
+  name: student.kccitm.in
+  googleAPIJSON: classpath:google.json
+  fileTempFolder: classpath:temp
+  auth:
+    tokenSecret: 04ca023b39512e46d0c2cf4b48d5aac61d34302994c87ed4eff225dcf3b0a218739f3897051a057f9b846a69ea2927a587044164b7bae5e1306219d50b588cb1
+    tokenExpirationMsec: 864000000
+  cors:
+    allowedOrigins: http://localhost:3000,http://localhost:8080,http://localhost,http://localhost:80,https://staging.student.kccitm.in/,https://student.kccitm.in/
+  oauth2:
+    # After successfully authenticating with the OAuth2 Provider,
+    # we'll be generating an auth token for the user and sending the token to the
+    # redirectUri mentioned by the client in the /oauth2/authorize request.
+    # We're not using cookies because they won't work well in mobile clients.
+    authorizedRedirectUris:
+      - https://student.kccitm.in/oauth2/redirect
+      - https://staging.student.kccitm.in/oauth2/redirect
+      - https://student.kccitm.in/oauth2/redirect
+      - http://localhost:3000/oauth2/redirect
+      - myandroidapp://oauth2/redirect
+      - http://localhost/oauth2/redirect
+      - http://localhost:80/oauth2/redirect
+      - myiosapp://oauth2/redirect
+  mandrill: WXX3fC00pJTZgonjnVvkgQ
+
+---
+
