@@ -17,11 +17,6 @@ import QuestionSectionEditPage from "../pages/QuestionSections/components/Questi
 import QuestionSectionPage from "../pages/QuestionSections/CreateQuestionSection";
 import { ToolEditPage } from "../pages/Tool/components";
 import ToolCreatePage from "../pages/Tool/components/ToolCreatePage";
-import CareerPage from "../pages/Career/CareerPage";
-import CareerCreatePage from "../pages/Career/components/CareerCreatePage";
-import CareerEditPage from "../pages/Career/components/CareerEditPage";
-// import CareerPage from "../pages/Career/CareerPage";
-// import CareerRoutes from "./CareerRoutes";
 // Update these paths to the correct locations of your components
 
 
@@ -153,8 +148,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
-        
         {/* <Route
           path="pdf"
           element={
@@ -318,33 +311,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         /> */}
-
-        
-        {/* Career Routes */}
-        <Route
-          path="/careers"
-          element={
-            <SuspensedView>
-              <CareerPage/>
-            </SuspensedView>
-          }
-        />
-        <Route
-          path="/careers/create"
-          element={
-            <SuspensedView>
-              <CareerCreatePage />
-            </SuspensedView>
-          }
-        />
-        <Route
-          path="/careers/edit/:id"
-          element={
-            <SuspensedView>
-              <CareerEditPage />
-            </SuspensedView>
-          }
-        />
         <Route
           path="/assessment-questions"
           element={
@@ -353,8 +319,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
-        
         <Route
           path="/assessment-questions/create"
           element={
