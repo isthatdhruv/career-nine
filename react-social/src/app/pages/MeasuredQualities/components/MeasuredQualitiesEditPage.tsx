@@ -119,7 +119,7 @@ const MeasuredQualitiesEditPage = (props?: { setPageLoading?: any }) => {
         >
 
           <div className="fv-row mb-7">
-            <label className="required fs-6 fw-bold mb-2">Question Text:</label>
+            <label className="required fs-6 fw-bold mb-2">Quality Name:</label>
             <textarea
               placeholder="Enter Quality Name"
               rows={4}
