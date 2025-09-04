@@ -30,6 +30,12 @@ const ToolTable = (props: {
         width: 150,
       },
       {
+        label: "Tool Type",
+        field: "type",
+        sort: "asc",
+        width: 150,
+      },
+      {
         label: "Actions",
         field: "actions",
         sort: "disabled",
@@ -38,8 +44,9 @@ const ToolTable = (props: {
     ],
 
     rows: props.data.map((data: any) => ({
-      toolName: data.toolName,
-      toolPrice: data.toolPrice,
+      toolName: data.name,
+      toolPrice: data.price,
+      type: data.price==0?"Free" : "Paid",
       actions: (
         <>
           <button

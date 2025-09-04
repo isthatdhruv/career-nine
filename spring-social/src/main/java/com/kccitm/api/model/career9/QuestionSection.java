@@ -11,6 +11,8 @@ import javax.persistence.JoinColumn;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+
 @Entity
 @Table(name = "question_sections")
 
@@ -26,6 +28,7 @@ public class QuestionSection implements Serializable {
     //1 Section to Many Questions (section question mapping)
     @OneToMany(cascade=CascadeType.ALL)
     @JoinColumn(name="fk_question_section",referencedColumnName = "sectionId")
+    @JsonManagedReference
     private List<AssessmentQuestions> questions;
 
 
@@ -53,5 +56,22 @@ public class QuestionSection implements Serializable {
 
     public void setSectionDescription(String sectionDescription) {
         this.sectionDescription = sectionDescription;
+    }
+
+    public List<AssessmentQuestions> getQuestions() {
+        return questions;
+    }
+
+    public void setQuestions(List<AssessmentQuestions> questions) {
+        this.questions = questions;
+    }
+
+    @Override
+    public String toString() {
+        return "QuestionSection{" +
+                "sectionId=" + sectionId +
+                ", sectionName='" + sectionName + '\'' +
+                ", sectionDescription='" + sectionDescription + '\'' +
+                '}';
     }
 }

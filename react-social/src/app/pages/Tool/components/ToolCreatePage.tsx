@@ -1,24 +1,24 @@
 import clsx from "clsx";
-import { Formik, Form, Field } from "formik";
-import { useState, useEffect } from "react";
+import { Field, Form, Formik } from "formik";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
-import { CreateToolData } from "../API/Tool_APIs";
 import { ReadToolData } from "../../Tool/API/Tool_APIs";
+import { CreateToolData } from "../API/Tool_APIs";
 
 const validationSchema = Yup.object().shape({
   toolName: Yup.string().required("Tool name is required"),
   toolPrice: Yup.string().required("Tool price is required"),
   priceAmount: Yup.number()
     .when("toolPrice", {
-      is: "paid",
+      is: "PAID",
       then: (schema) =>
         schema.required("Please enter the price").positive("Must be positive"),
       otherwise: (schema) => schema.notRequired(),
     }),
 });
 
-const ToolCreatePage = ({ setPageLoading }: { setPageLoading: any }) => {
+const ToolCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const [loading, setLoading] = useState(false);
   const [sections, setSections] = useState<any[]>([]);
   const navigate = useNavigate();
@@ -73,10 +73,9 @@ const ToolCreatePage = ({ setPageLoading }: { setPageLoading: any }) => {
                 <div className="fv-row mb-7">
                   <label className="required fs-6 fw-bold mb-2">Tool Name :</label>
                   <Field
-                    as="textarea"
+                    type="text"
                     name="toolName"
                     placeholder="Enter Tool Name"
-                    rows={4}
                     className={clsx(
                       "form-control form-control-lg form-control-solid",
                       {
@@ -113,8 +112,8 @@ const ToolCreatePage = ({ setPageLoading }: { setPageLoading: any }) => {
                     )}
                   >
                     <option value="">Select Tool Price</option>
-                    <option value="free">Free</option>
-                    <option value="paid">Paid</option>
+                    <option value="FREE">Free</option>
+                    <option value="PAID">Paid</option>
                   </Field>
                   {touched.toolPrice && errors.toolPrice && (
                     <div className="fv-plugins-message-container">
@@ -125,7 +124,7 @@ const ToolCreatePage = ({ setPageLoading }: { setPageLoading: any }) => {
                   )}
                 </div>
 
-                {values.toolPrice === "paid" && (
+                {values.toolPrice === "PAID" && (
                   <div className="fv-row mb-7">
                     <label className="required fs-6 fw-bold mb-2">Enter Price :</label>
                     <Field

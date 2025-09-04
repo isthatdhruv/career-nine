@@ -1,8 +1,11 @@
 package com.kccitm.api.config;
 
+import java.util.Arrays;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.BeanIds;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
@@ -14,6 +17,9 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.kccitm.api.security.CustomUserDetailsService;
 import com.kccitm.api.security.RestAuthenticationEntryPoint;
@@ -79,10 +85,28 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         return super.authenticationManagerBean();
     }
 
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOriginPatterns(Arrays.asList(
+            "http://localhost:3000",
+            "http://192.168.3.78:3000",
+            "http://192.168.0.204:3000",
+            "https://192.168.0.204:3000"
+        ));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowCredentials(true);
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         http
-                .cors()
+                .cors().configurationSource(corsConfigurationSource())
                 .and()
                 .sessionManagement()
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
@@ -97,6 +121,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .authenticationEntryPoint(new RestAuthenticationEntryPoint())
                 .and()
                 .authorizeRequests()
+                .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .antMatchers("/",
                         "/error",
                         "/favicon.ico",
@@ -108,12 +133,12 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                         "/**/*.css",
                         "/**/*.js")
                 .permitAll()
-                .antMatchers("/api/career9/","/api/assessment-questions/*","/api/question-sections/*","/api/question-sections/*/*","/api/assessment-questions/*/*","/api/firebase/*/*","/api/firebase/*" ,"/api/firebase/*","/actuator/*","/auth/**", "/oauth2/callback/google/*", "/oauth2/**", "/user/me", "role/*", "/gender/get",
+                .antMatchers("/api/career9/","/api/assessment-questions/**","/api/question-sections/**","/api/assessment-questions/*/*","/api/firebase/*/*","/api/firebase/*" ,"/api/firebase/*","/actuator/*","/auth/**", "/oauth2/callback/google/*", "/oauth2/**", "/user/me", "role/*", "/gender/get",
                         "/category/*", "/board/*",
                         "/rolegroup/*", "/user/*", "/instituteDetail/*", "/role/*", "/instituteBranch/getbybranchid/*",
                         "/instituteBatch/getbyid/*", "/instituteCourse/getbyCollegeId/*",
                         "/instituteBranch/getbyCourseId/*", "/instituteSession/getbyBatchId/*",
-                         "/section/get","/tools/*","/question-sections/*","/assesment-questions/*",
+                         "/section/get","/api/tools/**","/tools/**","/question-sections/**","/assesment-questions/**",
                         "/question-sections/getbyid/*","/assesment-questions/getbyid/*","/question-sections/getbycollegeid/*",
                         "/assesment-questions/getbycollegeid/*","/question-sections/getbyinstituteid/*","/assesment-questions/getbyinstituteid/*",
                         "/question-sections/getbybatchid/*","/assesment-questions/getbybatchid/*","/question-sections/getbycourseid/*",

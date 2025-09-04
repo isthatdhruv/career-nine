@@ -1,17 +1,17 @@
 import clsx from "clsx";
 import { useFormik } from "formik";
-import { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
-import { UpdateQuestionData } from "../API/Question_APIs";
 import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
+import { ReadQuestionByIdData, UpdateQuestionData } from "../API/Question_APIs";
 
 const validationSchema = Yup.object().shape({
   questionText: Yup.string().required("Question text is required"),
   questionType: Yup.string().required("Question type is required"),
-  sectionType: Yup.string().required("Section is required"),
+  sectionId: Yup.string().required("Section is required"),
   questionOptions: Yup.array()
     .of(Yup.string().required("Option cannot be empty"))
     .min(1, "At least one option is required"),
@@ -22,28 +22,73 @@ const QuestionEditPage = (props?: {
 }) => {
   const [loading, setLoading] = useState(false);
   const [sections, setSections] = useState<any[]>([]);
-  const navigate = useNavigate();
-  const location = useLocation();
-  
-  const questionData = (location.state as any)?.data || {
+  const [questionData, setQuestionData] = useState<any>({
     questionText: "",
     questionType: "",
-    sectionType: "",
+    sectionId: "",
     questionOptions: [""],
     id: "",
-  };
+  });
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { id } = useParams<{ id: string }>();
+
+  // Fetch question data and sections when component mounts
+  useEffect(() => {
+    const fetchData = async () => {
+      if (id) {
+        try {
+          setLoading(true);
+          // Fetch question data by ID
+          const questionResponse = await ReadQuestionByIdData(id);
+          console.log("Fetched question data:", questionResponse.data);
+          setQuestionData(questionResponse.data);
+        } catch (error) {
+          console.error("Error fetching question:", error);
+          // Try to get data from location state as fallback
+          const locationData = (location.state as any)?.data;
+          if (locationData) {
+            setQuestionData(locationData);
+          }
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        // Fallback to location state if no ID in URL
+        const locationData = (location.state as any)?.data;
+        if (locationData) {
+          setQuestionData(locationData);
+        }
+      }
+    };
+
+    const fetchSections = async () => {
+      try {
+        const response = await ReadQuestionSectionData();
+        console.log("Fetched sections for edit:", response.data);
+        setSections(response.data);
+      } catch (error) {
+        console.error("Error fetching sections:", error);
+      }
+    };
+
+    fetchData();
+    fetchSections();
+  }, [id, location.state]);
 
   // ✅ Keep using useFormik but with enhanced initial values
   const formik = useFormik({
     enableReinitialize: true,
     initialValues: {
-      id: questionData.id,
+      id: questionData.id || id,
       questionText: questionData.questionText || "",
       questionType: questionData.questionType || "",
-      sectionType: questionData.sectionType || questionData.section?.sectionName || "",
-      questionOptions: questionData.questionOptions && questionData.questionOptions.length > 0 
-        ? questionData.questionOptions 
-        : [""],
+      sectionId: questionData.sectionId || questionData.section?.sectionId || "",
+      questionOptions: questionData.options && questionData.options.length > 0 
+        ? questionData.options.map((option: any) => option.optionText || option) 
+        : questionData.questionOptions && questionData.questionOptions.length > 0 
+          ? questionData.questionOptions 
+          : [""],
     },
     validationSchema: validationSchema,
     onSubmit: async (values) => {
@@ -52,6 +97,7 @@ const QuestionEditPage = (props?: {
         console.log("Attempting to update question:");
         console.log("Question ID:", values.id);
         console.log("Values being sent:", values);
+        console.log("Section ID being sent:", values.sectionId);
 
         if (!values.id) {
           alert("No question ID found. Please try navigating back and selecting the question again.");
@@ -86,18 +132,18 @@ const QuestionEditPage = (props?: {
     },
   });
 
-  // ✅ Fetch sections data
-  useEffect(() => {
-    const fetchSections = async () => {
-      try {
-        const response = await ReadQuestionSectionData();
-        setSections(response.data);
-      } catch (error) {
-        console.error("Error fetching sections:", error);
-      }
-    };
-    fetchSections();
-  }, []);
+  if (loading) {
+    return (
+      <div className="container py-5">
+        <div className="text-center">
+          <div className="spinner-border" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="mt-2">Loading question...</p>
+        </div>
+      </div>
+    );
+  }
 
   // ✅ Helper functions for managing options array (since we can't use FieldArray)
   const addOption = () => {
@@ -217,30 +263,30 @@ const QuestionEditPage = (props?: {
                 Section
               </label>
               <select
-                {...formik.getFieldProps("sectionType")}
+                {...formik.getFieldProps("sectionId")}
                 className={clsx(
                   "form-control form-control-lg form-control-solid",
                   {
                     "is-invalid text-danger":
-                      formik.touched.sectionType && formik.errors.sectionType,
+                      formik.touched.sectionId && formik.errors.sectionId,
                   },
                   {
                     "is-valid":
-                      formik.touched.sectionType && !formik.errors.sectionType,
+                      formik.touched.sectionId && !formik.errors.sectionId,
                   }
                 )}
               >
                 <option value="">Select Section</option>
                 {sections.map((section) => (
-                  <option key={section.id} value={section.sectionName}>
+                  <option key={section.sectionId} value={section.sectionId}>
                     {section.sectionName}
                   </option>
                 ))}
               </select>
-              {formik.touched.sectionType && formik.errors.sectionType && (
+              {formik.touched.sectionId && formik.errors.sectionId && (
                 <div className="fv-plugins-message-container">
                   <div className="fv-help-block text-danger">
-                    <span role="alert">{String(formik.errors.sectionType)}</span>
+                    <span role="alert">{String(formik.errors.sectionId)}</span>
                   </div>
                 </div>
               )}

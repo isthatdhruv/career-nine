@@ -1,60 +1,93 @@
 import clsx from "clsx";
 import { useFormik } from "formik";
-import { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
-import { ReadToolData, UpdateToolData } from "../API/Tool_APIs";
-
+import { ReadToolByIdData, UpdateToolData } from "../API/Tool_APIs";
 
 const validationSchema = Yup.object().shape({
-  questionText: Yup.string().required("Question text is required"),
-  questionType: Yup.string().required("Question type is required"),
-  sectionType: Yup.string().required("Section is required"),
-  questionOptions: Yup.array()
-    .of(Yup.string().required("Option cannot be empty"))
-    .min(1, "At least one option is required"),
+  toolName: Yup.string().required("Tool name is required"),
+  toolPrice: Yup.string().required("Tool type is required"),
+  priceAmount: Yup.number()
+    .when("toolPrice", {
+      is: "PAID",
+      then: (schema) =>
+        schema.required("Please enter the price").positive("Must be positive"),
+      otherwise: (schema) => schema.notRequired(),
+    }),
 });
 
 const ToolEditPage = (props?: {
   setPageLoading?: any;
 }) => {
   const [loading, setLoading] = useState(false);
-  const [sections, setSections] = useState<any[]>([]);
+  const [toolData, setToolData] = useState<any>({
+    name: "",
+    price: "",
+    id: "",
+    type: "",
+  });
   const navigate = useNavigate();
   const location = useLocation();
+  const { id } = useParams<{ id: string }>();
 
-  const toolData = (location.state as any)?.data || {
-    questionText: "",
-    questionType: "",
-    sectionType: "",
-    questionOptions: [""],
-    id: "",
-  };
+  // Fetch tool data when component mounts
+  useEffect(() => {
+    const fetchData = async () => {
+      if (id) {
+        try {
+          setLoading(true);
+          const response = await ReadToolByIdData(id);
+          console.log("Fetched tool data:", response.data);
+          const transformedData = {
+            id: response.data.tool_id || response.data.toolId,
+            toolName: response.data.name || response.data.toolName,
+            toolPrice: response.data.isFree ? "FREE" : "PAID",
+            priceAmount: response.data.isFree ? "" : (response.data.price || ""),
+          };
+          setToolData(transformedData);
+        } catch (error) {
+          console.error("Error fetching tool:", error);
+          // Try to get data from location state as fallback
+          const locationData = (location.state as any)?.data;
+          if (locationData) {
+            setToolData(locationData);
+          }
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        // Fallback to location state if no ID in URL
+        const locationData = (location.state as any)?.data;
+        if (locationData) {
+          setToolData(locationData);
+        }
+      }
+    };
 
+    fetchData();
+  }, [id, location.state]);
 
   const formik = useFormik({
     enableReinitialize: true,
     initialValues: {
-      id: toolData.id,
-      questionText: toolData.questionText || "",
-      questionType: toolData.questionType || "",
-      sectionType: toolData.sectionType || toolData.section?.sectionName || "",
-      questionOptions: toolData.questionOptions && toolData.questionOptions.length > 0
-        ? toolData.questionOptions
-        : [""],
+      id: toolData.id || id,
+      toolName: toolData.toolName || "",
+      toolPrice: toolData.toolPrice || "",
+      priceAmount: toolData.priceAmount || "",
     },
     validationSchema: validationSchema,
     onSubmit: async (values) => {
       setLoading(true);
       try {
-        console.log("Attempting to update question:");
-        console.log("Question ID:", values.id);
+        console.log("Attempting to update tool:");
+        console.log("Tool ID:", values.id);
         console.log("Values being sent:", values);
 
         if (!values.id) {
-          alert("No question ID found. Please try navigating back and selecting the question again.");
+          alert("No tool ID found. Please try navigating back and selecting the tool again.");
           return;
         }
 
@@ -76,9 +109,9 @@ const ToolEditPage = (props?: {
           console.error("Error data:", (error as any).response?.data);
 
           const errorMessage = (error as any).response?.data?.message || (error as any).message || "Unknown error occurred";
-          alert(`Failed to update question: ${errorMessage}`);
+          alert(`Failed to update tool: ${errorMessage}`);
         } else {
-          alert("Failed to update question: Unknown error occurred");
+          alert("Failed to update tool: Unknown error occurred");
         }
       } finally {
         setLoading(false);
@@ -86,49 +119,11 @@ const ToolEditPage = (props?: {
     },
   });
 
-  // ✅ Fetch sections data
-  useEffect(() => {
-    const fetchSections = async () => {
-      try {
-        const response = await ReadToolData();
-        setSections(response.data);
-      } catch (error) {
-        console.error("Error fetching sections:", error);
-      }
-    };
-    fetchSections();
-  }, []);
-
-  const addOption = () => {
-    const currentOptions = formik.values.questionOptions;
-    const lastOption = currentOptions[currentOptions.length - 1];
-    
-    if (lastOption && lastOption.trim() !== "") {
-      formik.setFieldValue("questionOptions", [...currentOptions, ""]);
-    } else {
-      alert("Please fill the current option before adding a new one.");
-    }
-  };
-
-  const removeOption = (index: number) => {
-    const currentOptions = formik.values.questionOptions;
-    if (currentOptions.length > 1) {
-      const newOptions = currentOptions.filter((_, i) => i !== index);
-      formik.setFieldValue("questionOptions", newOptions);
-    }
-  };
-
-  const updateOption = (index: number, value: string) => {
-    const currentOptions = [...formik.values.questionOptions];
-    currentOptions[index] = value;
-    formik.setFieldValue("questionOptions", currentOptions);
-  };
-
   return (
     <div className="container py-5">
       <div className="card shadow-sm py-5">
         <div className="card-header d-flex justify-content-between align-items-center">
-          <h1 className="mb-0">Edit Assessment Question</h1>
+          <h1 className="mb-0">Edit Tool</h1>
           <button
             className="btn btn-sm btn-icon btn-active-color-primary"
             onClick={() => navigate(-1)}
@@ -149,160 +144,100 @@ const ToolEditPage = (props?: {
         >
           <div className="card-body">
 
-            {/* Question Text */}
+            {/* Tool Name */}
             <div className="fv-row mb-7">
               <label className="required fs-6 fw-bold mb-2">
-                Question Text:
+                Tool Name:
               </label>
-              <textarea
-                placeholder="Enter Question Text"
-                rows={4}
-                {...formik.getFieldProps("questionText")}
+              <input
+                type="text"
+                placeholder="Enter Tool Name"
+                {...formik.getFieldProps("toolName")}
                 className={clsx(
                   "form-control form-control-lg form-control-solid",
                   {
                     "is-invalid text-danger":
-                      formik.touched.questionText && formik.errors.questionText,
+                      formik.touched.toolName && formik.errors.toolName,
                   },
                   {
                     "is-valid":
-                      formik.touched.questionText && !formik.errors.questionText,
+                      formik.touched.toolName && !formik.errors.toolName,
                   }
                 )}
               />
-              {formik.touched.questionText && formik.errors.questionText && (
+              {formik.touched.toolName && formik.errors.toolName && (
                 <div className="fv-plugins-message-container">
                   <div className="fv-help-block text-danger">
-                    <span role="alert">{String(formik.errors.questionText)}</span>
+                    <span role="alert">{String(formik.errors.toolName)}</span>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Question Type */}
+            {/* Tool Price Type */}
             <div className="fv-row mb-7">
               <label className="required fs-6 fw-bold mb-2">
-                Question Type:
+                Tool Type:
               </label>
               <select
-                {...formik.getFieldProps("questionType")}
+                {...formik.getFieldProps("toolPrice")}
                 className={clsx(
                   "form-control form-control-lg form-control-solid",
                   {
                     "is-invalid text-danger":
-                      formik.touched.questionType && formik.errors.questionType,
+                      formik.touched.toolPrice && formik.errors.toolPrice,
                   },
                   {
                     "is-valid":
-                      formik.touched.questionType && !formik.errors.questionType,
+                      formik.touched.toolPrice && !formik.errors.toolPrice,
                   }
                 )}
               >
-                <option value="">Select Question Type</option>
-                <option value="multiple-choice">Multiple Choice</option>
+                <option value="">Select Tool Type</option>
+                <option value="FREE">Free</option>
+                <option value="PAID">Paid</option>
               </select>
-              {formik.touched.questionType && formik.errors.questionType && (
+              {formik.touched.toolPrice && formik.errors.toolPrice && (
                 <div className="fv-plugins-message-container">
                   <div className="fv-help-block text-danger">
-                    <span role="alert">{String(formik.errors.questionType)}</span>
+                    <span role="alert">{String(formik.errors.toolPrice)}</span>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Section Type */}
-            <div className="fv-row mb-7">
-              <label className="required fs-6 fw-bold mb-2">
-                Section
-              </label>
-              <select
-                {...formik.getFieldProps("sectionType")}
-                className={clsx(
-                  "form-control form-control-lg form-control-solid",
-                  {
-                    "is-invalid text-danger":
-                      formik.touched.sectionType && formik.errors.sectionType,
-                  },
-                  {
-                    "is-valid":
-                      formik.touched.sectionType && !formik.errors.sectionType,
-                  }
-                )}
-              >
-                <option value="">Select Section</option>
-                {sections.map((section) => (
-                  <option key={section.id} value={section.sectionName}>
-                    {section.sectionName}
-                  </option>
-                ))}
-              </select>
-              {formik.touched.sectionType && formik.errors.sectionType && (
-                <div className="fv-plugins-message-container">
-                  <div className="fv-help-block text-danger">
-                    <span role="alert">{String(formik.errors.sectionType)}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Options - Manual implementation since FieldArray won't work with useFormik */}
-            <div className="fv-row mb-7">
-              <label className="required fs-6 fw-bold mb-2">Options:</label>
-              
-              {formik.values.questionOptions.map((option, index) => (
-                <div
-                  key={index}
-                  className="d-flex align-items-center gap-2 mb-2"
-                >
-                  <input
-                    type="text"
-                    placeholder={`Enter option ${index + 1}`}
-                    value={option}
-                    onChange={(e) => updateOption(index, e.target.value)}
-                    onBlur={() => formik.setFieldTouched(`questionOptions.${index}`, true)}
-                    className={clsx(
-                      "form-control form-control-lg form-control-solid w-50",
-                      {
-                        "is-invalid text-danger":
-                          formik.touched.questionOptions?.[index] &&
-                          (formik.errors.questionOptions as any)?.[index],
-                      },
-                      {
-                        "is-valid":
-                          formik.touched.questionOptions?.[index] &&
-                          !(formik.errors.questionOptions as any)?.[index],
-                      }
-                    )}
-                  />
-
-                  {index === formik.values.questionOptions.length - 1 ? (
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-primary"
-                      onClick={addOption}
-                    >
-                      +
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-danger"
-                      onClick={() => removeOption(index)}
-                    >
-                      -
-                    </button>
+            {/* Price Amount - only shown if PAID */}
+            {formik.values.toolPrice === "PAID" && (
+              <div className="fv-row mb-7">
+                <label className="required fs-6 fw-bold mb-2">
+                  Price Amount:
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Enter Price Amount"
+                  {...formik.getFieldProps("priceAmount")}
+                  className={clsx(
+                    "form-control form-control-lg form-control-solid",
+                    {
+                      "is-invalid text-danger":
+                        formik.touched.priceAmount && formik.errors.priceAmount,
+                    },
+                    {
+                      "is-valid":
+                        formik.touched.priceAmount && !formik.errors.priceAmount,
+                    }
                   )}
-                </div>
-              ))}
-
-              {typeof formik.errors.questionOptions === "string" && (
-                <div className="fv-plugins-message-container">
-                  <div className="fv-help-block text-danger">
-                    <span role="alert">{formik.errors.questionOptions}</span>
+                />
+                {formik.touched.priceAmount && formik.errors.priceAmount && (
+                  <div className="fv-plugins-message-container">
+                    <div className="fv-help-block text-danger">
+                      <span role="alert">{String(formik.errors.priceAmount)}</span>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
           </div>
 

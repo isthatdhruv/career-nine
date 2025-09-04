@@ -8,7 +8,7 @@ import { DeleteQuestionSectionData } from "../API/Question_Section_APIs";
 const QuestionSectionTable = (props: {
   data: any;
   setLoading: any;
-  setPageLoading: any;
+  // setPageLoading: ;
 }) => {
   const navigate = useNavigate();
 
@@ -57,7 +57,7 @@ const QuestionSectionTable = (props: {
             onClick={() => {
               props.setLoading(true);
               DeleteQuestionSectionData(data.id).then(() => {
-                props.setPageLoading(["true"]);
+                // props.setPageLoading(["true"]);
               });
             }}
             className="btn btn-icon btn-danger btn-sm me-3"

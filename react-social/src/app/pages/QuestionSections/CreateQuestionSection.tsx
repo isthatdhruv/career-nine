@@ -66,7 +66,7 @@ const QuestionSectionPage = () => {
           <QuestionSectionTable
             data={questionSectionData}
             setLoading={setLoading}
-            setPageLoading={setPageLoading}
+            // setPageLoading={setPageLoading}
           />
         </div>
       )}

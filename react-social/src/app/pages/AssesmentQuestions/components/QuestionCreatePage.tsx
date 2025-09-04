@@ -9,13 +9,13 @@ import { CreateQuestionData } from "../API/Question_APIs";
 const validationSchema = Yup.object().shape({
   questionText: Yup.string().required("Question text is required"),
   questionType: Yup.string().required("Question type is required"),
-  // sectionId: Yup.String.required("Section is required"),
+  sectionId: Yup.string().required("Section is required"),
   questionOptions: Yup.array()
     .of(Yup.string().required("Option cannot be empty"))
     .min(1, "At least one option is required"),
 });
 
-const QuestionCreatePage = ({ setPageLoading }: { setPageLoading: any }) => {
+const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const [loading, setLoading] = useState(false);
   const [sections, setSections] = useState<any[]>([]); 
   const navigate = useNavigate();
@@ -32,6 +32,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading: any }) => {
     const fetchSections = async () => {
       try {
         const response = await ReadQuestionSectionData();
+        console.log("Fetched sections data:", response.data);
         setSections(response.data);
       } catch (error) {
         console.error("Error fetching sections:", error);
@@ -54,11 +55,13 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading: any }) => {
           onSubmit={async (values, { resetForm }) => {
             setLoading(true);
             try {
+              console.log("Creating question with values:", values);
+              console.log("Section ID being sent:", values.sectionId);
               await CreateQuestionData(values);
               resetForm();
               navigate("/assessment-questions");
             } catch (error) {
-              console.error(error);
+              console.error("Error creating question:", error);
               window.location.replace("/error");
             } finally {
               setLoading(false);
@@ -142,30 +145,30 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading: any }) => {
                   </label>
                   <Field
                     as="select"
-                    name="sectionType"
+                    name="sectionId"
                     className={clsx(
                       "form-control form-control-lg form-control-solid",
                       {
                         "is-invalid text-danger":
-                          touched.sectionType && errors.sectionType,
+                          touched.sectionId && errors.sectionId,
                       },
                       {
                         "is-valid":
-                          touched.sectionType && !errors.sectionType,
+                          touched.sectionId && !errors.sectionId,
                       }
                     )}
                   >
                     <option value="">Select Section</option>
                     {sections.map((section) => (
-                      <option key={section.id} value={section.sectionName}>
+                      <option key={section.sectionId} value={section.sectionId}>
                         {section.sectionName}
                       </option>
                     ))}
                   </Field>
-                  {touched.sectionType && errors.sectionType && (
+                  {touched.sectionId && errors.sectionId && (
                     <div className="fv-plugins-message-container">
                       <div className="fv-help-block text-danger">
-                        <span role="alert">{errors.sectionType}</span>
+                        <span role="alert">{errors.sectionId}</span>
                       </div>
                     </div>
                   )}

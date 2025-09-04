@@ -38,8 +38,20 @@ public class QuestionSectionController {
     }
     @PutMapping("/update/{id}")
     public QuestionSection updateQuestionSection(@PathVariable Long id, @RequestBody QuestionSection questionSection) {
+        System.out.println("Updating question section with ID: " + id);
+        System.out.println("Request body: " + questionSection.toString());
+        
+        // Ensure the ID is set correctly
         questionSection.setSectionId(id);
-        return questionSectionRepository.save(questionSection);
+        
+        // Check if the entity exists first
+        if (!questionSectionRepository.existsById(id)) {
+            throw new RuntimeException("Question section with ID " + id + " not found");
+        }
+        
+        QuestionSection updatedSection = questionSectionRepository.save(questionSection);
+        System.out.println("Successfully updated question section: " + updatedSection.toString());
+        return updatedSection;
     }
     @DeleteMapping("/delete/{id}")
     public void deleteQuestionSection(@PathVariable Long id) {

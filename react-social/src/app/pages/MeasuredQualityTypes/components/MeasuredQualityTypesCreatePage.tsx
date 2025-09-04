@@ -1,10 +1,9 @@
 import clsx from "clsx";
-import { Formik, Form, Field } from "formik";
-import { useState, useEffect } from "react";
+import { Field, Form, Formik } from "formik";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
-import { CreateMeasuredQualityTypesData } from "../API/Measured_Quality_Types_APIs";
-import { ReadMeasuredQualityTypesData } from "../API/Measured_Quality_Types_APIs";
+import { CreateMeasuredQualityTypesData, ReadMeasuredQualityTypesData } from "../API/Measured_Quality_Types_APIs";
 
 const validationSchema = Yup.object().shape({
   qualityTypeName: Yup.string().required("Quality Type name is required"),
@@ -12,7 +11,7 @@ const validationSchema = Yup.object().shape({
   qualityTypeDisplayName: Yup.string().required("Quality Type display name is required"),
 });
 
-const MeasuredQualityTypesCreatePage = ({ setPageLoading }: { setPageLoading: any }) => {
+const MeasuredQualityTypesCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const [loading, setLoading] = useState(false);
   const [sections, setSections] = useState<any[]>([]);
   const navigate = useNavigate();

@@ -1,11 +1,11 @@
 import axios from "axios";
 const API_URL = process.env.REACT_APP_API_URL;
 
-const readQuestions = `${API_URL}/api/assessment-questions/getAll`;
-const readQuestionById = `${API_URL}/api/assessment-questions/get/`;
-const createQuestion = `${API_URL}/api/assessment-questions/create`;
-const updateQuestion = `${API_URL}/api/assessment-questions/update`;
-const deleteQuestion = `${API_URL}/api/assessment-questions/delete/`;
+const readQuestions = `${API_URL}/assessment-questions/getAll`;
+const readQuestionById = `${API_URL}/assessment-questions/get/`;
+const createQuestion = `${API_URL}/assessment-questions/create`;
+const updateQuestion = `${API_URL}/assessment-questions/update`;
+const deleteQuestion = `${API_URL}/assessment-questions/delete/`;
 
 export function ReadQuestionsData() {
   return axios.get(readQuestions);
@@ -16,11 +16,43 @@ export function ReadQuestionByIdData(id: any) {
 }
 
 export function CreateQuestionData(values: any) {
-  return axios.post(createQuestion, values);
+  // Transform the data to match backend expectations
+  const requestData = {
+    ...values,
+    section: values.sectionId ? { sectionId: values.sectionId } : null,
+    options: values.questionOptions 
+      ? values.questionOptions
+          .filter((option: string) => option.trim() !== '') // Remove empty options
+          .map((option: string, index: number) => ({
+            optionText: option,
+            isCorrect: index === 0 // For now, make first option correct by default
+          }))
+      : []
+  };
+  delete requestData.sectionId; // Remove the flat sectionId
+  delete requestData.questionOptions; // Remove the original field
+  console.log("Sending to backend:", requestData);
+  return axios.post(createQuestion, requestData);
 }
 
 export function UpdateQuestionData(id: any, values: any) {
-  return axios.put(`${updateQuestion}/${id}`, values);
+  // Transform the data to match backend expectations
+  const requestData = {
+    ...values,
+    section: values.sectionId ? { sectionId: values.sectionId } : null,
+    options: values.questionOptions 
+      ? values.questionOptions
+          .filter((option: string) => option.trim() !== '') // Remove empty options
+          .map((option: string, index: number) => ({
+            optionText: option,
+            isCorrect: index === 0 // For now, make first option correct by default
+          }))
+      : []
+  };
+  delete requestData.sectionId; // Remove the flat sectionId
+  delete requestData.questionOptions; // Remove the original field
+  console.log("Sending update to backend:", requestData);
+  return axios.put(`${updateQuestion}/${id}`, requestData);
 }
 
 export function DeleteQuestionData(id: any) {

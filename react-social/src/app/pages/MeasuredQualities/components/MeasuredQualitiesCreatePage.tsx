@@ -1,10 +1,9 @@
 import clsx from "clsx";
-import { Formik, Form, Field } from "formik";
-import { useState, useEffect } from "react";
+import { Field, Form, Formik } from "formik";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
-import { CreateMeasuredQualitiesData } from "../API/Measured_Qualities_APIs";
-import { ReadMeasuredQualitiesData } from "../API/Measured_Qualities_APIs";
+import { CreateMeasuredQualitiesData, ReadMeasuredQualitiesData } from "../API/Measured_Qualities_APIs";
 
 const validationSchema = Yup.object().shape({
   qualityName: Yup.string().required("Quality name is required"),
@@ -15,7 +14,7 @@ const validationSchema = Yup.object().shape({
 const MeasuredQualitiesCreatePage = ({
   setPageLoading,
 }: {
-  setPageLoading: any;
+  setPageLoading?: any;
 }) => {
   const [loading, setLoading] = useState(false);
   const [sections, setSections] = useState<any[]>([]);

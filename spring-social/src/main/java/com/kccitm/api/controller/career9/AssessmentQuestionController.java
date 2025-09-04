@@ -12,8 +12,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.model.career9.AssessmentQuestionOptions;
 import com.kccitm.api.model.career9.AssessmentQuestions;
+import com.kccitm.api.model.career9.QuestionSection;
 import com.kccitm.api.repository.Career9.AssessmentQuestionRepository;
+import com.kccitm.api.repository.Career9.QuestionSectionRepository;
 
 
 @RestController
@@ -22,6 +25,9 @@ public class AssessmentQuestionController {
 
     @Autowired
     private AssessmentQuestionRepository assessmentQuestionRepository;
+
+    @Autowired
+    private QuestionSectionRepository questionSectionRepository;
 
     @GetMapping("/getAll")
     public List<AssessmentQuestions> getAllAssessmentQuestions() {
@@ -35,12 +41,53 @@ public class AssessmentQuestionController {
 
     @PostMapping("/create")
     public AssessmentQuestions createAssessmentQuestion(@RequestBody AssessmentQuestions assessmentQuestions) {
+        System.out.println("Creating assessment question: " + assessmentQuestions.toString());
+        
+        // Handle section relationship
+        if (assessmentQuestions.getSection() != null && assessmentQuestions.getSection().getSectionId() != null) {
+            QuestionSection section = questionSectionRepository.findById(assessmentQuestions.getSection().getSectionId()).orElse(null);
+            assessmentQuestions.setSection(section);
+        }
+        
+        // Handle options relationship
+        if (assessmentQuestions.getOptions() != null && !assessmentQuestions.getOptions().isEmpty()) {
+            for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
+                option.setQuestion(assessmentQuestions);
+            }
+        }
+        
         return assessmentQuestionRepository.save(assessmentQuestions);
     }
     @PutMapping("/update/{id}")
     public AssessmentQuestions updateAssessmentQuestion(@PathVariable Long id, @RequestBody AssessmentQuestions assessmentQuestions) {
+        System.out.println("Updating assessment question with ID: " + id);
+        System.out.println("Request body: " + assessmentQuestions.toString());
+        
+        // Get existing question to preserve data
+        AssessmentQuestions existingQuestion = assessmentQuestionRepository.findById(id).orElse(null);
+        if (existingQuestion == null) {
+            throw new RuntimeException("Question not found with ID: " + id);
+        }
+        
+        // Set the ID
         assessmentQuestions.setId(id);
-        return assessmentQuestionRepository.save(assessmentQuestions);
+        
+        // Handle section relationship
+        if (assessmentQuestions.getSection() != null && assessmentQuestions.getSection().getSectionId() != null) {
+            QuestionSection section = questionSectionRepository.findById(assessmentQuestions.getSection().getSectionId()).orElse(null);
+            assessmentQuestions.setSection(section);
+        }
+        
+        // Handle options relationship
+        if (assessmentQuestions.getOptions() != null) {
+            for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
+                option.setQuestion(assessmentQuestions);
+            }
+        }
+        
+        AssessmentQuestions updated = assessmentQuestionRepository.save(assessmentQuestions);
+        System.out.println("Successfully updated assessment question: " + updated.toString());
+        return updated;
     }
     @DeleteMapping("/delete/{id}")
     public void deleteAssessmentQuestion(@PathVariable Long id) {

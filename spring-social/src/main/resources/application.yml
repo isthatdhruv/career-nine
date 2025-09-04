@@ -3,7 +3,7 @@ spring:
     active: dev
 
 server:
-  port: 8080
+  port: 8443
   # ssl:
   #   enabled: true
   #   key-store: classpath:keystore.p12
@@ -14,7 +14,7 @@ server:
 spring:
   profiles: dev
   datasource:
-    url: jdbc:mysql://192.168.3.78:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://192.168.0.204:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     username: root
     password: Career-qCsfeuECc3MW
     
@@ -34,7 +34,7 @@ spring:
             clientId: 101961828065-ak601ssij07ugrffovuns8v2adrqvtqd.apps.googleusercontent.com
             clientSecret: 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
             # redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
-            redirectUri: "https://192.168.3.78:8080/oauth2/callback/{registrationId}"
+            redirectUri: "http://192.168.0.204:8443/oauth2/callback/{registrationId}"
 
             scope:
               - email
@@ -71,7 +71,7 @@ app:
     tokenSecret: 04ca023b39512e46d0c2cf4b48d5aac61d34302994c87ed4eff225dcf3b0a218739f3897051a057f9b846a69ea2927a587044164b7bae5e1306219d50b588cb1
     tokenExpirationMsec: 864000000
   cors:
-    allowedOrigins: http://192.168.3.78:3000,http://192.168.3.78:3000,http://localhost:3000,https://localhost:3000,https://localhost:8080,https://192.168.3.78:8080,https://localhost,https://localhost:80,https://staging.student.kccitm.in/,https://student.kccitm.in/,https://erp.aktu.ac.in/,https://leetcode.com
+    allowedOrigins: http://192.168.0.204:3000,http://192.168.0.204:3000,http://localhost:3000,https://localhost:3000,https://localhost:8080,https://192.168.0.204:8080,https://localhost,https://localhost:80,https://staging.student.kccitm.in/,https://student.kccitm.in/,https://erp.aktu.ac.in/,https://leetcode.com,http://192.168.0.204:8443
   oauth2:
   
     # After successfully authenticating with the OAuth2 Provider,
@@ -82,12 +82,12 @@ app:
       - https://student.kccitm.in/oauth2/redirect
       - https://staging.student.kccitm.in/oauth2/redirect
       - https://student.kccitm.in/oauth2/redirect
-      - http://192.168.3.78:3000/oauth2/redirect
+      - http://192.168.0.204:3000/oauth2/redirect
       - myandroidapp://oauth2/redirect
       - http://localhost/oauth2/redirect
       - http://localhost:80/oauth2/redirect
       - myiosapp://oauth2/redirect
-      - http://192.168.3.78:3000
+      - http://192.168.0.204:3000
   mandrill: WXX3fC00pJTZgonjnVvkgQ
   firebase:
     project-id: career-library

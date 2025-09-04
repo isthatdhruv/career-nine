@@ -16,10 +16,10 @@ const Footer: FC = () => {
             {new Date().getFullYear()} &copy;
           </span>
           <a
-            href="https://www.kccitm.edu.in/"
+            href="https://career-9.com/"
             className="text-gray-800 text-hover-primary"
           >
-            KCC Institute of Technology & Management
+            Career9
           </a>
         </div>
         {/* end::Copyright */}

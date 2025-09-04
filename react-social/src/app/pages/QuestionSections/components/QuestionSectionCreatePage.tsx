@@ -2,7 +2,7 @@ import clsx from "clsx";
 import { useFormik } from "formik";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import * as Yup from "yup"; 
+import * as Yup from "yup";
 import { CreateQuestionSectionData } from "../API/Question_Section_APIs";
 
 const validationSchema = Yup.object().shape({
@@ -10,7 +10,7 @@ const validationSchema = Yup.object().shape({
   sectionDescription: Yup.string().required("Section description is required"),
 });
 
-const QuestionSectionCreatePage = ({ setPageLoading }: { setPageLoading: any }) => {
+const QuestionSectionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 

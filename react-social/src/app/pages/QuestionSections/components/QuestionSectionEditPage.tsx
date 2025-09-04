@@ -1,11 +1,11 @@
 import clsx from "clsx";
 import { useFormik } from "formik";
-import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
-import { UpdateQuestionSectionData } from "../API/Question_Section_APIs";
+import { ReadQuestionSectionByIdData, UpdateQuestionSectionData } from "../API/Question_Section_APIs";
 
 const validationSchema = Yup.object().shape({
   sectionName: Yup.string().required("Section name is required"),
@@ -16,41 +16,90 @@ const QuestionSectionEditPage = (props?: {
   setPageLoading?: any;
 }) => {
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
-  const location = useLocation();
-  
- 
-  const questionSectionData = (location.state as any)?.data || {
+  const [questionSectionData, setQuestionSectionData] = useState<any>({
     sectionName: "",
     sectionDescription: "",
-    id: "",
-  };
+    sectionId: "",
+  });
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { id } = useParams<{ id: string }>();
+
+  // Fetch question section data when component mounts
+  useEffect(() => {
+    const fetchQuestionSection = async () => {
+      if (id) {
+        try {
+          setLoading(true);
+          const response = await ReadQuestionSectionByIdData(id);
+          setQuestionSectionData(response.data);
+        } catch (error) {
+          console.error("Error fetching question section:", error);
+          // Try to get data from location state as fallback
+          const locationData = (location.state as any)?.data;
+          if (locationData) {
+            setQuestionSectionData(locationData);
+          }
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        // Fallback to location state if no ID in URL
+        const locationData = (location.state as any)?.data;
+        if (locationData) {
+          setQuestionSectionData(locationData);
+        }
+      }
+    };
+
+    fetchQuestionSection();
+  }, [id, location.state]);
 
   const initialValues: any = {
-    id: questionSectionData.id,
-    sectionName: questionSectionData.sectionName,
-    sectionDescription: questionSectionData.sectionDescription,
+    sectionId: questionSectionData.sectionId || id,
+    sectionName: questionSectionData.sectionName || "",
+    sectionDescription: questionSectionData.sectionDescription || "",
   };
 
   const formik = useFormik({
     enableReinitialize: true,
     initialValues,
     validationSchema: validationSchema,
-    onSubmit: (values) => {
+    onSubmit: async (values) => {
       try {
-        UpdateQuestionSectionData(values).then(() => {
-          navigate(-1);
-          if (props?.setPageLoading) {
-            props.setPageLoading(["true"]);
-          }
-        });
+        setLoading(true);
+        // Ensure sectionId is properly set
+        const updateData = {
+          ...values,
+          sectionId: values.sectionId || id
+        };
+        console.log("Updating question section with values:", updateData);
+        await UpdateQuestionSectionData(updateData);
+        navigate("/question-sections"); // Navigate to question sections list
+        if (props?.setPageLoading) {
+          props.setPageLoading(["true"]);
+        }
       } catch (error) {
-        console.error(error);
+        console.error("Error updating question section:", error);
         window.location.replace("/error");
+      } finally {
+        setLoading(false);
       }
-      setLoading(true);
     },
   });
+
+  if (loading) {
+    return (
+      <div className="container py-5">
+        <div className="text-center">
+          <div className="spinner-border" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="mt-2">Loading question section...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container py-5">

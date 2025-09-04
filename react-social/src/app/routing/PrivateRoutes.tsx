@@ -283,7 +283,7 @@ const PrivateRoutes = () => {
           path="/question-sections"
           element={
             <SuspensedView>
-              <QuestionSectionPage />
+              <QuestionSectionPage/>
             </SuspensedView>
           }
         />
@@ -291,7 +291,7 @@ const PrivateRoutes = () => {
           path="/question-sections/create"
           element={
             <SuspensedView>
-              <QuestionSectionCreatePage setPageLoading={undefined} />
+              <QuestionSectionCreatePage />
             </SuspensedView>
           }
         />
@@ -299,7 +299,7 @@ const PrivateRoutes = () => {
           path="/question-sections/edit/:id"
           element={
             <SuspensedView>
-              <QuestionSectionEditPage setPageLoading={undefined} />
+              <QuestionSectionEditPage />
             </SuspensedView>
           }
         />
@@ -323,7 +323,7 @@ const PrivateRoutes = () => {
           path="/assessment-questions/create"
           element={
             <SuspensedView>
-              <QuestionCreatePage setPageLoading={undefined} />
+              <QuestionCreatePage />
             </SuspensedView>
           }
         />
@@ -331,7 +331,7 @@ const PrivateRoutes = () => {
           path="/assessment-questions/edit/:id"
           element={
             <SuspensedView>
-              <QuestionEditPage setPageLoading={undefined} />
+              <QuestionEditPage />
             </SuspensedView>
           }
         />
@@ -348,7 +348,7 @@ const PrivateRoutes = () => {
           path="/tools/create"
           element={
             <SuspensedView>
-              <ToolCreatePage setPageLoading={undefined} />
+              <ToolCreatePage />
             </SuspensedView>
           }
         />
@@ -356,7 +356,7 @@ const PrivateRoutes = () => {
           path="/tools/edit/:id"
           element={
             <SuspensedView>
-              <ToolEditPage setPageLoading={undefined} />
+              <ToolEditPage />
             </SuspensedView>
           }
         />
@@ -373,7 +373,7 @@ const PrivateRoutes = () => {
           path="/measured-qualities/create"
           element={
             <SuspensedView>
-              <MeasuredQualitiesCreatePage setPageLoading={undefined} />
+              <MeasuredQualitiesCreatePage />
             </SuspensedView>
           }
         />
@@ -381,7 +381,7 @@ const PrivateRoutes = () => {
           path="/measured-qualities/edit/:id"
           element={
             <SuspensedView>
-              <MeasuredQualitiesEditPage setPageLoading={undefined} />
+              <MeasuredQualitiesEditPage />
             </SuspensedView>
           }
         />
@@ -398,7 +398,7 @@ const PrivateRoutes = () => {
           path="/measured-quality-types/create"
           element={
             <SuspensedView>
-              <MeasuredQualityTypesCreatePage setPageLoading={undefined} />
+              <MeasuredQualityTypesCreatePage />
             </SuspensedView>
           }
         />
@@ -406,7 +406,7 @@ const PrivateRoutes = () => {
           path="/measured-quality-types/edit/:id"
           element={
             <SuspensedView>
-              <MeasuredQualityTypesEditPage setPageLoading={undefined} />
+              <MeasuredQualityTypesEditPage />
             </SuspensedView>
           }
         />
@@ -517,7 +517,3 @@ const SuspensedView: FC<WithChildren> = ({ children }) => {
 };
 
 export { PrivateRoutes };
-
-function setAutorized(arg0: boolean) {
-  throw new Error("Function not implemented.");
-}

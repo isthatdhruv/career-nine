@@ -16,11 +16,23 @@ export function ReadToolByIdData(id: any) {
 }
 
 export function CreateToolData(values: any) {
-  return axios.post(createTool, values);
+  const isFree = values.toolPrice === "FREE";
+  const toolData = {
+    name: values.toolName,
+    price: isFree ? 0.0 : parseFloat(values.priceAmount),
+    isFree: isFree
+  };
+  return axios.post(createTool, toolData);
 }
 
 export function UpdateToolData(id: any, values: any) {
-  return axios.put(`${updateTool}/${id}`, values);
+  const isFree = values.toolPrice === "FREE";
+  const toolData = {
+    name: values.toolName,
+    price: isFree ? 0.0 : parseFloat(values.priceAmount),
+    isFree: isFree
+  };
+  return axios.put(`${updateTool}/${id}`, toolData);
 }
 
 export function DeleteToolData(id: any) {

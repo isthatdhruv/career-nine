@@ -16,6 +16,9 @@ import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+
 @Entity
 @Table(name = "assessment_questions")
 public class AssessmentQuestions implements Serializable {
@@ -30,6 +33,7 @@ public class AssessmentQuestions implements Serializable {
 
     // 1 Question to Many Options
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
     private List<AssessmentQuestionOptions> options;
 
     @ManyToMany
@@ -43,6 +47,7 @@ public class AssessmentQuestions implements Serializable {
     // NEW: Link Question -> Section
     @ManyToOne
     @JoinColumn(name = "section_id")   // FK in questions table
+    @JsonBackReference
     private QuestionSection section;
 
     // --- getters and setters ---
@@ -94,7 +99,22 @@ public class AssessmentQuestions implements Serializable {
         this.section = section;
     }
 
+    // For compatibility with frontend
+    public Long getId() {
+        return question_id;
+    }
+
     public void setId(Long id) {
-        throw new UnsupportedOperationException("Unimplemented method 'setId'");
+        this.question_id = id;
+    }
+
+    @Override
+    public String toString() {
+        return "AssessmentQuestions{" +
+                "question_id=" + question_id +
+                ", questionText='" + questionText + '\'' +
+                ", questionType='" + questionType + '\'' +
+                ", section=" + (section != null ? section.getSectionId() : null) +
+                '}';
     }
 }

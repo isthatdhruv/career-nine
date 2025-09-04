@@ -1,11 +1,11 @@
 import axios from "axios";
 const API_URL = process.env.REACT_APP_API_URL;
 
-const readMeasuredQualities = `${API_URL}/api/measured-qualities/getAll`;
-const readMeasuredQualitiesById = `${API_URL}/api/measured-qualities/get/`;
-const createMeasuredQualities = `${API_URL}/api/measured-qualities/create`;
-const updateMeasuredQualities = `${API_URL}/api/measured-qualities/update`;
-const deleteMeasuredQualities = `${API_URL}/api/measured-qualities/delete/`;
+const readMeasuredQualities = `${API_URL}/measured-qualities/getAll`;
+const readMeasuredQualitiesById = `${API_URL}/measured-qualities/get/`;
+const createMeasuredQualities = `${API_URL}/measured-qualities/create`;
+const updateMeasuredQualities = `${API_URL}/measured-qualities/update`;
+const deleteMeasuredQualities = `${API_URL}/measured-qualities/delete/`;
 
 export function ReadMeasuredQualitiesData() {
   return axios.get(readMeasuredQualities);

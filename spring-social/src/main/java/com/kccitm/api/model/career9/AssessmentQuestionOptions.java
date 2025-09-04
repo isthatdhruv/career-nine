@@ -1,5 +1,6 @@
 package com.kccitm.api.model.career9;
 import java.io.Serializable;
+
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
@@ -7,6 +8,8 @@ import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
+
+import com.fasterxml.jackson.annotation.JsonBackReference;
 
 @Entity
 @Table(name = "assessment_question_options")
@@ -22,6 +25,7 @@ public class AssessmentQuestionOptions implements Serializable {
 
     @ManyToOne
     @JoinColumn(name = "fk_assessment_questions", nullable = false)
+    @JsonBackReference
     private AssessmentQuestions question;
 
     // Getters and Setters

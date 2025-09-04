@@ -3,6 +3,7 @@ import java.io.Serializable;
 import java.util.HashSet;
 import java.util.Set;
 
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
@@ -14,15 +15,22 @@ import javax.persistence.Table;
 
 @Entity
 @Table(name = "tools")
-// @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Tool implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "tool_id")
     private Long tool_id;
+    
+    @Column(name = "name")
     private String name;
+    
+    @Column(name = "price")
     private Double price;
+    
+    @Column(name = "is_free")
+    private boolean isFree;
 
     // Many-to-Many relationship with MeasuredQualities
     @ManyToMany
@@ -57,6 +65,14 @@ public class Tool implements Serializable {
 
     public void setPrice(Double price) {
         this.price = price;
+    }
+
+    public boolean isFree() {
+        return isFree;
+    }
+    
+    public void setFree(boolean isFree) {
+        this.isFree = isFree;
     }
 
 }
