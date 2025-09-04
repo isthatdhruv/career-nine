@@ -72,10 +72,9 @@ const MeasuredQualitiesCreatePage = ({
                     Quality Name :
                   </label>
                   <Field
-                    as="textarea"
+                    as="input"
                     name="qualityName"
                     placeholder="Enter Quality Name"
-                    rows={4}
                     className={clsx(
                       "form-control form-control-lg form-control-solid",
                       {
@@ -134,10 +133,9 @@ const MeasuredQualitiesCreatePage = ({
                     Display Name :
                   </label>
                   <Field
-                    as="textarea"
+                    as="input"
                     name="displayName"
                     placeholder="Enter Display Name"
-                    rows={4}
                     className={clsx(
                       "form-control form-control-lg form-control-solid",
                       {
