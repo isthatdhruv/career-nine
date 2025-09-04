@@ -7,5 +7,7 @@ import com.kccitm.api.model.career9.Tool;
 
 @Repository
 public interface ToolRepository extends JpaRepository<Tool, Long> {
+
+    
     // JpaRepository already provides findAll(), findById(), save(), deleteById(), etc.
 }
