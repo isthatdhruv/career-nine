@@ -14,9 +14,6 @@ import { AuthRedirectPage } from "../../app/pages/authRedirectPage";
 import { App } from "../App";
 import { Logout, useAuth } from "../modules/auth";
 import { ErrorsPage } from "../modules/errors/ErrorsPage";
-import CompilerPage from "../pages/Compiler/compiler";
-import CompilerListQuestion from "../pages/Compiler/compilerListQuestion";
-import CompilerPage_Student from "../pages/Compiler_Student/compiler";
 import FacultyRegistrationForm from "../pages/FacultyRegistration/FacultyRegistrationForm";
 import StudentDetailPage from "../pages/StudentRegistration/StudentRegistrationForm";
 import { ThankYouPage } from "../pages/StudentRegistration/ThankYou";
@@ -57,12 +54,7 @@ const AppRoutes: FC = () => {
           <Route path="/student-details" element={<StudentDetailPage />} />
           <Route path="/oauth2/redirect" element={<AuthRedirectPage />} />
           <Route path="error/*" element={<ErrorsPage />} />
-          <Route path="compiler/*" element={<CompilerPage />} />
-          <Route path="compiler_student/*" element={<CompilerPage_Student />} />
-          <Route
-            path="compiler/list/questions"
-            element={<CompilerListQuestion />}
-          />
+          
           {/* <Route path="compiler/compiler-edit" element={<CompilerPageEdit />} /> */}
           <Route
             path="/thankyou"

@@ -9,8 +9,10 @@ import com.kccitm.api.model.career9.QuestionSection;
 @Repository
 public interface QuestionSectionRepository extends JpaRepository<QuestionSection, Long> {
     // Repository methods for QuestionSection entity
+    @Override
     public List<QuestionSection> findAll();
 
+    @Override
     public QuestionSection getOne(Long id);
 
 }

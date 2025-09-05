@@ -16,7 +16,7 @@ const ToolTable = (props: {
     columns: [
       {
         label: "Tool Name",
-        field: "toolName",
+        field: "name",
         width: 300,
         attributes: {
           "aria-controls": "DataTable",
@@ -25,7 +25,7 @@ const ToolTable = (props: {
       },
       {
         label: "Tool Price",
-        field: "toolPrice",
+        field: "price",
         sort: "asc",
         width: 150,
       },
@@ -44,8 +44,8 @@ const ToolTable = (props: {
     ],
 
     rows: props.data.map((data: any) => ({
-      toolName: data.name,
-      toolPrice: data.price,
+      name: data.name,
+      price: data.price,
       type: data.price==0?"Free" : "Paid",
       actions: (
         <>
