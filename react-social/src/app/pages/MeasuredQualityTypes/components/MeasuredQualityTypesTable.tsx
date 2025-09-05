@@ -16,7 +16,7 @@ const MeasuredQualityTypesTable = (props: {
     columns: [
       {
         label: "Quality Type Name",
-        field: "qualityTypeName",
+        field: "measuredQualityTypeName",
         width: 300,
         attributes: {
           "aria-controls": "DataTable",
@@ -25,13 +25,13 @@ const MeasuredQualityTypesTable = (props: {
       },
       {
         label: "Quality Type Description",
-        field: "qualityTypeDescription",
+        field: "measuredQualityTypeDescription",
         sort: "asc",
         width: 150,
       },
       {
         label: "Quality Type Display Name",
-        field: "qualityTypeDisplayName",
+        field: "measuredQualityTypeDisplayName",
         sort: "asc",
         width: 150,
       },
@@ -44,14 +44,14 @@ const MeasuredQualityTypesTable = (props: {
     ],
 
     rows: props.data.map((data: any) => ({
-      qualityTypeName: data.qualityTypeName,
-      qualityTypeDescription: data.qualityTypeDescription,
-      qualityTypeDisplayName: data.qualityTypeDisplayName,
+      measuredQualityTypeName: data.measuredQualityTypeName,
+      measuredQualityTypeDescription: data.measuredQualityTypeDescription,
+      measuredQualityTypeDisplayName: data.measuredQualityTypeDisplayName,
       actions: (
         <>
           <button
             onClick={() => {
-              navigate(`/measured-quality-types/edit/${data.id}`, {
+              navigate(`/measured-quality-types/edit/${data.measuredQualityTypeId}`, {
                 state: { data },
               });
             }}
@@ -63,7 +63,7 @@ const MeasuredQualityTypesTable = (props: {
             onClick={async () => { 
               props.setLoading(true);
               try {
-                await DeleteMeasuredQualityTypesData(data.id);
+                await DeleteMeasuredQualityTypesData(data.measuredQualityTypeId);
                 props.setPageLoading(["true"]);
               } catch (error) {
                 console.error("Delete failed:", error);
