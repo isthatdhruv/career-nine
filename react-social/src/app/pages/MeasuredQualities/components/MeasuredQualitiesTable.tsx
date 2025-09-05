@@ -1,13 +1,11 @@
+import { Checkbox, FormControl, InputLabel, ListItemText, MenuItem, OutlinedInput, Select } from "@mui/material";
 import { MDBDataTableV5 } from "mdbreact";
-import { AiFillAppstore, AiFillEdit, AiFillPlusSquare } from "react-icons/ai";
+import { useEffect, useState } from "react";
+import { AiFillEdit } from "react-icons/ai";
 import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
-import { DeleteMeasuredQualitiesData } from "../API/Measured_Qualities_APIs";
-import { GiTrafficLightsGreen } from "react-icons/gi";
-import { useState } from "react";
-import MeasuredQualitiesModal from "./MeasuredQualitiesModal";
-import { Select, MenuItem, InputLabel, FormControl, Checkbox, ListItemText, OutlinedInput } from "@mui/material";
+import { DeleteMeasuredQualitiesData, ReadToolsData } from "../API/Measured_Qualities_APIs";
 
 const MeasuredQualitiesTable = (props: {
   data: any;
@@ -17,23 +15,32 @@ const MeasuredQualitiesTable = (props: {
   const navigate = useNavigate();
   const [modalShow, setModalShow] = useState(false);
   const [modalData, setModalData] = useState<any>(null);
-  const [selectedCities, setSelectedCities] = useState<string[]>([]);
-  const cities = [
-    { name: 'New York', code: 'NY' },
-    { name: 'Rome', code: 'RM' },
-    { name: 'London', code: 'LDN' },
-    { name: 'Istanbul', code: 'IST' },
-    { name: 'Paris', code: 'PRS' }
-  ];
+  const [selectedTools, setSelectedTools] = useState<any[]>([]);
+  const [tools, setTools] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchTools = async () => {
+      try {
+        const response = await ReadToolsData();
+        setTools(response.data);
+      } catch (error) {
+        console.error("Error fetching tools:", error);
+      }
+    };
+    fetchTools();
+  }, []);
+  
+  
   const datatable = {
     columns: [
       {
         label: "Quality Name",
         field: "measuredQualityName",
-        width: 300,
+        width: 200,
         attributes: {
           "aria-controls": "DataTable",
           "aria-label": "Quality Name",
+          className: "text-center",
         },
       },
       {
@@ -41,33 +48,45 @@ const MeasuredQualitiesTable = (props: {
         field: "measuredQualityDescription",
         sort: "asc",
         width: 150,
+        attributes: {
+          className: "text-center",
+        },
       },
       {
         label: "Display Name",
         field: "qualityDisplayName",
         sort: "asc",
         width: 150,
+        attributes: {
+          className: "text-center",
+        },
       },
       {
         label: "Actions",
         field: "actions",
         sort: "disabled",
         width: 150,
+        attributes: {
+          className: "text-center",
+        },
       },
       {
         label: "Tools",
         field: "Tools",
         sort: "disabled",
         width: 150,
+        attributes: {
+          className: "text-center",
+        },
       },
     ],
 
     rows: props.data.map((data: any) => ({
-      measuredQualityName: data.measuredQualityName,
-      measuredQualityDescription: data.measuredQualityDescription,
-      qualityDisplayName: data.qualityDisplayName,
+      measuredQualityName: <div className="text-center">{data.measuredQualityName}</div>,
+      measuredQualityDescription: <div className="text-center">{data.measuredQualityDescription}</div>,
+      qualityDisplayName: <div className="text-center">{data.qualityDisplayName}</div>,
       actions: (
-        <>
+        <div className="text-center">
           <button
             onClick={() => {
               navigate(`/measured-qualities/edit/${data.measuredQualityId}`, {
@@ -100,36 +119,29 @@ const MeasuredQualitiesTable = (props: {
               strokeColor={"#EFF8FE"}
             />
           </button>
-          <button
-            onClick={() => {
-              setModalData(data);
-              setModalShow(true);
-            }}
-            className="btn btn-icon btn-success btn-sm me-3"
-          >
-            <AiFillAppstore size={16} />
-          </button>
-        </>
+        </div>
       ),
       Tools: (
-        <FormControl sx={{ m: 1, width: 200 }} size="small">
-          <InputLabel id="multi-select-cities-label">Select Cities</InputLabel>
-          <Select
-            labelId="multi-select-cities-label"
-            multiple
-            value={selectedCities}
-            onChange={e => setSelectedCities(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value)}
-            input={<OutlinedInput label="Select Cities" />}
-            renderValue={(selected) => (selected as string[]).map(code => cities.find(c => c.code === code)?.name).join(', ')}
-          >
-            {cities.map((city) => (
-              <MenuItem key={city.code} value={city.code}>
-                <Checkbox checked={selectedCities.indexOf(city.code) > -1} />
-                <ListItemText primary={city.name} />
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <div className="text-center">
+          <FormControl sx={{ m: 1, width: 200 }} size="small">
+            <InputLabel id={`multi-select-tools-label-${data.measuredQualityId}`}>Select Tools</InputLabel>
+            <Select
+              labelId={`multi-select-tools-label-${""}`}
+              multiple
+              value={selectedTools}
+              onChange={e => setSelectedTools(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value)}
+              input={<OutlinedInput label="Select Tools" />}
+              renderValue={(selected) => (selected as any[]).map(toolId => tools.find(t => t.toolId === toolId)?.name).join(', ')}
+            >
+              {tools.map((tool) => (
+                <MenuItem key={tool.toolId} value={tool.toolId}>
+                  <Checkbox checked={selectedTools.includes(tool.toolId)} />
+                  <ListItemText primary={tool.name} />
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </div>
       )
     })),
   };

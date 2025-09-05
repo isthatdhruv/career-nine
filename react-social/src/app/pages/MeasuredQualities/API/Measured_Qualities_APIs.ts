@@ -6,7 +6,11 @@ const readMeasuredQualitiesById = `${API_URL}/measured-qualities/get/`;
 const createMeasuredQualities = `${API_URL}/measured-qualities/create`;
 const updateMeasuredQualities = `${API_URL}/measured-qualities/update`;
 const deleteMeasuredQualities = `${API_URL}/measured-qualities/delete/`;
+const readTools = `${API_URL}/tools/getAll`;
 
+export function ReadToolsData() {
+  return axios.get(readTools);
+}
 export function ReadMeasuredQualitiesData() {
   return axios.get(readMeasuredQualities);
 }
