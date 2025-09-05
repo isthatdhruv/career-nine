@@ -33,7 +33,7 @@ const MeasuredQualitiesCreatePage = ({
   return (
     <div className="container py-5">
       <div className="card shadow-sm py-5">
-        <div className="card-header">
+        <div className="card-header justify-content-between align-items-center d-flex">
           <h1 className="mb-0">Add Measured Qualities</h1>
         </div>
 
