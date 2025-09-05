@@ -30,6 +30,7 @@ const MeasuredQualitiesPage = () => {
         setLoading(true);
         try {
           const response = await ReadMeasuredQualitiesData();
+          console.log(response.data);
           setSections(response.data);
         } catch (error) {
           console.error("Error fetching sections:", error);

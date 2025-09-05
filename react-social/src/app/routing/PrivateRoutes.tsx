@@ -64,7 +64,7 @@ const PrivateRoutes = () => {
   // const Compiler = lazy(() => import("../pages/Compiler/compiler"));
 
   const MeasuredQualityTypes = lazy(() => import("../pages/MeasuredQualityTypes/CreateMeasuredQualityTypes"));
-  const MeasuredQualities = lazy(() => import("../pages/MeasuredQualities/CreateMeasuredQualities"));
+  const MeasuredQualities = lazy(() => import("../pages/MeasuredQualities/MeasuredQualities"));
   const Tools = lazy(() => import("../pages/Tool/CreateTool"));
   const College = lazy(() => import("../pages/College/CollegePage"));
   // Update the import path below to the correct location if the file exists elsewhere
