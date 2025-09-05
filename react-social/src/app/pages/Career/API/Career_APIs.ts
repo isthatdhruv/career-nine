@@ -1,10 +1,11 @@
 import axios from "axios";
-const API_URL = process.env.REACT_APP_API_URL ;
+const API_URL = process.env.REACT_APP_API_URL;
 
-const readCareer = `${API_URL}/Career/get`;
-const readCareerById = `${API_URL}/Career/getbyid/`;
-const updateCareer = `${API_URL}/Career/update`;
-const deleteCareer = `${API_URL}/Career/delete/`;
+const readCareer = `${API_URL}/career/getAll`;
+const readCareerById = `${API_URL}/career/get/`;
+const createCareer = `${API_URL}/career/create`;
+const updateCareer = `${API_URL}/career/update`;
+const deleteCareer = `${API_URL}/career/delete/`;
 
 export function ReadCareerData() {
   return axios.get(readCareer);
@@ -14,12 +15,14 @@ export function ReadCareerByIdData(id: any) {
   return axios.get(readCareerById + id);
 }
 
-export function UpdateCareerData(values: any) {
-  return axios.post(updateCareer, {
-    values,
-  });
+export function CreateCareerData(values: any) {
+  return axios.post(createCareer, values);
+}
+
+export function UpdateCareerData(id: any, values: any) {
+  return axios.put(`${updateCareer}/${id}`, values);
 }
 
 export function DeleteCareerData(id: any) {
-  return axios.get(deleteCareer + id);
+  return axios.delete(deleteCareer + id);
 }

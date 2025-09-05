@@ -20,8 +20,6 @@ import ToolCreatePage from "../pages/Tool/components/ToolCreatePage";
 import CareerPage from "../pages/Career/CareerPage";
 import CareerCreatePage from "../pages/Career/components/CareerCreatePage";
 import CareerEditPage from "../pages/Career/components/CareerEditPage";
-// import CareerPage from "../pages/Career/CareerPage";
-// import CareerRoutes from "./CareerRoutes";
 // Update these paths to the correct locations of your components
 
 
@@ -78,6 +76,10 @@ const PrivateRoutes = () => {
   const AssessmentQuestions = lazy(() => import("../pages/AssesmentQuestions/CreateQuestion"));
   const QuestionCreatePage = lazy(() => import("../pages/AssesmentQuestions/components/QuestionCreatePage"));
   const QuestionEditPage = lazy(() => import("../pages/AssesmentQuestions/components/QuestionEditPage"));
+  
+  const CareerCreatePage = lazy(() => import("../pages/Career/components/CareerCreatePage"));
+  const CareerEditPage = lazy(() => import("../pages/Career/components/CareerEditPage"));
+
   const Board = lazy(() => import("../pages/Board/BoardPage"));
   const Section = lazy(() => import("../pages/Section/SectionPage"));
   const Course = lazy(() => import("../pages/Course/CoursePage"));
@@ -153,8 +155,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
-        
         {/* <Route
           path="pdf"
           element={
@@ -310,17 +310,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-        {/* <Route
-          path="/college/edit/:id"
-          element={
-            <SuspensedView>
-              <CollegeEditPage  />
-            </SuspensedView>
-          }
-        /> */}
-
-        
-        {/* Career Routes */}
         <Route
           path="/careers"
           element={
@@ -345,6 +334,14 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
+        {/* <Route
+          path="/college/edit/:id"
+          element={
+            <SuspensedView>
+              <CollegeEditPage  />
+            </SuspensedView>
+          }
+        /> */}
         <Route
           path="/assessment-questions"
           element={
@@ -353,8 +350,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
-        
         <Route
           path="/assessment-questions/create"
           element={

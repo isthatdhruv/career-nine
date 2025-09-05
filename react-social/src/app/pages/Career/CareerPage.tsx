@@ -1,29 +1,53 @@
 import { useEffect, useState } from "react";
 import { Button } from "react-bootstrap";
 import { IconContext } from "react-icons";
-import { MdSchool } from "react-icons/md";
+import { MdQuestionAnswer } from "react-icons/md";
+import { useNavigate } from "react-router-dom";
 import { ReadCareerData } from "./API/Career_APIs";
-import CareerCreateModal from "./components/CareerCreateModal";
-import CareerTable from "./components/CareerTable";
+import { CareerTable } from "./components";
 
 const CareerPage = () => {
-  const [modalShowCreate, setModalShowCreate] = useState(false);
   const [careerData, setCareerData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [sections, setSections] = useState<any[]>([]); 
   const [pageLoading, setPageLoading] = useState(["false"]);
+  const navigate = useNavigate();
 
-  useEffect(() => {
+  const fetchCareerData = async () => {
     setLoading(true);
     try {
-      ReadCareerData().then((data) => {
-        setCareerData(data.data);
-        setLoading(false);
-      });
+      const response = await ReadCareerData();
+      setCareerData(response.data);
     } catch (error) {
-      console.error(error);
-      // window.location.replace("/error");
+      console.error("Failed to fetch career data:", error);
+    } finally {
+      setLoading(false);
     }
-  }, [pageLoading]);
+  };
+
+  useEffect(() => {
+      const fetchSections = async () => {
+        setLoading(true);
+        try {
+          const response = await ReadCareerData();
+          setSections(response.data);
+        } catch (error) {
+          console.error("Error fetching sections:", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchSections();
+    }, []);
+
+  useEffect(() => {
+    fetchCareerData();
+
+    if (pageLoading[0] === "true") {
+      setPageLoading(["false"]);
+    }
+  }, [pageLoading[0]]); 
+
 
   return (
     <div className="card">
@@ -37,7 +61,7 @@ const CareerPage = () => {
       {!loading && (
         <div className="card-header border-0 pt-6">
           <div className="card-title">
-            <h1>Careers List</h1>
+            <h1>Career</h1>
           </div>
 
           <div className="card-toolbar">
@@ -45,14 +69,14 @@ const CareerPage = () => {
               <Button
                 variant="primary"
                 onClick={() => {
-                  setModalShowCreate(true);
+                  navigate("/careers/create");
                 }}
               >
                 <IconContext.Provider
                   value={{ style: { paddingBottom: "4px" } }}
                 >
                   <div>
-                    Add Career <MdSchool size={21} />
+                    Add Career <MdQuestionAnswer size={21} />
                   </div>
                 </IconContext.Provider>
               </Button>
@@ -70,12 +94,6 @@ const CareerPage = () => {
           />
         </div>
       )}
-
-      <CareerCreateModal
-        setPageLoading={setPageLoading}
-        show={modalShowCreate}
-        onHide={() => setModalShowCreate(false)}
-      />
     </div>
   );
 };

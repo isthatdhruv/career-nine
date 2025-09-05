@@ -1,105 +1,89 @@
 import { MDBDataTableV5 } from "mdbreact";
-import { useState } from "react";
 import { AiFillEdit } from "react-icons/ai";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { DeleteCareerData } from "../API/Career_APIs";
-import CareerEditModal from "./CareerEditModal";
 
 const CareerTable = (props: {
   data: any;
   setLoading: any;
   setPageLoading: any;
 }) => {
-  const [modalShowEdit, setModalShowEdit] = useState(false);
-  const [editModalData, setEditModalData] = useState({
-    careerName: "",
-    careerAddress: "",
-    careerCode: "",
-  });
+  const navigate = useNavigate();
 
   const datatable = {
     columns: [
       {
-        label: "Name",
-        field: "name",
-        width: 150,
+        label: "Career Name",
+        field: "careerName",
+        width: 300,
         attributes: {
           "aria-controls": "DataTable",
-          "aria-label": "Name",
+          "aria-label": "Career",
         },
       },
       {
-        label: "Code",
-        field: "code",
+        label: "Career Description",
+        field: "careerDescription",
         sort: "asc",
-        width: 100,
+        width: 150,
       },
-      {
-        label: "Address",
-        field: "address",
-        width: 100,
-      },
+      // {
+      //   label: "Display Name",
+      //   field: "displayName",
+      //   sort: "asc",
+      //   width: 150,
+      // },
       {
         label: "Actions",
         field: "actions",
         sort: "disabled",
-        width: 100,
+        width: 150,
       },
     ],
 
-    rows: props.data.map((data: any) =>
-      data.display === true
-        ? {
-            name: data.careerName,
-            code: data.careerCode,
-            address: data.careerAddress,
-            actions: (
-              <>
-                <button
-                  onClick={() => {
-                    setEditModalData(data);
-                    setModalShowEdit(true);
-                  }}
-                  className="btn btn-icon btn-primary btn-sm me-3"
-                >
-                  <AiFillEdit size={16} />
-                </button>
-
-                <button
-                  onClick={() => {
-                    props.setLoading(true);
-                    DeleteCareerData(data.careerCode).then(() => {
-                      props.setPageLoading(["true"]);
-                    });
-                  }}
-                  className="btn btn-icon btn-danger btn-sm me-3"
-                >
-                  <UseAnimations
-                    animation={trash}
-                    size={22}
-                    strokeColor={"#EFF8FE"}
-                  />
-                </button>
-
-                <Link
-                  to="/course"
-                  state={{
-                    careerId: data.careerCode,
-                    career: data.careerName,
-                  }}
-                  className="btn btn-sm btn-info"
-                >
-                  Add Career
-                </Link>
-              </>
-            ),
-          }
-        : {}
-    ),
+    rows: props.data.map((data: any) => ({
+      careerName: data.careerName,
+      careerDescription: data.careerDescription,
+      actions: (
+        <>
+          <button
+            onClick={() => {
+              navigate(`/careers/edit/${data.id}`, {
+                state: { data },
+              });
+            }}
+            className="btn btn-icon btn-primary btn-sm me-3"
+          >
+            <AiFillEdit size={16} />
+          </button>
+          <button
+            onClick={async () => { 
+              props.setLoading(true);
+              try {
+                await DeleteCareerData(data.id);
+                props.setPageLoading(["true"]);
+              } catch (error) {
+                console.error("Delete failed:", error);
+                alert("Failed to delete measured quality. Please try again.");
+              } finally {
+                props.setLoading(false);
+              }
+            }}
+            className="btn btn-icon btn-danger btn-sm me-3"
+          >
+            <UseAnimations
+              animation={trash}
+              size={22}
+              strokeColor={"#EFF8FE"}
+            />
+          </button>
+        </>
+      ),
+    })),
   };
-
+  
   return (
     <>
       <MDBDataTableV5
@@ -110,12 +94,6 @@ const CareerTable = (props: {
         entries={25}
         pagesAmount={4}
         data={datatable}
-      />
-      <CareerEditModal
-        show={modalShowEdit}
-        onHide={() => setModalShowEdit(false)}
-        data={editModalData}
-        setPageLoading={props.setPageLoading}
       />
     </>
   );
