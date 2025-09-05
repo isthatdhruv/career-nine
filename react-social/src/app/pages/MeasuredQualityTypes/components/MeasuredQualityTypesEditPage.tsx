@@ -9,9 +9,9 @@ import { ReadMeasuredQualityTypesData, UpdateMeasuredQualityTypesData } from "..
 
 
 const validationSchema = Yup.object().shape({
-  qualityTypeName: Yup.string().required("Quality Type name is required"),
-  qualityTypeDescription: Yup.string().required("Quality Type description is required"),
-  qualityTypeDisplayName: Yup.string().required("Quality Type display name is required"),
+  measuredQualityTypeName: Yup.string().required("Quality Type name is required"),
+  measuredQualityTypeDescription: Yup.string().required("Quality Type description is required"),
+  measuredQualityTypeDisplayName: Yup.string().required("Quality Type display name is required"),
 });
 
 const MeasuredQualityTypesEditPage = (props?: {
@@ -23,9 +23,9 @@ const MeasuredQualityTypesEditPage = (props?: {
   const location = useLocation();
 
   const MeasuredQualityTypesData = (location.state as any)?.data || {
-    qualityTypeName: "",
-    qualityTypeDescription: "",
-    qualityTypeDisplayName: "",
+    measuredQualityTypeName: "",
+    measuredQualityTypeDescription: "",
+    measuredQualityTypeDisplayName: "",
     id: "",
   };
 
@@ -33,25 +33,25 @@ const MeasuredQualityTypesEditPage = (props?: {
   const formik = useFormik({
     enableReinitialize: true,
     initialValues: {
-      id: MeasuredQualityTypesData.id,
-      qualityTypeName: MeasuredQualityTypesData.qualityTypeName || "",
-      qualityTypeDescription: MeasuredQualityTypesData.qualityTypeDescription || "",
-      qualityTypeDisplayName: MeasuredQualityTypesData.qualityTypeDisplayName || "",
+      measuredQualityTypeId: MeasuredQualityTypesData.measuredQualityTypeId,
+      measuredQualityTypeName: MeasuredQualityTypesData.measuredQualityTypeName || "",
+      measuredQualityTypeDescription: MeasuredQualityTypesData.measuredQualityTypeDescription || "",
+      measuredQualityTypeDisplayName: MeasuredQualityTypesData.measuredQualityTypeDisplayName || "",
     },
     validationSchema: validationSchema,
     onSubmit: async (values) => {
       setLoading(true);
       try {
         console.log("Attempting to update question:");
-        console.log("Question ID:", values.id);
+        console.log("Question ID:", values.measuredQualityTypeId);
         console.log("Values being sent:", values);
 
-        if (!values.id) {
+        if (!values.measuredQualityTypeId) {
           alert("No question ID found. Please try navigating back and selecting the question again.");
           return;
         }
 
-        const response = await UpdateMeasuredQualityTypesData(values.id, values);
+        const response = await UpdateMeasuredQualityTypesData(values.measuredQualityTypeId, values);
         console.log("Update successful:", response);
 
         navigate("/measured-quality-types");
@@ -121,26 +121,26 @@ const MeasuredQualityTypesEditPage = (props?: {
               <label className="required fs-6 fw-bold mb-2">
                 Quality Type Name:
               </label>
-              <textarea
+              <input
+                type="text"
                 placeholder="Enter Quality Type Name"
-                rows={4}
-                {...formik.getFieldProps("qualityTypeName")}
+                {...formik.getFieldProps("measuredQualityTypeName")}
                 className={clsx(
                   "form-control form-control-lg form-control-solid",
                   {
                     "is-invalid text-danger":
-                      formik.touched.qualityTypeName && formik.errors.qualityTypeName,
+                      formik.touched.measuredQualityTypeName && formik.errors.measuredQualityTypeName,
                   },
                   {
                     "is-valid":
-                      formik.touched.qualityTypeName && !formik.errors.qualityTypeName,
+                      formik.touched.measuredQualityTypeName && !formik.errors.measuredQualityTypeName,
                   }
                 )}
               />
-              {formik.touched.qualityTypeName && formik.errors.qualityTypeName && (
+              {formik.touched.measuredQualityTypeName && formik.errors.measuredQualityTypeName && (
                 <div className="fv-plugins-message-container">
                   <div className="fv-help-block text-danger">
-                    <span role="alert">{String(formik.errors.qualityTypeName)}</span>
+                    <span role="alert">{String(formik.errors.measuredQualityTypeName)}</span>
                   </div>
                 </div>
               )}
@@ -150,27 +150,25 @@ const MeasuredQualityTypesEditPage = (props?: {
               <label className="required fs-6 fw-bold mb-2">
                 Measured Quality Type Description:
               </label>
-              <select
-                {...formik.getFieldProps("qualityTypeDescription")}
+              <textarea
+                {...formik.getFieldProps("measuredQualityTypeDescription")}
                 className={clsx(
                   "form-control form-control-lg form-control-solid",
                   {
                     "is-invalid text-danger":
-                      formik.touched.qualityTypeDescription && formik.errors.qualityTypeDescription,
+                      formik.touched.measuredQualityTypeDescription && formik.errors.measuredQualityTypeDescription,
                   },
                   {
                     "is-valid":
-                      formik.touched.qualityTypeDescription && !formik.errors.qualityTypeDescription,
+                      formik.touched.measuredQualityTypeDescription && !formik.errors.measuredQualityTypeDescription,
                   }
                 )}
               >
-                <option value="">Select Measured Quality Type</option>
-                <option value="multiple-choice">Multiple Choice</option>
-              </select>
-              {formik.touched.qualityTypeDescription && formik.errors.qualityTypeDescription && (
+              </textarea>
+              {formik.touched.measuredQualityTypeDescription && formik.errors.measuredQualityTypeDescription && (
                 <div className="fv-plugins-message-container">
                   <div className="fv-help-block text-danger">
-                    <span role="alert">{String(formik.errors.qualityTypeDescription)}</span>
+                    <span role="alert">{String(formik.errors.measuredQualityTypeDescription)}</span>
                   </div>
                 </div>
               )}
@@ -180,31 +178,25 @@ const MeasuredQualityTypesEditPage = (props?: {
               <label className="required fs-6 fw-bold mb-2">
                 Measured Quality Type Display Name :
               </label>
-              <select
-                {...formik.getFieldProps("qualityTypeDisplayName")}
+              <textarea
+                {...formik.getFieldProps("measuredQualityTypeDisplayName")}
                 className={clsx(
                   "form-control form-control-lg form-control-solid",
                   {
                     "is-invalid text-danger":
-                      formik.touched.qualityTypeDisplayName && formik.errors.qualityTypeDisplayName,
+                      formik.touched.measuredQualityTypeDisplayName && formik.errors.measuredQualityTypeDisplayName,
                   },
                   {
                     "is-valid":
-                      formik.touched.qualityTypeDisplayName && !formik.errors.qualityTypeDisplayName,
+                      formik.touched.measuredQualityTypeDisplayName && !formik.errors.measuredQualityTypeDisplayName,
                   }
                 )}
               >
-                <option value="">Select Measured Quality Type</option>
-                {sections.map((section) => (
-                  <option key={section.id} value={section.sectionName}>
-                    {section.sectionName}
-                  </option>
-                ))}
-              </select>
-              {formik.touched.qualityTypeDisplayName && formik.errors.qualityTypeDisplayName && (
+              </textarea>
+              {formik.touched.measuredQualityTypeDisplayName && formik.errors.measuredQualityTypeDisplayName && (
                 <div className="fv-plugins-message-container">
                   <div className="fv-help-block text-danger">
-                    <span role="alert">{String(formik.errors.qualityTypeDisplayName)}</span>
+                    <span role="alert">{String(formik.errors.measuredQualityTypeDisplayName)}</span>
                   </div>
                 </div>
               )}
