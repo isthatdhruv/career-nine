@@ -1,6 +1,8 @@
 package com.kccitm.api.controller.career9;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -13,7 +15,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.career9.MeasuredQualities;
+import com.kccitm.api.model.career9.Tool;
 import com.kccitm.api.repository.Career9.MeasuredQualitiesRepository;
+import com.kccitm.api.repository.Career9.ToolMeasuredQualititesMappingRespostory;
+import com.kccitm.api.repository.Career9.ToolRepository;
 
 @RestController
 @RequestMapping("/api/measured-qualities")
@@ -21,6 +26,9 @@ public class MeasuredQualitiesController {
     
     @Autowired
     private MeasuredQualitiesRepository measuredQualitiesRepository;
+
+    @Autowired
+    private ToolRepository toolRepository;
 
     @GetMapping("/getAll")
     public List<MeasuredQualities> getAllMeasuredQualities() {
@@ -34,7 +42,12 @@ public class MeasuredQualitiesController {
 
     @PostMapping("/create")
     public MeasuredQualities createMeasuredQualities(@RequestBody MeasuredQualities measuredQualities) {
-        return measuredQualitiesRepository.save(measuredQualities);
+        Long id = measuredQualities.getTools().iterator().next().getToolId();
+        Tool tool = toolRepository.getById(id);
+        Set<Tool> tools = new HashSet<>();
+        tools.add(tool);
+        measuredQualities.setTools(tools);
+        return measuredQualitiesRepository.save(measuredQualities); 
     }
     @PutMapping("/update/{id}")
     public MeasuredQualities updateMeasuredQualities(@PathVariable Long id, @RequestBody MeasuredQualities measuredQualities) {

@@ -72,4 +72,12 @@ public class MeasuredQualities implements Serializable {
         this.quality_display_name = quality_display_name;
     }
 
+    public Set<Tool> getTools() {
+        return tools;
+    }
+
+    public void setTools(Set<Tool> tools) {
+        this.tools = tools;
+    }
+
 }
