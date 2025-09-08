@@ -63,8 +63,32 @@ public class ToolController {
         return toolRepository.save(tool);
     }
     @DeleteMapping("/delete/{id}")
-    public void deleteTool(@PathVariable Long id) {
-        toolRepository.deleteById(id);
+    public ResponseEntity<String> deleteTool(@PathVariable Long id) {
+        try {
+            Tool tool = toolRepository.findById(id).orElse(null);
+            if (tool == null) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            // Remove all many-to-many relationships first
+            for (MeasuredQualities quality : tool.getMeasuredQualities()) {
+                quality.removeTool(tool);
+                measuredQualitiesRepository.save(quality);
+            }
+            
+            // Clear the tool's relationships
+            tool.getMeasuredQualities().clear();
+            toolRepository.save(tool);
+            
+            // Now delete the tool
+            toolRepository.deleteById(id);
+            
+            return ResponseEntity.ok("Tool deleted successfully");
+        } catch (Exception e) {
+            System.err.println("Error deleting tool with ID " + id + ": " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body("Failed to delete tool: " + e.getMessage());
+        }
     }
     
     // Many-to-Many relationship management endpoints

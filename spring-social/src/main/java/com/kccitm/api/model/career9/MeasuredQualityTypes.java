@@ -3,6 +3,7 @@ import java.io.Serializable;
 import java.util.HashSet;
 import java.util.Set;
 
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
@@ -29,6 +30,10 @@ public class MeasuredQualityTypes implements Serializable {
     private String measured_quality_type_description;
 
     private String measured_quality_type_display_name;
+
+    // Foreign key for one-to-many relationship with MeasuredQualities
+    @Column(name = "fk_measured_qualities")
+    private Long fk_measured_qualities;
 
     @ManyToMany
     @JoinTable(
@@ -89,6 +94,14 @@ public class MeasuredQualityTypes implements Serializable {
 
     public void setAssessmentQuestions(Set<AssessmentQuestions> assessmentQuestions) {
         this.assessmentQuestions = assessmentQuestions;
+    }
+
+    public Long getFk_measured_qualities() {
+        return fk_measured_qualities;
+    }
+
+    public void setFk_measured_qualities(Long fk_measured_qualities) {
+        this.fk_measured_qualities = fk_measured_qualities;
     }
 
     // Helper methods for managing the many-to-many relationships

@@ -19,6 +19,7 @@ import com.kccitm.api.model.career9.Career;
 import com.kccitm.api.model.career9.MeasuredQualityTypes;
 import com.kccitm.api.repository.Career9.AssessmentQuestionRepository;
 import com.kccitm.api.repository.Career9.CareerRepository;
+import com.kccitm.api.repository.Career9.MeasuredQualitiesRepository;
 import com.kccitm.api.repository.Career9.MeasuredQualityTypesRepository;
 
 @RestController
@@ -33,6 +34,9 @@ public class MeasuredQualityTypesController {
     
     @Autowired
     private AssessmentQuestionRepository assessmentQuestionRepository;
+    
+    @Autowired
+    private MeasuredQualitiesRepository measuredQualitiesRepository;
 
     @GetMapping("/getAll")
     public List<MeasuredQualityTypes> getAllMeasuredQualityTypes() {
@@ -50,8 +54,16 @@ public class MeasuredQualityTypesController {
     }
     @PutMapping("/update/{id}")
     public MeasuredQualityTypes updateMeasuredQualityTypes(@PathVariable Long id, @RequestBody MeasuredQualityTypes measuredQualityTypes) {
-        measuredQualityTypes.setMeasuredQualityTypeId(id);
-        return measuredQualityTypesRepository.save(measuredQualityTypes);
+        MeasuredQualityTypes existingType = measuredQualityTypesRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("MeasuredQualityType not found"));
+
+        // Only update simple fields, not relationships
+        existingType.setMeasuredQualityTypeName(measuredQualityTypes.getMeasuredQualityTypeName());
+        existingType.setMeasuredQualityTypeDescription(measuredQualityTypes.getMeasuredQualityTypeDescription());
+        existingType.setMeasuredQualityTypeDisplayName(measuredQualityTypes.getMeasuredQualityTypeDisplayName());
+        // Do NOT update careers or assessmentQuestions here
+
+        return measuredQualityTypesRepository.save(existingType);
     }
     @DeleteMapping("/delete/{id}")
     public void deleteMeasuredQualityTypes(@PathVariable Long id) {
@@ -142,5 +154,41 @@ public class MeasuredQualityTypesController {
         }
         
         return ResponseEntity.ok(measurementType.getAssessmentQuestions());
+    }
+    
+    // One-to-Many relationship: MeasuredQualities to MeasuredQualityTypes
+    @PutMapping("/{typeId}/assign-quality/{qualityId}")
+    public ResponseEntity<String> assignMeasuredQualityTypeToQuality(@PathVariable Long typeId, @PathVariable Long qualityId) {
+        MeasuredQualityTypes measurementType = measuredQualityTypesRepository.findById(typeId).orElse(null);
+        
+        if (measurementType == null) {
+            return ResponseEntity.badRequest().body("MeasuredQualityType not found");
+        }
+        
+        // Check if the quality exists
+        if (!measuredQualitiesRepository.existsById(qualityId)) {
+            return ResponseEntity.badRequest().body("MeasuredQuality not found");
+        }
+        
+        // Set the foreign key
+        measurementType.setFk_measured_qualities(qualityId);
+        measuredQualityTypesRepository.save(measurementType);
+        
+        return ResponseEntity.ok("MeasuredQualityType successfully assigned to MeasuredQuality");
+    }
+    
+    @PutMapping("/{typeId}/remove-quality")
+    public ResponseEntity<String> removeMeasuredQualityTypeFromQuality(@PathVariable Long typeId) {
+        MeasuredQualityTypes measurementType = measuredQualityTypesRepository.findById(typeId).orElse(null);
+        
+        if (measurementType == null) {
+            return ResponseEntity.badRequest().body("MeasuredQualityType not found");
+        }
+        
+        // Remove the association (set foreign key to null)
+        measurementType.setFk_measured_qualities(null);
+        measuredQualityTypesRepository.save(measurementType);
+        
+        return ResponseEntity.ok("MeasuredQualityType successfully removed from MeasuredQuality");
     }
 }

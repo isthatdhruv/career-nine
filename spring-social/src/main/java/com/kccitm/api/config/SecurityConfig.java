@@ -89,15 +89,14 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(Arrays.asList(
-            "http://localhost:3000",
-            "http://192.168.3.78:3000",
-            "http://192.168.0.204:3000",
-            "https://192.168.0.204:3000"
-        ));
+                "http://localhost:3000",
+                "http://192.168.3.78:3000",
+                "http://192.168.0.204:3000",
+                "https://192.168.0.204:3000"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
-        
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
@@ -133,23 +132,33 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                         "/**/*.css",
                         "/**/*.js")
                 .permitAll()
-                .antMatchers("/api/**","/api/**/**","/api/**/**/**","/api/assessment-questions/**","/api/question-sections/**","/api/assessment-questions/*/*","/api/firebase/*/*","/api/firebase/*" ,"/api/firebase/*","/actuator/*","/auth/**", "/oauth2/callback/google/*", "/oauth2/**", "/user/me", "role/*", "/gender/get",
+                .antMatchers("/api/**", "/api/**/**", "/api/**/**/**", "/api/assessment-questions/**",
+                        "/api/question-sections/**", "/api/assessment-questions/*/*", "/api/firebase/*/*",
+                        "/api/firebase/*", "/api/firebase/*", "/actuator/*", "/auth/**", "/oauth2/callback/google/*",
+                        "/oauth2/**", "/user/me", "role/*", "/gender/get",
                         "/category/*", "/board/*",
                         "/rolegroup/*", "/user/*", "/instituteDetail/*", "/role/*", "/instituteBranch/getbybranchid/*",
                         "/instituteBatch/getbyid/*", "/instituteCourse/getbyCollegeId/*",
                         "/instituteBranch/getbyCourseId/*", "/instituteSession/getbyBatchId/*",
-                         "/section/get","/api/tools/**","/tools/**","/api/measured-qualities/**","/measured-qualities/**","/api/measured-quality-types/**","/measured-quality-types/**","/question-sections/**","/assesment-questions/**",
-                        "/question-sections/getbyid/*","/assesment-questions/getbyid/*","/question-sections/getbycollegeid/*",
-                        "/assesment-questions/getbycollegeid/*","/question-sections/getbyinstituteid/*","/assesment-questions/getbyinstituteid/*",
-                        "/question-sections/getbybatchid/*","/assesment-questions/getbybatchid/*","/question-sections/getbycourseid/*",
+                        "/section/get", "/api/tools/**", "/tools/**", "/api/measured-qualities/**",
+                        "/measured-qualities/**", "/api/measured-quality-types/**", "/measured-quality-types/**",
+                        "/question-sections/**", "/assesment-questions/**",
+                        "/question-sections/getbyid/*", "/assesment-questions/getbyid/*",
+                        "/question-sections/getbycollegeid/*",
+                        "/assesment-questions/getbycollegeid/*", "/question-sections/getbyinstituteid/*",
+                        "/assesment-questions/getbyinstituteid/*",
+                        "/question-sections/getbybatchid/*", "/assesment-questions/getbybatchid/*",
+                        "/question-sections/getbycourseid/*",
                         "/section/update", "/generate_pdf", "/codingquestion/save", "/testcase/save",
                         "/student/update", "/student/getbyid/*", "/student/get", "/userrolegroupmapping/update",
                         "/util/**", "/util/file-get/getbyname/**", "/util/file-delete/deletebyname/**",
                         "/google-api/**", "/util/file-delete/delete/**", "/codingquestion/*", "/instituteBatch/*",
                         "/instituteBranch/*", "/instituteCourse/*", "/instituteDetail/getbyid/*", "/student/putmarks",
                         "/student/emailChecker", "/email-validation-official",
-                        "/email-validation-official-confermation", "/getmarks/*", "/getmarks", "/coding/*","/career/edit/*",
-                        "/google-api/email/get/*", "student/get-check","instituteBranchBatchMapping/*","/getmarks","/getmarksArray")
+                        "/email-validation-official-confermation", "/getmarks/*", "/getmarks", "/coding/*",
+                        "/career/edit/*",
+                        "/google-api/email/get/*", "student/get-check", "instituteBranchBatchMapping/*", "/getmarks",
+                        "/getmarksArray")
                 .permitAll()
                 .anyRequest()
                 .authenticated()

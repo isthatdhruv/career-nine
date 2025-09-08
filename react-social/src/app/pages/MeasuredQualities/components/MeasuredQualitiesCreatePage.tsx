@@ -3,7 +3,7 @@ import { Field, Form, Formik } from "formik";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
-import { CreateMeasuredQualitiesData, ReadMeasuredQualitiesData } from "../API/Measured_Qualities_APIs";
+import { CreateMeasuredQualitiesData } from "../API/Measured_Qualities_APIs";
 
 const validationSchema = Yup.object().shape({
   measuredQualityName: Yup.string().required("Quality name is required"),
@@ -47,8 +47,8 @@ const MeasuredQualitiesCreatePage = ({
             try {
               console.log(values);
               await CreateMeasuredQualitiesData(values);
-              // resetForm();
-              // navigate("/measured-qualities");
+              resetForm();
+              navigate("/measured-qualities");
             } catch (error) {
               console.error(error);
               // window.location.replace("/error");

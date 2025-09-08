@@ -11,6 +11,7 @@ import javax.persistence.ManyToMany;
 import javax.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Entity
 @Table(name = "careers")
@@ -20,8 +21,11 @@ public class Career implements Serializable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @JsonProperty("career_id")
     private Long career_id;
+
     private String title;
+    
     private String description;
 
     // Many-to-Many relationship with measured quality types

@@ -15,8 +15,6 @@ const MeasuredQualitiesTable = (props: {
   setPageLoading: any;
 }) => {
   const navigate = useNavigate();
-  const [modalShow, setModalShow] = useState(false);
-  const [modalData, setModalData] = useState<any>(null);
   const [selectedToolsByQuality, setSelectedToolsByQuality] = useState<{ [key: number]: any[] }>({});
   const [tools, setTools] = useState<any[]>([]);
 
@@ -114,7 +112,7 @@ const MeasuredQualitiesTable = (props: {
         attributes: {
           "aria-controls": "DataTable",
           "aria-label": "Quality Name",
-          className: "text-center",
+          className: "",
         },
       },
       {
@@ -123,7 +121,7 @@ const MeasuredQualitiesTable = (props: {
         sort: "asc",
         width: 150,
         attributes: {
-          className: "text-center",
+          className: "",
         },
       },
       {
@@ -132,7 +130,7 @@ const MeasuredQualitiesTable = (props: {
         sort: "asc",
         width: 150,
         attributes: {
-          className: "text-center",
+          className: "",
         },
       },
       {
@@ -141,7 +139,7 @@ const MeasuredQualitiesTable = (props: {
         sort: "disabled",
         width: 150,
         attributes: {
-          className: "text-center",
+          className: "",
         },
       },
       {
@@ -150,17 +148,17 @@ const MeasuredQualitiesTable = (props: {
         sort: "disabled",
         width: 150,
         attributes: {
-          className: "text-center",
+          className: "",
         },
       },
     ],
 
     rows: props.data.map((data: any) => ({
-      measuredQualityName: <div className="text-center">{data.measuredQualityName}</div>,
-      measuredQualityDescription: <div className="text-center">{data.measuredQualityDescription}</div>,
-      qualityDisplayName: <div className="text-center">{data.qualityDisplayName}</div>,
+      measuredQualityName: <div className="">{data.measuredQualityName}</div>,
+      measuredQualityDescription: <div className="">{data.measuredQualityDescription}</div>,
+      qualityDisplayName: <div className="">{data.qualityDisplayName}</div>,
       actions: (
-        <div className="text-center">
+        <div className="">
           <button
             onClick={() => {
               navigate(`/measured-qualities/edit/${data.measuredQualityId}`, {
@@ -196,7 +194,7 @@ const MeasuredQualitiesTable = (props: {
         </div>
       ),
       Tools: (
-        <div className="text-center">
+        <div className="">
           <FormControl sx={{ m: 1, width: 200 }} size="small">
             <InputLabel id={`multi-select-tools-label-${data.measuredQualityId}`}>Select Tools</InputLabel>
             <Select

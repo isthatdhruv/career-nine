@@ -16,7 +16,7 @@ import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 
 @Entity
@@ -47,7 +47,7 @@ public class AssessmentQuestions implements Serializable {
     // NEW: Link Question -> Section
     @ManyToOne
     @JoinColumn(name = "section_id")   // FK in questions table
-    @JsonBackReference
+    @JsonIgnoreProperties("questions")
     private QuestionSection section;
 
     // --- getters and setters ---
@@ -106,6 +106,17 @@ public class AssessmentQuestions implements Serializable {
 
     public void setId(Long id) {
         this.question_id = id;
+    }
+
+    // Helper methods for managing the many-to-many relationship
+    public void addMeasuredQualityType(MeasuredQualityTypes type) {
+        this.measuredQualityTypes.add(type);
+        type.getAssessmentQuestions().add(this);
+    }
+
+    public void removeMeasuredQualityType(MeasuredQualityTypes type) {
+        this.measuredQualityTypes.remove(type);
+        type.getAssessmentQuestions().remove(this);
     }
 
     @Override

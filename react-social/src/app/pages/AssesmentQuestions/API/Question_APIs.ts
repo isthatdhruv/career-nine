@@ -6,15 +6,30 @@ const readQuestionById = `${API_URL}/assessment-questions/get/`;
 const createQuestion = `${API_URL}/assessment-questions/create`;
 const updateQuestion = `${API_URL}/assessment-questions/update`;
 const deleteQuestion = `${API_URL}/assessment-questions/delete/`;
-
+const readMeasuredQualityTypes = `${API_URL}/measured-quality-types/getAll`;
 export function ReadQuestionsData() {
   return axios.get(readQuestions);
 }
-
+export function ReadMeasuredQualityTypes() {
+  return axios.get(readMeasuredQualityTypes);
+}
 export function ReadQuestionByIdData(id: any) {
   return axios.get(readQuestionById + id);
 }
+export function AssignMeasuredQualityTypeToQuestion(typeId: any, questionId: any) {
+  const assignTypeToQuestion = `${API_URL}/measured-quality-types/${typeId}/assessment-questions/${questionId}`;
+  return axios.post(assignTypeToQuestion);
+}
 
+export function RemoveMeasuredQualityTypeFromQuestion(typeId: any, questionId: any) {
+  const removeTypeFromQuestion = `${API_URL}/measured-quality-types/${typeId}/assessment-questions/${questionId}`;
+  return axios.delete(removeTypeFromQuestion);
+}
+
+export function GetMeasuredQualityTypesForQuestion(questionId: any) {
+  const getTypesForQuestion = `${API_URL}/assessment-questions/${questionId}/measured-quality-types`;
+  return axios.get(getTypesForQuestion);
+}
 export function CreateQuestionData(values: any) {
   // Transform the data to match backend expectations
   const requestData = {

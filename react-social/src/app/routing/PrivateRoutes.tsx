@@ -5,6 +5,8 @@ import { getCSSVariableValue } from "../../_metronic/assets/ts/_utils";
 import { WithChildren } from "../../_metronic/helpers";
 import { MasterLayout } from "../../_metronic/layout/MasterLayout";
 import { useAuth } from "../modules/auth";
+import CareerPage from "../pages/Career/CareerPage";
+import { CareerCreatePage, CareerEditPage } from "../pages/Career/components";
 import { DashboardWrapper } from "../pages/dashboard/DashboardWrapper";
 import FacultyRegistrationDetails from "../pages/FacultyRegistration/FacultyRegistrationDetails";
 import FacultyRegistrationForm from "../pages/FacultyRegistration/FacultyRegistrationForm";
@@ -243,6 +245,32 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
+        //careerpage
+        <Route
+          path="/career"
+          element={
+            <SuspensedView>
+              <CareerPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/career/create"
+          element={
+            <SuspensedView>
+              <CareerCreatePage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/career/edit/:id"
+          element={
+            <SuspensedView>
+              <CareerEditPage />
+            </SuspensedView>
+          }
+        />
+
 
         <Route
           path="/board"
@@ -275,7 +303,7 @@ const PrivateRoutes = () => {
           path="/college/create"
           element={
             <SuspensedView>
-              <CollegeCreatePage  />
+              <CollegeCreatePage />
             </SuspensedView>
           }
         />
@@ -283,7 +311,7 @@ const PrivateRoutes = () => {
           path="/question-sections"
           element={
             <SuspensedView>
-              <QuestionSectionPage/>
+              <QuestionSectionPage />
             </SuspensedView>
           }
         />
@@ -386,7 +414,7 @@ const PrivateRoutes = () => {
           }
         />
 
-          <Route
+        <Route
           path="/measured-quality-types"
           element={
             <SuspensedView>

@@ -67,6 +67,10 @@ public class Tool implements Serializable {
         return isFree;
     }
     
+    public boolean getIsFree() {
+        return isFree;
+    }
+    
     public void setIsFree(boolean isFree) {
         this.isFree = isFree;
     }
