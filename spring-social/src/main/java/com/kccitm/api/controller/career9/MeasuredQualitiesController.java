@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.kccitm.api.model.career9.MeasuredQualities;
 import com.kccitm.api.model.career9.Tool;
 import com.kccitm.api.repository.Career9.MeasuredQualitiesRepository;
+import com.kccitm.api.repository.Career9.ToolRepository;
 
 @RestController
 @RequestMapping("/api/measured-qualities")
