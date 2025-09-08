@@ -17,6 +17,7 @@ import QuestionSectionEditPage from "../pages/QuestionSections/components/Questi
 import QuestionSectionPage from "../pages/QuestionSections/CreateQuestionSection";
 import { ToolEditPage } from "../pages/Tool/components";
 import ToolCreatePage from "../pages/Tool/components/ToolCreatePage";
+import UploadExcelFile from "../pages/UploadExcelFile/UploadExcelFile";
 // Update these paths to the correct locations of your components
 
 
@@ -357,6 +358,15 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <ToolEditPage />
+            </SuspensedView>
+          }
+        />
+
+        <Route
+          path="/upload-excel"
+          element={
+            <SuspensedView>
+              <UploadExcelFile />
             </SuspensedView>
           }
         />

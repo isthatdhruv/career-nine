@@ -65,6 +65,13 @@ export function AsideMenuMain() {
       />
 
       <AsideMenuItem
+        to="/upload-excel"
+        icon="/media/icons/duotune/general/gen044.svg"
+        title="Upload Excel File"
+        fontIcon="bi-app-indicator"
+      />
+
+      <AsideMenuItem
         to="/board"
         icon="/media/icons/duotune/finance/fin001.svg"
         title="Board"
