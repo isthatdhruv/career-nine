@@ -138,7 +138,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                         "/rolegroup/*", "/user/*", "/instituteDetail/*", "/role/*", "/instituteBranch/getbybranchid/*",
                         "/instituteBatch/getbyid/*", "/instituteCourse/getbyCollegeId/*",
                         "/instituteBranch/getbyCourseId/*", "/instituteSession/getbyBatchId/*",
-                         "/section/get","/api/tools/**","/tools/**","/question-sections/**","/assesment-questions/**",
+                         "/section/get","/api/tools/**","/tools/**","/api/measured-qualities/**","/measured-qualities/**","/api/measured-quality-types/**","/measured-quality-types/**","/question-sections/**","/assesment-questions/**",
                         "/question-sections/getbyid/*","/assesment-questions/getbyid/*","/question-sections/getbycollegeid/*",
                         "/assesment-questions/getbycollegeid/*","/question-sections/getbyinstituteid/*","/assesment-questions/getbyinstituteid/*",
                         "/question-sections/getbybatchid/*","/assesment-questions/getbybatchid/*","/question-sections/getbycourseid/*",

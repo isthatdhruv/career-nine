@@ -91,4 +91,25 @@ public class MeasuredQualityTypes implements Serializable {
         this.assessmentQuestions = assessmentQuestions;
     }
 
+    // Helper methods for managing the many-to-many relationships
+    public void addCareer(Career career) {
+        this.careers.add(career);
+        career.getMeasuredQualityTypes().add(this);
+    }
+
+    public void removeCareer(Career career) {
+        this.careers.remove(career);
+        career.getMeasuredQualityTypes().remove(this);
+    }
+
+    public void addAssessmentQuestion(AssessmentQuestions assessmentQuestion) {
+        this.assessmentQuestions.add(assessmentQuestion);
+        assessmentQuestion.getMeasuredQualityTypes().add(this);
+    }
+
+    public void removeAssessmentQuestion(AssessmentQuestions assessmentQuestion) {
+        this.assessmentQuestions.remove(assessmentQuestion);
+        assessmentQuestion.getMeasuredQualityTypes().remove(this);
+    }
+
 }
