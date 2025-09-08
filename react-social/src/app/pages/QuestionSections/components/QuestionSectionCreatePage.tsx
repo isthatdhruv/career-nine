@@ -27,12 +27,11 @@ const QuestionSectionCreatePage = ({ setPageLoading }: { setPageLoading?: any })
       setLoading(true);
       try {
         await CreateQuestionSectionData(values);
-        setPageLoading(["true"]);
         formik.resetForm();
         navigate("/question-sections");
       } catch (error) {
         console.error(error);
-        window.location.replace("/error");
+        // window.location.replace("/error");
       }
       setLoading(false);
     },

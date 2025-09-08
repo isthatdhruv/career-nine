@@ -6,6 +6,7 @@ import trash from "react-useanimations/lib/trash";
 import { DeleteQuestionSectionData } from "../API/Question_Section_APIs";
 
 const QuestionSectionTable = (props: {
+  setPageLoading(arg0: string[]): unknown;
   data: any;
   setLoading: any;
   // setPageLoading: ;
@@ -57,7 +58,7 @@ const QuestionSectionTable = (props: {
             onClick={() => {
               props.setLoading(true);
               DeleteQuestionSectionData(data.sectionId).then(() => {
-                // props.setPageLoading(["true"]);
+                props.setPageLoading(["true"]);
               });
             }}
             className="btn btn-icon btn-danger btn-sm me-3"

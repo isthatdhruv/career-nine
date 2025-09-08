@@ -46,7 +46,12 @@ const QuestionTable = (props: {
           const response = await GetMeasuredQualityTypesForQuestion(question.id);
           newSelections[question.id] = response.data.map((type: any) => type.measuredQualityTypeId);
         } catch (error) {
-          console.error(`Error loading quality types for question ${question.id}:`, error);
+          // Handle 404 errors gracefully (question might have been deleted)
+          if ((error as any)?.response?.status === 404) {
+            console.log(`Question ${question.id} not found, skipping...`);
+          } else {
+            console.error(`Error loading quality types for question ${question.id}:`, error);
+          }
           newSelections[question.id] = [];
         }
       }
@@ -56,6 +61,9 @@ const QuestionTable = (props: {
     
     if (props.data && props.data.length > 0) {
       loadExistingSelections();
+    } else {
+      // Clear selections if no data
+      setSelectedMeasuredQualityTypesByQuestion({});
     }
   }, [props.data]);
 
@@ -170,6 +178,13 @@ const QuestionTable = (props: {
             onClick={async () => { 
               props.setLoading(true);
               try {
+                // Remove the question from local state immediately to prevent API calls
+                setSelectedMeasuredQualityTypesByQuestion(prev => {
+                  const newState = {...prev};
+                  delete newState[data.id];
+                  return newState;
+                });
+                
                 await DeleteQuestionData(data.id);
                 props.setPageLoading(["true"]);
               } catch (error) {

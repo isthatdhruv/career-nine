@@ -40,7 +40,12 @@ const MeasuredQualitiesTable = (props: {
           const response = await GetToolsForQuality(quality.measuredQualityId);
           newSelections[quality.measuredQualityId] = response.data.map((tool: any) => tool.toolId);
         } catch (error) {
-          console.error(`Error loading tools for quality ${quality.measuredQualityId}:`, error);
+          // Handle 404 errors gracefully (quality might have been deleted)
+          if ((error as any)?.response?.status === 404) {
+            console.log(`MeasuredQuality ${quality.measuredQualityId} not found, skipping...`);
+          } else {
+            console.error(`Error loading tools for quality ${quality.measuredQualityId}:`, error);
+          }
           newSelections[quality.measuredQualityId] = [];
         }
       }
@@ -50,6 +55,9 @@ const MeasuredQualitiesTable = (props: {
     
     if (props.data && props.data.length > 0) {
       loadExistingSelections();
+    } else {
+      // Clear selections if no data
+      setSelectedToolsByQuality({});
     }
   }, [props.data]);
 
@@ -174,6 +182,13 @@ const MeasuredQualitiesTable = (props: {
               props.setLoading(true);
               try {
                 console.log(data);
+                // Remove the quality from local state immediately to prevent API calls
+                setSelectedToolsByQuality(prev => {
+                  const newState = {...prev};
+                  delete newState[data.measuredQualityId];
+                  return newState;
+                });
+                
                 await DeleteMeasuredQualitiesData(data.measuredQualityId);
                 props.setPageLoading(["true"]);
               } catch (error) {

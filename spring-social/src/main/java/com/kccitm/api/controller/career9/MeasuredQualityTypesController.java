@@ -191,4 +191,6 @@ public class MeasuredQualityTypesController {
         
         return ResponseEntity.ok("MeasuredQualityType successfully removed from MeasuredQuality");
     }
+   
+
 }
