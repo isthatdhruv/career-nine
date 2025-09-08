@@ -12,6 +12,8 @@ import javax.persistence.JoinTable;
 import javax.persistence.ManyToMany;
 import javax.persistence.Table;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 @Entity
 @Table(name = "measured_quality_types")
 // @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
@@ -37,6 +39,7 @@ public class MeasuredQualityTypes implements Serializable {
     private Set<Career> careers = new HashSet<>();
 
     @ManyToMany(mappedBy = "measuredQualityTypes")
+    @JsonIgnore
     private Set<AssessmentQuestions> assessmentQuestions = new HashSet<>();
 
     // Getters and Setters
@@ -70,6 +73,22 @@ public class MeasuredQualityTypes implements Serializable {
 
     public void setMeasuredQualityTypeDisplayName(String measured_quality_type_display_name) {
         this.measured_quality_type_display_name = measured_quality_type_display_name;
+    }
+
+    public Set<Career> getCareers() {
+        return careers;
+    }
+
+    public void setCareers(Set<Career> careers) {
+        this.careers = careers;
+    }
+
+    public Set<AssessmentQuestions> getAssessmentQuestions() {
+        return assessmentQuestions;
+    }
+
+    public void setAssessmentQuestions(Set<AssessmentQuestions> assessmentQuestions) {
+        this.assessmentQuestions = assessmentQuestions;
     }
 
 }

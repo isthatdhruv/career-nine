@@ -15,7 +15,7 @@ const MeasuredQualitiesTable = (props: {
   const navigate = useNavigate();
   const [modalShow, setModalShow] = useState(false);
   const [modalData, setModalData] = useState<any>(null);
-  const [selectedTools, setSelectedTools] = useState<any[]>([]);
+  const [selectedToolsByQuality, setSelectedToolsByQuality] = useState<{[key: number]: any[]}>({});
   const [tools, setTools] = useState<any[]>([]);
 
   useEffect(() => {
@@ -126,16 +126,29 @@ const MeasuredQualitiesTable = (props: {
           <FormControl sx={{ m: 1, width: 200 }} size="small">
             <InputLabel id={`multi-select-tools-label-${data.measuredQualityId}`}>Select Tools</InputLabel>
             <Select
-              labelId={`multi-select-tools-label-${""}`}
+              labelId={`multi-select-tools-label-${data.measuredQualityId}`}
               multiple
-              value={selectedTools}
-              onChange={e => setSelectedTools(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value)}
+              value={selectedToolsByQuality[data.measuredQualityId] || []}
+              onChange={e => {
+                const newValue = typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value;
+                setSelectedToolsByQuality(prev => ({
+                  ...prev,
+                  [data.measuredQualityId]: newValue
+                }));
+                // TODO: Call API to save the relationship
+              }}
               input={<OutlinedInput label="Select Tools" />}
-              renderValue={(selected) => (selected as any[]).map(toolId => tools.find(t => t.toolId === toolId)?.name).join(', ')}
+              renderValue={(selected) => 
+                (selected as any[]).map(toolId => 
+                  tools.find(t => t.toolId === toolId)?.name
+                ).join(', ')
+              }
             >
               {tools.map((tool) => (
                 <MenuItem key={tool.toolId} value={tool.toolId}>
-                  <Checkbox checked={selectedTools.includes(tool.toolId)} />
+                  <Checkbox 
+                    checked={(selectedToolsByQuality[data.measuredQualityId] || []).includes(tool.toolId)} 
+                  />
                   <ListItemText primary={tool.name} />
                 </MenuItem>
               ))}
