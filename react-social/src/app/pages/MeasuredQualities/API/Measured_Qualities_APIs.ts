@@ -7,7 +7,27 @@ const createMeasuredQualities = `${API_URL}/measured-qualities/create`;
 const updateMeasuredQualities = `${API_URL}/measured-qualities/update`;
 const deleteMeasuredQualities = `${API_URL}/measured-qualities/delete/`;
 const readTools = `${API_URL}/tools/getAll`;
+const updateToolsForQuality = (toolId: string | number, qualityId: string | number) =>
+  `${API_URL}/tools/${toolId}/measured-qualities/${qualityId}`; // e.g., /measured-qualities/{qualityId}/tools
 
+export function UpdateToolsForQuality(toolId: string | number, qualityId: string | number) {
+  return axios.post(updateToolsForQuality(toolId, qualityId));
+}
+
+export function AssignToolToQuality(toolId: any, qualityId: any) {
+  const assignToolToQuality = `${API_URL}/tools/${toolId}/measured-qualities/${qualityId}`;
+  return axios.post(assignToolToQuality);
+}
+
+export function RemoveToolFromQuality(toolId: any, qualityId: any) {
+  const removeToolFromQuality = `${API_URL}/tools/${toolId}/measured-qualities/${qualityId}`;
+  return axios.delete(removeToolFromQuality);
+}
+
+export function GetToolsForQuality(qualityId: any) {
+  const getToolsForQuality = `${API_URL}/measured-qualities/${qualityId}/tools`;
+  return axios.get(getToolsForQuality);
+}
 export function ReadToolsData() {
   return axios.get(readTools);
 }

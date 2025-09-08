@@ -10,6 +10,9 @@ import javax.persistence.Id;
 import javax.persistence.ManyToMany;
 import javax.persistence.Table;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 @Entity
 @Table(name = "careers")
 // @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
@@ -18,12 +21,16 @@ public class Career implements Serializable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @JsonProperty("career_id")
     private Long career_id;
+
     private String title;
+    
     private String description;
 
     // Many-to-Many relationship with measured quality types
     @ManyToMany(mappedBy = "careers")
+    @JsonIgnore
     private Set<MeasuredQualityTypes> measuredQualityTypes = new HashSet<>();
 
     // Getters and Setters
@@ -49,5 +56,24 @@ public class Career implements Serializable {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public Set<MeasuredQualityTypes> getMeasuredQualityTypes() {
+        return measuredQualityTypes;
+    }
+
+    public void setMeasuredQualityTypes(Set<MeasuredQualityTypes> measuredQualityTypes) {
+        this.measuredQualityTypes = measuredQualityTypes;
+    }
+
+    // Helper methods for managing the many-to-many relationship
+    public void addMeasuredQualityType(MeasuredQualityTypes measuredQualityType) {
+        this.measuredQualityTypes.add(measuredQualityType);
+        measuredQualityType.getCareers().add(this);
+    }
+
+    public void removeMeasuredQualityType(MeasuredQualityTypes measuredQualityType) {
+        this.measuredQualityTypes.remove(measuredQualityType);
+        measuredQualityType.getCareers().remove(this);
     }
 }
