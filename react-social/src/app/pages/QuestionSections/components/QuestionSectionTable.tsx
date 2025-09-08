@@ -44,7 +44,7 @@ const QuestionSectionTable = (props: {
         <>
           <button
             onClick={() => {
-              navigate(`/question-sections/edit/${data.id}`, {
+              navigate(`/question-sections/edit/${data.sectionId}`, {
                 state: { data }
               });
             }}
@@ -56,7 +56,7 @@ const QuestionSectionTable = (props: {
           <button
             onClick={() => {
               props.setLoading(true);
-              DeleteQuestionSectionData(data.id).then(() => {
+              DeleteQuestionSectionData(data.sectionId).then(() => {
                 // props.setPageLoading(["true"]);
               });
             }}

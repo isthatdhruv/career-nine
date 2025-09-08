@@ -5,7 +5,9 @@ import { AiFillEdit } from "react-icons/ai";
 import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
-import { DeleteMeasuredQualitiesData, ReadToolsData } from "../API/Measured_Qualities_APIs";
+import { AssignToolToQuality, DeleteMeasuredQualitiesData, GetToolsForQuality, ReadToolsData, RemoveToolFromQuality } from "../API/Measured_Qualities_APIs";
+
+// Define your API base URL here or import it from your config
 
 const MeasuredQualitiesTable = (props: {
   data: any;
@@ -13,9 +15,7 @@ const MeasuredQualitiesTable = (props: {
   setPageLoading: any;
 }) => {
   const navigate = useNavigate();
-  const [modalShow, setModalShow] = useState(false);
-  const [modalData, setModalData] = useState<any>(null);
-  const [selectedTools, setSelectedTools] = useState<any[]>([]);
+  const [selectedToolsByQuality, setSelectedToolsByQuality] = useState<{ [key: number]: any[] }>({});
   const [tools, setTools] = useState<any[]>([]);
 
   useEffect(() => {
@@ -29,8 +29,80 @@ const MeasuredQualitiesTable = (props: {
     };
     fetchTools();
   }, []);
-  
-  
+
+  // Load existing tool selections when component mounts
+  useEffect(() => {
+    const loadExistingSelections = async () => {
+      const newSelections: {[key: number]: any[]} = {};
+      
+      for (const quality of props.data) {
+        try {
+          const response = await GetToolsForQuality(quality.measuredQualityId);
+          newSelections[quality.measuredQualityId] = response.data.map((tool: any) => tool.toolId);
+        } catch (error) {
+          console.error(`Error loading tools for quality ${quality.measuredQualityId}:`, error);
+          newSelections[quality.measuredQualityId] = [];
+        }
+      }
+      
+      setSelectedToolsByQuality(newSelections);
+    };
+    
+    if (props.data && props.data.length > 0) {
+      loadExistingSelections();
+    }
+  }, [props.data]);
+
+  // Handle tool selection changes with real-time API calls
+  const handleToolSelectionChange = async (qualityId: number, newValue: any[]) => {
+    const currentValue = selectedToolsByQuality[qualityId] || [];
+    
+    // Find newly selected tools
+    const newlySelected = newValue.filter(toolId => !currentValue.includes(toolId));
+    
+    // Find deselected tools
+    const deselected = currentValue.filter(toolId => !newValue.includes(toolId));
+    
+    try {
+      // Assign new tools
+      for (const toolId of newlySelected) {
+        await AssignToolToQuality(toolId, qualityId);
+        console.log(`Tool ${toolId} assigned to quality ${qualityId}`);
+      }
+      
+      // Remove deselected tools
+      for (const toolId of deselected) {
+        await RemoveToolFromQuality(toolId, qualityId);
+        console.log(`Tool ${toolId} removed from quality ${qualityId}`);
+      }
+      
+      // Update state only after successful API calls
+      setSelectedToolsByQuality(prev => ({
+        ...prev,
+        [qualityId]: newValue
+      }));
+      
+    } catch (error) {
+      console.error('Error updating tool assignments:', error);
+      alert('Failed to update tool assignments. Please try again.');
+      
+      // Revert to previous state on error
+      setSelectedToolsByQuality(prev => ({
+        ...prev,
+        [qualityId]: currentValue
+      }));
+    }
+  };
+
+  // const assignToolToQuality = async (toolId: number, qualityId: number) => {
+  //   try {
+  //     const response = await AssignToolToQuality(toolId, qualityId);
+  //     console.log('Tool assigned successfully:', response.data);
+  //   } catch (error) {
+  //     console.error('Error assigning tool:', error);
+  //   }
+  // };
+
   const datatable = {
     columns: [
       {
@@ -40,7 +112,7 @@ const MeasuredQualitiesTable = (props: {
         attributes: {
           "aria-controls": "DataTable",
           "aria-label": "Quality Name",
-          className: "text-center",
+          className: "",
         },
       },
       {
@@ -49,7 +121,7 @@ const MeasuredQualitiesTable = (props: {
         sort: "asc",
         width: 150,
         attributes: {
-          className: "text-center",
+          className: "",
         },
       },
       {
@@ -58,7 +130,7 @@ const MeasuredQualitiesTable = (props: {
         sort: "asc",
         width: 150,
         attributes: {
-          className: "text-center",
+          className: "",
         },
       },
       {
@@ -67,7 +139,7 @@ const MeasuredQualitiesTable = (props: {
         sort: "disabled",
         width: 150,
         attributes: {
-          className: "text-center",
+          className: "",
         },
       },
       {
@@ -76,17 +148,17 @@ const MeasuredQualitiesTable = (props: {
         sort: "disabled",
         width: 150,
         attributes: {
-          className: "text-center",
+          className: "",
         },
       },
     ],
 
     rows: props.data.map((data: any) => ({
-      measuredQualityName: <div className="text-center">{data.measuredQualityName}</div>,
-      measuredQualityDescription: <div className="text-center">{data.measuredQualityDescription}</div>,
-      qualityDisplayName: <div className="text-center">{data.qualityDisplayName}</div>,
+      measuredQualityName: <div className="">{data.measuredQualityName}</div>,
+      measuredQualityDescription: <div className="">{data.measuredQualityDescription}</div>,
+      qualityDisplayName: <div className="">{data.qualityDisplayName}</div>,
       actions: (
-        <div className="text-center">
+        <div className="">
           <button
             onClick={() => {
               navigate(`/measured-qualities/edit/${data.measuredQualityId}`, {
@@ -122,20 +194,29 @@ const MeasuredQualitiesTable = (props: {
         </div>
       ),
       Tools: (
-        <div className="text-center">
+        <div className="">
           <FormControl sx={{ m: 1, width: 200 }} size="small">
             <InputLabel id={`multi-select-tools-label-${data.measuredQualityId}`}>Select Tools</InputLabel>
             <Select
-              labelId={`multi-select-tools-label-${""}`}
+              labelId={`multi-select-tools-label-${data.measuredQualityId}`}
               multiple
-              value={selectedTools}
-              onChange={e => setSelectedTools(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value)}
+              value={selectedToolsByQuality[data.measuredQualityId] || []}
+              onChange={async (e) => {
+                const newValue = typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value;
+                await handleToolSelectionChange(data.measuredQualityId, newValue);
+              }}
               input={<OutlinedInput label="Select Tools" />}
-              renderValue={(selected) => (selected as any[]).map(toolId => tools.find(t => t.toolId === toolId)?.name).join(', ')}
+              renderValue={(selected) =>
+                (selected as any[]).map(toolId =>
+                  tools.find(t => t.toolId === toolId)?.name
+                ).join(', ')
+              }
             >
               {tools.map((tool) => (
                 <MenuItem key={tool.toolId} value={tool.toolId}>
-                  <Checkbox checked={selectedTools.includes(tool.toolId)} />
+                  <Checkbox
+                    checked={(selectedToolsByQuality[data.measuredQualityId] || []).includes(tool.toolId)}
+                  />
                   <ListItemText primary={tool.name} />
                 </MenuItem>
               ))}

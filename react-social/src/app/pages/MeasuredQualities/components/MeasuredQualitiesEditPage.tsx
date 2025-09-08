@@ -1,6 +1,6 @@
 import clsx from "clsx";
-import { Form, useFormik } from "formik";
-import { useState, useEffect } from "react";
+import { useFormik } from "formik";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
@@ -44,8 +44,8 @@ const MeasuredQualitiesEditPage = (props?: { setPageLoading?: any }) => {
     onSubmit: async (values) => {
       setLoading(true);
       try {
-        console.log("Attempting to update question:");
-        console.log("Question ID:", values.measuredQualityId);
+        console.log("Attempting to update Measured Quality:");
+        console.log("Quality ID:", values.measuredQualityId);
         console.log("Values being sent:", values);
 
         if (!values.measuredQualityId) {
@@ -55,7 +55,15 @@ const MeasuredQualitiesEditPage = (props?: { setPageLoading?: any }) => {
           return;
         }
 
-        const response = await UpdateMeasuredQualitiesData(values.measuredQualityId, values);
+        const updatePayload = {
+          measuredQualityName: values.measuredQualityName,
+          measuredQualityDescription: values.measuredQualityDescription,
+          qualityDisplayName: values.qualityDisplayName,
+          // Explicitly exclude tools field to prevent relationship reset
+        };
+
+        console.log("Values being sent:", updatePayload);
+        const response = await UpdateMeasuredQualitiesData(values.measuredQualityId, updatePayload);
         console.log("Update successful:", response);
         navigate("/measured-qualities");
 

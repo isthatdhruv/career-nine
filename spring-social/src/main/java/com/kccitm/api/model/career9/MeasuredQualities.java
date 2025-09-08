@@ -10,9 +10,12 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
+import javax.persistence.JoinTable;
 import javax.persistence.ManyToMany;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
 @Table(name = "measured_qualities")
@@ -36,7 +39,13 @@ public class MeasuredQualities implements Serializable {
     private List<MeasuredQualityTypes> qualityTypes;
 
     // Many-to-Many relationship with Tools
-    @ManyToMany(mappedBy = "measuredQualities")
+    @ManyToMany
+    @JoinTable(
+        name = "tool_measured_quality_mapping",
+        joinColumns = @JoinColumn(name = "measured_quality_id"),
+        inverseJoinColumns = @JoinColumn(name = "tool_id")
+    )
+    @JsonIgnoreProperties("measuredQualities")
     private Set<Tool> tools = new HashSet<>();
 
     //Getters and Setters
@@ -72,12 +81,31 @@ public class MeasuredQualities implements Serializable {
         this.quality_display_name = quality_display_name;
     }
 
+    public List<MeasuredQualityTypes> getQualityTypes() {
+        return qualityTypes;
+    }
+
+    public void setQualityTypes(List<MeasuredQualityTypes> qualityTypes) {
+        this.qualityTypes = qualityTypes;
+    }
+
     public Set<Tool> getTools() {
         return tools;
     }
 
     public void setTools(Set<Tool> tools) {
         this.tools = tools;
+    }
+
+    // Helper methods for managing relationships
+    public void addTool(Tool tool) {
+        this.tools.add(tool);
+        tool.getMeasuredQualities().add(this);
+    }
+
+    public void removeTool(Tool tool) {
+        this.tools.remove(tool);
+        tool.getMeasuredQualities().remove(this);
     }
 
 }

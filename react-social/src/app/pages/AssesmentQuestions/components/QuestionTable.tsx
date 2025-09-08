@@ -1,9 +1,17 @@
+import { Checkbox, FormControl, InputLabel, ListItemText, MenuItem, OutlinedInput, Select } from "@mui/material";
 import { MDBDataTableV5 } from "mdbreact";
+import { useEffect, useState } from "react";
 import { AiFillEdit } from "react-icons/ai";
 import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
-import { DeleteQuestionData } from "../API/Question_APIs";
+import {
+  AssignMeasuredQualityTypeToQuestion,
+  DeleteQuestionData,
+  GetMeasuredQualityTypesForQuestion,
+  ReadMeasuredQualityTypes,
+  RemoveMeasuredQualityTypeFromQuestion
+} from "../API/Question_APIs";
 
 const QuestionTable = (props: {
   data: any;
@@ -12,6 +20,85 @@ const QuestionTable = (props: {
   setPageLoading: any;
 }) => {
   const navigate = useNavigate();
+  const [selectedMeasuredQualityTypesByQuestion, setSelectedMeasuredQualityTypesByQuestion] = useState<{ [key: number]: any[] }>({});
+  const [measuredQualityTypes, setMeasuredQualityTypes] = useState<any[]>([]);
+
+  // Fetch measured quality types
+  useEffect(() => {
+    const fetchMeasuredQualityTypes = async () => {
+      try {
+        const response = await ReadMeasuredQualityTypes();
+        setMeasuredQualityTypes(response.data);
+      } catch (error) {
+        console.error("Error fetching MeasuredQualityTypes:", error);
+      }
+    };
+    fetchMeasuredQualityTypes();
+  }, []);
+
+  // Load existing selections when component mounts
+  useEffect(() => {
+    const loadExistingSelections = async () => {
+      const newSelections: {[key: number]: any[]} = {};
+      
+      for (const question of props.data) {
+        try {
+          const response = await GetMeasuredQualityTypesForQuestion(question.id);
+          newSelections[question.id] = response.data.map((type: any) => type.measuredQualityTypeId);
+        } catch (error) {
+          console.error(`Error loading quality types for question ${question.id}:`, error);
+          newSelections[question.id] = [];
+        }
+      }
+      
+      setSelectedMeasuredQualityTypesByQuestion(newSelections);
+    };
+    
+    if (props.data && props.data.length > 0) {
+      loadExistingSelections();
+    }
+  }, [props.data]);
+
+  // Handle measured quality type selection changes with real-time API calls
+  const handleMeasuredQualityTypeSelectionChange = async (questionId: number, newValue: any[]) => {
+    const currentValue = selectedMeasuredQualityTypesByQuestion[questionId] || [];
+    
+    // Find newly selected types
+    const newlySelected = newValue.filter(typeId => !currentValue.includes(typeId));
+    
+    // Find deselected types
+    const deselected = currentValue.filter(typeId => !newValue.includes(typeId));
+    
+    try {
+      // Assign new types
+      for (const typeId of newlySelected) {
+        await AssignMeasuredQualityTypeToQuestion(typeId, questionId);
+        console.log(`MeasuredQualityType ${typeId} assigned to Question ${questionId}`);
+      }
+      
+      // Remove deselected types
+      for (const typeId of deselected) {
+        await RemoveMeasuredQualityTypeFromQuestion(typeId, questionId);
+        console.log(`MeasuredQualityType ${typeId} removed from Question ${questionId}`);
+      }
+      
+      // Update state only after successful API calls
+      setSelectedMeasuredQualityTypesByQuestion(prev => ({
+        ...prev,
+        [questionId]: newValue
+      }));
+      
+    } catch (error) {
+      console.error('Error updating MeasuredQualityType assignments:', error);
+      alert('Failed to update MeasuredQualityType assignments. Please try again.');
+      
+      // Revert to previous state on error
+      setSelectedMeasuredQualityTypesByQuestion(prev => ({
+        ...prev,
+        [questionId]: currentValue
+      }));
+    }
+  };
 
   const datatable = {
     columns: [
@@ -22,6 +109,7 @@ const QuestionTable = (props: {
         attributes: {
           "aria-controls": "DataTable",
           "aria-label": "Question Text",
+          className: "",
         },
       },
       {
@@ -29,27 +117,45 @@ const QuestionTable = (props: {
         field: "questionType",
         sort: "asc",
         width: 150,
+        attributes: {
+          className: "",
+        },
       },
       {
         label: "Section",
         field: "sectionType",
         sort: "asc",
         width: 150,
+        attributes: {
+          className: "",
+        },
       },
       {
         label: "Actions",
         field: "actions",
         sort: "disabled",
         width: 150,
+        attributes: {
+          className: "",
+        },
+      },
+      {
+        label: "MeasuredQualityTypes",
+        field: "MeasuredQualityTypes",
+        sort: "disabled",
+        width: 150,
+        attributes: {
+          className: "",
+        },
       },
     ],
 
     rows: props.data.map((data: any) => ({
-      questionText: data.questionText,
-      questionType: data.questionType,
-      sectionType: props.sections.find(section => section.id === data.sectionId)?.sectionName ?? "un",
+      questionText: <div className="">{data.questionText}</div>,
+      questionType: <div className="">{data.questionType}</div>,
+      sectionType: <div className="">{props.sections.find(section => section.id === data.sectionId)?.sectionName ?? "Unknown"}</div>,
       actions: (
-        <>
+        <div className="">
           <button
             onClick={() => {
               navigate(`/assessment-questions/edit/${data.id}`, {
@@ -81,8 +187,39 @@ const QuestionTable = (props: {
               strokeColor={"#EFF8FE"}
             />
           </button>
-        </>
+        </div>
       ),
+      MeasuredQualityTypes: (
+        <div className="">
+          <FormControl sx={{ m: 1, width: 200 }} size="small">
+            <InputLabel id={`multi-select-quality-types-label-${data.id}`}>Select Quality Types</InputLabel>
+            <Select
+              labelId={`multi-select-quality-types-label-${data.id}`}
+              multiple
+              value={selectedMeasuredQualityTypesByQuestion[data.id] || []}
+              onChange={async (e) => {
+                const newValue = typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value;
+                await handleMeasuredQualityTypeSelectionChange(data.id, newValue);
+              }}
+              input={<OutlinedInput label="Select Quality Types" />}
+              renderValue={(selected) =>
+                (selected as any[]).map(typeId =>
+                  measuredQualityTypes.find(t => t.measuredQualityTypeId === typeId)?.measuredQualityTypeName
+                ).join(', ')
+              }
+            >
+              {measuredQualityTypes.map((type) => (
+                <MenuItem key={type.measuredQualityTypeId} value={type.measuredQualityTypeId}>
+                  <Checkbox
+                    checked={(selectedMeasuredQualityTypesByQuestion[data.id] || []).includes(type.measuredQualityTypeId)}
+                  />
+                  <ListItemText primary={type.measuredQualityTypeName} />
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </div>
+      )
     })),
   };
   
