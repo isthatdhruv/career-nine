@@ -38,7 +38,12 @@ const CareerTable = (props: { data: any; setLoading: any; setPageLoading: any; }
           const response = await GetMeasuredQualityTypesForCareer(career.career_id);
           newSelections[career.career_id] = response.data.map((type: any) => type.measuredQualityTypeId);
         } catch (error) {
-          console.error(`Error loading quality types for career ${career.career_id}:`, error);
+          // Handle 404 errors gracefully (career might have been deleted)
+          if ((error as any)?.response?.status === 404) {
+            console.log(`Career ${career.career_id} not found, skipping...`);
+          } else {
+            console.error(`Error loading quality types for career ${career.career_id}:`, error);
+          }
           newSelections[career.career_id] = [];
         }
       }
@@ -46,6 +51,9 @@ const CareerTable = (props: { data: any; setLoading: any; setPageLoading: any; }
     };
     if (props.data && props.data.length > 0) {
       loadExistingSelections();
+    } else {
+      // Clear selections if no data
+      setSelectedMeasuredQualityTypesByCareer({});
     }
   }, [props.data]);
 
@@ -90,6 +98,13 @@ const CareerTable = (props: { data: any; setLoading: any; setPageLoading: any; }
             onClick={async () => {
               props.setLoading(true);
               try {
+                // Remove the career from local state immediately to prevent API calls
+                setSelectedMeasuredQualityTypesByCareer(prev => {
+                  const newState = {...prev};
+                  delete newState[data.career_id];
+                  return newState;
+                });
+                
                 await DeleteCareerData(data.career_id);
                 props.setPageLoading(["true"]);
               } catch (error) {

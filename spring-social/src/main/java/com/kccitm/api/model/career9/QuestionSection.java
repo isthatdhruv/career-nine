@@ -11,7 +11,7 @@ import javax.persistence.JoinColumn;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
-import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "question_sections")
@@ -28,7 +28,7 @@ public class QuestionSection implements Serializable {
     //1 Section to Many Questions (section question mapping)
     @OneToMany(cascade=CascadeType.ALL)
     @JoinColumn(name="fk_question_section",referencedColumnName = "sectionId")
-    @JsonManagedReference
+    @JsonIgnore
     private List<AssessmentQuestions> questions;
 
 
