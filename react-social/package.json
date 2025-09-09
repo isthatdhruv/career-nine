@@ -62,6 +62,7 @@
     "statistics.ts": "^1.0.1",
     "underscore": "^1.13.6",
     "universal-cookie": "^4.0.4",
+    "xlsx": "^0.18.5",
     "yup": "0.32.11"
   },
   "devDependencies": {
