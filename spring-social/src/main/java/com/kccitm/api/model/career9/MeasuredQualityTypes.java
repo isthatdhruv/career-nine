@@ -1,6 +1,7 @@
 package com.kccitm.api.model.career9;
 import java.io.Serializable;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import javax.persistence.Column;
@@ -11,6 +12,7 @@ import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.JoinTable;
 import javax.persistence.ManyToMany;
+import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -43,11 +45,21 @@ public class MeasuredQualityTypes implements Serializable {
     )
     private Set<Career> careers = new HashSet<>();
 
+    @OneToMany(mappedBy = "measuredQualityType")
+    private List<OptionScoreBasedOnMEasuredQualityTypes> optionScores;
+
     @ManyToMany(mappedBy = "measuredQualityTypes")
     @JsonIgnore
     private Set<AssessmentQuestions> assessmentQuestions = new HashSet<>();
 
     // Getters and Setters
+    public List<OptionScoreBasedOnMEasuredQualityTypes> getOptionScores() {
+        return optionScores;
+    }
+    public void setOptionScores(List<OptionScoreBasedOnMEasuredQualityTypes> optionScores) {
+        this.optionScores = optionScores;
+    }
+
     public Long getMeasuredQualityTypeId() {
         return measured_quality_type_id;
     }

@@ -1,5 +1,6 @@
 package com.kccitm.api.model.career9;
 import java.io.Serializable;
+import java.util.List;
 
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
@@ -7,6 +8,7 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
+import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
@@ -27,6 +29,9 @@ public class AssessmentQuestionOptions implements Serializable {
     @JoinColumn(name = "fk_assessment_questions", nullable = false)
     @JsonBackReference
     private AssessmentQuestions question;
+
+    @OneToMany(mappedBy = "question_option")
+    private List<OptionScoreBasedOnMEasuredQualityTypes> optionScores;
 
     // Getters and Setters
     public Long getOptionId() {
@@ -59,5 +64,13 @@ public class AssessmentQuestionOptions implements Serializable {
 
     public void setQuestion(AssessmentQuestions question) {
         this.question = question;
+    }
+
+    public List<OptionScoreBasedOnMEasuredQualityTypes> getOptionScores() {
+        return optionScores;
+    }
+
+    public void setOptionScores(List<OptionScoreBasedOnMEasuredQualityTypes> optionScores) {
+        this.optionScores = optionScores;
     }
 }
