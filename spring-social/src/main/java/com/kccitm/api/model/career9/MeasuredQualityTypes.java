@@ -4,7 +4,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
@@ -12,10 +11,12 @@ import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.JoinTable;
 import javax.persistence.ManyToMany;
+import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
 @Table(name = "measured_quality_types")
@@ -33,9 +34,11 @@ public class MeasuredQualityTypes implements Serializable {
 
     private String measured_quality_type_display_name;
 
-    // Foreign key for one-to-many relationship with MeasuredQualities
-    @Column(name = "fk_measured_qualities")
-    private Long fk_measured_qualities;
+    // Many-to-One relationship with MeasuredQualities
+    @ManyToOne
+    @JoinColumn(name = "fk_measured_qualities")
+    @JsonIgnoreProperties("qualityTypes")
+    private MeasuredQualities measuredQuality;
 
     @ManyToMany
     @JoinTable(
@@ -43,9 +46,11 @@ public class MeasuredQualityTypes implements Serializable {
         joinColumns = @JoinColumn(name="measured_quality_type_id"),
         inverseJoinColumns = @JoinColumn(name="career_id")
     )
+    @JsonIgnore
     private Set<Career> careers = new HashSet<>();
 
     @OneToMany(mappedBy = "measuredQualityType")
+    @JsonIgnoreProperties({"question_option", "measuredQualityType"})
     private List<OptionScoreBasedOnMEasuredQualityTypes> optionScores;
 
     @ManyToMany(mappedBy = "measuredQualityTypes")
@@ -108,12 +113,12 @@ public class MeasuredQualityTypes implements Serializable {
         this.assessmentQuestions = assessmentQuestions;
     }
 
-    public Long getFk_measured_qualities() {
-        return fk_measured_qualities;
+    public MeasuredQualities getMeasuredQuality() {
+        return measuredQuality;
     }
 
-    public void setFk_measured_qualities(Long fk_measured_qualities) {
-        this.fk_measured_qualities = fk_measured_qualities;
+    public void setMeasuredQuality(MeasuredQualities measuredQuality) {
+        this.measuredQuality = measuredQuality;
     }
 
     // Helper methods for managing the many-to-many relationships

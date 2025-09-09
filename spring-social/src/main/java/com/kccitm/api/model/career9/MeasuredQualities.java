@@ -34,8 +34,8 @@ public class MeasuredQualities implements Serializable {
     private String quality_display_name;
 
     // 1 Measured Quality to Many Quality Types (measured quality types mapping)
-    @OneToMany(cascade=CascadeType.ALL)
-    @JoinColumn(name="fk_measured_qualities",referencedColumnName = "measured_quality_id")
+    @OneToMany(mappedBy = "measuredQuality", cascade=CascadeType.ALL)
+    @JsonIgnoreProperties("measuredQuality")
     private List<MeasuredQualityTypes> qualityTypes;
 
     // Many-to-Many relationship with Tools

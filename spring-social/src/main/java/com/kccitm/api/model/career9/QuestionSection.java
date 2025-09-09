@@ -7,7 +7,6 @@ import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
-import javax.persistence.JoinColumn;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
@@ -26,8 +25,7 @@ public class QuestionSection implements Serializable {
     private String sectionDescription;
 
     //1 Section to Many Questions (section question mapping)
-    @OneToMany(cascade=CascadeType.ALL)
-    @JoinColumn(name="fk_question_section",referencedColumnName = "sectionId")
+    @OneToMany(mappedBy = "section", cascade=CascadeType.ALL)
     @JsonIgnore
     private List<AssessmentQuestions> questions;
 

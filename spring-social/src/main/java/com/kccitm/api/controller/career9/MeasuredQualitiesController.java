@@ -1,9 +1,7 @@
 package com.kccitm.api.controller.career9;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -42,31 +40,27 @@ public class MeasuredQualitiesController {
     }
 
     @PostMapping("/create")
-    public MeasuredQualities createMeasuredQualities(@RequestBody MeasuredQualities measuredQualities) {
-        Long id = measuredQualities.getTools().iterator().next().getToolId();
-        Tool tool = toolRepository.getById(id);
-        Set<Tool> tools = new HashSet<>();
-        tools.add(tool);
-        measuredQualities.setTools(tools);
-        return measuredQualitiesRepository.save(measuredQualities); 
+    public ResponseEntity<MeasuredQualities> createMeasuredQualities(@RequestBody MeasuredQualities measuredQualities) {
+        try {
+            // Don't automatically set tools relationships during creation
+            // This should be done via separate relationship management endpoints
+            MeasuredQualities savedQuality = measuredQualitiesRepository.save(measuredQualities);
+            return ResponseEntity.ok(savedQuality);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     @PutMapping("/update/{id}")
     public MeasuredQualities updateMeasuredQualities(@PathVariable Long id,
             @RequestBody MeasuredQualities measuredQualities) {
-        System.out.println("Updating measured quality ID: " + id);
 
-        // Get existing entity from database
         MeasuredQualities existingQuality = measuredQualitiesRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("MeasuredQuality not found"));
 
-        // Update only the fields that should be updated (preserve relationships)
         existingQuality.setMeasuredQualityName(measuredQualities.getMeasuredQualityName());
         existingQuality.setMeasuredQualityDescription(measuredQualities.getMeasuredQualityDescription());
         existingQuality.setQualityDisplayName(measuredQualities.getQualityDisplayName());
-
-        // DON'T update tools - preserve existing relationships
-        // existingQuality.setTools(measuredQuality.getTools()); // Remove this line
 
         return measuredQualitiesRepository.save(existingQuality);
     }

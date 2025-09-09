@@ -48,15 +48,11 @@ public class AssessmentQuestionController {
 
     @PostMapping("/create")
     public AssessmentQuestions createAssessmentQuestion(@RequestBody AssessmentQuestions assessmentQuestions) {
-        System.out.println("Creating assessment question: " + assessmentQuestions.toString());
-        
-        // Handle section relationship
         if (assessmentQuestions.getSection() != null && assessmentQuestions.getSection().getSectionId() != null) {
             QuestionSection section = questionSectionRepository.findById(assessmentQuestions.getSection().getSectionId()).orElse(null);
             assessmentQuestions.setSection(section);
         }
         
-        // Handle options relationship
         if (assessmentQuestions.getOptions() != null && !assessmentQuestions.getOptions().isEmpty()) {
             for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
                 option.setQuestion(assessmentQuestions);
@@ -67,18 +63,12 @@ public class AssessmentQuestionController {
     }
     @PutMapping("/update/{id}")
     public AssessmentQuestions updateAssessmentQuestion(@PathVariable Long id, @RequestBody AssessmentQuestions assessmentQuestions) {
-        System.out.println("Updating assessment question with ID: " + id);
-        System.out.println("Request body: " + assessmentQuestions.toString());
-        
-        // Get existing question to preserve relationships
         AssessmentQuestions existingQuestion = assessmentQuestionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Question not found with ID: " + id));
         
-        // Update only the fields that should be updated
         existingQuestion.setQuestionText(assessmentQuestions.getQuestionText());
         existingQuestion.setQuestionType(assessmentQuestions.getQuestionType());
         
-        // Handle section relationship - only update if provided
         if (assessmentQuestions.getSection() != null && assessmentQuestions.getSection().getSectionId() != null) {
             QuestionSection section = questionSectionRepository.findById(assessmentQuestions.getSection().getSectionId()).orElse(null);
             if (section != null) {
@@ -86,25 +76,18 @@ public class AssessmentQuestionController {
             }
         }
         
-        // Handle options relationship - only update if provided
         if (assessmentQuestions.getOptions() != null && !assessmentQuestions.getOptions().isEmpty()) {
-            // Clear existing options to avoid orphaned records
             if (existingQuestion.getOptions() != null) {
                 existingQuestion.getOptions().clear();
             }
             
-            // Set new options
             for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
                 option.setQuestion(existingQuestion);
             }
             existingQuestion.setOptions(assessmentQuestions.getOptions());
         }
         
-        // DON'T update measuredQualityTypes - preserve existing relationships
-        
-        AssessmentQuestions updated = assessmentQuestionRepository.save(existingQuestion);
-        System.out.println("Successfully updated assessment question: " + updated.toString());
-        return updated;
+        return assessmentQuestionRepository.save(existingQuestion);
     }
     @DeleteMapping("/delete/{id}")
     public void deleteAssessmentQuestion(@PathVariable Long id) {
