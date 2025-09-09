@@ -1,7 +1,9 @@
 package com.kccitm.api.controller.career9;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -41,7 +43,12 @@ public class MeasuredQualitiesController {
 
     @PostMapping("/create")
     public MeasuredQualities createMeasuredQualities(@RequestBody MeasuredQualities measuredQualities) {
-        return measuredQualitiesRepository.save(measuredQualities);
+        Long id = measuredQualities.getTools().iterator().next().getToolId();
+        Tool tool = toolRepository.getById(id);
+        Set<Tool> tools = new HashSet<>();
+        tools.add(tool);
+        measuredQualities.setTools(tools);
+        return measuredQualitiesRepository.save(measuredQualities); 
     }
 
     @PutMapping("/update/{id}")
