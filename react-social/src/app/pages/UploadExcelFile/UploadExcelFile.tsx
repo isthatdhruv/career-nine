@@ -3,10 +3,23 @@ import { Button, Modal, Dropdown } from "react-bootstrap";
 import { IconContext } from "react-icons";
 import { MdQuestionAnswer } from "react-icons/md";
 import { ReadToolData } from "../Tool/API/Tool_APIs";
+import { MDBDataTableV5 } from "mdbreact";
+import * as XLSX from "xlsx"; // Add this import
+import { setData } from "./StudentDataComputationExcel";
+import { SchoolOMRRow } from "./DataStructure";
 
 export default function ToolsPage() {
   const [fileName, setFileName] = useState("");
   const [showModal, setShowModal] = useState(false);
+  const [tools, setTools] = useState<any[]>([]);
+  const [selectedTool, setSelectedTool] = useState<string>("Select Tool");
+  const [tableData, setTableData] = useState<{
+    columns: { label: string; field: string; sort: string; width: number }[];
+    rows: any[];
+  }>({
+    columns: [],
+    rows: [],
+  });
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0]; // only one file allowed
@@ -23,22 +36,51 @@ export default function ToolsPage() {
         return;
       }
 
+      // Read the Excel file
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: "array" });
+
+        // Get first worksheet
+        const worksheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[worksheetName];
+
+        // Convert to JSON
+        const jsonData:any[] = XLSX.utils.sheet_to_json(worksheet);
+        var data2:SchoolOMRRow[] = setData( jsonData); // Use the setData function to process data
+        if (data2.length > 0) {
+          // Create columns from the first row
+          const columns = Object.keys(data2[0]).map((key) => ({
+            label: key,
+            field: key,
+            sort: "asc",
+            width: 150,
+          }));
+
+          // Set the table data
+          setTableData({
+            columns: columns,
+            rows: jsonData,
+          });
+        }
+      };
+      reader.readAsArrayBuffer(file);
       setFileName(file.name);
       setShowModal(false); // close modal after valid selection
     }
   };
 
   useEffect(() => {
-    const fetchSections = async () => {
+    const fetchTools = async () => {
       try {
         const response = await ReadToolData();
-        console.log("Fetched sections data:", response.data);
-        // You can process response.data here as needed
+        setTools(response.data);
       } catch (error) {
-        console.error("Error fetching sections:", error);
+        console.error("Error fetching tools:", error);
       }
     };
-    fetchSections();
+    fetchTools();
   }, []);
 
   return (
@@ -60,9 +102,20 @@ export default function ToolsPage() {
               </Dropdown.Toggle>
 
               <Dropdown.Menu>
-                <Dropdown.Item href="#/action-1">Tool 1</Dropdown.Item>
-                <Dropdown.Item href="#/action-2">Tool 2</Dropdown.Item>
-                <Dropdown.Item href="#/action-3">Tool 3</Dropdown.Item>
+                {tools.length > 0 ? (
+                  tools.map((tool) => (
+                    <Dropdown.Item
+                      key={tool.id} // 🔑 use correct field from API
+                      onClick={
+                        () => setSelectedTool(tool.name) // 🔑 adjust if API field is toolName/title
+                      }
+                    >
+                      {tool.name}
+                    </Dropdown.Item>
+                  ))
+                ) : (
+                  <Dropdown.Item disabled>No tools available</Dropdown.Item>
+                )}
               </Dropdown.Menu>
             </Dropdown>
           )}
@@ -107,6 +160,15 @@ export default function ToolsPage() {
           </Button>
         </Modal.Footer>
       </Modal>
+      <MDBDataTableV5
+        hover
+        scrollY
+        maxHeight="160vh"
+        entriesOptions={[5, 20, 25]}
+        entries={25}
+        pagesAmount={4}
+        data={tableData} // Add the table data here
+      />
     </div>
   );
 }
