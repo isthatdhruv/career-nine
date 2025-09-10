@@ -39,9 +39,6 @@ public class ToolController {
 
     @PostMapping(value = "/create" , headers = "Accept=application/json")
     public Tool createTool(@RequestBody Tool tool) {
-        System.out.println("Creating tool: " + tool.getName() + ", isFree: " + tool.isFree() + ", price: " + tool.getPrice());
-        
-        // Ensure data consistency
         if (tool.isFree()) {
             tool.setPrice(0.0);
         }
@@ -51,11 +48,8 @@ public class ToolController {
     
     @PutMapping("/update/{id}")
     public Tool updateTool(@PathVariable Long id, @RequestBody Tool tool) {
-        System.out.println("Updating tool ID: " + id + ", name: " + tool.getName() + ", isFree: " + tool.isFree() + ", price: " + tool.getPrice());
-        
         tool.setToolId(id);
         
-        // Ensure data consistency
         if (tool.isFree()) {
             tool.setPrice(0.0);
         }
@@ -70,23 +64,18 @@ public class ToolController {
                 return ResponseEntity.notFound().build();
             }
             
-            // Remove all many-to-many relationships first
             for (MeasuredQualities quality : tool.getMeasuredQualities()) {
                 quality.removeTool(tool);
                 measuredQualitiesRepository.save(quality);
             }
             
-            // Clear the tool's relationships
             tool.getMeasuredQualities().clear();
             toolRepository.save(tool);
             
-            // Now delete the tool
             toolRepository.deleteById(id);
             
             return ResponseEntity.ok("Tool deleted successfully");
         } catch (Exception e) {
-            System.err.println("Error deleting tool with ID " + id + ": " + e.getMessage());
-            e.printStackTrace();
             return ResponseEntity.internalServerError().body("Failed to delete tool: " + e.getMessage());
         }
     }
@@ -133,8 +122,5 @@ public class ToolController {
         
         return ResponseEntity.ok(tool.getMeasuredQualities());
     }
-    
-    // Test endpoint to add sample data
-    
-    }
+}
 

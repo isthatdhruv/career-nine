@@ -53,7 +53,7 @@ public class CareerController {
     public void deleteCareer(@PathVariable Long id) {
         careerRepository.deleteById(id);
     }
-    // Many-to-Many: Get MeasuredQualityTypes for a Career
+    
     @GetMapping("/{id}/measured-quality-types")
     public List<com.kccitm.api.model.career9.MeasuredQualityTypes> getMeasuredQualityTypesForCareer(@PathVariable Long id) {
         Career career = careerRepository.findById(id).orElse(null);

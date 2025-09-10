@@ -165,13 +165,14 @@ public class MeasuredQualityTypesController {
             return ResponseEntity.badRequest().body("MeasuredQualityType not found");
         }
         
-        // Check if the quality exists
-        if (!measuredQualitiesRepository.existsById(qualityId)) {
+        // Get the MeasuredQuality entity
+        com.kccitm.api.model.career9.MeasuredQualities measuredQuality = measuredQualitiesRepository.findById(qualityId).orElse(null);
+        if (measuredQuality == null) {
             return ResponseEntity.badRequest().body("MeasuredQuality not found");
         }
         
-        // Set the foreign key
-        measurementType.setFk_measured_qualities(qualityId);
+        // Set the relationship using the proper JPA mapping
+        measurementType.setMeasuredQuality(measuredQuality);
         measuredQualityTypesRepository.save(measurementType);
         
         return ResponseEntity.ok("MeasuredQualityType successfully assigned to MeasuredQuality");
@@ -185,8 +186,8 @@ public class MeasuredQualityTypesController {
             return ResponseEntity.badRequest().body("MeasuredQualityType not found");
         }
         
-        // Remove the association (set foreign key to null)
-        measurementType.setFk_measured_qualities(null);
+        // Remove the association (set to null)
+        measurementType.setMeasuredQuality(null);
         measuredQualityTypesRepository.save(measurementType);
         
         return ResponseEntity.ok("MeasuredQualityType successfully removed from MeasuredQuality");

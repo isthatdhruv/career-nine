@@ -7,10 +7,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import com.kccitm.api.model.career9.MeasuredQualityTypes;
+import com.kccitm.api.model.career9.Tool;
 
 @Repository
-public interface MeasuredQualityTypesRepository extends JpaRepository<MeasuredQualityTypes, Long> {
+public interface ToolMeasuredQualitiesMappingRepository extends JpaRepository<Tool, Long> {
 
-   
+    
 }
