@@ -48,16 +48,16 @@ public class AssessmentQuestionController {
 
     @PostMapping("/create")
     public AssessmentQuestions createAssessmentQuestion(@RequestBody AssessmentQuestions assessmentQuestions) {
-        if (assessmentQuestions.getSection() != null && assessmentQuestions.getSection().getSectionId() != null) {
-            QuestionSection section = questionSectionRepository.findById(assessmentQuestions.getSection().getSectionId()).orElse(null);
-            assessmentQuestions.setSection(section);
-        }
+        // if (assessmentQuestions.getSection() != null && assessmentQuestions.getSection().getSectionId() != null) {
+        //     QuestionSection section = questionSectionRepository.findById(assessmentQuestions.getSection().getSectionId()).orElse(null);
+        //     assessmentQuestions.setSection(section);
+        // }
         
-        if (assessmentQuestions.getOptions() != null && !assessmentQuestions.getOptions().isEmpty()) {
-            for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
-                option.setQuestion(assessmentQuestions);
-            }
-        }
+        // if (assessmentQuestions.getOptions() != null && !assessmentQuestions.getOptions().isEmpty()) {
+        //     for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
+        //         option.setQuestion(assessmentQuestions);
+        //     }
+        // }
         
         return assessmentQuestionRepository.save(assessmentQuestions);
     }

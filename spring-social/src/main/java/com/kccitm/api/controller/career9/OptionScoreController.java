@@ -48,25 +48,6 @@ public class OptionScoreController {
     @PostMapping("/create")
     public ResponseEntity<OptionScoreBasedOnMEasuredQualityTypes> createOptionScore(@RequestBody OptionScoreBasedOnMEasuredQualityTypes optionScore) {
         try {
-            if (optionScore.getQuestion_option() == null || optionScore.getQuestion_option().getOptionId() == null) {
-                return ResponseEntity.badRequest().build();
-            }
-            if (optionScore.getMeasuredQualityType() == null || optionScore.getMeasuredQualityType().getMeasuredQualityTypeId() == null) {
-                return ResponseEntity.badRequest().build();
-            }
-
-            AssessmentQuestionOptions option = optionRepository.findById(optionScore.getQuestion_option().getOptionId())
-                .orElse(null);
-            MeasuredQualityTypes qualityType = qualityTypeRepository.findById(optionScore.getMeasuredQualityType().getMeasuredQualityTypeId())
-                .orElse(null);
-
-            if (option == null || qualityType == null) {
-                return ResponseEntity.badRequest().build();
-            }
-
-            optionScore.setQuestion_option(option);
-            optionScore.setMeasuredQualityType(qualityType);
-
             OptionScoreBasedOnMEasuredQualityTypes savedScore = optionScoreRepository.save(optionScore);
             return ResponseEntity.ok(savedScore);
             
@@ -77,31 +58,12 @@ public class OptionScoreController {
 
     @PutMapping("/update/{id}")
     public ResponseEntity<OptionScoreBasedOnMEasuredQualityTypes> updateOptionScore(@PathVariable Long id, @RequestBody OptionScoreBasedOnMEasuredQualityTypes optionScore) {
-        if (!optionScoreRepository.existsById(id)) {
-            return ResponseEntity.notFound().build();
-        }
+      
 
         try {
             optionScore.setScoreId(id);
             
-            if (optionScore.getQuestion_option() != null && optionScore.getQuestion_option().getOptionId() != null) {
-                AssessmentQuestionOptions option = optionRepository.findById(optionScore.getQuestion_option().getOptionId())
-                    .orElse(null);
-                if (option == null) {
-                    return ResponseEntity.badRequest().build();
-                }
-                optionScore.setQuestion_option(option);
-            }
-
-            if (optionScore.getMeasuredQualityType() != null && optionScore.getMeasuredQualityType().getMeasuredQualityTypeId() != null) {
-                MeasuredQualityTypes qualityType = qualityTypeRepository.findById(optionScore.getMeasuredQualityType().getMeasuredQualityTypeId())
-                    .orElse(null);
-                if (qualityType == null) {
-                    return ResponseEntity.badRequest().build();
-                }
-                optionScore.setMeasuredQualityType(qualityType);
-            }
-
+            
             OptionScoreBasedOnMEasuredQualityTypes updatedScore = optionScoreRepository.save(optionScore);
             return ResponseEntity.ok(updatedScore);
             

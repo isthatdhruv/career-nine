@@ -2,6 +2,7 @@ package com.kccitm.api.model.career9;
 import java.io.Serializable;
 import java.util.List;
 
+import javax.persistence.CascadeType;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
@@ -31,7 +32,7 @@ public class AssessmentQuestionOptions implements Serializable {
     @JsonBackReference
     private AssessmentQuestions question;
 
-    @OneToMany(mappedBy = "question_option")
+    @OneToMany(mappedBy = "question_option",cascade = CascadeType.ALL)
     @JsonIgnoreProperties({"question_option", "measuredQualityType"})
     private List<OptionScoreBasedOnMEasuredQualityTypes> optionScores;
 
