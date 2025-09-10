@@ -12,6 +12,7 @@ import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
 @Table(name = "assessment_question_options")
@@ -31,6 +32,7 @@ public class AssessmentQuestionOptions implements Serializable {
     private AssessmentQuestions question;
 
     @OneToMany(mappedBy = "question_option")
+    @JsonIgnoreProperties({"question_option", "measuredQualityType"})
     private List<OptionScoreBasedOnMEasuredQualityTypes> optionScores;
 
     // Getters and Setters

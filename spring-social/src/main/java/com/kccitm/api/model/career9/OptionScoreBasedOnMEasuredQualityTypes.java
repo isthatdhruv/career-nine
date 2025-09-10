@@ -9,11 +9,17 @@ import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
+import javax.persistence.UniqueConstraint;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Entity
-@Table(name = "score_based_on_measured_quality_types")
+@Table(name = "score_based_on_measured_quality_types", 
+       uniqueConstraints = @UniqueConstraint(
+           columnNames = {"fk_option_id", "fk_measured_quality_type_id"},
+           name = "uk_option_quality_type"
+       ))
 public class OptionScoreBasedOnMEasuredQualityTypes implements Serializable {
     private static final long serialVersionUID = 1L;
 
@@ -26,10 +32,12 @@ public class OptionScoreBasedOnMEasuredQualityTypes implements Serializable {
 
     @ManyToOne
     @JoinColumn(name = "fk_option_id")
+    @JsonIgnoreProperties("optionScores")
     private AssessmentQuestionOptions question_option;
 
     @ManyToOne
     @JoinColumn(name = "fk_measured_quality_type_id")
+    @JsonIgnoreProperties("optionScores")
     private MeasuredQualityTypes measuredQualityType;
 
     //getters and setters
