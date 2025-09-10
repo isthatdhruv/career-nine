@@ -58,7 +58,12 @@ public class AssessmentQuestionController {
         //         option.setQuestion(assessmentQuestions);
         //     }
         // }
-        
+         
+        try{
+            assessmentQuestionRepository.save(assessmentQuestions);
+        }catch(Exception e){
+            System.out.println(e);
+        }
         return assessmentQuestionRepository.save(assessmentQuestions);
     }
     @PutMapping("/update/{id}")

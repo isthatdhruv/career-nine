@@ -14,8 +14,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.kccitm.api.model.career9.AssessmentQuestionOptions;
-import com.kccitm.api.model.career9.MeasuredQualityTypes;
 import com.kccitm.api.model.career9.OptionScoreBasedOnMEasuredQualityTypes;
 import com.kccitm.api.repository.Career9.AssessmentQuestionOptionsRepository;
 import com.kccitm.api.repository.Career9.MeasuredQualityTypesRepository;
@@ -47,11 +45,14 @@ public class OptionScoreController {
 
     @PostMapping("/create")
     public ResponseEntity<OptionScoreBasedOnMEasuredQualityTypes> createOptionScore(@RequestBody OptionScoreBasedOnMEasuredQualityTypes optionScore) {
+        OptionScoreBasedOnMEasuredQualityTypes score = optionScore;
         try {
-            OptionScoreBasedOnMEasuredQualityTypes savedScore = optionScoreRepository.save(optionScore);
-            return ResponseEntity.ok(savedScore);
+            // optionScoreRepository.deleteById(optionScore.getScoreId());
+             OptionScoreBasedOnMEasuredQualityTypes savedScore = optionScoreRepository.save(optionScore);
+            return ResponseEntity.ok(savedScore.getScoreId() != null ? savedScore : null);
             
         } catch (Exception e) {
+            System.out.println(e);
             return ResponseEntity.badRequest().build();
         }
     }
