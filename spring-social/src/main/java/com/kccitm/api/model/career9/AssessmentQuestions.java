@@ -28,7 +28,6 @@ public class AssessmentQuestions implements Serializable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long question_id;
 
-    private int maxOptionsAllowed; // New field for max options allowed
     private String questionText;
     private String questionType;
 
@@ -52,13 +51,6 @@ public class AssessmentQuestions implements Serializable {
     private QuestionSection section;
 
     // --- getters and setters ---
-    public int getMaxOptionsAllowed() {
-        return maxOptionsAllowed;
-    }
-    public void setMaxOptionsAllowed(int maxOptionsAllowed) {
-        this.maxOptionsAllowed = maxOptionsAllowed;
-    }
-
     public Long getQuestionId() {
         return question_id;
     }
