@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.career9.AssessmentQuestionOptions;
@@ -121,31 +120,31 @@ public class OptionScoreController {
         return ResponseEntity.ok("Option score deleted successfully");
     }
 
-    @GetMapping("/by-option/{optionId}")
-    public ResponseEntity<List<OptionScoreBasedOnMEasuredQualityTypes>> getScoresByOption(@PathVariable Long optionId) {
-        List<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository.findByQuestionOptionAssessmentQuestionOptionId(optionId);
-        return ResponseEntity.ok(scores);
-    }
+    // @GetMapping("/by-option/{optionId}")
+    // public ResponseEntity<List<OptionScoreBasedOnMEasuredQualityTypes>> getScoresByOption(@PathVariable Long optionId) {
+    //     List<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository.findByQuestionOptionAssessmentQuestionOptionId(optionId);
+    //     return ResponseEntity.ok(scores);
+    // }
 
-    @GetMapping("/by-quality-type/{qualityTypeId}")
-    public ResponseEntity<List<OptionScoreBasedOnMEasuredQualityTypes>> getScoresByQualityType(@PathVariable Long qualityTypeId) {
-        List<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository.findByMeasuredQualityTypeMeasuredQualityTypeId(qualityTypeId);
-        return ResponseEntity.ok(scores);
-    }
+    // @GetMapping("/by-quality-type/{qualityTypeId}")
+    // public ResponseEntity<List<OptionScoreBasedOnMEasuredQualityTypes>> getScoresByQualityType(@PathVariable Long qualityTypeId) {
+    //     List<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository.findByMeasuredQualityTypeMeasuredQualityTypeId(qualityTypeId);
+    //     return ResponseEntity.ok(scores);
+    // }
 
-    @GetMapping("/specific")
-    public ResponseEntity<OptionScoreBasedOnMEasuredQualityTypes> getSpecificScore(
-            @RequestParam Long optionId, 
-            @RequestParam Long qualityTypeId) {
+    // @GetMapping("/specific")
+    // public ResponseEntity<OptionScoreBasedOnMEasuredQualityTypes> getSpecificScore(
+    //         @RequestParam Long optionId, 
+    //         @RequestParam Long qualityTypeId) {
         
-        OptionScoreBasedOnMEasuredQualityTypes score = optionScoreRepository.findByOptionAndQualityType(optionId, qualityTypeId);
+    //     OptionScoreBasedOnMEasuredQualityTypes score = optionScoreRepository.findByOptionAndQualityType(optionId, qualityTypeId);
         
-        if (score == null) {
-            return ResponseEntity.notFound().build();
-        }
+    //     if (score == null) {
+    //         return ResponseEntity.notFound().build();
+    //     }
         
-        return ResponseEntity.ok(score);
-    }
+    //     return ResponseEntity.ok(score);
+    // }
 
     @PostMapping("/batch-create")
     public ResponseEntity<List<OptionScoreBasedOnMEasuredQualityTypes>> createBatchScores(@RequestBody List<OptionScoreBasedOnMEasuredQualityTypes> scores) {
@@ -158,17 +157,10 @@ public class OptionScoreController {
     }
 
     @GetMapping("/by-question/{questionId}")
-    public ResponseEntity<List<OptionScoreBasedOnMEasuredQualityTypes>> getScoresByQuestion(@PathVariable Long questionId) {
-        List<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository.findByQuestionId(questionId);
+    public ResponseEntity<Optional<OptionScoreBasedOnMEasuredQualityTypes>> getScoresByQuestion(@PathVariable Long questionId) {
+        Optional<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository.findById(questionId);
         return ResponseEntity.ok(scores);
     }
 
-    @GetMapping("/average-score/{qualityTypeId}")
-    public ResponseEntity<Double> getAverageScoreByQualityType(@PathVariable Long qualityTypeId) {
-        Double average = optionScoreRepository.getAverageScoreByQualityType(qualityTypeId);
-        if (average == null) {
-            return ResponseEntity.ok(0.0);
-        }
-        return ResponseEntity.ok(average);
-    }
+   
 }

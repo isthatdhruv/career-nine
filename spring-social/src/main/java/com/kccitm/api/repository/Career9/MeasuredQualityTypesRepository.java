@@ -12,17 +12,5 @@ import com.kccitm.api.model.career9.MeasuredQualityTypes;
 @Repository
 public interface MeasuredQualityTypesRepository extends JpaRepository<MeasuredQualityTypes, Long> {
 
-    // Find quality types by measured quality ID
-    List<MeasuredQualityTypes> findByMeasuredQualityMeasuredQualityId(Long measuredQualityId);
-    
-    // Find quality types by name
-    List<MeasuredQualityTypes> findByMeasuredQualityTypeNameContainingIgnoreCase(String name);
-    
-    // Find quality types associated with a specific career
-    @Query("SELECT mqt FROM MeasuredQualityTypes mqt JOIN mqt.careers c WHERE c.career_id = :careerId")
-    List<MeasuredQualityTypes> findByCareer(@Param("careerId") Long careerId);
-    
-    // Find quality types by assessment question
-    @Query("SELECT mqt FROM MeasuredQualityTypes mqt JOIN mqt.assessmentQuestions aq WHERE aq.assessment_question_id = :questionId")
-    List<MeasuredQualityTypes> findByAssessmentQuestion(@Param("questionId") Long questionId);
+   
 }

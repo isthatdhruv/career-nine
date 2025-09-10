@@ -12,18 +12,4 @@ import com.kccitm.api.model.career9.MeasuredQualities;
 @Repository
 public interface MeasuredQualitiesRepository extends JpaRepository<MeasuredQualities, Long> {
 
-    // Find by name (partial match)
-    List<MeasuredQualities> findByMeasuredQualityNameContainingIgnoreCase(String name);
-    
-    // Find qualities that have associated tools
-    @Query("SELECT DISTINCT mq FROM MeasuredQualities mq WHERE SIZE(mq.tools) > 0")
-    List<MeasuredQualities> findQualitiesWithTools();
-    
-    // Find qualities by tool ID
-    @Query("SELECT mq FROM MeasuredQualities mq JOIN mq.tools t WHERE t.tool_id = :toolId")
-    List<MeasuredQualities> findByToolId(@Param("toolId") Long toolId);
-    
-    // Find qualities with free tools
-    @Query("SELECT DISTINCT mq FROM MeasuredQualities mq JOIN mq.tools t WHERE t.isFree = true")
-    List<MeasuredQualities> findQualitiesWithFreeTools();
 }
