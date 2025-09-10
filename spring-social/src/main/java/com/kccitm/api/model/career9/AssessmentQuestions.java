@@ -15,6 +15,7 @@ import javax.persistence.ManyToMany;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
+import javax.persistence.Column;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
@@ -30,6 +31,9 @@ public class AssessmentQuestions implements Serializable {
 
     private String questionText;
     private String questionType;
+
+    @Column(name = "max_options_allowed")
+    private int maxOptionsAllowed;
 
     // 1 Question to Many Options
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -51,6 +55,13 @@ public class AssessmentQuestions implements Serializable {
     private QuestionSection section;
 
     // --- getters and setters ---
+    public int getmaxOptionsAllowed() {
+        return maxOptionsAllowed;
+    }
+    public void setmaxAllowedOptions(int maxAllowedOptions) {
+        this.maxOptionsAllowed = maxOptionsAllowed;
+    }
+
     public Long getQuestionId() {
         return question_id;
     }
