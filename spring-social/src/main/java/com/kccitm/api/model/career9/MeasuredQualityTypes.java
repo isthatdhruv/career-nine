@@ -54,7 +54,13 @@ public class MeasuredQualityTypes implements Serializable {
     private List<OptionScoreBasedOnMEasuredQualityTypes> optionScores;
 
     // REMOVED: Many-to-many mapping to AssessmentQuestions
-
+public MeasuredQualityTypes(Long measuredQualityTypeId) {
+        this.measured_quality_type_id = measuredQualityTypeId;
+    }
+public MeasuredQualityTypes() {
+    
+    super();
+}
     // Getters and Setters
     public List<OptionScoreBasedOnMEasuredQualityTypes> getOptionScores() {
         return optionScores;

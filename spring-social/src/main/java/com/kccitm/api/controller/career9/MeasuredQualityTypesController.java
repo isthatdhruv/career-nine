@@ -76,7 +76,7 @@ public class MeasuredQualityTypesController {
         // Nullify measuredQualityType in all related OptionScoreBasedOnMEasuredQualityTypes
         if (type.getOptionScores() != null) {
             for (var score : type.getOptionScores()) {
-                score.setMeasuredQualityType(null);
+                score.setMeasuredQualityType(type);
                 optionScoreRepo.save(score);
             }
         }

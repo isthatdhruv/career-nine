@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.career9.AssessmentQuestionOptions;
 import com.kccitm.api.model.career9.AssessmentQuestions;
+import com.kccitm.api.model.career9.MeasuredQualityTypes;
 import com.kccitm.api.model.career9.QuestionSection;
 import com.kccitm.api.repository.Career9.AssessmentQuestionRepository;
 import com.kccitm.api.repository.Career9.MeasuredQualityTypesRepository;
@@ -36,7 +37,16 @@ public class AssessmentQuestionController {
 
     @GetMapping("/getAll")
     public List<AssessmentQuestions> getAllAssessmentQuestions() {
-        return assessmentQuestionRepository.findAll();
+        List<AssessmentQuestions> assementQuestionsObject = assessmentQuestionRepository.findAll();
+        assementQuestionsObject.iterator().forEachRemaining(assmentQuestion->{
+            assmentQuestion.getOptions().iterator().forEachRemaining(option->{
+                option.getOptionScores().iterator().forEachRemaining(score->{
+                    score.setMeasuredQualityType(new MeasuredQualityTypes(score.getMeasuredQualityType().getMeasuredQualityTypeId()));
+                    score.setQuestion_option(new AssessmentQuestionOptions(score.getQuestion_option().getOptionId()));
+                });
+            }); 
+        });
+        return assementQuestionsObject;
     }
 
     @GetMapping("/get/{id}")
@@ -44,25 +54,35 @@ public class AssessmentQuestionController {
         return assessmentQuestionRepository.findById(id).orElse(null);
     }
 
-    @PostMapping("/create")
-    public AssessmentQuestions createAssessmentQuestion(@RequestBody AssessmentQuestions assessmentQuestions) {
-        if (assessmentQuestions.getSection() != null && assessmentQuestions.getSection().getSectionId() != null) {
-            QuestionSection section = questionSectionRepository.findById(assessmentQuestions.getSection().getSectionId()).orElse(null);
-            assessmentQuestions.setSection(section);
-        }
+    @PostMapping(value = "/create", consumes = "application/json")
+    public AssessmentQuestions createAssessmentQuestion(@RequestBody AssessmentQuestions assessmentQuestions) throws Exception{
+        AssessmentQuestions assementQustionObject ;
+        // if (assessmentQuestions.getSection() != null && assessmentQuestions.getSection().getSectionId() != null) {
+        //     QuestionSection section = questionSectionRepository.findById(assessmentQuestions.getSection().getSectionId()).orElse(null);
+        //     assessmentQuestions.setSection(section);
+        // }
 
-        if (assessmentQuestions.getOptions() != null && !assessmentQuestions.getOptions().isEmpty()) {
-            for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
-                option.setQuestion(assessmentQuestions);
-            }
-        }
+        // if (assessmentQuestions.getOptions() != null && !assessmentQuestions.getOptions().isEmpty()) {
+        //     for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
+        //         option.setQuestion(assessmentQuestions);
+        //     }
+        // }
 
-        try{
-            assessmentQuestionRepository.save(assessmentQuestions);
-        }catch(Exception e){
-            System.out.println(e);
-        }
-        return assessmentQuestionRepository.save(assessmentQuestions);
+        
+          List<AssessmentQuestionOptions> assessmentQuestionOptions =   assessmentQuestions.getOptions();
+          assementQustionObject   = assessmentQuestionRepository.save(assessmentQuestions);
+          
+          
+       
+          
+          assementQustionObject.getOptions().iterator().forEachRemaining(option->{
+                option.getOptionScores().iterator().forEachRemaining(score->{
+                    score.setMeasuredQualityType(new MeasuredQualityTypes(score.getMeasuredQualityType().getMeasuredQualityTypeId()));
+                    score.setQuestion_option(new AssessmentQuestionOptions(score.getQuestion_option().getOptionId()));
+                });
+            });
+        
+        return assementQustionObject.getId() != null ? assementQustionObject : null;
     }
     @PutMapping("/update/{id}")
     public AssessmentQuestions updateAssessmentQuestion(@PathVariable Long id, @RequestBody AssessmentQuestions assessmentQuestions) {

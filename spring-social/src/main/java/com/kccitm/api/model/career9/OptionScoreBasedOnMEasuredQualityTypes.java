@@ -6,6 +6,7 @@ import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
+import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
@@ -24,9 +25,11 @@ public class OptionScoreBasedOnMEasuredQualityTypes implements Serializable {
     private Integer score;
 
     @ManyToOne
+    @JoinColumn(name = "fk_assessment_questions_option", nullable = false)
     private AssessmentQuestionOptions question_option;
 
     @ManyToOne
+    @JoinColumn(name = "fk_quality_type", nullable = false)
     private MeasuredQualityTypes measuredQualityType;
 
     //getters and setters
@@ -48,13 +51,14 @@ public class OptionScoreBasedOnMEasuredQualityTypes implements Serializable {
     public void setQuestion_option(AssessmentQuestionOptions question_option) {
         this.question_option = question_option;
     }
+    
     public MeasuredQualityTypes getMeasuredQualityType() {
         return measuredQualityType;
     }
     public void setMeasuredQualityType(MeasuredQualityTypes measuredQualityType) {
         this.measuredQualityType = measuredQualityType;
     }
-
+   
     
     
 }
