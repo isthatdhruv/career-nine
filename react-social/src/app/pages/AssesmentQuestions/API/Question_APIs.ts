@@ -7,6 +7,12 @@ const createQuestion = `${API_URL}/assessment-questions/create`;
 const updateQuestion = `${API_URL}/assessment-questions/update`;
 const deleteQuestion = `${API_URL}/assessment-questions/delete/`;
 const readMeasuredQualityTypes = `${API_URL}/measured-quality-types/getAll`;
+const updateOptionScore = `${API_URL}/option-scores/create`;
+
+export function updateOptionScoreData(optionScores: any) {
+  return axios.post(updateOptionScore, optionScores);
+}
+
 export function ReadQuestionsData() {
   return axios.get(readQuestions);
 }

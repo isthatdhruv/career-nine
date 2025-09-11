@@ -66,8 +66,20 @@ public class MeasuredQualitiesController {
     }
 
     @DeleteMapping("/delete/{id}")
-    public void deleteMeasuredQualities(@PathVariable Long id) {
+    public ResponseEntity<String> deleteMeasuredQualities(@PathVariable Long id) {
+        MeasuredQualities measuredQuality = measuredQualitiesRepository.findById(id).orElse(null);
+        if (measuredQuality == null) {
+            return ResponseEntity.notFound().build();
+        }
+        // Remove all mappings to MeasuredQualityTypes (but do not delete the types)
+        if (measuredQuality.getQualityTypes() != null) {
+            for (var type : measuredQuality.getQualityTypes()) {
+                type.setMeasuredQuality(null); // Remove the back-reference if it exists
+            }
+            measuredQuality.getQualityTypes().clear();
+        }
         measuredQualitiesRepository.deleteById(id);
+        return ResponseEntity.ok("MeasuredQualities deleted. All mappings to MeasuredQualityTypes removed, no types deleted.");
     }
 
     // Many-to-Many relationship management endpoints for Tools

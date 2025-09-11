@@ -53,9 +53,7 @@ public class MeasuredQualityTypes implements Serializable {
     @JsonIgnoreProperties({"question_option", "measuredQualityType"})
     private List<OptionScoreBasedOnMEasuredQualityTypes> optionScores;
 
-    @ManyToMany(mappedBy = "measuredQualityTypes")
-    @JsonIgnore
-    private Set<AssessmentQuestions> assessmentQuestions = new HashSet<>();
+    // REMOVED: Many-to-many mapping to AssessmentQuestions
 
     // Getters and Setters
     public List<OptionScoreBasedOnMEasuredQualityTypes> getOptionScores() {
@@ -105,13 +103,7 @@ public class MeasuredQualityTypes implements Serializable {
         this.careers = careers;
     }
 
-    public Set<AssessmentQuestions> getAssessmentQuestions() {
-        return assessmentQuestions;
-    }
-
-    public void setAssessmentQuestions(Set<AssessmentQuestions> assessmentQuestions) {
-        this.assessmentQuestions = assessmentQuestions;
-    }
+    // REMOVED: get/setAssessmentQuestions
 
     public MeasuredQualities getMeasuredQuality() {
         return measuredQuality;
@@ -132,14 +124,6 @@ public class MeasuredQualityTypes implements Serializable {
         career.getMeasuredQualityTypes().remove(this);
     }
 
-    public void addAssessmentQuestion(AssessmentQuestions assessmentQuestion) {
-        this.assessmentQuestions.add(assessmentQuestion);
-        assessmentQuestion.getMeasuredQualityTypes().add(this);
-    }
-
-    public void removeAssessmentQuestion(AssessmentQuestions assessmentQuestion) {
-        this.assessmentQuestions.remove(assessmentQuestion);
-        assessmentQuestion.getMeasuredQualityTypes().remove(this);
-    }
+    // REMOVED: add/removeAssessmentQuestion
 
 }

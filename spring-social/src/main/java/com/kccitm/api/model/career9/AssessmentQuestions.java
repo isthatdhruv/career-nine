@@ -1,21 +1,17 @@
 package com.kccitm.api.model.career9;
 import java.io.Serializable;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import javax.persistence.CascadeType;
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
-import javax.persistence.JoinTable;
-import javax.persistence.ManyToMany;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
-import javax.persistence.Column;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
@@ -40,13 +36,7 @@ public class AssessmentQuestions implements Serializable {
     @JsonManagedReference
     private List<AssessmentQuestionOptions> options;
 
-    @ManyToMany
-    @JoinTable(
-        name = "assessment_question_measured_quality_type_mapping",
-        joinColumns = @JoinColumn(name = "question_id"),
-        inverseJoinColumns = @JoinColumn(name = "measured_quality_type_id")
-    )
-    private Set<MeasuredQualityTypes> measuredQualityTypes = new HashSet<>();
+    // REMOVED: Many-to-many mapping to MeasuredQualityTypes
 
     // NEW: Link Question -> Section
     @ManyToOne
@@ -94,13 +84,7 @@ public class AssessmentQuestions implements Serializable {
         this.options = options;
     }
 
-    public Set<MeasuredQualityTypes> getMeasuredQualityTypes() {
-        return measuredQualityTypes;
-    }
-
-    public void setMeasuredQualityTypes(Set<MeasuredQualityTypes> measuredQualityTypes) {
-        this.measuredQualityTypes = measuredQualityTypes;
-    }
+    // REMOVED: get/setMeasuredQualityTypes
 
     public QuestionSection getSection() {
         return section;
@@ -120,15 +104,7 @@ public class AssessmentQuestions implements Serializable {
     }
 
     // Helper methods for managing the many-to-many relationship
-    public void addMeasuredQualityType(MeasuredQualityTypes type) {
-        this.measuredQualityTypes.add(type);
-        type.getAssessmentQuestions().add(this);
-    }
-
-    public void removeMeasuredQualityType(MeasuredQualityTypes type) {
-        this.measuredQualityTypes.remove(type);
-        type.getAssessmentQuestions().remove(this);
-    }
+    // REMOVED: add/removeMeasuredQualityType
 
     @Override
     public String toString() {

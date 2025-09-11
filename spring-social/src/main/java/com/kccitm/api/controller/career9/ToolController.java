@@ -66,7 +66,8 @@ public class ToolController {
             
             for (MeasuredQualities quality : tool.getMeasuredQualities()) {
                 quality.removeTool(tool);
-                measuredQualitiesRepository.save(quality);
+                continue;
+                // measuredQualitiesRepository.save(quality);
             }
             
             tool.getMeasuredQualities().clear();

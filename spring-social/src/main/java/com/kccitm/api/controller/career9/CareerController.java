@@ -50,8 +50,17 @@ public class CareerController {
         return careerRepository.save(existingCareer);
     }
     @DeleteMapping("/delete/{id}")
-    public void deleteCareer(@PathVariable Long id) {
+    public org.springframework.http.ResponseEntity<String> deleteCareer(@PathVariable Long id) {
+        Career career = careerRepository.findById(id).orElse(null);
+        if (career == null) {
+            return org.springframework.http.ResponseEntity.notFound().build();
+        }
+        // Remove all mappings to MeasuredQualityTypes (but do not delete the types)
+        if (career.getMeasuredQualityTypes() != null) {
+            career.getMeasuredQualityTypes().clear();
+        }
         careerRepository.deleteById(id);
+        return org.springframework.http.ResponseEntity.ok("Career deleted. All mappings to MeasuredQualityTypes removed, no types deleted.");
     }
     
     @GetMapping("/{id}/measured-quality-types")
