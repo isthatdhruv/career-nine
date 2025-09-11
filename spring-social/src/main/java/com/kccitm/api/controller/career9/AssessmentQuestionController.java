@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.kccitm.api.model.career9.AssessmentQuestionOptions;
 import com.kccitm.api.model.career9.AssessmentQuestions;
 import com.kccitm.api.model.career9.MeasuredQualityTypes;
+import com.kccitm.api.model.career9.OptionScoreBasedOnMEasuredQualityTypes;
 import com.kccitm.api.model.career9.QuestionSection;
 import com.kccitm.api.repository.Career9.AssessmentQuestionRepository;
 import com.kccitm.api.repository.Career9.MeasuredQualityTypesRepository;
@@ -69,7 +70,18 @@ public class AssessmentQuestionController {
         // }
 
         
-          List<AssessmentQuestionOptions> assessmentQuestionOptions =   assessmentQuestions.getOptions();
+        //   List<AssessmentQuestionOptions> assessmentQuestionOptions =   assessmentQuestions.getOptions();
+          
+          // Example: before saving AssessmentQuestions
+for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
+    option.setQuestion(assessmentQuestions); // set parent question
+    if (option.getOptionScores() != null) {
+        for (OptionScoreBasedOnMEasuredQualityTypes score : option.getOptionScores()) {
+            score.setQuestion_option(option); // set parent option
+        }
+    }
+}
+
           assementQustionObject   = assessmentQuestionRepository.save(assessmentQuestions);
           
           
