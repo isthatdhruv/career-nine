@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.career9.AssessmentQuestionOptions;
 import com.kccitm.api.model.career9.AssessmentQuestions;
+import com.kccitm.api.model.career9.MeasuredQualityTypes;
 import com.kccitm.api.repository.Career9.AssessmentQuestionOptionsRepository;
 import com.kccitm.api.repository.Career9.AssessmentQuestionRepository;
 
@@ -32,7 +33,16 @@ public class AssessmentQuestionOptionsController {
 
     @GetMapping("/getAll")
     public List<AssessmentQuestionOptions> getAllAssessmentQuestionOptions() {
-        return assessmentQuestionOptionsRepository.findAll();
+        List<AssessmentQuestionOptions> aqo =  assessmentQuestionOptionsRepository.findAll();
+        aqo.iterator().forEachRemaining(option -> {
+            // Force loading of lazy relationships
+            option.getOptionScores().iterator().forEachRemaining(score -> {
+                score.setMeasuredQualityType(new MeasuredQualityTypes(score.getMeasuredQualityType().getMeasuredQualityTypeId()));
+                    score.setQuestion_option(new AssessmentQuestionOptions(score.getQuestion_option().getOptionId()));
+            });
+            
+        });
+        return aqo;
     }
 
     @GetMapping("/get/{id}")

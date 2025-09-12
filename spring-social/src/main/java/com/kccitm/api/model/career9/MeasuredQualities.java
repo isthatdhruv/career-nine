@@ -4,7 +4,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import javax.persistence.CascadeType;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
@@ -34,7 +33,7 @@ public class MeasuredQualities implements Serializable {
     private String quality_display_name;
 
     // 1 Measured Quality to Many Quality Types (measured quality types mapping)
-    @OneToMany(mappedBy = "measuredQuality", cascade=CascadeType.ALL)
+    @OneToMany(mappedBy = "measuredQuality")
     @JsonIgnoreProperties("measuredQuality")
     private List<MeasuredQualityTypes> qualityTypes;
 

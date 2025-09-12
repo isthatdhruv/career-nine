@@ -14,17 +14,19 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.kccitm.api.model.career9.AssessmentQuestions;
 import com.kccitm.api.model.career9.Career;
 import com.kccitm.api.model.career9.MeasuredQualityTypes;
 import com.kccitm.api.repository.Career9.AssessmentQuestionRepository;
 import com.kccitm.api.repository.Career9.CareerRepository;
 import com.kccitm.api.repository.Career9.MeasuredQualitiesRepository;
 import com.kccitm.api.repository.Career9.MeasuredQualityTypesRepository;
+import com.kccitm.api.repository.Career9.OptionScoreBasedOnMeasuredQualityTypesRepository;
 
 @RestController
 @RequestMapping("/api/measured-quality-types")
 public class MeasuredQualityTypesController {
+    @Autowired
+    private OptionScoreBasedOnMeasuredQualityTypesRepository optionScoreRepo;
     
     @Autowired
     private MeasuredQualityTypesRepository measuredQualityTypesRepository;
@@ -66,8 +68,20 @@ public class MeasuredQualityTypesController {
         return measuredQualityTypesRepository.save(existingType);
     }
     @DeleteMapping("/delete/{id}")
-    public void deleteMeasuredQualityTypes(@PathVariable Long id) {
+    public ResponseEntity<String> deleteMeasuredQualityTypes(@PathVariable Long id) {
+        MeasuredQualityTypes type = measuredQualityTypesRepository.findById(id).orElse(null);
+        if (type == null) {
+            return ResponseEntity.notFound().build();
+        }
+        // Nullify measuredQualityType in all related OptionScoreBasedOnMEasuredQualityTypes
+        if (type.getOptionScores() != null) {
+            for (var score : type.getOptionScores()) {
+                score.setMeasuredQualityType(type);
+                optionScoreRepo.save(score);
+            }
+        }
         measuredQualityTypesRepository.deleteById(id);
+        return ResponseEntity.ok("MeasuredQualityType deleted. All mappings removed, no score entries deleted.");
     }
     
     // Many-to-Many relationship management endpoints
@@ -114,47 +128,7 @@ public class MeasuredQualityTypesController {
         return ResponseEntity.ok(measurementType.getCareers());
     }
     
-    // AssessmentQuestion relationships
-    @PostMapping("/{typeId}/assessment-questions/{questionId}")
-    public ResponseEntity<String> addAssessmentQuestionToMeasuredQualityType(@PathVariable Long typeId, @PathVariable Long questionId) {
-        MeasuredQualityTypes measurementType = measuredQualityTypesRepository.findById(typeId).orElse(null);
-        AssessmentQuestions question = assessmentQuestionRepository.findById(questionId).orElse(null);
-        
-        if (measurementType == null || question == null) {
-            return ResponseEntity.badRequest().body("MeasuredQualityType or AssessmentQuestion not found");
-        }
-        
-        measurementType.addAssessmentQuestion(question);
-        measuredQualityTypesRepository.save(measurementType);
-        
-        return ResponseEntity.ok("AssessmentQuestion successfully associated with MeasuredQualityType");
-    }
-    
-    @DeleteMapping("/{typeId}/assessment-questions/{questionId}")
-    public ResponseEntity<String> removeAssessmentQuestionFromMeasuredQualityType(@PathVariable Long typeId, @PathVariable Long questionId) {
-        MeasuredQualityTypes measurementType = measuredQualityTypesRepository.findById(typeId).orElse(null);
-        AssessmentQuestions question = assessmentQuestionRepository.findById(questionId).orElse(null);
-        
-        if (measurementType == null || question == null) {
-            return ResponseEntity.badRequest().body("MeasuredQualityType or AssessmentQuestion not found");
-        }
-        
-        measurementType.removeAssessmentQuestion(question);
-        measuredQualityTypesRepository.save(measurementType);
-        
-        return ResponseEntity.ok("AssessmentQuestion successfully removed from MeasuredQualityType");
-    }
-    
-    @GetMapping("/{typeId}/assessment-questions")
-    public ResponseEntity<Set<AssessmentQuestions>> getMeasuredQualityTypeQuestions(@PathVariable Long typeId) {
-        MeasuredQualityTypes measurementType = measuredQualityTypesRepository.findById(typeId).orElse(null);
-        
-        if (measurementType == null) {
-            return ResponseEntity.notFound().build();
-        }
-        
-        return ResponseEntity.ok(measurementType.getAssessmentQuestions());
-    }
+// ...existing code...
     
     // One-to-Many relationship: MeasuredQualities to MeasuredQualityTypes
     @PutMapping("/{typeId}/assign-quality/{qualityId}")

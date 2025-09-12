@@ -1,6 +1,7 @@
 package com.kccitm.api.controller.career9;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.model.career9.AssessmentQuestions;
 import com.kccitm.api.model.career9.QuestionSection;
 import com.kccitm.api.repository.Career9.QuestionSectionRepository;
 
@@ -56,16 +58,19 @@ public class QuestionSectionController {
     }
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<String> deleteQuestionSection(@PathVariable Long id) {
-        if (!questionSectionRepository.existsById(id)) {
+        Optional<QuestionSection> questionSectionOptional = questionSectionRepository.findById(id);
+        if (!questionSectionOptional.isPresent()) {
             return ResponseEntity.notFound().build();
         }
-        
-        try {
-            questionSectionRepository.deleteById(id);
-            return ResponseEntity.ok("Question section deleted successfully");
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Failed to delete section: " + e.getMessage());
+        QuestionSection questionSection = questionSectionOptional.get();
+        // Set section to null for all related AssessmentQuestions
+        if (questionSection.getQuestions() != null) {
+            for (AssessmentQuestions question : questionSection.getQuestions()) {
+                question.setSection(null);
+            }
         }
+        questionSectionRepository.deleteById(id);
+        return ResponseEntity.ok("Question section deleted successfully");
     }
     
     // Additional endpoints

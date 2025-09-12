@@ -32,7 +32,7 @@ public class OptionScoreController {
     private AssessmentQuestionOptionsRepository optionRepository;
     
     @Autowired
-    private MeasuredQualityTypesRepository qualityTypeRepository;
+    private MeasuredQualityTypesRepository measuredQualityTypesRepository;
 
     @GetMapping("/getAll")
     public List<OptionScoreBasedOnMEasuredQualityTypes> getAllOptionScores() {
@@ -46,27 +46,47 @@ public class OptionScoreController {
     }
 
     @PostMapping("/create")
-    public ResponseEntity<OptionScoreBasedOnMEasuredQualityTypes> createOptionScore(@RequestBody OptionScoreBasedOnMEasuredQualityTypes optionScore) {
-        try {
-            OptionScoreBasedOnMEasuredQualityTypes savedScore = optionScoreRepository.save(optionScore);
-            return ResponseEntity.ok(savedScore);
-            
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
+    public ResponseEntity<?> createOptionScores(@RequestBody List<OptionScoreBasedOnMEasuredQualityTypes> scores) {
+        for (OptionScoreBasedOnMEasuredQualityTypes score : scores) {
+            // Set option entity
+            if (score.getQuestion_option() != null && score.getQuestion_option().getOptionId() != null) {
+                AssessmentQuestionOptions option = optionRepository.findById(score.getQuestion_option().getOptionId()).orElse(null);
+                score.setQuestion_option(option);
+            } else {
+                return ResponseEntity.badRequest().body("Missing optionId for a score entry");
+            }
+            // Set measured quality type entity
+            if (score.getMeasuredQualityType() != null && score.getMeasuredQualityType().getMeasuredQualityTypeId() != null) {
+                MeasuredQualityTypes mqt = measuredQualityTypesRepository.findById(score.getMeasuredQualityType().getMeasuredQualityTypeId()).orElse(null);
+                score.setMeasuredQualityType(mqt);
+            } else {
+                return ResponseEntity.badRequest().body("Missing measuredQualityTypeId for a score entry");
+            }
         }
+        optionScoreRepository.saveAll(scores);
+        return ResponseEntity.ok("Saved all option scores");
     }
 
     @PutMapping("/update/{id}")
     public ResponseEntity<OptionScoreBasedOnMEasuredQualityTypes> updateOptionScore(@PathVariable Long id, @RequestBody OptionScoreBasedOnMEasuredQualityTypes optionScore) {
-      
-
         try {
             optionScore.setScoreId(id);
-            
-            
+            // Set option entity
+            if (optionScore.getQuestion_option() != null && optionScore.getQuestion_option().getOptionId() != null) {
+                AssessmentQuestionOptions option = optionRepository.findById(optionScore.getQuestion_option().getOptionId()).orElse(null);
+                optionScore.setQuestion_option(option);
+            } else {
+                return ResponseEntity.badRequest().build();
+            }
+            // Set measured quality type entity
+            if (optionScore.getMeasuredQualityType() != null && optionScore.getMeasuredQualityType().getMeasuredQualityTypeId() != null) {
+                MeasuredQualityTypes mqt = measuredQualityTypesRepository.findById(optionScore.getMeasuredQualityType().getMeasuredQualityTypeId()).orElse(null);
+                optionScore.setMeasuredQualityType(mqt);
+            } else {
+                return ResponseEntity.badRequest().build();
+            }
             OptionScoreBasedOnMEasuredQualityTypes updatedScore = optionScoreRepository.save(optionScore);
             return ResponseEntity.ok(updatedScore);
-            
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
         }
@@ -108,21 +128,9 @@ public class OptionScoreController {
     //     return ResponseEntity.ok(score);
     // }
 
-    @PostMapping("/batch-create")
-    public ResponseEntity<List<OptionScoreBasedOnMEasuredQualityTypes>> createBatchScores(@RequestBody List<OptionScoreBasedOnMEasuredQualityTypes> scores) {
-        try {
-            List<OptionScoreBasedOnMEasuredQualityTypes> savedScores = optionScoreRepository.saveAll(scores);
-            return ResponseEntity.ok(savedScores);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
-    }
+    // Removed redundant batch-create endpoint. Use /create for batch creation.
 
-    @GetMapping("/by-question/{questionId}")
-    public ResponseEntity<Optional<OptionScoreBasedOnMEasuredQualityTypes>> getScoresByQuestion(@PathVariable Long questionId) {
-        Optional<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository.findById(questionId);
-        return ResponseEntity.ok(scores);
-    }
+    
 
    
 }

@@ -1,7 +1,6 @@
 package com.kccitm.api.controller.career9;
 
 import java.util.List;
-import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.kccitm.api.model.career9.AssessmentQuestionOptions;
 import com.kccitm.api.model.career9.AssessmentQuestions;
 import com.kccitm.api.model.career9.MeasuredQualityTypes;
+import com.kccitm.api.model.career9.OptionScoreBasedOnMEasuredQualityTypes;
 import com.kccitm.api.model.career9.QuestionSection;
 import com.kccitm.api.repository.Career9.AssessmentQuestionRepository;
 import com.kccitm.api.repository.Career9.MeasuredQualityTypesRepository;
@@ -38,7 +38,16 @@ public class AssessmentQuestionController {
 
     @GetMapping("/getAll")
     public List<AssessmentQuestions> getAllAssessmentQuestions() {
-        return assessmentQuestionRepository.findAll();
+        List<AssessmentQuestions> assementQuestionsObject = assessmentQuestionRepository.findAll();
+        assementQuestionsObject.iterator().forEachRemaining(assmentQuestion->{
+            assmentQuestion.getOptions().iterator().forEachRemaining(option->{
+                option.getOptionScores().iterator().forEachRemaining(score->{
+                    score.setMeasuredQualityType(new MeasuredQualityTypes(score.getMeasuredQualityType().getMeasuredQualityTypeId()));
+                    score.setQuestion_option(new AssessmentQuestionOptions(score.getQuestion_option().getOptionId()));
+                });
+            }); 
+        });
+        return assementQuestionsObject;
     }
 
     @GetMapping("/get/{id}")
@@ -46,20 +55,46 @@ public class AssessmentQuestionController {
         return assessmentQuestionRepository.findById(id).orElse(null);
     }
 
-    @PostMapping("/create")
-    public AssessmentQuestions createAssessmentQuestion(@RequestBody AssessmentQuestions assessmentQuestions) {
+    @PostMapping(value = "/create", consumes = "application/json")
+    public AssessmentQuestions createAssessmentQuestion(@RequestBody AssessmentQuestions assessmentQuestions) throws Exception{
+        AssessmentQuestions assementQustionObject ;
         // if (assessmentQuestions.getSection() != null && assessmentQuestions.getSection().getSectionId() != null) {
         //     QuestionSection section = questionSectionRepository.findById(assessmentQuestions.getSection().getSectionId()).orElse(null);
         //     assessmentQuestions.setSection(section);
         // }
-        
+
         // if (assessmentQuestions.getOptions() != null && !assessmentQuestions.getOptions().isEmpty()) {
         //     for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
         //         option.setQuestion(assessmentQuestions);
         //     }
         // }
+
         
-        return assessmentQuestionRepository.save(assessmentQuestions);
+        //   List<AssessmentQuestionOptions> assessmentQuestionOptions =   assessmentQuestions.getOptions();
+          
+          // Example: before saving AssessmentQuestions
+for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
+    option.setQuestion(assessmentQuestions); // set parent question
+    if (option.getOptionScores() != null) {
+        for (OptionScoreBasedOnMEasuredQualityTypes score : option.getOptionScores()) {
+            score.setQuestion_option(option); // set parent option
+        }
+    }
+}
+
+          assementQustionObject   = assessmentQuestionRepository.save(assessmentQuestions);
+          
+          
+       
+          
+          assementQustionObject.getOptions().iterator().forEachRemaining(option->{
+                option.getOptionScores().iterator().forEachRemaining(score->{
+                    score.setMeasuredQualityType(new MeasuredQualityTypes(score.getMeasuredQualityType().getMeasuredQualityTypeId()));
+                    score.setQuestion_option(new AssessmentQuestionOptions(score.getQuestion_option().getOptionId()));
+                });
+            });
+        
+        return assementQustionObject.getId() != null ? assementQustionObject : null;
     }
     @PutMapping("/update/{id}")
     public AssessmentQuestions updateAssessmentQuestion(@PathVariable Long id, @RequestBody AssessmentQuestions assessmentQuestions) {
@@ -90,50 +125,17 @@ public class AssessmentQuestionController {
         return assessmentQuestionRepository.save(existingQuestion);
     }
     @DeleteMapping("/delete/{id}")
-    public void deleteAssessmentQuestion(@PathVariable Long id) {
+    public ResponseEntity<String> deleteAssessmentQuestion(@PathVariable Long id) {
+        if (!assessmentQuestionRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        // This will also delete all related AssessmentQuestionOptions and join table entries due to cascade settings.
         assessmentQuestionRepository.deleteById(id);
+        return ResponseEntity.ok("AssessmentQuestion and all related options/relationships deleted successfully.");
     }
     
     // Many-to-Many relationship management endpoints for MeasuredQualityTypes
     
-    @PostMapping("/{questionId}/measured-quality-types/{typeId}")
-    public ResponseEntity<String> addMeasuredQualityTypeToQuestion(@PathVariable Long questionId, @PathVariable Long typeId) {
-        AssessmentQuestions question = assessmentQuestionRepository.findById(questionId).orElse(null);
-        MeasuredQualityTypes type = measuredQualityTypesRepository.findById(typeId).orElse(null);
+    
 
-        if (question == null || type == null) {
-            return ResponseEntity.badRequest().body("AssessmentQuestion or MeasuredQualityType not found");
-        }
-
-        question.addMeasuredQualityType(type);
-        assessmentQuestionRepository.save(question);
-
-        return ResponseEntity.ok("MeasuredQualityType successfully associated with AssessmentQuestion");
-    }
-
-    @DeleteMapping("/{questionId}/measured-quality-types/{typeId}")
-    public ResponseEntity<String> removeMeasuredQualityTypeFromQuestion(@PathVariable Long questionId, @PathVariable Long typeId) {
-        AssessmentQuestions question = assessmentQuestionRepository.findById(questionId).orElse(null);
-        MeasuredQualityTypes type = measuredQualityTypesRepository.findById(typeId).orElse(null);
-
-        if (question == null || type == null) {
-            return ResponseEntity.badRequest().body("AssessmentQuestion or MeasuredQualityType not found");
-        }
-
-        question.removeMeasuredQualityType(type);
-        assessmentQuestionRepository.save(question);
-
-        return ResponseEntity.ok("MeasuredQualityType successfully removed from AssessmentQuestion");
-    }
-
-    @GetMapping("/{questionId}/measured-quality-types")
-    public ResponseEntity<Set<MeasuredQualityTypes>> getQuestionMeasuredQualityTypes(@PathVariable Long questionId) {
-        AssessmentQuestions question = assessmentQuestionRepository.findById(questionId).orElse(null);
-
-        if (question == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        return ResponseEntity.ok(question.getMeasuredQualityTypes());
-    }
 }

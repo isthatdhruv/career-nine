@@ -33,8 +33,17 @@ public class AssessmentQuestionOptions implements Serializable {
     private AssessmentQuestions question;
 
     @OneToMany(mappedBy = "question_option",cascade = CascadeType.ALL)
-    @JsonIgnoreProperties({"question_option", "measuredQualityType"})
+    // @JsonIgnoreProperties({"question_option", "measuredQualityType"})
     private List<OptionScoreBasedOnMEasuredQualityTypes> optionScores;
+
+
+        public AssessmentQuestionOptions(Long optionId) {
+            this.optionId = optionId;
+        }
+
+        public AssessmentQuestionOptions() {
+            super();
+        }
 
     // Getters and Setters
     public Long getOptionId() {
