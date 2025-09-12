@@ -7,29 +7,29 @@ import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
 import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
-import { ReadMeasuredQualityTypes, ReadQuestionByIdData, updateOptionScoreData, UpdateQuestionData } from "../API/Question_APIs";
+import { CreateQuestionData, ReadMeasuredQualityTypes, ReadQuestionByIdData } from "../API/Question_APIs";
 
 const validationSchema = Yup.object().shape({
   questionText: Yup.string().required("Question text is required"),
   questionType: Yup.string().required("Question type is required"),
-  sectionId: Yup.string().required("Section is required"),
-  questionOptions: Yup.array()
-    .of(Yup.string().required("Option cannot be empty"))
+  section: Yup.object().shape({
+    sectionId: Yup.string().required("Section is required"),
+  }).required("Section is required"),
+  options: Yup.array()
+    .of(Yup.object().shape({
+      optionText: Yup.string().required("Option cannot be empty"),
+    }))
     .min(1, "At least one option is required"),
 });
 
-
-
-const QuestionEditPage = (props?: {
-  setPageLoading?: any;
-}) => {
+const QuestionEditPage = (props?: { setPageLoading?: any }) => {
   const [loading, setLoading] = useState(false);
   const [sections, setSections] = useState<any[]>([]);
   const [mqt, setMqt] = useState<any[]>([]);
   const [questionData, setQuestionData] = useState<any>({
     questionText: "",
     questionType: "",
-    sectionId: "",
+    section: "",
     questionOptions: [""],
     id: "",
   });
@@ -110,13 +110,13 @@ const QuestionEditPage = (props?: {
 
           const processedData = {
             ...fetchedQuestion,
-            sectionId: fetchedQuestion.section?.sectionId || "",
+            section: fetchedQuestion.section?.section || "",
             questionOptions: fetchedQuestion.options
               ? fetchedQuestion.options.map((option: any) => option.optionText || option)
               : [""]
           };
 
-          console.log("Processed data with sectionId:", processedData.sectionId);
+          console.log("Processed data with section:", processedData.section);
           setQuestionData(processedData);
         } catch (error) {
           console.error("Error fetching question:", error);
@@ -125,7 +125,7 @@ const QuestionEditPage = (props?: {
           if (locationData) {
             const processedLocationData = {
               ...locationData,
-              sectionId: locationData.section?.sectionId || locationData.sectionId || "",
+              section: locationData.section?.section || locationData.section || "",
               questionOptions: locationData.options
                 ? locationData.options.map((option: any) => option.optionText || option)
                 : locationData.questionOptions || [""]
@@ -141,7 +141,7 @@ const QuestionEditPage = (props?: {
         if (locationData) {
           const processedLocationData = {
             ...locationData,
-            sectionId: locationData.section?.sectionId || locationData.sectionId || "",
+            section: locationData.section?.section || locationData.section || "",
             questionOptions: locationData.options
               ? locationData.options.map((option: any) => option.optionText || option)
               : locationData.questionOptions || [""]
@@ -185,81 +185,70 @@ const formik = useFormik({
   enableReinitialize: true,
   initialValues: {
     id: questionData.id || id,
+    questionId: questionData.questionId || questionData.id || id,
     questionText: questionData.questionText || "",
     questionType: questionData.questionType || "",
-    sectionId: questionData.sectionId || questionData.section?.sectionId || "",
-    questionOptions: questionData.options && questionData.options.length > 0
-      ? questionData.options.map((option: any) => option.optionText || option)
-      : questionData.questionOptions && questionData.questionOptions.length > 0
-        ? questionData.questionOptions
-        : [""],
+    maxOptionsAllowed: questionData.maxOptionsAllowed || 0,
+    section: questionData.section && typeof questionData.section === "object" && "sectionId" in questionData.section
+      ? { sectionId: String(questionData.section.sectionId) }
+      : questionData.section
+      ? { sectionId: String(questionData.section) }
+      : { sectionId: "" },
+    options:
+      questionData.options && questionData.options.length > 0
+        ? questionData.options.map((option: any, idx: number) => ({
+            optionText: option.optionText || "",
+            // optionId: option.optionId || option.id, // for existing options
+            correct: option.correct ?? false,
+          }))
+        : [
+            {
+              optionText: "",
+              correct: false,
+            },
+          ],
   },
   validationSchema: validationSchema,
   onSubmit: async (values) => {
     setLoading(true);
     try {
-      console.log("Attempting to update question:");
-      console.log("Question ID:", values.id);
-      console.log("Values being sent:", values);
-      console.log("Section ID being sent:", values.sectionId);
-
-      if (!values.id) {
-        alert("No question ID found. Please try navigating back and selecting the question again.");
-        return;
-      }
-
-      // Build options array with measuredQualities for each option
-      const options = values.questionOptions.map((optionText: string, idx: number) => {
+      // Build options array with optionScores from optionMeasuredQualities
+      const options = values.options.map((option: any, idx: number) => {
         const qualities = optionMeasuredQualities[idx] || {};
-        const measuredQualities = Object.entries(qualities)
+        const optionScores = Object.entries(qualities)
           .filter(([_, v]) => v && v.checked)
           .map(([typeId, v]) => ({
-            measuredQualityTypeId: Number(typeId),
-            score: v.score
+            score: v.score,
+            question_option: option.optionId ? { optionId: option.optionId } : {},
+            measuredQualityType: { measuredQualityTypeId: Number(typeId) },
           }));
         return {
-          optionText,
-          measuredQualities
+          optionText: option.optionText,
+          optionScores,
+          correct: option.correct ?? false,
+          ...(option.optionId ? { optionId: option.optionId } : {}),
         };
       });
 
-      // Build payload
       const payload = {
         id: values.id,
+        questionId: values.questionId,
         questionText: values.questionText,
         questionType: values.questionType,
-        sectionId: values.sectionId,
-        options
+        maxOptionsAllowed: Number(values.maxOptionsAllowed) || 0,
+        options,
+        section: { sectionId: values.section.sectionId },
       };
+      console.log("Submitting payload:", payload);
+      console.log("Values: ", values);
+      console.log(values.section.sectionId)
 
-
-      const response = await UpdateQuestionData(values.id, payload);
-      console.log("Update successful:", response);
-
-      // Prepare and send option scores to backend
-      // We need the option IDs from the backend response (after update)
-      const updatedOptions = response.data.options || [];
-      const optionScoresPayload = updatedOptions.flatMap((option: any, idx: number) => {
-        // Find measuredQualities for this option index
-        const qualities = optionMeasuredQualities[idx] || {};
-        return Object.entries(qualities)
-          .filter(([_, v]) => v && v.checked)
-          .map(([typeId, v]) => ({
-            question_option: { optionId: option.optionId },
-            measuredQualityType: { measuredQualityTypeId: Number(typeId) },
-            score: v.score
-          }));
-      });
-      if (optionScoresPayload.length > 0) {
-        await updateOptionScoreData(optionScoresPayload);
-      }
+      await CreateQuestionData(payload);
 
       navigate("/assessment-questions");
-
       if (props?.setPageLoading) {
         props.setPageLoading(["true"]);
       }
-
     } catch (error) {
       console.error("Full error object:", error);
       if (typeof error === "object" && error !== null) {
@@ -282,9 +271,9 @@ const formik = useFormik({
 // Debug effect to log formik values
 useEffect(() => {
   console.log("Current questionData:", questionData);
-  console.log("Current formik sectionId:", formik.values.sectionId);
+  console.log("Current formik section:", formik.values.section);
   console.log("Available sections:", sections);
-}, [questionData, formik.values.sectionId, sections]);
+}, [questionData, formik.values.section, sections]);
 
 if (loading) {
   return (
@@ -301,23 +290,27 @@ if (loading) {
 
 // ✅ Helper functions for managing options array (since we can't use FieldArray)
 const addOption = () => {
-  const currentOptions = formik.values.questionOptions;
+  const currentOptions = [...formik.values.options];
   const lastOption = currentOptions[currentOptions.length - 1];
-  if (lastOption && lastOption.trim() !== "") {
-    formik.setFieldValue("questionOptions", [...currentOptions, ""]);
-    // Also add a blank measured quality state for the new option
-    setOptionMeasuredQualities((prev) => ({ ...prev, [currentOptions.length]: {} }));
+  if (lastOption && lastOption.optionText.trim() !== "") {
+    formik.setFieldValue("options", [
+      ...currentOptions,
+      { optionText: "", optionScores: [], correct: false },
+    ]);
+    setOptionMeasuredQualities((prev) => ({
+      ...prev,
+      [currentOptions.length]: {},
+    }));
   } else {
     alert("Please fill the current option before adding a new one.");
   }
 };
 
 const removeOption = (index: number) => {
-  const currentOptions = formik.values.questionOptions;
+  const currentOptions = [...formik.values.options];
   if (currentOptions.length > 1) {
     const newOptions = currentOptions.filter((_, i) => i !== index);
-    formik.setFieldValue("questionOptions", newOptions);
-    // Remove measured quality state for this option and shift others
+    formik.setFieldValue("options", newOptions);
     setOptionMeasuredQualities((prev) => {
       const newQualities: Record<number, Record<number, { checked: boolean; score: number }>> = {};
       Object.keys(prev).forEach((key) => {
@@ -331,9 +324,9 @@ const removeOption = (index: number) => {
 };
 
 const updateOption = (index: number, value: string) => {
-  const currentOptions = [...formik.values.questionOptions];
-  currentOptions[index] = value;
-  formik.setFieldValue("questionOptions", currentOptions);
+  const currentOptions = [...formik.values.options];
+  currentOptions[index].optionText = value;
+  formik.setFieldValue("options", currentOptions);
 };
 
 
@@ -429,30 +422,34 @@ return (
               Section
             </label>
             <select
-              {...formik.getFieldProps("sectionId")}
+              value={formik.values.section?.sectionId || ""}
+              onChange={e => {
+                const selectedSection = sections.find(s => String(s.sectionId) === e.target.value);
+                formik.setFieldValue("section", selectedSection ? { sectionId: String(selectedSection.sectionId) } : { sectionId: "" });
+              }}
               className={clsx(
                 "form-control form-control-lg form-control-solid",
                 {
                   "is-invalid text-danger":
-                    formik.touched.sectionId && formik.errors.sectionId,
+                    formik.touched.section && formik.errors.section,
                 },
                 {
                   "is-valid":
-                    formik.touched.sectionId && !formik.errors.sectionId,
+                    formik.touched.section && !formik.errors.section,
                 }
               )}
             >
               <option value="">Select Section</option>
-              {sections.map((section) => (
+              {sections.map(section => (
                 <option key={section.sectionId} value={section.sectionId}>
                   {section.sectionName}
                 </option>
               ))}
             </select>
-            {formik.touched.sectionId && formik.errors.sectionId && (
+            {formik.touched.section && formik.errors.section && (
               <div className="fv-plugins-message-container">
                 <div className="fv-help-block text-danger">
-                  <span role="alert">{String(formik.errors.sectionId)}</span>
+                  <span role="alert">{String(formik.errors.section)}</span>
                 </div>
               </div>
             )}
@@ -462,7 +459,7 @@ return (
             <div className="fv-row mb-7">
             <label className="required fs-6 fw-bold mb-2">Options:</label>
 
-            {formik.values.questionOptions.map((option, index) => (
+            {formik.values.options.map((option, index) => (
               <div
                 key={index}
                 className="d-flex align-items-center gap-2 mb-2"
@@ -470,20 +467,13 @@ return (
                 <input
                   type="text"
                   placeholder={`Enter option ${index + 1}`}
-                  value={option}
-                  onChange={(e) => updateOption(index, e.target.value)}
-                  onBlur={() => formik.setFieldTouched(`questionOptions.${index}`, true)}
+                  value={option.optionText}
+                  onChange={e => updateOption(index, e.target.value)}
                   className={clsx(
                     "form-control form-control-lg form-control-solid w-50",
                     {
-                      "is-invalid text-danger":
-                        formik.touched.questionOptions?.[index] &&
-                        (formik.errors.questionOptions as any)?.[index],
-                    },
-                    {
-                      "is-valid":
-                        formik.touched.questionOptions?.[index] &&
-                        !(formik.errors.questionOptions as any)?.[index],
+                      "is-invalid text-danger": !option.optionText,
+                      "is-valid": !!option.optionText,
                     }
                   )}
                 />
@@ -493,7 +483,7 @@ return (
                     id={`dropdown-option-${index}`}
                     size="sm"
                   >
-                    Measured Quality Types 
+                    Measured Quality Types
                   </Dropdown.Toggle>
                   <Dropdown.Menu style={{ minWidth: 250 }}>
                     <Dropdown.Header>Measured Quality Types</Dropdown.Header>
@@ -533,7 +523,7 @@ return (
                   </Dropdown.Menu>
                 </Dropdown>
                 {/* Add/Remove buttons after dropdown, in the same row */}
-                {formik.values.questionOptions.length > 1 && (
+                {formik.values.options.length > 1 && (
                   <button
                     type="button"
                     className="btn btn-sm btn-danger ms-2"
@@ -542,7 +532,7 @@ return (
                     -
                   </button>
                 )}
-                {index === formik.values.questionOptions.length - 1 && (
+                {index === formik.values.options.length - 1 && (
                   <button
                     type="button"
                     className="btn btn-sm btn-primary ms-2"
@@ -555,7 +545,7 @@ return (
             ))}
             {/* Keep the + and - buttons for quick access if desired */}
             {/* 
-            {index === formik.values.questionOptions.length - 1 ? (
+            {index === formik.values.options.length - 1 ? (
               <button
               type="button"
               className="btn btn-sm btn-primary"
@@ -575,15 +565,29 @@ return (
             */}
             </div>
             <div>
-            {typeof formik.errors.questionOptions === "string" && (
+            {typeof formik.errors.options === "string" && (
               <div className="fv-plugins-message-container">
               <div className="fv-help-block text-danger">
-                <span role="alert">{formik.errors.questionOptions}</span>
+                <span role="alert">{formik.errors.options}</span>
               </div>
               </div>
             )}
             </div>
-
+            <div className="fv-row mb-7">
+              <label className="fs-6 fw-bold mb-2">Max Options Allowed</label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={formik.values.maxOptionsAllowed}
+                onChange={e =>
+                  formik.setFieldValue("maxOptionsAllowed", e.target.value)
+                }
+                placeholder="Max Options Allowed"
+                className="form-control form-control-lg form-control-solid w-25"
+                style={{ width: 200 }}
+              />
+            </div>
         </div> {/* Close card-body */}
 
 <div className="card-footer d-flex justify-content-end">
