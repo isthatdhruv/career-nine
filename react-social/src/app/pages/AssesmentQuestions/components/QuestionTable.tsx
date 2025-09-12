@@ -1,4 +1,3 @@
-import { Checkbox, FormControl, InputLabel, ListItemText, MenuItem, OutlinedInput, Select } from "@mui/material";
 import { MDBDataTableV5 } from "mdbreact";
 import { useEffect, useState } from "react";
 import { AiFillEdit } from "react-icons/ai";
@@ -204,37 +203,6 @@ const QuestionTable = (props: {
           </button>
         </div>
       ),
-      MeasuredQualityTypes: (
-        <div className="">
-          <FormControl sx={{ m: 1, width: 200 }} size="small">
-            <InputLabel id={`multi-select-quality-types-label-${data.id}`}>Select Quality Types</InputLabel>
-            <Select
-              labelId={`multi-select-quality-types-label-${data.id}`}
-              multiple
-              value={selectedMeasuredQualityTypesByQuestion[data.id] || []}
-              onChange={async (e) => {
-                const newValue = typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value;
-                await handleMeasuredQualityTypeSelectionChange(data.id, newValue);
-              }}
-              input={<OutlinedInput label="Select Quality Types" />}
-              renderValue={(selected) =>
-                (selected as any[]).map(typeId =>
-                  measuredQualityTypes.find(t => t.measuredQualityTypeId === typeId)?.measuredQualityTypeName
-                ).join(', ')
-              }
-            >
-              {measuredQualityTypes.map((type) => (
-                <MenuItem key={type.measuredQualityTypeId} value={type.measuredQualityTypeId}>
-                  <Checkbox
-                    checked={(selectedMeasuredQualityTypesByQuestion[data.id] || []).includes(type.measuredQualityTypeId)}
-                  />
-                  <ListItemText primary={type.measuredQualityTypeName} />
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </div>
-      )
     })),
   };
   

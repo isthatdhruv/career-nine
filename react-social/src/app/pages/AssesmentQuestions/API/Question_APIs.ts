@@ -38,22 +38,22 @@ export function GetMeasuredQualityTypesForQuestion(questionId: any) {
 }
 export function CreateQuestionData(values: any) {
   // Transform the data to match backend expectations
-  const requestData = {
-    ...values,
-    section: values.sectionId ? { sectionId: values.sectionId } : null,
-    options: values.questionOptions 
-      ? values.questionOptions
-          .filter((option: string) => option.trim() !== '') // Remove empty options
-          .map((option: string, index: number) => ({
-            optionText: option,
-            isCorrect: index === 0 // For now, make first option correct by default
-          }))
-      : []
-  };
-  delete requestData.sectionId; // Remove the flat sectionId
-  delete requestData.questionOptions; // Remove the original field
-  console.log("Sending to backend:", requestData);
-  return axios.post(createQuestion, requestData);
+  // const requestData = {
+  //   ...values,
+  //   section: values.sectionId ? { sectionId: values.sectionId } : null,
+  //   options: values.questionOptions 
+  //     ? values.questionOptions
+  //         .filter((option: string) => option.trim() !== '') // Remove empty options
+  //         .map((option: string, index: number) => ({
+  //           optionText: option,
+  //           isCorrect: index === 0 // For now, make first option correct by default
+  //         }))
+  //     : []
+  // };
+  // delete requestData.sectionId; // Remove the flat sectionId
+  // delete requestData.questionOptions; // Remove the original field
+  // console.log("Sending to backend:", requestData);
+  return axios.post(createQuestion, values);
 }
 
 export function UpdateQuestionData(id: any, values: any) {
