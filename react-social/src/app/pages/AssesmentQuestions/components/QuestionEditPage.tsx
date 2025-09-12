@@ -42,13 +42,34 @@ const QuestionEditPage = (props?: {
           // Fetch question data by ID
           const questionResponse = await ReadQuestionByIdData(id);
           console.log("Fetched question data:", questionResponse.data);
-          setQuestionData(questionResponse.data);
+          
+          // Process the question data to extract section properly
+          const fetchedQuestion = questionResponse.data;
+          
+          
+          const processedData = {
+            ...fetchedQuestion,
+            sectionId: fetchedQuestion.section?.sectionId || "",
+            questionOptions: fetchedQuestion.options 
+              ? fetchedQuestion.options.map((option: any) => option.optionText || option)
+              : [""]
+          };
+          
+          console.log("Processed data with sectionId:", processedData.sectionId);
+          setQuestionData(processedData);
         } catch (error) {
           console.error("Error fetching question:", error);
           // Try to get data from location state as fallback
           const locationData = (location.state as any)?.data;
           if (locationData) {
-            setQuestionData(locationData);
+            const processedLocationData = {
+              ...locationData,
+              sectionId: locationData.section?.sectionId || locationData.sectionId || "",
+              questionOptions: locationData.options 
+                ? locationData.options.map((option: any) => option.optionText || option)
+                : locationData.questionOptions || [""]
+            };
+            setQuestionData(processedLocationData);
           }
         } finally {
           setLoading(false);
@@ -57,7 +78,14 @@ const QuestionEditPage = (props?: {
         // Fallback to location state if no ID in URL
         const locationData = (location.state as any)?.data;
         if (locationData) {
-          setQuestionData(locationData);
+          const processedLocationData = {
+            ...locationData,
+            sectionId: locationData.section?.sectionId || locationData.sectionId || "",
+            questionOptions: locationData.options 
+              ? locationData.options.map((option: any) => option.optionText || option)
+              : locationData.questionOptions || [""]
+          };
+          setQuestionData(processedLocationData);
         }
       }
     };
@@ -131,6 +159,13 @@ const QuestionEditPage = (props?: {
       }
     },
   });
+
+  // Debug effect to log formik values
+  useEffect(() => {
+    console.log("Current questionData:", questionData);
+    console.log("Current formik sectionId:", formik.values.sectionId);
+    console.log("Available sections:", sections);
+  }, [questionData, formik.values.sectionId, sections]);
 
   if (loading) {
     return (

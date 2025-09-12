@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "react-bootstrap";
 import { IconContext } from "react-icons";
+<<<<<<< HEAD
 import { MdQuestionAnswer } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { ReadCareerData } from "./API/Career_APIs";
@@ -8,11 +9,22 @@ import { CareerTable } from "./components";
 
 const CareerPage = () => {
   const [careerData, setCareerData] = useState([]);
+=======
+import { MdWork } from "react-icons/md";
+import { useNavigate } from "react-router-dom";
+import { ReadCareersData } from "./API/Career_APIs";
+import { CareerTable } from "./components";
+
+
+const CareerPage = () => {
+  const [careersData, setCareersData] = useState([]);
+>>>>>>> origin/palak
   const [loading, setLoading] = useState(false);
   const [sections, setSections] = useState<any[]>([]); 
   const [pageLoading, setPageLoading] = useState(["false"]);
   const navigate = useNavigate();
 
+<<<<<<< HEAD
   const fetchCareerData = async () => {
     setLoading(true);
     try {
@@ -20,12 +32,23 @@ const CareerPage = () => {
       setCareerData(response.data);
     } catch (error) {
       console.error("Failed to fetch career data:", error);
+=======
+
+  const fetchCareers = async () => {
+    setLoading(true);
+    try {
+      const response = await ReadCareersData();
+      setCareersData(response.data);
+    } catch (error) {
+      console.error("Failed to fetch careers:", error);
+>>>>>>> origin/palak
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+<<<<<<< HEAD
       const fetchSections = async () => {
         setLoading(true);
         try {
@@ -43,6 +66,10 @@ const CareerPage = () => {
   useEffect(() => {
     fetchCareerData();
 
+=======
+    fetchCareers();
+    
+>>>>>>> origin/palak
     if (pageLoading[0] === "true") {
       setPageLoading(["false"]);
     }
@@ -61,7 +88,11 @@ const CareerPage = () => {
       {!loading && (
         <div className="card-header border-0 pt-6">
           <div className="card-title">
+<<<<<<< HEAD
             <h1>Career</h1>
+=======
+            <h1>Careers</h1>
+>>>>>>> origin/palak
           </div>
 
           <div className="card-toolbar">
@@ -69,14 +100,20 @@ const CareerPage = () => {
               <Button
                 variant="primary"
                 onClick={() => {
+<<<<<<< HEAD
                   navigate("/careers/create");
+=======
+                  navigate("/career/create");
+>>>>>>> origin/palak
                 }}
               >
-                <IconContext.Provider
-                  value={{ style: { paddingBottom: "4px" } }}
-                >
+                <IconContext.Provider value={{ style: { paddingBottom: "4px" } }}>
                   <div>
+<<<<<<< HEAD
                     Add Career <MdQuestionAnswer size={21} />
+=======
+                    Add Career <MdWork size={21} />
+>>>>>>> origin/palak
                   </div>
                 </IconContext.Provider>
               </Button>
@@ -88,7 +125,7 @@ const CareerPage = () => {
       {!loading && (
         <div className="card-body pt-5">
           <CareerTable
-            data={careerData}
+            data={careersData}
             setLoading={setLoading}
             setPageLoading={setPageLoading}
           />

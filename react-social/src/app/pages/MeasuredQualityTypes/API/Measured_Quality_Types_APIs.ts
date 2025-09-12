@@ -26,3 +26,13 @@ export function UpdateMeasuredQualityTypesData(id: any, values: any) {
 export function DeleteMeasuredQualityTypesData(id: any) {
   return axios.delete(deleteMeasuredQualityTypes + id);
 }
+
+// One-to-Many relationship: Assign MeasuredQualityType to a MeasuredQualities
+export function AssignMeasuredQualityTypeToQuality(typeId: any, qualityId: any) {
+  return axios.put(`${API_URL}/measured-quality-types/${typeId}/assign-quality/${qualityId}`);
+}
+
+// Remove MeasuredQualityType from MeasuredQualities (set foreign key to null)
+export function RemoveMeasuredQualityTypeFromQuality(typeId: any) {
+  return axios.put(`${API_URL}/measured-quality-types/${typeId}/remove-quality`);
+}

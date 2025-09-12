@@ -39,11 +39,28 @@ public class CareerController {
     }
     @PutMapping("/update/{id}")
     public Career updateCareer(@PathVariable Long id, @RequestBody Career career) {
-        career.setId(id);
-        return careerRepository.save(career);
+        Career existingCareer = careerRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Career not found"));
+
+        // Only update simple fields, not relationships
+        existingCareer.setTitle(career.getTitle());
+        existingCareer.setDescription(career.getDescription());
+        // Do NOT update measuredQualityTypes here
+
+        return careerRepository.save(existingCareer);
     }
     @DeleteMapping("/delete/{id}")
     public void deleteCareer(@PathVariable Long id) {
         careerRepository.deleteById(id);
     }
+    // Many-to-Many: Get MeasuredQualityTypes for a Career
+    @GetMapping("/{id}/measured-quality-types")
+    public List<com.kccitm.api.model.career9.MeasuredQualityTypes> getMeasuredQualityTypesForCareer(@PathVariable Long id) {
+        Career career = careerRepository.findById(id).orElse(null);
+        if (career == null) {
+            return java.util.Collections.emptyList();
+        }
+        return new java.util.ArrayList<>(career.getMeasuredQualityTypes());
+    }
+
 }

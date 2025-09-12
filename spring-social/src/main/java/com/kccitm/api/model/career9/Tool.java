@@ -8,10 +8,10 @@ import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
-import javax.persistence.JoinColumn;
-import javax.persistence.JoinTable;
 import javax.persistence.ManyToMany;
 import javax.persistence.Table;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "tools")
@@ -33,12 +33,8 @@ public class Tool implements Serializable {
     private boolean isFree;
 
     // Many-to-Many relationship with MeasuredQualities
-    @ManyToMany
-    @JoinTable(
-        name="tool_measured_quality_mapping",
-        joinColumns = @JoinColumn(name="tool_id"),
-        inverseJoinColumns = @JoinColumn(name="measured_quality_id")
-    )
+    @ManyToMany(mappedBy = "tools")
+    @JsonIgnore
     private Set<MeasuredQualities> measuredQualities = new HashSet<>();
 
     // Getters and Setters
@@ -67,12 +63,24 @@ public class Tool implements Serializable {
         this.price = price;
     }
 
+    public boolean isFree() {
+        return isFree;
+    }
+    
     public boolean getIsFree() {
         return isFree;
     }
     
     public void setIsFree(boolean isFree) {
         this.isFree = isFree;
+    }
+
+    public Set<MeasuredQualities> getMeasuredQualities() {
+        return measuredQualities;
+    }
+
+    public void setMeasuredQualities(Set<MeasuredQualities> measuredQualities) {
+        this.measuredQualities = measuredQualities;
     }
 
 }

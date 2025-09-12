@@ -1,8 +1,10 @@
 package com.kccitm.api.controller.career9;
 
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,8 +16,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.career9.AssessmentQuestionOptions;
 import com.kccitm.api.model.career9.AssessmentQuestions;
+import com.kccitm.api.model.career9.MeasuredQualityTypes;
 import com.kccitm.api.model.career9.QuestionSection;
 import com.kccitm.api.repository.Career9.AssessmentQuestionRepository;
+import com.kccitm.api.repository.Career9.MeasuredQualityTypesRepository;
 import com.kccitm.api.repository.Career9.QuestionSectionRepository;
 
 
@@ -28,6 +32,9 @@ public class AssessmentQuestionController {
 
     @Autowired
     private QuestionSectionRepository questionSectionRepository;
+
+    @Autowired
+    private MeasuredQualityTypesRepository measuredQualityTypesRepository;
 
     @GetMapping("/getAll")
     public List<AssessmentQuestions> getAllAssessmentQuestions() {
@@ -63,34 +70,87 @@ public class AssessmentQuestionController {
         System.out.println("Updating assessment question with ID: " + id);
         System.out.println("Request body: " + assessmentQuestions.toString());
         
-        // Get existing question to preserve data
-        AssessmentQuestions existingQuestion = assessmentQuestionRepository.findById(id).orElse(null);
-        if (existingQuestion == null) {
-            throw new RuntimeException("Question not found with ID: " + id);
-        }
+        // Get existing question to preserve relationships
+        AssessmentQuestions existingQuestion = assessmentQuestionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Question not found with ID: " + id));
         
-        // Set the ID
-        assessmentQuestions.setId(id);
+        // Update only the fields that should be updated
+        existingQuestion.setQuestionText(assessmentQuestions.getQuestionText());
+        existingQuestion.setQuestionType(assessmentQuestions.getQuestionType());
         
-        // Handle section relationship
+        // Handle section relationship - only update if provided
         if (assessmentQuestions.getSection() != null && assessmentQuestions.getSection().getSectionId() != null) {
             QuestionSection section = questionSectionRepository.findById(assessmentQuestions.getSection().getSectionId()).orElse(null);
-            assessmentQuestions.setSection(section);
-        }
-        
-        // Handle options relationship
-        if (assessmentQuestions.getOptions() != null) {
-            for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
-                option.setQuestion(assessmentQuestions);
+            if (section != null) {
+                existingQuestion.setSection(section);
             }
         }
         
-        AssessmentQuestions updated = assessmentQuestionRepository.save(assessmentQuestions);
+        // Handle options relationship - only update if provided
+        if (assessmentQuestions.getOptions() != null && !assessmentQuestions.getOptions().isEmpty()) {
+            // Clear existing options to avoid orphaned records
+            if (existingQuestion.getOptions() != null) {
+                existingQuestion.getOptions().clear();
+            }
+            
+            // Set new options
+            for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
+                option.setQuestion(existingQuestion);
+            }
+            existingQuestion.setOptions(assessmentQuestions.getOptions());
+        }
+        
+        // DON'T update measuredQualityTypes - preserve existing relationships
+        
+        AssessmentQuestions updated = assessmentQuestionRepository.save(existingQuestion);
         System.out.println("Successfully updated assessment question: " + updated.toString());
         return updated;
     }
     @DeleteMapping("/delete/{id}")
     public void deleteAssessmentQuestion(@PathVariable Long id) {
         assessmentQuestionRepository.deleteById(id);
+    }
+    
+    // Many-to-Many relationship management endpoints for MeasuredQualityTypes
+    
+    @PostMapping("/{questionId}/measured-quality-types/{typeId}")
+    public ResponseEntity<String> addMeasuredQualityTypeToQuestion(@PathVariable Long questionId, @PathVariable Long typeId) {
+        AssessmentQuestions question = assessmentQuestionRepository.findById(questionId).orElse(null);
+        MeasuredQualityTypes type = measuredQualityTypesRepository.findById(typeId).orElse(null);
+
+        if (question == null || type == null) {
+            return ResponseEntity.badRequest().body("AssessmentQuestion or MeasuredQualityType not found");
+        }
+
+        question.addMeasuredQualityType(type);
+        assessmentQuestionRepository.save(question);
+
+        return ResponseEntity.ok("MeasuredQualityType successfully associated with AssessmentQuestion");
+    }
+
+    @DeleteMapping("/{questionId}/measured-quality-types/{typeId}")
+    public ResponseEntity<String> removeMeasuredQualityTypeFromQuestion(@PathVariable Long questionId, @PathVariable Long typeId) {
+        AssessmentQuestions question = assessmentQuestionRepository.findById(questionId).orElse(null);
+        MeasuredQualityTypes type = measuredQualityTypesRepository.findById(typeId).orElse(null);
+
+        if (question == null || type == null) {
+            return ResponseEntity.badRequest().body("AssessmentQuestion or MeasuredQualityType not found");
+        }
+
+        question.removeMeasuredQualityType(type);
+        assessmentQuestionRepository.save(question);
+
+        return ResponseEntity.ok("MeasuredQualityType successfully removed from AssessmentQuestion");
+    }
+
+    @GetMapping("/{questionId}/measured-quality-types")
+    public ResponseEntity<Set<MeasuredQualityTypes>> getQuestionMeasuredQualityTypes(@PathVariable Long questionId) {
+        AssessmentQuestions question = assessmentQuestionRepository.findById(questionId).orElse(null);
+
+        if (question == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok(question.getMeasuredQualityTypes());
     }
 }

@@ -46,12 +46,12 @@ const ToolTable = (props: {
     rows: props.data.map((data: any) => ({
       name: data.name,
       price: data.price,
-      type: data.price==0?"Free" : "Paid",
+      type: data.isFree ? "Free" : "Paid",
       actions: (
         <>
           <button
             onClick={() => {
-              navigate(`/tools/edit/${data.id}`, {
+              navigate(`/tools/edit/${data.toolId}`, {
                 state: { data },
               });
             }}
@@ -63,7 +63,7 @@ const ToolTable = (props: {
             onClick={async () => { 
               props.setLoading(true);
               try {
-                await DeleteToolData(data.id);
+                await DeleteToolData(data.toolId);
                 props.setPageLoading(["true"]);
               } catch (error) {
                 console.error("Delete failed:", error);

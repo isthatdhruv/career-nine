@@ -1,6 +1,6 @@
 import clsx from "clsx";
 import { useFormik } from "formik";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
@@ -11,9 +11,10 @@ import {
 } from "../API/Measured_Qualities_APIs";
 
 const validationSchema = Yup.object().shape({
-  qualityName: Yup.string().required("Quality name is required"),
-  qualityDescription: Yup.string().required("Quality description is required"),
-  displayName: Yup.string().required("Display name is required"),
+  measuredQualityName: Yup.string().required("Quality name is required"),
+  measuredQualityDescription: Yup.string().required("Quality description is required"),
+  qualityDisplayName
+    : Yup.string().required("Display name is required"),
 });
 
 const MeasuredQualitiesEditPage = (props?: { setPageLoading?: any }) => {
@@ -23,38 +24,47 @@ const MeasuredQualitiesEditPage = (props?: { setPageLoading?: any }) => {
   const location = useLocation();
 
   const measuredQualitiesData = (location.state as any)?.data || {
-    qualityName: "",
-    qualityDescription: "",
-    displayName: "",
-    id: "",
+    measuredQualityName: "",
+    measuredQualityDescription: "",
+    qualityDisplayName: "",
+    measuredQualityId: "",
   };
 
   const formik = useFormik({
     enableReinitialize: true,
     initialValues: {
-      id: measuredQualitiesData.id,
-      qualityName: measuredQualitiesData.qualityName || "",
-      qualityDescription: measuredQualitiesData.qualityDescription || "",
-      displayName: measuredQualitiesData.displayName || "",
+      measuredQualityId: measuredQualitiesData.measuredQualityId,
+      measuredQualityName: measuredQualitiesData.measuredQualityName || "",
+      measuredQualityDescription: measuredQualitiesData.measuredQualityDescription || "",
+      qualityDisplayName
+        : measuredQualitiesData.qualityDisplayName
+        || "",
     },
     validationSchema: validationSchema,
     onSubmit: async (values) => {
       setLoading(true);
       try {
-        console.log("Attempting to update question:");
-        console.log("Question ID:", values.id);
+        console.log("Attempting to update Measured Quality:");
+        console.log("Quality ID:", values.measuredQualityId);
         console.log("Values being sent:", values);
 
-        if (!values.id) {
+        if (!values.measuredQualityId) {
           alert(
             "No question ID found. Please try navigating back and selecting the question again."
           );
           return;
         }
 
-        const response = await UpdateMeasuredQualitiesData(values.id, values);
-        console.log("Update successful:", response);
+        const updatePayload = {
+          measuredQualityName: values.measuredQualityName,
+          measuredQualityDescription: values.measuredQualityDescription,
+          qualityDisplayName: values.qualityDisplayName,
+          // Explicitly exclude tools field to prevent relationship reset
+        };
 
+        console.log("Values being sent:", updatePayload);
+        const response = await UpdateMeasuredQualitiesData(values.measuredQualityId, updatePayload);
+        console.log("Update successful:", response);
         navigate("/measured-qualities");
 
         if (props?.setPageLoading) {
@@ -117,103 +127,104 @@ const MeasuredQualitiesEditPage = (props?: { setPageLoading?: any }) => {
           className="form w-100 fv-plugins-bootstrap5 fv-plugins-framework"
           onSubmit={formik.handleSubmit}
         >
+          <div className="card-body">
+            <div className="fv-row mb-7">
+              <label className="required fs-6 fw-bold mb-2">Quality Name:</label>
+              <input
+                type="text"
+                placeholder="Enter Quality Name"
 
-          <div className="fv-row mb-7">
-            <label className="required fs-6 fw-bold mb-2">Question Text:</label>
-            <textarea
-              placeholder="Enter Quality Name"
-              rows={4}
-              {...formik.getFieldProps("qualityName")}
-              className={clsx(
-                "form-control form-control-lg form-control-solid",
-                {
-                  "is-invalid text-danger":
-                    formik.touched.qualityName && formik.errors.qualityName,
-                },
-                {
-                  "is-valid":
-                    formik.touched.qualityName && !formik.errors.qualityName,
-                }
-              )}
-            />
-            {formik.touched.qualityName && formik.errors.qualityName && (
-              <div className="fv-plugins-message-container">
-                <div className="fv-help-block text-danger">
-                  <span role="alert">
-                    {String(formik.errors.qualityName)}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="fv-row mb-7">
-            <label className="required fs-6 fw-bold mb-2">Question Type:</label>
-            <select
-              {...formik.getFieldProps("qualityDescription")}
-              className={clsx(
-                "form-control form-control-lg form-control-solid",
-                {
-                  "is-invalid text-danger":
-                    formik.touched.qualityDescription &&
-                    formik.errors.qualityDescription,
-                },
-                {
-                  "is-valid":
-                    formik.touched.qualityDescription &&
-                    !formik.errors.qualityDescription,
-                }
-              )}
-            >
-              <option value="">Select Question Type</option>
-              <option value="multiple-choice">Multiple Choice</option>
-            </select>
-            {formik.touched.qualityDescription &&
-              formik.errors.qualityDescription && (
+                {...formik.getFieldProps("measuredQualityName")}
+                className={clsx(
+                  "form-control form-control-lg form-control-solid",
+                  {
+                    "is-invalid text-danger":
+                      formik.touched.measuredQualityName && formik.errors.measuredQualityName,
+                  },
+                  {
+                    "is-valid":
+                      formik.touched.measuredQualityName && !formik.errors.measuredQualityName,
+                  }
+                )}
+              />
+              {formik.touched.measuredQualityName && formik.errors.measuredQualityName && (
                 <div className="fv-plugins-message-container">
                   <div className="fv-help-block text-danger">
                     <span role="alert">
-                      {String(formik.errors.qualityDescription)}
+                      {String(formik.errors.measuredQualityName)}
                     </span>
                   </div>
                 </div>
               )}
-          </div>
+            </div>
 
-          <div className="fv-row mb-7">
-            <label className="required fs-6 fw-bold mb-2">Section</label>
-            <select
-              {...formik.getFieldProps("displayName")}
-              className={clsx(
-                "form-control form-control-lg form-control-solid",
-                {
-                  "is-invalid text-danger":
-                    formik.touched.displayName && formik.errors.displayName,
-                },
-                {
-                  "is-valid":
-                    formik.touched.displayName && !formik.errors.displayName,
-                }
-              )}
-            >
-              <option value="">Select Section</option>
-              {sections.map((section) => (
-                <option key={section.id} value={section.displayName}>
-                  {section.displayName}
-                </option>
-              ))}
-            </select>
-            {formik.touched.displayName && formik.errors.displayName && (
-              <div className="fv-plugins-message-container">
-                <div className="fv-help-block text-danger">
-                  <span role="alert">
-                    {String(formik.errors.displayName)}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
+            <div className="fv-row mb-7">
+              <label className="required fs-6 fw-bold mb-2">Quality Description:</label>
+              <textarea
+                placeholder="Enter Quality Description"
+                rows={4}
+                {...formik.getFieldProps("measuredQualityDescription")}
+                className={clsx(
+                  "form-control form-control-lg form-control-solid",
+                  {
+                    "is-invalid text-danger":
+                      formik.touched.measuredQualityDescription &&
+                      formik.errors.measuredQualityDescription,
+                  },
+                  {
+                    "is-valid":
+                      formik.touched.measuredQualityDescription &&
+                      !formik.errors.measuredQualityDescription,
+                  }
+                )}
+              >
+              </textarea>
+              {formik.touched.measuredQualityDescription &&
+                formik.errors.measuredQualityDescription && (
+                  <div className="fv-plugins-message-container">
+                    <div className="fv-help-block text-danger">
+                      <span role="alert">
+                        {String(formik.errors.measuredQualityDescription)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+            </div>
 
+            <div className="fv-row mb-7">
+              <label className="required fs-6 fw-bold mb-2">Display Name:</label>
+              <input
+                type="text"
+                placeholder="Enter Display Name"
+                {...formik.getFieldProps("qualityDisplayName")}
+                className={clsx(
+                  "form-control form-control-lg form-control-solid",
+                  {
+                    "is-invalid text-danger":
+                      formik.touched.qualityDisplayName &&
+                      formik.errors.qualityDisplayName,
+                  },
+                  {
+                    "is-valid":
+                      formik.touched.qualityDisplayName &&
+                      !formik.errors.qualityDisplayName,
+                  }
+                )}
+              />
+              {formik.touched.qualityDisplayName
+                && formik.errors.qualityDisplayName
+                && (
+                  <div className="fv-plugins-message-container">
+                    <div className="fv-help-block text-danger">
+                      <span role="alert">
+                        {String(formik.errors.qualityDisplayName
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                )}
+            </div>
+          </div>
           <div className="card-footer d-flex justify-content-end">
             <button
               type="button"

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import clsx from "clsx";
 import { useFormik } from "formik";
 import { useState, useEffect } from "react";
@@ -14,33 +15,60 @@ const validationSchema = Yup.object().shape({
   careerName: Yup.string().required("Career name is required"),
   careerDescription: Yup.string().required("Career description is required"),
   // displayName: Yup.string().required("Display name is required"),
+=======
+import { useFormik } from "formik";
+import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import * as Yup from "yup";
+import { UpdateCareerData } from "../API/Career_APIs";
+
+const validationSchema = Yup.object().shape({
+  title: Yup.string().required("Title is required"),
+  description: Yup.string().required("Description is required"),
+>>>>>>> origin/palak
 });
 
 const CareerEditPage = (props?: { setPageLoading?: any }) => {
   const [loading, setLoading] = useState(false);
+<<<<<<< HEAD
   const [sections, setSections] = useState<any[]>([]);
+=======
+>>>>>>> origin/palak
   const navigate = useNavigate();
   const location = useLocation();
 
   const careerData = (location.state as any)?.data || {
+<<<<<<< HEAD
     careerName: "",
     careerDescription: "",
     // displayName: "",
     id: "",
+=======
+    title: "",
+    description: "",
+    career_id: "",
+>>>>>>> origin/palak
   };
 
   const formik = useFormik({
     enableReinitialize: true,
     initialValues: {
+<<<<<<< HEAD
       id: careerData.id,
       careerName: careerData.careerName || "",
       careerDescription: careerData.careerDescription || "",
       // displayName: careerData.displayName || "",
+=======
+      career_id: careerData.career_id,
+      title: careerData.title || "",
+      description: careerData.description || "",
+>>>>>>> origin/palak
     },
     validationSchema: validationSchema,
     onSubmit: async (values) => {
       setLoading(true);
       try {
+<<<<<<< HEAD
         console.log("Attempting to update question:");
         console.log("Question ID:", values.id);
         console.log("Values being sent:", values);
@@ -57,10 +85,23 @@ const CareerEditPage = (props?: { setPageLoading?: any }) => {
 
         navigate("/careers");
 
+=======
+        if (!values.career_id) {
+          alert("No career ID found. Please try navigating back and selecting the career again.");
+          return;
+        }
+        const updatePayload = {
+          title: values.title,
+          description: values.description,
+        };
+        const response = await UpdateCareerData(values.career_id, updatePayload);
+        navigate("/career");
+>>>>>>> origin/palak
         if (props?.setPageLoading) {
           props.setPageLoading(["true"]);
         }
       } catch (error) {
+<<<<<<< HEAD
         console.error("Full error object:", error);
         if (typeof error === "object" && error !== null) {
           console.error("Error response:", (error as any).response);
@@ -76,12 +117,16 @@ const CareerEditPage = (props?: { setPageLoading?: any }) => {
         } else {
           alert("Failed to update question: Unknown error occurred");
         }
+=======
+        alert("Failed to update career. Please try again.");
+>>>>>>> origin/palak
       } finally {
         setLoading(false);
       }
     },
   });
 
+<<<<<<< HEAD
   useEffect(() => {
     const fetchSections = async () => {
       try {
@@ -234,6 +279,43 @@ const CareerEditPage = (props?: { setPageLoading?: any }) => {
           </div>
         </form>
       </div>
+=======
+  return (
+    <div className="container py-5">
+      <form onSubmit={formik.handleSubmit}>
+        <div className="mb-3">
+          <label className="form-label">Title</label>
+          <input
+            type="text"
+            className="form-control"
+            name="title"
+            value={formik.values.title}
+            onChange={formik.handleChange}
+            onBlur={formik.handleBlur}
+          />
+          {formik.touched.title && typeof formik.errors.title === "string" && (
+            <div className="text-danger">{formik.errors.title}</div>
+          )}
+        </div>
+        <div className="mb-3">
+          <label className="form-label">Description</label>
+          <input
+            type="text"
+            className="form-control"
+            name="description"
+            value={formik.values.description}
+            onChange={formik.handleChange}
+            onBlur={formik.handleBlur}
+          />
+          {formik.touched.description && typeof formik.errors.description === "string" && (
+            <div className="text-danger">{formik.errors.description}</div>
+          )}
+        </div>
+        <button type="submit" className="btn btn-primary" disabled={loading}>
+          {loading ? "Updating..." : "Update Career"}
+        </button>
+      </form>
+>>>>>>> origin/palak
     </div>
   );
 };

@@ -5,6 +5,8 @@ import { getCSSVariableValue } from "../../_metronic/assets/ts/_utils";
 import { WithChildren } from "../../_metronic/helpers";
 import { MasterLayout } from "../../_metronic/layout/MasterLayout";
 import { useAuth } from "../modules/auth";
+import CareerPage from "../pages/Career/CareerPage";
+import { CareerCreatePage, CareerEditPage } from "../pages/Career/components";
 import { DashboardWrapper } from "../pages/dashboard/DashboardWrapper";
 import FacultyRegistrationDetails from "../pages/FacultyRegistration/FacultyRegistrationDetails";
 import FacultyRegistrationForm from "../pages/FacultyRegistration/FacultyRegistrationForm";
@@ -17,9 +19,13 @@ import QuestionSectionEditPage from "../pages/QuestionSections/components/Questi
 import QuestionSectionPage from "../pages/QuestionSections/CreateQuestionSection";
 import { ToolEditPage } from "../pages/Tool/components";
 import ToolCreatePage from "../pages/Tool/components/ToolCreatePage";
+<<<<<<< HEAD
 import CareerPage from "../pages/Career/CareerPage";
 import CareerCreatePage from "../pages/Career/components/CareerCreatePage";
 import CareerEditPage from "../pages/Career/components/CareerEditPage";
+=======
+import UploadExcelFile from "../pages/UploadExcelFile/UploadExcelFile";
+>>>>>>> origin/palak
 // Update these paths to the correct locations of your components
 
 
@@ -67,7 +73,7 @@ const PrivateRoutes = () => {
   // const Compiler = lazy(() => import("../pages/Compiler/compiler"));
 
   const MeasuredQualityTypes = lazy(() => import("../pages/MeasuredQualityTypes/CreateMeasuredQualityTypes"));
-  const MeasuredQualities = lazy(() => import("../pages/MeasuredQualities/CreateMeasuredQualities"));
+  const MeasuredQualities = lazy(() => import("../pages/MeasuredQualities/MeasuredQualities"));
   const Tools = lazy(() => import("../pages/Tool/CreateTool"));
   const College = lazy(() => import("../pages/College/CollegePage"));
   // Update the import path below to the correct location if the file exists elsewhere
@@ -250,6 +256,32 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
+        //careerpage
+        <Route
+          path="/career"
+          element={
+            <SuspensedView>
+              <CareerPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/career/create"
+          element={
+            <SuspensedView>
+              <CareerCreatePage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/career/edit/:id"
+          element={
+            <SuspensedView>
+              <CareerEditPage />
+            </SuspensedView>
+          }
+        />
+
 
         <Route
           path="/board"
@@ -282,7 +314,7 @@ const PrivateRoutes = () => {
           path="/college/create"
           element={
             <SuspensedView>
-              <CollegeCreatePage  />
+              <CollegeCreatePage />
             </SuspensedView>
           }
         />
@@ -290,7 +322,7 @@ const PrivateRoutes = () => {
           path="/question-sections"
           element={
             <SuspensedView>
-              <QuestionSectionPage/>
+              <QuestionSectionPage />
             </SuspensedView>
           }
         />
@@ -310,6 +342,7 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
+<<<<<<< HEAD
         <Route
           path="/careers"
           element={
@@ -334,6 +367,8 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
+=======
+>>>>>>> origin/palak
         {/* <Route
           path="/college/edit/:id"
           element={
@@ -393,6 +428,15 @@ const PrivateRoutes = () => {
         />
 
         <Route
+          path="/upload-excel"
+          element={
+            <SuspensedView>
+              <UploadExcelFile />
+            </SuspensedView>
+          }
+        />
+
+        <Route
           path="/measured-qualities"
           element={
             <SuspensedView>
@@ -417,7 +461,7 @@ const PrivateRoutes = () => {
           }
         />
 
-          <Route
+        <Route
           path="/measured-quality-types"
           element={
             <SuspensedView>

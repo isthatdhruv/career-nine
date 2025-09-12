@@ -46,6 +46,7 @@ const ToolEditPage = (props?: {
             toolName: response.data.name || response.data.toolName,
             toolPrice: response.data.isFree ? "FREE" : "PAID",
             priceAmount: response.data.isFree ? "" : (response.data.price || ""),
+            isFree: response.data.isFree
           };
           setToolData(transformedData);
         } catch (error) {
@@ -77,6 +78,7 @@ const ToolEditPage = (props?: {
       toolName: toolData.toolName || "",
       toolPrice: toolData.toolPrice || "",
       priceAmount: toolData.priceAmount || "",
+      isFree: toolData.isFree || false,
     },
     validationSchema: validationSchema,
     onSubmit: async (values) => {
@@ -91,7 +93,16 @@ const ToolEditPage = (props?: {
           return;
         }
 
-        const response = await UpdateToolData(values.id, values);
+        // Transform the form values to match backend expectations
+        const payload = {
+          name: values.toolName,
+          isFree: values.toolPrice === "FREE",
+          price: values.toolPrice === "FREE" ? 0 : Number(values.priceAmount)
+        };
+
+        console.log("Payload being sent:", payload);
+
+        const response = await UpdateToolData(values.id, payload);
         console.log("Update successful:", response);
 
         navigate("/tools");

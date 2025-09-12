@@ -6,9 +6,9 @@ import * as Yup from "yup";
 import { CreateMeasuredQualityTypesData, ReadMeasuredQualityTypesData } from "../API/Measured_Quality_Types_APIs";
 
 const validationSchema = Yup.object().shape({
-  qualityTypeName: Yup.string().required("Quality Type name is required"),
-  qualityTypeDescription: Yup.string().required("Quality Type description is required"),
-  qualityTypeDisplayName: Yup.string().required("Quality Type display name is required"),
+  measuredQualityTypeName: Yup.string().required("Quality Type name is required"),
+  measuredQualityTypeDescription: Yup.string().required("Quality Type description is required"),
+  measuredQualityTypeDisplayName: Yup.string().required("Quality Type display name is required"),
 });
 
 const MeasuredQualityTypesCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
@@ -17,9 +17,9 @@ const MeasuredQualityTypesCreatePage = ({ setPageLoading }: { setPageLoading?: a
   const navigate = useNavigate();
 
   const initialValues = {
-    qualityTypeName: "",
-    qualityTypeDescription: "",
-    qualityTypeDisplayName: "",
+    measuredQualityTypeName: "",
+    measuredQualityTypeDescription: "",
+    measuredQualityTypeDisplayName: "",
   };
 
   useEffect(() => {
@@ -68,25 +68,24 @@ const MeasuredQualityTypesCreatePage = ({ setPageLoading }: { setPageLoading?: a
                     Quality Type Name :
                   </label>
                   <Field
-                    as="textarea"
-                    name="qualityTypeName"
+                    as="input"
+                    name="measuredQualityTypeName"
                     placeholder="Enter Quality Type Name"
-                    rows={4}
                     className={clsx(
                       "form-control form-control-lg form-control-solid",
                       {
                         "is-invalid text-danger":
-                          touched.qualityTypeName && errors.qualityTypeName,
+                          touched.measuredQualityTypeName && errors.measuredQualityTypeName,
                       },
                       {
-                        "is-valid": touched.qualityTypeName && !errors.qualityTypeName,
+                        "is-valid": touched.measuredQualityTypeName && !errors.measuredQualityTypeName,
                       }
                     )}
                   />
-                  {touched.qualityTypeName && errors.qualityTypeName && (
+                  {touched.measuredQualityTypeName && errors.measuredQualityTypeName && (
                     <div className="fv-plugins-message-container">
                       <div className="fv-help-block text-danger">
-                        <span role="alert">{errors.qualityTypeName}</span>
+                        <span role="alert">{errors.measuredQualityTypeName}</span>
                       </div>
                     </div>
                   )}
@@ -99,27 +98,28 @@ const MeasuredQualityTypesCreatePage = ({ setPageLoading }: { setPageLoading?: a
                   </label>
                   <Field
                     as="textarea"
-                    name="qualityTypeDescription"
+                    name="measuredQualityTypeDescription"
                     placeholder="Enter Quality Type Description"
                     rows={4}
                     className={clsx(
                       "form-control form-control-lg form-control-solid",
                       {
                         "is-invalid text-danger":
-                          touched.qualityTypeDescription &&
-                          errors.qualityTypeDescription,
+                          touched.measuredQualityTypeDescription &&
+                          errors.measuredQualityTypeDescription,
                       },
                       {
                         "is-valid":
-                          touched.qualityTypeDescription &&
-                          !errors.qualityTypeDescription,
+                          touched.measuredQualityTypeDescription &&
+                          !errors.measuredQualityTypeDescription
                       }
                     )}
                   />
-                  {touched.qualityTypeDescription && errors.qualityTypeDescription && (
-                    <div className="fv-plugins-message-container">
-                      <div className="fv-help-block text-danger">
-                        <span role="alert">{errors.qualityTypeDescription}</span>
+                  {touched.measuredQualityTypeDescription &&
+                    errors.measuredQualityTypeDescription && (
+                      <div className="fv-plugins-message-container">
+                        <div className="fv-help-block text-danger">
+                          <span role="alert">{errors.measuredQualityTypeDescription}</span>
                       </div>
                     </div>
                   )}
@@ -131,26 +131,25 @@ const MeasuredQualityTypesCreatePage = ({ setPageLoading }: { setPageLoading?: a
                     Quality Type Display Name :
                   </label>
                   <Field
-                    as="textarea"
-                    name="qualityTypeDisplayName"
+                    as="input"
+                    name="measuredQualityTypeDisplayName"
                     placeholder="Enter Display Name"
-                    rows={4}
                     className={clsx(
                       "form-control form-control-lg form-control-solid",
                       {
                         "is-invalid text-danger":
-                          touched.qualityTypeDisplayName && errors.qualityTypeDisplayName,
+                          touched.measuredQualityTypeDisplayName && errors.measuredQualityTypeDisplayName,
                       },
                       {
                         "is-valid":
-                          touched.qualityTypeDisplayName && !errors.qualityTypeDisplayName,
+                          touched.measuredQualityTypeDisplayName && !errors.measuredQualityTypeDisplayName
                       }
                     )}
                   />
-                  {touched.qualityTypeDisplayName && errors.qualityTypeDisplayName && (
+                  {touched.measuredQualityTypeDisplayName && errors.measuredQualityTypeDisplayName && (
                     <div className="fv-plugins-message-container">
                       <div className="fv-help-block text-danger">
-                        <span role="alert">{errors.qualityTypeDisplayName}</span>
+                        <span role="alert">{errors.measuredQualityTypeDisplayName}</span>
                       </div>
                     </div>
                   )}
