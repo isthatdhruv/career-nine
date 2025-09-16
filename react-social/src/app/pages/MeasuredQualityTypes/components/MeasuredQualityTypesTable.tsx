@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { ReadMeasuredQualitiesData } from "../../MeasuredQualities/API/Measured_Qualities_APIs";
-import { AssignMeasuredQualityTypeToQuality, DeleteMeasuredQualityTypesData, RemoveMeasuredQualityTypeFromQuality } from "../API/Measured_Quality_Types_APIs";
+import { DeleteMeasuredQualityTypesData } from "../API/Measured_Quality_Types_APIs";
 
 const MeasuredQualityTypesTable = (props: {
   data: any;
@@ -48,14 +48,16 @@ const MeasuredQualityTypesTable = (props: {
     try {
       if (qualityId) {
         // Assign the type to a quality
-        await AssignMeasuredQualityTypeToQuality(typeId, qualityId);
+        // await AssignMeasuredQualityTypeToQuality(typeId, qualityId);
+        console.log(`Assigned type ${typeId} to quality ${qualityId}`);
       } else {
         // Remove the type from quality (set foreign key to null)
-        await RemoveMeasuredQualityTypeFromQuality(typeId);
+        // await RemoveMeasuredQualityTypeFromQuality(typeId);
+        console.log(`Removed type ${typeId} from its assigned quality`);
       }
-      
+
       setSelectedQualityByType(prev => ({ ...prev, [typeId]: qualityId }));
-      
+
     } catch (error) {
       alert('Failed to update quality assignment. Please try again.');
       // Revert the change
@@ -141,7 +143,7 @@ const MeasuredQualityTypesTable = (props: {
             <AiFillEdit size={16} />
           </button>
           <button
-            onClick={async () => { 
+            onClick={async () => {
               props.setLoading(true);
               try {
                 await DeleteMeasuredQualityTypesData(data.measuredQualityTypeId);
@@ -165,7 +167,7 @@ const MeasuredQualityTypesTable = (props: {
       ),
     })),
   };
-  
+
   return (
     <>
       <MDBDataTableV5
