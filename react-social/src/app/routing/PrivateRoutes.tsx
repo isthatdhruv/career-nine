@@ -21,6 +21,12 @@ import { ToolEditPage } from "../pages/Tool/components";
 import ToolCreatePage from "../pages/Tool/components/ToolCreatePage";
 import UploadExcelFile from "../pages/UploadExcelFile/UploadExcelFile";
 // Update these paths to the correct locations of your components
+import Assessments from "../pages/CreateAssessment/Assessment";
+import AssessmentCreatePage from "../pages/CreateAssessment/components/AssessmentCreatePage";
+import AssessmentEditPage from "../pages/CreateAssessment/components/AssessmentEditPage";
+import AssessmentToolPage from "../pages/CreateAssessment/components/AssessmentToolPage";
+import AssessmentUploadFile from "../pages/CreateAssessment/components/AssessmentUploadFile";
+import AssessmentSection from "../pages/CreateAssessment/components/AssessmentSection";
 
 
 const PrivateRoutes = () => {
@@ -395,6 +401,55 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <UploadExcelFile />
+            </SuspensedView>
+          }
+        />
+
+        <Route
+          path="/assessments"
+          element={
+            <SuspensedView>
+              <Assessments />
+            </SuspensedView>
+          }
+        />  
+        <Route
+          path="/assessments/create/step-2"
+          element={
+            <SuspensedView>
+              <AssessmentToolPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/assessments/create/step-3"
+          element={
+            <SuspensedView>
+              <AssessmentUploadFile />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/assessments/create/step-4"
+          element={
+            <SuspensedView>
+              <AssessmentSection />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/assessments/create"
+          element={
+            <SuspensedView>
+              <AssessmentCreatePage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/assessments/edit/:id"
+          element={
+            <SuspensedView>
+              <AssessmentEditPage />
             </SuspensedView>
           }
         />
