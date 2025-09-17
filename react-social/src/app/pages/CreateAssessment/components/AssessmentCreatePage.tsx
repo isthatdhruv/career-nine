@@ -1,45 +1,64 @@
 import clsx from "clsx";
 import { Field, Form, Formik } from "formik";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
-import { CreateToolData } from "../API/Tool_APIs";
+import { ReadCollegeData } from "../../College/API/College_APIs";
+import CollegeCreateModal from "../../College/components/CollegeCreateModal";
 
 const validationSchema = Yup.object().shape({
-  name: Yup.string().required("Tool name is required"),
-  isFree: Yup.string().required("Tool price type is required"),
+  name: Yup.string().required("Assessment name is required"),
+  isFree: Yup.string().required("Assessment price type is required"),
   price: Yup.number()
     .typeError("Price must be a number")
     .when("isFree", {
       is: "false",
-      then: (schema) => schema.required("Please enter the price").positive("Must be positive"),
+      then: (schema) =>
+        schema.required("Please enter the price").positive("Must be positive"),
       otherwise: (schema) => schema.notRequired(),
     }),
+  collegeId: Yup.string().required("College is required"),
 });
 
-const ToolCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
+const AssessmentCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const [loading, setLoading] = useState(false);
-  // const [sections, setSections] = useState<any[]>([]);
   const navigate = useNavigate();
 
   const initialValues = {
     name: "",
     price: 0,
     isFree: "true",
+    collegeId: "",
   };
+
+  const [college, setCollege] = useState<any[]>([]);
+  const [showCollegeModal, setShowCollegeModal] = useState(false);
+
+  useEffect(() => {
+    const fetchCollege = async () => {
+      try {
+        const response = await ReadCollegeData();
+        setCollege(response.data || []); 
+      } catch (error) {
+        console.error("Error fetching college:", error);
+      }
+    };
+
+    fetchCollege();
+  }, []);
 
   return (
     <div className="container py-5">
       <div className="card shadow-sm py-5">
         <div className="card-header">
-          <h1 className="mb-0">Add Tool</h1>
+          <h1 className="mb-0 mt-5">Create Assessment</h1>
         </div>
 
         <Formik
           enableReinitialize
           initialValues={initialValues}
           validationSchema={validationSchema}
-          onSubmit={async (values, { resetForm }) => {
+          onSubmit={async (values) => {
             setLoading(true);
             try {
               const isFreeBool = values.isFree === "true";
@@ -47,10 +66,10 @@ const ToolCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                 name: values.name,
                 isFree: isFreeBool,
                 price: isFreeBool ? 0 : Number(values.price),
+                collegeId: values.collegeId,
               };
-              await CreateToolData(payload);
-              resetForm();
-              navigate("/tools");
+              localStorage.setItem("assessmentStep1", JSON.stringify(payload));
+              navigate("/assessments/create/step-2");
             } catch (error) {
               console.error(error);
               window.location.replace("/error");
@@ -59,17 +78,18 @@ const ToolCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
             }
           }}
         >
-          {({ errors, touched, values }) => (
+          {({ errors, touched }) => (
             <Form className="form w-100 fv-plugins-bootstrap5 fv-plugins-framework">
-
               <div className="card-body">
-                {/* Tool Name */}
+                {/* Assessment Name */}
                 <div className="fv-row mb-7">
-                  <label className="required fs-6 fw-bold mb-2">Tool Name :</label>
+                  <label className="required fs-6 fw-bold mb-2">
+                    Assessment Name:
+                  </label>
                   <Field
-                    type="text"
+                    as="input"
                     name="name"
-                    placeholder="Enter Tool Name"
+                    placeholder="Enter Assessment Name"
                     className={clsx(
                       "form-control form-control-lg form-control-solid",
                       {
@@ -89,63 +109,77 @@ const ToolCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                   )}
                 </div>
 
-                {/* Tool Price Dropdown */}
+                {/* Select College */}
                 <div className="fv-row mb-7">
-                  <label className="required fs-6 fw-bold mb-2">Tool Price :</label>
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <label className="required fs-6 fw-bold">
+                      Select College
+                    </label>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-light-primary"
+                      onClick={() => setShowCollegeModal(true)}
+                    >
+                      Add New College
+                    </button>
+                  </div>
+
+                  {/* College Modal */}
+                  <CollegeCreateModal
+                    setPageLoading={setPageLoading ?? (() => {})}
+                    show={showCollegeModal}
+                    onHide={() => setShowCollegeModal(false)}
+                  />
+
                   <Field
                     as="select"
-                    name="isFree"
+                    name="collegeId"
                     className={clsx(
                       "form-control form-control-lg form-control-solid",
                       {
-                        "is-invalid text-danger": touched.isFree && errors.isFree,
+                        "is-invalid text-danger":
+                          touched.collegeId && errors.collegeId,
                       },
                       {
-                        "is-valid": touched.isFree && !errors.isFree,
+                        "is-valid": touched.collegeId && !errors.collegeId,
                       }
                     )}
                   >
-                    <option value="true">Free</option>
-                    <option value="false">Paid</option>
+                    <option value="">Select College</option>
+                    {college.map((inst) => (
+                      <option
+                        key={inst.instituteCode}
+                        value={inst.instituteCode}
+                      >
+                        {inst.instituteName}
+                      </option>
+                    ))}
                   </Field>
-                  {touched.isFree && errors.isFree && (
+
+                  {touched.collegeId && errors.collegeId && (
                     <div className="fv-plugins-message-container">
                       <div className="fv-help-block text-danger">
-                        <span role="alert">{errors.isFree}</span>
+                        <span role="alert">{errors.collegeId}</span>
                       </div>
                     </div>
                   )}
                 </div>
 
-                {values.isFree === "false" && (
-                  <>
-                    <div className="fv-row mb-7">
-                      <label className="required fs-6 fw-bold mb-2">Enter Price :</label>
-                      <Field
-                        type="number"
-                        name="price"
-                        placeholder="Enter Price"
-                        className={clsx(
-                          "form-control form-control-lg form-control-solid",
-                          {
-                            "is-invalid text-danger": touched.price && errors.price,
-                            "is-valid": touched.price && !errors.price,
-                          }
-                        )}
-                      />
-                    </div>
-                  </>
-                )}
+                {/* Footer Buttons */}
                 <div className="card-footer d-flex justify-content-end">
                   <button
                     type="button"
                     className="btn btn-light me-2"
-                    onClick={() => navigate("/tools")}
+                    onClick={() => navigate("/assessments")}
                   >
                     Cancel
                   </button>
-                  <button type="submit" className="btn btn-primary" disabled={loading}>
-                    {!loading && <span className="indicator-label">Submit</span>}
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={loading}
+                  >
+                    {!loading && <span className="indicator-label">Next</span>}
                     {loading && (
                       <span
                         className="indicator-progress"
@@ -166,4 +200,4 @@ const ToolCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   );
 };
 
-export default ToolCreatePage;
+export default AssessmentCreatePage;

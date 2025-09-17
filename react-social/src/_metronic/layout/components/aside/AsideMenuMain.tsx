@@ -16,6 +16,13 @@ export function AsideMenuMain() {
       />
 
       <AsideMenuItem
+        to="/assessments"
+        icon="/media/icons/duotune/general/gen044.svg"
+        title="Assessments"
+        fontIcon="bi-app-indicator"
+      />
+
+      <AsideMenuItem
         to="/college"
         icon="/media/icons/duotune/general/gen001.svg"
         title="College"
