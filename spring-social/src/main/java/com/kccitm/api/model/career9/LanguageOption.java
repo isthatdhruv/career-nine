@@ -1,14 +1,19 @@
 package com.kccitm.api.model.career9;
 
+import java.io.Serializable;
+
 import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
 
 @Entity
 @Table
-public class LanguageOption {
+public class LanguageOption implements Serializable {
     
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long LanguageOptionId;
     
     // private Long languageId;
