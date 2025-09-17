@@ -146,15 +146,6 @@ const QuestionTable = (props: {
           className: "",
         },
       },
-      {
-        label: "MeasuredQualityTypes",
-        field: "MeasuredQualityTypes",
-        sort: "disabled",
-        width: 150,
-        attributes: {
-          className: "",
-        },
-      },
     ],
 
     rows: props.data.map((data: any) => ({

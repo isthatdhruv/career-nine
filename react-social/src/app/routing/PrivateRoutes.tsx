@@ -27,7 +27,8 @@ import AssessmentEditPage from "../pages/CreateAssessment/components/AssessmentE
 import AssessmentToolPage from "../pages/CreateAssessment/components/AssessmentToolPage";
 import AssessmentUploadFile from "../pages/CreateAssessment/components/AssessmentUploadFile";
 import AssessmentSection from "../pages/CreateAssessment/components/AssessmentSection";
-
+import AssessmentQuestion from "../pages/CreateAssessment/components/AssessmentQuestion";
+  
 
 const PrivateRoutes = () => {
   const StudentsData = lazy(
@@ -434,6 +435,14 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <AssessmentSection />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/assessments/create/step-5"
+          element={
+            <SuspensedView>
+              <AssessmentQuestion />
             </SuspensedView>
           }
         />

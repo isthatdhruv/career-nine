@@ -170,7 +170,7 @@ const AssessmentCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                   <button
                     type="button"
                     className="btn btn-light me-2"
-                    onClick={() => navigate("/assessments/create/step-3")}
+                    onClick={() => navigate("/assessments")}
                   >
                     Cancel
                   </button>
