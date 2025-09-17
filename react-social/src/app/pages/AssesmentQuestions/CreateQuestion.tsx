@@ -3,9 +3,9 @@ import { Button } from "react-bootstrap";
 import { IconContext } from "react-icons";
 import { MdQuestionAnswer } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
+import { ReadQuestionSectionData } from "../QuestionSections/API/Question_Section_APIs";
 import { ReadQuestionsData } from "./API/Question_APIs";
 import { QuestionTable } from "./components";
-import { ReadQuestionSectionData } from "../QuestionSections/API/Question_Section_APIs";
 
 const AssessmentQuestionsPage = () => {
   const [questionsData, setQuestionsData] = useState([]);
@@ -92,7 +92,7 @@ const AssessmentQuestionsPage = () => {
           <QuestionTable
             data={questionsData}
             sections={sections}
-            setLoading={setLoading}
+            setLoading={true}
             setPageLoading={setPageLoading}
           />
         </div>

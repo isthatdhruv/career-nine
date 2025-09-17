@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.career9.Career;
+import com.kccitm.api.model.career9.MeasuredQualities;
 import com.kccitm.api.model.career9.MeasuredQualityTypes;
 import com.kccitm.api.repository.Career9.AssessmentQuestionRepository;
 import com.kccitm.api.repository.Career9.CareerRepository;
@@ -133,23 +134,38 @@ public class MeasuredQualityTypesController {
     // One-to-Many relationship: MeasuredQualities to MeasuredQualityTypes
     @PutMapping("/{typeId}/assign-quality/{qualityId}")
     public ResponseEntity<String> assignMeasuredQualityTypeToQuality(@PathVariable Long typeId, @PathVariable Long qualityId) {
-        MeasuredQualityTypes measurementType = measuredQualityTypesRepository.findById(typeId).orElse(null);
         
-        if (measurementType == null) {
-            return ResponseEntity.badRequest().body("MeasuredQualityType not found");
+        MeasuredQualityTypes MQType = measuredQualityTypesRepository.findById(typeId).orElse(null);
+
+        MeasuredQualities mQuality = measuredQualitiesRepository.findById(qualityId).orElse(null);
+        
+        if (MQType == null || mQuality == null) {
+            return ResponseEntity.noContent().build();
         }
+
+        MQType.setMeasuredQuality(mQuality);
+        measuredQualityTypesRepository.save(MQType);
         
-        // Get the MeasuredQuality entity
-        com.kccitm.api.model.career9.MeasuredQualities measuredQuality = measuredQualitiesRepository.findById(qualityId).orElse(null);
-        if (measuredQuality == null) {
-            return ResponseEntity.badRequest().body("MeasuredQuality not found");
-        }
-        
-        // Set the relationship using the proper JPA mapping
-        measurementType.setMeasuredQuality(measuredQuality);
-        measuredQualityTypesRepository.save(measurementType);
         
         return ResponseEntity.ok("MeasuredQualityType successfully assigned to MeasuredQuality");
+        
+        // MeasuredQualityTypes measurementType = measuredQualityTypesRepository.findById(typeId).orElse(null);
+        
+        // if (measurementType == null) {
+        //     return ResponseEntity.badRequest().body("MeasuredQualityType not found");
+        // }
+        
+        // // Get the MeasuredQuality entity
+        // com.kccitm.api.model.career9.MeasuredQualities measuredQuality = measuredQualitiesRepository.findById(qualityId).orElse(null);
+        // if (measuredQuality == null) {
+        //     return ResponseEntity.badRequest().body("MeasuredQuality not found");
+        // }
+        
+        // // Set the relationship using the proper JPA mapping
+        // measurementType.setMeasuredQuality(measuredQuality);
+        // measuredQualityTypesRepository.save(measurementType);
+        
+        // return ResponseEntity.ok("MeasuredQualityType successfully assigned to MeasuredQuality");
     }
     
     @PutMapping("/{typeId}/remove-quality")
