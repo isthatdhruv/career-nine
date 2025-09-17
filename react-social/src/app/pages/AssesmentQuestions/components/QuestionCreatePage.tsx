@@ -1,10 +1,11 @@
 import clsx from "clsx";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Dropdown } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
 import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
 import { CreateQuestionData, ReadMeasuredQualityTypes } from "../API/Question_APIs";
+import { MQT } from "./MeasuredQualityTypesAsOptionComponent"; // Adjust the import based on your file structure
 
 const validationSchema = Yup.object().shape({
   questionText: Yup.string().required("Question text is required"),
@@ -19,6 +20,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const [sections, setSections] = useState<any[]>([]);
   const [mqt, setMqt] = useState<any[]>([]); // Measured Quality Types
   const [optionMeasuredQualities, setOptionMeasuredQualities] = useState<any>({});
+  const [useMQTAsOptions, setUseMQTAsOptions] = React.useState(false);
   const navigate = useNavigate();
 
   const initialValues = {
@@ -121,6 +123,16 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
     };
     fetchMQT();
   }, []);
+
+  useEffect(() => {
+    if (!useMQTAsOptions) {
+      setFormikValues(v => ({
+        ...v,
+        questionOptions: [""], // or your preferred default
+      }));
+      setOptionMeasuredQualities({});
+    }
+  }, [useMQTAsOptions]);
 
   return (
     <div className="container py-5">
@@ -239,86 +251,94 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
             </div>
             <div className="fv-row mb-7">
               <label className="required fs-6 fw-bold mb-2">Options:</label>
-              {formikValues.questionOptions.map((option, index) => (
-                <div key={index} className="d-flex align-items-center gap-2 mb-2">
-                  <input
-                    type="text"
-                    placeholder={`Enter option ${index + 1}`}
-                    value={option}
-                    onChange={e => updateOption(index, e.target.value)}
-                    className={clsx(
-                      "form-control form-control-lg form-control-solid w-50",
-                      {
-                        "is-invalid text-danger": !option,
-                        "is-valid": !!option,
-                      }
-                    )}
-                  />
-                  <Dropdown>
-                    <Dropdown.Toggle
-                      variant="secondary"
-                      id={`dropdown-option-${index}`}
-                      size="sm"
-                    >
-                      Measured Quality Types
-                    </Dropdown.Toggle>
-                    <Dropdown.Menu style={{ minWidth: 250 }}>
-                      <Dropdown.Header>Measured Quality Types</Dropdown.Header>
-                      <div style={{ maxHeight: 250, overflowY: "auto", padding: 8 }}>
-                        {mqt.map((type: any, i: number) => (
-                          <>
-                            <div key={type.measuredQualityTypeId} className="d-flex align-items-center mb-2">
-                              <input
-                                type="checkbox"
-                                checked={!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked}
-                                onChange={() => handleQualityToggle(index, type.measuredQualityTypeId)}
-                                className="form-check-input me-2"
-                                id={`option-${index}-type-${type.measuredQualityTypeId}`}
-                              />
-                              <label htmlFor={`option-${index}-type-${type.measuredQualityTypeId}`} className="me-2 mb-0">
-                                {type.measuredQualityTypeName}
-                              </label>
-                              {!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked && (
+              {useMQTAsOptions ? (
+                <MQT
+                  mqt={mqt}
+                  formikValues={formikValues}
+                  setFormikValues={setFormikValues}
+                />
+              ) : (
+                formikValues.questionOptions.map((option, index) => (
+                  <div key={index} className="d-flex align-items-center gap-2 mb-2">
+                    <input
+                      type="text"
+                      placeholder={`Enter option ${index + 1}`}
+                      value={option}
+                      onChange={e => updateOption(index, e.target.value)}
+                      className={clsx(
+                        "form-control form-control-lg form-control-solid w-50",
+                        {
+                          "is-invalid text-danger": !option,
+                          "is-valid": !!option,
+                        }
+                      )}
+                    />
+                    <Dropdown>
+                      <Dropdown.Toggle
+                        variant="secondary"
+                        id={`dropdown-option-${index}`}
+                        size="sm"
+                      >
+                        Measured Quality Types
+                      </Dropdown.Toggle>
+                      <Dropdown.Menu style={{ minWidth: 250 }}>
+                        <Dropdown.Header>Measured Quality Types</Dropdown.Header>
+                        <div style={{ maxHeight: 250, overflowY: "auto", padding: 8 }}>
+                          {mqt.map((type: any, i: number) => (
+                            <>
+                              <div key={type.measuredQualityTypeId} className="d-flex align-items-center mb-2">
                                 <input
-                                  type="number"
-                                  min={0}
-                                  max={100}
-                                  value={optionMeasuredQualities[index][type.measuredQualityTypeId]?.score ?? 0}
-                                  onChange={e =>
-                                    handleQualityScoreChange(index, type.measuredQualityTypeId, Number(e.target.value))
-                                  }
-                                  placeholder="Score"
-                                  className="form-control form-control-sm ms-2"
-                                  style={{ width: 70 }}
+                                  type="checkbox"
+                                  checked={!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked}
+                                  onChange={() => handleQualityToggle(index, type.measuredQualityTypeId)}
+                                  className="form-check-input me-2"
+                                  id={`option-${index}-type-${type.measuredQualityTypeId}`}
                                 />
-                              )}
-                            </div>
-                            {i < mqt.length - 1 && <hr style={{ margin: '4px 0' }} />}
-                          </>
-                        ))}
-                      </div>
-                    </Dropdown.Menu>
-                  </Dropdown>
-                  {formikValues.questionOptions.length > 1 && (
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-danger ms-2"
-                      onClick={() => removeOption(index)}
-                    >
-                      -
-                    </button>
-                  )}
-                  {index === formikValues.questionOptions.length - 1 && (
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-primary ms-2"
-                      onClick={addOption}
-                    >
-                      +
-                    </button>
-                  )}
-                </div>
-              ))}
+                                <label htmlFor={`option-${index}-type-${type.measuredQualityTypeId}`} className="me-2 mb-0">
+                                  {type.measuredQualityTypeName}
+                                </label>
+                                {!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked && (
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    value={optionMeasuredQualities[index][type.measuredQualityTypeId]?.score ?? 0}
+                                    onChange={e =>
+                                      handleQualityScoreChange(index, type.measuredQualityTypeId, Number(e.target.value))
+                                    }
+                                    placeholder="Score"
+                                    className="form-control form-control-sm ms-2"
+                                    style={{ width: 70 }}
+                                  />
+                                )}
+                              </div>
+                              {i < mqt.length - 1 && <hr style={{ margin: '4px 0' }} />}
+                            </>
+                          ))}
+                        </div>
+                      </Dropdown.Menu>
+                    </Dropdown>
+                    {formikValues.questionOptions.length > 1 && (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-danger ms-2"
+                        onClick={() => removeOption(index)}
+                      >
+                        -
+                      </button>
+                    )}
+                    {index === formikValues.questionOptions.length - 1 && (
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-primary ms-2"
+                        onClick={addOption}
+                      >
+                        +
+                      </button>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
             <div className="fv-row mb-7">
               <label className="fs-6 fw-bold mb-2">Max Options Allowed</label>
@@ -337,6 +357,17 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                 className="form-control form-control-lg form-control-solid w-25"
                 style={{ width: 200 }}
               />
+            </div>
+            <div className="mb-4">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={useMQTAsOptions}
+                  onChange={() => setUseMQTAsOptions(v => !v)}
+                  className="me-2"
+                />
+                Use Measured Quality Types as Options
+              </label>
             </div>
           </div>
           <div className="card-footer d-flex justify-content-end">
