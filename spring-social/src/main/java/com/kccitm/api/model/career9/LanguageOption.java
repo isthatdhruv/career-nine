@@ -11,6 +11,8 @@ import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 @Entity
 @Table
 public class LanguageOption implements Serializable {
@@ -31,6 +33,7 @@ public class LanguageOption implements Serializable {
 
     @ManyToOne
     @JoinColumn(name = "language_question_id", nullable = false)
+    @JsonIgnore // Add this to break the circular reference
     private LanguageQuestion languageQuestion;
 
     @ManyToOne
@@ -41,9 +44,11 @@ public class LanguageOption implements Serializable {
     public LanguagesSupported getLanguage() {
         return language;
     }
+
     public void setLanguage(LanguagesSupported language) {
         this.language = language;
     }
+
     public Long getLanguageOptionId() {
         return LanguageOptionId;
     }
@@ -63,6 +68,7 @@ public class LanguageOption implements Serializable {
     public LanguageQuestion getLanguageQuestion() {
         return languageQuestion;
     }
+
     public void setLanguageQuestion(LanguageQuestion languageQuestion) {
         this.languageQuestion = languageQuestion;
     }
@@ -70,6 +76,7 @@ public class LanguageOption implements Serializable {
     public AssessmentQuestionOptions getAssessmentOption() {
         return assessmentOption;
     }
+
     public void setAssessmentQuestionOption(AssessmentQuestionOptions assessmentOption) {
         this.assessmentOption = assessmentOption;
     }

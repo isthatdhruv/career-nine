@@ -3,7 +3,7 @@ import { Field, Form, Formik } from "formik";
 import { useState, useEffect } from "react";
 import { Modal, Button, Dropdown } from "react-bootstrap";
 import * as Yup from "yup";
-import { createLanguageData, readLanguageData } from "../API/Language_APIs";
+import { createLanguageQuestionAndOptionData, readLanguageData } from "../API/Language_APIs";
 import { ReadQuestionByIdData } from "../../AssesmentQuestions/API/Question_APIs";
 
 const validationSchema = Yup.object().shape({
@@ -46,6 +46,7 @@ const QuestionLanguageModal = ({
           setQuestionData({
             questionText: data.questionText || "",
             options: data.options?.map((opt: any) => ({
+              optionId: opt.optionId || opt.id,
               optionText: opt.optionText || "",
               translatedText: "",
             })) || [],
@@ -124,23 +125,25 @@ const QuestionLanguageModal = ({
           setLoading(true);
           setPageLoading?.(true);
           try {
-            // Submit question translation
-            await createLanguageData({
-              name: questionData.questionText,
-              translatedQuestion: values.translatedQuestion,
-              questionId: questionId,
-              languageId: selectedLanguage.languageId,
-            });
+            // Prepare payload in the required structure
+            const payload = {
+              language: {
+                languageId: selectedLanguage.languageId
+              },
+              questionText: values.translatedQuestion,
+              assessmentQuestion: {
+                questionId: questionId
+              },
+              options: values.translatedOptions.map((option: any) => ({
+                optionText: option.translatedText,
+                assessmentOption: {
+                  optionId: option.optionId
+                }
+              }))
+            };
 
-            // Submit each option translation
-            for (const option of values.translatedOptions) {
-              await createLanguageData({
-                name: option.optionText,
-                translatedQuestion: option.translatedText,
-                questionId: questionId,
-                languageId: selectedLanguage.languageId,
-              });
-            }
+            // Send the payload to backend
+            await createLanguageQuestionAndOptionData(payload);
 
             resetForm();
             setSelectedLanguage(null);
