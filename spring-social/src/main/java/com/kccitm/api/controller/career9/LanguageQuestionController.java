@@ -3,6 +3,7 @@ package com.kccitm.api.controller.career9;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,6 +22,12 @@ public class LanguageQuestionController {
     @Autowired
     private LanguageQuestionRepository languagequestionrepository;
 
+    @PostMapping("/create-with-options")
+    public ResponseEntity<?> createLanguageQuestion(@RequestBody LanguageQuestion languageQuestion) {
+        // JPA will cascade and save options as well
+        languagequestionrepository.save(languageQuestion);
+        return ResponseEntity.ok("Saved");
+    }
 
     @GetMapping("/getAll")
     public List<LanguageQuestion> getAllLanguageQuestions() {

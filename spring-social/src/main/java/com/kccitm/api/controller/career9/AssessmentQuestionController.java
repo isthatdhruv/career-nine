@@ -126,9 +126,9 @@ for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
     }
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<String> deleteAssessmentQuestion(@PathVariable Long id) {
-        if (!assessmentQuestionRepository.existsById(id)) {
-            return ResponseEntity.notFound().build();
-        }
+        // if (!assessmentQuestionRepository.existsById(id)) {
+        //     return ResponseEntity.notFound().build();
+        // }
         // This will also delete all related AssessmentQuestionOptions and join table entries due to cascade settings.
         assessmentQuestionRepository.deleteById(id);
         return ResponseEntity.ok("AssessmentQuestion and all related options/relationships deleted successfully.");

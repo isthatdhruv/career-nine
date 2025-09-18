@@ -29,6 +29,14 @@ public class LanguageOption implements Serializable {
     @JoinColumn(name = "language_id", nullable = false)
     private LanguagesSupported language;
 
+    @ManyToOne
+    @JoinColumn(name = "language_question_id", nullable = false)
+    private LanguageQuestion languageQuestion;
+
+    @ManyToOne
+    @JoinColumn(name = "assessment_option_id", nullable = false)
+    private AssessmentQuestionOptions assessmentOption;
+
     // getter setters
     public LanguagesSupported getLanguage() {
         return language;
@@ -50,5 +58,19 @@ public class LanguageOption implements Serializable {
 
     public void setLanguageOptionText(String opti_text) {
         this.LanguageoptionText = opti_text;
+    }
+
+    public LanguageQuestion getLanguageQuestion() {
+        return languageQuestion;
+    }
+    public void setLanguageQuestion(LanguageQuestion languageQuestion) {
+        this.languageQuestion = languageQuestion;
+    }
+
+    public AssessmentQuestionOptions getAssessmentOption() {
+        return assessmentOption;
+    }
+    public void setAssessmentQuestionOption(AssessmentQuestionOptions assessmentOption) {
+        this.assessmentOption = assessmentOption;
     }
 }

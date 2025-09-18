@@ -15,7 +15,7 @@ import {
 const QuestionTable = (props: {
   data: any;
   sections: any[];
-  setLoading: any;
+  
   setPageLoading: any;
 }) => {
   const navigate = useNavigate();
@@ -67,45 +67,45 @@ const QuestionTable = (props: {
   }, [props.data]);
 
   // Handle measured quality type selection changes with real-time API calls
-  const handleMeasuredQualityTypeSelectionChange = async (questionId: number, newValue: any[]) => {
-    const currentValue = selectedMeasuredQualityTypesByQuestion[questionId] || [];
+  // const handleMeasuredQualityTypeSelectionChange = async (questionId: number, newValue: any[]) => {
+  //   const currentValue = selectedMeasuredQualityTypesByQuestion[questionId] || [];
     
-    // Find newly selected types
-    const newlySelected = newValue.filter(typeId => !currentValue.includes(typeId));
+  //   // Find newly selected types
+  //   const newlySelected = newValue.filter(typeId => !currentValue.includes(typeId));
     
-    // Find deselected types
-    const deselected = currentValue.filter(typeId => !newValue.includes(typeId));
+  //   // Find deselected types
+  //   const deselected = currentValue.filter(typeId => !newValue.includes(typeId));
     
-    try {
-      // Assign new types
-      for (const typeId of newlySelected) {
-        await AssignMeasuredQualityTypeToQuestion(typeId, questionId);
-        console.log(`MeasuredQualityType ${typeId} assigned to Question ${questionId}`);
-      }
+  //   try {
+  //     // Assign new types
+  //     for (const typeId of newlySelected) {
+  //       await AssignMeasuredQualityTypeToQuestion(typeId, questionId);
+  //       console.log(`MeasuredQualityType ${typeId} assigned to Question ${questionId}`);
+  //     }
       
-      // Remove deselected types
-      for (const typeId of deselected) {
-        await RemoveMeasuredQualityTypeFromQuestion(typeId, questionId);
-        console.log(`MeasuredQualityType ${typeId} removed from Question ${questionId}`);
-      }
+  //     // Remove deselected types
+  //     for (const typeId of deselected) {
+  //       await RemoveMeasuredQualityTypeFromQuestion(typeId, questionId);
+  //       console.log(`MeasuredQualityType ${typeId} removed from Question ${questionId}`);
+  //     }
       
-      // Update state only after successful API calls
-      setSelectedMeasuredQualityTypesByQuestion(prev => ({
-        ...prev,
-        [questionId]: newValue
-      }));
+  //     // Update state only after successful API calls
+  //     setSelectedMeasuredQualityTypesByQuestion(prev => ({
+  //       ...prev,
+  //       [questionId]: newValue
+  //     }));
       
-    } catch (error) {
-      console.error('Error updating MeasuredQualityType assignments:', error);
-      alert('Failed to update MeasuredQualityType assignments. Please try again.');
+  //   } catch (error) {
+  //     console.error('Error updating MeasuredQualityType assignments:', error);
+  //     alert('Failed to update MeasuredQualityType assignments. Please try again.');
       
-      // Revert to previous state on error
-      setSelectedMeasuredQualityTypesByQuestion(prev => ({
-        ...prev,
-        [questionId]: currentValue
-      }));
-    }
-  };
+  //     // Revert to previous state on error
+  //     setSelectedMeasuredQualityTypesByQuestion(prev => ({
+  //       ...prev,
+  //       [questionId]: currentValue
+  //     }));
+  //   }
+  // };
 
   const datatable = {
     columns: [
@@ -166,7 +166,7 @@ const QuestionTable = (props: {
           </button>
           <button
             onClick={async () => { 
-              props.setLoading(true);
+              // props.setLoading(true);
               try {
                 // Remove the question from local state immediately to prevent API calls
                 setSelectedMeasuredQualityTypesByQuestion(prev => {
@@ -181,7 +181,7 @@ const QuestionTable = (props: {
                 console.error("Delete failed:", error);
                 alert("Failed to delete question. Please try again.");
               } finally {
-                props.setLoading(false);
+                // props.setLoading(false);
               }
             }}
             className="btn btn-icon btn-danger btn-sm me-3"

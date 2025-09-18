@@ -129,43 +129,23 @@ public class MeasuredQualityTypesController {
         return ResponseEntity.ok(measurementType.getCareers());
     }
     
-// ...existing code...
-    
     // One-to-Many relationship: MeasuredQualities to MeasuredQualityTypes
     @PutMapping("/{typeId}/assign-quality/{qualityId}")
     public ResponseEntity<String> assignMeasuredQualityTypeToQuality(@PathVariable Long typeId, @PathVariable Long qualityId) {
-        
         MeasuredQualityTypes MQType = measuredQualityTypesRepository.findById(typeId).orElse(null);
-
         MeasuredQualities mQuality = measuredQualitiesRepository.findById(qualityId).orElse(null);
-        
-        if (MQType == null || mQuality == null) {
-            return ResponseEntity.noContent().build();
+
+        if (MQType == null) {
+            return ResponseEntity.status(404).body("MeasuredQualityType not found");
+        }
+        if (mQuality == null) {
+            return ResponseEntity.status(404).body("MeasuredQuality not found");
         }
 
         MQType.setMeasuredQuality(mQuality);
         measuredQualityTypesRepository.save(MQType);
-        
-        
+
         return ResponseEntity.ok("MeasuredQualityType successfully assigned to MeasuredQuality");
-        
-        // MeasuredQualityTypes measurementType = measuredQualityTypesRepository.findById(typeId).orElse(null);
-        
-        // if (measurementType == null) {
-        //     return ResponseEntity.badRequest().body("MeasuredQualityType not found");
-        // }
-        
-        // // Get the MeasuredQuality entity
-        // com.kccitm.api.model.career9.MeasuredQualities measuredQuality = measuredQualitiesRepository.findById(qualityId).orElse(null);
-        // if (measuredQuality == null) {
-        //     return ResponseEntity.badRequest().body("MeasuredQuality not found");
-        // }
-        
-        // // Set the relationship using the proper JPA mapping
-        // measurementType.setMeasuredQuality(measuredQuality);
-        // measuredQualityTypesRepository.save(measurementType);
-        
-        // return ResponseEntity.ok("MeasuredQualityType successfully assigned to MeasuredQuality");
     }
     
     @PutMapping("/{typeId}/remove-quality")
@@ -182,6 +162,4 @@ public class MeasuredQualityTypesController {
         
         return ResponseEntity.ok("MeasuredQualityType successfully removed from MeasuredQuality");
     }
-   
-
 }
