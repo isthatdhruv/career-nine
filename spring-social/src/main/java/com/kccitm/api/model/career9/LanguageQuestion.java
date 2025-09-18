@@ -41,12 +41,9 @@ public class LanguageQuestion implements Serializable{
     private List<LanguageOption> options = new ArrayList<>();
 
     //getter setters
-    // public AssessmentQuestions getAssessmentQuestion() {
-    //     return assessmentQuestion;
-    // }
-    // public void setAssessmentQuestion(AssessmentQuestions assessmentQuestion) {
-    //     this.assessmentQuestion = assessmentQuestion;
-    // }
+    public AssessmentQuestions getAssessmentQuestion() {
+        return assessmentQuestion;
+    }
     
     public LanguagesSupported getLanguage() {
         return language;
@@ -76,18 +73,19 @@ public class LanguageQuestion implements Serializable{
     public Long getOriginalQuestionId() {
         return assessmentQuestion != null ? assessmentQuestion.getQuestionId() : null;
     }
-
-    public void setAssessmentQuestion(AssessmentQuestions assessmentQuestion) {
-        this.assessmentQuestion = assessmentQuestion;
-    }
-
+    
     public List<LanguageOption> getOptions() {
         return options;
     }
-
     public void setOptions(List<LanguageOption> options) {
         this.options = options;
+
     }
-
-
+    public void setAssessmentQuestion(AssessmentQuestions assessmentQuestion) {
+        this.assessmentQuestion = assessmentQuestion;
+    }
+    
 }
+
+
+
