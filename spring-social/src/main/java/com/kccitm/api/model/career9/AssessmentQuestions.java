@@ -23,7 +23,8 @@ public class AssessmentQuestions implements Serializable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long question_id;
+    @Column(name = "questionId")
+    private Long questionId;
 
     private String questionText;
     private String questionType;
@@ -53,11 +54,11 @@ public class AssessmentQuestions implements Serializable {
     }
 
     public Long getQuestionId() {
-        return question_id;
+        return questionId;
     }
 
-    public void setQuestionId(Long question_id) {
-        this.question_id = question_id;
+    public void setQuestionId(Long questionId) {
+        this.questionId = questionId;
     }
 
     public String getQuestionText() {
@@ -96,11 +97,11 @@ public class AssessmentQuestions implements Serializable {
 
     // For compatibility with frontend
     public Long getId() {
-        return question_id;
+        return questionId;
     }
 
     public void setId(Long id) {
-        this.question_id = id;
+        this.questionId = id;
     }
 
     // Helper methods for managing the many-to-many relationship
@@ -109,7 +110,7 @@ public class AssessmentQuestions implements Serializable {
     @Override
     public String toString() {
         return "AssessmentQuestions{" +
-                "question_id=" + question_id +
+                "questionId=" + questionId +
                 ", questionText='" + questionText + '\'' +
                 ", questionType='" + questionType + '\'' +
                 ", section=" + (section != null ? section.getSectionId() : null) +
