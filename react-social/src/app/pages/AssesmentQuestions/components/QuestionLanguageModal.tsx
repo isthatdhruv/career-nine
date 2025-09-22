@@ -61,6 +61,27 @@ const QuestionLanguageModal = ({
     fetchQuestion();
   }, [questionId, show]);
 
+  const handleOptionTranslate = async (index: number) => {
+    if (!selectedLanguage) {
+      alert("Please select a language first!");
+      return;
+    }
+    const optionText = questionData.options[index]?.optionText;
+    if (!optionText) {
+      alert("Option text is empty!");
+      return;
+    }
+    setLoading(true);
+    try{
+      
+    }catch(error){
+      console.error("Error translating option:", error);
+      alert("Failed to translate option");
+    }finally{
+      setLoading(false);
+    }
+
+  }
   useEffect(() => {
     const fetchLanguages = async () => {
       try {
@@ -234,6 +255,7 @@ const QuestionLanguageModal = ({
                           : ""
                       )}
                     />
+                    <Button onClick={() => handleOptionTranslate(index)}>Translate</Button>
                     {touched.translatedOptions?.[index]?.translatedText &&
                       errors.translatedOptions?.[index]?.translatedText && (
                         <div className="text-danger mt-1">
@@ -266,4 +288,4 @@ const QuestionLanguageModal = ({
   );
 };
 
-export default QuestionLanguageModal;
+export default QuestionLanguageModal ;

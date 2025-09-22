@@ -124,7 +124,7 @@ const QuestionTable = (props: {
       questionType: <div>{data.questionType}</div>,
       sectionType: (
         <div>
-          {props.sections.find(section => section.id === data.sectionId)?.sectionName ?? "Unknown"}
+          {props.sections.find(section => section.sectionId === data.sectionId)?.sectionName ?? "Unknown"}
         </div>
       ),
       actions: (

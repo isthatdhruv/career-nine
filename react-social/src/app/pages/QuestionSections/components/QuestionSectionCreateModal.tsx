@@ -1,6 +1,6 @@
 import clsx from "clsx";
 import { useFormik } from "formik";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Modal, Button } from "react-bootstrap";
 import * as Yup from "yup";
 import { CreateQuestionSectionData } from "../API/Question_Section_APIs";
@@ -24,6 +24,8 @@ const QuestionSectionCreateModal = ({ show, onHide, onSuccess }: QuestionSection
     sectionDescription: "",
   };
 
+
+
   const formik = useFormik({
     enableReinitialize: true,
     initialValues,
@@ -31,7 +33,11 @@ const QuestionSectionCreateModal = ({ show, onHide, onSuccess }: QuestionSection
     onSubmit: async (values) => {
       setLoading(true);
       try {
-        await CreateQuestionSectionData(values);
+        const payload = {
+          sectionName: values.sectionName,
+          sectionDescription: values.sectionDescription,
+        };
+        await CreateQuestionSectionData(payload);
         formik.resetForm();
         if (onSuccess) onSuccess(); // Call parent callback
         onHide(); // Close modal
@@ -43,8 +49,10 @@ const QuestionSectionCreateModal = ({ show, onHide, onSuccess }: QuestionSection
     },
   });
 
+  
+
   return (
-    <Modal show={show} onHide={onHide} centered>
+    <Modal show={show} onHide={onHide} centered size="lg">
       <Modal.Header closeButton>
         <Modal.Title>Add New Section</Modal.Title>
       </Modal.Header>
@@ -78,6 +86,7 @@ const QuestionSectionCreateModal = ({ show, onHide, onSuccess }: QuestionSection
             <label className="required fs-6 fw-bold mb-2">Section Description:</label>
             <textarea
               placeholder="Enter Section Description"
+              rows={3}
               {...formik.getFieldProps("sectionDescription")}
               className={clsx(
                 "form-control form-control-solid",
@@ -93,16 +102,27 @@ const QuestionSectionCreateModal = ({ show, onHide, onSuccess }: QuestionSection
               </div>
             )}
           </div>
+
+
         </Modal.Body>
 
         <Modal.Footer>
-          <Button variant="light" onClick={onHide}>Cancel</Button>
-          <Button type="submit" variant="primary" disabled={formik.isSubmitting || !formik.isValid}>
-            {!loading && <span>Submit</span>}
-            {loading && (
-              <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
-            )}
-          </Button>
+          <div className="d-flex justify-content-end w-100">
+            <div>
+              <Button variant="light" onClick={onHide} className="me-2">
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" disabled={formik.isSubmitting || !formik.isValid}>
+                {!loading && <span>Create Section</span>}
+                {loading && (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2"></span>
+                    Creating...
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         </Modal.Footer>
       </form>
     </Modal>
