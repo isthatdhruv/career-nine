@@ -5,7 +5,7 @@ import { Modal, Button, Dropdown } from "react-bootstrap";
 import * as Yup from "yup";
 import { createLanguageQuestionAndOptionData, readLanguageData } from "../API/Language_APIs";
 import { ReadQuestionByIdData } from "../../AssesmentQuestions/API/Question_APIs";
-import { translateOption } from "../API/Translate_APIs";
+import { translateOption, translateQuestion, translateAll } from "../API/Translate_APIs";
 
 const validationSchema = Yup.object().shape({
   translatedQuestion: Yup.string().required("Translated question is required"),
@@ -31,6 +31,8 @@ const QuestionLanguageModal = ({
 }: QuestionLanguageModalProps) => {
   const [loading, setLoading] = useState(false);
   const [translatingOptions, setTranslatingOptions] = useState<{ [key: number]: boolean }>({});
+  const [translatingQuestion, setTranslatingQuestion] = useState(false);
+  const [translatingAll, setTranslatingAll] = useState(false);
   const [languages, setLanguages] = useState<any[]>([]);
   const [selectedLanguage, setSelectedLanguage] = useState<any>(null);
   const [questionData, setQuestionData] = useState<any>({
@@ -157,6 +159,31 @@ const QuestionLanguageModal = ({
         }}
       >
         {({ values, errors, touched, handleChange, setFieldValue }) => {
+          // Question translation handler
+          const handleQuestionTranslate = async () => {
+            if (!questionData.questionText || !selectedLanguage?.languageName) {
+              alert("Question text or target language is missing!");
+              return;
+            }
+            
+            console.log("Translating question:", questionData.questionText, "to", selectedLanguage.languageName);
+            
+            try {
+              setTranslatingQuestion(true);
+              const translatedText = await translateQuestion(questionData.questionText, selectedLanguage.languageName);
+              console.log("Question translation result:", translatedText);
+              
+              setFieldValue("translatedQuestion", translatedText);
+              
+            } catch (error) {
+              console.error("Question translation error:", error);
+              alert("Failed to translate question");
+            } finally {
+              setTranslatingQuestion(false);
+            }
+          };
+
+          // Option translation handler
           const optionTranslate = async (optionText: string, targetLanguage: string, index: number) => {
             if (!optionText || !targetLanguage) {
               alert("Option text or target language is missing!");
@@ -166,20 +193,16 @@ const QuestionLanguageModal = ({
             console.log(`Translating option ${index}:`, optionText, "to", targetLanguage);
             
             try {
-              // Set loading state for this specific option
               setTranslatingOptions(prev => ({ ...prev, [index]: true }));
-              
               const translatedText = await translateOption(optionText, targetLanguage);
               console.log(`Translation result for option ${index}:`, translatedText);
               
-              // Update the specific option's translatedText
               setFieldValue(`translatedOptions.${index}.translatedText`, translatedText);
               
             } catch (error) {
               console.error("Translation error:", error);
               alert("Failed to translate option");
             } finally {
-              // Remove loading state for this specific option
               setTranslatingOptions(prev => {
                 const newState = { ...prev };
                 delete newState[index];
@@ -188,9 +211,70 @@ const QuestionLanguageModal = ({
             }
           };
 
+          // Translate all handler
+          const handleTranslateAll = async () => {
+            if (!questionData.questionText || !selectedLanguage?.languageName) {
+              alert("Question text or target language is missing!");
+              return;
+            }
+
+            const optionTexts = questionData.options.map((opt: any) => opt.optionText);
+            
+            console.log("Translating all:", {
+              question: questionData.questionText,
+              options: optionTexts,
+              targetLanguage: selectedLanguage.languageName
+            });
+            
+            try {
+              setTranslatingAll(true);
+              
+              const result = await translateAll(
+                questionData.questionText,
+                optionTexts,
+                selectedLanguage.languageName
+              );
+              
+              console.log("Translate all result:", result);
+              
+              // Set translated question
+              setFieldValue("translatedQuestion", result.translated.question);
+              
+              // Set translated options
+              result.translated.options.forEach((translatedOption: string, index: number) => {
+                setFieldValue(`translatedOptions.${index}.translatedText`, translatedOption);
+              });
+              
+            } catch (error) {
+              console.error("Translate all error:", error);
+              alert("Failed to translate all content");
+            } finally {
+              setTranslatingAll(false);
+            }
+          };
+
           return (
             <Form>
               <Modal.Body>
+                {/* Translate All Button */}
+                <div className="d-flex justify-content-end mb-3">
+                  <Button 
+                    variant="success" 
+                    size="sm"
+                    onClick={handleTranslateAll}
+                    disabled={!selectedLanguage || translatingAll}
+                  >
+                    {translatingAll ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-1"></span>
+                        Translating All...
+                      </>
+                    ) : (
+                      "🌐 Translate All"
+                    )}
+                  </Button>
+                </div>
+
                 {/* Question Text */}
                 <div className="fv-row mb-3">
                   <label className="required fs-6 fw-bold mb-2">
@@ -209,24 +293,41 @@ const QuestionLanguageModal = ({
                     Question in{" "}
                     {selectedLanguage ? selectedLanguage.languageName : "Selected Language"}:
                   </label>
-                  <Field
-                    type="text"
-                    name="translatedQuestion"
-                    placeholder={`Enter question in ${
-                      selectedLanguage
-                        ? selectedLanguage.languageName
-                        : "selected language"
-                    }`}
-                    className={clsx(
-                      "form-control",
-                      {
-                        "is-invalid": touched.translatedQuestion && errors.translatedQuestion,
-                      },
-                      {
-                        "is-valid": touched.translatedQuestion && !errors.translatedQuestion,
-                      }
-                    )}
-                  />
+                  <div className="d-flex align-items-center gap-2">
+                    <Field
+                      type="text"
+                      name="translatedQuestion"
+                      placeholder={`Enter question in ${
+                        selectedLanguage
+                          ? selectedLanguage.languageName
+                          : "selected language"
+                      }`}
+                      className={clsx(
+                        "form-control",
+                        {
+                          "is-invalid": touched.translatedQuestion && errors.translatedQuestion,
+                        },
+                        {
+                          "is-valid": touched.translatedQuestion && !errors.translatedQuestion,
+                        }
+                      )}
+                    />
+                    <Button 
+                      onClick={handleQuestionTranslate}
+                      disabled={!selectedLanguage || translatingQuestion}
+                      size="sm"
+                      variant="primary"
+                    >
+                      {translatingQuestion ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-1"></span>
+                          ...
+                        </>
+                      ) : (
+                        "Translate"
+                      )}
+                    </Button>
+                  </div>
                   {touched.translatedQuestion && errors.translatedQuestion && (
                     <div className="text-danger mt-1">{errors.translatedQuestion}</div>
                   )}
