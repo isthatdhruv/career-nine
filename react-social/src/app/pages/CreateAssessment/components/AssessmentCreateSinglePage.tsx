@@ -83,6 +83,8 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
     collegeId: "",
     toolId: "",
     sectionIds: [] as string[],
+    // store selected question ids per section
+    sectionQuestions: {} as { [sectionId: string]: string[] },
   };
 
   // Fetch data functions
@@ -659,6 +661,7 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                           className="form-select form-select-solid"
                           value={selectedSectionForQuestions}
                           onChange={(e) => setSelectedSectionForQuestions(e.target.value)}
+                          name="selectedSectionForQuestions"
                         >
                           <option value="">-- Select a section to add questions --</option>
                           {values.sectionIds.map((sectionId: string) => {
@@ -698,19 +701,36 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                                 <div className="questions-list">
                                   {questions.map((question, qIndex) => {
                                     const questionId = String(question.id || question.questionId || qIndex);
+                                    const fieldName = `sectionQuestions.${selectedSectionForQuestions}`;
+                                    // read currently selected questions for this section from Formik values
+                                    const selectedForSection: string[] =
+                                      (values.sectionQuestions && values.sectionQuestions[selectedSectionForQuestions]) || [];
+                                    const checked = selectedForSection.includes(questionId);
+
                                     return (
                                       <div key={questionId} className="form-check mb-2">
                                         <input
                                           type="checkbox"
                                           className="form-check-input"
                                           id={`question-${selectedSectionForQuestions}-${questionId}`}
-                                          // You can add state management for selected questions per section here
+                                          checked={checked}
+                                          onChange={(e) => {
+                                            const copy = selectedForSection.slice();
+                                            if (e.target.checked) {
+                                              if (!copy.includes(questionId)) copy.push(questionId);
+                                            } else {
+                                              const idx = copy.indexOf(questionId);
+                                              if (idx > -1) copy.splice(idx, 1);
+                                            }
+                                            // update Formik values for this section
+                                            setFieldValue(fieldName, copy);
+                                          }}
                                         />
-                                        <label 
-                                          className="form-check-label ms-2" 
+                                        <label
+                                          className="form-check-label ms-2"
                                           htmlFor={`question-${selectedSectionForQuestions}-${questionId}`}
                                         >
-                                          {question.questionText || question.question || 'Question text not available'}
+                                          {question.questionText || question.question || "Question text not available"}
                                         </label>
                                       </div>
                                     );
@@ -726,12 +746,20 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                             
                             {questions.length > 0 && (
                               <div className="mt-3 text-end">
-                                <button 
-                                  type="button" 
-                                  className="btn btn-primary"
-                                  // Add functionality to save selected questions to this section
+                                <button
+                                  type="button"
+                                  className="btn btn-primary submit-assesement"
+                                  onClick={() => {
+                                    // values.sectionQuestions now contains selected question ids per section
+                                    // this will print the whole form values (including the selected questions)
+                                    console.log("Form JSON:\n", JSON.stringify(values, null, 2));
+                                    // optionally you can also log only the selected section questions:
+                                    console.log(
+                                      `Selected questions for section ${selectedSectionForQuestions}:`,
+                                      values.sectionQuestions?.[selectedSectionForQuestions] || []
+                                    );
+                                  }}
                                 >
-                                  <i className="fas fa-save me-2"></i>
                                   Save Questions to Section
                                 </button>
                               </div>
