@@ -30,6 +30,7 @@ const QuestionLanguageModal = ({
   questionId,
 }: QuestionLanguageModalProps) => {
   const [loading, setLoading] = useState(false);
+  const [translatingOptions, setTranslatingOptions] = useState<{ [key: number]: boolean }>({});
   const [languages, setLanguages] = useState<any[]>([]);
   const [selectedLanguage, setSelectedLanguage] = useState<any>(null);
   const [questionData, setQuestionData] = useState<any>({
@@ -126,7 +127,6 @@ const QuestionLanguageModal = ({
           setLoading(true);
           setPageLoading?.(true);
           try {
-            // Prepare payload in the required structure
             const payload = {
               language: {
                 languageId: selectedLanguage.languageId
@@ -143,9 +143,7 @@ const QuestionLanguageModal = ({
               }))
             };
 
-            // Send the payload to backend
             await createLanguageQuestionAndOptionData(payload);
-
             resetForm();
             setSelectedLanguage(null);
             onHide();
@@ -158,114 +156,159 @@ const QuestionLanguageModal = ({
           }
         }}
       >
-        {({ values, errors, touched, handleChange }) => (
-          <Form>
-            <Modal.Body>
-              {/* Question Text */}
-              <div className="fv-row mb-3">
-                <label className="required fs-6 fw-bold mb-2">
-                  Question Text:
-                </label>
-                <Field
-                  type="text"
-                  value={questionData.questionText}
-                  disabled
-                  className="form-control"
-                />
-              </div>
+        {({ values, errors, touched, handleChange, setFieldValue }) => {
+          const optionTranslate = async (optionText: string, targetLanguage: string, index: number) => {
+            if (!optionText || !targetLanguage) {
+              alert("Option text or target language is missing!");
+              return;
+            }
+            
+            console.log(`Translating option ${index}:`, optionText, "to", targetLanguage);
+            
+            try {
+              // Set loading state for this specific option
+              setTranslatingOptions(prev => ({ ...prev, [index]: true }));
+              
+              const translatedText = await translateOption(optionText, targetLanguage);
+              console.log(`Translation result for option ${index}:`, translatedText);
+              
+              // Update the specific option's translatedText
+              setFieldValue(`translatedOptions.${index}.translatedText`, translatedText);
+              
+            } catch (error) {
+              console.error("Translation error:", error);
+              alert("Failed to translate option");
+            } finally {
+              // Remove loading state for this specific option
+              setTranslatingOptions(prev => {
+                const newState = { ...prev };
+                delete newState[index];
+                return newState;
+              });
+            }
+          };
 
-              <div className="fv-row mb-3">
-                <label className="required fs-6 fw-bold mb-2">
-                  Question in{" "}
-                  {selectedLanguage ? selectedLanguage.languageName : "Selected Language"}:
-                </label>
-                <Field
-                  type="text"
-                  name="translatedQuestion"
-                  placeholder={`Enter question in ${
-                    selectedLanguage
-                      ? selectedLanguage.languageName
-                      : "selected language"
-                  }`}
-                  className={clsx(
-                    "form-control",
-                    {
-                      "is-invalid": touched.translatedQuestion && errors.translatedQuestion,
-                    },
-                    {
-                      "is-valid": touched.translatedQuestion && !errors.translatedQuestion,
-                    }
+          return (
+            <Form>
+              <Modal.Body>
+                {/* Question Text */}
+                <div className="fv-row mb-3">
+                  <label className="required fs-6 fw-bold mb-2">
+                    Question Text:
+                  </label>
+                  <Field
+                    type="text"
+                    value={questionData.questionText}
+                    disabled
+                    className="form-control"
+                  />
+                </div>
+
+                <div className="fv-row mb-3">
+                  <label className="required fs-6 fw-bold mb-2">
+                    Question in{" "}
+                    {selectedLanguage ? selectedLanguage.languageName : "Selected Language"}:
+                  </label>
+                  <Field
+                    type="text"
+                    name="translatedQuestion"
+                    placeholder={`Enter question in ${
+                      selectedLanguage
+                        ? selectedLanguage.languageName
+                        : "selected language"
+                    }`}
+                    className={clsx(
+                      "form-control",
+                      {
+                        "is-invalid": touched.translatedQuestion && errors.translatedQuestion,
+                      },
+                      {
+                        "is-valid": touched.translatedQuestion && !errors.translatedQuestion,
+                      }
+                    )}
+                  />
+                  {touched.translatedQuestion && errors.translatedQuestion && (
+                    <div className="text-danger mt-1">{errors.translatedQuestion}</div>
                   )}
-                />
-                {touched.translatedQuestion && errors.translatedQuestion && (
-                  <div className="text-danger mt-1">{errors.translatedQuestion}</div>
-                )}
-              </div>
+                </div>
 
-              {/* Options Translation */}
-              <div className="fv-row mb-3">
-                <label className="fs-6 fw-bold mb-2">Options:</label>
-                {values.translatedOptions.map((option: any, index: number) => (
-                  <div key={index} className="d-flex align-items-center gap-2 mb-2">
-                    <input
-                      type="text"
-                      value={option.optionText}
-                      disabled
-                      className="form-control w-50"
-                    />
-                    <input
-                      type="text"
-                      name={`translatedOptions[${index}].translatedText`}
-                      value={option.translatedText}
-                      onChange={handleChange}
-                      placeholder={`Enter option ${index + 1} in ${
-                        selectedLanguage
-                          ? selectedLanguage.languageName
-                          : "selected language"
-                      }`}
-                      className={clsx(
-                        "form-control w-50",
-                        touched.translatedOptions?.[index]?.translatedText &&
-                        errors.translatedOptions?.[index]?.translatedText
-                          ? "is-invalid"
-                          : "",
-                        touched.translatedOptions?.[index]?.translatedText &&
-                        !errors.translatedOptions?.[index]?.translatedText
-                          ? "is-valid"
-                          : ""
-                      )}
-                    />
-                    <Button onClick={() => translateOption(option.optionText, selectedLanguage.languageName)}>Translate</Button>
-                    {touched.translatedOptions?.[index]?.translatedText &&
-                      errors.translatedOptions?.[index]?.translatedText && (
-                        <div className="text-danger mt-1">
-                          {errors.translatedOptions[index].translatedText}
-                        </div>
-                      )}
-                  </div>
-                ))}
-              </div>
-            </Modal.Body>
+                {/* Options Translation */}
+                <div className="fv-row mb-3">
+                  <label className="fs-6 fw-bold mb-2">Options:</label>
+                  {values.translatedOptions.map((option: any, index: number) => (
+                    <div key={index} className="d-flex align-items-center gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={option.optionText}
+                        disabled
+                        className="form-control w-50"
+                      />
+                      <Field
+                        type="text"
+                        name={`translatedOptions.${index}.translatedText`}
+                        value={option.translatedText || ""}
+                        placeholder={`Enter option ${index + 1} in ${
+                          selectedLanguage
+                            ? selectedLanguage.languageName
+                            : "selected language"
+                        }`}
+                        className={clsx(
+                          "form-control w-50",
+                          touched.translatedOptions?.[index]?.translatedText &&
+                          errors.translatedOptions?.[index]?.translatedText
+                            ? "is-invalid"
+                            : "",
+                          touched.translatedOptions?.[index]?.translatedText &&
+                          !errors.translatedOptions?.[index]?.translatedText
+                            ? "is-valid"
+                            : ""
+                        )}
+                      />
+                      <Button 
+                        onClick={() => optionTranslate(option.optionText, selectedLanguage?.languageName, index)}
+                        disabled={!selectedLanguage || translatingOptions[index]}
+                        size="sm"
+                      >
+                        {translatingOptions[index] ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm me-1"></span>
+                            ...
+                          </>
+                        ) : (
+                          "Translate"
+                        )}
+                      </Button>
+                      {touched.translatedOptions?.[index]?.translatedText &&
+                        errors.translatedOptions?.[index]?.translatedText && (
+                          <div className="text-danger mt-1">
+                            {errors.translatedOptions[index].translatedText}
+                          </div>
+                        )}
+                    </div>
+                  ))}
+                </div>
+              </Modal.Body>
 
-            <Modal.Footer>
-              <Button variant="light" onClick={onHide}>
-                Cancel
-              </Button>
-              <Button type="submit" variant="primary" disabled={loading}>
-                {!loading && "Submit"}
-                {loading && (
-                  <>
-                    Please wait...
-                    <span className="spinner-border spinner-border-sm ms-2"></span>
-                  </>
-                )}
-              </Button>
-            </Modal.Footer>
-          </Form>
-        )}
+              <Modal.Footer>
+                <Button variant="light" onClick={onHide}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary" disabled={loading}>
+                  {!loading && "Submit"}
+                  {loading && (
+                    <>
+                      Please wait...
+                      <span className="spinner-border spinner-border-sm ms-2"></span>
+                    </>
+                  )}
+                </Button>
+              </Modal.Footer>
+            </Form>
+          );
+        }}
       </Formik>
     </Modal>
   );
 };
 
-export default QuestionLanguageModal ;
+export default QuestionLanguageModal;
