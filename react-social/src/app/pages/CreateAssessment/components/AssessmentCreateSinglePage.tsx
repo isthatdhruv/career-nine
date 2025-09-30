@@ -1,6 +1,6 @@
 import clsx from "clsx";
 import { Field, Form, Formik, FieldArray } from "formik";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
 import { Button, Modal } from "react-bootstrap";
@@ -15,6 +15,7 @@ import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Sec
 import { ReadToolData } from "../../Tool/API/Tool_APIs";
 import { ReadQuestionsData } from "../../AssesmentQuestions/API/Question_APIs";
 import { CreateAssessmentData } from "../API/Create_Assessment_APIs";
+import { ReadLanguageData } from "../API/Create_Assessment_APIs";
 
 // Component imports
 import CollegeCreateModal from "../../College/components/CollegeCreateModal";
@@ -22,6 +23,7 @@ import QuestionSectionCreateModal from "../../QuestionSections/components/Questi
 import ToolCreateModal from "../../Tool/components/ToolCreateModal";
 import QuestionCreateModal from "../../AssesmentQuestions/components/QuestionCreateModal";
 import { QuestionTable } from "../../AssesmentQuestions/components";
+import SectionQuestionSelector from "./SectionQuestionSelector";
 
 const validationSchema = Yup.object().shape({
   // Basic Info
@@ -36,6 +38,7 @@ const validationSchema = Yup.object().shape({
       otherwise: (schema) => schema.notRequired(),
     }),
   collegeId: Yup.string().required("College is required"),
+  languages: Yup.array().min(1, "At least one language must be selected"),
   
   // Tool selection
   toolId: Yup.string().required("Tool is required"),
@@ -53,6 +56,7 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
   const [sections, setSections] = useState<any[]>([]);
   const [tools, setTools] = useState<any[]>([]);
   const [questions, setQuestions] = useState<any[]>([]);
+  const [languages, setLanguages] = useState<any[]>([]);
   
   // Modal states
   const [showCollegeModal, setShowCollegeModal] = useState(false);
@@ -75,17 +79,27 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
   
   // Question assignment state
   const [selectedSectionForQuestions, setSelectedSectionForQuestions] = useState<string>("");
+  // pre-filled mapping from fetched questions: sectionId -> [questionId,...]
+  const [preSectionQuestions, setPreSectionQuestions] = useState<{ [k: string]: string[] }>({});
 
-  const initialValues = {
+  const initialValues = useMemo(() => ({
     name: "",
     price: 0,
     isFree: "true",
     collegeId: "",
     toolId: "",
+    languages: [] as string[],
     sectionIds: [] as string[],
-    // store selected question ids per section
-    sectionQuestions: {} as { [sectionId: string]: string[] },
-  };
+    sectionQuestions: preSectionQuestions as { [sectionId: string]: string[] },
+    // ADD THIS NEW LINE FOR QUESTION ORDERING
+    sectionQuestionsOrder: Object.keys(preSectionQuestions).reduce((acc: any, sid) => {
+      acc[sid] = (preSectionQuestions[sid] || []).reduce((m: any, qid: string, idx: number) => {
+        m[qid] = idx + 1;
+        return m;
+      }, {});
+      return acc;
+    }, {}) as { [sectionId: string]: { [questionId: string]: number } },
+  }), [preSectionQuestions]);
 
   // Fetch data functions
   const fetchColleges = async () => {
@@ -140,12 +154,22 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
     }
   };
 
+  const fetchLanguages = async () => {
+    try {
+      const response = await ReadLanguageData();
+      setLanguages(response.data || []);
+    } catch (error) {
+      console.error("Error fetching languages:", error);
+    }
+  };
+
   // Initial data loading
   useEffect(() => {
     fetchColleges();
     fetchSections();
     fetchTools();
     fetchQuestions();
+    fetchLanguages();
   }, []);
 
   // Refresh data when modals close
@@ -215,6 +239,7 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
         collegeId: values.collegeId,
         toolId: values.toolId,
         sectionIds: values.sectionIds,
+        languages: values.languages,
         fileName: fileName,
         // Add any additional data from file upload or questions
       };
@@ -234,6 +259,21 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
       setLoading(false);
     }
   };
+
+  // build preSectionQuestions from questions fetched (auto-check)
+  useEffect(() => {
+    const map: { [k: string]: string[] } = {};
+    (questions || []).forEach((q: any) => {
+      const sid = q?.section?.sectionId ?? q?.sectionId ?? q?.section?.id;
+      const qid = String(q?.questionId ?? q?.id ?? "");
+      if (sid && qid) {
+        const s = String(sid);
+        if (!map[s]) map[s] = [];
+        if (!map[s].includes(qid)) map[s].push(qid);
+      }
+    });
+    setPreSectionQuestions(map);
+  }, [questions]);
 
   return (
     <div className="container-fluid py-5">
@@ -357,6 +397,64 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                             )}
                           </div>
                         )}
+
+                        {/* Language Selection */}
+                        <div className="fv-row mb-7">
+                          <label className="required fs-6 fw-bold mb-2">
+                            Assessment Languages
+                          </label>
+                          <FieldArray name="languages">
+                            {({ push, remove }) => (
+                              <div className={clsx(
+                                "border rounded p-3",
+                                {
+                                  "border-danger": touched.languages && errors.languages,
+                                  "border-success": touched.languages && !errors.languages && Array.isArray(values.languages) && values.languages.length > 0,
+                                }
+                              )}>
+                                <div className="d-flex flex-wrap gap-4">
+                                  {languages.map((lang) => (
+                                    <div key={lang.languageId} className="form-check">
+                                      <Field
+                                        type="checkbox"
+                                        name="languages"
+                                        value={lang.languageName}
+                                        className="form-check-input"
+                                        id={`lang-${lang.languageId}`}
+                                        checked={Array.isArray(values.languages) && values.languages.includes(lang.languageName)}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                          if (e.target.checked) {
+                                            push(lang.languageName);
+                                          } else {
+                                            if (Array.isArray(values.languages)) {
+                                              const index = values.languages.indexOf(lang.languageName);
+                                              if (index > -1) {
+                                                remove(index);
+                                              }
+                                            }
+                                          }
+                                        }}
+                                      />
+                                      <label
+                                        className="form-check-label fw-semibold"
+                                        htmlFor={`lang-${lang.languageId}`}
+                                      >
+                                        {lang.languageName}
+                                      </label>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </FieldArray>
+                          {touched.languages && errors.languages && (
+                            <div className="fv-plugins-message-container">
+                              <div className="fv-help-block text-danger">
+                                <span role="alert">{String(errors.languages)}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <div className="col-md-6">
@@ -643,130 +741,18 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                         Select a section below to add questions to it.
                       </div>
                       
-                      {/* Section Selector Dropdown */}
-                      <div className="fv-row mb-4">
-                        <div className="d-flex justify-content-between align-items-center mb-2">
-                          <label className="fs-6 fw-bold">Choose Section to Add Questions:</label>
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-outline-primary"
-                            onClick={() => setShowQuestionModal(true)}
-                          >
-                            <i className="fas fa-plus me-1"></i>
-                            Create New Question
-                          </button>
-                        </div>
-                        
-                        <select
-                          className="form-select form-select-solid"
-                          value={selectedSectionForQuestions}
-                          onChange={(e) => setSelectedSectionForQuestions(e.target.value)}
-                          name="selectedSectionForQuestions"
-                        >
-                          <option value="">-- Select a section to add questions --</option>
-                          {values.sectionIds.map((sectionId: string) => {
-                            const section = sections.find(s => String(s.sectionId || s.id) === sectionId);
-                            const sectionName = section ? String(section.sectionName || section.name || 'Unknown Section') : `Section ${sectionId}`;
-                            return (
-                              <option key={sectionId} value={sectionId}>
-                                {sectionName}
-                              </option>
-                            );
-                          })}
-                        </select>
-                      </div>
-
-                      {/* Questions List for Selected Section */}
-                      {selectedSectionForQuestions && (
-                        <div className="card">
-                          <div className="card-header bg-light">
-                            <h5 className="card-title mb-0">
-                              <i className="fas fa-layer-group text-secondary me-2"></i>
-                              {(() => {
-                                const section = sections.find(s => String(s.sectionId || s.id) === selectedSectionForQuestions);
-                                return section ? String(section.sectionName || section.name || 'Unknown Section') : `Section ${selectedSectionForQuestions}`;
-                              })()}
-                            </h5>
-                          </div>
-                          <div className="card-body">
-                            <div className="mb-3">
-                              <label className="fs-6 fw-bold">Available Questions:</label>
-                            </div>
-                            
-                            <div 
-                              className="border rounded p-3" 
-                              style={{ maxHeight: '300px', overflowY: 'auto' }}
-                            >
-                              {questions.length > 0 ? (
-                                <div className="questions-list">
-                                  {questions.map((question, qIndex) => {
-                                    const questionId = String(question.id || question.questionId || qIndex);
-                                    const fieldName = `sectionQuestions.${selectedSectionForQuestions}`;
-                                    // read currently selected questions for this section from Formik values
-                                    const selectedForSection: string[] =
-                                      (values.sectionQuestions && values.sectionQuestions[selectedSectionForQuestions]) || [];
-                                    const checked = selectedForSection.includes(questionId);
-
-                                    return (
-                                      <div key={questionId} className="form-check mb-2">
-                                        <input
-                                          type="checkbox"
-                                          className="form-check-input"
-                                          id={`question-${selectedSectionForQuestions}-${questionId}`}
-                                          checked={checked}
-                                          onChange={(e) => {
-                                            const copy = selectedForSection.slice();
-                                            if (e.target.checked) {
-                                              if (!copy.includes(questionId)) copy.push(questionId);
-                                            } else {
-                                              const idx = copy.indexOf(questionId);
-                                              if (idx > -1) copy.splice(idx, 1);
-                                            }
-                                            // update Formik values for this section
-                                            setFieldValue(fieldName, copy);
-                                          }}
-                                        />
-                                        <label
-                                          className="form-check-label ms-2"
-                                          htmlFor={`question-${selectedSectionForQuestions}-${questionId}`}
-                                        >
-                                          {question.questionText || question.question || "Question text not available"}
-                                        </label>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              ) : (
-                                <div className="text-muted text-center py-3">
-                                  <i className="fas fa-question-circle fa-2x mb-2"></i>
-                                  <p>No questions available. Create some questions first.</p>
-                                </div>
-                              )}
-                            </div>
-                            
-                            {questions.length > 0 && (
-                              <div className="mt-3 text-end">
-                                <button
-                                  type="button"
-                                  className="btn btn-primary submit-assesement"
-                                  onClick={() => {
-                                    // values.sectionQuestions now contains selected question ids per section
-                                    // this will print the whole form values (including the selected questions)
-                                    console.log("Form JSON:\n", JSON.stringify(values, null, 2));
-                                    // optionally you can also log only the selected section questions:
-                                    console.log(
-                                      `Selected questions for section ${selectedSectionForQuestions}:`,
-                                      values.sectionQuestions?.[selectedSectionForQuestions] || []
-                                    );
-                                  }}
-                                >
-                                  Save Questions to Section
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
+                      <SectionQuestionSelector
+                        sectionIds={values.sectionIds || []}
+                        sections={sections}
+                        selectedSection={selectedSectionForQuestions}
+                        onSelectSection={(sid) => setSelectedSectionForQuestions(sid)}
+                        onCreateQuestion={() => setShowQuestionModal(true)}
+                        createButtonLabel="Create New Question"
+                        // Pass down necessary props for question management
+                        questions={questions}
+                        values={values}
+                        setFieldValue={setFieldValue}
+                      />
                     </div>
                   </div>
                 )}
@@ -819,7 +805,7 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                     <button
                       type="submit"
                       className="btn btn-success btn-lg"
-                      disabled={loading || !values.name || !values.collegeId || !values.isFree || !values.toolId || values.sectionIds.length === 0}
+                      disabled={loading || !values.name || !values.collegeId || !values.isFree || !values.toolId || values.sectionIds.length === 0 || values.languages.length === 0}
                     >
                       {!loading && (
                         <span className="indicator-label">
