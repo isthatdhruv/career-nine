@@ -1,23 +1,29 @@
 import clsx from "clsx";
 import { Field, Form, Formik, FieldArray } from "formik";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
 import { Button, Modal } from "react-bootstrap";
+import { IconContext } from "react-icons";
+import { MdQuestionAnswer, MdUploadFile, MdSettings } from "react-icons/md";
 import * as XLSX from "xlsx";
+import { MDBDataTableV5 } from "mdbreact";
 
 // API imports
 import { ReadCollegeData } from "../../College/API/College_APIs";
 import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
 import { ReadToolData } from "../../Tool/API/Tool_APIs";
-import { ReadQuestionsData, ReadQuestionsBySectionData } from "../../AssesmentQuestions/API/Question_APIs";
+import { ReadQuestionsData } from "../../AssesmentQuestions/API/Question_APIs";
 import { CreateAssessmentData } from "../API/Create_Assessment_APIs";
+import { ReadLanguageData } from "../API/Create_Assessment_APIs";
 
 // Component imports
 import CollegeCreateModal from "../../College/components/CollegeCreateModal";
 import QuestionSectionCreateModal from "../../QuestionSections/components/QuestionSectionCreateModal";
 import ToolCreateModal from "../../Tool/components/ToolCreateModal";
 import QuestionCreateModal from "../../AssesmentQuestions/components/QuestionCreateModal";
+import { QuestionTable } from "../../AssesmentQuestions/components";
+import SectionQuestionSelector from "./SectionQuestionSelector";
 
 const validationSchema = Yup.object().shape({
   // Basic Info
@@ -32,6 +38,7 @@ const validationSchema = Yup.object().shape({
       otherwise: (schema) => schema.notRequired(),
     }),
   collegeId: Yup.string().required("College is required"),
+  languages: Yup.array().min(1, "At least one language must be selected"),
   
   // Tool selection
   toolId: Yup.string().required("Tool is required"),
@@ -49,7 +56,7 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
   const [sections, setSections] = useState<any[]>([]);
   const [tools, setTools] = useState<any[]>([]);
   const [questions, setQuestions] = useState<any[]>([]);
-  const [sectionQuestions, setSectionQuestions] = useState<any[]>([]);
+  const [languages, setLanguages] = useState<any[]>([]);
   
   // Modal states
   const [showCollegeModal, setShowCollegeModal] = useState(false);
@@ -57,6 +64,7 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
   const [showToolModal, setShowToolModal] = useState(false);
   const [showQuestionModal, setShowQuestionModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
   
   // File upload states
   const [fileName, setFileName] = useState("");
@@ -72,20 +80,27 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
   
   // Question assignment state
   const [selectedSectionForQuestions, setSelectedSectionForQuestions] = useState<string>("");
-  
-  // Ref to store Formik functions
-  const formikRef = useRef<any>({});
+  // pre-filled mapping from fetched questions: sectionId -> [questionId,...]
+  const [preSectionQuestions, setPreSectionQuestions] = useState<{ [k: string]: string[] }>({});
 
-  const initialValues = {
+  const initialValues = useMemo(() => ({
     name: "",
     price: 0,
     isFree: "true",
     collegeId: "",
     toolId: "",
+    languages: [] as string[],
     sectionIds: [] as string[],
-    // store selected question ids per section
-    sectionQuestions: {} as { [sectionId: string]: string[] },
-  };
+    sectionQuestions: preSectionQuestions as { [sectionId: string]: string[] },
+    // ADD THIS NEW LINE FOR QUESTION ORDERING
+    sectionQuestionsOrder: Object.keys(preSectionQuestions).reduce((acc: any, sid) => {
+      acc[sid] = (preSectionQuestions[sid] || []).reduce((m: any, qid: string, idx: number) => {
+        m[qid] = idx + 1;
+        return m;
+      }, {});
+      return acc;
+    }, {}) as { [sectionId: string]: { [questionId: string]: number } },
+  }), [preSectionQuestions]);
 
   // Fetch data functions
   const fetchColleges = async () => {
@@ -140,29 +155,12 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
     }
   };
 
-  const fetchQuestionsBySection = async (sectionId: string) => {
+  const fetchLanguages = async () => {
     try {
-      const response = await ReadQuestionsBySectionData(sectionId);
-      setSectionQuestions(response.data || []);
+      const response = await ReadLanguageData();
+      setLanguages(response.data || []);
     } catch (error) {
-      console.error("Error fetching questions by section:", error);
-      setSectionQuestions([]);
-    }
-  };
-
-  // Helper function to pre-populate already mapped questions
-  const prePopulateMappedQuestions = (sectionId: string, questions: any[], setFieldValue: any, currentValues: any) => {
-    const mappedQuestions = questions
-      .filter(question => 
-        question.section && 
-        String(question.section.sectionId || question.section.id) === sectionId
-      )
-      .map(question => String(question.id || question.questionId));
-    
-    if (mappedQuestions.length > 0) {
-      const currentSelected = currentValues.sectionQuestions?.[sectionId] || [];
-      const mergedQuestions = Array.from(new Set([...currentSelected, ...mappedQuestions]));
-      setFieldValue(`sectionQuestions.${sectionId}`, mergedQuestions);
+      console.error("Error fetching languages:", error);
     }
   };
 
@@ -172,6 +170,7 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
     fetchSections();
     fetchTools();
     fetchQuestions();
+    fetchLanguages();
   }, []);
 
   // Refresh data when modals close
@@ -190,20 +189,6 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
   useEffect(() => {
     if (!showQuestionModal) fetchQuestions();
   }, [showQuestionModal]);
-
-  // Pre-populate questions when sectionQuestions are loaded
-  useEffect(() => {
-    if (selectedSectionForQuestions && sectionQuestions.length > 0 && formikRef.current.setFieldValue) {
-      prePopulateMappedQuestions(
-        selectedSectionForQuestions, 
-        sectionQuestions, 
-        formikRef.current.setFieldValue, 
-        formikRef.current.values
-      );
-    }
-  }, [selectedSectionForQuestions, sectionQuestions]);
-
-
 
   // File upload handler
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -246,70 +231,6 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
 
   const handleSubmit = async (values: any) => {
     setLoading(true);
-    
-    // Create comprehensive JSON schema for all form values
-    const createAssessmentSchema = {
-      assessmentInfo: {
-        id: `assessment_${Date.now()}`,
-        name: values.name,
-        type: values.isFree === "true" ? "free" : "paid",
-        price: values.isFree === "true" ? 0 : Number(values.price),
-        createdAt: new Date().toISOString(),
-        status: "draft"
-      },
-      college: {
-        id: values.collegeId,
-        name: colleges.find(c => c.instituteCode === values.collegeId)?.instituteName || ""
-      },
-      tool: {
-        id: values.toolId,
-        name: tools.find(t => t.id === values.toolId)?.name || ""
-      },
-      sections: values.sectionIds.map((sectionId: string) => {
-        const sectionData = sections.find(s => String(s.sectionId || s.id) === sectionId);
-        const sectionQuestionIds = values.sectionQuestions?.[sectionId] || [];
-        
-        return {
-          sectionId: sectionId,
-          sectionName: sectionData?.sectionName || sectionData?.name || `Section ${sectionId}`,
-          sectionDescription: sectionData?.sectionDescription || sectionData?.description || "",
-          questions: sectionQuestionIds.map((questionId: string) => {
-            const questionData = sectionQuestions.find(q => String(q.id || q.questionId) === questionId) ||
-                               questions.find(q => String(q.id || q.questionId) === questionId);
-            
-            return {
-              questionId: questionId,
-              questionText: questionData?.questionText || questionData?.question || "",
-              questionType: questionData?.questionType || questionData?.type || "text",
-              options: questionData?.options || [],
-              isRequired: questionData?.isRequired || false,
-              points: questionData?.points || 1
-            };
-          })
-        };
-      }),
-      uploadedFile: {
-        fileName: fileName || null,
-        hasFile: !!fileName
-      },
-      metadata: {
-        totalSections: values.sectionIds.length,
-        totalQuestions: Object.values(values.sectionQuestions || {}).reduce((total: number, questions: any) => total + (questions?.length || 0), 0),
-        formValidation: {
-          isNameValid: !!values.name,
-          isCollegeSelected: !!values.collegeId,
-          isTypeSelected: !!values.isFree,
-          isToolSelected: !!values.toolId,
-          areSectionsSelected: values.sectionIds.length > 0,
-          isFormComplete: !!(values.name && values.collegeId && values.isFree && values.toolId && values.sectionIds.length > 0)
-        }
-      }
-    };
-
-    // Console log the comprehensive JSON schema
-    console.log("🚀 ASSESSMENT CREATION SCHEMA:", JSON.stringify(createAssessmentSchema, null, 2));
-    console.log("📋 Raw Form Values:", JSON.stringify(values, null, 2));
-    
     try {
       const isFreeBool = values.isFree === "true";
       const payload = {
@@ -319,9 +240,9 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
         collegeId: values.collegeId,
         toolId: values.toolId,
         sectionIds: values.sectionIds,
+        languages: values.languages,
         fileName: fileName,
-        sectionQuestions: values.sectionQuestions,
-        schema: createAssessmentSchema // Include the schema in payload
+        // Add any additional data from file upload or questions
       };
 
       const response = await CreateAssessmentData(payload);
@@ -340,6 +261,21 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
     }
   };
 
+  // build preSectionQuestions from questions fetched (auto-check)
+  useEffect(() => {
+    const map: { [k: string]: string[] } = {};
+    (questions || []).forEach((q: any) => {
+      const sid = q?.section?.sectionId ?? q?.sectionId ?? q?.section?.id;
+      const qid = String(q?.questionId ?? q?.id ?? "");
+      if (sid && qid) {
+        const s = String(sid);
+        if (!map[s]) map[s] = [];
+        if (!map[s].includes(qid)) map[s].push(qid);
+      }
+    });
+    setPreSectionQuestions(map);
+  }, [questions]);
+
   return (
     <div className="container-fluid py-5">
       <div className="row justify-content-center">
@@ -356,341 +292,144 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
           validationSchema={validationSchema}
           onSubmit={handleSubmit}
         >
-          {({ errors, touched, values, setFieldValue }) => {
-            // Store Formik functions in ref for use in useEffect
-            formikRef.current = { values, setFieldValue };
-            
-            return (
-            <Form className="form w-100 fv-plugins-bootstrap5 fv-plugins-framework">
-              <div className="card-body">
-                
-                {/* 1. Basic Information Section */}
-                <div className="card mb-6">
-                  <div className="card-header">
-                    <h3 className="card-title mb-0">
-                      <i className="fas fa-info-circle text-primary me-2"></i>
-                      1. Basic Information
-                      {values.name && values.collegeId && values.isFree && (
-                        <span className="badge badge-success ms-2">Complete</span>
-                      )}
-                    </h3>
-                  </div>
-                  <div className="card-body">
-                    <div className="row">
-                      <div className="col-md-6">
-                        {/* Assessment Name */}
-                        <div className="fv-row mb-7">
-                          <label className="required fs-6 fw-bold mb-2">
-                            Assessment Name:
-                          </label>
-                          <Field
-                            as="input"
-                            name="name"
-                            placeholder="Enter Assessment Name"
-                            className={clsx(
-                              "form-control form-control-lg form-control-solid",
-                              {
-                                "is-invalid text-danger": touched.name && errors.name,
-                              },
-                              {
-                                "is-valid": touched.name && !errors.name,
-                              }
-                            )}
-                          />
-                          {touched.name && errors.name && (
-                            <div className="fv-plugins-message-container">
-                              <div className="fv-help-block text-danger">
-                                <span role="alert">{String(errors.name)}</span>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Pricing */}
-                        <div className="fv-row mb-7">
-                          <label className="required fs-6 fw-bold mb-2">
-                            Assessment Type:
-                          </label>
-                          <Field
-                            as="select"
-                            name="isFree"
-                            className={clsx(
-                              "form-control form-control-lg form-control-solid",
-                              {
-                                "is-invalid text-danger": touched.isFree && errors.isFree,
-                              },
-                              {
-                                "is-valid": touched.isFree && !errors.isFree,
-                              }
-                            )}
-                          >
-                            <option value="">Select Type</option>
-                            <option value="true">Free</option>
-                            <option value="false">Paid</option>
-                          </Field>
-                          {touched.isFree && errors.isFree && (
-                            <div className="fv-plugins-message-container">
-                              <div className="fv-help-block text-danger">
-                                <span role="alert">{String(errors.isFree)}</span>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Price field - only show if paid */}
-                        {values.isFree === "false" && (
+          {({ errors, touched, values, setFieldValue }) => (
+            <>
+              <Form className="form w-100 fv-plugins-bootstrap5 fv-plugins-framework">
+                <div className="card-body">
+                  
+                  {/* 1. Basic Information Section */}
+                  <div className="card mb-6">
+                    <div className="card-header">
+                      <h3 className="card-title mb-0">
+                        <i className="fas fa-info-circle text-primary me-2"></i>
+                        1. Basic Information
+                        {values.name && values.collegeId && values.isFree && (
+                          <span className="badge badge-success ms-2">Complete</span>
+                        )}
+                      </h3>
+                    </div>
+                    <div className="card-body">
+                      <div className="row">
+                        <div className="col-md-6">
+                          {/* Assessment Name */}
                           <div className="fv-row mb-7">
                             <label className="required fs-6 fw-bold mb-2">
-                              Price:
+                              Assessment Name:
                             </label>
                             <Field
-                              type="number"
-                              name="price"
-                              placeholder="Enter price"
+                              as="input"
+                              name="name"
+                              placeholder="Enter Assessment Name"
                               className={clsx(
                                 "form-control form-control-lg form-control-solid",
                                 {
-                                  "is-invalid text-danger": touched.price && errors.price,
+                                  "is-invalid text-danger": touched.name && errors.name,
                                 },
                                 {
-                                  "is-valid": touched.price && !errors.price,
+                                  "is-valid": touched.name && !errors.name,
                                 }
                               )}
                             />
-                            {touched.price && errors.price && (
+                            {touched.name && errors.name && (
                               <div className="fv-plugins-message-container">
                                 <div className="fv-help-block text-danger">
-                                  <span role="alert">{String(errors.price)}</span>
+                                  <span role="alert">{String(errors.name)}</span>
                                 </div>
                               </div>
                             )}
                           </div>
-                        )}
-                      </div>
 
-                      <div className="col-md-6">
-                        {/* College Selection */}
-                        <div className="fv-row mb-7">
-                          <div className="d-flex justify-content-between align-items-center mb-2">
-                            <label className="required fs-6 fw-bold">
-                              Select College
+                          {/* Pricing */}
+                          <div className="fv-row mb-7">
+                            <label className="required fs-6 fw-bold mb-2">
+                              Assessment Type:
                             </label>
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-light-primary"
-                              onClick={() => setShowCollegeModal(true)}
+                            <Field
+                              as="select"
+                              name="isFree"
+                              className={clsx(
+                                "form-control form-control-lg form-control-solid",
+                                {
+                                  "is-invalid text-danger": touched.isFree && errors.isFree,
+                                },
+                                {
+                                  "is-valid": touched.isFree && !errors.isFree,
+                                }
+                              )}
                             >
-                              Add New College
-                            </button>
+                              <option value="">Select Type</option>
+                              <option value="true">Free</option>
+                              <option value="false">Paid</option>
+                            </Field>
+                            {touched.isFree && errors.isFree && (
+                              <div className="fv-plugins-message-container">
+                                <div className="fv-help-block text-danger">
+                                  <span role="alert">{String(errors.isFree)}</span>
+                                </div>
+                              </div>
+                            )}
                           </div>
 
-                          <Field
-                            as="select"
-                            name="collegeId"
-                            className={clsx(
-                              "form-control form-control-lg form-control-solid",
-                              {
-                                "is-invalid text-danger":
-                                  touched.collegeId && errors.collegeId,
-                              },
-                              {
-                                "is-valid": touched.collegeId && !errors.collegeId,
-                              }
-                            )}
-                          >
-                            <option value="">Select College</option>
-                            {colleges.map((college) => (
-                              <option
-                                key={college.instituteCode}
-                                value={college.instituteCode}
-                              >
-                                {college.instituteName}
-                              </option>
-                            ))}
-                          </Field>
-
-                          {touched.collegeId && errors.collegeId && (
-                            <div className="fv-plugins-message-container">
-                              <div className="fv-help-block text-danger">
-                                <span role="alert">{String(errors.collegeId)}</span>
-                              </div>
+                          {/* Price field - only show if paid */}
+                          {values.isFree === "false" && (
+                            <div className="fv-row mb-7">
+                              <label className="required fs-6 fw-bold mb-2">
+                                Price:
+                              </label>
+                              <Field
+                                type="number"
+                                name="price"
+                                placeholder="Enter price"
+                                className={clsx(
+                                  "form-control form-control-lg form-control-solid",
+                                  {
+                                    "is-invalid text-danger": touched.price && errors.price,
+                                  },
+                                  {
+                                    "is-valid": touched.price && !errors.price,
+                                  }
+                                )}
+                              />
+                              {touched.price && errors.price && (
+                                <div className="fv-plugins-message-container">
+                                  <div className="fv-help-block text-danger">
+                                    <span role="alert">{String(errors.price)}</span>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
-                {/* 2. Tool Selection Section */}
-                <div className="card mb-6">
-                  <div className="card-header">
-                    <h3 className="card-title mb-0">
-                      <i className="fas fa-tools text-primary me-2"></i>
-                      2. Tool Selection
-                      {values.toolId && (
-                        <span className="badge badge-success ms-2">Complete</span>
-                      )}
-                    </h3>
-                  </div>
-                  <div className="card-body">
-                    <div className="fv-row mb-7">
-                      <div className="d-flex justify-content-between align-items-center mb-2">
-                        <label className="required fs-6 fw-bold">Select Tool</label>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-light-primary"
-                          onClick={() => setShowToolModal(true)}
-                        >
-                          Add New Tool
-                        </button>
-                      </div>
-
-                      <Field
-                        as="select"
-                        name="toolId"
-                        className={clsx(
-                          "form-control form-control-lg form-control-solid",
-                          {
-                            "is-invalid text-danger": touched.toolId && errors.toolId,
-                          },
-                          {
-                            "is-valid": touched.toolId && !errors.toolId,
-                          }
-                        )}
-                      >
-                        <option value="">Select Tool</option>
-                        {tools.map((tool) => (
-                          <option key={tool.id} value={tool.id}>
-                            {tool.name}
-                          </option>
-                        ))}
-                      </Field>
-
-                      {touched.toolId && errors.toolId && (
-                        <div className="fv-plugins-message-container">
-                          <div className="fv-help-block text-danger">
-                            <span role="alert">{String(errors.toolId)}</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. File Upload Section */}
-                {/* <div className="card mb-6">
-                  <div className="card-header">
-                    <h3 className="card-title mb-0">
-                      <i className="fas fa-upload text-primary me-2"></i>
-                      3. File Upload (Optional)
-                      {fileName && (
-                        <span className="badge badge-success ms-2">Complete</span>
-                      )}
-                    </h3>
-                  </div>
-                  <div className="card-body">
-                    <div className="text-center py-4">
-                      <div className="mb-4">
-                        <Button
-                          variant="primary"
-                          size="lg"
-                          onClick={() => setShowUploadModal(true)}
-                        >
-                          <IconContext.Provider value={{ style: { verticalAlign: "middle" } }}>
-                            <span className="d-flex align-items-center gap-2">
-                              <MdUploadFile size={24} />
-                              Upload Excel File
-                            </span>
-                          </IconContext.Provider>
-                        </Button>
-                      </div>
-
-                      {fileName && (
-                        <div className="alert alert-success">
-                          <strong>✅ Uploaded File:</strong> {fileName}
-                        </div>
-                      )}
-
-                      {tableData.rows.length > 0 && (
-                        <div className="mt-4">
-                          <h5>File Preview:</h5>
-                          <MDBDataTableV5
-                            hover
-                            entriesOptions={[5, 10, 15]}
-                            entries={5}
-                            pagesAmount={4}
-                            data={tableData}
-                            searchTop
-                            searchBottom={false}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div> */}
-
-                {/* 4. Sections Selection */}
-                <div className="card mb-6">
-                  <div className="card-header">
-                    <h3 className="card-title mb-0">
-                      <i className="fas fa-list text-primary me-2"></i>
-                      3. Section Selection
-                      {Array.isArray(values.sectionIds) && values.sectionIds.length > 0 && (
-                        <span className="badge badge-success ms-2">Complete</span>
-                      )}
-                    </h3>
-                  </div>
-                  <div className="card-body">
-                    <div className="fv-row mb-7">
-                      <div className="d-flex justify-content-between align-items-center mb-2">
-                        <label className="required fs-6 fw-bold">Select Sections</label>
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-light-primary"
-                          onClick={() => setShowSectionModal(true)}
-                        >
-                          Add New Section
-                        </button>
-                      </div>
-
-                      <FieldArray name="sectionIds">
-                        {({ push, remove }) => (
-                          <div className={clsx(
-                            "border rounded p-3",
-                            {
-                              "border-danger": touched.sectionIds && errors.sectionIds,
-                              "border-success": touched.sectionIds && !errors.sectionIds && values.sectionIds.length > 0,
-                            }
-                          )}>
-                            {Array.isArray(sections) && sections.length > 0 ? (
-                              <div className="row">
-                                {sections.map((section, index) => {
-                                  // Ensure section is an object with required properties
-                                  if (!section || typeof section !== 'object') {
-                                    return null;
+                          {/* Language Selection */}
+                          <div className="fv-row mb-7">
+                            <label className="required fs-6 fw-bold mb-2">
+                              Assessment Languages
+                            </label>
+                            <FieldArray name="languages">
+                              {({ push, remove }) => (
+                                <div className={clsx(
+                                  "border rounded p-3",
+                                  {
+                                    "border-danger": touched.languages && errors.languages,
+                                    "border-success": touched.languages && !errors.languages && Array.isArray(values.languages) && values.languages.length > 0,
                                   }
-                                  
-                                  const rawSectionId = section.sectionId || section.id || index;
-                                  const sectionId = String(rawSectionId); // Ensure it's always a string
-                                  const sectionName = String(section.sectionName || section.name || `Section ${index + 1}`);
-                                  
-                                  return (
-                                    <div key={sectionId} className="col-md-6 col-lg-4 mb-3">
-                                      <div className="form-check">
+                                )}>
+                                  <div className="d-flex flex-wrap gap-4">
+                                    {languages.map((lang) => (
+                                      <div key={lang.languageId} className="form-check">
                                         <Field
                                           type="checkbox"
-                                          name="sectionIds"
-                                          value={sectionId}
+                                          name="languages"
+                                          value={lang.languageName}
                                           className="form-check-input"
-                                          id={`section-${sectionId}`}
-                                          checked={Array.isArray(values.sectionIds) && values.sectionIds.includes(sectionId)}
+                                          id={`lang-${lang.languageId}`}
+                                          checked={Array.isArray(values.languages) && values.languages.includes(lang.languageName)}
                                           onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                             if (e.target.checked) {
-                                              push(sectionId);
+                                              push(lang.languageName);
                                             } else {
-                                              if (Array.isArray(values.sectionIds)) {
-                                                const index = values.sectionIds.indexOf(sectionId);
+                                              if (Array.isArray(values.languages)) {
+                                                const index = values.languages.indexOf(lang.languageName);
                                                 if (index > -1) {
                                                   remove(index);
                                                 }
@@ -698,274 +437,468 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                                             }
                                           }}
                                         />
-                                        <label 
+                                        <label
                                           className="form-check-label fw-semibold"
-                                          htmlFor={`section-${sectionId}`}
+                                          htmlFor={`lang-${lang.languageId}`}
                                         >
-                                          {sectionName}
+                                          {lang.languageName}
                                         </label>
                                       </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            ) : (
-                              <div className="text-muted text-center py-3">
-                                No sections available. Please create a new section.
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </FieldArray>
+                            {touched.languages && errors.languages && (
+                              <div className="fv-plugins-message-container">
+                                <div className="fv-help-block text-danger">
+                                  <span role="alert">{String(errors.languages)}</span>
+                                </div>
                               </div>
                             )}
                           </div>
-                        )}
-                      </FieldArray>
+                        </div>
 
-                      {touched.sectionIds && errors.sectionIds && (
-                        <div className="fv-plugins-message-container">
-                          <div className="fv-help-block text-danger">
-                            <span role="alert">{String(errors.sectionIds)}</span>
+                        <div className="col-md-6">
+                          {/* College Selection */}
+                          <div className="fv-row mb-7">
+                            <div className="d-flex justify-content-between align-items-center mb-2">
+                              <label className="required fs-6 fw-bold">
+                                Select College
+                              </label>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-light-primary"
+                                onClick={() => setShowCollegeModal(true)}
+                              >
+                                Add New College
+                              </button>
+                            </div>
+
+                            <Field
+                              as="select"
+                              name="collegeId"
+                              className={clsx(
+                                "form-control form-control-lg form-control-solid",
+                                {
+                                  "is-invalid text-danger":
+                                    touched.collegeId && errors.collegeId,
+                                },
+                                {
+                                  "is-valid": touched.collegeId && !errors.collegeId,
+                                }
+                              )}
+                            >
+                              <option value="">Select College</option>
+                              {colleges.map((college) => (
+                                <option
+                                  key={college.instituteCode}
+                                  value={college.instituteCode}
+                                >
+                                  {college.instituteName}
+                                </option>
+                              ))}
+                            </Field>
+
+                            {touched.collegeId && errors.collegeId && (
+                              <div className="fv-plugins-message-container">
+                                <div className="fv-help-block text-danger">
+                                  <span role="alert">{String(errors.collegeId)}</span>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
-                      )}
-
-                      {Array.isArray(values.sectionIds) && values.sectionIds.length > 0 && (
-                        <div className="mt-3">
-                          <small className="text-muted">
-                            Selected: {values.sectionIds.length} section{values.sectionIds.length !== 1 ? 's' : ''}
-                          </small>
-                        </div>
-                      )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* 4.5. Question Assignment to Sections */}
-                {Array.isArray(values.sectionIds) && values.sectionIds.length > 0 && (
+                  {/* 2. Tool Selection Section */}
                   <div className="card mb-6">
                     <div className="card-header">
                       <h3 className="card-title mb-0">
-                        <i className="fas fa-plus-circle text-primary me-2"></i>
-                        4. Add Questions to Sections
+                        <i className="fas fa-tools text-primary me-2"></i>
+                        2. Tool Selection
+                        {values.toolId && (
+                          <span className="badge badge-success ms-2">Complete</span>
+                        )}
                       </h3>
                     </div>
                     <div className="card-body">
-                      <div className="alert alert-info">
-                        <i className="fas fa-info-circle me-2"></i>
-                        Select a section below to add questions to it.
-                      </div>
-                      
-                      {/* Section Selector Dropdown */}
-                      <div className="fv-row mb-4">
+                      <div className="fv-row mb-7">
                         <div className="d-flex justify-content-between align-items-center mb-2">
-                          <label className="fs-6 fw-bold">Choose Section to Add Questions:</label>
+                          <label className="required fs-6 fw-bold">Select Tool</label>
                           <button
                             type="button"
-                            className="btn btn-sm btn-outline-primary"
-                            onClick={() => setShowQuestionModal(true)}
+                            className="btn btn-sm btn-light-primary"
+                            onClick={() => setShowToolModal(true)}
                           >
-                            <i className="fas fa-plus me-1"></i>
-                            Create New Question
+                            Add New Tool
                           </button>
                         </div>
-                        
-                        <select
-                          className="form-select form-select-solid"
-                          value={selectedSectionForQuestions}
-                          onChange={(e) => {
-                            const newSectionId = e.target.value;
-                            setSelectedSectionForQuestions(newSectionId);
-                            if (newSectionId) {
-                              fetchQuestionsBySection(newSectionId);
-                            } else {
-                              setSectionQuestions([]);
+
+                        <Field
+                          as="select"
+                          name="toolId"
+                          className={clsx(
+                            "form-control form-control-lg form-control-solid",
+                            {
+                              "is-invalid text-danger": touched.toolId && errors.toolId,
+                            },
+                            {
+                              "is-valid": touched.toolId && !errors.toolId,
                             }
-                          }}
-                          name="selectedSectionForQuestions"
+                          )}
                         >
-                          <option value="">-- Select a section to add questions --</option>
-                          {values.sectionIds.map((sectionId: string) => {
-                            const section = sections.find(s => String(s.sectionId || s.id) === sectionId);
-                            const sectionName = section ? String(section.sectionName || section.name || 'Unknown Section') : `Section ${sectionId}`;
-                            return (
-                              <option key={sectionId} value={sectionId}>
-                                {sectionName}
-                              </option>
-                            );
-                          })}
-                        </select>
-                      </div>
+                          <option value="">Select Tool</option>
+                          {tools.map((tool) => (
+                            <option key={tool.id} value={tool.id}>
+                              {tool.name}
+                            </option>
+                          ))}
+                        </Field>
 
-                      {/* Questions List for Selected Section */}
-                      {selectedSectionForQuestions && (
-                        <div className="card">
-                          <div className="card-header bg-light">
-                            <h5 className="card-title mb-0">
-                              <i className="fas fa-layer-group text-secondary me-2"></i>
-                              {(() => {
-                                const section = sections.find(s => String(s.sectionId || s.id) === selectedSectionForQuestions);
-                                return section ? String(section.sectionName || section.name || 'Unknown Section') : `Section ${selectedSectionForQuestions}`;
-                              })()}
-                            </h5>
-                          </div>
-                          <div className="card-body">
-                            <div className="mb-3">
-                              <label className="fs-6 fw-bold">Available Questions:</label>
+                        {touched.toolId && errors.toolId && (
+                          <div className="fv-plugins-message-container">
+                            <div className="fv-help-block text-danger">
+                              <span role="alert">{String(errors.toolId)}</span>
                             </div>
-                            
-                            <div 
-                              className="border rounded p-3" 
-                              style={{ maxHeight: '300px', overflowY: 'auto' }}
-                            >
-                              {sectionQuestions.length > 0 ? (
-                                <div className="questions-list">
-                                  {sectionQuestions.map((question, qIndex) => {
-                                    const questionId = String(question.id || question.questionId || question.id || qIndex);
-                                    const fieldName = `sectionQuestions.${selectedSectionForQuestions}`;
-                                    // read currently selected questions for this section from Formik values
-                                    const selectedForSection: string[] =
-                                      (values.sectionQuestions && values.sectionQuestions[selectedSectionForQuestions]) || [];
-                                    
-                                    // Check if this question belongs to the selected section (pre-check)
-                                    const belongsToSection = question.section && 
-                                      String(question.section.sectionId || question.section.id) === selectedSectionForQuestions;
-                                    
-                                    // Question should be checked if it's already in selectedForSection OR if it belongs to this section
-                                    const checked = selectedForSection.includes(questionId) || belongsToSection;
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
+                  {/* 3. File Upload Section */}
+                  {/* <div className="card mb-6">
+                    <div className="card-header">
+                      <h3 className="card-title mb-0">
+                        <i className="fas fa-upload text-primary me-2"></i>
+                        3. File Upload (Optional)
+                        {fileName && (
+                          <span className="badge badge-success ms-2">Complete</span>
+                        )}
+                      </h3>
+                    </div>
+                    <div className="card-body">
+                      <div className="text-center py-4">
+                        <div className="mb-4">
+                          <Button
+                            variant="primary"
+                            size="lg"
+                            onClick={() => setShowUploadModal(true)}
+                          >
+                            <IconContext.Provider value={{ style: { verticalAlign: "middle" } }}>
+                              <span className="d-flex align-items-center gap-2">
+                                <MdUploadFile size={24} />
+                                Upload Excel File
+                              </span>
+                            </IconContext.Provider>
+                          </Button>
+                        </div>
+
+                        {fileName && (
+                          <div className="alert alert-success">
+                            <strong>✅ Uploaded File:</strong> {fileName}
+                          </div>
+                        )}
+
+                        {tableData.rows.length > 0 && (
+                          <div className="mt-4">
+                            <h5>File Preview:</h5>
+                            <MDBDataTableV5
+                              hover
+                              entriesOptions={[5, 10, 15]}
+                              entries={5}
+                              pagesAmount={4}
+                              data={tableData}
+                              searchTop
+                              searchBottom={false}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div> */}
+
+                  {/* 4. Sections Selection */}
+                  <div className="card mb-6">
+                    <div className="card-header">
+                      <h3 className="card-title mb-0">
+                        <i className="fas fa-list text-primary me-2"></i>
+                        3. Section Selection
+                        {Array.isArray(values.sectionIds) && values.sectionIds.length > 0 && (
+                          <span className="badge badge-success ms-2">Complete</span>
+                        )}
+                      </h3>
+                    </div>
+                    <div className="card-body">
+                      <div className="fv-row mb-7">
+                        <div className="d-flex justify-content-between align-items-center mb-2">
+                          <label className="required fs-6 fw-bold">Select Sections</label>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-light-primary"
+                            onClick={() => setShowSectionModal(true)}
+                          >
+                            Add New Section
+                          </button>
+                        </div>
+
+                        <FieldArray name="sectionIds">
+                          {({ push, remove }) => (
+                            <div className={clsx(
+                              "border rounded p-3",
+                              {
+                                "border-danger": touched.sectionIds && errors.sectionIds,
+                                "border-success": touched.sectionIds && !errors.sectionIds && values.sectionIds.length > 0,
+                              }
+                            )}>
+                              {Array.isArray(sections) && sections.length > 0 ? (
+                                <div className="row">
+                                  {sections.map((section, index) => {
+                                    // Ensure section is an object with required properties
+                                    if (!section || typeof section !== 'object') {
+                                      return null;
+                                    }
+                                    
+                                    const rawSectionId = section.sectionId || section.id || index;
+                                    const sectionId = String(rawSectionId); // Ensure it's always a string
+                                    const sectionName = String(section.sectionName || section.name || `Section ${index + 1}`);
+                                    
                                     return (
-                                      <div key={questionId} className="form-check mb-2">
-                                        <input
-                                          type="checkbox"
-                                          className="form-check-input"
-                                          id={`question-${selectedSectionForQuestions}-${questionId}`}
-                                          checked={checked}
-                                          onChange={(e) => {
-                                            const copy = selectedForSection.slice();
-                                            if (e.target.checked) {
-                                              if (!copy.includes(questionId)) copy.push(questionId);
-                                            } else {
-                                              const idx = copy.indexOf(questionId);
-                                              if (idx > -1) copy.splice(idx, 1);
-                                            }
-                                            // update Formik values for this section
-                                            setFieldValue(fieldName, copy);
-                                          }}
-                                        />
-                                        <label
-                                          className="form-check-label ms-2"
-                                          htmlFor={`question-${selectedSectionForQuestions}-${questionId}`}
-                                        >
-                                          {question.questionText || question.question || "Question text not available"}
-                                          {/* {belongsToSection && (
-                                            <span className="badge badge-success ms-2">Already mapped</span>
-                                          )} */}
-                                        </label>
+                                      <div key={sectionId} className="col-md-6 col-lg-4 mb-3">
+                                        <div className="form-check">
+                                          <Field
+                                            type="checkbox"
+                                            name="sectionIds"
+                                            value={sectionId}
+                                            className="form-check-input"
+                                            id={`section-${sectionId}`}
+                                            checked={Array.isArray(values.sectionIds) && values.sectionIds.includes(sectionId)}
+                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                              if (e.target.checked) {
+                                                push(sectionId);
+                                              } else {
+                                                if (Array.isArray(values.sectionIds)) {
+                                                  const index = values.sectionIds.indexOf(sectionId);
+                                                  if (index > -1) {
+                                                    remove(index);
+                                                  }
+                                                }
+                                              }
+                                            }}
+                                          />
+                                          <label 
+                                            className="form-check-label fw-semibold"
+                                            htmlFor={`section-${sectionId}`}
+                                          >
+                                            {sectionName}
+                                          </label>
+                                        </div>
                                       </div>
                                     );
                                   })}
                                 </div>
                               ) : (
                                 <div className="text-muted text-center py-3">
-                                  <i className="fas fa-question-circle fa-2x mb-2"></i>
-                                  <p>No questions available for this section. Create some questions first.</p>
+                                  No sections available. Please create a new section.
                                 </div>
                               )}
                             </div>
-                            
-                            {sectionQuestions.length > 0 && (
-                              <div className="mt-3 text-end">
-                                <button
-                                  type="button"
-                                  className="btn btn-primary submit-assesement"
-                                  onClick={() => {
-                                    // values.sectionQuestions now contains selected question ids per section
-                                    // this will print the whole form values (including the selected questions)
-                                    console.log("Form JSON:\n", JSON.stringify(values, null, 2));
-                                    // optionally you can also log only the selected section questions:
-                                    console.log(
-                                      `Selected questions for section ${selectedSectionForQuestions}:`,
-                                      values.sectionQuestions?.[selectedSectionForQuestions] || []
-                                    );
-                                  }}
-                                >
-                                  Save Questions to Section
-                                </button>
-                              </div>
-                            )}
+                          )}
+                        </FieldArray>
+
+                        {touched.sectionIds && errors.sectionIds && (
+                          <div className="fv-plugins-message-container">
+                            <div className="fv-help-block text-danger">
+                              <span role="alert">{String(errors.sectionIds)}</span>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
+
+                        {Array.isArray(values.sectionIds) && values.sectionIds.length > 0 && (
+                          <div className="mt-3">
+                            <small className="text-muted">
+                              Selected: {values.sectionIds.length} section{values.sectionIds.length !== 1 ? 's' : ''}
+                            </small>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                )}
 
-                {/* 6. Questions Management */}
-                {/* <div className="card mb-6">
-                  <div className="card-header">
-                    <div className="d-flex justify-content-between align-items-center">
-                      <h3 className="card-title mb-0">
-                        <i className="fas fa-question-circle text-primary me-2"></i>
-                        6. Questions Management
-                        {questions.length > 0 && (
-                          <span className="badge badge-success ms-2">Complete</span>
-                        )}
-                      </h3>
-                      <div className="d-flex justify-content-end align-items-center mb-2">
+                  {/* 4.5. Question Assignment to Sections */}
+                  {Array.isArray(values.sectionIds) && values.sectionIds.length > 0 && (
+                    <div className="card mb-6">
+                      <div className="card-header">
+                        <h3 className="card-title mb-0">
+                          <i className="fas fa-plus-circle text-primary me-2"></i>
+                          4. Add Questions to Sections
+                        </h3>
+                      </div>
+                      <div className="card-body">
+                        <div className="alert alert-info">
+                          <i className="fas fa-info-circle me-2"></i>
+                          Select a section below to add questions to it.
+                        </div>
+                        
+                        <SectionQuestionSelector
+                          sectionIds={values.sectionIds || []}
+                          sections={sections}
+                          selectedSection={selectedSectionForQuestions}
+                          onSelectSection={(sid) => setSelectedSectionForQuestions(sid)}
+                          onCreateQuestion={() => setShowQuestionModal(true)}
+                          createButtonLabel="Create New Question"
+                          // Pass down necessary props for question management
+                          questions={questions}
+                          values={values}
+                          setFieldValue={setFieldValue}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 6. Questions Management */}
+                  {/* <div className="card mb-6">
+                    <div className="card-header">
+                      <div className="d-flex justify-content-between align-items-center">
+                        <h3 className="card-title mb-0">
+                          <i className="fas fa-question-circle text-primary me-2"></i>
+                          6. Questions Management
+                          {questions.length > 0 && (
+                            <span className="badge badge-success ms-2">Complete</span>
+                          )}
+                        </h3>
+                        <div className="d-flex justify-content-end align-items-center mb-2">
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-light-primary"
+                            onClick={() => setShowQuestionModal(true)}
+                          >
+                            Add New Question
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="card-body">
+                      <div className="questions-section">
+                        <QuestionTable
+                          data={questions}
+                          sections={sections}
+                          setPageLoading={setPageLoadingState}
+                        />
+                      </div>
+                    </div>
+                  </div> */}
+
+                  {/* Form Actions */}
+                  <div className="card">
+                    <div className="card-footer d-flex justify-content-between">
+                      <button
+                        type="button"
+                        className="btn btn-light btn-lg"
+                        onClick={() => navigate("/assessments")}
+                      >
+                        <i className="fas fa-times me-2"></i>
+                        Cancel
+                      </button>
+                      
+                      <div>
                         <button
                           type="button"
-                          className="btn btn-sm btn-light-primary"
-                          onClick={() => setShowQuestionModal(true)}
+                          className="btn btn-info btn-lg me-3"
+                          onClick={() => setShowPreviewModal(true)}
+                          disabled={!Array.isArray(values.sectionIds) || values.sectionIds.length === 0}
                         >
-                          Add New Question
+                          <i className="fas fa-eye me-2"></i>
+                          Preview
+                        </button>
+                        <button
+                          type="submit"
+                          className="btn btn-success btn-lg"
+                          disabled={loading || !values.name || !values.collegeId || !values.isFree || !values.toolId || values.sectionIds.length === 0 || values.languages.length === 0}
+                        >
+                          {!loading && (
+                            <span className="indicator-label">
+                              <i className="fas fa-check me-2"></i>
+                              Create Assessment
+                            </span>
+                          )}
+                          {loading && (
+                            <span className="indicator-progress" style={{ display: "block" }}>
+                              <i className="fas fa-spinner fa-spin me-2"></i>
+                              Creating Assessment...
+                            </span>
+                          )}
                         </button>
                       </div>
                     </div>
                   </div>
-                  <div className="card-body">
-                    <div className="questions-section">
-                      <QuestionTable
-                        data={questions}
-                        sections={sections}
-                        setPageLoading={setPageLoadingState}
-                      />
-                    </div>
-                  </div>
-                </div> */}
-
-                {/* Form Actions */}
-                <div className="card">
-                  <div className="card-footer d-flex justify-content-between">
-                    <button
-                      type="button"
-                      className="btn btn-light btn-lg"
-                      onClick={() => navigate("/assessments")}
-                    >
-                      <i className="fas fa-times me-2"></i>
-                      Cancel
-                    </button>
-                    
-                    <button
-                      type="submit"
-                      className="btn btn-success btn-lg"
-                      disabled={loading || !values.name || !values.collegeId || !values.isFree || !values.toolId || values.sectionIds.length === 0}
-                    >
-                      {!loading && (
-                        <span className="indicator-label">
-                          <i className="fas fa-check me-2"></i>
-                          Create Assessment
-                        </span>
-                      )}
-                      {loading && (
-                        <span className="indicator-progress" style={{ display: "block" }}>
-                          <i className="fas fa-spinner fa-spin me-2"></i>
-                          Creating Assessment...
-                        </span>
-                      )}
-                    </button>
-                  </div>
                 </div>
-              </div>
-            </Form>
-          );
-          }}
+              </Form>
+
+              {/* Preview Modal */}
+              <Modal show={showPreviewModal} onHide={() => setShowPreviewModal(false)} size="lg" centered>
+                <Modal.Header closeButton>
+                  <Modal.Title>Assessment Preview</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                  {values.sectionIds && values.sectionIds.length > 0 ? (
+                    values.sectionIds.map((sectionId) => {
+                      const section = sections.find((s) => String(s.sectionId) === String(sectionId));
+                      const questionIds = values.sectionQuestions[sectionId] || [];
+                      const questionOrderMap = values.sectionQuestionsOrder?.[sectionId] || {};
+
+                      const sortedQuestionIds = [...questionIds].sort((a, b) => {
+                        const orderA = questionOrderMap[a] || Infinity;
+                        const orderB = questionOrderMap[b] || Infinity;
+                        return orderA - orderB;
+                      });
+
+                      return (
+                        <div key={sectionId} className="mb-4">
+                          <h4 className="text-primary border-bottom pb-2 mb-3">{section ? section.sectionName : `Section ${sectionId}`}</h4>
+                          {sortedQuestionIds.length > 0 ? (
+                            <ul className="list-group list-group-flush">
+                              {sortedQuestionIds.map((questionId, index) => {
+                                const question = questions.find((q) => String(q.questionId) === String(questionId));
+                                return (
+                                  <li key={questionId} className="list-group-item px-0">
+                                    <p className="fw-bold mb-2">{index + 1}. {question ? question.questionText : `Question not found`}</p>
+                                    {question && question.options && question.options.length > 0 ? (
+                                      <ul className="list-unstyled ps-4">
+                                        {question.options.map((opt: any, optIndex: number) => (
+                                          <li key={opt.optionId || optIndex} className="mb-1">
+                                            {String.fromCharCode(65 + optIndex)}. {opt.optionText}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    ) : (
+                                      <p className="text-muted fst-italic ps-4">No options available for this question.</p>
+                                    )}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          ) : (
+                            <p className="text-muted">No questions have been added to this section yet.</p>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-center text-muted">Select sections and add questions to see a preview.</p>
+                  )}
+                </Modal.Body>
+                <Modal.Footer>
+                  <Button variant="secondary" onClick={() => setShowPreviewModal(false)}>
+                    Close
+                  </Button>
+                </Modal.Footer>
+              </Modal>
+            </>
+          )}
         </Formik>
 
         {/* Modals */}
