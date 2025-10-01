@@ -12,5 +12,6 @@ import com.kccitm.api.model.career9.AssessmentQuestions;
 @Repository
 public interface AssessmentQuestionRepository extends JpaRepository<AssessmentQuestions, Long> {
 
-    
+List<AssessmentQuestions> findBySectionSectionId(Long sectionId);
+
 }

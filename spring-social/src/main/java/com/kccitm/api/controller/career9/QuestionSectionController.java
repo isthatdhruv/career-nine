@@ -23,6 +23,9 @@ import com.kccitm.api.repository.Career9.QuestionSectionRepository;
 public class QuestionSectionController {
     
     @Autowired
+    private com.kccitm.api.repository.Career9.AssessmentQuestionRepository assessmentQuestionRepository;
+
+    @Autowired
     private QuestionSectionRepository questionSectionRepository;
 
     @GetMapping("/getAll")
@@ -75,11 +78,14 @@ public class QuestionSectionController {
     
     // Additional endpoints
     @GetMapping("/{id}/questions")
-    public ResponseEntity<List<com.kccitm.api.model.career9.AssessmentQuestions>> getSectionQuestions(@PathVariable Long id) {
-        QuestionSection section = questionSectionRepository.findById(id).orElse(null);
-        if (section == null) {
-            return ResponseEntity.notFound().build();
+    public ResponseEntity<List<AssessmentQuestions>> getSectionQuestions(@PathVariable Long id) {
+        try {
+            List<AssessmentQuestions> questions = assessmentQuestionRepository.findBySectionSectionId(id);
+            return ResponseEntity.ok(questions);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().build();
         }
-        return ResponseEntity.ok(section.getQuestions());
     } 
 }
+   

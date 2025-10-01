@@ -1,19 +1,16 @@
 import clsx from "clsx";
 import { Field, Form, Formik, FieldArray } from "formik";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
 import { Button, Modal } from "react-bootstrap";
-import { IconContext } from "react-icons";
-import { MdQuestionAnswer, MdUploadFile, MdSettings } from "react-icons/md";
 import * as XLSX from "xlsx";
-import { MDBDataTableV5 } from "mdbreact";
 
 // API imports
 import { ReadCollegeData } from "../../College/API/College_APIs";
 import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
 import { ReadToolData } from "../../Tool/API/Tool_APIs";
-import { ReadQuestionsData } from "../../AssesmentQuestions/API/Question_APIs";
+import { ReadQuestionsData, ReadQuestionsBySectionData } from "../../AssesmentQuestions/API/Question_APIs";
 import { CreateAssessmentData } from "../API/Create_Assessment_APIs";
 
 // Component imports
@@ -21,7 +18,6 @@ import CollegeCreateModal from "../../College/components/CollegeCreateModal";
 import QuestionSectionCreateModal from "../../QuestionSections/components/QuestionSectionCreateModal";
 import ToolCreateModal from "../../Tool/components/ToolCreateModal";
 import QuestionCreateModal from "../../AssesmentQuestions/components/QuestionCreateModal";
-import { QuestionTable } from "../../AssesmentQuestions/components";
 
 const validationSchema = Yup.object().shape({
   // Basic Info
@@ -53,6 +49,7 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
   const [sections, setSections] = useState<any[]>([]);
   const [tools, setTools] = useState<any[]>([]);
   const [questions, setQuestions] = useState<any[]>([]);
+  const [sectionQuestions, setSectionQuestions] = useState<any[]>([]);
   
   // Modal states
   const [showCollegeModal, setShowCollegeModal] = useState(false);
@@ -75,6 +72,9 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
   
   // Question assignment state
   const [selectedSectionForQuestions, setSelectedSectionForQuestions] = useState<string>("");
+  
+  // Ref to store Formik functions
+  const formikRef = useRef<any>({});
 
   const initialValues = {
     name: "",
@@ -140,6 +140,32 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
     }
   };
 
+  const fetchQuestionsBySection = async (sectionId: string) => {
+    try {
+      const response = await ReadQuestionsBySectionData(sectionId);
+      setSectionQuestions(response.data || []);
+    } catch (error) {
+      console.error("Error fetching questions by section:", error);
+      setSectionQuestions([]);
+    }
+  };
+
+  // Helper function to pre-populate already mapped questions
+  const prePopulateMappedQuestions = (sectionId: string, questions: any[], setFieldValue: any, currentValues: any) => {
+    const mappedQuestions = questions
+      .filter(question => 
+        question.section && 
+        String(question.section.sectionId || question.section.id) === sectionId
+      )
+      .map(question => String(question.id || question.questionId));
+    
+    if (mappedQuestions.length > 0) {
+      const currentSelected = currentValues.sectionQuestions?.[sectionId] || [];
+      const mergedQuestions = Array.from(new Set([...currentSelected, ...mappedQuestions]));
+      setFieldValue(`sectionQuestions.${sectionId}`, mergedQuestions);
+    }
+  };
+
   // Initial data loading
   useEffect(() => {
     fetchColleges();
@@ -164,6 +190,20 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
   useEffect(() => {
     if (!showQuestionModal) fetchQuestions();
   }, [showQuestionModal]);
+
+  // Pre-populate questions when sectionQuestions are loaded
+  useEffect(() => {
+    if (selectedSectionForQuestions && sectionQuestions.length > 0 && formikRef.current.setFieldValue) {
+      prePopulateMappedQuestions(
+        selectedSectionForQuestions, 
+        sectionQuestions, 
+        formikRef.current.setFieldValue, 
+        formikRef.current.values
+      );
+    }
+  }, [selectedSectionForQuestions, sectionQuestions]);
+
+
 
   // File upload handler
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -206,6 +246,70 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
 
   const handleSubmit = async (values: any) => {
     setLoading(true);
+    
+    // Create comprehensive JSON schema for all form values
+    const createAssessmentSchema = {
+      assessmentInfo: {
+        id: `assessment_${Date.now()}`,
+        name: values.name,
+        type: values.isFree === "true" ? "free" : "paid",
+        price: values.isFree === "true" ? 0 : Number(values.price),
+        createdAt: new Date().toISOString(),
+        status: "draft"
+      },
+      college: {
+        id: values.collegeId,
+        name: colleges.find(c => c.instituteCode === values.collegeId)?.instituteName || ""
+      },
+      tool: {
+        id: values.toolId,
+        name: tools.find(t => t.id === values.toolId)?.name || ""
+      },
+      sections: values.sectionIds.map((sectionId: string) => {
+        const sectionData = sections.find(s => String(s.sectionId || s.id) === sectionId);
+        const sectionQuestionIds = values.sectionQuestions?.[sectionId] || [];
+        
+        return {
+          sectionId: sectionId,
+          sectionName: sectionData?.sectionName || sectionData?.name || `Section ${sectionId}`,
+          sectionDescription: sectionData?.sectionDescription || sectionData?.description || "",
+          questions: sectionQuestionIds.map((questionId: string) => {
+            const questionData = sectionQuestions.find(q => String(q.id || q.questionId) === questionId) ||
+                               questions.find(q => String(q.id || q.questionId) === questionId);
+            
+            return {
+              questionId: questionId,
+              questionText: questionData?.questionText || questionData?.question || "",
+              questionType: questionData?.questionType || questionData?.type || "text",
+              options: questionData?.options || [],
+              isRequired: questionData?.isRequired || false,
+              points: questionData?.points || 1
+            };
+          })
+        };
+      }),
+      uploadedFile: {
+        fileName: fileName || null,
+        hasFile: !!fileName
+      },
+      metadata: {
+        totalSections: values.sectionIds.length,
+        totalQuestions: Object.values(values.sectionQuestions || {}).reduce((total: number, questions: any) => total + (questions?.length || 0), 0),
+        formValidation: {
+          isNameValid: !!values.name,
+          isCollegeSelected: !!values.collegeId,
+          isTypeSelected: !!values.isFree,
+          isToolSelected: !!values.toolId,
+          areSectionsSelected: values.sectionIds.length > 0,
+          isFormComplete: !!(values.name && values.collegeId && values.isFree && values.toolId && values.sectionIds.length > 0)
+        }
+      }
+    };
+
+    // Console log the comprehensive JSON schema
+    console.log("🚀 ASSESSMENT CREATION SCHEMA:", JSON.stringify(createAssessmentSchema, null, 2));
+    console.log("📋 Raw Form Values:", JSON.stringify(values, null, 2));
+    
     try {
       const isFreeBool = values.isFree === "true";
       const payload = {
@@ -216,7 +320,8 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
         toolId: values.toolId,
         sectionIds: values.sectionIds,
         fileName: fileName,
-        // Add any additional data from file upload or questions
+        sectionQuestions: values.sectionQuestions,
+        schema: createAssessmentSchema // Include the schema in payload
       };
 
       const response = await CreateAssessmentData(payload);
@@ -251,7 +356,11 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
           validationSchema={validationSchema}
           onSubmit={handleSubmit}
         >
-          {({ errors, touched, values, setFieldValue }) => (
+          {({ errors, touched, values, setFieldValue }) => {
+            // Store Formik functions in ref for use in useEffect
+            formikRef.current = { values, setFieldValue };
+            
+            return (
             <Form className="form w-100 fv-plugins-bootstrap5 fv-plugins-framework">
               <div className="card-body">
                 
@@ -660,7 +769,15 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                         <select
                           className="form-select form-select-solid"
                           value={selectedSectionForQuestions}
-                          onChange={(e) => setSelectedSectionForQuestions(e.target.value)}
+                          onChange={(e) => {
+                            const newSectionId = e.target.value;
+                            setSelectedSectionForQuestions(newSectionId);
+                            if (newSectionId) {
+                              fetchQuestionsBySection(newSectionId);
+                            } else {
+                              setSectionQuestions([]);
+                            }
+                          }}
                           name="selectedSectionForQuestions"
                         >
                           <option value="">-- Select a section to add questions --</option>
@@ -697,15 +814,21 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                               className="border rounded p-3" 
                               style={{ maxHeight: '300px', overflowY: 'auto' }}
                             >
-                              {questions.length > 0 ? (
+                              {sectionQuestions.length > 0 ? (
                                 <div className="questions-list">
-                                  {questions.map((question, qIndex) => {
-                                    const questionId = String(question.id || question.questionId || qIndex);
+                                  {sectionQuestions.map((question, qIndex) => {
+                                    const questionId = String(question.id || question.questionId || question.id || qIndex);
                                     const fieldName = `sectionQuestions.${selectedSectionForQuestions}`;
                                     // read currently selected questions for this section from Formik values
                                     const selectedForSection: string[] =
                                       (values.sectionQuestions && values.sectionQuestions[selectedSectionForQuestions]) || [];
-                                    const checked = selectedForSection.includes(questionId);
+                                    
+                                    // Check if this question belongs to the selected section (pre-check)
+                                    const belongsToSection = question.section && 
+                                      String(question.section.sectionId || question.section.id) === selectedSectionForQuestions;
+                                    
+                                    // Question should be checked if it's already in selectedForSection OR if it belongs to this section
+                                    const checked = selectedForSection.includes(questionId) || belongsToSection;
 
                                     return (
                                       <div key={questionId} className="form-check mb-2">
@@ -731,6 +854,9 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                                           htmlFor={`question-${selectedSectionForQuestions}-${questionId}`}
                                         >
                                           {question.questionText || question.question || "Question text not available"}
+                                          {/* {belongsToSection && (
+                                            <span className="badge badge-success ms-2">Already mapped</span>
+                                          )} */}
                                         </label>
                                       </div>
                                     );
@@ -739,12 +865,12 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                               ) : (
                                 <div className="text-muted text-center py-3">
                                   <i className="fas fa-question-circle fa-2x mb-2"></i>
-                                  <p>No questions available. Create some questions first.</p>
+                                  <p>No questions available for this section. Create some questions first.</p>
                                 </div>
                               )}
                             </div>
                             
-                            {questions.length > 0 && (
+                            {sectionQuestions.length > 0 && (
                               <div className="mt-3 text-end">
                                 <button
                                   type="button"
@@ -838,7 +964,8 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                 </div>
               </div>
             </Form>
-          )}
+          );
+          }}
         </Formik>
 
         {/* Modals */}

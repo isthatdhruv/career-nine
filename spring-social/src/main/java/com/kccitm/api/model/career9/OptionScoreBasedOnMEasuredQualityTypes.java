@@ -10,6 +10,7 @@ import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Entity
@@ -26,39 +27,45 @@ public class OptionScoreBasedOnMEasuredQualityTypes implements Serializable {
 
     @ManyToOne
     @JoinColumn(name = "fk_assessment_questions_option", nullable = false)
+    @JsonBackReference("option-scores")
+
     private AssessmentQuestionOptions question_option;
 
     @ManyToOne
     @JoinColumn(name = "fk_quality_type", nullable = false)
     private MeasuredQualityTypes measuredQualityType;
 
-    //getters and setters
+    // getters and setters
     public Long getScoreId() {
         return scoreId;
     }
+
     public void setScoreId(Long scoreId) {
         this.scoreId = scoreId;
     }
+
     public Integer getScore() {
         return score;
     }
+
     public void setScore(Integer score) {
         this.score = score;
     }
+
     public AssessmentQuestionOptions getQuestion_option() {
         return question_option;
     }
+
     public void setQuestion_option(AssessmentQuestionOptions question_option) {
         this.question_option = question_option;
     }
-    
+
     public MeasuredQualityTypes getMeasuredQualityType() {
         return measuredQualityType;
     }
+
     public void setMeasuredQualityType(MeasuredQualityTypes measuredQualityType) {
         this.measuredQualityType = measuredQualityType;
     }
-   
-    
-    
+
 }

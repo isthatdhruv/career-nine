@@ -34,7 +34,7 @@ public class AssessmentQuestions implements Serializable {
 
     // 1 Question to Many Options
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonManagedReference
+    @JsonManagedReference("question-options")
     private List<AssessmentQuestionOptions> options;
 
     // REMOVED: Many-to-many mapping to MeasuredQualityTypes
@@ -42,7 +42,7 @@ public class AssessmentQuestions implements Serializable {
     // Link Question -> Section
     @ManyToOne
     @JoinColumn(name = "section_id")   // FK in questions table
-    @JsonIgnoreProperties("questions")
+    @JsonIgnoreProperties("section-questions")
     private QuestionSection section;
 
     // Link Question -> Language

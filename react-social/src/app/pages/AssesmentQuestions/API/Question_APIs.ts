@@ -16,6 +16,11 @@ export function updateOptionScoreData(optionScores: any) {
 export function ReadQuestionsData() {
   return axios.get(readQuestions);
 }
+
+export function ReadQuestionsBySectionData(sectionId: string) {
+  const readQuestionsBySection = `${API_URL}/question-sections/${sectionId}/questions`;
+  return axios.get(readQuestionsBySection);
+}
 export function ReadMeasuredQualityTypes() {
   return axios.get(readMeasuredQualityTypes);
 }
