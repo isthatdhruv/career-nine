@@ -192,6 +192,7 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
             >
               <option value="">Select Question Type</option>
               <option value="multiple-choice">Multiple Choice</option>
+              <option value="single-choice">Single-Choice</option>
             </select>
           </div>
 
@@ -208,7 +209,10 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
             >
               <option value="">Select Section</option>
               {sections.map(s => (
-                <option key={s.sectionId} value={s.sectionId}>{s.sectionName}</option>
+                <option key={s.sectionId} value={s.sectionId}>
+                  {s.sectionName}
+                  {s.sectionDescription && ` - ${s.sectionDescription}`}
+                </option>
               ))}
             </select>
           </div>

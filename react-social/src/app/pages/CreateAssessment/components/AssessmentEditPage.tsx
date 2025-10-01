@@ -19,6 +19,12 @@ const validationSchema = Yup.object().shape({
     }),
 });
 
+interface Option {
+  id: string;
+  text: string;
+  sequence: number;
+}
+
 const AssessmentEditPage = (props?: {
   setPageLoading?: any;
 }) => {
@@ -29,9 +35,68 @@ const AssessmentEditPage = (props?: {
     id: "",
     type: "",
   });
+  
+  // Options state
+  const [options, setOptions] = useState<Option[]>([]);
+  const [newOptionText, setNewOptionText] = useState("");
+  
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
+
+  // Generate sequence options for dropdown
+  const generateSequenceOptions = (maxSequence: number) => {
+    return Array.from({ length: maxSequence }, (_, i) => i + 1);
+  };
+
+  // Add new option
+  const addOption = () => {
+    if (newOptionText.trim()) {
+      const newOption: Option = {
+        id: Date.now().toString(),
+        text: newOptionText.trim(),
+        sequence: options.length + 1
+      };
+      setOptions([...options, newOption]);
+      setNewOptionText("");
+    }
+  };
+
+  // Remove option
+  const removeOption = (optionId: string) => {
+    const updatedOptions = options
+      .filter(opt => opt.id !== optionId)
+      .map((opt, index) => ({ ...opt, sequence: index + 1 }));
+    setOptions(updatedOptions);
+  };
+
+  // Update option sequence
+  const updateOptionSequence = (optionId: string, newSequence: number) => {
+    const optionToMove = options.find(opt => opt.id === optionId);
+    if (!optionToMove) return;
+
+    // Remove the option from current position
+    const otherOptions = options.filter(opt => opt.id !== optionId);
+    
+    // Insert at new position
+    const updatedOptions = [...otherOptions];
+    updatedOptions.splice(newSequence - 1, 0, optionToMove);
+    
+    // Reassign sequences
+    const resequencedOptions = updatedOptions.map((opt, index) => ({
+      ...opt,
+      sequence: index + 1
+    }));
+    
+    setOptions(resequencedOptions);
+  };
+
+  // Update option text
+  const updateOptionText = (optionId: string, newText: string) => {
+    setOptions(options.map(opt => 
+      opt.id === optionId ? { ...opt, text: newText } : opt
+    ));
+  };
 
   // Fetch tool data when component mounts
   useEffect(() => {
@@ -49,6 +114,16 @@ const AssessmentEditPage = (props?: {
             isFree: response.data.isFree
           };
           setAssessmentData(transformedData);
+          
+          // Load options if they exist in the response
+          if (response.data.options && Array.isArray(response.data.options)) {
+            const loadedOptions = response.data.options.map((opt: any, index: number) => ({
+              id: opt.id || `option_${index}`,
+              text: opt.text || opt.optionText || "",
+              sequence: opt.sequence || index + 1
+            }));
+            setOptions(loadedOptions);
+          }
         } catch (error) {
           console.error("Error fetching assessment:", error);
           // Try to get data from location state as fallback
@@ -87,6 +162,7 @@ const AssessmentEditPage = (props?: {
         console.log("Attempting to update assessment:");
         console.log("Assessment ID:", values.id);
         console.log("Values being sent:", values);
+        console.log("Options being sent:", options);
 
         if (!values.id) {
           alert("No assessment ID found. Please try navigating back and selecting the assessment again.");
@@ -97,7 +173,12 @@ const AssessmentEditPage = (props?: {
         const payload = {
           name: values.assessmentName,
           isFree: values.assessmentType === "FREE",
-          price: values.assessmentType === "FREE" ? 0 : Number(values.priceAmount)
+          price: values.assessmentType === "FREE" ? 0 : Number(values.priceAmount),
+          options: options.sort((a, b) => a.sequence - b.sequence).map(opt => ({
+            id: opt.id,
+            text: opt.text,
+            sequence: opt.sequence
+          }))
         };
 
         console.log("Payload being sent:", payload);
@@ -120,9 +201,9 @@ const AssessmentEditPage = (props?: {
           console.error("Error data:", (error as any).response?.data);
 
           const errorMessage = (error as any).response?.data?.message || (error as any).message || "Unknown error occurred";
-          alert(`Failed to update tool: ${errorMessage}`);
+          alert(`Failed to update assessment: ${errorMessage}`);
         } else {
-          alert("Failed to update tool: Unknown error occurred");
+          alert("Failed to update assessment: Unknown error occurred");
         }
       } finally {
         setLoading(false);
@@ -249,6 +330,97 @@ const AssessmentEditPage = (props?: {
                 )}
               </div>
             )}
+
+            {/* Options Management Section */}
+            <div className="card mb-7">
+              <div className="card-header">
+                <h3 className="card-title">Assessment Options</h3>
+              </div>
+              <div className="card-body">
+                
+                {/* Add New Option */}
+                <div className="row mb-4">
+                  <div className="col-md-8">
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Enter new option text"
+                      value={newOptionText}
+                      onChange={(e) => setNewOptionText(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && addOption()}
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={addOption}
+                      disabled={!newOptionText.trim()}
+                    >
+                      <i className="fas fa-plus me-2"></i>
+                      Add Option
+                    </button>
+                  </div>
+                </div>
+
+                {/* Options List */}
+                {options.length > 0 && (
+                  <div className="table-responsive">
+                    <table className="table table-row-bordered">
+                      <thead>
+                        <tr className="fw-bold fs-6 text-gray-800">
+                          <th style={{ width: "80px" }}>Sequence</th>
+                          <th>Option Text</th>
+                          <th style={{ width: "100px" }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {options
+                          .sort((a, b) => a.sequence - b.sequence)
+                          .map((option) => (
+                          <tr key={option.id}>
+                            <td>
+                              <select
+                                className="form-select form-select-sm"
+                                value={option.sequence}
+                                onChange={(e) => updateOptionSequence(option.id, parseInt(e.target.value))}
+                              >
+                                {generateSequenceOptions(options.length).map(seq => (
+                                  <option key={seq} value={seq}>{seq}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td>
+                              <input
+                                type="text"
+                                className="form-control form-control-sm"
+                                value={option.text}
+                                onChange={(e) => updateOptionText(option.id, e.target.value)}
+                              />
+                            </td>
+                            <td>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-danger"
+                                onClick={() => removeOption(option.id)}
+                              >
+                                <i className="fas fa-trash"></i>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {options.length === 0 && (
+                  <div className="text-center py-4 text-muted">
+                    No options added yet. Add your first option above.
+                  </div>
+                )}
+              </div>
+            </div>
 
           </div>
 
