@@ -29,6 +29,8 @@ public class AssessmentQuestions implements Serializable {
     private String questionText;
     private String questionType;
 
+    private Boolean flag;
+
     @Column(name = "max_options_allowed")
     private int maxOptionsAllowed;
 
@@ -70,6 +72,12 @@ public class AssessmentQuestions implements Serializable {
         return questionText;
     }
 
+    public Boolean getFlag() {
+        return flag;
+    }
+    public void setFlag(Boolean flag) {
+        this.flag = flag;
+    }
     public void setQuestionText(String questionText) {
         this.questionText = questionText;
     }
