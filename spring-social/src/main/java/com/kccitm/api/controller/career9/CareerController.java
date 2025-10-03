@@ -17,7 +17,7 @@ import com.kccitm.api.repository.Career9.CareerRepository;
 
 
 @RestController
-@RequestMapping("/api/career")
+@RequestMapping("/career")
 public class CareerController {
 
     @Autowired

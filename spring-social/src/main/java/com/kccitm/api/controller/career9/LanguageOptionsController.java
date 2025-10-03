@@ -13,7 +13,7 @@ import com.kccitm.api.model.career9.LanguageOption;
 import com.kccitm.api.repository.Career9.LanguageOptionRepository;
 
 @RestController
-@RequestMapping("/api/options")
+@RequestMapping("/options")
 public class LanguageOptionsController {
     
     @Autowired

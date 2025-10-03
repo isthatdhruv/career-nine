@@ -13,7 +13,7 @@ import com.kccitm.api.model.career9.LanguagesSupported;
 import com.kccitm.api.repository.Career9.LanguagesSupportedRepository;
 
 @RestController
-@RequestMapping("/api/language-supported")
+@RequestMapping("/language-supported")
 public class LanguagesSupportedController {
     
     @Autowired
