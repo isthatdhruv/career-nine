@@ -859,7 +859,7 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
 
                         <div className="col-md-6">
                           {/* College Selection */}
-                          <div className="fv-row mb-7">
+                          {/* <div className="fv-row mb-7">
                             <label className="required fs-6 fw-bold mb-2">
                               Assessment Type:
                             </label>
@@ -887,7 +887,7 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                                 </div>
                               </div>
                             )}
-                          </div>
+                          </div> */}
 
                           {/* Price field - only show if paid */}
                           {values.isFree === "false" && (
