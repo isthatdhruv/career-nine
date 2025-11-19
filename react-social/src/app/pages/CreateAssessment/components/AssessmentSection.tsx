@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { Field, Form, Formik } from "formik";
+import { Field, Form, Formik, FieldArray } from "formik";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
@@ -7,7 +7,7 @@ import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Sec
 import QuestionSectionCreateModal from "../../QuestionSections/components/QuestionSectionCreateModal";
 
 const validationSchema = Yup.object().shape({
-  sectionId: Yup.string().required("Section is required"),
+  sectionIds: Yup.array().min(1, "At least one section must be selected"),
 });
 
 const AssessmentSection = () => {
@@ -16,13 +16,13 @@ const AssessmentSection = () => {
 
   const [sections, setSections] = useState<any[]>([]);
   const [showSectionModal, setShowSectionModal] = useState(false);
-  const [initialValues, setInitialValues] = useState({ sectionId: "" });
+  const [initialValues, setInitialValues] = useState({ sectionIds: [] as string[] });
 
   // Load saved step1 data
   useEffect(() => {
     const savedStep1 = localStorage.getItem("assessmentStep1");
     if (savedStep1) {
-      setInitialValues({ sectionId: "" });
+      setInitialValues({ sectionIds: [] });
     }
   }, []);
 
@@ -38,13 +38,13 @@ const AssessmentSection = () => {
     };
 
     fetchSections();
-  }, []);
+  }, [!showSectionModal]);
 
   return (
     <div className="container py-5">
       <div className="card shadow-sm py-5">
         <div className="card-header">
-          <h1 className="mb-0 mt-5">Select Section For This Assessment</h1>
+          <h1 className="mb-0 mt-5">Select Sections For This Assessment</h1>
         </div>
 
         <Formik
@@ -59,7 +59,7 @@ const AssessmentSection = () => {
 
               const payload = {
                 ...step1Data,
-                sectionId: values.sectionId,
+                sectionIds: values.sectionIds,
               };
 
               localStorage.setItem("assessmentStep2", JSON.stringify(payload));
@@ -72,13 +72,13 @@ const AssessmentSection = () => {
             }
           }}
         >
-          {({ errors, touched }) => (
+          {({ errors, touched, values }) => (
             <Form className="form w-100 fv-plugins-bootstrap5 fv-plugins-framework">
               <div className="card-body">
-                {/* Select Section */}
+                {/* Select Sections */}
                 <div className="fv-row mb-7">
                   <div className="d-flex justify-content-between align-items-center mb-2">
-                    <label className="required fs-6 fw-bold">Select Section</label>
+                    <label className="required fs-6 fw-bold">Select Sections</label>
                     <button
                       type="button"
                       className="btn btn-sm btn-light-primary"
@@ -94,30 +94,72 @@ const AssessmentSection = () => {
                     onHide={() => setShowSectionModal(false)}
                   />
 
-                  <Field
-                    as="select"
-                    name="sectionId"
-                    className={clsx(
-                      "form-control form-control-lg form-control-solid",
-                      {
-                        "is-invalid text-danger": touched.sectionId && errors.sectionId,
-                        "is-valid": touched.sectionId && !errors.sectionId,
-                      }
+                  <FieldArray name="sectionIds">
+                    {({ push, remove }) => (
+                      <div className={clsx(
+                        "border rounded p-3",
+                        {
+                          "border-danger": touched.sectionIds && errors.sectionIds,
+                          "border-success": touched.sectionIds && !errors.sectionIds && values.sectionIds.length > 0,
+                        }
+                      )}>
+                        {sections.length > 0 ? (
+                          <div className="row">
+                            {sections.map((section) => {
+                              const isChecked = values.sectionIds.includes(section.sectionId);
+                              return (
+                                <div key={section.sectionId} className="col-md-6 col-lg-4 mb-3">
+                                  <div className="form-check">
+                                    <Field
+                                      type="checkbox"
+                                      name="sectionIds"
+                                      value={section.sectionId}
+                                      className="form-check-input"
+                                      id={`section-${section.sectionId}`}
+                                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                        if (e.target.checked) {
+                                          push(section.sectionId);
+                                        } else {
+                                          const index = values.sectionIds.indexOf(section.sectionId);
+                                          if (index > -1) {
+                                            remove(index);
+                                          }
+                                        }
+                                      }}
+                                    />
+                                    <label 
+                                      className="form-check-label fw-semibold"
+                                      htmlFor={`section-${section.sectionId}`}
+                                    >
+                                      {section.sectionName}
+                                    </label>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-muted text-center py-3">
+                            No sections available. Please create a new section.
+                          </div>
+                        )}
+                      </div>
                     )}
-                  >
-                    <option value="">Select Section</option>
-                    {sections.map((section) => (
-                      <option key={section.sectionId} value={section.sectionId}>
-                        {section.sectionName}
-                      </option>
-                    ))}
-                  </Field>
+                  </FieldArray>
 
-                  {touched.sectionId && errors.sectionId && (
+                  {touched.sectionIds && errors.sectionIds && (
                     <div className="fv-plugins-message-container">
                       <div className="fv-help-block text-danger">
-                        <span role="alert">{errors.sectionId}</span>
+                        <span role="alert">{errors.sectionIds}</span>
                       </div>
+                    </div>
+                  )}
+
+                  {values.sectionIds.length > 0 && (
+                    <div className="mt-3">
+                      <small className="text-muted">
+                        Selected: {values.sectionIds.length} section{values.sectionIds.length !== 1 ? 's' : ''}
+                      </small>
                     </div>
                   )}
                 </div>

@@ -45,7 +45,7 @@ const AssessmentCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
     };
 
     fetchCollege();
-  }, []);
+  }, [!showCollegeModal]);
 
   return (
     <div className="container py-5">
