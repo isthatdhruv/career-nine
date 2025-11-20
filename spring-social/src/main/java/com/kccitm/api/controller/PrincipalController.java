@@ -2,26 +2,27 @@ package com.kccitm.api.controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.beans.factory.annotation.Autowired;
+import com.kccitm.api.repository.PrincipalRepository;
+import com.kccitm.api.model.Principal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import java.util.List;
-import com.kccitm.api.repository.RoleRepository;
-import com.kccitm.api.model.Role;
+
 
 @RestController
-@RequestMapping("/role")
-public class RoleController {
+@RequestMapping("/principal")
+public class PrincipalController {
     @Autowired
-    private RoleRepository roleRepository;
+    private PrincipalRepository principalRepository;
     
     @GetMapping("/all")
-    public List<Role> getAllRoles() {
-        return roleRepository.findAll();
+    public List<Principal> getAllPrincipals() {
+        return principalRepository.findAll();
     }
 
     @PostMapping("/add")
-    public Role addRole(@RequestBody Role role) {
-        return roleRepository.save(role);
+    public Principal addPrincipal(@RequestBody Principal principal) {
+        return principalRepository.save(principal);
     }
 }

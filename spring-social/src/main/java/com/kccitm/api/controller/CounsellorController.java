@@ -6,22 +6,23 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import java.util.List;
-import com.kccitm.api.repository.RoleRepository;
-import com.kccitm.api.model.Role;
+import com.kccitm.api.repository.CounsellorRepository;
+import com.kccitm.api.model.Counsellor;
+
 
 @RestController
-@RequestMapping("/role")
-public class RoleController {
+@RequestMapping("/counsellor")
+public class CounsellorController {
     @Autowired
-    private RoleRepository roleRepository;
+    private CounsellorRepository counsellorRepository;
     
     @GetMapping("/all")
-    public List<Role> getAllRoles() {
-        return roleRepository.findAll();
+    public List<Counsellor> getAllCounsellors() {
+        return counsellorRepository.findAll();
     }
 
     @PostMapping("/add")
-    public Role addRole(@RequestBody Role role) {
-        return roleRepository.save(role);
+    public Counsellor addCounsellor(@RequestBody Counsellor counsellor) {
+        return counsellorRepository.save(counsellor);
     }
 }

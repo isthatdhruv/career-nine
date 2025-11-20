@@ -6,22 +6,22 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import java.util.List;
-import com.kccitm.api.repository.RoleRepository;
-import com.kccitm.api.model.Role;
+import com.kccitm.api.repository.SchoolRepository;
+import com.kccitm.api.model.School;
 
 @RestController
-@RequestMapping("/role")
-public class RoleController {
+@RequestMapping("/school")
+public class SchoolController {
     @Autowired
-    private RoleRepository roleRepository;
-    
+    private SchoolRepository schoolRepository;
+
     @GetMapping("/all")
-    public List<Role> getAllRoles() {
-        return roleRepository.findAll();
+    public List<School> getAllSchools() {
+        return schoolRepository.findAll();
     }
 
     @PostMapping("/add")
-    public Role addRole(@RequestBody Role role) {
-        return roleRepository.save(role);
+    public School addSchool(@RequestBody School school) {
+        return schoolRepository.save(school);
     }
 }

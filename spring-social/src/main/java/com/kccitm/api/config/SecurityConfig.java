@@ -21,27 +21,27 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import com.kccitm.api.security.CustomUserDetailsService;
+// import com.kccitm.api.security.CustomUserDetailsService;
 import com.kccitm.api.security.RestAuthenticationEntryPoint;
-import com.kccitm.api.security.TokenAuthenticationFilter;
-import com.kccitm.api.security.oauth2.CustomOAuth2UserService;
+// import com.kccitm.api.security.TokenAuthenticationFilter;
+// import com.kccitm.api.security.oauth2.CustomOAuth2UserService;
 import com.kccitm.api.security.oauth2.HttpCookieOAuth2AuthorizationRequestRepository;
 import com.kccitm.api.security.oauth2.OAuth2AuthenticationFailureHandler;
-import com.kccitm.api.security.oauth2.OAuth2AuthenticationSuccessHandler;
+// import com.kccitm.api.security.oauth2.OAuth2AuthenticationSuccessHandler;
 
 @Configuration
 @EnableWebSecurity
 @EnableGlobalMethodSecurity(securedEnabled = true, jsr250Enabled = true, prePostEnabled = true)
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
-    @Autowired
-    private CustomUserDetailsService customUserDetailsService;
+    // @Autowired
+    // private CustomUserDetailsService customUserDetailsService;
 
-    @Autowired
-    private CustomOAuth2UserService customOAuth2UserService;
+    // @Autowired
+    // private CustomOAuth2UserService customOAuth2UserService;
 
-    @Autowired
-    private OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
+    // @Autowired
+    // private OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
 
     @Autowired
     private OAuth2AuthenticationFailureHandler oAuth2AuthenticationFailureHandler;
@@ -50,10 +50,10 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     // private HttpCookieOAuth2AuthorizationRequestRepository
     // httpCookieOAuth2AuthorizationRequestRepository;
 
-    @Bean
-    public TokenAuthenticationFilter tokenAuthenticationFilter() {
-        return new TokenAuthenticationFilter();
-    }
+    // @Bean
+    // public TokenAuthenticationFilter tokenAuthenticationFilter() {
+    //     return new TokenAuthenticationFilter();
+    // }
 
     /*
      * By default, Spring OAuth2 uses
@@ -67,12 +67,12 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         return new HttpCookieOAuth2AuthorizationRequestRepository();
     }
 
-    @Override
-    public void configure(AuthenticationManagerBuilder authenticationManagerBuilder) throws Exception {
-        authenticationManagerBuilder
-                .userDetailsService(customUserDetailsService)
-                .passwordEncoder(passwordEncoder());
-    }
+    // @Override
+    // public void configure(AuthenticationManagerBuilder authenticationManagerBuilder) throws Exception {
+    //     authenticationManagerBuilder
+    //             .userDetailsService(customUserDetailsService)
+    //             .passwordEncoder(passwordEncoder());
+    // }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -172,12 +172,12 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .baseUri("/oauth2/callback/*")
                 .and()
                 .userInfoEndpoint()
-                .userService(customOAuth2UserService)
+                // .userService(customOAuth2UserService)
                 .and()
-                .successHandler(oAuth2AuthenticationSuccessHandler)
+                // .successHandler(oAuth2AuthenticationSuccessHandler)
                 .failureHandler(oAuth2AuthenticationFailureHandler);
 
         // Add our custom Token based authentication filter
-        http.addFilterBefore(tokenAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+        // http.addFilterBefore(tokenAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
     }
 }
