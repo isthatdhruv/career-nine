@@ -25,7 +25,7 @@ export function AsideMenuMain() {
       <AsideMenuItem
         to="/college"
         icon="/media/icons/duotune/general/gen001.svg"
-        title="College"
+        title="Institute"
         fontIcon="bi-app-indicator"
       />
 
