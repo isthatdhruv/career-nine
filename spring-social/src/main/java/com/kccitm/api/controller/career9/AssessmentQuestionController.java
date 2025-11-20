@@ -24,7 +24,7 @@ import com.kccitm.api.repository.Career9.QuestionSectionRepository;
 
 
 @RestController
-@RequestMapping("/api/assessment-questions")
+@RequestMapping("/assessment-questions")
 public class AssessmentQuestionController {
 
     @Autowired

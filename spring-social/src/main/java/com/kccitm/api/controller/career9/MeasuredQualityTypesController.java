@@ -24,7 +24,7 @@ import com.kccitm.api.repository.Career9.MeasuredQualityTypesRepository;
 import com.kccitm.api.repository.Career9.OptionScoreBasedOnMeasuredQualityTypesRepository;
 
 @RestController
-@RequestMapping("/api/measured-quality-types")
+@RequestMapping("/measured-quality-types")
 public class MeasuredQualityTypesController {
     @Autowired
     private OptionScoreBasedOnMeasuredQualityTypesRepository optionScoreRepo;

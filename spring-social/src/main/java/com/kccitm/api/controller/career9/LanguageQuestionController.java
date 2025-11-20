@@ -19,7 +19,7 @@ import com.kccitm.api.model.career9.LanguagesSupported;
 import com.kccitm.api.repository.Career9.LanguageQuestionRepository;
 
 @RestController
-@RequestMapping("/api/language-question")
+@RequestMapping("/language-question")
 public class LanguageQuestionController {
 
     @Autowired

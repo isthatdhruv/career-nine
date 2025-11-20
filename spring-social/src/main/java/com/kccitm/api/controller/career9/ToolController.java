@@ -19,7 +19,7 @@ import com.kccitm.api.repository.Career9.MeasuredQualitiesRepository;
 import com.kccitm.api.repository.Career9.ToolRepository;
 
 @RestController
-@RequestMapping("/api/tools")
+@RequestMapping("/tools")
 public class ToolController {
 
     @Autowired

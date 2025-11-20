@@ -22,7 +22,7 @@ import com.kccitm.api.repository.Career9.AssessmentQuestionRepository;
 
 
 @RestController
-@RequestMapping("/api/assessment-question-options")
+@RequestMapping("/assessment-question-options")
 public class AssessmentQuestionOptionsController {
 
     @Autowired

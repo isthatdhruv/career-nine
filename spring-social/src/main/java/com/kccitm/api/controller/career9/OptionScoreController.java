@@ -22,7 +22,7 @@ import com.kccitm.api.repository.Career9.MeasuredQualityTypesRepository;
 import com.kccitm.api.repository.Career9.OptionScoreBasedOnMeasuredQualityTypesRepository;
 
 @RestController
-@RequestMapping("/api/option-scores")
+@RequestMapping("/option-scores")
 public class OptionScoreController {
 
     @Autowired

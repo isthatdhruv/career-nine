@@ -20,7 +20,7 @@ import com.kccitm.api.repository.Career9.MeasuredQualitiesRepository;
 import com.kccitm.api.repository.Career9.ToolRepository;
 
 @RestController
-@RequestMapping("/api/measured-qualities")
+@RequestMapping("/measured-qualities")
 public class MeasuredQualitiesController {
 
     @Autowired

@@ -19,7 +19,7 @@ import com.kccitm.api.model.career9.QuestionSection;
 import com.kccitm.api.repository.Career9.QuestionSectionRepository;
 
 @RestController
-@RequestMapping("/api/question-sections")
+@RequestMapping("/question-sections")
 public class QuestionSectionController {
     
     @Autowired
