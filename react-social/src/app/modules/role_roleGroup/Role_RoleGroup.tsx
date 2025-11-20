@@ -33,9 +33,9 @@ const Role_RoleGroupPage = () => {
   // const authUser = currentUser?.authorityUrls?.includes(location.pathname)
 
   useEffect(() => {
-    if (_.contains(currentUser!.authorityUrls!, location.pathname)) {
-      setAutorized(true);
-    }
+    // if (_.contains(currentUser!.authorityUrls!, location.pathname)) {
+    //   setAutorized(true);
+    // }
     // console.log(currentUser?.authorityUrls?.includes(location.pathname));
     setloading(true);
     try {
