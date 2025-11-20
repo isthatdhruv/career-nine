@@ -37,7 +37,7 @@ const CollegePage = () => {
       {!loading && (
         <div className="card-header border-0 pt-6">
           <div className="card-title">
-            <h1>Colleges List</h1>
+            <h1>Institutes List</h1>
           </div>
 
           <div className="card-toolbar">
@@ -52,7 +52,7 @@ const CollegePage = () => {
                   value={{ style: { paddingBottom: "4px" } }}
                 >
                   <div>
-                    Add College <MdSchool size={21} />
+                    Add Institute <MdSchool size={21} />
                   </div>
                 </IconContext.Provider>
               </Button>
