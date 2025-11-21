@@ -89,7 +89,7 @@ const AssessmentQuestionsPage = () => {
             <QuestionTable
               data={questionsData}
               sections={sections}
-              setLoading={true}
+              // setLoading={true}
               setPageLoading={setPageLoading}
             />
           </div>

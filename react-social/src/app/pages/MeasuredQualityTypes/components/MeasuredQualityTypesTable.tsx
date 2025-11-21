@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { ReadMeasuredQualitiesData } from "../../MeasuredQualities/API/Measured_Qualities_APIs";
-import { DeleteMeasuredQualityTypesData } from "../API/Measured_Quality_Types_APIs";
+import { AssignMeasuredQualityTypeToQuality, DeleteMeasuredQualityTypesData, RemoveMeasuredQualityTypeFromQuality } from "../API/Measured_Quality_Types_APIs";
 
 const MeasuredQualityTypesTable = (props: {
   data: any;
@@ -34,8 +34,9 @@ const MeasuredQualityTypesTable = (props: {
     const loadExistingSelections = async () => {
       const newSelections: { [key: number]: any } = {};
       for (const type of props.data) {
-        // Load the foreign key value from the backend response
-        newSelections[type.measuredQualityTypeId] = type.fk_measured_qualities || '';
+        // Use the correct property for the selected quality ID
+        newSelections[type.measuredQualityTypeId] =
+          type.measuredQuality?.measuredQualityId || type.fk_measured_qualities || '';
       }
       setSelectedQualityByType(newSelections);
     };
@@ -48,11 +49,11 @@ const MeasuredQualityTypesTable = (props: {
     try {
       if (qualityId) {
         // Assign the type to a quality
-        // await AssignMeasuredQualityTypeToQuality(typeId, qualityId);
+        await AssignMeasuredQualityTypeToQuality(typeId, qualityId);
         console.log(`Assigned type ${typeId} to quality ${qualityId}`);
       } else {
         // Remove the type from quality (set foreign key to null)
-        // await RemoveMeasuredQualityTypeFromQuality(typeId);
+        await RemoveMeasuredQualityTypeFromQuality(typeId);
         console.log(`Removed type ${typeId} from its assigned quality`);
       }
 

@@ -6,9 +6,13 @@ const readAssessmentById = `${API_URL}/assessments/get/`;
 const createAssessment = `${API_URL}/assessments/create`;
 const updateAssessment = `${API_URL}/assessments/update`;
 const deleteAssessment = `${API_URL}/assessments/delete/`;
-
+const readLanguageData = `${API_URL}/language-supported/getAll`;
 export function ReadAssessmentData() {
   return axios.get(readAssessment);
+}
+
+export function ReadLanguageData() {
+  return axios.get(readLanguageData);
 }
 
 export function ReadAssessmentByIdData(id: any) {

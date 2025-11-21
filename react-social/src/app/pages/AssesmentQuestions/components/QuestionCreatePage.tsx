@@ -89,7 +89,13 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const updateOption = (index: number, value: string) => {
     setFormikValues((prev: any) => {
       const newOptions = [...prev.questionOptions];
-      newOptions[index] = value;
+      // Handle both string and object types
+      if (typeof newOptions[index] === 'string') {
+        newOptions[index] = value;
+      } else {
+        // If it's an object (MQT), update the optionText property
+        newOptions[index] = { ...newOptions[index], optionText: value };
+      }
       return { ...prev, questionOptions: newOptions };
     });
   };
@@ -148,7 +154,11 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
             setLoading(true);
             try {
               // Build options array with optionScores
-              const options = formikValues.questionOptions.map((optionText: string, index: number) => {
+              const options = formikValues.questionOptions.map((option: any, index: number) => {
+                // Handle both string options (manual) and object options (MQT)
+                const optionText = typeof option === 'string' ? option : option.optionText;
+                const isCorrect = typeof option === 'string' ? false : (option.correct || false);
+                
                 // Build optionScores for this option
                 const optionScores: any[] = [];
                 if (optionMeasuredQualities[index]) {
@@ -165,7 +175,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                 return {
                   optionText,
                   optionScores,
-                  correct: false // or set as needed
+                  correct: isCorrect
                 };
               });
 
@@ -175,7 +185,8 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                 questionType: formikValues.questionType,
                 maxOptionsAllowed: Number(formikValues.maxOptionsAllowed) || 0,
                 options,
-                section: { sectionId: Number(formikValues.sectionId) }
+                section: { sectionId: Number(formikValues.sectionId) },
+                flag: useMQTAsOptions ? 1 : 0
               };
 
               console.log("Payload to submit:", payload);
@@ -258,18 +269,20 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                   setFormikValues={setFormikValues}
                 />
               ) : (
-                formikValues.questionOptions.map((option, index) => (
+                formikValues.questionOptions.map((option: any, index: number) => {
+                  const optionText = typeof option === 'string' ? option : option.optionText;
+                  return (
                   <div key={index} className="d-flex align-items-center gap-2 mb-2">
                     <input
                       type="text"
                       placeholder={`Enter option ${index + 1}`}
-                      value={option}
+                      value={optionText}
                       onChange={e => updateOption(index, e.target.value)}
                       className={clsx(
                         "form-control form-control-lg form-control-solid w-50",
                         {
-                          "is-invalid text-danger": !option,
-                          "is-valid": !!option,
+                          "is-invalid text-danger": !optionText,
+                          "is-valid": !!optionText,
                         }
                       )}
                     />
@@ -337,7 +350,8 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                       </button>
                     )}
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
             <div className="fv-row mb-7">

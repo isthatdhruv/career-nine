@@ -18,9 +18,18 @@ const validationSchema = Yup.object().shape({
   options: Yup.array()
     .of(Yup.object().shape({
       optionText: Yup.string().required("Option cannot be empty"),
+      description: Yup.string().optional(),
     }))
     .min(1, "At least one option is required"),
 });
+
+interface Option {
+  optionText: string;
+  description?: string;
+  correct: boolean;
+  sequence: number;
+  optionId?: string;
+}
 
 const QuestionEditPage = (props?: { setPageLoading?: any }) => {
   const [loading, setLoading] = useState(false);
@@ -57,6 +66,51 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
       setOptionMeasuredQualities(qualities);
     }
   }, [questionData]);
+
+  // Generate sequence options for dropdown
+  const generateSequenceOptions = (maxSequence: number) => {
+    return Array.from({ length: maxSequence }, (_, i) => i + 1);
+  };
+
+  // Update option sequence
+  const updateOptionSequence = (index: number, newSequence: number) => {
+    const currentOptions = [...formik.values.options];
+    const optionToMove = currentOptions[index];
+    
+    // Remove the option from current position
+    const otherOptions = currentOptions.filter((_, i) => i !== index);
+    
+    // Insert at new position
+    const updatedOptions = [...otherOptions];
+    updatedOptions.splice(newSequence - 1, 0, optionToMove);
+    
+    // Reassign sequences
+    const resequencedOptions = updatedOptions.map((opt, idx) => ({
+      ...opt,
+      sequence: idx + 1
+    }));
+    
+    formik.setFieldValue("options", resequencedOptions);
+    
+    // Update measured qualities mapping to maintain proper indexing
+    const newQualities: Record<number, Record<number, { checked: boolean; score: number }>> = {};
+    resequencedOptions.forEach((_, newIdx) => {
+      // Find which original index this option came from
+      let originalIdx = newIdx;
+      if (newIdx < newSequence - 1) {
+        originalIdx = newIdx >= index ? newIdx + 1 : newIdx;
+      } else if (newIdx === newSequence - 1) {
+        originalIdx = index;
+      } else {
+        originalIdx = newIdx >= index ? newIdx : newIdx - 1;
+      }
+      
+      if (optionMeasuredQualities[originalIdx]) {
+        newQualities[newIdx] = optionMeasuredQualities[originalIdx];
+      }
+    });
+    setOptionMeasuredQualities(newQualities);
+  };
 
   // Helper: toggle measured quality type for an option
   const handleQualityToggle = (optionIdx: number, typeId: number) => {
@@ -198,13 +252,17 @@ const formik = useFormik({
       questionData.options && questionData.options.length > 0
         ? questionData.options.map((option: any, idx: number) => ({
             optionText: option.optionText || "",
-            // optionId: option.optionId || option.id, // for existing options
+            description: option.description || "",
             correct: option.correct ?? false,
+            sequence: option.sequence || idx + 1,
+            ...(option.optionId ? { optionId: option.optionId } : {}),
           }))
         : [
             {
               optionText: "",
+              description: "",
               correct: false,
+              sequence: 1,
             },
           ],
   },
@@ -212,8 +270,11 @@ const formik = useFormik({
   onSubmit: async (values) => {
     setLoading(true);
     try {
+      // Sort options by sequence before processing
+      const sortedOptions = [...values.options].sort((a, b) => a.sequence - b.sequence);
+      
       // Build options array with optionScores from optionMeasuredQualities
-      const options = values.options.map((option: any, idx: number) => {
+      const options = sortedOptions.map((option: any, idx: number) => {
         const qualities = optionMeasuredQualities[idx] || {};
         const optionScores = Object.entries(qualities)
           .filter(([_, v]) => v && v.checked)
@@ -224,8 +285,10 @@ const formik = useFormik({
           }));
         return {
           optionText: option.optionText,
+          description: option.description || "",
           optionScores,
           correct: option.correct ?? false,
+          sequence: option.sequence,
           ...(option.optionId ? { optionId: option.optionId } : {}),
         };
       });
@@ -239,13 +302,11 @@ const formik = useFormik({
         options,
         section: { sectionId: values.section.sectionId },
       };
+      
       console.log("Submitting payload:", payload);
-      console.log("Values: ", values);
-      console.log(values.section.sectionId)
-
       await CreateQuestionData(payload);
-
       navigate("/assessment-questions");
+      
       if (props?.setPageLoading) {
         props.setPageLoading(["true"]);
       }
@@ -293,10 +354,13 @@ const addOption = () => {
   const currentOptions = [...formik.values.options];
   const lastOption = currentOptions[currentOptions.length - 1];
   if (lastOption && lastOption.optionText.trim() !== "") {
-    formik.setFieldValue("options", [
-      ...currentOptions,
-      { optionText: "", optionScores: [], correct: false },
-    ]);
+    const newOption = {
+      optionText: "",
+      description: "",
+      correct: false,
+      sequence: currentOptions.length + 1, // Auto-increment sequence
+    };
+    formik.setFieldValue("options", [...currentOptions, newOption]);
     setOptionMeasuredQualities((prev) => ({
       ...prev,
       [currentOptions.length]: {},
@@ -310,7 +374,14 @@ const removeOption = (index: number) => {
   const currentOptions = [...formik.values.options];
   if (currentOptions.length > 1) {
     const newOptions = currentOptions.filter((_, i) => i !== index);
-    formik.setFieldValue("options", newOptions);
+    // Reassign sequences after removal
+    const resequencedOptions = newOptions.map((opt, idx) => ({
+      ...opt,
+      sequence: idx + 1
+    }));
+    formik.setFieldValue("options", resequencedOptions);
+    
+    // Update measured qualities mapping
     setOptionMeasuredQualities((prev) => {
       const newQualities: Record<number, Record<number, { checked: boolean; score: number }>> = {};
       Object.keys(prev).forEach((key) => {
@@ -326,6 +397,12 @@ const removeOption = (index: number) => {
 const updateOption = (index: number, value: string) => {
   const currentOptions = [...formik.values.options];
   currentOptions[index].optionText = value;
+  formik.setFieldValue("options", currentOptions);
+};
+
+const updateOptionDescription = (index: number, value: string) => {
+  const currentOptions = [...formik.values.options];
+  currentOptions[index].description = value;
   formik.setFieldValue("options", currentOptions);
 };
 
@@ -353,7 +430,7 @@ return (
         className="form w-100 fv-plugins-bootstrap5 fv-plugins-framework"
         onSubmit={formik.handleSubmit}
       >
-  <div className="card-body">
+        <div className="card-body">
 
           {/* Question Text */}
           <div className="fv-row mb-7">
@@ -406,6 +483,7 @@ return (
             >
               <option value="">Select Question Type</option>
               <option value="multiple-choice">Multiple Choice</option>
+              <option value="single-choice">Single Choice</option>
             </select>
             {formik.touched.questionType && formik.errors.questionType && (
               <div className="fv-plugins-message-container">
@@ -443,6 +521,7 @@ return (
               {sections.map(section => (
                 <option key={section.sectionId} value={section.sectionId}>
                   {section.sectionName}
+                  {section.sectionDescription && ` - ${section.sectionDescription}`}
                 </option>
               ))}
             </select>
@@ -459,162 +538,185 @@ return (
             <div className="fv-row mb-7">
             <label className="required fs-6 fw-bold mb-2">Options:</label>
 
-            {formik.values.options.map((option, index) => (
-              <div
-                key={index}
-                className="d-flex align-items-center gap-2 mb-2"
-              >
-                <input
-                  type="text"
-                  placeholder={`Enter option ${index + 1}`}
-                  value={option.optionText}
-                  onChange={e => updateOption(index, e.target.value)}
-                  className={clsx(
-                    "form-control form-control-lg form-control-solid w-50",
-                    {
-                      "is-invalid text-danger": !option.optionText,
-                      "is-valid": !!option.optionText,
-                    }
-                  )}
-                />
-                <Dropdown>
-                  <Dropdown.Toggle
-                    variant="secondary"
-                    id={`dropdown-option-${index}`}
-                    size="sm"
-                  >
-                    Measured Quality Types
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu style={{ minWidth: 250 }}>
-                    <Dropdown.Header>Measured Quality Types</Dropdown.Header>
-                    <div style={{ maxHeight: 250, overflowY: "auto", padding: 8 }}>
-                      {mqt.map((type: any, i: number) => (
-                        <>
-                          <div key={type.measuredQualityTypeId} className="d-flex align-items-center mb-2">
-                            <input
-                              type="checkbox"
-                              checked={!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked}
-                              onChange={() => handleQualityToggle(index, type.measuredQualityTypeId)}
-                              className="form-check-input me-2"
-                              id={`option-${index}-type-${type.measuredQualityTypeId}`}
-                            />
-                            <label htmlFor={`option-${index}-type-${type.measuredQualityTypeId}`} className="me-2 mb-0">
-                              {type.measuredQualityTypeName}
-                            </label>
-                            {!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked && (
-                              <input
-                                type="number"
-                                min={0}
-                                max={100}
-                                value={optionMeasuredQualities[index][type.measuredQualityTypeId]?.score ?? 0}
-                                onChange={e =>
-                                  handleQualityScoreChange(index, type.measuredQualityTypeId, Number(e.target.value))
-                                }
-                                placeholder="Score"
-                                className="form-control form-control-sm ms-2"
-                                style={{ width: 70 }}
-                              />
+            {/* Options Table */}
+            <div className="table-responsive">
+              <table className="table table-row-bordered">
+                <thead>
+                  <tr className="fw-bold fs-6 text-gray-800">
+                    <th style={{ minWidth: "80px" }}>Sequence</th>
+                    <th>Option Text & Description</th>
+                    <th style={{ minWidth: "200px" }}>Measured Quality Types</th>
+                    <th style={{ minWidth: "100px" }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {formik.values.options
+                    .sort((a, b) => a.sequence - b.sequence)
+                    .map((option, index) => (
+                    <tr key={index}>
+                      <td>
+                        <select
+                          className="form-select form-select-sm"
+                          value={option.sequence}
+                          onChange={(e) => updateOptionSequence(index, parseInt(e.target.value))}
+                        >
+                          {generateSequenceOptions(formik.values.options.length).map(seq => (
+                            <option key={seq} value={seq}>{seq}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>
+                        <div className="mb-2">
+                          <input
+                            type="text"
+                            placeholder={`Enter option ${option.sequence}`}
+                            value={option.optionText}
+                            onChange={e => updateOption(index, e.target.value)}
+                            className={clsx(
+                              "form-control form-control-sm",
+                              {
+                                "is-invalid text-danger": !option.optionText,
+                                "is-valid": !!option.optionText,
+                              }
                             )}
-                          </div>
-                          {i < mqt.length - 1 && <hr style={{ margin: '4px 0' }} />}
-                        </>
-                      ))}
-                    </div>
-                  </Dropdown.Menu>
-                </Dropdown>
-                {/* Add/Remove buttons after dropdown, in the same row */}
-                {formik.values.options.length > 1 && (
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-danger ms-2"
-                    onClick={() => removeOption(index)}
-                  >
-                    -
-                  </button>
-                )}
-                {index === formik.values.options.length - 1 && (
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-primary ms-2"
-                    onClick={addOption}
-                  >
-                    +
-                  </button>
-                )}
-              </div>
-            ))}
-            {/* Keep the + and - buttons for quick access if desired */}
-            {/* 
-            {index === formik.values.options.length - 1 ? (
-              <button
-              type="button"
-              className="btn btn-sm btn-primary"
-              onClick={addOption}
-              >
-              +
-              </button>
-            ) : (
-              <button
-              type="button"
-              className="btn btn-sm btn-danger"
-              onClick={() => removeOption(index)}
-              >
-              -
-              </button>
-            )} 
-            */}
+                          />
+                        </div>
+                        <textarea
+                          placeholder={`Enter description for option ${option.sequence} (optional)`}
+                          value={option.description || ""}
+                          onChange={e => updateOptionDescription(index, e.target.value)}
+                          className="form-control form-control-sm"
+                          rows={2}
+                          style={{ resize: "vertical" }}
+                        />
+                      </td>
+                      <td>
+                        <Dropdown>
+                          <Dropdown.Toggle
+                            variant="secondary"
+                            id={`dropdown-option-${index}`}
+                            size="sm"
+                          >
+                            Quality Types
+                          </Dropdown.Toggle>
+                          <Dropdown.Menu style={{ minWidth: 250 }}>
+                            <Dropdown.Header>Measured Quality Types</Dropdown.Header>
+                            <div style={{ maxHeight: 250, overflowY: "auto", padding: 8 }}>
+                              {mqt.map((type: any, i: number) => (
+                                <div key={type.measuredQualityTypeId}>
+                                  <div className="d-flex align-items-center mb-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked}
+                                      onChange={() => handleQualityToggle(index, type.measuredQualityTypeId)}
+                                      className="form-check-input me-2"
+                                      id={`option-${index}-type-${type.measuredQualityTypeId}`}
+                                    />
+                                    <label htmlFor={`option-${index}-type-${type.measuredQualityTypeId}`} className="me-2 mb-0">
+                                      {type.measuredQualityTypeName}
+                                    </label>
+                                    {!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked && (
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        max={100}
+                                        value={optionMeasuredQualities[index][type.measuredQualityTypeId]?.score ?? 0}
+                                        onChange={e =>
+                                          handleQualityScoreChange(index, type.measuredQualityTypeId, Number(e.target.value))
+                                        }
+                                        placeholder="Score"
+                                        className="form-control form-control-sm ms-2"
+                                        style={{ width: 70 }}
+                                      />
+                                    )}
+                                  </div>
+                                  {i < mqt.length - 1 && <hr style={{ margin: '4px 0' }} />}
+                                </div>
+                              ))}
+                            </div>
+                          </Dropdown.Menu>
+                        </Dropdown>
+                      </td>
+                      <td>
+                        <div className="d-flex gap-1">
+                          {formik.values.options.length > 1 && (
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-danger"
+                              onClick={() => removeOption(index)}
+                            >
+                              <i className="fas fa-trash"></i>
+                            </button>
+                          )}
+                          {index === formik.values.options.length - 1 && (
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-primary"
+                              onClick={addOption}
+                            >
+                              <i className="fas fa-plus"></i>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div>
+
             {typeof formik.errors.options === "string" && (
               <div className="fv-plugins-message-container">
-              <div className="fv-help-block text-danger">
-                <span role="alert">{formik.errors.options}</span>
-              </div>
+                <div className="fv-help-block text-danger">
+                  <span role="alert">{formik.errors.options}</span>
+                </div>
               </div>
             )}
-            </div>
-            <div className="fv-row mb-7">
-              <label className="fs-6 fw-bold mb-2">Max Options Allowed</label>
-              <input
-                type="number"
-                min={0}
-                max={100}
-                value={formik.values.maxOptionsAllowed}
-                onChange={e =>
-                  formik.setFieldValue("maxOptionsAllowed", e.target.value)
-                }
-                placeholder="Max Options Allowed"
-                className="form-control form-control-lg form-control-solid w-25"
-                style={{ width: 200 }}
-              />
-            </div>
+          </div>
+
+          {/* Max Options Allowed */}
+          <div className="fv-row mb-7">
+            <label className="fs-6 fw-bold mb-2">Max Options Allowed</label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={formik.values.maxOptionsAllowed}
+              onChange={e =>
+                formik.setFieldValue("maxOptionsAllowed", e.target.value)
+              }
+              placeholder="Max Options Allowed"
+              className="form-control form-control-lg form-control-solid"
+              style={{ width: 200 }}
+            />
+          </div>
         </div> {/* Close card-body */}
 
-<div className="card-footer d-flex justify-content-end">
-  <button
-    type="button"
-    className="btn btn-light me-2"
-    onClick={() => navigate("/assessment-questions")}
-  >
-    Cancel
-  </button>
-  <button
-    type="submit"
-    className="btn btn-primary"
-    disabled={loading}
-  >
-    {!loading && <span className="indicator-label">Update</span>}
-    {loading && (
-      <span
-        className="indicator-progress"
-        style={{ display: "block" }}
-      >
-        Please wait...{" "}
-        <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
-      </span>
-    )}
-  </button>
-</div>
+        <div className="card-footer d-flex justify-content-end">
+          <button
+            type="button"
+            className="btn btn-light me-2"
+            onClick={() => navigate("/assessment-questions")}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={loading}
+          >
+            {!loading && <span className="indicator-label">Update</span>}
+            {loading && (
+              <span
+                className="indicator-progress"
+                style={{ display: "block" }}
+              >
+                Please wait...{" "}
+                <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
+              </span>
+            )}
+          </button>
+        </div>
         </form>
       </div>
     </div>

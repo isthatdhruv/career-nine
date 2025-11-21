@@ -23,6 +23,7 @@ import UploadExcelFile from "../pages/UploadExcelFile/UploadExcelFile";
 // Update these paths to the correct locations of your components
 import Assessments from "../pages/CreateAssessment/Assessment";
 import AssessmentCreatePage from "../pages/CreateAssessment/components/AssessmentCreatePage";
+import AssessmentCreateSinglePage from "../pages/CreateAssessment/components/AssessmentCreateSinglePage";
 import AssessmentEditPage from "../pages/CreateAssessment/components/AssessmentEditPage";
 import AssessmentToolPage from "../pages/CreateAssessment/components/AssessmentToolPage";
 import AssessmentUploadFile from "../pages/CreateAssessment/components/AssessmentUploadFile";
@@ -448,6 +449,14 @@ const PrivateRoutes = () => {
         />
         <Route
           path="/assessments/create"
+          element={
+            <SuspensedView>
+              <AssessmentCreateSinglePage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/assessments/create-old"
           element={
             <SuspensedView>
               <AssessmentCreatePage />
