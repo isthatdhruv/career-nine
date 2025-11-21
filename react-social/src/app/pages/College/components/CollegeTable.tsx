@@ -1,11 +1,12 @@
 import { MDBDataTableV5 } from "mdbreact";
 import { useState } from "react";
-import { AiFillEdit } from "react-icons/ai";
+import { AiFillEdit, AiOutlineInfoCircle } from "react-icons/ai";
 import { Link } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { DeleteCollegeData } from "../API/College_APIs";
 import CollegeEditModal from "./CollegeEditModal";
+import CollegeInfoModal from "./CollegeInfoModal ";
 
 const CollegeTable = (props: {
   data: any;
@@ -13,6 +14,7 @@ const CollegeTable = (props: {
   setPageLoading: any;
 }) => {
   const [modalShowEdit, setModalShowEdit] = useState(false);
+  const [modalShowInfo, setModalShowInfo] = useState(false);
   const [editModalData, setEditModalData] = useState({
     instituteName: "",
     instituteAddress: "",
@@ -45,7 +47,7 @@ const CollegeTable = (props: {
         label: "Actions",
         field: "actions",
         sort: "disabled",
-        width: 100,
+        width: 150,
       },
     ],
 
@@ -57,6 +59,7 @@ const CollegeTable = (props: {
             address: data.instituteAddress,
             actions: (
               <>
+                {/* Edit Button */}
                 <button
                   onClick={() => {
                     setEditModalData(data);
@@ -67,6 +70,7 @@ const CollegeTable = (props: {
                   <AiFillEdit size={16} />
                 </button>
 
+                {/* Delete Button */}
                 <button
                   onClick={() => {
                     props.setLoading(true);
@@ -83,16 +87,27 @@ const CollegeTable = (props: {
                   />
                 </button>
 
+                {/* Add Course Button */}
                 <Link
                   to="/course"
                   state={{
                     collegeId: data.instituteCode,
                     college: data.instituteName,
                   }}
-                  className="btn btn-sm btn-info"
+                  className="btn btn-sm btn-info me-3"
                 >
                   Add Course
                 </Link>
+
+                {/* NEW Info Button */}
+                <button
+                  className="btn btn-icon btn-secondary btn-sm"
+                  onClick={() => {
+                    setModalShowInfo(true);
+                  }}
+                >
+                  <AiOutlineInfoCircle size={18} />
+                </button>
               </>
             ),
           }
@@ -115,6 +130,11 @@ const CollegeTable = (props: {
         show={modalShowEdit}
         onHide={() => setModalShowEdit(false)}
         data={editModalData}
+        setPageLoading={props.setPageLoading}
+      />
+      <CollegeInfoModal
+        show={modalShowInfo}
+        onHide={() => setModalShowInfo(false)}
         setPageLoading={props.setPageLoading}
       />
     </>

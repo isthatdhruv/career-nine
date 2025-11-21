@@ -132,7 +132,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                         "/**/*.css",
                         "/**/*.js")
                 .permitAll()
-                .antMatchers("/api/role/get","/api/**", "/api/**/**", "/api/**/**/**", "/api/assessment-questions/**",
+                .antMatchers("/assessment-questions/*/*","/assessment-questions/*","/assessments/*","/api/**", "/api/**/**", "/api/**/**/**", "/api/assessment-questions/**",
                         "/api/question-sections/**", "/api/assessment-questions/*/*", "/api/firebase/*/*",
                         "/api/firebase/*", "/api/firebase/*", "/actuator/*", "/auth/**", "/oauth2/callback/google/*",
                         "/oauth2/**", "/user/me", "role/*", "/gender/get",

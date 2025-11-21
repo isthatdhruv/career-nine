@@ -24,7 +24,7 @@ import com.kccitm.api.repository.InstituteCourseRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/instituteDetail")
 public class InstituteDetailController {
 
 	@Autowired
@@ -42,7 +42,7 @@ public class InstituteDetailController {
 	@Autowired
 	private InstituteBatchRepository instituteBatchRepository;
 
-	@GetMapping(value = "instituteDetail/get", headers = "Accept=application/json")
+	@GetMapping(value = "/get", headers = "Accept=application/json")
 	public List<InstituteDetail> getallInstituteDetail() {
 		List<InstituteDetail> allInstituteDetails = instituteDetailRepository.findAll();
 		List<InstituteDetail> allInstituteDetailsNew = new ArrayList<InstituteDetail>();
@@ -55,7 +55,7 @@ public class InstituteDetailController {
 		return allInstituteDetailsNew;
 	}
 
-	@GetMapping(value = "instituteDetail/getbyid/{id}", headers = "Accept=application/json")
+	@GetMapping(value = "/getbyid/{id}", headers = "Accept=application/json")
 	public InstituteDetail getInstituteDetailById(@PathVariable("id") int instituteDetailId) {
 		InstituteDetail instituteDetail = instituteDetailRepository.findById(instituteDetailId);
 		instituteDetail.setInstituteCourse(instituteCourseRepository.findByInstituteId(instituteDetailId));
@@ -72,7 +72,7 @@ public class InstituteDetailController {
 		return instituteDetail;
 	}
 
-	@GetMapping(value = "instituteBatchAndBranchDetail/getbyid/{id}", headers = "Accept=application/json")
+	@GetMapping(value = "/instituteBatchAndBranchDetail/getbyid/{id}", headers = "Accept=application/json")
 	public BatchBranchOption getInstituteBatchAndBranchById(@PathVariable("id") int instituteDetailId) {
 		InstituteDetail instituteDetail = instituteDetailRepository.findById(instituteDetailId);
 		instituteDetail.setInstituteCourse(instituteCourseRepository.findByInstituteId(instituteDetailId));
@@ -90,7 +90,7 @@ public class InstituteDetailController {
 		return bbo;
 	}
 
-	@PostMapping(value = "instituteDetail/update", headers = "Accept=application/json")
+	@PostMapping(value = "/instituteDetail/update", headers = "Accept=application/json")
 	public List<InstituteDetail> updateInstituteDetail(@RequestBody Map<String, InstituteDetail> inputData) {
 		InstituteDetail r = inputData.get("values");
 		instituteDetailRepository.save(r);
@@ -106,14 +106,14 @@ public class InstituteDetailController {
 	// instituteDetailRepository.findByInstituteName(instituteDetail.getInstituteName());
 	// }
 
-	@GetMapping(value = "instituteDetail/delete/{id}", headers = "Accept=application/json")
+	@GetMapping(value = "/instituteDetail/delete/{id}", headers = "Accept=application/json")
 	public InstituteDetail deleteUser(@PathVariable("id") int instituteDetailId) {
 		InstituteDetail instituteDetail = instituteDetailRepository.getOne(instituteDetailId);
 		instituteDetail.setDisplay(false);
 		InstituteDetail r = instituteDetailRepository.save(instituteDetail);
 		return r;
 	}
-	@PostMapping(value = "instituteDetail/create", headers = "Accept=application/json")
+	@PostMapping(value = "/instituteDetail/create", headers = "Accept=application/json")
 	public void createInstituteDetail(@RequestBody InstituteDetail instituteDetail) {
 		instituteDetailRepository.save(instituteDetail);
 	}
