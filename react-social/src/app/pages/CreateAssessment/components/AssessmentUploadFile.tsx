@@ -53,7 +53,7 @@ export default function AssessmentUploadFile() {
   const handleNext = () => {
     if (!fileName) {
       alert("❌ Please upload an Excel file before proceeding.");
-      return;
+      // return;
     }
     const payload = { fileName, tableData };
     localStorage.setItem("assessmentUploadStep", JSON.stringify(payload));
