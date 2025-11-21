@@ -44,6 +44,13 @@ export function AsideMenuMain() {
       />
 
       <AsideMenuItem
+        to="/contact-person"
+        icon="/media/icons/duotune/general/gen044.svg"
+        title="Add Contact Person Information"
+        fontIcon="bi-app-indicator"
+      />
+
+      <AsideMenuItem
         to="/tools"
         icon="/media/icons/duotune/general/gen044.svg"
         title="Tools"
