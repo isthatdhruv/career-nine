@@ -28,6 +28,9 @@ import AssessmentToolPage from "../pages/CreateAssessment/components/AssessmentT
 import AssessmentUploadFile from "../pages/CreateAssessment/components/AssessmentUploadFile";
 import AssessmentSection from "../pages/CreateAssessment/components/AssessmentSection";
 import AssessmentQuestion from "../pages/CreateAssessment/components/AssessmentQuestion";
+import ContactPersonCreatePage from "../pages/ContactPerson/components/ContactPersonCreatePage";
+import { ContactPersonEditPage } from "../pages/ContactPerson/components";
+import ContactPersonPage from "../pages/ContactPerson/ContactPersonPage";
   
 
 const PrivateRoutes = () => {
@@ -279,7 +282,30 @@ const PrivateRoutes = () => {
           }
         />
 
-
+        <Route
+          path="/contact-person"
+          element={
+            <SuspensedView>
+              <ContactPersonPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/contact-person/create"
+          element={
+            <SuspensedView>
+              <ContactPersonCreatePage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/contact-person/edit/:id"
+          element={
+            <SuspensedView>
+              <ContactPersonEditPage />
+            </SuspensedView>
+          }
+        />
         <Route
           path="/board"
           element={
