@@ -78,4 +78,16 @@ public class InstituteDetail implements Serializable {
 		this.instituteCourse = instituteCourse;
 	}
 
+	public List<ContactPerson> getContactPersons() {
+		return contactPersons;
+	}
+	public void setContactPersons(List<ContactPerson> contactPersons) {
+		this.contactPersons = contactPersons;
+	}
+	public Set<Owner> getOwners() {
+		return owners;
+	}
+	public void setOwners(Set<Owner> owners) {
+		this.owners = owners;
+	}
 }
