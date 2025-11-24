@@ -41,13 +41,6 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
       <div className="card shadow-sm">
         <div className="card-header d-flex align-items-center justify-content-between">
           <h1 className="mb-0">Add Contact Person Information</h1>
-          <button
-            type="button"
-            className="btn btn-sm btn-outline-primary"
-            onClick={() => navigate("/colleges/create")}
-          >
-            Add New College
-          </button>
         </div>
 
         <Formik
@@ -57,7 +50,6 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
           onSubmit={async (values, { resetForm }) => {
             setLoading(true);
             try {
-              // sequential API calls — replace with bulk if preferred
               for (const person of values.contactPersons) {
                 await CreateContactInformationData(person);
               }
@@ -108,7 +100,6 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
                     const e = (errors as any).contactPersons?.[index] || {};
 
                     return (
-                      // Outer container for this contact person
                       <div
                         key={index}
                         className="mb-4 contact-person-outer"
@@ -119,7 +110,6 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
                           background: "#fff",
                         }}
                       >
-                        {/* Header with add/remove controls */}
                         <div className="d-flex justify-content-between align-items-center mb-3">
                           <h5 className="mb-0 fw-bold">Contact Person {index + 1}</h5>
                           <div>
@@ -129,7 +119,7 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
                                 className="btn btn-sm btn-danger me-2"
                                 onClick={() => removeContactPerson(index)}
                               >
-                                Remove
+                                -
                               </button>
                             )}
                             {index === values.contactPersons.length - 1 && (
@@ -138,13 +128,12 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
                                 className="btn btn-sm btn-primary"
                                 onClick={addContactPerson}
                               >
-                                Add
+                                +
                               </button>
                             )}
                           </div>
                         </div>
-
-                        {/* ===== Row 1: 3 fields side-by-side ===== */}
+                        
                         <div className="row gx-3">
                           {/* Name container */}
                           <div className="col-md-4">
