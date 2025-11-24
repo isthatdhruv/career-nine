@@ -1,10 +1,13 @@
 package com.kccitm.api.repository;
 
-import com.kccitm.api.model.ContactPerson;
 import java.util.List;
 import java.util.Optional;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+
+import com.kccitm.api.model.ContactPerson;
+
 
 @Repository
 public interface ContactPersonRepository extends JpaRepository<ContactPerson, Long> {
