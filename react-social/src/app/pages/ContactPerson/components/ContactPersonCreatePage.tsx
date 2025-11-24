@@ -52,7 +52,6 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
             // setLoading(true);
             // try {
               for (const person of values.contactPersons) {
-                // person already has correct keys: name, email, phoneNumber, gender, designation
                 console.log(person)
                 await CreateContactInformationData(person);
               }
