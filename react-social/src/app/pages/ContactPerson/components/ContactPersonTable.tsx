@@ -1,3 +1,4 @@
+// ContactPersonTable.tsx
 import { MDBDataTableV5 } from "mdbreact";
 import { AiFillEdit } from "react-icons/ai";
 import { useNavigate } from "react-router-dom";
@@ -46,12 +47,12 @@ const ContactPersonTable = (props: {
     rows: props.data.map((data: any) => ({
       name: data.name,
       email: data.email,
-      phone: data.phone,
+      phone: data.phoneNumber, // 👈 backend field name
       actions: (
         <>
           <button
             onClick={() => {
-              navigate(`/contact-person/edit/${data.contactId}`, {
+              navigate(`/contact-person/edit/${data.id}`, {
                 state: { data },
               });
             }}
@@ -60,10 +61,10 @@ const ContactPersonTable = (props: {
             <AiFillEdit size={16} />
           </button>
           <button
-            onClick={async () => { 
+            onClick={async () => {
               props.setLoading(true);
               try {
-                await DeleteContactInformationData(data.contactId);
+                await DeleteContactInformationData(data.id); // 👈 id not contactId
                 props.setPageLoading(["true"]);
               } catch (error) {
                 console.error("Delete failed:", error);
@@ -84,7 +85,7 @@ const ContactPersonTable = (props: {
       ),
     })),
   };
-  
+
   return (
     <>
       <MDBDataTableV5

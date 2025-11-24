@@ -10,9 +10,9 @@ const validationSchema = Yup.object().shape({
   contactPersons: Yup.array()
     .of(
       Yup.object().shape({
-        contactName: Yup.string().required("Contact name is required"),
-        contactEmail: Yup.string().email("Invalid email").required("Email is required"),
-        contactPhone: Yup.string().required("Phone number is required"),
+        name: Yup.string().required("Contact name is required"),
+        email: Yup.string().email("Invalid email").required("Email is required"),
+        phoneNumber: Yup.string().required("Phone number is required"), // 👈 changed
         gender: Yup.string().nullable(),
         designation: Yup.string().nullable(),
       })
@@ -27,9 +27,9 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
   const initialValues = {
     contactPersons: [
       {
-        contactName: "",
-        contactEmail: "",
-        contactPhone: "",
+        name: "",
+        email: "",
+        phoneNumber: "",   
         gender: "",
         designation: "",
       },
@@ -48,21 +48,23 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
           initialValues={initialValues}
           validationSchema={validationSchema}
           onSubmit={async (values, { resetForm }) => {
-            setLoading(true);
-            try {
+            
+            // setLoading(true);
+            // try {
               for (const person of values.contactPersons) {
+                // person already has correct keys: name, email, phoneNumber, gender, designation
+                console.log(person)
                 await CreateContactInformationData(person);
               }
-
-              resetForm();
-              if (setPageLoading) setPageLoading(["true"]);
-              navigate("/contact-person");
-            } catch (error) {
-              console.error(error);
-              window.location.replace("/error");
-            } finally {
-              setLoading(false);
-            }
+            //   resetForm();
+            //   if (setPageLoading) setPageLoading(["true"]);
+            //   navigate("/contact-person");
+            // } catch (error) {
+            //   console.error(error);
+            //   window.location.replace("/error");
+            // } finally {
+            //   setLoading(false);
+            // }
           }}
         >
           {({ values, errors, touched, handleBlur, setFieldValue }) => {
@@ -70,9 +72,9 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
               setFieldValue("contactPersons", [
                 ...values.contactPersons,
                 {
-                  contactName: "",
-                  contactEmail: "",
-                  contactPhone: "",
+                  name: "",
+                  email: "",
+                  phoneNumber: "",   // 👈 changed
                   gender: "",
                   designation: "",
                 },
@@ -133,75 +135,85 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
                             )}
                           </div>
                         </div>
-                        
+
                         <div className="row gx-3">
-                          {/* Name container */}
+                          {/* Name */}
                           <div className="col-md-4">
                             <div className="p-3" style={{ background: "#f8fafc", borderRadius: 6 }}>
-                              <label className="required fs-6 fw-bold mb-1">Contact Person Name :</label>
+                              <label className="required fs-6 fw-bold mb-1">
+                                Contact Person Name :
+                              </label>
                               <input
                                 type="text"
                                 placeholder="Enter Contact Person Name"
-                                value={person.contactName}
-                                onChange={(e) => updateField(index, "contactName", e.target.value)}
+                                value={person.name}
+                                onChange={(e) => updateField(index, "name", e.target.value)}
                                 onBlur={handleBlur}
                                 className={clsx(
                                   "form-control form-control-lg form-control-solid mt-2",
-                                  { "is-invalid text-danger": t.contactName && e.contactName }
+                                  { "is-invalid text-danger": t.name && e.name }
                                 )}
                               />
-                              {t.contactName && e.contactName && (
-                                <div className="fv-help-block text-danger mt-2">{e.contactName}</div>
+                              {t.name && e.name && (
+                                <div className="fv-help-block text-danger mt-2">{e.name}</div>
                               )}
                             </div>
                           </div>
 
-                          {/* Email container */}
+                          {/* Email */}
                           <div className="col-md-4">
                             <div className="p-3" style={{ background: "#f8fafc", borderRadius: 6 }}>
-                              <label className="required fs-6 fw-bold mb-1">Contact Person Email :</label>
+                              <label className="required fs-6 fw-bold mb-1">
+                                Contact Person Email :
+                              </label>
                               <input
                                 type="email"
                                 placeholder="Enter Contact Person Email"
-                                value={person.contactEmail}
-                                onChange={(e) => updateField(index, "contactEmail", e.target.value)}
+                                value={person.email}
+                                onChange={(e) => updateField(index, "email", e.target.value)}
                                 onBlur={handleBlur}
                                 className={clsx(
                                   "form-control form-control-lg form-control-solid mt-2",
-                                  { "is-invalid text-danger": t.contactEmail && e.contactEmail }
+                                  { "is-invalid text-danger": t.email && e.email }
                                 )}
                               />
-                              {t.contactEmail && e.contactEmail && (
-                                <div className="fv-help-block text-danger mt-2">{e.contactEmail}</div>
+                              {t.email && e.email && (
+                                <div className="fv-help-block text-danger mt-2">{e.email}</div>
                               )}
                             </div>
                           </div>
 
-                          {/* Phone container */}
+                          {/* Phone Number */}
                           <div className="col-md-4">
                             <div className="p-3" style={{ background: "#f8fafc", borderRadius: 6 }}>
-                              <label className="required fs-6 fw-bold mb-1">Contact Person Phone Number :</label>
+                              <label className="required fs-6 fw-bold mb-1">
+                                Contact Person Phone Number :
+                              </label>
                               <input
                                 type="text"
                                 placeholder="Enter Contact Person Phone Number"
-                                value={person.contactPhone}
-                                onChange={(e) => updateField(index, "contactPhone", e.target.value)}
+                                value={person.phoneNumber}    // 👈 changed
+                                onChange={(e) =>
+                                  updateField(index, "phoneNumber", e.target.value)
+                                }
                                 onBlur={handleBlur}
                                 className={clsx(
                                   "form-control form-control-lg form-control-solid mt-2",
-                                  { "is-invalid text-danger": t.contactPhone && e.contactPhone }
+                                  { "is-invalid text-danger": t.phoneNumber && e.phoneNumber }
                                 )}
                               />
-                              {t.contactPhone && e.contactPhone && (
-                                <div className="fv-help-block text-danger mt-2">{e.contactPhone}</div>
+                              {t.phoneNumber && e.phoneNumber && (
+                                <div className="fv-help-block text-danger mt-2">
+                                  {e.phoneNumber}
+                                </div>
                               )}
                             </div>
                           </div>
                         </div>
 
-                        {/* ===== Row 2: 2 fields side-by-side ===== */}
+                        {/* Row 2 */}
                         <div className="row gx-3 mt-3">
-                          {/* Gender container */}
+                          {/* Gender */}
                           <div className="col-md-6">
                             <div className="p-3" style={{ background: "#f8fafc", borderRadius: 6 }}>
                               <label className="fs-6 fw-bold mb-1">Gender :</label>
@@ -218,7 +230,7 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
                             </div>
                           </div>
 
-                          {/* Designation container */}
+                          {/* Designation */}
                           <div className="col-md-6">
                             <div className="p-3" style={{ background: "#f8fafc", borderRadius: 6 }}>
                               <label className="fs-6 fw-bold mb-1">Designation :</label>
@@ -235,7 +247,6 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
                       </div>
                     );
                   })}
-
                 </div>
 
                 <div className="card-footer d-flex justify-content-end">
@@ -262,11 +273,6 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
             );
           }}
         </Formik>
-      </div>
-
-      <div className="mt-3 text-muted small">
-        {/* layout reference image (local path) */}
-        Layout reference image: <code>/mnt/data/556d6c4d-1033-4fd7-8d4f-f02d4f436ce2.png</code>
       </div>
     </div>
   );
