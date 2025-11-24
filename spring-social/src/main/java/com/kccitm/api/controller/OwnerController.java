@@ -136,7 +136,7 @@ public class InstituteDetailController {
         InstituteDetail inst = instituteDetailRepository.findById(instituteCode);
         if (inst == null) return null;
 
-        // link and save
+        // link and
         contactPerson.setInstitute(inst);
         ContactPerson saved = contactPersonRepository.save(contactPerson);
 
