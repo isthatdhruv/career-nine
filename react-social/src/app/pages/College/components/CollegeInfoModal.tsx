@@ -5,6 +5,7 @@ import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import { UpdateCollegeData } from "../API/College_APIs";
 import { ReadBoardData } from "../../Board/API/Board_APIs";
+import { ReadContactInformationData } from "../../ContactPerson/API/Contact_Person_APIs";
 
 type ContactPerson = {
   id?: string;
@@ -25,7 +26,7 @@ type Board = {
 type CollegeDataForModal = {
   instituteCode?: string;
   contactPersons?: ContactPerson[];
-  maxClass?: number | string; // 🔹 new field (optional)
+  maxClass?: number | string;
   [key: string]: any;
 };
 
@@ -53,15 +54,46 @@ const CollegeInfoModal = (props: Props) => {
   useEffect(() => {
     if (!props.show) return;
 
-    // CONTACT PERSONS FROM PROPS
-    const rawContacts = props.data?.contactPersons ?? [];
-    const contacts = rawContacts.filter(
-      (c) => c && (c.name || c.email || c.phone || c.designation)
-    );
-    setAvailableContacts(contacts);
-    setSelectedContactIndexes([]);
+    // ✅ Fetch ALL contact persons from API
+    const fetchContacts = async () => {
+      try {
+        const res = await ReadContactInformationData();
+        const rawContacts: any[] =
+          (res as any)?.data?.data ??
+          (res as any)?.data?.contacts ??
+          (res as any)?.data ??
+          [];
 
-    // BOARDS FROM API
+        const contacts: ContactPerson[] = rawContacts.filter(
+          (c) => c && (c.name || c.email || c.phone || c.designation)
+        );
+
+        setAvailableContacts(contacts);
+
+        // ✅ Pre-select contacts already mapped to this institute
+        const instituteContacts = props.data?.contactPersons ?? [];
+        const preSelected: number[] = [];
+
+        contacts.forEach((contact, index) => {
+          const match = instituteContacts.find(
+            (ic) =>
+              (ic.id && contact.id && ic.id === contact.id) ||
+              (ic.email && contact.email && ic.email === contact.email)
+          );
+          if (match) {
+            preSelected.push(index);
+          }
+        });
+
+        setSelectedContactIndexes(preSelected);
+      } catch (err) {
+        console.error("Failed to load contacts:", err);
+        setAvailableContacts([]);
+        setSelectedContactIndexes([]);
+      }
+    };
+
+    // ✅ BOARDS FROM API
     const fetchBoards = async () => {
       try {
         const res = await ReadBoardData();
@@ -86,6 +118,7 @@ const CollegeInfoModal = (props: Props) => {
       }
     };
 
+    fetchContacts();
     fetchBoards();
 
     // 🔹 Initialize maxClass from props (if present)
@@ -117,7 +150,6 @@ const CollegeInfoModal = (props: Props) => {
 
   const isBoardSelected = (index: number) => selectedBoardIndexes.includes(index);
 
-  // 🔹 Helper to clamp and set maxClass
   const handleMaxClassChange = (value: string) => {
     if (value === "") {
       setMaxClass(null);
@@ -172,6 +204,9 @@ const CollegeInfoModal = (props: Props) => {
 
   const selectedContactList = selectedContactIndexes.map((i) => availableContacts[i]);
   const selectedBoardList = selectedBoardIndexes.map((i) => availableBoards[i]);
+
+  // 🔐 Step 2 should only be usable after Step 1 has at least one selection
+  const isStep2Enabled = selectedContactIndexes.length > 0;
 
   return (
     <Modal
@@ -337,7 +372,11 @@ const CollegeInfoModal = (props: Props) => {
             </div>
 
             {/* ====== STEP 2: BOARDS ====== */}
-            <div className="card shadow-sm border-0">
+            <div
+              className={`card shadow-sm border-0 ${
+                !isStep2Enabled ? "opacity-75" : ""
+              }`}
+            >
               <div className="card-body">
                 <div className="d-flex justify-content-between align-items-center mb-2">
                   <div>
@@ -345,9 +384,14 @@ const CollegeInfoModal = (props: Props) => {
                     <h5 className="mb-0">Select Board(s)</h5>
                     <small className="text-muted">
                       Map this institute to one or more education boards.
+                      {!isStep2Enabled && (
+                        <span className="text-danger ms-1">
+                          (Select at least one contact person in Step 1 first)
+                        </span>
+                      )}
                     </small>
                   </div>
-                  {availableBoards.length > 0 && (
+                  {availableBoards.length > 0 && isStep2Enabled && (
                     <span className="badge bg-primary-subtle text-primary">
                       {selectedBoardIndexes.length} selected
                     </span>
@@ -358,7 +402,11 @@ const CollegeInfoModal = (props: Props) => {
                   <button
                     type="button"
                     className="btn btn-outline-primary dropdown-toggle d-flex align-items-center px-3 py-2"
-                    onClick={() => setBoardDropdownOpen((o) => !o)}
+                    onClick={() => {
+                      if (!isStep2Enabled) return;
+                      setBoardDropdownOpen((o) => !o);
+                    }}
+                    disabled={!isStep2Enabled}
                   >
                     <span className="me-2">📋</span>
                     <span>
@@ -370,7 +418,7 @@ const CollegeInfoModal = (props: Props) => {
 
                   <div
                     className={`dropdown-menu mt-2 shadow-sm border-0 ${
-                      boardDropdownOpen ? "show" : ""
+                      boardDropdownOpen && isStep2Enabled ? "show" : ""
                     }`}
                     style={{
                       maxHeight: "260px",
@@ -378,7 +426,11 @@ const CollegeInfoModal = (props: Props) => {
                       minWidth: "260px",
                     }}
                   >
-                    {availableBoards.length === 0 ? (
+                    {!isStep2Enabled ? (
+                      <span className="dropdown-item-text text-muted fst-italic">
+                        Please select contact person(s) in Step 1 first.
+                      </span>
+                    ) : availableBoards.length === 0 ? (
                       <span className="dropdown-item-text text-muted fst-italic">
                         No boards found.
                       </span>
@@ -406,7 +458,7 @@ const CollegeInfoModal = (props: Props) => {
                   </div>
                 </div>
 
-                {selectedBoardList.length > 0 && (
+                {isStep2Enabled && selectedBoardList.length > 0 && (
                   <div>
                     <div className="text-muted small mb-1">Selected board(s):</div>
                     <div className="d-flex flex-wrap gap-2">

@@ -12,7 +12,7 @@ const validationSchema = Yup.object().shape({
       Yup.object().shape({
         name: Yup.string().required("Contact name is required"),
         email: Yup.string().email("Invalid email").required("Email is required"),
-        phoneNumber: Yup.string().required("Phone number is required"), // 👈 changed
+        phoneNumber: Yup.string().required("Phone number is required"),
         gender: Yup.string().nullable(),
         designation: Yup.string().nullable(),
       })
@@ -29,7 +29,7 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
       {
         name: "",
         email: "",
-        phoneNumber: "",   
+        phoneNumber: "",
         gender: "",
         designation: "",
       },
@@ -48,22 +48,24 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
           initialValues={initialValues}
           validationSchema={validationSchema}
           onSubmit={async (values, { resetForm }) => {
-            
-            // setLoading(true);
-            // try {
+            setLoading(true);
+            try {
               for (const person of values.contactPersons) {
-                console.log(person)
+                console.log(person);
                 await CreateContactInformationData(person);
               }
-            //   resetForm();
-            //   if (setPageLoading) setPageLoading(["true"]);
-            //   navigate("/contact-person");
-            // } catch (error) {
-            //   console.error(error);
-            //   window.location.replace("/error");
-            // } finally {
-            //   setLoading(false);
-            // }
+
+              resetForm();
+              if (setPageLoading) setPageLoading(["true"]);
+
+              // ✅ Navigate after successful submit
+              navigate("/contact-person");
+            } catch (error) {
+              console.error(error);
+              window.location.replace("/error");
+            } finally {
+              setLoading(false);
+            }
           }}
         >
           {({ values, errors, touched, handleBlur, setFieldValue }) => {
@@ -73,7 +75,7 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
                 {
                   name: "",
                   email: "",
-                  phoneNumber: "",   // 👈 changed
+                  phoneNumber: "",
                   gender: "",
                   designation: "",
                 },
@@ -191,7 +193,7 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
                               <input
                                 type="text"
                                 placeholder="Enter Contact Person Phone Number"
-                                value={person.phoneNumber}    // 👈 changed
+                                value={person.phoneNumber}
                                 onChange={(e) =>
                                   updateField(index, "phoneNumber", e.target.value)
                                 }
