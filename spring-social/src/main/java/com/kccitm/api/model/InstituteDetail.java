@@ -56,15 +56,6 @@ public class InstituteDetail implements Serializable {
     @JsonManagedReference
     private Set<ContactPerson> contactPersons = new HashSet<>();
 
-    // Many-to-Many: Owner
-    //Owners of the institute
-    @ManyToMany(fetch = FetchType.LAZY, cascade = { CascadeType.PERSIST, CascadeType.MERGE })
-    @JoinTable(
-        name = "institute_owner",
-        joinColumns = @JoinColumn(name = "institute_code"),
-        inverseJoinColumns = @JoinColumn(name = "owner_id")
-    )
-    private Set<Owner> owners = new HashSet<>();
 
     // One-to-Many: Courses
     @JsonManagedReference("inst-course")
@@ -151,14 +142,6 @@ public class InstituteDetail implements Serializable {
 
     public void setContactPersons(Set<ContactPerson> contactPersons) {
         this.contactPersons = contactPersons;
-    }
-
-    public Set<Owner> getOwners() {
-        return owners;
-    }
-
-    public void setOwners(Set<Owner> owners) {
-        this.owners = owners;
     }
 
     public List<InstituteCourse> getInstituteCourse() {

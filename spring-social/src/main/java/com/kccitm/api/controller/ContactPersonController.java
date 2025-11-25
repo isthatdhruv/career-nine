@@ -1,6 +1,7 @@
 package com.kccitm.api.controller;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,7 +17,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kccitm.api.model.ContactPerson;
+import com.kccitm.api.model.InstituteDetail;
 import com.kccitm.api.repository.ContactPersonRepository;
 @RestController
 @RequestMapping("/contact-person")
@@ -51,23 +55,37 @@ public class ContactPersonController {
         return contactPersonRepository.save(contactPerson);
     }
 
-    @PutMapping("/update/{id}")
-    public ResponseEntity<?> updateContactPerson(@PathVariable Long id, @RequestBody ContactPerson body) {
-        Optional<ContactPerson> opt = contactPersonRepository.findById(id);
-        if (!opt.isPresent()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("ContactPerson not found");
-        }
+    // @PutMapping("/update/{id}")
+    // public ResponseEntity<?> updateContactPerson(@PathVariable Long id, @RequestBody ContactPerson body) {
+    //     Optional<ContactPerson> opt = contactPersonRepository.findById(id);
+    //     if (!opt.isPresent()) {
+    //         return ResponseEntity.status(HttpStatus.NOT_FOUND).body("ContactPerson not found");
+    //     }
 
-        ContactPerson existing = opt.get();
+    //     ContactPerson existing = opt.get();
 
-        existing.setName(body.getName());
-        existing.setEmail(body.getEmail());
-        existing.setPhoneNumber(body.getPhoneNumber()); 
-        existing.setDesignation(body.getDesignation());
-        existing.setGender(body.getGender());
+    //     existing.setName(body.getName());
+    //     existing.setEmail(body.getEmail());
+    //     existing.setPhoneNumber(body.getPhoneNumber()); 
+    //     existing.setDesignation(body.getDesignation());
+    //     existing.setGender(body.getGender());
 
-        ContactPerson saved = contactPersonRepository.save(existing);
-        return ResponseEntity.ok(saved);
-    }
+    //     ContactPerson saved = contactPersonRepository.save(existing);
+    //     return ResponseEntity.ok(saved);
+    // }
+    @PostMapping(value = "/update", consumes = "application/json", produces = "application/json")
+	public ContactPerson updateContactPerson(@RequestBody Map<String, ContactPerson> payload) {
+		if (payload == null || payload.isEmpty()) {
+			return null;
+		}
+
+		ObjectMapper mapper = new ObjectMapper()
+				.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+ 		ContactPerson contactPerson =  payload.get("values");
+		ContactPerson saved = contactPersonRepository.save(contactPerson);
+	
+		return saved;
+	}
 
 }
