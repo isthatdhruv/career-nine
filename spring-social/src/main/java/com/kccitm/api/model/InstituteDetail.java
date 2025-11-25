@@ -29,7 +29,7 @@ public class InstituteDetail implements Serializable {
 
     @Id
     @Column(name = "institute_code")
-    private int instituteCode;
+    private Integer instituteCode;
 
     @NotNull
     @Column(name = "institute_name")
@@ -61,10 +61,10 @@ public class InstituteDetail implements Serializable {
         joinColumns = @JoinColumn(name = "institute_code"),
         inverseJoinColumns = @JoinColumn(name = "owner_id")
     )
-    @JsonManagedReference
     private Set<Owner> owners = new HashSet<>();
 
     // One-to-Many: Courses
+    @JsonManagedReference("inst-course")
     @OneToMany(mappedBy = "institute", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private List<InstituteCourse> instituteCourse;
 
@@ -72,11 +72,11 @@ public class InstituteDetail implements Serializable {
     //           GETTERS / SETTERS
     // ------------------------------
 
-    public int getInstituteCode() {
+    public Integer getInstituteCode() {
         return instituteCode;
     }
 
-    public void setInstituteCode(int instituteCode) {
+    public void setInstituteCode(Integer instituteCode) {
         this.instituteCode = instituteCode;
     }
 

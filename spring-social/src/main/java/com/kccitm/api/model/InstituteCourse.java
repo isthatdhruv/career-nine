@@ -56,7 +56,7 @@ public class InstituteCourse implements Serializable {
 		insertable = false,
 		updatable = false
 	)
-	@JsonBackReference
+	@JsonBackReference("inst-course")
 	private InstituteDetail institute;
 
 	// @Transient

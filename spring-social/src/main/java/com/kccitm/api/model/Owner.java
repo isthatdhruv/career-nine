@@ -15,6 +15,7 @@ import javax.persistence.FetchType;
 import javax.validation.constraints.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 
 
@@ -36,7 +37,7 @@ public class Owner implements Serializable{
     private String ownerPhone;
 
     @ManyToMany(mappedBy = "owners", fetch = FetchType.LAZY)
-    @JsonBackReference
+    @JsonIgnore
     private Set<InstituteDetail> institutes = new HashSet<>();
 
     public Long getId() {
