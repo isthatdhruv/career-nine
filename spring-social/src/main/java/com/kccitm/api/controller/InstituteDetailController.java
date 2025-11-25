@@ -115,7 +115,7 @@ public class InstituteDetailController {
 	// 	instituteDetailRepository.save(instituteDetail);
 	// }
 
-	
+	//update
 	@PostMapping(value = "/update", consumes = "application/json", produces = "application/json")
 	public ResponseEntity<?> updateInstituteDetail(@RequestBody Map<String, Object> payload) {
 		if (payload == null || payload.isEmpty()) {
