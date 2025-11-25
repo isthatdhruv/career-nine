@@ -115,25 +115,7 @@ public class InstituteDetailController {
 	// 	instituteDetailRepository.save(instituteDetail);
 	// }
 
-	
-	// @PostMapping(value = "/update", consumes = "application/json", produces = "application/json")
-	// public ResponseEntity<?> updateInstituteDetail(@RequestBody Map<String, Object> payload) {
-	// 	if (payload == null || payload.isEmpty()) {
-	// 		return ResponseEntity.badRequest().body("Empty request body");
-	// 	}
-
-	// 	ObjectMapper mapper = new ObjectMapper()
-	// 			.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-
-	// 	Object toConvert = payload.containsKey("values") ? payload.get("values") : payload;
-	// 	InstituteDetail instituteDetail = mapper.convertValue(toConvert, InstituteDetail.class);
-
-	// 	InstituteDetail saved = instituteDetailRepository.save(instituteDetail);
-	// 	List<InstituteDetail> found = instituteDetailRepository.findByInstituteName(saved.getInstituteName());
-	// 	return ResponseEntity.ok(found);
-	// }
-
-
+	//update
 	@PostMapping(value = "/update", consumes = "application/json", produces = "application/json")
 	public InstituteDetail updateInstituteDetail(@RequestBody Map<String, InstituteDetail> payload) {
 		if (payload == null || payload.isEmpty()) {
