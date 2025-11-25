@@ -36,6 +36,7 @@ public class Owner implements Serializable{
 
     private String ownerPhone;
 
+    //owners
     @ManyToMany(mappedBy = "owners", fetch = FetchType.LAZY)
     @JsonIgnore
     private Set<InstituteDetail> institutes = new HashSet<>();
