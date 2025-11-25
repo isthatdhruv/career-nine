@@ -38,15 +38,14 @@ public class ContactPersonController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    // Prefer DELETE for deletions
     @DeleteMapping("/delete/{id}")
-    public ContactPerson deleteContactPerson(@PathVariable("id") Long id) {
-        Optional<ContactPerson> cpOpt = contactPersonRepository.findById(id);
-        if (cpOpt.isPresent()) {
-            ContactPerson cp = cpOpt.get();
-            contactPersonRepository.deleteById(id);
-            return cp;
+    public ResponseEntity<Void> deleteContactPerson(@PathVariable("id") Long id) {
+        if (!contactPersonRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
         }
-        return null;
+        contactPersonRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping(
