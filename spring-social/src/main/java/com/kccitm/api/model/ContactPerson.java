@@ -14,6 +14,7 @@ import javax.persistence.FetchType;
 import javax.validation.constraints.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 
 @Entity
@@ -40,7 +41,7 @@ public class ContactPerson implements Serializable{
     //contact person
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "institute_code")
-    @JsonBackReference
+    @JsonIgnore
     private InstituteDetail institute;
 
     public Long getId() {

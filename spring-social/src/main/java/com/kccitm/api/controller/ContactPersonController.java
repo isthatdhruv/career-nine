@@ -25,14 +25,17 @@ public class ContactPersonController {
     @Autowired
     private ContactPersonRepository contactPersonRepository;
 
-    @GetMapping(value = "/getAll", headers = "Accept=application/json")
-    public List<ContactPerson> getAllContactPersons() {
-        return contactPersonRepository.findAll();
+    @GetMapping("/getAll")
+    public ResponseEntity<List<ContactPerson>> getAllContactPersons() {
+        List<ContactPerson> list = contactPersonRepository.findAll();
+        return ResponseEntity.ok(list);
     }
 
-    @GetMapping(value = "/get/{id}", headers = "Accept=application/json")
-    public ContactPerson getContactPersonById(@PathVariable("id") Long contactPersonId) {
-        return contactPersonRepository.findById(contactPersonId).orElse(null);
+    @GetMapping("/get/{id}")
+    public ResponseEntity<ContactPerson> getContactPersonById(@PathVariable("id") Long contactPersonId) {
+        return contactPersonRepository.findById(contactPersonId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/delete/{id}")
@@ -46,9 +49,14 @@ public class ContactPersonController {
         return null;
     }
 
-    @PostMapping("/create")
-    public ContactPerson createContactPerson(@RequestBody ContactPerson contactPerson) {
-        return contactPersonRepository.save(contactPerson);
+    @PostMapping(
+        value = "/create",
+        consumes = MediaType.APPLICATION_JSON_VALUE,
+        produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<ContactPerson> createContactPerson(@RequestBody ContactPerson contactPerson) {
+        ContactPerson saved = contactPersonRepository.save(contactPerson);
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
     @PutMapping(value = "/update/{id}", consumes = "application/json", produces = "application/json")
