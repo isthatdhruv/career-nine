@@ -6,7 +6,6 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -48,14 +47,28 @@ public class ContactPersonController {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping(
-        value = "/create",
-        consumes = MediaType.APPLICATION_JSON_VALUE,
-        produces = MediaType.APPLICATION_JSON_VALUE
-    )
-    public ResponseEntity<ContactPerson> createContactPerson(@RequestBody ContactPerson contactPerson) {
-        ContactPerson saved = contactPersonRepository.save(contactPerson);
-        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+    @PostMapping("/create")
+    public ContactPerson createContactPerson(@RequestBody ContactPerson contactPerson) {
+        return contactPersonRepository.save(contactPerson);
+    }
+
+    @PutMapping("/update/{id}")
+    public ResponseEntity<?> updateContactPerson(@PathVariable Long id, @RequestBody ContactPerson body) {
+        Optional<ContactPerson> opt = contactPersonRepository.findById(id);
+        if (!opt.isPresent()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("ContactPerson not found");
+        }
+
+        ContactPerson existing = opt.get();
+
+        existing.setName(body.getName());
+        existing.setEmail(body.getEmail());
+        existing.setPhoneNumber(body.getPhoneNumber()); 
+        existing.setDesignation(body.getDesignation());
+        existing.setGender(body.getGender());
+
+        ContactPerson saved = contactPersonRepository.save(existing);
+        return ResponseEntity.ok(saved);
     }
 
 }
