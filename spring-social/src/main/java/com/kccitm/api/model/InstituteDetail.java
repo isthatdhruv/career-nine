@@ -55,6 +55,7 @@ public class InstituteDetail implements Serializable {
     private Set<ContactPerson> contactPersons = new HashSet<>();
 
     // Many-to-Many: Owner
+    //Owners of the institute
     @ManyToMany(fetch = FetchType.LAZY, cascade = { CascadeType.PERSIST, CascadeType.MERGE })
     @JoinTable(
         name = "institute_owner",

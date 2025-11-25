@@ -30,6 +30,7 @@ import org.springframework.http.ResponseEntity;
 	
 @RestController
 @RequestMapping("/instituteDetail")
+//institute detail controller
 public class InstituteDetailController {
 
 	@Autowired

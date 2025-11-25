@@ -36,6 +36,7 @@ public class ContactPerson implements Serializable{
     private String gender;
 
     // Many contact persons belong to one institute
+    //contact person
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "institute_code")
     @JsonBackReference
