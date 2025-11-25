@@ -19,6 +19,7 @@ const layoutImagePath = "/mnt/data/556d6c4d-1033-4fd7-8d4f-f02d4f436ce2.png";
  * (kept permissive — API may return extra fields)
  */
 type CollegeRow = {
+  id?: string | number; // 🔹 added: backend id used for delete
   instituteName?: string;
   instituteAddress?: string;
   instituteCode?: string;
@@ -106,6 +107,7 @@ const CollegeTable = (props: {
           <>
             {/* Edit Button */}
             <button
+              type="button"
               onClick={() => {
                 setEditModalData(data);
                 setModalShowEdit(true);
@@ -117,15 +119,32 @@ const CollegeTable = (props: {
 
             {/* Delete Button */}
             <button
+              type="button"
               onClick={async () => {
                 try {
+                  const deleteId = data.id ?? data.instituteCode;
+
+                  console.log("Attempting to delete college. Row:", data);
+                  console.log("Using deleteId:", deleteId);
+
+                  if (!deleteId) {
+                    console.error(
+                      "No 'id' or 'instituteCode' found on this row. Cannot call DeleteCollegeData."
+                    );
+                    alert("Cannot delete: no valid ID found for this record.");
+                    return;
+                  }
+
                   props.setLoading(true);
-                  // Pass instituteCode (may be undefined) - adjust API if it requires a string
-                  await DeleteCollegeData(data.instituteCode);
+
+                  // 🔹 Backend expects /instituteDetail/delete/{id}
+                  await DeleteCollegeData(deleteId);
+
                   // trigger parent reload — toggle pattern is generic
                   props.setPageLoading((p: any) => !p);
                 } catch (err) {
                   console.error("Delete failed:", err);
+                  alert("Delete failed. Check console for details.");
                 } finally {
                   props.setLoading(false);
                 }
@@ -213,7 +232,7 @@ const CollegeTable = (props: {
         setPageLoading={props.setPageLoading}
       />
 
-      {/* Info modal (new) */}
+      {/* Info modal */}
       <CollegeInfoModal
         show={infoModalShow}
         onHide={() => setInfoModalShow(false)}
