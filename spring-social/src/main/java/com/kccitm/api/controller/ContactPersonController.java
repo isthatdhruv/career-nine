@@ -25,45 +25,37 @@ public class ContactPersonController {
     @Autowired
     private ContactPersonRepository contactPersonRepository;
 
-    @GetMapping(value = "/getAll", headers = "Accept=application/json")
-    public List<ContactPerson> getAllContactPersons() {
-        return contactPersonRepository.findAll();
+    @GetMapping("/getAll")
+    public ResponseEntity<List<ContactPerson>> getAllContactPersons() {
+        List<ContactPerson> list = contactPersonRepository.findAll();
+        return ResponseEntity.ok(list);
     }
 
-    @GetMapping(value = "/get/{id}", headers = "Accept=application/json")
-    public ContactPerson getContactPersonById(@PathVariable("id") Long contactPersonId) {
-        return contactPersonRepository.findById(contactPersonId).orElse(null);
+    @GetMapping("/get/{id}")
+    public ResponseEntity<ContactPerson> getContactPersonById(@PathVariable("id") Long contactPersonId) {
+        return contactPersonRepository.findById(contactPersonId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @GetMapping("/delete/{id}")
-    public ContactPerson deleteContactPerson(@PathVariable("id") Long id) {
-        Optional<ContactPerson> cpOpt = contactPersonRepository.findById(id);
-        if (cpOpt.isPresent()) {
-            ContactPerson cp = cpOpt.get();
-            contactPersonRepository.deleteById(id);
-            return cp;
+    // Prefer DELETE for deletions
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity<Void> deleteContactPerson(@PathVariable("id") Long id) {
+        if (!contactPersonRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
         }
-        return null;
+        contactPersonRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/create")
-    public ContactPerson createContactPerson(@RequestBody ContactPerson contactPerson) {
-        return contactPersonRepository.save(contactPerson);
-    }
-
-    @PutMapping("/update/{id}")
-    public ResponseEntity<?> updateContactPerson(@PathVariable Long id, @RequestBody ContactPerson body) {
-        return contactPersonRepository.findById(id)
-            .map(existing -> {
-                // copy fields you allow to update
-                existing.setName(body.getName());
-                existing.setEmail(body.getEmail());
-                existing.setPhone(body.getPhone());
-                // ... other fields
-                contactPersonRepository.save(existing);
-                return ResponseEntity.ok(existing);
-            })
-            .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body("ContactPerson not found"));
+    @PostMapping(
+        value = "/create",
+        consumes = MediaType.APPLICATION_JSON_VALUE,
+        produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ResponseEntity<ContactPerson> createContactPerson(@RequestBody ContactPerson contactPerson) {
+        ContactPerson saved = contactPersonRepository.save(contactPerson);
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
 }
