@@ -94,41 +94,14 @@ public class InstituteDetailController {
 	// 	BatchBranchOption bbo = new BatchBranchOption(instituteDetail);
 	// 	return bbo;
 	// }
-	
+
 	// @PostMapping(value = "/update", headers = "Accept=application/json")
 	// public List<InstituteDetail> updateInstituteDetail(@RequestBody Map<String, InstituteDetail> inputData) {
 	// 	InstituteDetail r = inputData.get("values");
 	// 	instituteDetailRepository.save(r);
 	// 	return instituteDetailRepository.findByInstituteName(r.getInstituteName());
 	// }
-	
 
-	// @PostMapping(value = "/update", consumes = "application/json", produces = "application/json")
-	// public ResponseEntity<?> updateInstituteDetail(@RequestBody InstituteDetail instituteDetail) {
-	// 	if (instituteDetail == null) {
-	// 		return ResponseEntity.badRequest().body("Empty request body");
-	// 	}
-	// 	try {
-	// 		InstituteDetail saved = instituteDetailRepository.save(instituteDetail);
-	// 		// If you have a method findByInstituteName returning List
-	// 		List<InstituteDetail> found = instituteDetailRepository.findByInstituteName(saved.getInstituteName());
-	// 		return ResponseEntity.ok(found);
-	// 	} catch (Exception ex) {
-	// 		// log the exception (use logger in real app)
-	// 		ex.printStackTrace();
-	// 		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-	// 							.body("Error saving institute: " + ex.getMessage());
-	// 	}
-	// }
-
-	// @PostMapping(value = "instituteDetail/update", headers =
-	// "Accept=application/json")
-	// public List<InstituteDetail> updateInstituteDetail(@RequestBody
-	// InstituteDetail instituteDetail) {
-	// instituteDetailRepository.save(instituteDetail);
-	// return
-	// instituteDetailRepository.findByInstituteName(instituteDetail.getInstituteName());
-	// }
 
 	@GetMapping(value = "/delete/{id}", headers = "Accept=application/json")
 	public InstituteDetail deleteUser(@PathVariable("id") int instituteDetailId) {
@@ -141,43 +114,25 @@ public class InstituteDetailController {
 	// public void createInstituteDetail(@RequestBody InstituteDetail instituteDetail) {
 	// 	instituteDetailRepository.save(instituteDetail);
 	// }
+
+	
 	@PostMapping(value = "/update", consumes = "application/json", produces = "application/json")
 	public ResponseEntity<?> updateInstituteDetail(@RequestBody Map<String, Object> payload) {
-		try {
-			if (payload == null || payload.isEmpty()) {
-				return ResponseEntity.badRequest().body("Empty request body");
-			}
-
-			ObjectMapper mapper = new ObjectMapper();
-			mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-
-			InstituteDetail instituteDetail;
-
-			// If the client sends { "values": { ... } } or sends InstituteDetail fields at top-level
-			if (payload.containsKey("values")) {
-				Object valuesObj = payload.get("values");
-				instituteDetail = mapper.convertValue(valuesObj, InstituteDetail.class);
-			} else {
-				instituteDetail = mapper.convertValue(payload, InstituteDetail.class);
-			}
-
-			if (instituteDetail == null) {
-				return ResponseEntity.badRequest().body("Unable to parse InstituteDetail from request");
-			}
-
-			InstituteDetail saved = instituteDetailRepository.save(instituteDetail);
-			List<InstituteDetail> found = instituteDetailRepository.findByInstituteName(saved.getInstituteName());
-			return ResponseEntity.ok(found);
-
-		} catch (IllegalArgumentException iae) {
-			iae.printStackTrace();
-			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Bad request: " + iae.getMessage());
-		} catch (Exception ex) {
-			ex.printStackTrace();
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-								.body("Error saving institute: " + ex.getMessage());
+		if (payload == null || payload.isEmpty()) {
+			return ResponseEntity.badRequest().body("Empty request body");
 		}
+
+		ObjectMapper mapper = new ObjectMapper()
+				.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+		Object toConvert = payload.containsKey("values") ? payload.get("values") : payload;
+		InstituteDetail instituteDetail = mapper.convertValue(toConvert, InstituteDetail.class);
+
+		InstituteDetail saved = instituteDetailRepository.save(instituteDetail);
+		List<InstituteDetail> found = instituteDetailRepository.findByInstituteName(saved.getInstituteName());
+		return ResponseEntity.ok(found);
 	}
+
 
 
 
