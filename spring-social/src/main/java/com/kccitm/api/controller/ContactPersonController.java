@@ -53,17 +53,21 @@ public class ContactPersonController {
 
     @PutMapping("/update/{id}")
     public ResponseEntity<?> updateContactPerson(@PathVariable Long id, @RequestBody ContactPerson body) {
-        return contactPersonRepository.findById(id)
-            .map(existing -> {
-                // copy fields you allow to update
-                existing.setName(body.getName());
-                existing.setEmail(body.getEmail());
-                existing.setPhone(body.getPhone());
-                // ... other fields
-                contactPersonRepository.save(existing);
-                return ResponseEntity.ok(existing);
-            })
-            .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body("ContactPerson not found"));
+        Optional<ContactPerson> opt = contactPersonRepository.findById(id);
+        if (!opt.isPresent()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("ContactPerson not found");
+        }
+
+        ContactPerson existing = opt.get();
+
+        existing.setName(body.getName());
+        existing.setEmail(body.getEmail());
+        existing.setPhoneNumber(body.getPhoneNumber()); 
+        existing.setDesignation(body.getDesignation());
+        existing.setGender(body.getGender());
+
+        ContactPerson saved = contactPersonRepository.save(existing);
+        return ResponseEntity.ok(saved);
     }
 
 }
