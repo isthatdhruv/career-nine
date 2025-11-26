@@ -643,15 +643,6 @@ const PrivateRoutes = () => {
         />
 
         <Route
-          path="/roles/users"
-          element={
-            <SuspensedView>
-              <Users />
-            </SuspensedView>
-          }
-        />
-
-        <Route
           path="/roles/role_roleGroup"
           element={
             <SuspensedView>
