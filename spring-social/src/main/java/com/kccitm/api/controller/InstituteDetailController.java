@@ -3,8 +3,10 @@ package com.kccitm.api.controller;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,20 +16,17 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kccitm.api.model.ContactPerson;
 import com.kccitm.api.model.InstituteBranch;
 import com.kccitm.api.model.InstituteBranchBatchMapping;
 import com.kccitm.api.model.InstituteCourse;
 import com.kccitm.api.model.InstituteDetail;
-import com.kccitm.api.model.userDefinedModel.BatchBranchOption;
 import com.kccitm.api.repository.InstituteBatchRepository;
 import com.kccitm.api.repository.InstituteBranchBatchMappingRepository;
 import com.kccitm.api.repository.InstituteBranchRepository;
 import com.kccitm.api.repository.InstituteCourseRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-	
 @RestController
 @RequestMapping("/instituteDetail")
 public class InstituteDetailController {
@@ -95,13 +94,6 @@ public class InstituteDetailController {
 	// 	return bbo;
 	// }
 
-	// @PostMapping(value = "/update", headers = "Accept=application/json")
-	// public List<InstituteDetail> updateInstituteDetail(@RequestBody Map<String, InstituteDetail> inputData) {
-	// 	InstituteDetail r = inputData.get("values");
-	// 	instituteDetailRepository.save(r);
-	// 	return instituteDetailRepository.findByInstituteName(r.getInstituteName());
-	// }
-
 
 	@GetMapping(value = "/delete/{id}", headers = "Accept=application/json")
 	public InstituteDetail deleteUser(@PathVariable("id") int instituteDetailId) {
@@ -110,11 +102,6 @@ public class InstituteDetailController {
 		InstituteDetail r = instituteDetailRepository.save(instituteDetail);
 		return r;
 	}
-	// @PostMapping(value = "/create", headers = "Accept=application/json")
-	// public void createInstituteDetail(@RequestBody InstituteDetail instituteDetail) {
-	// 	instituteDetailRepository.save(instituteDetail);
-	// }
-
 	
 	@PostMapping(value = "/update", consumes = "application/json", produces = "application/json")
 	public InstituteDetail updateInstituteDetail(@RequestBody Map<String, InstituteDetail> payload) {
@@ -125,11 +112,9 @@ public class InstituteDetailController {
 		ObjectMapper mapper = new ObjectMapper()
 				.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-		// Object toConvert = payload.containsKey("values") ? payload.get("values") : payload;
-		// InstituteDetail instituteDetail = mapper.convertValue(toConvert, InstituteDetail.class);
  		InstituteDetail instituteDetail =  payload.get("values");
 		InstituteDetail saved = instituteDetailRepository.save(instituteDetail);
-		// List<InstituteDetail> found = instituteDetailRepository.findByInstituteName(saved.getInstituteName());
+
 		return saved;
 	}
 

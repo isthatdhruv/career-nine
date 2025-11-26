@@ -15,13 +15,6 @@ public interface ContactPersonRepository extends JpaRepository<ContactPerson, Lo
     // Find all contact persons for an institute (by institute_code)
     List<ContactPerson> findByInstitute_InstituteCode(int instituteCode);
 
-    // Basic lookups
-    List<ContactPerson> findByName(String name);
-    List<ContactPerson> findByEmail(String email);
-    List<ContactPerson> findByPhoneNumber(String phoneNumber);
-    List<ContactPerson> findByDesignation(String designation);
-    List<ContactPerson> findByGender(String gender);
-
     // Convenience: getOne (exists on JpaRepository, but re-declared for clarity)
     ContactPerson getOne(Long id);
 

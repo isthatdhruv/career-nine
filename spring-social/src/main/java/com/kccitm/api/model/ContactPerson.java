@@ -34,6 +34,7 @@ public class ContactPerson implements Serializable{
     private String phoneNumber;
     private String designation;
     private String gender;
+    private String type;
 
     // Many contact persons belong to one institute
     //contact person
@@ -84,6 +85,12 @@ public class ContactPerson implements Serializable{
     }
     public void setInstitute(InstituteDetail institute) {
         this.institute = institute;
+    }
+    public String getType() {
+        return type;
+    }
+    public void setType(String type) {
+        this.type = type;
     }
 
 }
