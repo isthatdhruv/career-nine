@@ -299,14 +299,6 @@ const PrivateRoutes = () => {
           }
         />
         <Route
-          path="/contact-person/edit/:id"
-          element={
-            <SuspensedView>
-              <ContactPersonEditPage />
-            </SuspensedView>
-          }
-        />
-        <Route
           path="/board"
           element={
             <SuspensedView>

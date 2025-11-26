@@ -1,17 +1,41 @@
 // ContactPersonTable.tsx
+import React, { useState } from "react";
 import { MDBDataTableV5 } from "mdbreact";
 import { AiFillEdit } from "react-icons/ai";
 import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { DeleteContactInformationData } from "../API/Contact_Person_APIs";
+import ContactPersonEditModal from "./ContactPersonEditModal";
+
+type ContactRow = {
+  id?: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  phoneNumber?: string;
+  gender?: string;
+  designation?: string;
+};
 
 const ContactPersonTable = (props: {
-  data: any;
-  setLoading: any;
-  setPageLoading: any;
+  data?: ContactRow[];
+  setLoading: (v: boolean) => void;
+  setPageLoading: (v: any) => void;
 }) => {
   const navigate = useNavigate();
+  const [modalShowEdit, setModalShowEdit] = useState(false);
+  const [editModalData, setEditModalData] = useState<ContactRow>({
+    id: undefined,
+    name: "",
+    email: "",
+    phone: "",
+    gender: "",
+    designation: "",
+  });
+
+  // Defensive: if no data, use empty array
+  const rowsSource = Array.isArray(props.data) ? props.data : [];
 
   const datatable = {
     columns: [
@@ -44,46 +68,52 @@ const ContactPersonTable = (props: {
       },
     ],
 
-    rows: props.data.map((data: any) => ({
-      name: data.name,
-      email: data.email,
-      phone: data.phoneNumber, // 👈 backend field name
-      actions: (
-        <>
-          <button
-            onClick={() => {
-              navigate(`/contact-person/edit/${data.id}`, {
-                state: { data },
-              });
-            }}
-            className="btn btn-icon btn-primary btn-sm me-3"
-          >
-            <AiFillEdit size={16} />
-          </button>
-          <button
-            onClick={async () => {
-              props.setLoading(true);
-              try {
-                await DeleteContactInformationData(data.id); // 👈 id not contactId
-                props.setPageLoading(["true"]);
-              } catch (error) {
-                console.error("Delete failed:", error);
-                alert("Failed to delete contact person. Please try again.");
-              } finally {
-                props.setLoading(false);
-              }
-            }}
-            className="btn btn-icon btn-danger btn-sm me-3"
-          >
-            <UseAnimations
-              animation={trash}
-              size={22}
-              strokeColor={"#EFF8FE"}
-            />
-          </button>
-        </>
-      ),
-    })),
+    rows: rowsSource.map((row) => {
+      // prefer phone, fallback to phoneNumber
+      const phone = row.phone ?? (row as any).phoneNumber ?? "";
+
+      return {
+        // include an id/key field if your table or actions need it
+        id: row.id,
+        name: row.name ?? "",
+        email: row.email ?? "",
+        phone,
+        actions: (
+          <>
+            <button
+              onClick={() => {
+                setEditModalData(row);
+                setModalShowEdit(true);
+              }}
+              className="btn btn-icon btn-primary btn-sm me-3"
+              type="button"
+            >
+              <AiFillEdit size={16} />
+            </button>
+
+            <button
+              onClick={async () => {
+                props.setLoading(true);
+                try {
+                  if (!row.id) throw new Error("Missing id for delete");
+                  await DeleteContactInformationData(row.id);
+                  props.setPageLoading(["true"]);
+                } catch (error) {
+                  console.error("Delete failed:", error);
+                  alert("Failed to delete contact person. Please try again.");
+                } finally {
+                  props.setLoading(false);
+                }
+              }}
+              className="btn btn-icon btn-danger btn-sm me-3"
+              type="button"
+            >
+              <UseAnimations animation={trash} size={22} strokeColor={"#EFF8FE"} />
+            </button>
+          </>
+        ),
+      };
+    }),
   };
 
   return (
@@ -97,6 +127,14 @@ const ContactPersonTable = (props: {
         pagesAmount={4}
         data={datatable}
       />
+
+      {/* Example: you should render your edit modal somewhere and pass editModalData */}
+      <ContactPersonEditModal
+          show={modalShowEdit}
+          onHide={() => setModalShowEdit(false)}
+          data={editModalData}
+          setPageLoading={props.setPageLoading}
+        />
     </>
   );
 };
