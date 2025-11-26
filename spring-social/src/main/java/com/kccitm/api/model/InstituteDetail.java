@@ -43,6 +43,7 @@ public class InstituteDetail implements Serializable {
     private String city;
     private String state;
     private String phone;
+    private Integer maxClass;
 
     // IMPORTANT FIX: Boolean instead of boolean
     @Column(name = "display")
@@ -51,7 +52,7 @@ public class InstituteDetail implements Serializable {
     @Transient
     private String transientField;
 
-    // One-to-Many: ContactPersons
+    // Many-to-Many: ContactPersons
     @OneToMany(mappedBy = "institute", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JsonManagedReference
     private Set<ContactPerson> contactPersons = new HashSet<>();
@@ -150,5 +151,11 @@ public class InstituteDetail implements Serializable {
 
     public void setInstituteCourse(List<InstituteCourse> instituteCourse) {
         this.instituteCourse = instituteCourse;
+    }
+    public Integer getMaxClass() {
+        return maxClass;
+    }
+    public void setMaxClass(Integer maxClass) {
+        this.maxClass = maxClass;
     }
 }
