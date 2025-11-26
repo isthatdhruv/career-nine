@@ -4,6 +4,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import javax.validation.Valid;
+
+import org.checkerframework.checker.units.qual.C;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -73,19 +76,11 @@ public class ContactPersonController {
     //     ContactPerson saved = contactPersonRepository.save(existing);
     //     return ResponseEntity.ok(saved);
     // }
-    @PostMapping(value = "/update", consumes = "application/json", produces = "application/json")
-	public ContactPerson updateContactPerson(@RequestBody Map<String, ContactPerson> payload) {
-		if (payload == null || payload.isEmpty()) {
-			return null;
-		}
-
-		ObjectMapper mapper = new ObjectMapper()
-				.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-
- 		ContactPerson contactPerson =  payload.get("values");
-		ContactPerson saved = contactPersonRepository.save(contactPerson);
-	
-		return saved;
-	}
+    @PutMapping(value = "/update/{id}", consumes = "application/json", produces = "application/json")
+	public ContactPerson updateContactPerson(@PathVariable("id") Long id, @RequestBody @Valid ContactPerson payload) {
+        payload.setId(id);
+        ContactPerson updatedContactPerson = contactPersonRepository.save(payload);
+        return updatedContactPerson;
+    }
 
 }
