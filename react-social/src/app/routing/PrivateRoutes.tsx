@@ -32,6 +32,7 @@ import AssessmentQuestion from "../pages/CreateAssessment/components/AssessmentQ
 import ContactPersonCreatePage from "../pages/ContactPerson/components/ContactPersonCreatePage";
 import { ContactPersonEditPage } from "../pages/ContactPerson/components";
 import ContactPersonPage from "../pages/ContactPerson/ContactPersonPage";
+import Users from "../pages/Users/Users";
   
 
 const PrivateRoutes = () => {
@@ -604,6 +605,15 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <Role />
+            </SuspensedView>
+          }
+        />
+
+        <Route
+          path="/roles/users"
+          element={
+            <SuspensedView>
+              <Users />
             </SuspensedView>
           }
         />
