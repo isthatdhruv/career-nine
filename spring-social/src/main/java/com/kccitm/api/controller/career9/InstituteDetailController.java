@@ -1,4 +1,4 @@
-package com.kccitm.api.controller;
+package com.kccitm.api.controller.career9;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -95,6 +95,7 @@ public class InstituteDetailController {
 	// }
 
 
+<<<<<<< HEAD:spring-social/src/main/java/com/kccitm/api/controller/InstituteDetailController.java
 	@GetMapping(value = "/delete/{id}", headers = "Accept=application/json")
 	public InstituteDetail deleteUser(@PathVariable("id") int instituteDetailId) {
 		InstituteDetail instituteDetail = instituteDetailRepository.getOne(instituteDetailId);
@@ -108,6 +109,26 @@ public class InstituteDetailController {
 	// }
 
 	//update
+=======
+	// @GetMapping(value = "/delete/{id}", headers = "Accept=application/json")
+	// public InstituteDetail deleteUser(@PathVariable("id") int instituteDetailId) {
+	// 	InstituteDetail instituteDetail = instituteDetailRepository.getOne(instituteDetailId);
+	// 	instituteDetail.setDisplay(false);
+	// 	InstituteDetail r = instituteDetailRepository.save(instituteDetail);
+	// 	return r;
+	// }
+	@GetMapping("/delete/{id}")
+    public InstituteDetail deleteUser(@PathVariable("id") Integer id) {
+        Optional<InstituteDetail> cpOpt = instituteDetailRepository.findById(id);
+        if (cpOpt.isPresent()) {
+            InstituteDetail cp = cpOpt.get();
+            instituteDetailRepository.deleteById(id);
+            return cp;
+        }
+        return null;
+    }
+
+>>>>>>> 8e6e49e (moved files into career-9 and studentcontroller delete):spring-social/src/main/java/com/kccitm/api/controller/career9/InstituteDetailController.java
 	@PostMapping(value = "/update", consumes = "application/json", produces = "application/json")
 	public InstituteDetail updateInstituteDetail(@RequestBody Map<String, InstituteDetail> payload) {
 		if (payload == null || payload.isEmpty()) {
