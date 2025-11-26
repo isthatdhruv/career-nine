@@ -31,6 +31,13 @@ import AssessmentQuestion from "../pages/CreateAssessment/components/AssessmentQ
 import ContactPersonCreatePage from "../pages/ContactPerson/components/ContactPersonCreatePage";
 import { ContactPersonEditPage } from "../pages/ContactPerson/components";
 import ContactPersonPage from "../pages/ContactPerson/ContactPersonPage";
+import LoginPage from "../pages/Login/components/LoginPage";
+import LoginEnterEmail from "../pages/Login/components/LoginEnterEmail";
+import LoginCheckEmail from "../pages/Login/components/LoginCheckEmail";
+import LoginChangePassword from "../pages/Login/components/LoginChangePassword";
+
+
+
   
 
 const PrivateRoutes = () => {
@@ -129,6 +136,33 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <StudentsData />
+            </SuspensedView>
+          }
+        />
+
+        <Route path="/login" element={<LoginPage />} />
+
+        <Route
+          path="/login/reset-password/enter-email"
+          element={
+            <SuspensedView>
+              <LoginEnterEmail />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/login/reset-password/check-email"
+          element={
+            <SuspensedView>
+              <LoginCheckEmail />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/login/reset-password/change-password"
+          element={
+            <SuspensedView>
+              <LoginChangePassword />
             </SuspensedView>
           }
         />
