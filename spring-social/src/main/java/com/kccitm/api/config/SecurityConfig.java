@@ -137,7 +137,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                         "/api/firebase/*", "/api/firebase/*", "/actuator/*", "/auth/**", "/oauth2/callback/google/*",
                         "/oauth2/**", "/user/me", "role/*", "/gender/get",
                         "/category/*", "/board/*",
-                        "/rolegroup/*", "/user/*", "/instituteDetail/*", "/role/*", "/instituteBranch/getbybranchid/*",
+                        "/rolegroup/*", "/user/*", "/instituteDetail/**", "/role/*", "/instituteBranch/getbybranchid/*",
                         "/instituteBatch/getbyid/*", "/instituteCourse/getbyCollegeId/*",
                         "/instituteBranch/getbyCourseId/*", "/instituteSession/getbyBatchId/*",
                         "/section/get", "/api/tools/**", "/tools/**", "/api/measured-qualities/**",
