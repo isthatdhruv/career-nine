@@ -180,7 +180,7 @@ export function AsideMenuMain() {
         fontIcon="bi-app-indicator"
       /> */}
 
-      {/* <AsideMenuItemWithSub
+      <AsideMenuItemWithSub
         to=""
         title="Students Registration"
         fontIcon="bi-app-indicator"
@@ -201,14 +201,14 @@ export function AsideMenuMain() {
           title="Registrations Course Branch Batch page"
           hasBullet={true}
         />
-      </AsideMenuItemWithSub> */}
+      </AsideMenuItemWithSub> */
 
-      {/* <AsideMenuItem
+      <AsideMenuItem
         to="/studentlist"
         title="Student's List & Profile"
         fontIcon="bi-app-indicator"
         icon="/media/icons/duotune/communication/com006.svg"
-      ></AsideMenuItem> */}
+      ></AsideMenuItem>
       {/* <AsideMenuItem
         to="/compiler"
         icon="/media/icons/duotune/coding/cod003.svg"
