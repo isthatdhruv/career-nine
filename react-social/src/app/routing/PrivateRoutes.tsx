@@ -35,6 +35,7 @@ import LoginPage from "../pages/Login/components/LoginPage";
 import LoginEnterEmail from "../pages/Login/components/LoginEnterEmail";
 import LoginCheckEmail from "../pages/Login/components/LoginCheckEmail";
 import LoginChangePassword from "../pages/Login/components/LoginChangePassword";
+import Users from "../pages/Users/components/Users";
 
 
 
@@ -629,6 +630,15 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <Role />
+            </SuspensedView>
+          }
+        />
+
+        <Route
+          path="/roles/users"
+          element={
+            <SuspensedView>
+              <Users />
             </SuspensedView>
           }
         />

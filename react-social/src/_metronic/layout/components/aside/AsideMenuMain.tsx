@@ -250,11 +250,16 @@ export function AsideMenuMain() {
       </div>
       <AsideMenuItemWithSub
         to="/apps/chat"
-        title="Roles"
+        title="Roles and Users"
         fontIcon="bi-chat-left"
         icon="/media/icons/duotune/general/gen019.svg"
       >
         <AsideMenuItem to="roles/role" title="Role" hasBullet={true} />
+        <AsideMenuItem
+          to="roles/users"
+          title="Users"
+          hasBullet={true}
+        />
         <AsideMenuItem
           to="roles/role_roleGroup"
           title="Role - Role Group"
