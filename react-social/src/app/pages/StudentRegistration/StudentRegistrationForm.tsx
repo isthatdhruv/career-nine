@@ -339,11 +339,11 @@ const StudentDetails = () => {
           })
           .catch((error) => {
             console.error(error);
-            window.location.replace("/error");
+            setloading(false);
           });
       } catch (error) {
         console.error(error);
-        window.location.replace("/error");
+        setloading(false);
       }
 
       // formik.resetForm();
@@ -429,11 +429,11 @@ const StudentDetails = () => {
           })
           .catch((error) => {
             console.error(error);
-            window.location.replace("/error");
+            setloading(false);
           });
       } catch (error) {
         console.error(error);
-        window.location.replace("/error");
+        setloading(false);
       }
     }
 
@@ -444,11 +444,11 @@ const StudentDetails = () => {
         })
         .catch((error) => {
           console.error(error);
-          window.location.replace("/error");
+          setloading(false);
         });
     } catch (error) {
       console.error(error);
-      window.location.replace("/error");
+      setloading(false);
     }
 
     try {
@@ -458,11 +458,11 @@ const StudentDetails = () => {
         })
         .catch((error) => {
           console.error(error);
-          window.location.replace("/error");
+          setloading(false);
         });
     } catch (error) {
       console.error(error);
-      window.location.replace("/error");
+      setloading(false);
     }
 
     try {
@@ -472,11 +472,11 @@ const StudentDetails = () => {
         })
         .catch((error) => {
           console.error(error);
-          window.location.replace("/error");
+          setloading(false);
         });
     } catch (error) {
       console.error(error);
-      window.location.replace("/error");
+      setloading(false);
     }
 
     try {
@@ -488,11 +488,13 @@ const StudentDetails = () => {
         })
         .catch((error) => {
           console.error(error);
-          window.location.replace("/error");
+          setCourseDataLoading(false);
+          setloading(false);
         });
     } catch (error) {
       console.error(error);
-      window.location.replace("/error");
+      setCourseDataLoading(false);
+      setloading(false);
     }
 
     // try {
@@ -1675,7 +1677,7 @@ const StudentDetails = () => {
                   )}
               </div>
             </div>
-            <div className="row g-9 mb-8 mt-1">
+            <div className="row g-9 mb-4 mt-0 mx-auto">
               <div className="fv-row fv-plugins-icon-container">
                 <label className=" fs-6 fw-bold mb-2">
                   <div className="form-check form-check-custom form-check-solid mx-3 ">
