@@ -44,6 +44,8 @@ public class InstituteDetail implements Serializable {
     private String state;
     private String phone;
     private Integer maxClass;
+    private Integer maxStudents;
+    private Integer maxContactPersons;
 
     // IMPORTANT FIX: Boolean instead of boolean
     @Column(name = "display")
@@ -157,5 +159,17 @@ public class InstituteDetail implements Serializable {
     }
     public void setMaxClass(Integer maxClass) {
         this.maxClass = maxClass;
+    }
+    public Integer getMaxStudents() {
+        return maxStudents;
+    }
+    public void setMaxStudents(Integer maxStudents) {
+        this.maxStudents = maxStudents;
+    }
+    public Integer getMaxContactPersons() {
+        return maxContactPersons;
+    }
+    public void setMaxContactPersons(Integer maxContactPersons) {
+        this.maxContactPersons = maxContactPersons;
     }
 }
