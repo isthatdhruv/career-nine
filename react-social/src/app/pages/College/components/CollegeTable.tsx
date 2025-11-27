@@ -5,11 +5,12 @@ import { AiFillEdit, AiOutlineInfoCircle } from "react-icons/ai";
 import { Link } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
-import { Button } from "react-bootstrap-v5";
+import { Button, Dropdown } from "react-bootstrap-v5";
 
 import { DeleteCollegeData } from "../API/College_APIs";
 import CollegeEditModal from "./CollegeEditModal";
 import CollegeInfoModal from "./CollegeInfoModal";
+import CollegeAssignRoleModal from "../components/CollegeAssignRoleModal";
 
 // Layout reference image (local path)
 const layoutImagePath = "/mnt/data/556d6c4d-1033-4fd7-8d4f-f02d4f436ce2.png";
@@ -57,8 +58,14 @@ const CollegeTable = (props: {
 
   // Info modal state: typed as ModalData | undefined
   const [infoModalShow, setInfoModalShow] = useState(false);
-  const [infoModalData, setInfoModalData] = useState<ModalData | undefined>(undefined);
+  const [infoModalData, setInfoModalData] = useState<ModalData | undefined>(
+    undefined
+  );
 
+  const [infoRolesModalShow, setInfoRolesModalShow] = useState(false);
+  const [infoRolesModalData, setInfoRolesModalData] = useState<ModalData | undefined>(
+    undefined
+  );
   // convert a table row into the modal-compatible partial form shape
   const toModalData = (row: CollegeRow): ModalData => {
     // convert boolean display -> numeric (1/0), keep numeric/string as is
@@ -74,7 +81,9 @@ const CollegeTable = (props: {
       // preserve if API returned these already, otherwise use minimal defaults
       questionOptions: row.questionOptions ?? [""],
       contactPersons:
-        row.contactPersons && Array.isArray(row.contactPersons) && row.contactPersons.length
+        row.contactPersons &&
+        Array.isArray(row.contactPersons) &&
+        row.contactPersons.length
           ? row.contactPersons
           : [
               {
@@ -96,7 +105,8 @@ const CollegeTable = (props: {
         // if display is boolean, require true; if string/number, treat "true"/1 as shown
         if (typeof d.display === "boolean") return d.display === true;
         if (typeof d.display === "number") return d.display !== 0;
-        if (typeof d.display === "string") return d.display !== "0" && d.display !== "false";
+        if (typeof d.display === "string")
+          return d.display !== "0" && d.display !== "false";
         return Boolean(d.display);
       })
       .map((data) => ({
@@ -151,31 +161,70 @@ const CollegeTable = (props: {
               }}
               className="btn btn-icon btn-danger btn-sm me-3"
             >
-              <UseAnimations animation={trash} size={22} strokeColor={"#EFF8FE"} />
+              <UseAnimations
+                animation={trash}
+                size={22}
+                strokeColor={"#EFF8FE"}
+              />
             </button>
 
-            {/* Add Course Button */}
-            <Link
-              to="/course"
-              state={{
-                collegeId: data.instituteCode,
-                college: data.instituteName,
-              }}
-              className="btn btn-sm btn-info me-3"
-            >
-              Add Course
-            </Link>
+            {/* Actions Dropdown - Combines Add Course, Info, and Assign Role */}
+            <Dropdown className="d-inline">
+              <Dropdown.Toggle 
+                variant="success" 
+                size="sm" 
+                id={`dropdown-${data.instituteCode}`}
+                className="dropdown-toggle"
+              >
+                Actions
+              </Dropdown.Toggle>
 
-            {/* Info Button - opens modal instead of navigation */}
-            <Button
-              variant="primary"
-              onClick={() => {
-                setInfoModalData(toModalData(data));
-                setInfoModalShow(true);
-              }}
-            >
-              <AiOutlineInfoCircle size={18} />
-            </Button>
+              <Dropdown.Menu 
+                style={{ 
+                  maxHeight: 'unset', 
+                  overflow: 'visible',
+                  minWidth: '150px'
+                }}
+                renderOnMount
+              >
+                {/* Add Course */}
+                <Link
+                  to="/course"
+                  state={{
+                    collegeId: data.instituteCode,
+                    college: data.instituteName,
+                  }}
+                  style={{ textDecoration: 'none' }}
+                >
+                  <Dropdown.Item as="button">
+                    <AiOutlineInfoCircle size={18} className="me-2" />
+                    Add Course
+                  </Dropdown.Item>
+                </Link>
+
+                {/* Info */}
+                <Dropdown.Item
+                  onClick={() => {
+                    setInfoModalData(toModalData(data));
+                    setInfoModalShow(true);
+                  }}
+                >
+                  <AiOutlineInfoCircle size={18} className="me-2" />
+                  Info
+                </Dropdown.Item>
+
+                {/* Assign Role */}
+                <Dropdown.Item
+                  onClick={() => {
+                    setInfoRolesModalData(toModalData(data));
+                    setInfoRolesModalShow(true);
+                  }}
+                >
+                  <AiOutlineInfoCircle size={18} className="me-2" />
+                  Assign Roles
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
           </>
         ),
       })) ?? [];
@@ -237,6 +286,14 @@ const CollegeTable = (props: {
         show={infoModalShow}
         onHide={() => setInfoModalShow(false)}
         data={infoModalData}
+        setPageLoading={props.setPageLoading}
+      />
+
+      {/* Assign Roles */}
+      <CollegeAssignRoleModal
+        show={infoRolesModalShow}
+        onHide={() => setInfoRolesModalShow(false)}
+        data={infoRolesModalData}
         setPageLoading={props.setPageLoading}
       />
     </>
