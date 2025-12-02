@@ -192,6 +192,7 @@ const CollegeCreateModal = ({ setPageLoading, show, onHide }: Props) => {
                   </div>
                 )}
               </div>
+              
             </div>
           </div>
         </Modal.Body>
