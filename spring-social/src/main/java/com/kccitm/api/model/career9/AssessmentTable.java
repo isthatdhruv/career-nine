@@ -36,6 +36,8 @@ public class AssessmentTable implements java.io.Serializable {
 
     private String endDate;
 
+    
+
     @OneToOne
     @JoinColumn(name = "institute_code")
     private InstituteDetail institute;
