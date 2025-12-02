@@ -62,9 +62,6 @@ public class InstituteDetail implements Serializable {
     @OneToMany(mappedBy = "institute", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private List<InstituteCourse> instituteCourse;
 
-    // ------------------------------
-    //           GETTERS / SETTERS
-    // ------------------------------
 
     public Integer getInstituteCode() {
         return instituteCode;
