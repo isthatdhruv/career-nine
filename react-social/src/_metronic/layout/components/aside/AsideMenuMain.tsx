@@ -44,6 +44,13 @@ export function AsideMenuMain() {
       />
 
       <AsideMenuItem
+        to="/contact-person"
+        icon="/media/icons/duotune/general/gen044.svg"
+        title="Add Contact Person Information"
+        fontIcon="bi-app-indicator"
+      />
+
+      <AsideMenuItem
         to="/tools"
         icon="/media/icons/duotune/general/gen044.svg"
         title="Tools"
@@ -173,7 +180,7 @@ export function AsideMenuMain() {
         fontIcon="bi-app-indicator"
       /> */}
 
-      {/* <AsideMenuItemWithSub
+      <AsideMenuItemWithSub
         to=""
         title="Students Registration"
         fontIcon="bi-app-indicator"
@@ -194,14 +201,14 @@ export function AsideMenuMain() {
           title="Registrations Course Branch Batch page"
           hasBullet={true}
         />
-      </AsideMenuItemWithSub> */}
+      </AsideMenuItemWithSub> */
 
-      {/* <AsideMenuItem
+      <AsideMenuItem
         to="/studentlist"
         title="Student's List & Profile"
         fontIcon="bi-app-indicator"
         icon="/media/icons/duotune/communication/com006.svg"
-      ></AsideMenuItem> */}
+      ></AsideMenuItem>
       {/* <AsideMenuItem
         to="/compiler"
         icon="/media/icons/duotune/coding/cod003.svg"
@@ -243,11 +250,16 @@ export function AsideMenuMain() {
       </div>
       <AsideMenuItemWithSub
         to="/apps/chat"
-        title="Roles"
+        title="Roles and Users"
         fontIcon="bi-chat-left"
         icon="/media/icons/duotune/general/gen019.svg"
       >
         <AsideMenuItem to="roles/role" title="Role" hasBullet={true} />
+        <AsideMenuItem
+          to="roles/users"
+          title="Users"
+          hasBullet={true}
+        />
         <AsideMenuItem
           to="roles/role_roleGroup"
           title="Role - Role Group"

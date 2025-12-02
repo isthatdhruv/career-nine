@@ -107,20 +107,19 @@ const studnetSchema = Yup.object()
       ),
   })
   .when((values, schema) => {
-    if (values._0thboard == 1) {
+    if (values._0thboard === "other") {
       return schema.shape({
         other10thBoard: Yup.string().required("Other 10th Board is required"),
       });
     }
   })
   .when((values, schema) => {
-    if (values._2thboardSS == 1) {
+    if (values._2thboardSS === "other") {
       return schema.shape({
         other12thBoard: Yup.string().required("Other 12th Board is required"),
       });
     }
   });
-
 const StudentDetails = () => {
   const [genderData, setGenderData] = useState([]);
   const [generate, setGenerate] = useState(true);
@@ -339,11 +338,11 @@ const StudentDetails = () => {
           })
           .catch((error) => {
             console.error(error);
-            window.location.replace("/error");
+            setloading(false);
           });
       } catch (error) {
         console.error(error);
-        window.location.replace("/error");
+        setloading(false);
       }
 
       // formik.resetForm();
@@ -429,11 +428,11 @@ const StudentDetails = () => {
           })
           .catch((error) => {
             console.error(error);
-            window.location.replace("/error");
+            setloading(false);
           });
       } catch (error) {
         console.error(error);
-        window.location.replace("/error");
+        setloading(false);
       }
     }
 
@@ -444,11 +443,11 @@ const StudentDetails = () => {
         })
         .catch((error) => {
           console.error(error);
-          window.location.replace("/error");
+          setloading(false);
         });
     } catch (error) {
       console.error(error);
-      window.location.replace("/error");
+      setloading(false);
     }
 
     try {
@@ -458,11 +457,11 @@ const StudentDetails = () => {
         })
         .catch((error) => {
           console.error(error);
-          window.location.replace("/error");
+          setloading(false);
         });
     } catch (error) {
       console.error(error);
-      window.location.replace("/error");
+      setloading(false);
     }
 
     try {
@@ -472,11 +471,11 @@ const StudentDetails = () => {
         })
         .catch((error) => {
           console.error(error);
-          window.location.replace("/error");
+          setloading(false);
         });
     } catch (error) {
       console.error(error);
-      window.location.replace("/error");
+      setloading(false);
     }
 
     try {
@@ -488,11 +487,13 @@ const StudentDetails = () => {
         })
         .catch((error) => {
           console.error(error);
-          window.location.replace("/error");
+          setCourseDataLoading(false);
+          setloading(false);
         });
     } catch (error) {
       console.error(error);
-      window.location.replace("/error");
+      setCourseDataLoading(false);
+      setloading(false);
     }
 
     // try {
@@ -692,36 +693,36 @@ const StudentDetails = () => {
                   style={{ borderRadius: "3px" }}
                 />
                 <div className="d-flex">
-                {isRegrstrar && (
-                  <div className="form-check form-check-custom form-check-solid mx-3 mt-8">
-                    <input
-                      className="form-check-input"
-                      type="checkbox"
-                      style={{
-                        width: "16px",
-                        height: "16px",
-                        borderRadius: "4px",
-                      }}
-                      defaultChecked={formik.values.check.webcam_photo}
-                      onChange={(data) => {
-                        formik.setFieldValue(
-                          "check.webcam_photo",
-                          data.target.checked
-                        );
-                      }}
-                    />
-                  </div>
-                )}
-                <Button
-                  variant="outline-danger"
-                  className="mt-8"
-                  onClick={() => {
-                    formik.setFieldValue("webcamPhoto", "");
-                  }}
-                >
-                  {" "}
-                  Delete
-                </Button>
+                  {isRegrstrar && (
+                    <div className="form-check form-check-custom form-check-solid mx-3 mt-8">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        style={{
+                          width: "16px",
+                          height: "16px",
+                          borderRadius: "4px",
+                        }}
+                        defaultChecked={formik.values.check.webcam_photo}
+                        onChange={(data) => {
+                          formik.setFieldValue(
+                            "check.webcam_photo",
+                            data.target.checked
+                          );
+                        }}
+                      />
+                    </div>
+                  )}
+                  <Button
+                    variant="outline-danger"
+                    className="mt-8"
+                    onClick={() => {
+                      formik.setFieldValue("webcamPhoto", "");
+                    }}
+                  >
+                    {" "}
+                    Delete
+                  </Button>
                 </div>
               </>
             )}
@@ -1675,7 +1676,7 @@ const StudentDetails = () => {
                   )}
               </div>
             </div>
-            <div className="row g-9 mb-8 mt-1">
+            <div className="row g-9 mb-4 mt-0 mx-auto">
               <div className="fv-row fv-plugins-icon-container">
                 <label className=" fs-6 fw-bold mb-2">
                   <div className="form-check form-check-custom form-check-solid mx-3 ">
@@ -1842,7 +1843,8 @@ const StudentDetails = () => {
                         ["_0thboard"]: true,
                       });
 
-                      data.target.value == 1
+                      // Check if "Other Board" is selected
+                      data.target.value === "other"
                         ? setOther10thBoard(true)
                         : setOther10thBoard(false);
 
@@ -1864,14 +1866,12 @@ const StudentDetails = () => {
                       Select 10th Board
                     </option>
                     {boardData.map((board: any, index: any) => (
-                      <>
-                        <option value={board.id} key={index}>
-                          {board.permanent
-                            ? board.name
-                            : board.name + "(Temporary)"}
-                        </option>
-                      </>
+                      <option value={board.id} key={index}>
+                        {board.permanent ? board.name : board.name}
+                      </option>
                     ))}
+                    {/* Add Other Board option */}
+                    <option value="other">Other Board</option>
                   </select>
                   {formik.touched._0thboard && formik.errors._0thboard && (
                     <>{formik.errors._0thboard}</>
@@ -2041,19 +2041,10 @@ const StudentDetails = () => {
                         ["_2thboardSS"]: true,
                       });
 
-                      data.target.value == 1
+                      // Check if "Other Board" is selected
+                      data.target.value === "other"
                         ? setOther12thBoard(true)
                         : setOther12thBoard(false);
-
-                      // if (data.target.value == 4) {
-                      //   list_of_Document[10].required = false;
-                      //   list_of_Document[9].required = true;
-                      // } else {
-                      //   list_of_Document[9].required = false;
-                      //   list_of_Document[10].required = true;
-                      // }
-
-                      // setlistofDocument(list_of_Document);
 
                       formik.setFieldValue("_2thboardSS", data.target.value);
                     }}
@@ -2075,14 +2066,12 @@ const StudentDetails = () => {
                       Select 12th Board
                     </option>
                     {boardData.map((board: any, index: any) => (
-                      <>
-                        <option value={board.id} key={index}>
-                          {board.permanent
-                            ? board.name
-                            : board.name + "(Temporary)"}
-                        </option>
-                      </>
+                      <option value={board.id} key={index}>
+                        {board.permanent ? board.name : board.name}
+                      </option>
                     ))}
+                    {/* Add Other Board option */}
+                    <option value="other">Other Board</option>
                   </select>
                   {formik.touched._2thboardSS && formik.errors._2thboardSS && (
                     <>{formik.errors._2thboardSS}</>

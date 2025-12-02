@@ -29,6 +29,17 @@ import AssessmentToolPage from "../pages/CreateAssessment/components/AssessmentT
 import AssessmentUploadFile from "../pages/CreateAssessment/components/AssessmentUploadFile";
 import AssessmentSection from "../pages/CreateAssessment/components/AssessmentSection";
 import AssessmentQuestion from "../pages/CreateAssessment/components/AssessmentQuestion";
+import ContactPersonCreatePage from "../pages/ContactPerson/components/ContactPersonCreatePage";
+import { ContactPersonEditPage } from "../pages/ContactPerson/components";
+import ContactPersonPage from "../pages/ContactPerson/ContactPersonPage";
+import LoginPage from "../pages/Login/components/LoginPage";
+import LoginEnterEmail from "../pages/Login/components/LoginEnterEmail";
+import LoginCheckEmail from "../pages/Login/components/LoginCheckEmail";
+import LoginChangePassword from "../pages/Login/components/LoginChangePassword";
+import Users from "../pages/Users/components/Users";
+
+
+
   
 
 const PrivateRoutes = () => {
@@ -127,6 +138,33 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <StudentsData />
+            </SuspensedView>
+          }
+        />
+
+        <Route path="/login" element={<LoginPage />} />
+
+        <Route
+          path="/login/reset-password/enter-email"
+          element={
+            <SuspensedView>
+              <LoginEnterEmail />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/login/reset-password/check-email"
+          element={
+            <SuspensedView>
+              <LoginCheckEmail />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/login/reset-password/change-password"
+          element={
+            <SuspensedView>
+              <LoginChangePassword />
             </SuspensedView>
           }
         />
@@ -280,7 +318,22 @@ const PrivateRoutes = () => {
           }
         />
 
-
+        <Route
+          path="/contact-person"
+          element={
+            <SuspensedView>
+              <ContactPersonPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/contact-person/create"
+          element={
+            <SuspensedView>
+              <ContactPersonCreatePage />
+            </SuspensedView>
+          }
+        />
         <Route
           path="/board"
           element={
@@ -586,6 +639,15 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <Role />
+            </SuspensedView>
+          }
+        />
+
+        <Route
+          path="/roles/users"
+          element={
+            <SuspensedView>
+              <Users />
             </SuspensedView>
           }
         />

@@ -132,12 +132,12 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                         "/**/*.css",
                         "/**/*.js")
                 .permitAll()
-                .antMatchers("/assessment-questions/*/*","/assessment-questions/*","/assessments/*","/api/**", "/api/**/**", "/**/**/**", "/api/assessment-questions/**",
+                .antMatchers("/contact-person/**","/assessment-questions/*/*","/assessment-questions/*","/assessments/*","/api/**", "/api/**/**", "/api/**/**/**", "/api/assessment-questions/**",
                         "/api/question-sections/**", "/api/assessment-questions/*/*", "/api/firebase/*/*",
                         "/api/firebase/*", "/api/firebase/*", "/actuator/*", "/auth/**", "/oauth2/callback/google/*",
                         "/oauth2/**", "/user/me", "role/*", "/gender/get",
                         "/category/*", "/board/*",
-                        "/rolegroup/*", "/user/*", "/instituteDetail/*", "/role/*", "/instituteBranch/getbybranchid/*",
+                        "/rolegroup/*", "/user/*", "/instituteDetail/**", "/role/*", "/instituteBranch/getbybranchid/*",
                         "/instituteBatch/getbyid/*", "/instituteCourse/getbyCollegeId/*",
                         "/instituteBranch/getbyCourseId/*", "/instituteSession/getbyBatchId/*",
                         "/section/get", "tools/**", "/tools/**", "measured-qualities/**",
