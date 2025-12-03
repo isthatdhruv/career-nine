@@ -28,7 +28,7 @@ import SectionQuestionSelector from "./SectionQuestionSelector";
 const validationSchema = Yup.object().shape({
   // Basic Info
   instructions: Yup.object().optional(),
-  isFree: Yup.string().required("Assessment price type is required"),
+  isFree: Yup.string().required("Questionare price type is required"),
   price: Yup.number()
     .typeError("Price must be a number")
     .when("isFree", {
@@ -46,7 +46,7 @@ const validationSchema = Yup.object().shape({
   sectionIds: Yup.array().min(1, "At least one section must be selected"),
 });
 
-const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }) => {
+const QuestionareCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const [loading, setLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
   const navigate = useNavigate();
@@ -92,28 +92,29 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
   // pre-filled mapping from fetched questions: sectionId -> [questionId,...]
   const [preSectionQuestions, setPreSectionQuestions] = useState<{ [k: string]: string[] }>({});
 
-  // Get assessment data from localStorage (passed from modal)
-  const [assessmentData, setAssessmentData] = useState<any>(null);
+  // Get questionare data from localStorage (passed from modal)
+  const [questionareData, setQuestionareData] = useState<any>(null);
 
   useEffect(() => {
-    const savedData = localStorage.getItem('assessmentStep2');
+    const savedData = localStorage.getItem('questionareStep2');
     if (savedData) {
       try {
         const parsed = JSON.parse(savedData);
-        setAssessmentData(parsed);
+        setQuestionareData(parsed);
       } catch (error) {
-        console.error('Error parsing assessment data:', error);
+        console.error('Error parsing questionare data:', error);
         // Redirect back if no valid data
-        navigate('/assessments');
+        // navigate('/questionares');
       }
     } else {
+      console.log("Adista is cool but fool")
       // Redirect back if no data
-      navigate('/assessments');
+      // navigate('/questionares/create');
     }
   }, [navigate]);
 
   const initialValues = useMemo(() => ({
-    // Remove name and collegeId - these come from assessmentData
+    // Remove name and collegeId - these come from questionareData
     instructions: { "English": "" },
     sectionInstructions: {} as { [sectionId: string]: { [language: string]: string } },
     price: 0,
@@ -287,14 +288,14 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
     setLoading(true);
     
     try {
-      // Combine assessment data from modal with current form values
+      // Combine questionare data from modal with current form values
       const completePayload = {
-        // From modal (AssessmentCreateModal)
-        name: assessmentData?.name || '',
-        mode: assessmentData?.mode || 'online',
-        collegeId: assessmentData?.collegeId || '',
-        schoolContactIds: assessmentData?.schoolContactIds || [],
-        career9ContactIds: assessmentData?.career9ContactIds || [],
+        // From modal (QuestionareCreateModal)
+        name: questionareData?.name || '',
+        mode: questionareData?.mode || 'online',
+        collegeId: questionareData?.collegeId || '',
+        schoolContactIds: questionareData?.schoolContactIds || [],
+        career9ContactIds: questionareData?.career9ContactIds || [],
         
         // From current form
         instructions: values.instructions,
@@ -324,25 +325,25 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
       console.log(JSON.stringify(completePayload, null, 2));
       
       // Show alert with summary
-      alert(`Assessment data prepared successfully!\n\nSummary:\n- Name: ${completePayload.name}\n- College: ${completePayload.collegeId}\n- Mode: ${completePayload.mode}\n- Sections: ${values.sectionIds.length}\n- Questions: ${Object.values(values.sectionQuestions).flat().length}\n\nCheck console for complete data.`);
+      alert(`Questionare data prepared successfully!\n\nSummary:\n- Name: ${completePayload.name}\n- College: ${completePayload.collegeId}\n- Mode: ${completePayload.mode}\n- Sections: ${values.sectionIds.length}\n- Questions: ${Object.values(values.sectionQuestions).flat().length}\n\nCheck console for complete data.`);
       
       // Clear localStorage
-      localStorage.removeItem('assessmentStep2');
+      localStorage.removeItem('questionareStep2');
       
-      // Uncomment below when ready to actually create assessment
-      // const response = await CreateAssessmentData(completePayload);
+      // Uncomment below when ready to actually create questionare
+      // const response = await CreateQuestionareData(completePayload);
       // if (response.status === 200 || response.status === 201) {
-      //   alert("✅ Assessment created successfully!");
-      //   navigate("/assessments");
+      //   alert("✅ Questionare created successfully!");
+      //   navigate("/questionares");
       // } else {
-      //   throw new Error("Failed to create assessment");
+      //   throw new Error("Failed to create questionare");
       // }
       
-      navigate("/assessments");
+      navigate("/questionares");
       
     } catch (error) {
-      console.error("Error creating assessment:", error);
-      alert("❌ Error creating assessment. Please try again.");
+      console.error("Error creating questionare:", error);
+      alert("❌ Error creating questionare. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -364,7 +365,7 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
   }, [questions]);
 
   // Show loading screen while data is being fetched
-  if (dataLoading || !isDataLoaded || !assessmentData) {
+  if (dataLoading || !isDataLoaded || !questionareData) {
     return (
       <div className="container-fluid py-5">
         <div className="row justify-content-center">
@@ -374,8 +375,8 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                 <div className="mb-4">
                   <Spinner animation="border" variant="primary" style={{ width: '3rem', height: '3rem' }} />
                 </div>
-                <h3 className="text-muted mb-3">Loading Assessment Builder</h3>
-                <p className="text-muted mb-4">Please wait while we prepare your assessment creation tools...</p>
+                <h3 className="text-muted mb-3">Loading Questionare Builder</h3>
+                <p className="text-muted mb-4">Please wait while we prepare your questionare creation tools...</p>
                 
                 {/* Loading Progress */}
                 <div className="row justify-content-center">
@@ -437,12 +438,12 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                   </div>
                 </div>
 
-                {/* Assessment Info Preview */}
-                {assessmentData && (
+                {/* Questionare Info Preview */}
+                {questionareData && (
                   <div className="mt-4 p-3 bg-light rounded">
-                    <small className="text-muted d-block mb-2">Building assessment for:</small>
-                    <h5 className="text-primary mb-0">{assessmentData.name}</h5>
-                    <small className="text-muted">Mode: {assessmentData.mode} | College ID: {assessmentData.collegeId}</small>
+                    <small className="text-muted d-block mb-2">Building questionare for:</small>
+                    <h5 className="text-primary mb-0">{questionareData.name}</h5>
+                    <small className="text-muted">Mode: {questionareData.mode} | College ID: {questionareData.collegeId}</small>
                   </div>
                 )}
               </div>
@@ -459,15 +460,15 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
         <div className="col-12 col-xl-10">
           <div className="card shadow-sm">
             <div className="card-header text-center">
-              <h1 className="mb-2 py-3">Complete Assessment Setup</h1>
-              {assessmentData && (
+              <h1 className="mb-2 py-3">Complete Questionare Setup</h1>
+              {questionareData && (
                 <div className="mb-3">
-                  <h4 className="text-primary mb-1">{assessmentData.name}</h4>
+                  <h4 className="text-primary mb-1">{questionareData.name}</h4>
                   <small className="text-muted">
-                    Mode: {assessmentData.mode.toUpperCase()} | 
-                    College: {colleges.find(c => c.instituteCode === assessmentData.collegeId || c.id === assessmentData.collegeId)?.instituteName || assessmentData.collegeId}
-                    {assessmentData.schoolContactIds?.length > 0 && ` | School Contacts: ${assessmentData.schoolContactIds.length}`}
-                    {assessmentData.career9ContactIds?.length > 0 && ` | Career-9 Contacts: ${assessmentData.career9ContactIds.length}`}
+                    Mode: {questionareData.mode.toUpperCase()} | 
+                    College: {colleges.find(c => c.instituteCode === questionareData.collegeId || c.id === questionareData.collegeId)?.instituteName || questionareData.collegeId}
+                    {questionareData.schoolContactIds?.length > 0 && ` | School Contacts: ${questionareData.schoolContactIds.length}`}
+                    {questionareData.career9ContactIds?.length > 0 && ` | Career-9 Contacts: ${questionareData.career9ContactIds.length}`}
                   </small>
                 </div>
               )}
@@ -489,7 +490,7 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                     <div className="card-header">
                       <h3 className="card-title mb-0">
                         <i className="fas fa-cog text-primary me-2"></i>
-                        1. Assessment Configuration
+                        1. Questionare Configuration
                         {values.isFree && values.languages.length > 0 && (
                           <span className="badge badge-success ms-2">Complete</span>
                         )}
@@ -501,7 +502,7 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                           {/* Pricing */}
                           <div className="fv-row mb-7">
                             <label className="required fs-6 fw-bold mb-2">
-                              Assessment Type:
+                              Questionare Type:
                             </label>
                             <Field
                               as="select"
@@ -564,7 +565,7 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                           {/* Language Selection */}
                           <div className="fv-row mb-7">
                             <label className="required fs-6 fw-bold mb-2">
-                              Assessment Languages
+                              Questionare Languages
                             </label>
                             <FieldArray name="languages">
                               {({ push, remove }) => (
@@ -646,7 +647,7 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                             <textarea
                               {...field}
                               rows={4}
-                              placeholder="Enter general instructions for the assessment in English"
+                              placeholder="Enter general instructions for the questionare in English"
                               className="form-control form-control-lg form-control-solid"
                               style={{ resize: "vertical" }}
                               onChange={(e) => {
@@ -677,7 +678,7 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                                   <textarea
                                     {...field}
                                     rows={4}
-                                    placeholder={`Enter general instructions for the assessment in ${language}`}
+                                    placeholder={`Enter general instructions for the questionare in ${language}`}
                                     className="form-control form-control-lg form-control-solid"
                                     style={{ resize: "vertical" }}
                                     onChange={(e) => {
@@ -694,7 +695,7 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                       {(!Array.isArray(values.languages) || values.languages.length === 0) && (
                         <div className="alert alert-info d-flex align-items-center">
                           <i className="fas fa-info-circle me-2"></i>
-                          <span>Select languages in the Assessment Configuration section to add language-specific instructions.</span>
+                          <span>Select languages in the Questionare Configuration section to add language-specific instructions.</span>
                         </div>
                       )}
                     </div>
@@ -969,7 +970,7 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                           {(!Array.isArray(values.languages) || values.languages.length === 0) && (
                             <div className="alert alert-warning d-flex align-items-center">
                               <i className="fas fa-exclamation-triangle me-2"></i>
-                              <span>Select languages in the Assessment Configuration section to add language-specific section instructions.</span>
+                              <span>Select languages in the Questionare Configuration section to add language-specific section instructions.</span>
                             </div>
                           )}
                         </>
@@ -1018,7 +1019,7 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                       <button
                         type="button"
                         className="btn btn-light btn-lg"
-                        onClick={() => navigate("/assessments")}
+                        onClick={() => navigate("/questionares")}
                       >
                         <i className="fas fa-times me-2"></i>
                         Cancel
@@ -1042,13 +1043,13 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
                           {!loading && (
                             <span className="indicator-label">
                               <i className="fas fa-check me-2"></i>
-                              Create Assessment
+                              Create Questionare
                             </span>
                           )}
                           {loading && (
                             <span className="indicator-progress" style={{ display: "block" }}>
                               <i className="fas fa-spinner fa-spin me-2"></i>
-                              Creating Assessment...
+                              Creating Questionare...
                             </span>
                           )}
                         </button>
@@ -1061,15 +1062,15 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
               {/* Preview Modal */}
               <Modal show={showPreviewModal} onHide={() => setShowPreviewModal(false)} size="lg" centered>
                 <Modal.Header closeButton>
-                  <Modal.Title>Assessment Preview</Modal.Title>
+                  <Modal.Title>Questionare Preview</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
-                  {assessmentData && (
+                  {questionareData && (
                     <div className="mb-4 p-3 bg-light rounded">
-                      <h5 className="text-primary mb-1">{assessmentData.name}</h5>
+                      <h5 className="text-primary mb-1">{questionareData.name}</h5>
                       <small className="text-muted">
-                        Mode: {assessmentData.mode.toUpperCase()} | 
-                        College: {colleges.find(c => c.instituteCode === assessmentData.collegeId || c.id === assessmentData.collegeId)?.instituteName || assessmentData.collegeId}
+                        Mode: {questionareData.mode.toUpperCase()} | 
+                        College: {colleges.find(c => c.instituteCode === questionareData.collegeId || c.id === questionareData.collegeId)?.instituteName || questionareData.collegeId}
                       </small>
                     </div>
                   )}
@@ -1184,4 +1185,4 @@ const AssessmentCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }
   );
 };
 
-export default AssessmentCreateSinglePage;
+export default QuestionareCreateSinglePage;
