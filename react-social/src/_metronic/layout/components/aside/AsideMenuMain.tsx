@@ -15,13 +15,7 @@ export function AsideMenuMain() {
         fontIcon="bi-app-indicator"
       />
 
-      <AsideMenuItem
-        to="/assessments"
-        icon="/media/icons/duotune/general/gen044.svg"
-        title="Assessments"
-        fontIcon="bi-app-indicator"
-      />
-
+    
       <AsideMenuItem
         to="/college"
         icon="/media/icons/duotune/general/gen001.svg"
@@ -30,16 +24,9 @@ export function AsideMenuMain() {
       />
 
       <AsideMenuItem
-        to="/assessment-questions"
+        to="/questionare/create"
         icon="/media/icons/duotune/general/gen044.svg"
-        title="Assessment Questions"
-        fontIcon="bi-app-indicator"
-      />
-
-      <AsideMenuItem
-        to="/question-sections"
-        icon="/media/icons/duotune/general/gen044.svg"
-        title="Assessment Sections"
+        title="Create and View Questionare"
         fontIcon="bi-app-indicator"
       />
 
@@ -56,10 +43,16 @@ export function AsideMenuMain() {
         title="Tools"
         fontIcon="bi-app-indicator"
       />
+      <AsideMenuItem
+        to="/list"
+        icon="/media/icons/duotune/general/gen044.svg"
+        title="List"
+        fontIcon="bi-app-indicator"
+      />
 
       <AsideMenuItem
         to="/measured-qualities"
-        icon="/media/icons/duotune/general/gen044.svg"
+        icon="/media/icons/duotune/general/gen044.svg```"
         title="Measured Qualities"
         fontIcon="bi-app-indicator"
       />
@@ -121,16 +114,31 @@ export function AsideMenuMain() {
         fontIcon="bi-app-indicator"
         icon="/media/icons/duotune/communication/com006.svg"
       >
+        <AsideMenuItem
+        to="/assessments"
+        icon="/media/icons/duotune/general/gen044.svg"
+        title="Assessments"
+        fontIcon="bi-app-indicator"
+        />
        <AsideMenuItem
           to="/assessment-sections"
           title="Assessment Section List"
-          hasBullet={true}
+          icon="/media/icons/duotune/general/gen044.svg"
+          fontIcon="bi-app-indicator"
         />
         <AsideMenuItem
-          to="/assessment-questions"
-          title="Assessment Questions"
-          hasBullet={true}
-        /> 
+        to="/assessment-questions"
+        icon="/media/icons/duotune/general/gen044.svg"
+        title="Assessment Questions"
+        fontIcon="bi-app-indicator"
+      />
+
+      <AsideMenuItem
+        to="/question-sections"
+        icon="/media/icons/duotune/general/gen044.svg"
+        title="Assessment Sections"
+        fontIcon="bi-app-indicator"
+      />
       </AsideMenuItemWithSub>
 
       {/* <AsideMenuItem
