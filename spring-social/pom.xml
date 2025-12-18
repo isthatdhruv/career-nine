@@ -137,10 +137,6 @@
 			<groupId>com.google.cloud</groupId>
 			<artifactId>google-cloud-storage</artifactId>
 		</dependency>
-		<dependency>
-			<groupId>com.fasterxml.jackson.core</groupId>
-			<artifactId>jackson-databind</artifactId>
-		</dependency>
 
 		<!-- Firebase Admin SDK -->
 
