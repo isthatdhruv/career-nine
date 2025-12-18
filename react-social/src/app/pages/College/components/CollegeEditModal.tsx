@@ -10,9 +10,6 @@ import { UpdateCollegeData } from "../API/College_APIs";
 const validationSchema = Yup.object().shape({
   instituteName: Yup.string().required(),
   instituteAddress: Yup.string().required(),
-  instituteCode: Yup.string().required(),
-  maxStudents: Yup.string().required(),
-  maxContactPersons: Yup.string().required(),
 });
 
 const CollegeEditModal = (props: {
@@ -27,8 +24,6 @@ const CollegeEditModal = (props: {
     instituteName: props.data.instituteName,
     instituteAddress: props.data.instituteAddress,
     instituteCode: props.data.instituteCode,
-    maxStudents: props.data.maxStudents,
-    maxContactPersons: props.data.maxContactPersons,
     display: 1,
   };
 
@@ -38,7 +33,6 @@ const CollegeEditModal = (props: {
     validationSchema: validationSchema,
     onSubmit: (values) => {
       try {
-        setLoading(true);
         UpdateCollegeData(values).then(() => {
           props.onHide(false);
           props.setPageLoading(["true"]);
@@ -47,6 +41,7 @@ const CollegeEditModal = (props: {
         console.error(error);
         window.location.replace("/error");
       }
+      setLoading(true);
     },
   });
   return (
@@ -160,74 +155,6 @@ const CollegeEditModal = (props: {
                     </div>
                   )}
               </div>
-
-              {/* Max Students */}
-              <div className="fv-row mb-7">
-                <label className="required fs-6 fw-bold mb-2">
-                  Maximum Students :
-                </label>
-                <input
-                  placeholder="Enter Maximum Students"
-                  type="text"
-                  autoComplete="off"
-                  {...formik.getFieldProps("maxStudents")}
-                  className={clsx(
-                    "form-control form-control-lg form-control-solid",
-                    {
-                      "is-invalid text-danger":
-                        formik.touched.maxStudents && !!formik.errors.maxStudents,
-                    },
-                    {
-                      "is-valid":
-                        formik.touched.maxStudents && !formik.errors.maxStudents,
-                    }
-                  )}
-                />
-                {formik.touched.maxStudents && formik.errors.maxStudents && (
-                  <div className="fv-plugins-message-container">
-                    <div className="fv-help-block text-danger">
-                      <span role="alert">Maximum Students is Required</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Max Contact Persons */}
-              <div className="fv-row mb-7">
-                <label className="required fs-6 fw-bold mb-2">
-                  Maximum Contact Persons :
-                </label>
-                <input
-                  placeholder="Enter Maximum Contact Persons"
-                  type="text"
-                  autoComplete="off"
-                  {...formik.getFieldProps("maxContactPersons")}
-                  className={clsx(
-                    "form-control form-control-lg form-control-solid",
-                    {
-                      "is-invalid text-danger":
-                        formik.touched.maxContactPersons &&
-                        !!formik.errors.maxContactPersons,
-                    },
-                    {
-                      "is-valid":
-                        formik.touched.maxContactPersons &&
-                        !formik.errors.maxContactPersons,
-                    }
-                  )}
-                />
-                {formik.touched.maxContactPersons &&
-                  formik.errors.maxContactPersons && (
-                    <div className="fv-plugins-message-container">
-                      <div className="fv-help-block text-danger">
-                        <span role="alert">
-                          Maximum Contact Persons is Required
-                        </span>
-                      </div>
-                    </div>
-                  )}
-              </div>
-
             </div>
           </div>
         </Modal.Body>

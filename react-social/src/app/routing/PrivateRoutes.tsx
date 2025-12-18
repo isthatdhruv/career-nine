@@ -23,26 +23,12 @@ import UploadExcelFile from "../pages/UploadExcelFile/UploadExcelFile";
 // Update these paths to the correct locations of your components
 import Assessments from "../pages/CreateAssessment/Assessment";
 import AssessmentCreatePage from "../pages/CreateAssessment/components/AssessmentCreatePage";
-import QuestionareCreateSinglePage from "../pages/CreateAssessment/components/QuestionareCreateSinglePage";
+import AssessmentCreateSinglePage from "../pages/CreateAssessment/components/AssessmentCreateSinglePage";
 import AssessmentEditPage from "../pages/CreateAssessment/components/AssessmentEditPage";
 import AssessmentToolPage from "../pages/CreateAssessment/components/AssessmentToolPage";
 import AssessmentUploadFile from "../pages/CreateAssessment/components/AssessmentUploadFile";
 import AssessmentSection from "../pages/CreateAssessment/components/AssessmentSection";
 import AssessmentQuestion from "../pages/CreateAssessment/components/AssessmentQuestion";
-import ContactPersonCreatePage from "../pages/ContactPerson/components/ContactPersonCreatePage";
-import { ContactPersonEditPage } from "../pages/ContactPerson/components";
-import ContactPersonPage from "../pages/ContactPerson/ContactPersonPage";
-import LoginPage from "../pages/Login/components/LoginPage";
-import LoginEnterEmail from "../pages/Login/components/LoginEnterEmail";
-import LoginCheckEmail from "../pages/Login/components/LoginCheckEmail";
-import LoginChangePassword from "../pages/Login/components/LoginChangePassword";
-import Users from "../pages/Users/components/Users";
-import ListCreatePage from "../pages/List/components/ListCreatePage";
-import ListEditPage from "../pages/List/components/ListEditPage";
-import ListPage from "../pages/List/CreateList";
-
-
-
   
 
 const PrivateRoutes = () => {
@@ -91,7 +77,6 @@ const PrivateRoutes = () => {
   const MeasuredQualityTypes = lazy(() => import("../pages/MeasuredQualityTypes/CreateMeasuredQualityTypes"));
   const MeasuredQualities = lazy(() => import("../pages/MeasuredQualities/MeasuredQualities"));
   const Tools = lazy(() => import("../pages/Tool/CreateTool"));
-  const List = lazy(() => import("../pages/List/CreateList"));
   const College = lazy(() => import("../pages/College/CollegePage"));
   // Update the import path below to the correct location if the file exists elsewhere
   const CollegeCreatePage = lazy(() => import("../pages/College/CollegePage"));
@@ -142,33 +127,6 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <StudentsData />
-            </SuspensedView>
-          }
-        />
-
-        <Route path="/login" element={<LoginPage />} />
-
-        <Route
-          path="/login/reset-password/enter-email"
-          element={
-            <SuspensedView>
-              <LoginEnterEmail />
-            </SuspensedView>
-          }
-        />
-        <Route
-          path="/login/reset-password/check-email"
-          element={
-            <SuspensedView>
-              <LoginCheckEmail />
-            </SuspensedView>
-          }
-        />
-        <Route
-          path="/login/reset-password/change-password"
-          element={
-            <SuspensedView>
-              <LoginChangePassword />
             </SuspensedView>
           }
         />
@@ -322,22 +280,7 @@ const PrivateRoutes = () => {
           }
         />
 
-        <Route
-          path="/contact-person"
-          element={
-            <SuspensedView>
-              <ContactPersonPage />
-            </SuspensedView>
-          }
-        />
-        <Route
-          path="/contact-person/create"
-          element={
-            <SuspensedView>
-              <ContactPersonCreatePage />
-            </SuspensedView>
-          }
-        />
+
         <Route
           path="/board"
           element={
@@ -456,31 +399,6 @@ const PrivateRoutes = () => {
         />
 
         <Route
-          path="/list"
-          element={
-            <SuspensedView>
-              <ListPage />
-            </SuspensedView>
-          }
-        />
-        <Route
-          path="/list/create"
-          element={
-            <SuspensedView>
-              <ListCreatePage />
-            </SuspensedView>
-          }
-        />
-        <Route
-          path="/list/edit/:id"
-          element={
-            <SuspensedView>
-              <ListEditPage />
-            </SuspensedView>
-          } 
-        />
-
-        <Route
           path="/upload-excel"
           element={
             <SuspensedView>
@@ -496,7 +414,7 @@ const PrivateRoutes = () => {
               <Assessments />
             </SuspensedView>
           }
-        /> 
+        />  
         <Route
           path="/assessments/create/step-2"
           element={
@@ -530,10 +448,10 @@ const PrivateRoutes = () => {
           }
         />
         <Route
-          path="/questionare/create"
+          path="/assessments/create"
           element={
             <SuspensedView>
-              <QuestionareCreateSinglePage />
+              <AssessmentCreateSinglePage />
             </SuspensedView>
           }
         />
@@ -668,15 +586,6 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <Role />
-            </SuspensedView>
-          }
-        />
-
-        <Route
-          path="/roles/users"
-          element={
-            <SuspensedView>
-              <Users />
             </SuspensedView>
           }
         />

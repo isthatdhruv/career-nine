@@ -15,7 +15,13 @@ export function AsideMenuMain() {
         fontIcon="bi-app-indicator"
       />
 
-    
+      <AsideMenuItem
+        to="/assessments"
+        icon="/media/icons/duotune/general/gen044.svg"
+        title="Assessments"
+        fontIcon="bi-app-indicator"
+      />
+
       <AsideMenuItem
         to="/college"
         icon="/media/icons/duotune/general/gen001.svg"
@@ -24,16 +30,16 @@ export function AsideMenuMain() {
       />
 
       <AsideMenuItem
-        to="/questionare/create"
+        to="/assessment-questions"
         icon="/media/icons/duotune/general/gen044.svg"
-        title="Create and View Questionare"
+        title="Assessment Questions"
         fontIcon="bi-app-indicator"
       />
 
       <AsideMenuItem
-        to="/contact-person"
+        to="/question-sections"
         icon="/media/icons/duotune/general/gen044.svg"
-        title="Add Contact Person Information"
+        title="Assessment Sections"
         fontIcon="bi-app-indicator"
       />
 
@@ -43,16 +49,10 @@ export function AsideMenuMain() {
         title="Tools"
         fontIcon="bi-app-indicator"
       />
-      <AsideMenuItem
-        to="/list"
-        icon="/media/icons/duotune/general/gen044.svg"
-        title="List"
-        fontIcon="bi-app-indicator"
-      />
 
       <AsideMenuItem
         to="/measured-qualities"
-        icon="/media/icons/duotune/general/gen044.svg```"
+        icon="/media/icons/duotune/general/gen044.svg"
         title="Measured Qualities"
         fontIcon="bi-app-indicator"
       />
@@ -114,31 +114,16 @@ export function AsideMenuMain() {
         fontIcon="bi-app-indicator"
         icon="/media/icons/duotune/communication/com006.svg"
       >
-        <AsideMenuItem
-        to="/assessments"
-        icon="/media/icons/duotune/general/gen044.svg"
-        title="Assessments"
-        fontIcon="bi-app-indicator"
-        />
        <AsideMenuItem
           to="/assessment-sections"
           title="Assessment Section List"
-          icon="/media/icons/duotune/general/gen044.svg"
-          fontIcon="bi-app-indicator"
+          hasBullet={true}
         />
         <AsideMenuItem
-        to="/assessment-questions"
-        icon="/media/icons/duotune/general/gen044.svg"
-        title="Assessment Questions"
-        fontIcon="bi-app-indicator"
-      />
-
-      <AsideMenuItem
-        to="/question-sections"
-        icon="/media/icons/duotune/general/gen044.svg"
-        title="Assessment Sections"
-        fontIcon="bi-app-indicator"
-      />
+          to="/assessment-questions"
+          title="Assessment Questions"
+          hasBullet={true}
+        /> 
       </AsideMenuItemWithSub>
 
       {/* <AsideMenuItem
@@ -188,7 +173,7 @@ export function AsideMenuMain() {
         fontIcon="bi-app-indicator"
       /> */}
 
-      <AsideMenuItemWithSub
+      {/* <AsideMenuItemWithSub
         to=""
         title="Students Registration"
         fontIcon="bi-app-indicator"
@@ -209,14 +194,14 @@ export function AsideMenuMain() {
           title="Registrations Course Branch Batch page"
           hasBullet={true}
         />
-      </AsideMenuItemWithSub> */
+      </AsideMenuItemWithSub> */}
 
-      <AsideMenuItem
+      {/* <AsideMenuItem
         to="/studentlist"
         title="Student's List & Profile"
         fontIcon="bi-app-indicator"
         icon="/media/icons/duotune/communication/com006.svg"
-      ></AsideMenuItem>
+      ></AsideMenuItem> */}
       {/* <AsideMenuItem
         to="/compiler"
         icon="/media/icons/duotune/coding/cod003.svg"
@@ -258,16 +243,11 @@ export function AsideMenuMain() {
       </div>
       <AsideMenuItemWithSub
         to="/apps/chat"
-        title="Roles and Users"
+        title="Roles"
         fontIcon="bi-chat-left"
         icon="/media/icons/duotune/general/gen019.svg"
       >
         <AsideMenuItem to="roles/role" title="Role" hasBullet={true} />
-        <AsideMenuItem
-          to="roles/users"
-          title="Users"
-          hasBullet={true}
-        />
         <AsideMenuItem
           to="roles/role_roleGroup"
           title="Role - Role Group"

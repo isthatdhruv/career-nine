@@ -5,7 +5,22 @@ import * as Yup from 'yup';
 import { Modal, Button } from 'react-bootstrap';
 import { ReadCollegeData } from '../../College/API/College_APIs';
 import CollegeCreateModal from '../../College/components/CollegeCreateModal';
+import { ReadToolData } from '../../Tool/API/Tool_APIs';
+import ToolCreateModal from '../../Tool/components/ToolCreateModal';
 import { useNavigate } from 'react-router-dom';
+
+/*
+  AssessmentCreateModal
+  ---------------------
+  Replaces the previous multi-page step-1 + step-2 flow (AssessmentCreatePage + AssessmentToolPage)
+  by merging Assessment basic info (name, college, pricing) and Tool selection into a single modal.
+
+  On successful submit it stores the merged payload in localStorage under `assessmentStep2` (to keep
+  compatibility with downstream step-3 logic that previously expected combined data after tool selection)
+  and navigates to `/assessments/create/step-3`.
+
+  If you later refactor step-3 to also be modal-based, update the navigation accordingly.
+*/
 
 interface AssessmentCreateModalProps {
     show: boolean;
@@ -15,79 +30,98 @@ interface AssessmentCreateModalProps {
 
 const validationSchema = Yup.object().shape({
     name: Yup.string().required('Assessment name is required'),
+    isFree: Yup.string().required('Assessment price type is required'),
     mode: Yup.string().oneOf(['online', 'offline']).required('Mode is required'),
+    price: Yup.number()
+        .typeError('Price must be a number')
+        .when('isFree', {
+            is: 'false',
+            then: (schema) => schema.required('Please enter the price').positive('Must be positive'),
+            otherwise: (schema) => schema.notRequired(),
+        }),
     collegeId: Yup.string().required('College is required'),
+    toolId: Yup.string().required('Tool is required'),
 });
 
 const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreateModalProps) => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
-    const [collegeLoading, setCollegeLoading] = useState(false);
 
     const initialValues = {
         name: '',
+        price: 0,
+        isFree: 'true',
         mode: 'online',
         collegeId: '',
-        schoolContactIds: [] as string[],
-        career9ContactIds: [] as string[],
+        toolId: '',
+        schoolContactIds: [] as string[], // multiselect
+        career9ContactIds: [] as string[], // multiselect
     };
 
     const [college, setCollege] = useState<any[]>([]);
+    const [tools, setTools] = useState<any[]>([]);
     const [showCollegeModal, setShowCollegeModal] = useState(false);
+    const [showToolModal, setShowToolModal] = useState(false);
 
     // Fetch Colleges when modal opens
     useEffect(() => {
-        if (!show) return;
-        
+        if (!show) return; // avoid unnecessary fetches when modal is closed
         const fetchCollege = async () => {
-            setCollegeLoading(true);
             try {
-                console.log('Fetching colleges...'); // Debug log
                 const response = await ReadCollegeData();
-                console.log('College response:', response); // Debug log
-                
-                // Handle different response structures
-                if (response?.data) {
-                    setCollege(response.data);
-                } else if (Array.isArray(response)) {
-                    setCollege(response);
-                } else {
-                    console.warn('Unexpected college response format:', response);
-                    setCollege([]);
-                }
+                setCollege(response.data || []);
             } catch (error) {
-                console.error('Error fetching colleges:', error);
-                setCollege([]);
-            } finally {
-                setCollegeLoading(false);
+                console.error('Error fetching college:', error);
             }
         };
-        
         fetchCollege();
     }, [show]);
 
-    // Re-fetch when college create modal closes
+    // Fetch Tools when modal opens
+    useEffect(() => {
+        if (!show) return;
+        const fetchTool = async () => {
+            try {
+                const response = await ReadToolData();
+                setTools(response.data || []);
+            } catch (error) {
+                console.error('Error fetching tool:', error);
+            }
+        };
+        fetchTool();
+    }, [show]);
+
+    // Re-fetch when a create sub-modal closes (so newly created items appear)
     const prevShowCollegeModalRef = useRef(showCollegeModal);
     useEffect(() => {
+        // detect transition: true -> false
         if (prevShowCollegeModalRef.current && !showCollegeModal && show) {
             (async () => {
                 try {
-                    console.log('Re-fetching colleges after create...'); // Debug log
                     const response = await ReadCollegeData();
-                    if (response?.data) {
-                        setCollege(response.data);
-                    } else if (Array.isArray(response)) {
-                        setCollege(response);
-                    } else {
-                        setCollege([]);
-                    }
+                    setCollege(response.data || []);
                 } catch (error) {
-                    console.error('Error re-fetching colleges after create:', error);
+                    console.error('Error re-fetching college after create:', error);
                 }
             })();
         }
         prevShowCollegeModalRef.current = showCollegeModal;
     }, [showCollegeModal, show]);
+
+    const prevShowToolModalRef = useRef(showToolModal);
+    useEffect(() => {
+        if (prevShowToolModalRef.current && !showToolModal && show) {
+            (async () => {
+                try {
+                    const response = await ReadToolData();
+                    setTools(response.data || []);
+                } catch (error) {
+                    console.error('Error re-fetching tool after create:', error);
+                }
+            })();
+        }
+        prevShowToolModalRef.current = showToolModal;
+    }, [showToolModal, show]);
 
     return (
         <Modal show={show} onHide={onHide} centered size="lg">
@@ -101,24 +135,23 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
                 onSubmit={async (values) => {
                     setLoading(true);
                     try {
+                        // const isFreeBool = values.isFree === 'true';
                         const payload = {
                             name: values.name,
-                            mode: values.mode,
+                            //   isFree: isFreeBool,
+                            //   price: isFreeBool ? 0 : Number(values.price),
                             collegeId: values.collegeId,
+                            toolId: values.toolId,
                             schoolContactIds: values.schoolContactIds,
                             career9ContactIds: values.career9ContactIds,
                         };
-                        
-                        console.log('Submitting assessment payload:', payload); // Debug log
-                        
-                        // Store data for next step
+                        // Maintain compatibility: store merged data under assessmentStep2 (previously after tool selection)
                         localStorage.setItem('assessmentStep2', JSON.stringify(payload));
                         onHide();
                         navigate('/assessments/create/step-3');
                     } catch (error) {
-                        console.error('Error submitting assessment:', error);
-                        // Instead of redirecting to error page, you might want to show a toast/alert
-                        alert('Error creating assessment. Please try again.');
+                        console.error(error);
+                        window.location.replace('/error');
                     } finally {
                         setLoading(false);
                     }
@@ -169,18 +202,15 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
                                 <Field
                                     as="select"
                                     name="collegeId"
-                                    disabled={collegeLoading}
                                     className={clsx('form-control form-control-lg form-control-solid', {
                                         'is-invalid text-danger': touched.collegeId && errors.collegeId,
                                         'is-valid': touched.collegeId && !errors.collegeId,
                                     })}
                                 >
-                                    <option value="">
-                                        {collegeLoading ? 'Loading colleges...' : 'Select College'}
-                                    </option>
+                                    <option value="">Select College</option>
                                     {college.map((inst) => (
-                                        <option key={inst.instituteCode || inst.id} value={inst.instituteCode || inst.id}>
-                                            {inst.instituteName || inst.name}
+                                        <option key={inst.instituteCode} value={inst.instituteCode}>
+                                            {inst.instituteName}
                                         </option>
                                     ))}
                                 </Field>
@@ -191,12 +221,49 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
                                         </div>
                                     </div>
                                 )}
-                                {college.length === 0 && !collegeLoading && (
-                                    <small className="text-muted">No colleges found. Add a new college to continue.</small>
-                                )}
                             </div>
 
-                            {/* Mode Of Assessment */}
+                            {/* Tool Selection */}
+                            <div className="fv-row mb-7">
+                                <div className="d-flex justify-content-between align-items-center mb-2">
+                                    <label className="required fs-6 fw-bold">Select Tool</label>
+                                    <Button
+                                        variant="light-primary"
+                                        size="sm"
+                                        type="button"
+                                        onClick={() => setShowToolModal(true)}
+                                    >
+                                        Add New Tool
+                                    </Button>
+                                </div>
+                                <ToolCreateModal
+                                    setPageLoading={setPageLoading ?? (() => { })}
+                                    show={showToolModal}
+                                    onHide={() => setShowToolModal(false)}
+                                />
+                                <Field
+                                    as="select"
+                                    name="toolId"
+                                    className={clsx('form-control form-control-lg form-control-solid', {
+                                        'is-invalid text-danger': touched.toolId && errors.toolId,
+                                        'is-valid': touched.toolId && !errors.toolId,
+                                    })}
+                                >
+                                    <option value="">Select Tool</option>
+                                    {tools.map((tool) => (
+                                        <option key={tool.id} value={tool.id}>
+                                            {tool.name}
+                                        </option>
+                                    ))}
+                                </Field>
+                                {touched.toolId && errors.toolId && (
+                                    <div className="fv-plugins-message-container">
+                                        <div className="fv-help-block text-danger">
+                                            <span role="alert">{errors.toolId}</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                             <div className="fv-row mb-7">
                                 <label className="fs-6 fw-bold mb-2">Mode Of Assessment</label>
                                 <div className="d-flex gap-4">
@@ -229,12 +296,15 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
                                         </label>
                                     </div>
                                 </div>
-                            </div>
 
+
+
+                            </div>
                             {/* School Contacts Checkbox Dropdown */}
                             <div className="fv-row mb-7">
                                 <label className="fs-6 fw-bold mb-2">Select School Contacts (optional)</label>
                                 <div className="border rounded p-3" style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                                    {/* Sample static options - replace with dynamic data later */}
                                     {[
                                         { id: 'sc1', name: 'School Contact A' },
                                         { id: 'sc2', name: 'School Contact B' },
@@ -267,6 +337,7 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
                             <div className="fv-row mb-7">
                                 <label className="fs-6 fw-bold mb-2">Select Career-9 Contacts (optional)</label>
                                 <div className="border rounded p-3" style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                                    {/* Sample static options - replace with dynamic data later */}
                                     {[
                                         { id: 'c9a', name: 'Career-9 Contact A' },
                                         { id: 'c9b', name: 'Career-9 Contact B' },
@@ -294,6 +365,9 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
                                     ))}
                                 </div>
                             </div>
+
+                            {/* Pricing Toggle */}
+
                         </Modal.Body>
                         <Modal.Footer className="d-flex justify-content-end">
                             <Button variant="light" type="button" onClick={onHide} disabled={loading}>

@@ -11,13 +11,6 @@ import javax.persistence.Id;
 import javax.persistence.Table;
 import javax.persistence.Transient;
 
-import javax.persistence.FetchType;
-import javax.persistence.ManyToOne;
-import javax.persistence.JoinColumn;
-
-import com.fasterxml.jackson.annotation.JsonBackReference;
-
-
 /**
  * The persistent class for the institute_courses database table.
  * 
@@ -49,15 +42,6 @@ public class InstituteCourse implements Serializable {
 
 	@Transient
 	private List<InstituteBranch> instituteBranchs;
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(
-		name = "institute_id", 
-		referencedColumnName = "institute_code",
-		insertable = false,
-		updatable = false
-	)
-	@JsonBackReference("inst-course")
-	private InstituteDetail institute;
 
 	// @Transient
 	// @JoinTable(
@@ -125,17 +109,6 @@ public class InstituteCourse implements Serializable {
 
 	public void setInstituteBranchs(List<InstituteBranch> instituteBranchs) {
 		this.instituteBranchs = instituteBranchs;
-	}
-
-	public InstituteDetail getInstitute() {
-    return institute;
-}
-
-	public void setInstitute(InstituteDetail institute) {
-		this.institute = institute;
-		if (institute != null) {
-			this.instituteId = institute.getInstituteCode(); // keep instituteId in sync
-		}
 	}
 
 }

@@ -1,4 +1,4 @@
-package com.kccitm.api.controller.career9;
+package com.kccitm.api.controller;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
