@@ -6,12 +6,6 @@ import java.util.Optional;
 import javax.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
-<<<<<<< HEAD
-import org.springframework.http.HttpStatus;               
-import org.springframework.http.MediaType;             
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-=======
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -22,7 +16,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
->>>>>>> a1af1ad532286dbb0e052338fea4067ac752c569
 
 import com.kccitm.api.model.ContactPerson;
 import com.kccitm.api.repository.ContactPersonRepository;
@@ -60,8 +53,6 @@ public class ContactPersonController {
     public ContactPerson createContactPerson(@RequestBody ContactPerson contactPerson) {
         return contactPersonRepository.save(contactPerson);
     }
-<<<<<<< HEAD
-=======
 
     @PutMapping("/update/{id}")
     public ResponseEntity<?> updateContactPerson(@PathVariable Long id, @RequestBody ContactPerson body) {
@@ -82,5 +73,4 @@ public class ContactPersonController {
         return ResponseEntity.ok(saved);
     }
 
->>>>>>> a1af1ad532286dbb0e052338fea4067ac752c569
 }
