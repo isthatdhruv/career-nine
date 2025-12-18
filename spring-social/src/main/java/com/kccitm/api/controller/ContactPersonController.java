@@ -7,6 +7,8 @@ import javax.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
 
 import com.kccitm.api.model.ContactPerson;
 import com.kccitm.api.repository.ContactPersonRepository;
@@ -48,21 +51,28 @@ public class ContactPersonController {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping(
-        value = "/create",
-        consumes = MediaType.APPLICATION_JSON_VALUE,
-        produces = MediaType.APPLICATION_JSON_VALUE
-    )
-    public ResponseEntity<ContactPerson> createContactPerson(@RequestBody ContactPerson contactPerson) {
-        ContactPerson saved = contactPersonRepository.save(contactPerson);
-        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+    @PostMapping("/create")
+    public ContactPerson createContactPerson(@RequestBody ContactPerson contactPerson) {
+        return contactPersonRepository.save(contactPerson);
     }
 
-    @PutMapping(value = "/update/{id}", consumes = "application/json", produces = "application/json")
-	public ContactPerson updateContactPerson(@PathVariable("id") Long id, @RequestBody @Valid ContactPerson payload) {
-        payload.setId(id);
-        ContactPerson updatedContactPerson = contactPersonRepository.save(payload);
-        return updatedContactPerson;
+    @PutMapping("/update/{id}")
+    public ResponseEntity<?> updateContactPerson(@PathVariable Long id, @RequestBody ContactPerson body) {
+        Optional<ContactPerson> opt = contactPersonRepository.findById(id);
+        if (!opt.isPresent()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("ContactPerson not found");
+        }
+
+        ContactPerson existing = opt.get();
+
+        existing.setName(body.getName());
+        existing.setEmail(body.getEmail());
+        existing.setPhoneNumber(body.getPhoneNumber()); 
+        existing.setDesignation(body.getDesignation());
+        existing.setGender(body.getGender());
+
+        ContactPerson saved = contactPersonRepository.save(existing);
+        return ResponseEntity.ok(saved);
     }
 
 }
