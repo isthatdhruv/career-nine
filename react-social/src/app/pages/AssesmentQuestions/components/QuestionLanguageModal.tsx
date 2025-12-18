@@ -1,0 +1,415 @@
+import clsx from "clsx";
+import { Field, Form, Formik } from "formik";
+import { useState, useEffect } from "react";
+import { Modal, Button, Dropdown } from "react-bootstrap";
+import * as Yup from "yup";
+import { createLanguageQuestionAndOptionData, readLanguageData } from "../API/Language_APIs";
+import { ReadQuestionByIdData } from "../../AssesmentQuestions/API/Question_APIs";
+import { translateOption, translateQuestion, translateAll } from "../API/Translate_APIs";
+
+const validationSchema = Yup.object().shape({
+  translatedQuestion: Yup.string().required("Translated question is required"),
+  translatedOptions: Yup.array().of(
+    Yup.object().shape({
+      translatedText: Yup.string().required("Translated option is required"),
+    })
+  ),
+});
+
+interface QuestionLanguageModalProps {
+  show: boolean;
+  onHide: () => void;
+  setPageLoading?: (loading: boolean) => void;
+  questionId: number | null;
+}
+
+const QuestionLanguageModal = ({
+  show,
+  onHide,
+  setPageLoading,
+  questionId,
+}: QuestionLanguageModalProps) => {
+  const [loading, setLoading] = useState(false);
+  const [translatingOptions, setTranslatingOptions] = useState<{ [key: number]: boolean }>({});
+  const [translatingQuestion, setTranslatingQuestion] = useState(false);
+  const [translatingAll, setTranslatingAll] = useState(false);
+  const [languages, setLanguages] = useState<any[]>([]);
+  const [selectedLanguage, setSelectedLanguage] = useState<any>(null);
+  const [questionData, setQuestionData] = useState<any>({
+    questionText: "",
+    options: [],
+  });
+
+  useEffect(() => {
+    const fetchQuestion = async () => {
+      if (questionId && show) {
+        try {
+          setLoading(true);
+          const response = await ReadQuestionByIdData(questionId);
+          const data = response.data;
+          setQuestionData({
+            questionText: data.questionText || "",
+            options: data.options?.map((opt: any) => ({
+              optionId: opt.optionId || opt.id,
+              optionText: opt.optionText || "",
+              translatedText: "",
+            })) || [],
+          });
+        } catch (error) {
+          console.error("Error fetching question:", error);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    fetchQuestion();
+  }, [questionId, show]);
+
+  useEffect(() => {
+    const fetchLanguages = async () => {
+      try {
+        const response = await readLanguageData();
+        setLanguages(response.data || []);
+      } catch (error) {
+        console.error("Error fetching languages:", error);
+      }
+    };
+    if (show) fetchLanguages();
+  }, [show]);
+
+  if (loading) {
+    return (
+      <div className="text-center py-5">
+        <div className="spinner-border" role="status"></div>
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  return (
+    <Modal show={show} onHide={onHide} size="lg" centered>
+      <Modal.Header closeButton>
+        <Modal.Title>Translate Question</Modal.Title>
+        <Dropdown className="ms-auto">
+          <Dropdown.Toggle variant="secondary" id="dropdown-languages" size="sm">
+            {selectedLanguage
+              ? selectedLanguage.languageName
+              : "Select Language"}
+          </Dropdown.Toggle>
+          <Dropdown.Menu>
+            {languages.length > 0 ? (
+              languages.map((lang: any) => (
+                <Dropdown.Item
+                  key={lang.languageId}
+                  onClick={() => setSelectedLanguage(lang)}
+                >
+                  {lang.languageName}
+                </Dropdown.Item>
+              ))
+            ) : (
+              <Dropdown.Item disabled>No languages found</Dropdown.Item>
+            )}
+          </Dropdown.Menu>
+        </Dropdown>
+      </Modal.Header>
+
+      <Formik
+        enableReinitialize
+        initialValues={{
+          translatedQuestion: "",
+          translatedOptions: questionData.options,
+        }}
+        validationSchema={validationSchema}
+        onSubmit={async (values, { resetForm }) => {
+          if (!selectedLanguage) {
+            alert("Please select a language!");
+            return;
+          }
+
+          setLoading(true);
+          setPageLoading?.(true);
+          try {
+            const payload = {
+              language: {
+                languageId: selectedLanguage.languageId
+              },
+              questionText: values.translatedQuestion,
+              assessmentQuestion: {
+                questionId: questionId
+              },
+              options: values.translatedOptions.map((option: any) => ({
+                optionText: option.translatedText,
+                assessmentOption: {
+                  optionId: option.optionId
+                }
+              }))
+            };
+
+            await createLanguageQuestionAndOptionData(payload);
+            resetForm();
+            setSelectedLanguage(null);
+            onHide();
+          } catch (error) {
+            console.error(error);
+            alert("Failed to save translations");
+          } finally {
+            setLoading(false);
+            setPageLoading?.(false);
+          }
+        }}
+      >
+        {({ values, errors, touched, handleChange, setFieldValue }) => {
+          // Question translation handler
+          const handleQuestionTranslate = async () => {
+            if (!questionData.questionText || !selectedLanguage?.languageName) {
+              alert("Question text or target language is missing!");
+              return;
+            }
+            
+            console.log("Translating question:", questionData.questionText, "to", selectedLanguage.languageName);
+            
+            try {
+              setTranslatingQuestion(true);
+              const translatedText = await translateQuestion(questionData.questionText, selectedLanguage.languageName);
+              console.log("Question translation result:", translatedText);
+              
+              setFieldValue("translatedQuestion", translatedText);
+              
+            } catch (error) {
+              console.error("Question translation error:", error);
+              alert("Failed to translate question");
+            } finally {
+              setTranslatingQuestion(false);
+            }
+          };
+
+          // Option translation handler
+          const optionTranslate = async (optionText: string, targetLanguage: string, index: number) => {
+            if (!optionText || !targetLanguage) {
+              alert("Option text or target language is missing!");
+              return;
+            }
+            
+            console.log(`Translating option ${index}:`, optionText, "to", targetLanguage);
+            
+            try {
+              setTranslatingOptions(prev => ({ ...prev, [index]: true }));
+              const translatedText = await translateOption(optionText, targetLanguage);
+              console.log(`Translation result for option ${index}:`, translatedText);
+              
+              setFieldValue(`translatedOptions.${index}.translatedText`, translatedText);
+              
+            } catch (error) {
+              console.error("Translation error:", error);
+              alert("Failed to translate option");
+            } finally {
+              setTranslatingOptions(prev => {
+                const newState = { ...prev };
+                delete newState[index];
+                return newState;
+              });
+            }
+          };
+
+          // Translate all handler
+          const handleTranslateAll = async () => {
+            if (!questionData.questionText || !selectedLanguage?.languageName) {
+              alert("Question text or target language is missing!");
+              return;
+            }
+
+            const optionTexts = questionData.options.map((opt: any) => opt.optionText);
+            
+            console.log("Translating all:", {
+              question: questionData.questionText,
+              options: optionTexts,
+              targetLanguage: selectedLanguage.languageName
+            });
+            
+            try {
+              setTranslatingAll(true);
+              
+              const result = await translateAll(
+                questionData.questionText,
+                optionTexts,
+                selectedLanguage.languageName
+              );
+              
+              console.log("Translate all result:", result);
+              
+              // Set translated question
+              setFieldValue("translatedQuestion", result.translated.question);
+              
+              // Set translated options
+              result.translated.options.forEach((translatedOption: string, index: number) => {
+                setFieldValue(`translatedOptions.${index}.translatedText`, translatedOption);
+              });
+              
+            } catch (error) {
+              console.error("Translate all error:", error);
+              alert("Failed to translate all content");
+            } finally {
+              setTranslatingAll(false);
+            }
+          };
+
+          return (
+            <Form>
+              <Modal.Body>
+                {/* Translate All Button */}
+                <div className="d-flex justify-content-end mb-3">
+                  <Button 
+                    variant="success" 
+                    size="sm"
+                    onClick={handleTranslateAll}
+                    disabled={!selectedLanguage || translatingAll}
+                  >
+                    {translatingAll ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-1"></span>
+                        Translating All...
+                      </>
+                    ) : (
+                      "🌐 Translate All"
+                    )}
+                  </Button>
+                </div>
+
+                {/* Question Text */}
+                <div className="fv-row mb-3">
+                  <label className="required fs-6 fw-bold mb-2">
+                    Question Text:
+                  </label>
+                  <Field
+                    type="text"
+                    value={questionData.questionText}
+                    disabled
+                    className="form-control"
+                  />
+                </div>
+
+                <div className="fv-row mb-3">
+                  <label className="required fs-6 fw-bold mb-2">
+                    Question in{" "}
+                    {selectedLanguage ? selectedLanguage.languageName : "Selected Language"}:
+                  </label>
+                  <div className="d-flex align-items-center gap-2">
+                    <Field
+                      type="text"
+                      name="translatedQuestion"
+                      placeholder={`Enter question in ${
+                        selectedLanguage
+                          ? selectedLanguage.languageName
+                          : "selected language"
+                      }`}
+                      className={clsx(
+                        "form-control",
+                        {
+                          "is-invalid": touched.translatedQuestion && errors.translatedQuestion,
+                        },
+                        {
+                          "is-valid": touched.translatedQuestion && !errors.translatedQuestion,
+                        }
+                      )}
+                    />
+                    <Button 
+                      onClick={handleQuestionTranslate}
+                      disabled={!selectedLanguage || translatingQuestion}
+                      size="sm"
+                      variant="primary"
+                    >
+                      {translatingQuestion ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-1"></span>
+                          ...
+                        </>
+                      ) : (
+                        "Translate"
+                      )}
+                    </Button>
+                  </div>
+                  {touched.translatedQuestion && errors.translatedQuestion && (
+                    <div className="text-danger mt-1">{errors.translatedQuestion}</div>
+                  )}
+                </div>
+
+                {/* Options Translation */}
+                <div className="fv-row mb-3">
+                  <label className="fs-6 fw-bold mb-2">Options:</label>
+                  {values.translatedOptions.map((option: any, index: number) => (
+                    <div key={index} className="d-flex align-items-center gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={option.optionText}
+                        disabled
+                        className="form-control w-50"
+                      />
+                      <Field
+                        type="text"
+                        name={`translatedOptions.${index}.translatedText`}
+                        value={option.translatedText || ""}
+                        placeholder={`Enter option ${index + 1} in ${
+                          selectedLanguage
+                            ? selectedLanguage.languageName
+                            : "selected language"
+                        }`}
+                        className={clsx(
+                          "form-control w-50",
+                          touched.translatedOptions?.[index]?.translatedText &&
+                          errors.translatedOptions?.[index]?.translatedText
+                            ? "is-invalid"
+                            : "",
+                          touched.translatedOptions?.[index]?.translatedText &&
+                          !errors.translatedOptions?.[index]?.translatedText
+                            ? "is-valid"
+                            : ""
+                        )}
+                      />
+                      <Button 
+                        onClick={() => optionTranslate(option.optionText, selectedLanguage?.languageName, index)}
+                        disabled={!selectedLanguage || translatingOptions[index]}
+                        size="sm"
+                      >
+                        {translatingOptions[index] ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm me-1"></span>
+                            ...
+                          </>
+                        ) : (
+                          "Translate"
+                        )}
+                      </Button>
+                      {touched.translatedOptions?.[index]?.translatedText &&
+                        errors.translatedOptions?.[index]?.translatedText && (
+                          <div className="text-danger mt-1">
+                            {errors.translatedOptions[index].translatedText}
+                          </div>
+                        )}
+                    </div>
+                  ))}
+                </div>
+              </Modal.Body>
+
+              <Modal.Footer>
+                <Button variant="light" onClick={onHide}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary" disabled={loading}>
+                  {!loading && "Submit"}
+                  {loading && (
+                    <>
+                      Please wait...
+                      <span className="spinner-border spinner-border-sm ms-2"></span>
+                    </>
+                  )}
+                </Button>
+              </Modal.Footer>
+            </Form>
+          );
+        }}
+      </Formik>
+    </Modal>
+  );
+};
+
+export default QuestionLanguageModal;

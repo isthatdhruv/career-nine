@@ -20,6 +20,8 @@ services:
       # Where our data will be persisted
     volumes:
       - mysql_data:/var/lib/mysql
+    networks:
+      - career_shared_net
 
     #   api-mysql:
 
@@ -48,6 +50,6 @@ services:
 volumes:
   mysql_data:
 
-# networks: 
-#   default: 
-#     name: api-mysql   
+networks:
+  career_shared_net:
+    external: true

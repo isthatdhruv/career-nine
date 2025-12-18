@@ -58,7 +58,7 @@ public class InstituteCourseController {
 		instituteCourseRepository.save(r);
 		return instituteCourseRepository.findByCourseName(r.getCourseName());
 	}
-
+	
 
 	@GetMapping(value = "instituteCourse/delete/{id}", headers = "Accept=application/json")
 	public InstituteCourse deleteUser(@PathVariable("id") int instituteCourseId) {

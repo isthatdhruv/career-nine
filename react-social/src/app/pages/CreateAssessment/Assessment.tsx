@@ -5,6 +5,7 @@ import { MdQuestionAnswer } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { ReadAssessmentData } from "./API/Create_Assessment_APIs";
 import { AssessmentTable } from "./components";
+import AssessmentCreateModal from "./components/AssessmentCreateModal";
 
 const AssessmentPage = () => {
   const [assessmentData, setAssessmentData] = useState([]);
@@ -12,6 +13,7 @@ const AssessmentPage = () => {
   const [sections, setSections] = useState<any[]>([]); 
   const [pageLoading, setPageLoading] = useState(["false"]);
   const navigate = useNavigate();
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const fetchQuestions = async () => {
     setLoading(true);
@@ -68,9 +70,7 @@ const AssessmentPage = () => {
             <div className="d-flex justify-content-end">
               <Button
                 variant="primary"
-                onClick={() => {
-                  navigate("/assessments/create");
-                }}
+                onClick={() => setShowCreateModal(true)}
               >
                 <IconContext.Provider
                   value={{ style: { paddingBottom: "4px" } }}
@@ -94,6 +94,13 @@ const AssessmentPage = () => {
           />
         </div>
       )}
+
+      {/* Creation Modal */}
+      <AssessmentCreateModal
+        show={showCreateModal}
+        onHide={() => setShowCreateModal(false)}
+        setPageLoading={setPageLoading}
+      />
     </div>
   );
 };

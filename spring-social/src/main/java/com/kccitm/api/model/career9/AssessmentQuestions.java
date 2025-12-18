@@ -29,6 +29,8 @@ public class AssessmentQuestions implements Serializable {
     private String questionText;
     private String questionType;
 
+    private Boolean flag;
+
     @Column(name = "max_options_allowed")
     private int maxOptionsAllowed;
 
@@ -39,11 +41,16 @@ public class AssessmentQuestions implements Serializable {
 
     // REMOVED: Many-to-many mapping to MeasuredQualityTypes
 
-    // NEW: Link Question -> Section
+    // Link Question -> Section
     @ManyToOne
     @JoinColumn(name = "section_id")   // FK in questions table
     @JsonIgnoreProperties("questions")
     private QuestionSection section;
+
+    // Link Question -> Language
+    @OneToMany(mappedBy = "assessmentQuestion", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnoreProperties("assessmentQuestion")
+    private List<LanguageQuestion> languageQuestions;
 
     // --- getters and setters ---
     public int getmaxOptionsAllowed() {
@@ -65,6 +72,12 @@ public class AssessmentQuestions implements Serializable {
         return questionText;
     }
 
+    public Boolean getFlag() {
+        return flag;
+    }
+    public void setFlag(Boolean flag) {
+        this.flag = flag;
+    }
     public void setQuestionText(String questionText) {
         this.questionText = questionText;
     }
@@ -93,6 +106,14 @@ public class AssessmentQuestions implements Serializable {
 
     public void setSection(QuestionSection section) {
         this.section = section;
+    }
+
+    public List<LanguageQuestion> getLanguageQuestions() {
+        return languageQuestions;
+    }
+
+    public void setLanguageQuestions(List<LanguageQuestion> languageQuestions) {
+        this.languageQuestions = languageQuestions;
     }
 
     // For compatibility with frontend

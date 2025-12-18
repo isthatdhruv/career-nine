@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import javax.persistence.CascadeType;
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
@@ -23,7 +24,8 @@ public class LanguagesSupported implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.IDENTITY )
+    // @Column(name="language_id", nullable = false, unique = true)
     private Long languageId;
 
     private String languageName;
@@ -32,30 +34,30 @@ public class LanguagesSupported implements Serializable {
     @JsonIgnore
     private List<LanguageQuestion> questions = new ArrayList<>();
 
-    // @OneToMany(cascade= CascadeType.ALL)
-    // @JoinColumn(name="fk_LanguageQuestion", referencedColumnName = "languageId")
-    // private List<LanguageQuestion> LanguageQuestion;
+    @OneToMany(cascade= CascadeType.ALL)
+    @JoinColumn(name="fk_LanguageQuestion", referencedColumnName = "languageId")
+    private List<LanguageQuestion> LanguageQuestion;
 
-    // @OneToMany(cascade= CascadeType.ALL)
-    // @JoinColumn(name="FK_LanguageOption", referencedColumnName = "languageId")
-    // private List<LanguageOption> LanguageOption;
+    @OneToMany(cascade= CascadeType.ALL)
+    @JoinColumn(name="FK_LanguageOption", referencedColumnName = "languageId")
+    private List<LanguageOption> LanguageOption;
 
     //getter/setter
-    // public List<LanguageOption> getLanguageOption(){
-    //     return LanguageOption;
-    // }
+    public List<LanguageOption> getLanguageOption(){
+        return LanguageOption;
+    }
 
-    // public void setLanguageOption(List<LanguageOption> LanguageOption){
-    //     this.LanguageOption = LanguageOption;
-    // }
+    public void setLanguageOption(List<LanguageOption> LanguageOption){
+        this.LanguageOption = LanguageOption;
+    }
 
-    // public List<LanguageQuestion> getLanguageQuestion(){
-    //     return LanguageQuestion;
-    // }
+    public List<LanguageQuestion> getLanguageQuestion(){
+        return LanguageQuestion;
+    }
 
-    // public void setLanguageQuestion(List<LanguageQuestion> LanguageQuestion){
-    //     this.LanguageQuestion = LanguageQuestion;
-    // }
+    public void setLanguageQuestion(List<LanguageQuestion> LanguageQuestion){
+        this.LanguageQuestion = LanguageQuestion;
+    }
 
     //getter setter
     public List<LanguageQuestion> getQuestions() {
