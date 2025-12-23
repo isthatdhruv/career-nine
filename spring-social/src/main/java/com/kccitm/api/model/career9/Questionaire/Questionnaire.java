@@ -2,7 +2,9 @@ package com.kccitm.api.model.career9.Questionaire;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.util.List;
 
+import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
@@ -11,6 +13,7 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
+import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -29,9 +32,20 @@ public class Questionnaire implements Serializable {
     private Long questionnaireId;
 
     // Foreign key to tools table
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "tool_id", referencedColumnName = "tool_id")
     private Tool tool;
+
+    // List of languages supported by this questionnaire
+    @OneToMany(mappedBy = "questionnaire", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnoreProperties("questionnaire")
+    private List<QuestionnaireLanguage> languages;
+
+    @OneToMany(mappedBy = "questionnaire", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnoreProperties("questionnaire")
+    private List<QuestionnaireSection> section;
+
+    
 
     // Mode id
     @Column(name = "mode_id")
@@ -45,9 +59,23 @@ public class Questionnaire implements Serializable {
     @Column(name = "is_free")
     private Boolean isFree;
 
-    @Column(name = "is_free")
+    @Column(name = "name")
     private String name;
 
+    @Column(name = "display")
+    private Boolean display;
+
+    public Boolean getDisplay() {
+        return display;
+    }
+
+    public boolean isDisplay() {
+        return display != null && display;
+    }
+
+    public void setDisplay(Boolean display) {
+        this.display = display;
+    }
 
     public Long getQuestionnaireId() {
         return this.questionnaireId;
@@ -63,6 +91,22 @@ public class Questionnaire implements Serializable {
 
     public void setTool(Tool tool) {
         this.tool = tool;
+    }
+
+    public List<QuestionnaireLanguage> getLanguages() {
+        return this.languages;
+    }
+
+    public void setLanguages(List<QuestionnaireLanguage> languages) {
+        this.languages = languages;
+    }
+
+    public List<QuestionnaireSection> getSections() {
+        return this.section;
+    }
+
+    public void setSections(List<QuestionnaireSection> section) {
+        this.section = section;
     }
 
     public Integer getModeId() {
@@ -100,5 +144,5 @@ public class Questionnaire implements Serializable {
     public void setName(String name) {
         this.name = name;
     }
-    
+  
 }
