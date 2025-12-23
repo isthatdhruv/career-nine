@@ -1,7 +1,14 @@
 package com.kccitm.api.controller.career9;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
+import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -13,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kccitm.api.model.career9.AssessmentQuestionOptions;
 import com.kccitm.api.model.career9.AssessmentQuestions;
 import com.kccitm.api.model.career9.MeasuredQualityTypes;
@@ -27,6 +36,11 @@ import com.kccitm.api.repository.Career9.QuestionSectionRepository;
 @RequestMapping("/assessment-questions")
 public class AssessmentQuestionController {
 
+    private final Logger logger = LoggerFactory.getLogger(AssessmentQuestionController.class);
+
+    private static final Path CACHE_DIR = Paths.get("cache");
+    private static final Path CACHE_FILE = CACHE_DIR.resolve("assessment_questions.json");
+
     @Autowired
     private AssessmentQuestionRepository assessmentQuestionRepository;
 
@@ -36,8 +50,34 @@ public class AssessmentQuestionController {
     @Autowired
     private MeasuredQualityTypesRepository measuredQualityTypesRepository;
 
-    @GetMapping("/getAll")
-    public List<AssessmentQuestions> getAllAssessmentQuestions() {
+    private Optional<List<AssessmentQuestions>> readCache() {
+        try {
+            if (Files.exists(CACHE_FILE) && Files.size(CACHE_FILE) > 0) {
+                ObjectMapper mapper = new ObjectMapper();
+                List<AssessmentQuestions> cached = mapper.readValue(CACHE_FILE.toFile(), new TypeReference<List<AssessmentQuestions>>() {});
+                return Optional.ofNullable(cached);
+            }
+        } catch (IOException e) {
+            logger.error("Error reading assessment questions cache file", e);
+        }
+        return Optional.empty();
+    }
+
+    private void writeCache(List<AssessmentQuestions> data) {
+        System.out.println(CACHE_DIR);
+        System.out.println(CACHE_FILE);
+        try {
+            if (!Files.exists(CACHE_DIR)) {
+                Files.createDirectories(CACHE_DIR);
+            }
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.writerWithDefaultPrettyPrinter().writeValue(CACHE_FILE.toFile(), data);
+        } catch (IOException e) {
+            logger.error("Error writing assessment questions cache file", e);
+        }
+    }
+
+    private List<AssessmentQuestions> fetchAndTransformFromDb() {
         List<AssessmentQuestions> assementQuestionsObject = assessmentQuestionRepository.findAll();
         assementQuestionsObject.iterator().forEachRemaining(assmentQuestion->{
             assmentQuestion.getOptions().iterator().forEachRemaining(option->{
@@ -50,6 +90,26 @@ public class AssessmentQuestionController {
         return assementQuestionsObject;
     }
 
+    // When called: return cached JSON if present, otherwise fetch from DB, cache it and return.
+    @GetMapping("/getAll")
+    public List<AssessmentQuestions> getAllAssessmentQuestions() {
+        try {
+            Optional<List<AssessmentQuestions>> cached = readCache();
+            if (cached.isPresent() && !cached.get().isEmpty()) {
+                logger.info("Returning assessment questions from cache file: {}", CACHE_FILE.toAbsolutePath());
+                return cached.get();
+            }
+        } catch (Exception e) {
+            // Continue to DB fetch if cache read fails
+            logger.warn("Failed to read cache or cache empty, falling back to DB", e);
+        }
+
+        // Cache not present or empty: fetch from DB, transform and write cache
+        List<AssessmentQuestions> fromDb = fetchAndTransformFromDb();
+        writeCache(fromDb);
+        return fromDb;
+    }
+
     @GetMapping("/get/{id}")
     public AssessmentQuestions getAssessmentQuestionById(@PathVariable Long id) {
         return assessmentQuestionRepository.findById(id).orElse(null);
@@ -58,44 +118,35 @@ public class AssessmentQuestionController {
     @PostMapping(value = "/create", consumes = "application/json")
     public AssessmentQuestions createAssessmentQuestion(@RequestBody AssessmentQuestions assessmentQuestions) throws Exception{
         AssessmentQuestions assementQustionObject ;
-        // if (assessmentQuestions.getSection() != null && assessmentQuestions.getSection().getSectionId() != null) {
-        //     QuestionSection section = questionSectionRepository.findById(assessmentQuestions.getSection().getSectionId()).orElse(null);
-        //     assessmentQuestions.setSection(section);
-        // }
-
-        // if (assessmentQuestions.getOptions() != null && !assessmentQuestions.getOptions().isEmpty()) {
-        //     for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
-        //         option.setQuestion(assessmentQuestions);
-        //     }
-        // }
-
-        
-        //   List<AssessmentQuestionOptions> assessmentQuestionOptions =   assessmentQuestions.getOptions();
-          
-          // Example: before saving AssessmentQuestions
-for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
-    option.setQuestion(assessmentQuestions); // set parent question
-    if (option.getOptionScores() != null) {
-        for (OptionScoreBasedOnMEasuredQualityTypes score : option.getOptionScores()) {
-            score.setQuestion_option(option); // set parent option
+        for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
+            option.setQuestion(assessmentQuestions); // set parent question
+            if (option.getOptionScores() != null) {
+                for (OptionScoreBasedOnMEasuredQualityTypes score : option.getOptionScores()) {
+                    score.setQuestion_option(option); // set parent option
+                }
+            }
         }
-    }
-}
 
-          assementQustionObject   = assessmentQuestionRepository.save(assessmentQuestions);
-          
-          
-       
-          
-          assementQustionObject.getOptions().iterator().forEachRemaining(option->{
-                option.getOptionScores().iterator().forEachRemaining(score->{
-                    score.setMeasuredQualityType(new MeasuredQualityTypes(score.getMeasuredQualityType().getMeasuredQualityTypeId()));
-                    score.setQuestion_option(new AssessmentQuestionOptions(score.getQuestion_option().getOptionId()));
-                });
+        assementQustionObject   = assessmentQuestionRepository.save(assessmentQuestions);
+
+        assementQustionObject.getOptions().iterator().forEachRemaining(option->{
+            option.getOptionScores().iterator().forEachRemaining(score->{
+                score.setMeasuredQualityType(new MeasuredQualityTypes(score.getMeasuredQualityType().getMeasuredQualityTypeId()));
+                score.setQuestion_option(new AssessmentQuestionOptions(score.getQuestion_option().getOptionId()));
             });
-        
+        });
+
+        // refresh cache after create
+        try {
+            List<AssessmentQuestions> refreshed = fetchAndTransformFromDb();
+            writeCache(refreshed);
+        } catch (Exception e) {
+            logger.warn("Failed to refresh assessment questions cache after create", e);
+        }
+
         return assementQustionObject.getId() != null ? assementQustionObject : null;
     }
+
     @PutMapping("/update/{id}")
     public AssessmentQuestions updateAssessmentQuestion(@PathVariable Long id, @RequestBody AssessmentQuestions assessmentQuestions) {
         AssessmentQuestions existingQuestion = assessmentQuestionRepository.findById(id)
@@ -122,15 +173,31 @@ for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
             existingQuestion.setOptions(assessmentQuestions.getOptions());
         }
         
-        return assessmentQuestionRepository.save(existingQuestion);
+        AssessmentQuestions saved = assessmentQuestionRepository.save(existingQuestion);
+
+        // refresh cache after update
+        try {
+            List<AssessmentQuestions> refreshed = fetchAndTransformFromDb();
+            writeCache(refreshed);
+        } catch (Exception e) {
+            logger.warn("Failed to refresh assessment questions cache after update", e);
+        }
+
+        return saved;
     }
+
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<String> deleteAssessmentQuestion(@PathVariable Long id) {
-        // if (!assessmentQuestionRepository.existsById(id)) {
-        //     return ResponseEntity.notFound().build();
-        // }
-        // This will also delete all related AssessmentQuestionOptions and join table entries due to cascade settings.
         assessmentQuestionRepository.deleteById(id);
+
+        // refresh cache after delete
+        try {
+            List<AssessmentQuestions> refreshed = fetchAndTransformFromDb();
+            writeCache(refreshed);
+        } catch (Exception e) {
+            logger.warn("Failed to refresh assessment questions cache after delete", e);
+        }
+
         return ResponseEntity.ok("AssessmentQuestion and all related options/relationships deleted successfully.");
     }
     

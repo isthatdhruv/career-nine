@@ -14,10 +14,11 @@ server:
 spring:
   profiles: dev
   datasource:
+    # url: jdbc:mysql://localhost:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     url: jdbc:mysql://localhost:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     username: root
-    password: Career-qCsfeuECc3MW
-    
+    # password: Career-qCsfeuECc3MW
+    password: Google.com1
   jpa:
     show-sql: true
     hibernate:

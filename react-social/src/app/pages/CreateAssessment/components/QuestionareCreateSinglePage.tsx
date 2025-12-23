@@ -4,10 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
 import { Button, Modal, Spinner } from "react-bootstrap";
-import { IconContext } from "react-icons";
-import { MdQuestionAnswer, MdUploadFile, MdSettings } from "react-icons/md";
 import * as XLSX from "xlsx";
-import { MDBDataTableV5 } from "mdbreact";
 
 // API imports
 import { ReadCollegeData } from "../../College/API/College_APIs";
@@ -27,6 +24,7 @@ import SectionQuestionSelector from "./SectionQuestionSelector";
 
 const validationSchema = Yup.object().shape({
   // Basic Info
+  name: Yup.string().required("Questionare name is required"),
   instructions: Yup.object().optional(),
   isFree: Yup.string().required("Questionare price type is required"),
   price: Yup.number()
@@ -46,7 +44,7 @@ const validationSchema = Yup.object().shape({
   sectionIds: Yup.array().min(1, "At least one section must be selected"),
 });
 
-const QuestionareCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any }) => {
+const QuestionareCreateSinglePage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
   const navigate = useNavigate();
@@ -114,6 +112,8 @@ const QuestionareCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any 
   }, [navigate]);
 
   const initialValues = useMemo(() => ({
+    // Questionnaire name (editable, prefilled from modal/localStorage)
+    name: questionareData?.name || "",
     // Remove name and collegeId - these come from questionareData
     instructions: { "English": "" },
     sectionInstructions: {} as { [sectionId: string]: { [language: string]: string } },
@@ -130,7 +130,7 @@ const QuestionareCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any 
       }, {});
       return acc;
     }, {}) as { [sectionId: string]: { [questionId: string]: number } },
-  }), [preSectionQuestions]);
+  }), [preSectionQuestions, questionareData]);
 
   // Fetch data functions
   const fetchColleges = async () => {
@@ -290,12 +290,12 @@ const QuestionareCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any 
     try {
       // Combine questionare data from modal with current form values
       const completePayload = {
-        // From modal (QuestionareCreateModal)
-        name: questionareData?.name || '',
-        mode: questionareData?.mode || 'online',
-        collegeId: questionareData?.collegeId || '',
-        schoolContactIds: questionareData?.schoolContactIds || [],
-        career9ContactIds: questionareData?.career9ContactIds || [],
+       // From modal (QuestionareCreateModal)
+      name: values.name || questionareData?.name || '',
+       mode: questionareData?.mode || 'online',
+       collegeId: questionareData?.collegeId || '',
+       schoolContactIds: questionareData?.schoolContactIds || [],
+       career9ContactIds: questionareData?.career9ContactIds || [],
         
         // From current form
         instructions: values.instructions,
@@ -339,7 +339,7 @@ const QuestionareCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any 
       //   throw new Error("Failed to create questionare");
       // }
       
-      navigate("/questionares");
+      // navigate("/questionares");
       
     } catch (error) {
       console.error("Error creating questionare:", error);
@@ -365,7 +365,7 @@ const QuestionareCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any 
   }, [questions]);
 
   // Show loading screen while data is being fetched
-  if (dataLoading || !isDataLoaded || !questionareData) {
+  if (dataLoading) {
     return (
       <div className="container-fluid py-5">
         <div className="row justify-content-center">
@@ -373,7 +373,7 @@ const QuestionareCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any 
             <div className="card shadow-sm">
               <div className="card-body text-center py-5">
                 <div className="mb-4">
-                  <Spinner animation="border" variant="primary" style={{ width: '3rem', height: '3rem' }} />
+                  <Spinner animation="border" variant="primary" style={{ width: "3rem", height: "3rem" }} />
                 </div>
                 <h3 className="text-muted mb-3">Loading Questionare Builder</h3>
                 <p className="text-muted mb-4">Please wait while we prepare your questionare creation tools...</p>
@@ -382,58 +382,29 @@ const QuestionareCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any 
                 <div className="row justify-content-center">
                   <div className="col-md-6">
                     <div className="list-group list-group-flush">
-                      <div className={clsx("list-group-item d-flex justify-content-between align-items-center border-0", {
-                        "text-success": !loadingStates.languages,
-                        "text-muted": loadingStates.languages
-                      })}>
-                        <span>
-                          <i className={clsx("fas me-2", {
-                            "fa-check-circle text-success": !loadingStates.languages,
-                            "fa-spinner fa-spin text-primary": loadingStates.languages
-                          })}></i>
-                          Loading Languages
-                        </span>
-                        {!loadingStates.languages && <span className="badge bg-success">✓</span>}
-                      </div>
-                      <div className={clsx("list-group-item d-flex justify-content-between align-items-center border-0", {
-                        "text-success": !loadingStates.tools,
-                        "text-muted": loadingStates.tools
-                      })}>
-                        <span>
-                          <i className={clsx("fas me-2", {
-                            "fa-check-circle text-success": !loadingStates.tools,
-                            "fa-spinner fa-spin text-primary": loadingStates.tools
-                          })}></i>
-                          Loading Tools
-                        </span>
-                        {!loadingStates.tools && <span className="badge bg-success">✓</span>}
-                      </div>
-                      <div className={clsx("list-group-item d-flex justify-content-between align-items-center border-0", {
-                        "text-success": !loadingStates.sections,
-                        "text-muted": loadingStates.sections
-                      })}>
-                        <span>
-                          <i className={clsx("fas me-2", {
-                            "fa-check-circle text-success": !loadingStates.sections,
-                            "fa-spinner fa-spin text-primary": loadingStates.sections
-                          })}></i>
-                          Loading Sections
-                        </span>
-                        {!loadingStates.sections && <span className="badge bg-success">✓</span>}
-                      </div>
-                      <div className={clsx("list-group-item d-flex justify-content-between align-items-center border-0", {
-                        "text-success": !loadingStates.questions,
-                        "text-muted": loadingStates.questions
-                      })}>
-                        <span>
-                          <i className={clsx("fas me-2", {
-                            "fa-check-circle text-success": !loadingStates.questions,
-                            "fa-spinner fa-spin text-primary": loadingStates.questions
-                          })}></i>
-                          Loading Questions
-                        </span>
-                        {!loadingStates.questions && <span className="badge bg-success">✓</span>}
-                      </div>
+                      {[
+                        { key: "languages", label: "Languages" },
+                        { key: "tools", label: "Tools" },
+                        { key: "sections", label: "Sections" },
+                        { key: "questions", label: "Questions" },
+                      ].map((item) => {
+                        const isLoading = !!(loadingStates as any)[item.key];
+                        return (
+                          <div key={item.key} className={clsx("list-group-item d-flex justify-content-between align-items-center border-0", {
+                            "text-success": !isLoading,
+                            "text-muted": isLoading
+                          })}>
+                            <span>
+                              <i className={clsx("fas me-2", {
+                                "fa-check-circle text-success": !isLoading,
+                                "fa-spinner fa-spin text-primary": isLoading
+                              })}></i>
+                              {isLoading ? `Loading ${item.label}` : `Loaded ${item.label}`}
+                            </span>
+                            {!isLoading && <span className="badge bg-success">✓</span>}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -498,68 +469,94 @@ const QuestionareCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any 
                     </div>
                     <div className="card-body">
                       <div className="row">
-                        <div className="col-md-6">
-                          {/* Pricing */}
+                        <div className="col-12">
                           <div className="fv-row mb-7">
-                            <label className="required fs-6 fw-bold mb-2">
-                              Questionare Type:
-                            </label>
+                            <label className="required fs-6 fw-bold mb-2">Questionare Name</label>
                             <Field
-                              as="select"
-                              name="isFree"
+                              type="text"
+                              name="name"
+                              placeholder="Enter questionare name"
                               className={clsx(
                                 "form-control form-control-lg form-control-solid",
                                 {
-                                  "is-invalid text-danger": touched.isFree && errors.isFree,
+                                  "is-invalid text-danger": touched.name && errors.name,
                                 },
                                 {
-                                  "is-valid": touched.isFree && !errors.isFree,
+                                  "is-valid": touched.name && !errors.name,
                                 }
                               )}
-                            >
-                              <option value="">Select Type</option>
-                              <option value="true">Free</option>
-                              <option value="false">Paid</option>
-                            </Field>
-                            {touched.isFree && errors.isFree && (
+                            />
+                            {touched.name && errors.name && (
                               <div className="fv-plugins-message-container">
                                 <div className="fv-help-block text-danger">
-                                  <span role="alert">{String(errors.isFree)}</span>
+                                  <span role="alert">{String(errors.name)}</span>
                                 </div>
                               </div>
                             )}
                           </div>
-
-                          {/* Price field - only show if paid */}
-                          {values.isFree === "false" && (
-                            <div className="fv-row mb-7">
-                              <label className="required fs-6 fw-bold mb-2">
-                                Price:
-                              </label>
-                              <Field
-                                type="number"
-                                name="price"
-                                placeholder="Enter price"
-                                className={clsx(
-                                  "form-control form-control-lg form-control-solid",
-                                  {
-                                    "is-invalid text-danger": touched.price && errors.price,
-                                  },
-                                  {
-                                    "is-valid": touched.price && !errors.price,
-                                  }
-                                )}
-                              />
-                              {touched.price && errors.price && (
-                                <div className="fv-plugins-message-container">
-                                  <div className="fv-help-block text-danger">
-                                    <span role="alert">{String(errors.price)}</span>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
                         </div>
+                         <div className="col-md-6">
+                           {/* Pricing */}
+                           <div className="fv-row mb-7">
+                             <label className="required fs-6 fw-bold mb-2">
+                               Questionare Type:
+                             </label>
+                             <Field
+                               as="select"
+                               name="isFree"
+                               className={clsx(
+                                 "form-control form-control-lg form-control-solid",
+                                 {
+                                   "is-invalid text-danger": touched.isFree && errors.isFree,
+                                 },
+                                 {
+                                   "is-valid": touched.isFree && !errors.isFree,
+                                 }
+                               )}
+                             >
+                               <option value="">Select Type</option>
+                               <option value="true">Free</option>
+                               <option value="false">Paid</option>
+                             </Field>
+                             {touched.isFree && errors.isFree && (
+                               <div className="fv-plugins-message-container">
+                                 <div className="fv-help-block text-danger">
+                                   <span role="alert">{String(errors.isFree)}</span>
+                                 </div>
+                               </div>
+                             )}
+                           </div>
+
+                           {/* Price field - only show if paid */}
+                           {values.isFree === "false" && (
+                             <div className="fv-row mb-7">
+                               <label className="required fs-6 fw-bold mb-2">
+                                 Price:
+                               </label>
+                               <Field
+                                 type="number"
+                                 name="price"
+                                 placeholder="Enter price"
+                                 className={clsx(
+                                   "form-control form-control-lg form-control-solid",
+                                   {
+                                     "is-invalid text-danger": touched.price && errors.price,
+                                   },
+                                   {
+                                     "is-valid": touched.price && !errors.price,
+                                   }
+                                 )}
+                               />
+                               {touched.price && errors.price && (
+                                 <div className="fv-plugins-message-container">
+                                   <div className="fv-help-block text-danger">
+                                     <span role="alert">{String(errors.price)}</span>
+                                   </div>
+                                 </div>
+                               )}
+                             </div>
+                           )}
+                         </div>
 
                         <div className="col-md-6">
                           {/* Language Selection */}
@@ -1065,12 +1062,12 @@ const QuestionareCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any 
                   <Modal.Title>Questionare Preview</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
-                  {questionareData && (
+                  {(values.name || questionareData) && (
                     <div className="mb-4 p-3 bg-light rounded">
-                      <h5 className="text-primary mb-1">{questionareData.name}</h5>
+                      <h5 className="text-primary mb-1">{values.name || questionareData?.name}</h5>
                       <small className="text-muted">
-                        Mode: {questionareData.mode.toUpperCase()} | 
-                        College: {colleges.find(c => c.instituteCode === questionareData.collegeId || c.id === questionareData.collegeId)?.instituteName || questionareData.collegeId}
+                        Mode: {(questionareData?.mode || "").toUpperCase()} | 
+                        {questionareData && (colleges.find(c => c.instituteCode === questionareData.collegeId || c.id === questionareData.collegeId)?.instituteName || questionareData.collegeId)}
                       </small>
                     </div>
                   )}
@@ -1134,7 +1131,7 @@ const QuestionareCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any 
 
         {/* Modals */}
         <CollegeCreateModal
-          setPageLoading={setPageLoading ?? (() => {})}
+        setPageLoading={setPageLoadingState}
           show={showCollegeModal}
           onHide={() => setShowCollegeModal(false)}
         />
@@ -1145,7 +1142,6 @@ const QuestionareCreateSinglePage = ({ setPageLoading }: { setPageLoading?: any 
         />
 
         <ToolCreateModal
-          setPageLoading={setPageLoading ?? (() => {})}
           show={showToolModal}
           onHide={() => setShowToolModal(false)}
         />
