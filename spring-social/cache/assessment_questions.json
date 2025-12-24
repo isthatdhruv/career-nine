@@ -1,0 +1,2141 @@
+[ {
+  "questionId" : 6,
+  "questionText" : "Below is a list of 15 broad fields of study commonly pursued in India. Your task is to select the top 5 areas that resonate most deeply with your interests and aspirations. If you need clarification on the meaning of any field, please refer to the help section provided.",
+  "questionType" : "multiple-choice",
+  "flag" : null,
+  "maxOptionsAllowed" : 5,
+  "options" : [ {
+    "optionId" : 14,
+    "optionText" : "Agriculture",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 15,
+    "optionText" : "Art",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 16,
+    "optionText" : "Cultural Studies",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 17,
+    "optionText" : "English",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 18,
+    "optionText" : "Home and Consumer Science",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 19,
+    "optionText" : "Finance",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 20,
+    "optionText" : "Health",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 21,
+    "optionText" : "Languages",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 22,
+    "optionText" : "Management",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 23,
+    "optionText" : "Mathematics",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 24,
+    "optionText" : "Music",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 25,
+    "optionText" : "Science",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 26,
+    "optionText" : "Vocational studies",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 27,
+    "optionText" : "Social Sciences",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 28,
+    "optionText" : "Technology",
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 2,
+    "sectionName" : "Section A",
+    "sectionDescription" : "Section A Insight Navigator"
+  },
+  "languageQuestions" : [ {
+    "language" : {
+      "languageId" : 1,
+      "languageName" : "Hindi",
+      "languageQuestion" : [ ],
+      "languageOption" : [ ]
+    },
+    "questionText" : "नीचे भारत में सामान्यतः अपनाए जाने वाले 15 व्यापक अध्ययन क्षेत्रों की सूची दी गई है। आपका कार्य उन शीर्ष 5 क्षेत्रों का चयन करना है जो आपकी रुचियों और आकांक्षाओं से सबसे अधिक मेल खाते हों। यदि आपको किसी फ़ील्ड के अर्थ पर स्पष्टीकरण की आवश्यकता है, तो कृपया दिए गए सहायता अनुभाग को देखें।",
+    "languageQuestionId" : 22,
+    "originalQuestionId" : 6
+  }, {
+    "language" : {
+      "languageId" : 2,
+      "languageName" : "Marathi",
+      "languageQuestion" : [ ],
+      "languageOption" : [ ]
+    },
+    "questionText" : "MARATHI CHe",
+    "languageQuestionId" : 23,
+    "originalQuestionId" : 6
+  } ],
+  "id" : 6
+}, {
+  "questionId" : 9,
+  "questionText" : "In a timed class test or quiz…",
+  "questionType" : "multiple-choice",
+  "flag" : null,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 56,
+    "optionText" : "I finish early and check answers.",
+    "optionScores" : [ {
+      "score" : 4,
+      "question_option" : {
+        "optionId" : 56,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 17,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 10
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 57,
+    "optionText" : "I finish just on time.",
+    "optionScores" : [ {
+      "score" : 3,
+      "question_option" : {
+        "optionId" : 57,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 17,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 11
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 58,
+    "optionText" : "I leave a few questions.",
+    "optionScores" : [ {
+      "score" : 2,
+      "question_option" : {
+        "optionId" : 58,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 17,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 12
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 59,
+    "optionText" : "I need more time.",
+    "optionScores" : [ {
+      "score" : 1,
+      "question_option" : {
+        "optionId" : 59,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 17,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 13
+    } ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 4,
+    "sectionName" : "Section C",
+    "sectionDescription" : "Section C Insight Navigator"
+  },
+  "languageQuestions" : [ ],
+  "id" : 9
+}, {
+  "questionId" : 10,
+  "questionText" : "When shopping, if I get ₹250 and spend ₹185, I…",
+  "questionType" : "multiple-choice",
+  "flag" : null,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 60,
+    "optionText" : "Instantly know how much is left",
+    "optionScores" : [ {
+      "score" : 4,
+      "question_option" : {
+        "optionId" : 60,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 15,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 14
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 61,
+    "optionText" : "Try to guess the amount roughly",
+    "optionScores" : [ {
+      "score" : 3,
+      "question_option" : {
+        "optionId" : 61,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 15,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 15
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 62,
+    "optionText" : "Need to write and subtract",
+    "optionScores" : [ {
+      "score" : 2,
+      "question_option" : {
+        "optionId" : 62,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 15,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 16
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 63,
+    "optionText" : "I need help of a calculator",
+    "optionScores" : [ {
+      "score" : 1,
+      "question_option" : {
+        "optionId" : 63,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 15,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 17
+    } ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 4,
+    "sectionName" : "Section C",
+    "sectionDescription" : "Section C Insight Navigator"
+  },
+  "languageQuestions" : [ ],
+  "id" : 10
+}, {
+  "questionId" : 11,
+  "questionText" : "In a storytelling or creative writing task…",
+  "questionType" : "multiple-choice",
+  "flag" : null,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 64,
+    "optionText" : "I create new plots and characters",
+    "optionScores" : [ {
+      "score" : 4,
+      "question_option" : {
+        "optionId" : 64,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 20,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 18
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 65,
+    "optionText" : "I take help from stories I’ve read",
+    "optionScores" : [ {
+      "score" : 3,
+      "question_option" : {
+        "optionId" : 65,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 20,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 19
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 66,
+    "optionText" : "I write basic but clear stories",
+    "optionScores" : [ {
+      "score" : 2,
+      "question_option" : {
+        "optionId" : 66,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 20,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 20
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 67,
+    "optionText" : "I struggle to think of ideas",
+    "optionScores" : [ {
+      "score" : 1,
+      "question_option" : {
+        "optionId" : 67,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 20,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 21
+    } ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 4,
+    "sectionName" : "Section C",
+    "sectionDescription" : "Section C Insight Navigator"
+  },
+  "languageQuestions" : [ ],
+  "id" : 11
+}, {
+  "questionId" : 12,
+  "questionText" : "In a vocabulary quiz or crossword…",
+  "questionType" : "multiple-choice",
+  "flag" : null,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 68,
+    "optionText" : "I know most of the words.",
+    "optionScores" : [ {
+      "score" : 4,
+      "question_option" : {
+        "optionId" : 68,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 13,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 22
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 69,
+    "optionText" : "I know some of them.",
+    "optionScores" : [ {
+      "score" : 3,
+      "question_option" : {
+        "optionId" : 69,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 13,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 23
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 70,
+    "optionText" : "I guess most answers.",
+    "optionScores" : [ {
+      "score" : 2,
+      "question_option" : {
+        "optionId" : 70,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 13,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 24
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 71,
+    "optionText" : "I struggle with it.",
+    "optionScores" : [ {
+      "score" : 1,
+      "question_option" : {
+        "optionId" : 71,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 13,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 25
+    } ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 4,
+    "sectionName" : "Section C",
+    "sectionDescription" : "Section C Insight Navigator"
+  },
+  "languageQuestions" : [ ],
+  "id" : 12
+}, {
+  "questionId" : 13,
+  "questionText" : "When learning about how things work, like engines or computers..",
+  "questionType" : "multiple-choice",
+  "flag" : null,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 72,
+    "optionText" : "I find it fascinating and understand quickly.",
+    "optionScores" : [ {
+      "score" : 4,
+      "question_option" : {
+        "optionId" : 72,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 19,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 26
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 73,
+    "optionText" : "I can understand with some explanation",
+    "optionScores" : [ {
+      "score" : 3,
+      "question_option" : {
+        "optionId" : 73,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 19,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 27
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 74,
+    "optionText" : "I find it confusing and hard to grasp.",
+    "optionScores" : [ {
+      "score" : 2,
+      "question_option" : {
+        "optionId" : 74,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 19,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 28
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 75,
+    "optionText" : "I have no interest and can’t understand it.",
+    "optionScores" : [ {
+      "score" : 1,
+      "question_option" : {
+        "optionId" : 75,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 19,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 29
+    } ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 4,
+    "sectionName" : "Section C",
+    "sectionDescription" : "Section C Insight Navigator"
+  },
+  "languageQuestions" : [ ],
+  "id" : 13
+}, {
+  "questionId" : 14,
+  "questionText" : "When faced with a disagreement among friends…",
+  "questionType" : "multiple-choice",
+  "flag" : null,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 76,
+    "optionText" : "I can help resolve it by listening to both sides.",
+    "optionScores" : [ {
+      "score" : 4,
+      "question_option" : {
+        "optionId" : 76,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 14,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 30
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 77,
+    "optionText" : "I try to mediate but sometimes make it worse.",
+    "optionScores" : [ {
+      "score" : 3,
+      "question_option" : {
+        "optionId" : 77,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 14,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 31
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 78,
+    "optionText" : "I avoid getting involved.",
+    "optionScores" : [ {
+      "score" : 2,
+      "question_option" : {
+        "optionId" : 78,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 14,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 32
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 79,
+    "optionText" : "I often end up taking sides without thinking.",
+    "optionScores" : [ {
+      "score" : 1,
+      "question_option" : {
+        "optionId" : 79,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 14,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 33
+    } ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 4,
+    "sectionName" : "Section C",
+    "sectionDescription" : "Section C Insight Navigator"
+  },
+  "languageQuestions" : [ ],
+  "id" : 14
+}, {
+  "questionId" : 15,
+  "questionText" : "When doing crafts like origami or model-making…",
+  "questionType" : "multiple-choice",
+  "flag" : null,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 80,
+    "optionText" : "I make precise folds and manage detailing well.",
+    "optionScores" : [ {
+      "score" : 4,
+      "question_option" : {
+        "optionId" : 80,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 22,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 34
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 81,
+    "optionText" : "I finish with minor errors or less precision.",
+    "optionScores" : [ {
+      "score" : 3,
+      "question_option" : {
+        "optionId" : 81,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 22,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 35
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 82,
+    "optionText" : "I complete it but with less accuracy and more time.",
+    "optionScores" : [ {
+      "score" : 2,
+      "question_option" : {
+        "optionId" : 82,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 22,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 36
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 83,
+    "optionText" : "I struggle and it often lacks detail.",
+    "optionScores" : [ {
+      "score" : 1,
+      "question_option" : {
+        "optionId" : 83,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 22,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 37
+    } ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 4,
+    "sectionName" : "Section C",
+    "sectionDescription" : "Section C Insight Navigator"
+  },
+  "languageQuestions" : [ ],
+  "id" : 15
+}, {
+  "questionId" : 16,
+  "questionText" : "When designing a poster or artwork…",
+  "questionType" : "multiple-choice",
+  "flag" : null,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 84,
+    "optionText" : "I can arrange elements harmoniously and notice small misalignments.",
+    "optionScores" : [ {
+      "score" : 4,
+      "question_option" : {
+        "optionId" : 84,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 16,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 38
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 85,
+    "optionText" : "I can make it look good, but it might not be perfect.",
+    "optionScores" : [ {
+      "score" : 3,
+      "question_option" : {
+        "optionId" : 85,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 16,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 39
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 86,
+    "optionText" : "I struggle with layout and proportions.",
+    "optionScores" : [ {
+      "score" : 2,
+      "question_option" : {
+        "optionId" : 86,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 16,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 40
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 87,
+    "optionText" : "I can’t create a visually appealing design.",
+    "optionScores" : [ {
+      "score" : 1,
+      "question_option" : {
+        "optionId" : 87,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 16,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 41
+    } ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 4,
+    "sectionName" : "Section C",
+    "sectionDescription" : "Section C Insight Navigator"
+  },
+  "languageQuestions" : [ ],
+  "id" : 16
+}, {
+  "questionId" : 17,
+  "questionText" : "When playing strategy games like chess or other video games…",
+  "questionType" : "multiple-choice",
+  "flag" : null,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 88,
+    "optionText" : "I develop winning strategies and make successful decisions.",
+    "optionScores" : [ {
+      "score" : 4,
+      "question_option" : {
+        "optionId" : 88,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 18,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 42
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 89,
+    "optionText" : "I do well but sometimes make less effective decisions.",
+    "optionScores" : [ {
+      "score" : 3,
+      "question_option" : {
+        "optionId" : 89,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 18,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 43
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 90,
+    "optionText" : "I find it challenging and often adjust my strategies.",
+    "optionScores" : [ {
+      "score" : 2,
+      "question_option" : {
+        "optionId" : 90,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 18,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 44
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 91,
+    "optionText" : "I struggle to create effective strategies and make slow progress.",
+    "optionScores" : [ {
+      "score" : 1,
+      "question_option" : {
+        "optionId" : 91,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 18,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 45
+    } ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 4,
+    "sectionName" : "Section C",
+    "sectionDescription" : "Section C Insight Navigator"
+  },
+  "languageQuestions" : [ ],
+  "id" : 17
+}, {
+  "questionId" : 18,
+  "questionText" : "When participating in a sport (e.g., basketball, kho-kho)…",
+  "questionType" : "multiple-choice",
+  "flag" : null,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 92,
+    "optionText" : "I perform smoothly and excel in the sport.",
+    "optionScores" : [ {
+      "score" : 4,
+      "question_option" : {
+        "optionId" : 92,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 21,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 46
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 93,
+    "optionText" : "I do well but have occasional coordination issues.",
+    "optionScores" : [ {
+      "score" : 3,
+      "question_option" : {
+        "optionId" : 93,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 21,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 47
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 94,
+    "optionText" : "I find some movements challenging and need extra practice.",
+    "optionScores" : [ {
+      "score" : 2,
+      "question_option" : {
+        "optionId" : 94,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 21,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 48
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 95,
+    "optionText" : "I struggle with coordination and basic movements.",
+    "optionScores" : [ {
+      "score" : 1,
+      "question_option" : {
+        "optionId" : 95,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 21,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 49
+    } ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 4,
+    "sectionName" : "Section C",
+    "sectionDescription" : "Section C Insight Navigator"
+  },
+  "languageQuestions" : [ ],
+  "id" : 18
+}, {
+  "questionId" : 26,
+  "questionText" : "Your values play a crucial role in guiding your behaviour and decisions. They give direction to your\nlife and career, helping you decide who you are and how you interact with the world. Below are 15 values. Your\ntask is to select the top 5 values that are most important to you.",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 5,
+  "options" : [ {
+    "optionId" : 152,
+    "optionText" : "Good Salary: Receiving sufficient money to live a comfortable lifestyle. Like for example your pocket money is sufficient to manage necessary expenses and allows some saving.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 153,
+    "optionText" : "Job Security : Assurance that you won't lose your job come what may. This helps one plan future dreams and goals knowing there is a fixed income with minimum risk. For example job of a teacher.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 154,
+    "optionText" : "Job Security : Assurance that you won't lose your job come what may. This helps one plan future dreams and goals knowing there is a fixed income with minimum risk. For example job of a teacher.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 155,
+    "optionText" : "Working in Team/ Group: Working with others, in groups or team, where it is a friendly and non-competitive environment. Here team or group goals are considered important that personal interest.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 156,
+    "optionText" : "High achievement: High achievement refers to setting and completing challenging goals. It includes setting long term goals with clear objectives, optimistically managing to reach the goal and always attempting for success. For example setting targets for competitive exams.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 157,
+    "optionText" : "Independence/ Autonomy: Independence refers to making decision on our own with little or no supervision. It is like being your boss. It also about being making own choices and being responsible for them.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 158,
+    "optionText" : "Working with Hands: Working with hands refers to using practical skills to create things with your own hands rather than taking help from machines. For example, choosing to cook over ready to eat meals.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 159,
+    "optionText" : "Prestige/ Recognition: Prestige and recognition refers to looking for a chance to be seen as important person. It is important to get a pat on back for the hard work you put in. It refers to being appreciated for the task done. For example, finding it important to take lead role in school activities and getting fame for your achievements.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 160,
+    "optionText" : "Creativity: Creativity refers to using own ideas and experimenting with new things. It refers to valuing out of box ideas and innovation in any given assignment.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 161,
+    "optionText" : "Working with Mind: It's a belief in brain power. like they say 'Pen is mightier than a sword.' it refers to being able to analyze events around and use creative thinking for problem solving",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 162,
+    "optionText" : "Physical Activity: Physical activity simply refers to valuing thing that are related to body activity like giving importance to sport, exercise and outdoor activities.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 163,
+    "optionText" : "Leadership: Supervising/managing others and helping in development of a larger group. For example being captain of a sport team.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 164,
+    "optionText" : "Routine Activity: Believe that structure and discipline is important. it refers to enjoying routine and having clear plans. For example, arranging your study notes or closet in same order cause it works the best for you.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 165,
+    "optionText" : "Supervised Work : Having supportive management that stands behind you, egg. need for teacher or coach to help you progress.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 166,
+    "optionText" : "Working Conditions: Refers to having a safe position and nice place to work, you should be free to do your task, get reward for your work and not having fear of losing job.",
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 3,
+    "sectionName" : "Section B",
+    "sectionDescription" : "Section B Insight Navigator\n"
+  },
+  "languageQuestions" : [ ],
+  "id" : 26
+}, {
+  "questionId" : 27,
+  "questionText" : "Below is a list of 15 broad fields of study commonly pursued in India. Your task is to select the top\n5 areas that resonate most deeply with your interests and aspirations.",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 5,
+  "options" : [ {
+    "optionId" : 167,
+    "optionText" : "Agriculture: Agriculture includes the methods and techniques used in farming to produce food and raw materials.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 168,
+    "optionText" : "Art: Art studies how people express their creativity through painting, music, and storytelling.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 169,
+    "optionText" : "Cultural Studies: Cultural studies help in understanding how culture shapes society, identity, and daily life through traditions, beliefs, and practices.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 170,
+    "optionText" : "English: The study of the English language teaches grammar rules, vocabulary expansion, and the analysis of literature and texts.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 171,
+    "optionText" : "Home and Consumer Science: This subject teaches useful skills and knowledge for taking care of the home and family. It provides information on managing daily tasks, choosing a healthy diet, and keeping the family happy and healthy.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 172,
+    "optionText" : "Finance: The study of finance teaches money management, saving, investing, and planning expenses.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 173,
+    "optionText" : "Health: Health education includes information about nutrition, exercise, hygiene, and mental well-being.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 174,
+    "optionText" : "Languages: Language education involves learning to read, write, speak, and understand different languages.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 175,
+    "optionText" : "Management: The study of management teaches how to plan projects, lead teams, make decisions, and solve problems in various organizations.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 176,
+    "optionText" : "Mathematics: Mathematics involves the study of calculations, geometry, algebra, and data analysis.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 177,
+    "optionText" : "Music: Music teaches how to create, perform, and appreciate sounds and rhythms using various instruments and voice.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 178,
+    "optionText" : "Science: Science includes subjects like biology, chemistry, physics, and earth sciences to understand how the world works.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 179,
+    "optionText" : "Vocational Studies: This field prepares individuals for professions that involve practical skills like car repair, gardening, carpentry, baking, and cooking.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 180,
+    "optionText" : "Social Sciences: Social sciences teach how society functions, historical events, and the impact of economic and political systems.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 181,
+    "optionText" : "Technology: The study of technology includes subjects like engineering, computer science, and digital tools, helping explore how technology influences our world.",
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 3,
+    "sectionName" : "Section B",
+    "sectionDescription" : "Section B Insight Navigator\n"
+  },
+  "languageQuestions" : [ ],
+  "id" : 27
+}, {
+  "questionId" : 28,
+  "questionText" : "I prefer learning through practical experiments rather\nthan just listening to lectures.",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 182,
+    "optionText" : "Yes",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 183,
+    "optionText" : "No",
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 5,
+    "sectionName" : "Section D",
+    "sectionDescription" : "Section D Insight Navigator "
+  },
+  "languageQuestions" : [ {
+    "language" : {
+      "languageId" : 1,
+      "languageName" : "Hindi",
+      "languageQuestion" : [ ],
+      "languageOption" : [ ]
+    },
+    "questionText" : "मुझे केर्ि भाषर् (भाषर्) िुनने के बजाय, प्रयोग करके िीखना ज़्यािा पिंि है।",
+    "languageQuestionId" : 24,
+    "originalQuestionId" : 28
+  } ],
+  "id" : 28
+}, {
+  "questionId" : 29,
+  "questionText" : " I like to participate in debates or discussions to\nexplore different viewpoints.",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 184,
+    "optionText" : "Yes",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 185,
+    "optionText" : "No",
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 5,
+    "sectionName" : "Section D",
+    "sectionDescription" : "Section D Insight Navigator "
+  },
+  "languageQuestions" : [ {
+    "language" : {
+      "languageId" : 1,
+      "languageName" : "Hindi",
+      "languageQuestion" : [ ],
+      "languageOption" : [ ]
+    },
+    "questionText" : "मुझे अिग-अिग वर्िार जानने के लिए र्ाि-वर्र्ाि (debates) या ििाव (discussions) में भाग िेना पिंि है।",
+    "languageQuestionId" : 25,
+    "originalQuestionId" : 29
+  } ],
+  "id" : 29
+}, {
+  "questionId" : 30,
+  "questionText" : " I like to participate in art or drama competition in\nschool.",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 186,
+    "optionText" : "Yes",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 187,
+    "optionText" : "No",
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 5,
+    "sectionName" : "Section D",
+    "sectionDescription" : "Section D Insight Navigator "
+  },
+  "languageQuestions" : [ {
+    "language" : {
+      "languageId" : 1,
+      "languageName" : "Hindi",
+      "languageQuestion" : [ ],
+      "languageOption" : [ ]
+    },
+    "questionText" : "मुझे स्कूि में किा (art) या नाटक (drama) की प्रनियोचगिा में भाग िेना पिंि है।",
+    "languageQuestionId" : 26,
+    "originalQuestionId" : 30
+  } ],
+  "id" : 30
+}, {
+  "questionId" : 31,
+  "questionText" : " I enjoy social gatherings just to be with people.",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 188,
+    "optionText" : "Yes",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 189,
+    "optionText" : "No",
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 5,
+    "sectionName" : "Section D",
+    "sectionDescription" : "Section D Insight Navigator "
+  },
+  "languageQuestions" : [ {
+    "language" : {
+      "languageId" : 1,
+      "languageName" : "Hindi",
+      "languageQuestion" : [ ],
+      "languageOption" : [ ]
+    },
+    "questionText" : "मुझे िोगों के िाथ रहने के लिए िामास्जक िमारोहों (social gatherings) में शालमि होना अच्छा िगिा है।",
+    "languageQuestionId" : 27,
+    "originalQuestionId" : 31
+  } ],
+  "id" : 31
+}, {
+  "questionId" : 32,
+  "questionText" : "I like planning birthday parties and get-togethers with\nfriends.",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 190,
+    "optionText" : "Yes",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 191,
+    "optionText" : "No",
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 5,
+    "sectionName" : "Section D",
+    "sectionDescription" : "Section D Insight Navigator "
+  },
+  "languageQuestions" : [ {
+    "language" : {
+      "languageId" : 1,
+      "languageName" : "Hindi",
+      "languageQuestion" : [ ],
+      "languageOption" : [ ]
+    },
+    "questionText" : " मुझे िोस्िों के िाथ जन्मदिन की पाटी या छोटे-मोटे िमारोह की योजना बनाना अच्छा िगिा है।",
+    "languageQuestionId" : 28,
+    "originalQuestionId" : 32
+  } ],
+  "id" : 32
+}, {
+  "questionId" : 33,
+  "questionText" : " I like keeping my school notes and textbooks neatly\norganized.",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 192,
+    "optionText" : "Yes",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 193,
+    "optionText" : "No",
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 5,
+    "sectionName" : "Section D",
+    "sectionDescription" : "Section D Insight Navigator "
+  },
+  "languageQuestions" : [ {
+    "language" : {
+      "languageId" : 1,
+      "languageName" : "Hindi",
+      "languageQuestion" : [ ],
+      "languageOption" : [ ]
+    },
+    "questionText" : "मुझे अपनी स्कूि की कॉपी और ककिाबों को अच्छे िे जमाकर रखना अच्छा िगिा है।",
+    "languageQuestionId" : 29,
+    "originalQuestionId" : 33
+  } ],
+  "id" : 33
+}, {
+  "questionId" : 34,
+  "questionText" : "During exam…",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 194,
+    "optionText" : "I finish my paper on time with no error",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 195,
+    "optionText" : "I finish quickly but possibly make some errors",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 196,
+    "optionText" : "I need a little extra time.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 197,
+    "optionText" : "I never finish my paper in time",
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 9,
+    "sectionName" : "Section E ",
+    "sectionDescription" : "Section E Insight Navigator "
+  },
+  "languageQuestions" : [ {
+    "language" : {
+      "languageId" : 1,
+      "languageName" : "Hindi",
+      "languageQuestion" : [ ],
+      "languageOption" : [ ]
+    },
+    "questionText" : "परीक्षा के दौरान...",
+    "languageQuestionId" : 30,
+    "originalQuestionId" : 34
+  } ],
+  "id" : 34
+}, {
+  "questionId" : 35,
+  "questionText" : "To calculate daily math with two digit numbers (+.,-,*,/)\n…",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 198,
+    "optionText" : "I can do it in my mind accurately",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 199,
+    "optionText" : "I use my fingers",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 200,
+    "optionText" : "I do it with paper pencil",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 201,
+    "optionText" : "I need help of a calculator",
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 9,
+    "sectionName" : "Section E ",
+    "sectionDescription" : "Section E Insight Navigator "
+  },
+  "languageQuestions" : [ {
+    "language" : {
+      "languageId" : 1,
+      "languageName" : "Hindi",
+      "languageQuestion" : [ ],
+      "languageOption" : [ ]
+    },
+    "questionText" : "दो अंकों की संख्याओं के सार् रो ाना गणर्ि की गर्ना करने के लिए (+, -, *, /)...",
+    "languageQuestionId" : 31,
+    "originalQuestionId" : 35
+  } ],
+  "id" : 35
+}, {
+  "questionId" : 36,
+  "questionText" : "Given a blank piece of paper..",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 202,
+    "optionText" : " I can very easily think of something to draw or create",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 203,
+    "optionText" : "I would like to draw or create",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 204,
+    "optionText" : "I would take a while to think and draw something.",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 205,
+    "optionText" : " I am not good with drawing",
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 9,
+    "sectionName" : "Section E ",
+    "sectionDescription" : "Section E Insight Navigator "
+  },
+  "languageQuestions" : [ {
+    "language" : {
+      "languageId" : 1,
+      "languageName" : "Hindi",
+      "languageQuestion" : [ ],
+      "languageOption" : [ ]
+    },
+    "questionText" : "एक खाली कागज का टुकडा ममलने पर...",
+    "languageQuestionId" : 32,
+    "originalQuestionId" : 36
+  } ],
+  "id" : 36
+}, {
+  "questionId" : 37,
+  "questionText" : " When learning new language?",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 206,
+    "optionText" : "I can quickly learn new words",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 207,
+    "optionText" : "I take some time to learn new words",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 208,
+    "optionText" : "I simply mug up the new words",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 209,
+    "optionText" : "It’s difficult to remember new words",
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 9,
+    "sectionName" : "Section E ",
+    "sectionDescription" : "Section E Insight Navigator "
+  },
+  "languageQuestions" : [ {
+    "language" : {
+      "languageId" : 1,
+      "languageName" : "Hindi",
+      "languageQuestion" : [ ],
+      "languageOption" : [ ]
+    },
+    "questionText" : "जब नई भािा सीख रहे हों?",
+    "languageQuestionId" : 33,
+    "originalQuestionId" : 37
+  } ],
+  "id" : 37
+}, {
+  "questionId" : 38,
+  "questionText" : "Setting up and configuring new devices, like printers,\nelectric games, or smart home gadgets...",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 210,
+    "optionText" : " I easily set up a new device",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 211,
+    "optionText" : "With little help I can do it",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 212,
+    "optionText" : "I follow manual step by step",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 213,
+    "optionText" : "I don’t find it handy, always need help",
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 9,
+    "sectionName" : "Section E ",
+    "sectionDescription" : "Section E Insight Navigator "
+  },
+  "languageQuestions" : [ {
+    "language" : {
+      "languageId" : 1,
+      "languageName" : "Hindi",
+      "languageQuestion" : [ ],
+      "languageOption" : [ ]
+    },
+    "questionText" : "नए डडर्ाइि, जैिे वप्रंटर, इिेस्क्िक गेम या स्माटव होम गैजेट िेट अप और कॉस्न्फ़गर करना...",
+    "languageQuestionId" : 34,
+    "originalQuestionId" : 38
+  } ],
+  "id" : 38
+}, {
+  "questionId" : 39,
+  "questionText" : "I play a sport or dance",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 214,
+    "optionText" : "Strongly Agree",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 215,
+    "optionText" : "Agree",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 216,
+    "optionText" : "Disagree",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 217,
+    "optionText" : " Strongly Disagree",
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 10,
+    "sectionName" : "Section F ",
+    "sectionDescription" : "Section F Insight Navigator "
+  },
+  "languageQuestions" : [ {
+    "language" : {
+      "languageId" : 1,
+      "languageName" : "Hindi",
+      "languageQuestion" : [ ],
+      "languageOption" : [ ]
+    },
+    "questionText" : "मैंएक खेल खेलता ह ँया नृत्य करता ह ँ।",
+    "languageQuestionId" : 35,
+    "originalQuestionId" : 39
+  } ],
+  "id" : 39
+}, {
+  "questionId" : 40,
+  "questionText" : " I can throw things well - darts, skimming pebbles,\nfrisbees, etc .",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 218,
+    "optionText" : "Strongly Agree",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 219,
+    "optionText" : "Agree",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 220,
+    "optionText" : "Disagree",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 221,
+    "optionText" : "Strongly Disagree",
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 10,
+    "sectionName" : "Section F ",
+    "sectionDescription" : "Section F Insight Navigator "
+  },
+  "languageQuestions" : [ {
+    "language" : {
+      "languageId" : 1,
+      "languageName" : "Hindi",
+      "languageQuestion" : [ ],
+      "languageOption" : [ ]
+    },
+    "questionText" : "मैंषवमभन्न चीजों को अच्छी तरह र्ें क सकता ह ँ - जैसे र्ा्थस, पत्र्र को पानी पर उछालना, किस्बी आहद।",
+    "languageQuestionId" : 36,
+    "originalQuestionId" : 40
+  } ],
+  "id" : 40
+}, {
+  "questionId" : 41,
+  "questionText" : " I enjoy and am good at making things - I'm good with\nmy hands.",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 222,
+    "optionText" : "Strongly Agree",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 223,
+    "optionText" : "Agree",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 224,
+    "optionText" : "Disagree",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 225,
+    "optionText" : " Strongly Disagree",
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 10,
+    "sectionName" : "Section F ",
+    "sectionDescription" : "Section F Insight Navigator "
+  },
+  "languageQuestions" : [ {
+    "language" : {
+      "languageId" : 1,
+      "languageName" : "Hindi",
+      "languageQuestion" : [ ],
+      "languageOption" : [ ]
+    },
+    "questionText" : "मैंचीजेंबनानेका आनंद लेता ह ँऔर उसमें कुशल ह ँ - मैंअपने हार्ों से काम करने में ननपुण ह ँ।",
+    "languageQuestionId" : 37,
+    "originalQuestionId" : 41
+  } ],
+  "id" : 41
+}, {
+  "questionId" : 42,
+  "questionText" : "I find it easy to talk to new people",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 226,
+    "optionText" : "Strongly Agree",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 227,
+    "optionText" : "Agree",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 228,
+    "optionText" : "Disagree",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 229,
+    "optionText" : "Strongly Disagree",
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 10,
+    "sectionName" : "Section F ",
+    "sectionDescription" : "Section F Insight Navigator "
+  },
+  "languageQuestions" : [ {
+    "language" : {
+      "languageId" : 1,
+      "languageName" : "Hindi",
+      "languageQuestion" : [ ],
+      "languageOption" : [ ]
+    },
+    "questionText" : "मुझे नए लोगों से बात करना आसान लगता है।",
+    "languageQuestionId" : 38,
+    "originalQuestionId" : 42
+  } ],
+  "id" : 42
+}, {
+  "questionId" : 43,
+  "questionText" : " It upsets me to see someone cry and not be able to\nhelp.",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 230,
+    "optionText" : "Strongly Agree",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 231,
+    "optionText" : "Agree",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 232,
+    "optionText" : "Disagree",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 233,
+    "optionText" : " Strongly Disagree",
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 10,
+    "sectionName" : "Section F ",
+    "sectionDescription" : "Section F Insight Navigator "
+  },
+  "languageQuestions" : [ {
+    "language" : {
+      "languageId" : 1,
+      "languageName" : "Hindi",
+      "languageQuestion" : [ ],
+      "languageOption" : [ ]
+    },
+    "questionText" : "ककसी को रोते हुए देखना और उनकी मदद न कर पाना मुझे दुखी करता है।",
+    "languageQuestionId" : 39,
+    "originalQuestionId" : 43
+  } ],
+  "id" : 43
+}, {
+  "questionId" : 44,
+  "questionText" : "Kuch TOh",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 0,
+  "options" : [ {
+    "optionId" : 234,
+    "optionText" : "Hi",
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 2,
+    "sectionName" : "Section A",
+    "sectionDescription" : "Section A Insight Navigator"
+  },
+  "languageQuestions" : [ ],
+  "id" : 44
+}, {
+  "questionId" : 45,
+  "questionText" : "asd",
+  "questionType" : "single-choice",
+  "flag" : null,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 235,
+    "optionText" : "asd",
+    "optionScores" : [ {
+      "score" : 1,
+      "question_option" : {
+        "optionId" : 235,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 1,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 58
+    }, {
+      "score" : 2,
+      "question_option" : {
+        "optionId" : 235,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 2,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 59
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 236,
+    "optionText" : "pdf",
+    "optionScores" : [ {
+      "score" : 1,
+      "question_option" : {
+        "optionId" : 236,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 3,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 60
+    }, {
+      "score" : 2,
+      "question_option" : {
+        "optionId" : 236,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 4,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 61
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 237,
+    "optionText" : "sad",
+    "optionScores" : [ {
+      "score" : 2,
+      "question_option" : {
+        "optionId" : 237,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 5,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 62
+    }, {
+      "score" : 1,
+      "question_option" : {
+        "optionId" : 237,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 6,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 63
+    } ],
+    "correct" : false
+  }, {
+    "optionId" : 238,
+    "optionText" : "pdf",
+    "optionScores" : [ {
+      "score" : 2,
+      "question_option" : {
+        "optionId" : 238,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 1,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 64
+    }, {
+      "score" : 2,
+      "question_option" : {
+        "optionId" : 238,
+        "optionText" : null,
+        "optionScores" : null,
+        "correct" : false
+      },
+      "measuredQualityType" : {
+        "measuredQuality" : null,
+        "optionScores" : null,
+        "measuredQualityTypeId" : 4,
+        "measuredQualityTypeName" : null,
+        "measuredQualityTypeDescription" : null,
+        "measuredQualityTypeDisplayName" : null
+      },
+      "scoreId" : 65
+    } ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 2,
+    "sectionName" : "Section A",
+    "sectionDescription" : "Section A Insight Navigator"
+  },
+  "languageQuestions" : [ ],
+  "id" : 45
+} ]
