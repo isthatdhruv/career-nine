@@ -10,6 +10,7 @@ import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.kccitm.api.model.career9.LanguagesSupported;
 
 @Entity
@@ -24,6 +25,7 @@ public class QuestionnaireSectionInstruction {
    // Foreign key to QuestionnaireSection table
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "questionnaire_section_id") // explicit join column to avoid auto-generated column name
+    @JsonIgnore
     private QuestionnaireSection section;
 
     // Foreign key to language table
