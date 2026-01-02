@@ -40,6 +40,9 @@ import Users from "../pages/Users/components/Users";
 import ListCreatePage from "../pages/List/components/ListCreatePage";
 import ListEditPage from "../pages/List/components/ListEditPage";
 import ListPage from "../pages/List/CreateList";
+import Assessment from "../pages/StudentOnlineAssessment/components/SelectSectionPage";
+import SelectSectionPage from "../pages/StudentOnlineAssessment/components/SelectSectionPage";
+import SectionInstructionPage from "../pages/StudentOnlineAssessment/components/SectionInstructionPage";
 
 
 
@@ -133,6 +136,10 @@ const PrivateRoutes = () => {
   // const Pdf = lazy(() => import("../pages/newRegistrationUpload/StudentService"));
   return (
     <Routes>
+      <Route path="/studentAssessment" element={<SelectSectionPage />} />
+      <Route path="/studentAssessment/sections/:sectionId" element={<SectionInstructionPage />} />
+
+      <Route path="/login" element={<LoginPage />} />
       <Route element={<MasterLayout />}>
         <Route path="auth/*" element={<Navigate to="/dashboard" />} />
         <Route path="dashboard" element={<DashboardWrapper />} />
@@ -145,8 +152,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
-        <Route path="/login" element={<LoginPage />} />
 
         <Route
           path="/login/reset-password/enter-email"
