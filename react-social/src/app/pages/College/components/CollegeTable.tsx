@@ -2,10 +2,12 @@
 import React, { useState } from "react";
 import { MDBDataTableV5 } from "mdbreact";
 import { AiFillEdit, AiOutlineInfoCircle } from "react-icons/ai";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
-import { Button, Dropdown } from "react-bootstrap-v5";
+import { Button, Dropdown } from "react-bootstrap";
+import { IconContext } from "react-icons";
+import { MdEdit, MdDelete, MdSchool, MdOutlineDashboard, MdUploadFile } from "react-icons/md";
 
 import { DeleteCollegeData } from "../API/College_APIs";
 import CollegeEditModal from "./CollegeEditModal";
@@ -48,6 +50,7 @@ const CollegeTable = (props: {
   data?: CollegeRow[];
   setLoading: (v: boolean) => void;
   setPageLoading: (v: any) => void;
+  onUploadClick?: (college: CollegeRow) => void;
 }) => {
   const [modalShowEdit, setModalShowEdit] = useState(false);
   const [editModalData, setEditModalData] = useState<CollegeRow>({
@@ -66,6 +69,7 @@ const CollegeTable = (props: {
   const [infoRolesModalData, setInfoRolesModalData] = useState<ModalData | undefined>(
     undefined
   );
+  const navigate = useNavigate();
   // convert a table row into the modal-compatible partial form shape
   const toModalData = (row: CollegeRow): ModalData => {
     // convert boolean display -> numeric (1/0), keep numeric/string as is
@@ -225,6 +229,51 @@ const CollegeTable = (props: {
                 </Dropdown.Item>
               </Dropdown.Menu>
             </Dropdown>
+
+            {/* Upload students excel for this institute */}
+            <Button
+              variant="outline-success"
+              size="sm"
+              onClick={() => {
+                if (props.onUploadClick) {
+                  props.onUploadClick(editModalData);
+                }
+              }}
+              onClickCapture={() => {
+                if (typeof ({} as any) === "undefined") {}
+              }}
+            >
+              {/* fallback when using compiled TypeScript; real handler below */}
+            </Button>
+            {/* School Dashboard */}
+            <Button
+              variant="outline-info"
+              size="sm"
+              className="me-2"
+              onClick={() => navigate(`/dashboard/school/${data.instituteCode || data.id}`)}
+            >
+              <IconContext.Provider value={{ style: { paddingBottom: "3px" } }}>
+                <MdOutlineDashboard />
+              </IconContext.Provider>
+              <span style={{ marginLeft: 6 }}>Dashboard</span>
+            </Button>
+            {/* Actual safe handler - call passed in prop */}
+            <Button
+              variant="outline-success"
+              size="sm"
+              className="me-2"
+              onClick={() => props.onUploadClick && props.onUploadClick(data)}
+            >
+              <IconContext.Provider value={{ style: { paddingBottom: "3px" } }}>
+                <MdUploadFile />
+              </IconContext.Provider>
+              <span style={{ marginLeft: 6 }}>Upload Students</span>
+            </Button>
+            {/* Simpler: call prop directly if provided */}
+            <Button
+              hidden
+              onClick={() => {}}
+            />
           </>
         ),
       })) ?? [];
