@@ -25,12 +25,12 @@ public class QuestionnaireQuestion {
 
    // Foreign key to QuestionnaireSection table
     @ManyToOne(fetch = FetchType.EAGER)
+    @JsonIgnore
     @JoinColumn(name = "questionnaire_section_id") // explicit join column to avoid auto-generated column name
     private QuestionnaireSection section;
 
     // Foreign key to QuestionnaireSection table
     @ManyToOne(fetch = FetchType.EAGER)
-    @JsonIgnore
     @JoinColumn(name = "question_id") // explicit join column to avoid auto-generated column name
     private AssessmentQuestions question;
 

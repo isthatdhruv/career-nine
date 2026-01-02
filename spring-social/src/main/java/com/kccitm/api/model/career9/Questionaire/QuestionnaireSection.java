@@ -65,6 +65,7 @@ public class QuestionnaireSection {
     }
 
     public QuestionSection getSection() {
+        this.section.setQuestions(null);
         return this.section;
     }
 

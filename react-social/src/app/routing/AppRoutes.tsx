@@ -20,6 +20,7 @@ import { ThankYouPage } from "../pages/StudentRegistration/ThankYou";
 import { UniRollNoUpdate } from "../pages/StudentRegistration/UniRollNoUpdate";
 import { PrivateRoutes } from "./PrivateRoutes";
 // import CompilerPageEdit from "../pages/Compiler/compilerEdit";
+import SchoolDashboardPage from "../pages/dashboard/SchoolDashboardPage";
 
 const StudentRegistrationForm = lazy(
   () => import("../pages/StudentRegistration/StudentRegistrationForm")
@@ -144,6 +145,7 @@ const AppRoutes: FC = () => {
               </SuspensedView>
             }
           />
+          <Route path="/dashboard/school/:id" element={<SchoolDashboardPage />} />
 
           <Route path="logout" element={<Logout />} />
 
