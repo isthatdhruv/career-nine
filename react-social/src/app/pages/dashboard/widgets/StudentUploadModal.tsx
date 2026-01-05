@@ -143,21 +143,25 @@ const StudentUploadModal: React.FC<Props> = ({ show, onHide, onUpload }) => {
   };
 
   return (
-    <Modal show={show} onHide={onHide} size="lg" centered>
+    <Modal show={show} onHide={onHide} size="xl" centered>
       <Modal.Header closeButton>
         <Modal.Title>Upload Student List</Modal.Title>
       </Modal.Header>
       <Modal.Body>
-        <div className="d-flex gap-2 mb-3">
+        <div className="d-flex gap-2 mb-3 min-w-100">
           <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} />
-          <Button variant="outline-secondary" onClick={downloadTemplate}>
+          <Button variant="outline-primary" onClick={downloadTemplate}>
             Download Format
           </Button>
           {fileName && <div className="ms-2 text-muted align-self-center">Selected: {fileName}</div>}
         </div>
         {error && <div className="text-danger mb-2">{error}</div>}
         {rows ? (
-          <StudentTable rows={rows} maxPreviewRows={200} />
+          <StudentTable
+            rows={rows}
+            maxPreviewRows={200}
+            onUpdate={(newRows) => setRows(newRows)}
+          />
         ) : (
           <div className="text-muted">No file parsed yet.</div>
         )}

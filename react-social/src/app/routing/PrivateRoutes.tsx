@@ -168,6 +168,11 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
+        <Route path="/dashboard/school/:id" element={
+          <SuspensedView>
+            <SchoolDashboardPage />
+          </SuspensedView>
+        } />
         <Route
           path="/login/reset-password/enter-email"
           element={
