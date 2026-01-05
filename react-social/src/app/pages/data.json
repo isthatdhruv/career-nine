@@ -1,0 +1,525 @@
+[
+    {
+        "questionnaireId": 1,
+        "tool": {
+            "name": "Insight Navigator",
+            "price": 599.0,
+            "isFree": false,
+            "free": false,
+            "toolId": 2
+        },
+        "languages": [
+            {
+                "id": 1,
+                "language": {
+                    "languageId": 100,
+                    "languageName": "English",
+                    "languageQuestion": [],
+                    "languageOption": []
+                },
+                "instructions": "All is well"
+            },
+            {
+                "id": 2,
+                "language": {
+                    "languageId": 1,
+                    "languageName": "Hindi",
+                    "languageQuestion": [],
+                    "languageOption": []
+                },
+                "instructions": "सब ठीक है"
+            }
+        ],
+        "modeId": 0,
+        "price": 100.00,
+        "isFree": false,
+        "name": "A",
+        "display": null,
+        "sections": [
+            {
+                "questionnaireSectionId": 1,
+                "section": {
+                    "sectionId": 2,
+                    "sectionName": "Section A",
+                    "sectionDescription": "Section A Insight Navigator",
+                    "questionId": []
+                },
+                "questions": [
+                    {
+                        "questionnaireQuestionId": 7,
+                        "question": {
+                            "questionId": 26,
+                            "questionText": "Your values play a crucial role in guiding your behaviour and decisions. They give direction to your\nlife and career, helping you decide who you are and how you interact with the world. Below are 15 values. Your\ntask is to select the top 5 values that are most important to you.",
+                            "questionType": "multiple-choice",
+                            "flag": false,
+                            "maxOptionsAllowed": 5,
+                            "options": [
+                                {
+                                    "optionId": 152,
+                                    "optionText": "Good Salary: Receiving sufficient money to live a comfortable lifestyle. Like for example your pocket money is sufficient to manage necessary expenses and allows some saving.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 153,
+                                    "optionText": "Job Security : Assurance that you won't lose your job come what may. This helps one plan future dreams and goals knowing there is a fixed income with minimum risk. For example job of a teacher.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 154,
+                                    "optionText": "Job Security : Assurance that you won't lose your job come what may. This helps one plan future dreams and goals knowing there is a fixed income with minimum risk. For example job of a teacher.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 155,
+                                    "optionText": "Working in Team/ Group: Working with others, in groups or team, where it is a friendly and non-competitive environment. Here team or group goals are considered important that personal interest.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 156,
+                                    "optionText": "High achievement: High achievement refers to setting and completing challenging goals. It includes setting long term goals with clear objectives, optimistically managing to reach the goal and always attempting for success. For example setting targets for competitive exams.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 157,
+                                    "optionText": "Independence/ Autonomy: Independence refers to making decision on our own with little or no supervision. It is like being your boss. It also about being making own choices and being responsible for them.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 158,
+                                    "optionText": "Working with Hands: Working with hands refers to using practical skills to create things with your own hands rather than taking help from machines. For example, choosing to cook over ready to eat meals.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 159,
+                                    "optionText": "Prestige/ Recognition: Prestige and recognition refers to looking for a chance to be seen as important person. It is important to get a pat on back for the hard work you put in. It refers to being appreciated for the task done. For example, finding it important to take lead role in school activities and getting fame for your achievements.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 160,
+                                    "optionText": "Creativity: Creativity refers to using own ideas and experimenting with new things. It refers to valuing out of box ideas and innovation in any given assignment.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 161,
+                                    "optionText": "Working with Mind: It's a belief in brain power. like they say 'Pen is mightier than a sword.' it refers to being able to analyze events around and use creative thinking for problem solving",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 162,
+                                    "optionText": "Physical Activity: Physical activity simply refers to valuing thing that are related to body activity like giving importance to sport, exercise and outdoor activities.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 163,
+                                    "optionText": "Leadership: Supervising/managing others and helping in development of a larger group. For example being captain of a sport team.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 164,
+                                    "optionText": "Routine Activity: Believe that structure and discipline is important. it refers to enjoying routine and having clear plans. For example, arranging your study notes or closet in same order cause it works the best for you.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 165,
+                                    "optionText": "Supervised Work : Having supportive management that stands behind you, egg. need for teacher or coach to help you progress.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 166,
+                                    "optionText": "Working Conditions: Refers to having a safe position and nice place to work, you should be free to do your task, get reward for your work and not having fear of losing job.",
+                                    "optionScores": [],
+                                    "correct": false
+                                }
+                            ],
+                            "section": {
+                                "sectionId": 3,
+                                "sectionName": "Section B",
+                                "sectionDescription": "Section B Insight Navigator\n",
+                                "questionId": [
+                                    26,
+                                    27
+                                ]
+                            },
+                            "languageQuestions": [],
+                            "id": 26
+                        },
+                        "order": "1"
+                    },
+                    {
+                        "questionnaireQuestionId": 8,
+                        "question": {
+                            "questionId": 27,
+                            "questionText": "Below is a list of 15 broad fields of study commonly pursued in India. Your task is to select the top\n5 areas that resonate most deeply with your interests and aspirations.",
+                            "questionType": "multiple-choice",
+                            "flag": false,
+                            "maxOptionsAllowed": 5,
+                            "options": [
+                                {
+                                    "optionId": 167,
+                                    "optionText": "Agriculture: Agriculture includes the methods and techniques used in farming to produce food and raw materials.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 168,
+                                    "optionText": "Art: Art studies how people express their creativity through painting, music, and storytelling.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 169,
+                                    "optionText": "Cultural Studies: Cultural studies help in understanding how culture shapes society, identity, and daily life through traditions, beliefs, and practices.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 170,
+                                    "optionText": "English: The study of the English language teaches grammar rules, vocabulary expansion, and the analysis of literature and texts.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 171,
+                                    "optionText": "Home and Consumer Science: This subject teaches useful skills and knowledge for taking care of the home and family. It provides information on managing daily tasks, choosing a healthy diet, and keeping the family happy and healthy.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 172,
+                                    "optionText": "Finance: The study of finance teaches money management, saving, investing, and planning expenses.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 173,
+                                    "optionText": "Health: Health education includes information about nutrition, exercise, hygiene, and mental well-being.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 174,
+                                    "optionText": "Languages: Language education involves learning to read, write, speak, and understand different languages.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 175,
+                                    "optionText": "Management: The study of management teaches how to plan projects, lead teams, make decisions, and solve problems in various organizations.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 176,
+                                    "optionText": "Mathematics: Mathematics involves the study of calculations, geometry, algebra, and data analysis.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 177,
+                                    "optionText": "Music: Music teaches how to create, perform, and appreciate sounds and rhythms using various instruments and voice.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 178,
+                                    "optionText": "Science: Science includes subjects like biology, chemistry, physics, and earth sciences to understand how the world works.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 179,
+                                    "optionText": "Vocational Studies: This field prepares individuals for professions that involve practical skills like car repair, gardening, carpentry, baking, and cooking.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 180,
+                                    "optionText": "Social Sciences: Social sciences teach how society functions, historical events, and the impact of economic and political systems.",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 181,
+                                    "optionText": "Technology: The study of technology includes subjects like engineering, computer science, and digital tools, helping explore how technology influences our world.",
+                                    "optionScores": [],
+                                    "correct": false
+                                }
+                            ],
+                            "section": {
+                                "sectionId": 3,
+                                "sectionName": "Section B",
+                                "sectionDescription": "Section B Insight Navigator\n",
+                                "questionId": [
+                                    26,
+                                    27
+                                ]
+                            },
+                            "languageQuestions": [],
+                            "id": 27
+                        },
+                        "order": "2"
+                    }
+                ],
+                "order": "1",
+                "instruction": [
+                    {
+                        "questionnaireSectionInstructionId": 1,
+                        "language": {
+                            "languageId": 100,
+                            "languageName": "English",
+                            "languageQuestion": [],
+                            "languageOption": []
+                        },
+                        "instructionText": "This section consists of 20 options , out of which you have to select any 5 of your choice "
+                    },
+                    {
+                        "questionnaireSectionInstructionId": 2,
+                        "language": {
+                            "languageId": 2,
+                            "languageName": "Marathi",
+                            "languageQuestion": [],
+                            "languageOption": []
+                        },
+                        "instructionText": "इस अनुभाग में 20 विकल्प हैं, जिनमें से आपको अपनी पसंद के किसी भी 5 का चयन करना होगा"
+                    }
+                ]
+            },
+            {
+                "questionnaireSectionId": 2,
+                "section": {
+                    "sectionId": 3,
+                    "sectionName": "Section B",
+                    "sectionDescription": "Section B Insight Navigator\n",
+                    "questionId": []
+                },
+                "questions": [
+                    {
+                        "questionnaireQuestionId": 5,
+                        "question": {
+                            "questionId": 6,
+                            "questionText": "Below is a list of 15 broad fields of study commonly pursued in India. Your task is to select the top 5 areas that resonate most deeply with your interests and aspirations. If you need clarification on the meaning of any field, please refer to the help section provided.",
+                            "questionType": "multiple-choice",
+                            "flag": null,
+                            "maxOptionsAllowed": 5,
+                            "options": [
+                                {
+                                    "optionId": 14,
+                                    "optionText": "Agriculture",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 15,
+                                    "optionText": "Art",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 16,
+                                    "optionText": "Cultural Studies",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 17,
+                                    "optionText": "English",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 18,
+                                    "optionText": "Home and Consumer Science",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 19,
+                                    "optionText": "Finance",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 20,
+                                    "optionText": "Health",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 21,
+                                    "optionText": "Languages",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 22,
+                                    "optionText": "Management",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 23,
+                                    "optionText": "Mathematics",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 24,
+                                    "optionText": "Music",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 25,
+                                    "optionText": "Science",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 26,
+                                    "optionText": "Vocational studies",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 27,
+                                    "optionText": "Social Sciences",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 28,
+                                    "optionText": "Technology",
+                                    "optionScores": [],
+                                    "correct": false
+                                }
+                            ],
+                            "section": {
+                                "sectionId": 2,
+                                "sectionName": "Section A",
+                                "sectionDescription": "Section A Insight Navigator",
+                                "questionId": []
+                            },
+                            "languageQuestions": [
+                                {
+                                    "language": {
+                                        "languageId": 1,
+                                        "languageName": "Hindi",
+                                        "languageQuestion": [],
+                                        "languageOption": []
+                                    },
+                                    "questionText": "नीचे भारत में सामान्यतः अपनाए जाने वाले 15 व्यापक अध्ययन क्षेत्रों की सूची दी गई है। आपका कार्य उन शीर्ष 5 क्षेत्रों का चयन करना है जो आपकी रुचियों और आकांक्षाओं से सबसे अधिक मेल खाते हों। यदि आपको किसी फ़ील्ड के अर्थ पर स्पष्टीकरण की आवश्यकता है, तो कृपया दिए गए सहायता अनुभाग को देखें।",
+                                    "languageQuestionId": 22,
+                                    "originalQuestionId": 6
+                                },
+                                {
+                                    "language": {
+                                        "languageId": 2,
+                                        "languageName": "Marathi",
+                                        "languageQuestion": [],
+                                        "languageOption": []
+                                    },
+                                    "questionText": "MARATHI CHe",
+                                    "languageQuestionId": 23,
+                                    "originalQuestionId": 6
+                                }
+                            ],
+                            "id": 6
+                        },
+                        "order": "1"
+                    },
+                    {
+                        "questionnaireQuestionId": 6,
+                        "question": {
+                            "questionId": 44,
+                            "questionText": "Kuch TOh",
+                            "questionType": "multiple-choice",
+                            "flag": false,
+                            "maxOptionsAllowed": 0,
+                            "options": [
+                                {
+                                    "optionId": 234,
+                                    "optionText": "Hi",
+                                    "optionScores": [],
+                                    "correct": false
+                                }
+                            ],
+                            "section": {
+                                "sectionId": 2,
+                                "sectionName": "Section A",
+                                "sectionDescription": "Section A Insight Navigator",
+                                "questionId": []
+                            },
+                            "languageQuestions": [],
+                            "id": 44
+                        },
+                        "order": "2"
+                    }
+                ],
+                "order": "2",
+                "instruction": []
+            },
+            {
+                "questionnaireSectionId": 3,
+                "section": {
+                    "sectionId": 4,
+                    "sectionName": "Section C",
+                    "sectionDescription": "Section C Insight Navigator",
+                    "questionId": []
+                },
+                "questions": [],
+                "order": "3",
+                "instruction": []
+            },
+            {
+                "questionnaireSectionId": 4,
+                "section": {
+                    "sectionId": 5,
+                    "sectionName": "Section D",
+                    "sectionDescription": "Section D Insight Navigator ",
+                    "questionId": []
+                },
+                "questions": [],
+                "order": "4",
+                "instruction": []
+            },
+            {
+                "questionnaireSectionId": 5,
+                "section": {
+                    "sectionId": 9,
+                    "sectionName": "Section E ",
+                    "sectionDescription": "Section E Insight Navigator ",
+                    "questionId": []
+                },
+                "questions": [],
+                "order": "5",
+                "instruction": []
+            },
+            {
+                "questionnaireSectionId": 6,
+                "section": {
+                    "sectionId": 10,
+                    "sectionName": "Section F ",
+                    "sectionDescription": "Section F Insight Navigator ",
+                    "questionId": []
+                },
+                "questions": [],
+                "order": "6",
+                "instruction": []
+            }
+        ]
+    }
+]

@@ -44,10 +44,7 @@ import Assessment from "../pages/StudentOnlineAssessment/components/SelectSectio
 import SelectSectionPage from "../pages/StudentOnlineAssessment/components/SelectSectionPage";
 import SectionInstructionPage from "../pages/StudentOnlineAssessment/components/SectionInstructionPage";
 import {SchoolDashboardPage} from "../pages/dashboard/SchoolDashboardPage";
-
-
-
-  
+import SectionQuestionPage from "../pages/StudentOnlineAssessment/components/SectionQuestionPage";
 
 const PrivateRoutes = () => {
   const StudentsData = lazy(
@@ -92,17 +89,29 @@ const PrivateRoutes = () => {
 
   // const Compiler = lazy(() => import("../pages/Compiler/compiler"));
 
-  const MeasuredQualityTypes = lazy(() => import("../pages/MeasuredQualityTypes/CreateMeasuredQualityTypes"));
-  const MeasuredQualities = lazy(() => import("../pages/MeasuredQualities/MeasuredQualities"));
+  const MeasuredQualityTypes = lazy(
+    () => import("../pages/MeasuredQualityTypes/CreateMeasuredQualityTypes")
+  );
+  const MeasuredQualities = lazy(
+    () => import("../pages/MeasuredQualities/MeasuredQualities")
+  );
   const Tools = lazy(() => import("../pages/Tool/CreateTool"));
   const List = lazy(() => import("../pages/List/CreateList"));
   const College = lazy(() => import("../pages/College/CollegePage"));
   // Update the import path below to the correct location if the file exists elsewhere
   const CollegeCreatePage = lazy(() => import("../pages/College/CollegePage"));
-  const CollegeEditPage = lazy(() => import("../pages/College/components/CollegeEditModal"));
-  const AssessmentQuestions = lazy(() => import("../pages/AssesmentQuestions/CreateQuestion"));
-  const QuestionCreatePage = lazy(() => import("../pages/AssesmentQuestions/components/QuestionCreatePage"));
-  const QuestionEditPage = lazy(() => import("../pages/AssesmentQuestions/components/QuestionEditPage"));
+  const CollegeEditPage = lazy(
+    () => import("../pages/College/components/CollegeEditModal")
+  );
+  const AssessmentQuestions = lazy(
+    () => import("../pages/AssesmentQuestions/CreateQuestion")
+  );
+  const QuestionCreatePage = lazy(
+    () => import("../pages/AssesmentQuestions/components/QuestionCreatePage")
+  );
+  const QuestionEditPage = lazy(
+    () => import("../pages/AssesmentQuestions/components/QuestionEditPage")
+  );
   const Board = lazy(() => import("../pages/Board/BoardPage"));
   const Section = lazy(() => import("../pages/Section/SectionPage"));
   const Course = lazy(() => import("../pages/Course/CoursePage"));
@@ -138,13 +147,19 @@ const PrivateRoutes = () => {
   return (
     <Routes>
       <Route path="/studentAssessment" element={<SelectSectionPage />} />
-      <Route path="/studentAssessment/sections/:sectionId" element={<SectionInstructionPage />} />
+      <Route
+        path="/studentAssessment/sections/:sectionId"
+        element={<SectionInstructionPage />}
+      />
+      <Route
+        path="/studentAssessment/sections/:sectionId/questions/:questionIndex"
+        element={<SectionQuestionPage />}
+      />
 
       <Route path="/login" element={<LoginPage />} />
       <Route element={<MasterLayout />}>
         <Route path="auth/*" element={<Navigate to="/dashboard" />} />
         <Route path="dashboard" element={<DashboardWrapper />} />
-
         <Route
           path="/student/university/result-list"
           element={
@@ -153,7 +168,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="/login/reset-password/enter-email"
           element={
@@ -178,7 +192,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="/student/university/result-dashboard"
           element={
@@ -198,7 +211,6 @@ const PrivateRoutes = () => {
                 />
         */}
         ```
-
         <Route
           path="/student/university/result"
           element={
@@ -223,7 +235,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="/student/registration-details"
           element={
@@ -248,7 +259,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="/registrar/verification"
           element={
@@ -257,7 +267,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="/forgotpassword"
           element={
@@ -266,7 +275,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="google-groups"
           element={
@@ -275,7 +283,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="groups"
           element={
@@ -284,7 +291,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="group"
           element={
@@ -293,7 +299,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="/old-student-email"
           element={
@@ -327,7 +332,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="/contact-person"
           element={
@@ -352,7 +356,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="/section"
           element={
@@ -435,7 +438,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="/tools"
           element={
@@ -460,7 +462,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="/list"
           element={
@@ -483,9 +484,8 @@ const PrivateRoutes = () => {
             <SuspensedView>
               <ListEditPage />
             </SuspensedView>
-          } 
+          }
         />
-
         <Route
           path="/upload-excel"
           element={
@@ -494,7 +494,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="/assessments"
           element={
@@ -502,7 +501,7 @@ const PrivateRoutes = () => {
               <Assessments />
             </SuspensedView>
           }
-        /> 
+        />
         <Route
           path="/assessments/create/step-2"
           element={
@@ -559,7 +558,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="/measured-qualities"
           element={
@@ -584,7 +582,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="/measured-quality-types"
           element={
@@ -609,7 +606,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="/course"
           element={
@@ -642,7 +638,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="/batchgoogle"
           element={
@@ -651,7 +646,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="/studentlist"
           element={
@@ -668,7 +662,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="/roles/role"
           element={
@@ -677,7 +670,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="/roles/users"
           element={
@@ -686,7 +678,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="/roles/role_roleGroup"
           element={
@@ -695,7 +686,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
         <Route
           path="/roles/roleUser"
           element={
@@ -704,9 +694,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-
-         <Route path="/dashboard/school/:id" element={
-            <SchoolDashboardPage />} />
 
         {/* Page Not Found */}
         {/* <Route path="*" element={<Navigate to="/error/404" />} /> */}
