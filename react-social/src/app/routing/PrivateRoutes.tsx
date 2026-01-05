@@ -43,6 +43,7 @@ import ListPage from "../pages/List/CreateList";
 import Assessment from "../pages/StudentOnlineAssessment/components/SelectSectionPage";
 import SelectSectionPage from "../pages/StudentOnlineAssessment/components/SelectSectionPage";
 import SectionInstructionPage from "../pages/StudentOnlineAssessment/components/SectionInstructionPage";
+import {SchoolDashboardPage} from "../pages/dashboard/SchoolDashboardPage";
 
 
 
@@ -703,6 +704,9 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
+
+         <Route path="/dashboard/school/:id" element={
+            <SchoolDashboardPage />} />
 
         {/* Page Not Found */}
         {/* <Route path="*" element={<Navigate to="/error/404" />} /> */}
