@@ -15,13 +15,14 @@ import {
   TablesWidget10,
 } from "../../../_metronic/partials/widgets";
 import { StudentList } from "./widgets/StudentList";
+import { SchoolDashboardShortcut } from "./widgets/SchoolDashboardShortcut";
 
 const SchoolDashboardContent: FC = () => (
   <>
     {/* begin::Row */}
     <div className="row gy-5 g-xl-8">
       <div className="col-xxl-4">
-        <MixedWidget2
+        <SchoolDashboardShortcut
           className="card-xl-stretch mb-xl-8"
           chartColor="danger"
           chartHeight="200px"

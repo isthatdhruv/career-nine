@@ -160,6 +160,12 @@ const PrivateRoutes = () => {
       <Route element={<MasterLayout />}>
         <Route path="auth/*" element={<Navigate to="/dashboard" />} />
         <Route path="dashboard" element={<DashboardWrapper />} />
+
+        <Route path="/school/dashboard/:id" element={
+          <SuspensedView>
+            <SchoolDashboardPage />
+          </SuspensedView>
+        } />
         <Route
           path="/student/university/result-list"
           element={

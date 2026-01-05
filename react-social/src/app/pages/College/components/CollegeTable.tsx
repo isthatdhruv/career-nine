@@ -250,13 +250,14 @@ const CollegeTable = (props: {
               variant="outline-info"
               size="sm"
               className="me-2"
-              onClick={() => navigate(`/dashboard/school/${data.instituteCode || data.id}`)}
+              onClick={() => navigate(`/school/dashboard/${data.instituteCode || data.id}`)}
             >
               <IconContext.Provider value={{ style: { paddingBottom: "3px" } }}>
                 <MdOutlineDashboard />
               </IconContext.Provider>
               <span style={{ marginLeft: 6 }}>Dashboard</span>
             </Button>
+
             {/* Actual safe handler - call passed in prop */}
             <Button
               variant="outline-success"
