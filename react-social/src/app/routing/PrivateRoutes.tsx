@@ -45,9 +45,10 @@ import SelectSectionPage from "../pages/StudentOnlineAssessment/components/Selec
 import SectionInstructionPage from "../pages/StudentOnlineAssessment/components/SectionInstructionPage";
 import {SchoolDashboardPage} from "../pages/dashboard/SchoolDashboardPage";
 import SectionQuestionPage from "../pages/StudentOnlineAssessment/components/SectionQuestionPage";
-import studentList from "../pages/StudentInformation/StudentsList";
+import studentsList from "../pages/StudentInformation/StudentsList";
 // import QuestionaireList from "../pages/CreateAssessment/components/questionaire/QuestionaireListPage";
 import QuestionaireListPage from "../pages/CreateAssessment/components/questionaire/QuestionaireListPage";
+import StudentsList from "../pages/StudentInformation/StudentsList";
 const PrivateRoutes = () => {
   const StudentsData = lazy(
     () => import("../pages/UniversityResult/StudentData")
@@ -210,9 +211,9 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-        <Route path="/school/studentList" element={
+        <Route path="/school/dashboard/studentList" element={
           <SuspensedView>
-            <StudentList />
+            <StudentsList />
           </SuspensedView>
         } />
         <Route
@@ -233,7 +234,6 @@ const PrivateRoutes = () => {
                   }
                 />
         */}
-        ```
         <Route
           path="/student/university/result"
           element={
@@ -330,7 +330,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-        //careerpage
         <Route
           path="/career"
           element={

@@ -14,7 +14,7 @@ import {
   MixedWidget8,
   TablesWidget10,
 } from "../../../_metronic/partials/widgets";
-import { StudentList } from "./widgets/StudentList";
+import  StudentList  from "./widgets/StudentList";
 import { SchoolDashboardShortcut } from "./widgets/SchoolDashboardShortcut";
 
 const SchoolDashboardContent: FC = () => (

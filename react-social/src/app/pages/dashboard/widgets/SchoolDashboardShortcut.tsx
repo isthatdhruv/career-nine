@@ -93,7 +93,7 @@ const SchoolDashboardShortcut: React.FC<Props> = ({
               />
               <a
                 role="button"
-                onClick={() => navigate("/school/studentList")}
+                onClick={() => navigate("/school/dashboard/studentList")}
                 className="text-warning fw-semibold fs-6"
                 style={{ cursor: "pointer" }}
               >
