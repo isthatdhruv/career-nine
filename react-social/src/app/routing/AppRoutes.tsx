@@ -21,6 +21,7 @@ import { UniRollNoUpdate } from "../pages/StudentRegistration/UniRollNoUpdate";
 import { PrivateRoutes } from "./PrivateRoutes";
 // import CompilerPageEdit from "../pages/Compiler/compilerEdit";
 import {SchoolDashboardPage} from "../pages/dashboard/SchoolDashboardPage";
+import QuestionaireListPage from "../pages/CreateAssessment/components/questionaire/QuestionaireListPage";
 
 const StudentRegistrationForm = lazy(
   () => import("../pages/StudentRegistration/StudentRegistrationForm")
@@ -81,6 +82,11 @@ const AppRoutes: FC = () => {
             </SuspensedView>
           }
         />
+        {/* <Route path="/questionaire/List" element={
+          <SuspensedView>
+            <QuestionaireListPage />
+          </SuspensedView>
+        } /> */}
         <Route
           path="/faculty/registration-form"
           element={

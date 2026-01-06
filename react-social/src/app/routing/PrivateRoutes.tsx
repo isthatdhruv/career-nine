@@ -23,7 +23,7 @@ import UploadExcelFile from "../pages/UploadExcelFile/UploadExcelFile";
 // Update these paths to the correct locations of your components
 import Assessments from "../pages/CreateAssessment/Assessment";
 import AssessmentCreatePage from "../pages/CreateAssessment/components/AssessmentCreatePage";
-import QuestionareCreateSinglePage from "../pages/CreateAssessment/components/QuestionareCreateSinglePage";
+import QuestionareCreateSinglePage from "../pages/CreateAssessment/components/questionaire/QuestionareCreateSinglePage";
 import AssessmentEditPage from "../pages/CreateAssessment/components/AssessmentEditPage";
 import AssessmentToolPage from "../pages/CreateAssessment/components/AssessmentToolPage";
 import AssessmentUploadFile from "../pages/CreateAssessment/components/AssessmentUploadFile";
@@ -45,7 +45,9 @@ import SelectSectionPage from "../pages/StudentOnlineAssessment/components/Selec
 import SectionInstructionPage from "../pages/StudentOnlineAssessment/components/SectionInstructionPage";
 import {SchoolDashboardPage} from "../pages/dashboard/SchoolDashboardPage";
 import SectionQuestionPage from "../pages/StudentOnlineAssessment/components/SectionQuestionPage";
-
+import studentList from "../pages/StudentInformation/StudentsList";
+// import QuestionaireList from "../pages/CreateAssessment/components/questionaire/QuestionaireListPage";
+import QuestionaireListPage from "../pages/CreateAssessment/components/questionaire/QuestionaireListPage";
 const PrivateRoutes = () => {
   const StudentsData = lazy(
     () => import("../pages/UniversityResult/StudentData")
@@ -179,6 +181,11 @@ const PrivateRoutes = () => {
             <SchoolDashboardPage />
           </SuspensedView>
         } />
+        <Route path="/questionaire/List" element={
+          <SuspensedView>
+            <QuestionaireListPage />
+          </SuspensedView>
+        } />
         <Route
           path="/login/reset-password/enter-email"
           element={
@@ -203,6 +210,11 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
+        <Route path="/school/studentList" element={
+          <SuspensedView>
+            <StudentList />
+          </SuspensedView>
+        } />
         <Route
           path="/student/university/result-dashboard"
           element={

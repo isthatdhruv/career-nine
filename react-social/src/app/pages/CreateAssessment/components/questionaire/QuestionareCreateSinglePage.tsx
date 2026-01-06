@@ -7,20 +7,20 @@ import { Button, Modal, Spinner } from "react-bootstrap";
 import * as XLSX from "xlsx";
 
 // API imports
-import { ReadCollegeData } from "../../College/API/College_APIs";
-import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
-import { ReadToolData } from "../../Tool/API/Tool_APIs";
-import { ReadQuestionsData } from "../../AssesmentQuestions/API/Question_APIs";
-import { CreateAssessmentData } from "../API/Create_Assessment_APIs";
-import { ReadLanguageData } from "../API/Create_Assessment_APIs";
+import { ReadCollegeData } from "../../../College/API/College_APIs";
+import { ReadQuestionSectionData } from "../../../QuestionSections/API/Question_Section_APIs";
+import { ReadToolData } from "../../../Tool/API/Tool_APIs";
+import { ReadQuestionsData } from "../../../AssesmentQuestions/API/Question_APIs";
+import { CreateAssessmentData } from "../../API/Create_Assessment_APIs";
+import { ReadLanguageData } from "../../API/Create_Assessment_APIs";
 
 // Component imports
-import CollegeCreateModal from "../../College/components/CollegeCreateModal";
-import QuestionSectionCreateModal from "../../QuestionSections/components/QuestionSectionCreateModal";
-import ToolCreateModal from "../../Tool/components/ToolCreateModal";
-import QuestionCreateModal from "../../AssesmentQuestions/components/QuestionCreateModal";
-import { QuestionTable } from "../../AssesmentQuestions/components";
-import SectionQuestionSelector from "./SectionQuestionSelector";
+import CollegeCreateModal from "../../../College/components/CollegeCreateModal";
+import QuestionSectionCreateModal from "../../../QuestionSections/components/QuestionSectionCreateModal";
+import ToolCreateModal from "../../../Tool/components/ToolCreateModal";
+import QuestionCreateModal from "../../../AssesmentQuestions/components/QuestionCreateModal";
+import { QuestionTable } from "../../../AssesmentQuestions/components";
+import SectionQuestionSelector from "../SectionQuestionSelector";
 
 const validationSchema = Yup.object().shape({
   // Basic Info

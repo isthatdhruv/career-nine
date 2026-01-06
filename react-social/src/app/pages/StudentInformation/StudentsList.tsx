@@ -3,8 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import _ from "underscore";
 import { readStudentData } from "./Student_APIs";
-
-const API_URL = process.env.REACT_APP_API_URL ;
+import studentTable from 
 
 export default function Basic() {
   const [datatable, setDatatable] = React.useState({
