@@ -49,6 +49,8 @@ import studentsList from "../pages/StudentInformation/StudentsList";
 // import QuestionaireList from "../pages/CreateAssessment/components/questionaire/QuestionaireListPage";
 import QuestionaireListPage from "../pages/CreateAssessment/components/questionaire/QuestionaireListPage";
 import StudentsList from "../pages/StudentInformation/StudentsList";
+import GroupCreatePage from "../pages/dashboard/widgets/CreateNewGroup";
+import StudentCreatePage from "../pages/dashboard/widgets/CreateNewStudent";
 const PrivateRoutes = () => {
   const StudentsData = lazy(
     () => import("../pages/UniversityResult/StudentData")
@@ -67,7 +69,7 @@ const PrivateRoutes = () => {
     () => import("../pages/GoogleGroups/GroupMembers/GoogleGroups")
   );
 
-  const Groups = lazy(() => import("../pages/GoogleGroups/Groups"));
+  const Groups = lazy(() => import("../pages/dashboard/widgets/Groups"));
 
   const Group = lazy(() => import("../pages/Group/Group"));
 
@@ -216,6 +218,27 @@ const PrivateRoutes = () => {
             <StudentsList />
           </SuspensedView>
         } />
+        <Route path="/students/${member.id}/dashboard" element={
+          <SuspensedView>
+            <StudentsList />
+          </SuspensedView>
+        } />
+        <Route path="/school/groups" element={
+          <SuspensedView>
+            <Groups />
+          </SuspensedView>
+        } />
+        <Route path="/school/group/create" element={
+          <SuspensedView>
+            <GroupCreatePage />
+          </SuspensedView>
+        } />
+        <Route path="/school/student/create" element={
+          <SuspensedView>
+            <StudentCreatePage />
+          </SuspensedView>
+        } />
+
         <Route
           path="/student/university/result-dashboard"
           element={
