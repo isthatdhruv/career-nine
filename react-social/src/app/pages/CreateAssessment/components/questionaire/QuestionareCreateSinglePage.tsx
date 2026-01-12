@@ -19,6 +19,7 @@ import CollegeCreateModal from "../../../College/components/CollegeCreateModal";
 import QuestionSectionCreateModal from "../../../QuestionSections/components/QuestionSectionCreateModal";
 import ToolCreateModal from "../../../Tool/components/ToolCreateModal";
 import QuestionCreateModal from "../../../AssesmentQuestions/components/QuestionCreateModal";
+import QuestionLanguageModal from "../../../AssesmentQuestions/components/QuestionLanguageModal";
 import { QuestionTable } from "../../../AssesmentQuestions/components";
 import SectionQuestionSelector from "../SectionQuestionSelector";
 
@@ -89,6 +90,11 @@ const QuestionareCreateSinglePage: React.FC = () => {
   const [selectedSectionForQuestions, setSelectedSectionForQuestions] = useState<string>("");
   // pre-filled mapping from fetched questions: sectionId -> [questionId,...]
   const [preSectionQuestions, setPreSectionQuestions] = useState<{ [k: string]: string[] }>({});
+
+  // Translation Modal State
+  const [showTranslationModal, setShowTranslationModal] = useState(false);
+  const [translationQuestionId, setTranslationQuestionId] = useState<number | null>(null);
+  const [translationTargetLanguage, setTranslationTargetLanguage] = useState<string>("");
 
   // Get questionare data from localStorage (passed from modal)
   const [questionareData, setQuestionareData] = useState<any>(null);
@@ -347,6 +353,12 @@ const QuestionareCreateSinglePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAddTranslation = (questionId: number, language: string) => {
+    setTranslationQuestionId(questionId);
+    setTranslationTargetLanguage(language);
+    setShowTranslationModal(true);
   };
 
   // build preSectionQuestions from questions fetched (auto-check)
@@ -1005,6 +1017,8 @@ const QuestionareCreateSinglePage: React.FC = () => {
                           questions={questions}
                           values={values}
                           setFieldValue={setFieldValue}
+                          languages={values.languages}
+                          onAddTranslation={handleAddTranslation}
                         />
                       </div>
                     </div>
@@ -1150,6 +1164,14 @@ const QuestionareCreateSinglePage: React.FC = () => {
           show={showQuestionModal}
           onHide={() => setShowQuestionModal(false)}
           setPageLoading={setPageLoadingState}
+        />
+
+        <QuestionLanguageModal
+          show={showTranslationModal}
+          onHide={() => setShowTranslationModal(false)}
+          questionId={translationQuestionId}
+          targetLanguage={translationTargetLanguage}
+          setPageLoading={(isLoading) => setPageLoadingState(prev => [String(isLoading)])} 
         />
 
         {/* File Upload Modal */}

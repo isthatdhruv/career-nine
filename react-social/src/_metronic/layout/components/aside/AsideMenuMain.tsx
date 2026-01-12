@@ -30,7 +30,7 @@ export function AsideMenuMain() {
         fontIcon="bi-app-indicator"
       />
       <AsideMenuItem
-        to="/questionare/List"
+        to="/questionaire/List"
         icon="/media/icons/duotune/general/gen044.svg"
         title="Questionare List"
         fontIcon="bi-app-indicator"
