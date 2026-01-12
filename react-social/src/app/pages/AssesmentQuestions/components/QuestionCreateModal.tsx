@@ -121,15 +121,19 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
     e.preventDefault();
     setLoading(true);
     try {
-      const options = formikValues.questionOptions.map((optionText: string, index: number) => {
+      const options = formikValues.questionOptions.map((option: any, index: number) => {
+        // Handle both cases: when useMQTAsOptions is true (options are objects) and false (options are strings)
+        const optionText = typeof option === 'string' ? option : option.optionText;
         const optionScores: any[] = [];
+        console.log(optionText)
         if (optionMeasuredQualities[index]) {
           Object.entries(optionMeasuredQualities[index]).forEach(([typeId, val]: any) => {
             if (val.checked) {
               optionScores.push({
-                score: val.score,
-                question_option: {},
-                measuredQualityType: { measuredQualityTypeId: Number(typeId) }
+                score: val.score || 1,
+                measuredQualityType: {
+                  measuredQualityTypeId: Number(typeId)
+                }
               });
             }
           });
@@ -142,8 +146,10 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
         questionType: formikValues.questionType,
         maxOptionsAllowed: Number(formikValues.maxOptionsAllowed) || 0,
         options,
-        section: { sectionId: Number(formikValues.sectionId) }
+        section: { sectionId: Number(formikValues.sectionId) },
+        flag : useMQTAsOptions ? 1 : 0
       };
+      console.log(payload);
 
       await CreateQuestionData(payload);
       setFormikValues(initialValues);
@@ -152,7 +158,7 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
       navigate("/assessment-questions");
     } catch (error) {
       console.error(error);
-      window.location.replace("/error");
+      // window.location.replace("/error");
     } finally {
       setLoading(false);
     }

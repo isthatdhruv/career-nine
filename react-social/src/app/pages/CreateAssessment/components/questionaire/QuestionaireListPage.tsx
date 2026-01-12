@@ -13,6 +13,11 @@ const QuestionaireListPage: React.FC = () => {
   const [datatable, setDatatable] = useState({
     columns: [
       {
+        label: "ID",
+        field: "id",
+        width: 80,
+      },
+      {
         label: "Name",
         field: "name",
         width: 200,
@@ -21,14 +26,14 @@ const QuestionaireListPage: React.FC = () => {
           "aria-label": "Name",
         },
       },
+      // {
+      //   label: "Tool",
+      //   field: "tool",
+      //   width: 150,
+      // },
       {
-        label: "College ID",
-        field: "collegeId",
-        width: 150,
-      },
-      {
-        label: "Mode",
-        field: "mode",
+        label: "Mode ID",
+        field: "modeId",
         width: 100,
       },
       {
@@ -42,15 +47,10 @@ const QuestionaireListPage: React.FC = () => {
         width: 100,
       },
       {
-        label: "Created At",
-        field: "createdAt",
-        width: 200,
-      },
-      {
         label: "Actions",
         field: "actions",
         sort: "disabled",
-        width: 100,
+        width: 150,
       },
     ],
     rows: [] as any[],
@@ -69,15 +69,15 @@ const QuestionaireListPage: React.FC = () => {
       setQuestionaireList(data);
 
       const formattedRows = data.map((item: any) => ({
-        name: item.name,
-        collegeId: item.collegeId,
-        mode: item.mode,
-        isFree: item.isFree === "true" || item.isFree === true ? "Free" : "Paid",
+        id: item.questionnaireId,
+        name: item.name || "-",
+        tool: item.tool?.toolName || "-",
+        modeId: item.modeId==0?"Online":"Offline",
+        isFree: item.isFree === true ? "Free" : "Paid",
         price: item.price || 0,
-        createdAt: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "-",
         actions: (
           <Link
-            to={`/questionares/edit/${item.id}`} // Adjust route as needed
+            to={`/questionare/edit/${item.questionnaireId}`}
             className="btn btn-sm btn-light-primary"
           >
             Edit

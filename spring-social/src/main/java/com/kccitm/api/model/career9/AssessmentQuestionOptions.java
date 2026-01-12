@@ -1,4 +1,5 @@
 package com.kccitm.api.model.career9;
+
 import java.io.Serializable;
 import java.util.List;
 
@@ -32,18 +33,17 @@ public class AssessmentQuestionOptions implements Serializable {
     @JsonBackReference
     private AssessmentQuestions question;
 
-    @OneToMany(mappedBy = "question_option",cascade = CascadeType.ALL)
-    // @JsonIgnoreProperties({"question_option", "measuredQualityType"})
+    @OneToMany(mappedBy = "question_option", cascade = CascadeType.ALL)
+    @JsonIgnoreProperties({ "question_option", "measuredQualityType" })
     private List<OptionScoreBasedOnMEasuredQualityTypes> optionScores;
 
+    public AssessmentQuestionOptions(Long optionId) {
+        this.optionId = optionId;
+    }
 
-        public AssessmentQuestionOptions(Long optionId) {
-            this.optionId = optionId;
-        }
-
-        public AssessmentQuestionOptions() {
-            super();
-        }
+    public AssessmentQuestionOptions() {
+        super();
+    }
 
     // Getters and Setters
     public Long getOptionId() {

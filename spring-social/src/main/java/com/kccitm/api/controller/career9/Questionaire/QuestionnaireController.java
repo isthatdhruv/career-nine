@@ -16,6 +16,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.career9.Questionaire.Questionnaire;
+import com.kccitm.api.model.career9.Questionaire.QuestionnaireLanguage;
+import com.kccitm.api.model.career9.Questionaire.QuestionnaireSection;
+import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
+import com.kccitm.api.model.career9.Questionaire.QuestionnaireSectionInstruction;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireRepository;
 
 @RestController
@@ -29,23 +33,50 @@ public class QuestionnaireController {
     public ResponseEntity<Questionnaire> create(
             @RequestBody Questionnaire questionnaire) {
 
+        // Set bidirectional relationships for languages
+        if (questionnaire.getLanguages() != null) {
+            for (QuestionnaireLanguage language : questionnaire.getLanguages()) {
+                language.setQuestionnaire(questionnaire);
+            }
+        }
+
+        // Set bidirectional relationships for sections
+        if (questionnaire.getSections() != null) {
+            for (QuestionnaireSection section : questionnaire.getSections()) {
+                section.setQuestionnaire(questionnaire);
+
+                // Set relationships for questions within section
+                if (section.getQuestions() != null) {
+                    for (QuestionnaireQuestion question : section.getQuestions()) {
+                        question.setSection(section);
+                    }
+                }
+
+                // Set relationships for instructions within section
+                if (section.getInstruction() != null) {
+                    for (QuestionnaireSectionInstruction instruction : section.getInstruction()) {
+                        instruction.setSection(section);
+                    }
+                }
+            }
+        }
+
         Questionnaire saved = questionnaireRepository.save(questionnaire);
         return new ResponseEntity<>(saved, HttpStatus.CREATED);
     }
 
     @GetMapping(value = "/get", headers = "Accept=application/json")
-	public List<Questionnaire> getallQuestionnaire() {
-		// List<Questionnaire> allQuestionnaires = questionnaireRepository.findAll();
-		
-		return questionnaireRepository.findAll();
-	}
+    public List<Questionnaire> getallQuestionnaire() {
+        List<Questionnaire> allQuestionnaires = questionnaireRepository.findAll();
+
+        return allQuestionnaires;
+    }
 
     @GetMapping("/getbyid/{id}")
     public ResponseEntity<Questionnaire> getById(
             @PathVariable Long id) {
 
-        Optional<Questionnaire> optional =
-                questionnaireRepository.findById(id);
+        Optional<Questionnaire> optional = questionnaireRepository.findById(id);
 
         return optional
                 .map(ResponseEntity::ok)
@@ -64,8 +95,7 @@ public class QuestionnaireController {
                     existing.setIsFree(questionnaire.getIsFree());
                     existing.setTool(questionnaire.getTool());
 
-                    Questionnaire updated =
-                            questionnaireRepository.save(existing);
+                    Questionnaire updated = questionnaireRepository.save(existing);
 
                     return ResponseEntity.ok(updated);
                 })

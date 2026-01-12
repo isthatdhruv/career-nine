@@ -44,7 +44,247 @@
                     "sectionDescription": "Section A Insight Navigator",
                     "questionId": []
                 },
+                "order": "1",
                 "questions": [
+                    {
+                        "questionnaireQuestionId": 8,
+                        "question": {
+                            "questionId": 46,
+                            "questionText": "asd",
+                            "questionType": "multiple-choice",
+                            "flag": true,
+                            "maxOptionsAllowed": 5,
+                            "options": [
+                                {
+                                    "optionId": 239,
+                                    "optionText": "Conventional",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 240,
+                                    "optionText": "Investigative",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 241,
+                                    "optionText": "Enterprising",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 242,
+                                    "optionText": "Social",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 243,
+                                    "optionText": "Interpersonal",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 244,
+                                    "optionText": "Visual-Spatial",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 245,
+                                    "optionText": "Musical",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 246,
+                                    "optionText": "Intrapersonal",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 247,
+                                    "optionText": "Naturalistic",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 248,
+                                    "optionText": "Logical",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 249,
+                                    "optionText": "Bodily-Kinesthetic",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 250,
+                                    "optionText": "Linguistic",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 251,
+                                    "optionText": "Communication",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 252,
+                                    "optionText": "Decision making & problem solving",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 253,
+                                    "optionText": "Computational",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 254,
+                                    "optionText": "Form perception",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 255,
+                                    "optionText": "Speed and accuracy",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 256,
+                                    "optionText": "Logical reasoning",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 257,
+                                    "optionText": "Technical",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 258,
+                                    "optionText": "Creativity",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 259,
+                                    "optionText": "Motor movement",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 260,
+                                    "optionText": "Finger dexterity",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 261,
+                                    "optionText": "Doer",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 262,
+                                    "optionText": "Thinker",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 263,
+                                    "optionText": "Creator",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 264,
+                                    "optionText": "Helper",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 265,
+                                    "optionText": "Persuader",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 266,
+                                    "optionText": "Organizer",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 267,
+                                    "optionText": "R",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 268,
+                                    "optionText": "I",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 269,
+                                    "optionText": "A",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 270,
+                                    "optionText": "Helper",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 271,
+                                    "optionText": "Agriculture",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 272,
+                                    "optionText": "Art",
+                                    "optionScores": [],
+                                    "correct": false
+                                },
+                                {
+                                    "optionId": 273,
+                                    "optionText": "Cultural Studies",
+                                    "optionScores": [],
+                                    "correct": false
+                                }
+                            ],
+                            "section": {
+                                "sectionId": 5,
+                                "sectionName": "Section D",
+                                "sectionDescription": "Section D Insight Navigator ",
+                                "questionId": [
+                                    28,
+                                    29,
+                                    30,
+                                    31,
+                                    32,
+                                    33,
+                                    46
+                                ]
+                            },
+                            "languageQuestions": [],
+                            "id": 46
+                        },
+                        "order": "2"
+                    },
                     {
                         "questionnaireQuestionId": 7,
                         "question": {
@@ -160,101 +400,101 @@
                         "order": "1"
                     },
                     {
-                        "questionnaireQuestionId": 8,
+                        "questionnaireQuestionId": 9,
                         "question": {
-                            "questionId": 27,
-                            "questionText": "Below is a list of 15 broad fields of study commonly pursued in India. Your task is to select the top\n5 areas that resonate most deeply with your interests and aspirations.",
+                            "questionId": 26,
+                            "questionText": "Your values play a crucial role in guiding your behaviour and decisions. They give direction to your\nlife and career, helping you decide who you are and how you interact with the world. Below are 15 values. Your\ntask is to select the top 5 values that are most important to you.",
                             "questionType": "multiple-choice",
                             "flag": false,
                             "maxOptionsAllowed": 5,
                             "options": [
                                 {
-                                    "optionId": 167,
-                                    "optionText": "Agriculture: Agriculture includes the methods and techniques used in farming to produce food and raw materials.",
+                                    "optionId": 152,
+                                    "optionText": "Good Salary: Receiving sufficient money to live a comfortable lifestyle. Like for example your pocket money is sufficient to manage necessary expenses and allows some saving.",
                                     "optionScores": [],
                                     "correct": false
                                 },
                                 {
-                                    "optionId": 168,
-                                    "optionText": "Art: Art studies how people express their creativity through painting, music, and storytelling.",
+                                    "optionId": 153,
+                                    "optionText": "Job Security : Assurance that you won't lose your job come what may. This helps one plan future dreams and goals knowing there is a fixed income with minimum risk. For example job of a teacher.",
                                     "optionScores": [],
                                     "correct": false
                                 },
                                 {
-                                    "optionId": 169,
-                                    "optionText": "Cultural Studies: Cultural studies help in understanding how culture shapes society, identity, and daily life through traditions, beliefs, and practices.",
+                                    "optionId": 154,
+                                    "optionText": "Job Security : Assurance that you won't lose your job come what may. This helps one plan future dreams and goals knowing there is a fixed income with minimum risk. For example job of a teacher.",
                                     "optionScores": [],
                                     "correct": false
                                 },
                                 {
-                                    "optionId": 170,
-                                    "optionText": "English: The study of the English language teaches grammar rules, vocabulary expansion, and the analysis of literature and texts.",
+                                    "optionId": 155,
+                                    "optionText": "Working in Team/ Group: Working with others, in groups or team, where it is a friendly and non-competitive environment. Here team or group goals are considered important that personal interest.",
                                     "optionScores": [],
                                     "correct": false
                                 },
                                 {
-                                    "optionId": 171,
-                                    "optionText": "Home and Consumer Science: This subject teaches useful skills and knowledge for taking care of the home and family. It provides information on managing daily tasks, choosing a healthy diet, and keeping the family happy and healthy.",
+                                    "optionId": 156,
+                                    "optionText": "High achievement: High achievement refers to setting and completing challenging goals. It includes setting long term goals with clear objectives, optimistically managing to reach the goal and always attempting for success. For example setting targets for competitive exams.",
                                     "optionScores": [],
                                     "correct": false
                                 },
                                 {
-                                    "optionId": 172,
-                                    "optionText": "Finance: The study of finance teaches money management, saving, investing, and planning expenses.",
+                                    "optionId": 157,
+                                    "optionText": "Independence/ Autonomy: Independence refers to making decision on our own with little or no supervision. It is like being your boss. It also about being making own choices and being responsible for them.",
                                     "optionScores": [],
                                     "correct": false
                                 },
                                 {
-                                    "optionId": 173,
-                                    "optionText": "Health: Health education includes information about nutrition, exercise, hygiene, and mental well-being.",
+                                    "optionId": 158,
+                                    "optionText": "Working with Hands: Working with hands refers to using practical skills to create things with your own hands rather than taking help from machines. For example, choosing to cook over ready to eat meals.",
                                     "optionScores": [],
                                     "correct": false
                                 },
                                 {
-                                    "optionId": 174,
-                                    "optionText": "Languages: Language education involves learning to read, write, speak, and understand different languages.",
+                                    "optionId": 159,
+                                    "optionText": "Prestige/ Recognition: Prestige and recognition refers to looking for a chance to be seen as important person. It is important to get a pat on back for the hard work you put in. It refers to being appreciated for the task done. For example, finding it important to take lead role in school activities and getting fame for your achievements.",
                                     "optionScores": [],
                                     "correct": false
                                 },
                                 {
-                                    "optionId": 175,
-                                    "optionText": "Management: The study of management teaches how to plan projects, lead teams, make decisions, and solve problems in various organizations.",
+                                    "optionId": 160,
+                                    "optionText": "Creativity: Creativity refers to using own ideas and experimenting with new things. It refers to valuing out of box ideas and innovation in any given assignment.",
                                     "optionScores": [],
                                     "correct": false
                                 },
                                 {
-                                    "optionId": 176,
-                                    "optionText": "Mathematics: Mathematics involves the study of calculations, geometry, algebra, and data analysis.",
+                                    "optionId": 161,
+                                    "optionText": "Working with Mind: It's a belief in brain power. like they say 'Pen is mightier than a sword.' it refers to being able to analyze events around and use creative thinking for problem solving",
                                     "optionScores": [],
                                     "correct": false
                                 },
                                 {
-                                    "optionId": 177,
-                                    "optionText": "Music: Music teaches how to create, perform, and appreciate sounds and rhythms using various instruments and voice.",
+                                    "optionId": 162,
+                                    "optionText": "Physical Activity: Physical activity simply refers to valuing thing that are related to body activity like giving importance to sport, exercise and outdoor activities.",
                                     "optionScores": [],
                                     "correct": false
                                 },
                                 {
-                                    "optionId": 178,
-                                    "optionText": "Science: Science includes subjects like biology, chemistry, physics, and earth sciences to understand how the world works.",
+                                    "optionId": 163,
+                                    "optionText": "Leadership: Supervising/managing others and helping in development of a larger group. For example being captain of a sport team.",
                                     "optionScores": [],
                                     "correct": false
                                 },
                                 {
-                                    "optionId": 179,
-                                    "optionText": "Vocational Studies: This field prepares individuals for professions that involve practical skills like car repair, gardening, carpentry, baking, and cooking.",
+                                    "optionId": 164,
+                                    "optionText": "Routine Activity: Believe that structure and discipline is important. it refers to enjoying routine and having clear plans. For example, arranging your study notes or closet in same order cause it works the best for you.",
                                     "optionScores": [],
                                     "correct": false
                                 },
                                 {
-                                    "optionId": 180,
-                                    "optionText": "Social Sciences: Social sciences teach how society functions, historical events, and the impact of economic and political systems.",
+                                    "optionId": 165,
+                                    "optionText": "Supervised Work : Having supportive management that stands behind you, egg. need for teacher or coach to help you progress.",
                                     "optionScores": [],
                                     "correct": false
                                 },
                                 {
-                                    "optionId": 181,
-                                    "optionText": "Technology: The study of technology includes subjects like engineering, computer science, and digital tools, helping explore how technology influences our world.",
+                                    "optionId": 166,
+                                    "optionText": "Working Conditions: Refers to having a safe position and nice place to work, you should be free to do your task, get reward for your work and not having fear of losing job.",
                                     "optionScores": [],
                                     "correct": false
                                 }
@@ -269,12 +509,11 @@
                                 ]
                             },
                             "languageQuestions": [],
-                            "id": 27
+                            "id": 26
                         },
-                        "order": "2"
+                        "order": "1"
                     }
                 ],
-                "order": "1",
                 "instruction": [
                     {
                         "questionnaireSectionInstructionId": 1,
@@ -306,7 +545,35 @@
                     "sectionDescription": "Section B Insight Navigator\n",
                     "questionId": []
                 },
+                "order": "2",
                 "questions": [
+                    {
+                        "questionnaireQuestionId": 6,
+                        "question": {
+                            "questionId": 44,
+                            "questionText": "Kuch TOh",
+                            "questionType": "multiple-choice",
+                            "flag": false,
+                            "maxOptionsAllowed": 0,
+                            "options": [
+                                {
+                                    "optionId": 234,
+                                    "optionText": "Hi",
+                                    "optionScores": [],
+                                    "correct": false
+                                }
+                            ],
+                            "section": {
+                                "sectionId": 2,
+                                "sectionName": "Section A",
+                                "sectionDescription": "Section A Insight Navigator",
+                                "questionId": []
+                            },
+                            "languageQuestions": [],
+                            "id": 44
+                        },
+                        "order": "2"
+                    },
                     {
                         "questionnaireQuestionId": 5,
                         "question": {
@@ -432,45 +699,38 @@
                                         "languageQuestion": [],
                                         "languageOption": []
                                     },
-                                    "questionText": "MARATHI CHe",
-                                    "languageQuestionId": 23,
+                                    "questionText": "खाली भारतात सामान्यपणे पुरस्कृत केलेल्या 15 विशाल क्षेत्रांची यादी आहे. आपल्या कामात, आपल्या आवडींच्या आणि आकांक्षांच्या सर्वात मोठ्या संबंधात शीर्ष 5 क्षेत्र निवडण्याचे काम आहे. जर कोणत्याही क्षेत्राचा अर्थ स्पष्टीकरण आवश्यक असेल तर, कृपया प्रदान केलेल्या सहाय्य विभागावर दृष्टी टाका.",
+                                    "languageQuestionId": 40,
                                     "originalQuestionId": 6
                                 }
                             ],
                             "id": 6
                         },
                         "order": "1"
-                    },
-                    {
-                        "questionnaireQuestionId": 6,
-                        "question": {
-                            "questionId": 44,
-                            "questionText": "Kuch TOh",
-                            "questionType": "multiple-choice",
-                            "flag": false,
-                            "maxOptionsAllowed": 0,
-                            "options": [
-                                {
-                                    "optionId": 234,
-                                    "optionText": "Hi",
-                                    "optionScores": [],
-                                    "correct": false
-                                }
-                            ],
-                            "section": {
-                                "sectionId": 2,
-                                "sectionName": "Section A",
-                                "sectionDescription": "Section A Insight Navigator",
-                                "questionId": []
-                            },
-                            "languageQuestions": [],
-                            "id": 44
-                        },
-                        "order": "2"
                     }
                 ],
-                "order": "2",
-                "instruction": []
+                "instruction": [
+                    {
+                        "questionnaireSectionInstructionId": 3,
+                        "language": {
+                            "languageId": 2,
+                            "languageName": "Marathi",
+                            "languageQuestion": [],
+                            "languageOption": []
+                        },
+                        "instructionText": "इस अनुभाग में 20 विकल्प हैं, जिनमें से आपको अपनी पसंद के किसी भी 5 का चयन करना होगा"
+                    },
+                    {
+                        "questionnaireSectionInstructionId": 4,
+                        "language": {
+                            "languageId": 100,
+                            "languageName": "English",
+                            "languageQuestion": [],
+                            "languageOption": []
+                        },
+                        "instructionText": "This section consists of 20 options , out of which you have to select any 5 of your choice "
+                    }
+                ]
             },
             {
                 "questionnaireSectionId": 3,
@@ -480,8 +740,8 @@
                     "sectionDescription": "Section C Insight Navigator",
                     "questionId": []
                 },
-                "questions": [],
                 "order": "3",
+                "questions": [],
                 "instruction": []
             },
             {
@@ -492,8 +752,8 @@
                     "sectionDescription": "Section D Insight Navigator ",
                     "questionId": []
                 },
-                "questions": [],
                 "order": "4",
+                "questions": [],
                 "instruction": []
             },
             {
@@ -504,8 +764,8 @@
                     "sectionDescription": "Section E Insight Navigator ",
                     "questionId": []
                 },
-                "questions": [],
                 "order": "5",
+                "questions": [],
                 "instruction": []
             },
             {
@@ -516,8 +776,8 @@
                     "sectionDescription": "Section F Insight Navigator ",
                     "questionId": []
                 },
-                "questions": [],
                 "order": "6",
+                "questions": [],
                 "instruction": []
             }
         ]

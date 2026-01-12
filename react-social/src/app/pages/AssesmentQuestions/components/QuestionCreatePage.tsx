@@ -196,7 +196,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
               navigate("/assessment-questions");
             } catch (error) {
               console.error("Error creating question:", error);
-              window.location.replace("/error");
+              // window.location.replace("/error");
             } finally {
               setLoading(false);
             }

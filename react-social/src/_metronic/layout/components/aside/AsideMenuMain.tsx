@@ -24,7 +24,7 @@ export function AsideMenuMain() {
       />
 
       <AsideMenuItem
-        to="/questionaire/create"
+        to="/questionare/create"
         icon="/media/icons/duotune/general/gen044.svg"
         title="Create and View Questionare"
         fontIcon="bi-app-indicator"

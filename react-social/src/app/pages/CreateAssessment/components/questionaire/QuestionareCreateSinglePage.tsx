@@ -22,6 +22,7 @@ import QuestionCreateModal from "../../../AssesmentQuestions/components/Question
 import QuestionLanguageModal from "../../../AssesmentQuestions/components/QuestionLanguageModal";
 import { QuestionTable } from "../../../AssesmentQuestions/components";
 import SectionQuestionSelector from "../SectionQuestionSelector";
+import { time } from "console";
 
 const validationSchema = Yup.object().shape({
   // Basic Info
@@ -115,7 +116,7 @@ const QuestionareCreateSinglePage: React.FC = () => {
       // Redirect back if no data
       // navigate('/questionares/create');
     }
-  }, [navigate]);
+  }, []);
 
   const initialValues = useMemo(() => ({
     // Questionnaire name (editable, prefilled from modal/localStorage)
@@ -294,50 +295,130 @@ const QuestionareCreateSinglePage: React.FC = () => {
     setLoading(true);
     
     try {
-      // Combine questionare data from modal with current form values
+      // Build the tool object
+      const selectedTool = tools.find((t: any) => 
+        String(t.id || t.toolId || t.tool_id) === String(values.toolId)
+      );
+      const toolPayload = selectedTool ? {
+        toolId: Number(values.toolId),
+        name: selectedTool.name || selectedTool.toolName || null,
+        price: selectedTool.price || null,
+        isFree: selectedTool.isFree ?? false,
+        free: selectedTool.free ?? false
+      } : { toolId: Number(values.toolId) };
+
+      // Build the languages array with instructions
+      const languagesPayload = (values.languages || []).map((langName: string, idx: number) => {
+        const langObj = languages.find((l: any) => l.languageName === langName);
+        return {
+          id: null, // New entry, will be assigned by backend
+          language: langObj ? {
+            languageId: langObj.languageId,
+            languageName: langObj.languageName,
+            languageQuestion: [],
+            languageOption: []
+          } : { languageName: langName },
+          instructions: values.instructions?.[langName] || ""
+        };
+      });
+
+      // Build the sections array with questions and instructions
+      const sectionsPayload = (values.sectionIds || []).map((sectionId: string, sectionIdx: number) => {
+        const sectionObj = sections.find((s: any) => String(s.sectionId) === String(sectionId));
+        
+        // Build section object
+        const sectionData = sectionObj ? {
+          sectionId: Number(sectionId),
+          sectionName: sectionObj.sectionName || "",
+          sectionDescription: sectionObj.sectionDescription || "",
+          questionId: []
+        } : { sectionId: Number(sectionId) };
+
+        // Build questions array for this section
+        const sectionQuestionIds = values.sectionQuestions?.[sectionId] || [];
+        const sectionQuestionsOrderMap = values.sectionQuestionsOrder?.[sectionId] || {};
+        
+        const questionsPayload = sectionQuestionIds.map((qId: string) => {
+          const questionObj = questions.find((q: any) => 
+            String(q.questionId || q.id) === String(qId)
+          );
+          
+          // Build the full question object with options
+          const questionData = questionObj ? {
+            questionId: questionObj.questionId || questionObj.id,
+            questionText: questionObj.questionText || "",
+            questionType: questionObj.questionType || "multiple-choice",
+            flag: questionObj.flag ?? false,
+            maxOptionsAllowed: questionObj.maxOptionsAllowed || 0,
+            options: (questionObj.options || []).map((opt: any) => ({
+              optionId: opt.optionId || null,
+              optionText: opt.optionText || "",
+              optionScores: opt.optionScores || [],
+              correct: opt.correct ?? false
+            })),
+            section: sectionData,
+            languageQuestions: questionObj.languageQuestions || [],
+            id: questionObj.questionId || questionObj.id
+          } : { questionId: Number(qId) };
+
+          return {
+            questionnaireQuestionId: null, // New entry
+            question: questionData,
+            order: String(sectionQuestionsOrderMap[qId] || 1)
+          };
+        });
+
+        // Build section instructions array
+        const sectionInstructionsData = values.sectionInstructions?.[sectionId] || {};
+        const instructionPayload = (values.languages || []).map((langName: string, langIdx: number) => {
+          const langObj = languages.find((l: any) => l.languageName === langName);
+          return {
+            questionnaireSectionInstructionId: null, // New entry
+            language: langObj ? {
+              languageId: langObj.languageId,
+              languageName: langObj.languageName,
+              languageQuestion: [],
+              languageOption: []
+            } : { languageName: langName },
+            instructionText: sectionInstructionsData[langName] || ""
+          };
+        }).filter((inst: any) => inst.instructionText); // Only include non-empty instructions
+
+        return {
+          questionnaireSectionId: null, // New entry
+          section: sectionData,
+          order: String(sectionIdx + 1),
+          questions: questionsPayload,
+          instruction: instructionPayload
+        };
+      });
+
+      // Build the final payload matching the GET JSON format
       const completePayload = {
-       // From modal (QuestionareCreateModal)
-      name: values.name || questionareData?.name || '',
-       mode: questionareData?.mode || 'online',
-       collegeId: questionareData?.collegeId || '',
-       schoolContactIds: questionareData?.schoolContactIds || [],
-       career9ContactIds: questionareData?.career9ContactIds || [],
-        
-        // From current form
-        instructions: values.instructions,
-        sectionInstructions: values.sectionInstructions,
-        price: values.price,
-        isFree: values.isFree,
-        toolId: values.toolId,
-        languages: values.languages,
-        sectionIds: values.sectionIds,
-        sectionQuestions: values.sectionQuestions,
-        sectionQuestionsOrder: values.sectionQuestionsOrder,
-        
-        // Additional metadata
-        createdAt: new Date().toISOString(),
-        fileInfo: {
-          fileName: fileName || null,
-          hasFileData: tableData.rows.length > 0,
-          fileData: tableData.rows.length > 0 ? {
-            columns: tableData.columns,
-            rows: tableData.rows,
-            rowCount: tableData.rows.length
-          } : null
-        }
+        questionnaireId: null, // New questionnaire
+        tool: toolPayload,
+        languages: languagesPayload,
+        modeId: questionareData?.mode === 'offline' ? 1 : 0,
+        price: Number(values.price) || 0,
+        isFree: values.isFree === "true",
+        name: values.name || questionareData?.name || '',
+        display: null,
+        sections: sectionsPayload,
+        createdAt: ""
       };
       
       console.log("=== COMPLETE ASSESSMENT PAYLOAD ===");
       console.log(JSON.stringify(completePayload, null, 2));
       
       // Show alert with summary
-      alert(`Questionare data prepared successfully!\n\nSummary:\n- Name: ${completePayload.name}\n- College: ${completePayload.collegeId}\n- Mode: ${completePayload.mode}\n- Sections: ${values.sectionIds.length}\n- Questions: ${Object.values(values.sectionQuestions).flat().length}\n\nCheck console for complete data.`);
+      const totalQuestions = sectionsPayload.reduce((acc: number, s: any) => acc + (s.questions?.length || 0), 0);
+      alert(`Questionare data prepared successfully!\n\nSummary:\n- Name: ${completePayload.name}\n- Tool: ${toolPayload.name || toolPayload.toolId}\n- Languages: ${values.languages?.length || 0}\n- Sections: ${sectionsPayload.length}\n- Total Questions: ${totalQuestions}\n\nCheck console for complete data.`);
       
       // Clear localStorage
       localStorage.removeItem('questionareStep2');
       
       // Uncomment below when ready to actually create questionare
-      // const response = await CreateQuestionareData(completePayload);
+      // const response = await CreateAssessmentData(completePayload);
       // if (response.status === 200 || response.status === 201) {
       //   alert("✅ Questionare created successfully!");
       //   navigate("/questionares");
