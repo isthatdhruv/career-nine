@@ -23,6 +23,7 @@ import QuestionLanguageModal from "../../../AssesmentQuestions/components/Questi
 import { QuestionTable } from "../../../AssesmentQuestions/components";
 import SectionQuestionSelector from "../SectionQuestionSelector";
 import { time } from "console";
+import { CreateQuestionaire} from "../../API/Create_Questionaire_APIs";
 
 const validationSchema = Yup.object().shape({
   // Basic Info
@@ -338,7 +339,7 @@ const QuestionareCreateSinglePage: React.FC = () => {
         const sectionQuestionIds = values.sectionQuestions?.[sectionId] || [];
         const sectionQuestionsOrderMap = values.sectionQuestionsOrder?.[sectionId] || {};
         
-        const questionsPayload = sectionQuestionIds.map((qId: string) => {
+        const questionsPayload = sectionQuestionIds.map((qId: string, index: number) => {
           const questionObj = questions.find((q: any) => 
             String(q.questionId || q.id) === String(qId)
           );
@@ -361,10 +362,21 @@ const QuestionareCreateSinglePage: React.FC = () => {
             id: questionObj.questionId || questionObj.id
           } : { questionId: Number(qId) };
 
+          // Calculate header components
+          const safeSectionName = (sectionData.sectionName || "").replace(/\s+/g, '_');
+          const isMQT = questionData.flag === true; // Assuming flag=true means MQT
+          // Use index + 1 as the sequence number for this question within the section
+          const sequence = index + 1; 
+          
+          const header = isMQT 
+            ? `${safeSectionName}_MQT_${sequence}`
+            : `${safeSectionName}_${sequence}`;
+
           return {
             questionnaireQuestionId: null, // New entry
             question: questionData,
-            order: String(sectionQuestionsOrderMap[qId] || 1)
+            order: String(sectionQuestionsOrderMap[qId] || 1),
+            excelQuestionHeader: header
           };
         });
 
@@ -418,15 +430,13 @@ const QuestionareCreateSinglePage: React.FC = () => {
       localStorage.removeItem('questionareStep2');
       
       // Uncomment below when ready to actually create questionare
-      // const response = await CreateAssessmentData(completePayload);
-      // if (response.status === 200 || response.status === 201) {
-      //   alert("✅ Questionare created successfully!");
-      //   navigate("/questionares");
-      // } else {
-      //   throw new Error("Failed to create questionare");
-      // }
-      
-      // navigate("/questionares");
+      const response = await CreateQuestionaire(completePayload);
+      if (response.status === 200 || response.status === 201) {
+        alert("✅ Questionare created successfully!");
+        navigate("/questionaire/List");
+      } else {
+        throw new Error("Failed to create questionare");
+      }
       
     } catch (error) {
       console.error("Error creating questionare:", error);

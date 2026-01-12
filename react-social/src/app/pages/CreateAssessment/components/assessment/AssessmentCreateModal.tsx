@@ -3,8 +3,8 @@ import { Field, Form, Formik } from 'formik';
 import { useEffect, useState, useRef } from 'react';
 import * as Yup from 'yup';
 import { Modal, Button } from 'react-bootstrap';
-import { ReadCollegeData } from '../../College/API/College_APIs';
-import CollegeCreateModal from '../../College/components/CollegeCreateModal';
+import { ReadCollegeData } from '../../../College/API/College_APIs';
+import CollegeCreateModal from '../../../College/components/CollegeCreateModal';
 import { useNavigate } from 'react-router-dom';
 
 interface AssessmentCreateModalProps {

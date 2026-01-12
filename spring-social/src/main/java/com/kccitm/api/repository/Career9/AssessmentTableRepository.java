@@ -15,9 +15,5 @@ public interface AssessmentTableRepository extends JpaRepository<AssessmentTable
 
     // Optional<AssessmentTable> findByInstituteId(Long instituteId);
     // Optional<AssessmentTable> findByToolId(Long toolId);
-     @Query("SELECT a FROM AssessmentTable a WHERE a.institute.id = :instituteId")
-    Optional<AssessmentTable> findByInstituteId(@Param("instituteId") Long instituteId);
-    
-    @Query("SELECT a FROM AssessmentTable a WHERE a.tool.id = :toolId")
-    Optional<AssessmentTable> findByToolId(@Param("toolId") Long toolId);
+
 }

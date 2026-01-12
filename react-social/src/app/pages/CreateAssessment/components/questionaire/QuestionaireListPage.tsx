@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { MDBDataTableV5 } from "mdbreact";
 import { Link } from "react-router-dom";
-import { ReadAssessmentData } from "../../API/Create_Assessment_APIs";
+import { ReadQuestionaireData } from "../../API/Create_Questionaire_APIs";
 
 const QuestionaireListPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   
-  // This state variable 'questionaireList' holds the raw data,
-  // addressing the "Cannot find name 'questionaireList'" issue if referenced.
+  // This state variable 'questionaireList' holds the raw data
   const [questionaireList, setQuestionaireList] = useState<any[]>([]);
 
   const [datatable, setDatatable] = useState({
@@ -26,24 +25,14 @@ const QuestionaireListPage: React.FC = () => {
           "aria-label": "Name",
         },
       },
-      // {
-      //   label: "Tool",
-      //   field: "tool",
-      //   width: 150,
-      // },
       {
-        label: "Mode ID",
+        label: "Mode",
         field: "modeId",
         width: 100,
       },
       {
         label: "Type",
         field: "isFree",
-        width: 100,
-      },
-      {
-        label: "Price",
-        field: "price",
         width: 100,
       },
       {
@@ -63,8 +52,9 @@ const QuestionaireListPage: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await ReadAssessmentData();
+      const response = await ReadQuestionaireData();
       const data = response.data || [];
+      console.log("Fetched questionnaire data:", data);
       
       setQuestionaireList(data);
 

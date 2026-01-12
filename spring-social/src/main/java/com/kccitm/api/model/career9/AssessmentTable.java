@@ -19,7 +19,7 @@ import com.kccitm.api.model.career9.Questionaire.Questionnaire;
 @Entity
 @Table(name = "assessment_table")
 public class AssessmentTable implements java.io.Serializable {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -35,57 +35,65 @@ public class AssessmentTable implements java.io.Serializable {
 
     private String endDate;
 
-    @JoinColumn(name="questionnaire_id")
-    @OneToOne
+    @JoinColumn(name = "questionnaire_id")
+    @OneToOne(fetch = javax.persistence.FetchType.LAZY, optional = true)
+    @org.hibernate.annotations.NotFound(action = org.hibernate.annotations.NotFoundAction.IGNORE)
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private Questionnaire questionnaire;
-
-    @OneToOne
-    @JoinColumn(name = "institute_code")
-    private InstituteDetail institute;
-    
-    @OneToOne
-    @JoinColumn(name = "tool_id")
-    private Tool tool;
 
     public Long getId() {
         return id;
     }
+
     public void setId(Long id) {
         this.id = id;
     }
+
     public String getAssessmentName() {
         return AssessmentName;
     }
+
     public void setAssessmentName(String assessmentName) {
         this.AssessmentName = assessmentName;
     }
+
     public Boolean getIsActive() {
         return isActive;
     }
+
     public void setIsActive(Boolean isActive) {
         this.isActive = isActive;
     }
+
     public Boolean getModeofAssessment() {
         return modeofAssessment;
     }
+
     public void setModeofAssessment(Boolean modeofAssessment) {
         this.modeofAssessment = modeofAssessment;
     }
+
     public String getStarDate() {
         return starDate;
     }
+
     public void setStarDate(String starDate) {
         this.starDate = starDate;
     }
+
     public String getEndDate() {
         return endDate;
     }
+
     public void setEndDate(String endDate) {
         this.endDate = endDate;
     }
+
     public Questionnaire getQuestionnaire() {
         return questionnaire;
     }
+
     public void setQuestionnaire(Questionnaire questionnaire) {
         this.questionnaire = questionnaire;
     }

@@ -5,7 +5,7 @@ import { MdQuestionAnswer } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { ReadAssessmentData } from "./API/Create_Assessment_APIs";
 import { AssessmentTable } from "./components";
-import AssessmentCreateModal from "./components/AssessmentCreateModal";
+import AssessmentCreateModal from "./components/assessment/AssessmentCreateModal";
 
 const AssessmentPage = () => {
   const [assessmentData, setAssessmentData] = useState([]);
@@ -15,40 +15,41 @@ const AssessmentPage = () => {
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const fetchQuestions = async () => {
-    setLoading(true);
-    try {
-      const response = await ReadAssessmentData();
-      setAssessmentData(response.data);
-    } catch (error) {
-      console.error("Failed to fetch assessments:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+ 
 
+ 
+
+  // Initial load
   useEffect(() => {
-      const fetchSections = async () => {
-        setLoading(true);
+    const fetchData = async () => {
+      try {
+        const response = await ReadAssessmentData();
+        console.log("Fetched assessment data:", response.data);
+        setAssessmentData(response.data || []);
+      } catch (error) {
+        console.error("Error fetching assessments:", error);
+        setAssessmentData([]);
+      }
+    };
+    fetchData();
+  }, []);
+
+  // Refresh when pageLoading is set to true
+  useEffect(() => {
+    if (pageLoading[0] === "true") {
+      const fetchData = async () => {
         try {
           const response = await ReadAssessmentData();
-          setSections(response.data);
+          console.log("Refreshed assessment data:", response.data);
+          setAssessmentData(response.data || []);
         } catch (error) {
-          console.error("Error fetching sections:", error);
-        } finally {
-          setLoading(false);
+          console.error("Error refreshing assessments:", error);
         }
+        setPageLoading(["false"]);
       };
-      fetchSections();
-    }, []);
-
-  useEffect(() => {
-    fetchQuestions();
-    
-    if (pageLoading[0] === "true") {
-      setPageLoading(["false"]);
+      fetchData();
     }
-  }, [pageLoading[0]]); 
+  }, [pageLoading]);
 
 
   return (
@@ -70,7 +71,7 @@ const AssessmentPage = () => {
             <div className="d-flex justify-content-end">
               <Button
                 variant="primary"
-                onClick={() => setShowCreateModal(true)}
+                onClick={() => navigate("/assessments/create")}
               >
                 <IconContext.Provider
                   value={{ style: { paddingBottom: "4px" } }}

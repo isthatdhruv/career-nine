@@ -17,13 +17,13 @@ import com.kccitm.api.model.career9.AssessmentQuestions;
 @Table(name = "Questionnaire_Question")
 
 public class QuestionnaireQuestion {
-    //primary key questionnaire_question_id
-   @Id
-   @GeneratedValue(strategy = GenerationType.IDENTITY)
-   @Column(name = "questionnaire_question_id")
-   private Long questionnaireQuestionId;
+    // primary key questionnaire_question_id
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "questionnaire_question_id")
+    private Long questionnaireQuestionId;
 
-   // Foreign key to QuestionnaireSection table
+    // Foreign key to QuestionnaireSection table
     @ManyToOne(fetch = FetchType.EAGER)
     @JsonIgnore
     @JoinColumn(name = "questionnaire_section_id") // explicit join column to avoid auto-generated column name
@@ -37,6 +37,9 @@ public class QuestionnaireQuestion {
     @Column(name = "order_index")
     private String orderIndex;
 
+    @Column(name = "excel_question_header")
+    private String excelQuestionHeader;
+
     public String getOrder() {
         return this.orderIndex;
     }
@@ -45,7 +48,7 @@ public class QuestionnaireQuestion {
         this.orderIndex = order;
     }
 
-   public Long getQuestionnaireQuestionId() {
+    public Long getQuestionnaireQuestionId() {
         return this.questionnaireQuestionId;
     }
 
@@ -69,5 +72,12 @@ public class QuestionnaireQuestion {
         this.question = question;
     }
 
+    public String getExcelQuestionHeader() {
+        return excelQuestionHeader;
+    }
+
+    public void setExcelQuestionHeader(String excelQuestionHeader) {
+        this.excelQuestionHeader = excelQuestionHeader;
+    }
 
 }

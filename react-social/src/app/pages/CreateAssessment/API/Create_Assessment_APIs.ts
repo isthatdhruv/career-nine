@@ -1,12 +1,14 @@
 import axios from "axios";
 const API_URL = process.env.REACT_APP_API_URL;
 
-const readAssessment = `${API_URL}/api/questionnaire/get`;
-const readAssessmentById = `${API_URL}/api/questionnaire/getbyid/`;
-const createAssessment = `${API_URL}/api/questionnaire/create`;
-const updateAssessment = `${API_URL}/api/questionnaire/update`;
-const deleteAssessment = `${API_URL}/api/questionnaire/delete/`;
+const readAssessment = `${API_URL}/assessments/getAll`;
+const readAssessmentById = `${API_URL}/assessments/getbyid/`;
+const createAssessment = `${API_URL}/assessments/create`;
+const updateAssessment = `${API_URL}/assessments/update`;
+const deleteAssessment = `${API_URL}/assessments/delete/`;
 const readLanguageData = `${API_URL}/language-supported/getAll`;
+
+
 export function ReadAssessmentData() {
   return axios.get(readAssessment);
 }

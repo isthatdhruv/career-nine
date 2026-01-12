@@ -22,9 +22,9 @@ import ToolCreatePage from "../pages/Tool/components/ToolCreatePage";
 import UploadExcelFile from "../pages/UploadExcelFile/UploadExcelFile";
 // Update these paths to the correct locations of your components
 import Assessments from "../pages/CreateAssessment/Assessment";
-import AssessmentCreatePage from "../pages/CreateAssessment/components/AssessmentCreatePage";
+// import AssessmentCreatePage from "../pages/CreateAssessment/components/assessment/AssessmentCreatePage";
 import QuestionareCreateSinglePage from "../pages/CreateAssessment/components/questionaire/QuestionareCreateSinglePage";
-import AssessmentEditPage from "../pages/CreateAssessment/components/AssessmentEditPage";
+import AssessmentEditPage from "../pages/CreateAssessment/components/assessment/AssessmentEditandCreatePage";
 import AssessmentToolPage from "../pages/CreateAssessment/components/AssessmentToolPage";
 import AssessmentUploadFile from "../pages/CreateAssessment/components/AssessmentUploadFile";
 import AssessmentSection from "../pages/CreateAssessment/components/AssessmentSection";
@@ -587,11 +587,12 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
+        
         <Route
-          path="/assessments/create-old"
+          path="/assessments/create"
           element={
             <SuspensedView>
-              <AssessmentCreatePage />
+              <AssessmentEditPage />
             </SuspensedView>
           }
         />

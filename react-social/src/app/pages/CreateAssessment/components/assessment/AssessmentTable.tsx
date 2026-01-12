@@ -3,7 +3,7 @@ import { AiFillEdit } from "react-icons/ai";
 import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
-import { DeleteAssessmentData } from "../API/Create_Assessment_APIs";
+import { DeleteAssessmentData } from "../../API/Create_Assessment_APIs";
 
 const AssessmentTable = (props: {
   data: any;
@@ -11,6 +11,9 @@ const AssessmentTable = (props: {
   setPageLoading: any;
 }) => {
   const navigate = useNavigate();
+
+  // Debug log
+  console.log("AssessmentTable received data:", props.data);
 
   const datatable = {
     columns: [
@@ -23,15 +26,9 @@ const AssessmentTable = (props: {
           "aria-label": "Assessment Name",
         },
       },
-      // {
-      //   label: "Tool Name",
-      //   field: "toolName",
-      //   sort: "asc",
-      //   width: 150,
-      // },
       {
-        label: "School/College Name",
-        field: "type",
+        label: "Start Date",
+        field: "startDate",
         sort: "asc",
         width: 150,
       },
@@ -43,15 +40,14 @@ const AssessmentTable = (props: {
       },
     ],
 
-    rows: props.data.map((data: any) => ({
-      assessmentName: data.assessmentName,
-      toolName: data.toolName,
-      type: data.isFree ? "Free" : "Paid",
+    rows:props.data.map((data: any) => ({
+      assessmentName: data.AssessmentName || data.assessmentName || "N/A",
+      startDate: data.starDate || data.startDate || "N/A",
       actions: (
         <>
           <button
             onClick={() => {
-              navigate(`/assessments/edit/${data.assessmentId}`, {
+              navigate(`/assessments/edit/${data.id || data.assessmentId}`, {
                 state: { data },
               });
             }}
@@ -63,7 +59,7 @@ const AssessmentTable = (props: {
             onClick={async () => { 
               props.setLoading(true);
               try {
-                await DeleteAssessmentData(data.toolId);
+                await DeleteAssessmentData(data.id || data.toolId);
                 props.setPageLoading(["true"]);
               } catch (error) {
                 console.error("Delete failed:", error);
