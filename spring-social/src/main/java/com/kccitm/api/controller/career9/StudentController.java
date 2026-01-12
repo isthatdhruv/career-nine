@@ -113,6 +113,25 @@ public class StudentController {
   // @Autowired
   // private SubCategoryRepository subCategoryRepository;
 
+  @PostMapping(value = "/student/save-csv", headers = "Accept=application/json")
+  public Boolean saveBulk(
+      @RequestBody ArrayList<Student> saveAllStudentsCSV) {
+
+    try {
+      Object studentData = saveAllStudentsCSV.get(0);
+      if (studentData instanceof Student) {
+          studentRepository.save((Student) studentData);
+      } else {
+          throw new IllegalArgumentException("Invalid data type in saveAllStudentsCSV. Expected Student object.");
+      }
+    } catch (Exception e) {
+      System.out.println(e);
+      return false;
+    }
+    // String st = allStudents.get(2).getOfficialemailid();
+    return true;
+  }
+
   @GetMapping(value = "student/get-check", headers = "Accept=application/json")
   public List<Student> getAllStudentsGoogleAdmin(@CurrentUser UserPrincipal userPrincipal) {
     List<Student> allStudents = studentRepository.findAll();
@@ -208,10 +227,10 @@ public class StudentController {
         courseRepository.findById(student.getCourse()).isEmpty()
             ? null
             : courseRepository.findById(student.getCourse()).get());
-    student.setBranchData(
-        instituteBranchRepository.findById(student.getBranch_id()));
-    student.setBatchData(
-        instituteBatchRepository.findById(student.getBatch_id()));
+    // student.setBranchData(
+    //     instituteBranchRepository.findById(student.getBranch_id()));
+    // student.setBatchData(
+    //     instituteBatchRepository.findById(student.getBatch_id()));
     return student;
   }
 
@@ -414,8 +433,8 @@ public class StudentController {
         courseRepository.findById(stu.getCourse()).isEmpty()
             ? null
             : courseRepository.findById(stu.getCourse()).get());
-    stu.setBranchData(instituteBranchRepository.findById(stu.getBranch_id()));
-    stu.setBatchData(instituteBatchRepository.findById(stu.getBatch_id()));
+    // stu.setBranchData(instituteBranchRepository.findById(stu.getBranch_id()));
+    // stu.setBatchData(instituteBatchRepository.findById(stu.getBatch_id()));
     currentStudent.put("values", stu);
     try {
       if (gpa.getUserByEmail(userPrincipal, stu.getOfficialEmailAddress()).isEmpty()) {
@@ -536,8 +555,8 @@ public class StudentController {
         courseRepository.findById(stu.getCourse()).isEmpty()
             ? null
             : courseRepository.findById(stu.getCourse()).get());
-    stu.setBranchData(instituteBranchRepository.findById(stu.getBranch_id()));
-    stu.setBatchData(instituteBatchRepository.findById(stu.getBatch_id()));
+    // stu.setBranchData(instituteBranchRepository.findById(stu.getBranch_id()));
+    // stu.setBatchData(instituteBatchRepository.findById(stu.getBatch_id()));
     if (stu.getOfficialEmailAddress() == null)
       return "User Does Not Exist";
     currentStudent.put("values", stu);

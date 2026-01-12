@@ -154,7 +154,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                         "/question-sections/getbybatchid/*", "/assesment-questions/getbybatchid/*",
                         "/question-sections/getbycourseid/*",
                         "/section/update", "/generate_pdf", "/codingquestion/save", "/testcase/save",
-                        "/student/update", "/student/getbyid/*", "/student/get", "/userrolegroupmapping/update",
+                        "/student/update", "/student/getbyid/*", "/student/get", "/student/save-csv", "/userrolegroupmapping/update",
                         "/util/**", "/util/file-get/getbyname/**", "/util/file-delete/deletebyname/**",
                         "/google-api/**", "/util/file-delete/delete/**", "/codingquestion/*", "/instituteBatch/*",
                         "/instituteBranch/*", "/instituteCourse/*", "/instituteDetail/getbyid/*", "/student/putmarks",

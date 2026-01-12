@@ -2,7 +2,7 @@ import axios from 'axios';
 const API_URL = process.env.REACT_APP_API_URL  
 
 export const createUser = `${API_URL}/roleurl/createRole`;
-export const ReadUser = `${API_URL}/user/get`;
+export const  ReadUser = `${API_URL}/user/get`;
 export const ReadUserbyId = `${API_URL}/user/getbyid/`;
 export const upsertUser = `${API_URL}/user/update`;
 export const deleteUser = `${API_URL}/user/delete/`;
