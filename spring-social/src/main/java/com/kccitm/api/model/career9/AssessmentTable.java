@@ -1,7 +1,5 @@
 package com.kccitm.api.model.career9;
 
-import java.sql.Date;
-
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
@@ -12,6 +10,7 @@ import javax.persistence.OneToOne;
 import javax.persistence.Table;
 
 import com.kccitm.api.model.InstituteDetail;
+import com.kccitm.api.model.career9.Questionaire.Questionnaire;
 
 // import org.springframework.boot.context.properties.bind.DefaultValue;
 
@@ -36,7 +35,9 @@ public class AssessmentTable implements java.io.Serializable {
 
     private String endDate;
 
-    
+    @JoinColumn(name="questionnaire_id")
+    @OneToOne
+    private Questionnaire questionnaire;
 
     @OneToOne
     @JoinColumn(name = "institute_code")
@@ -81,5 +82,11 @@ public class AssessmentTable implements java.io.Serializable {
     }
     public void setEndDate(String endDate) {
         this.endDate = endDate;
+    }
+    public Questionnaire getQuestionnaire() {
+        return questionnaire;
+    }
+    public void setQuestionnaire(Questionnaire questionnaire) {
+        this.questionnaire = questionnaire;
     }
 }

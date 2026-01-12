@@ -6,6 +6,7 @@ import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
 import { ReadAssessmentByIdData, UpdateAssessmentData } from "../API/Create_Assessment_APIs";
+import { Dropdown } from "react-bootstrap";
 
 const validationSchema = Yup.object().shape({
   assessmentName: Yup.string().required("Assessment name is required"),
@@ -34,6 +35,9 @@ const AssessmentEditPage = (props?: {
     price: "",
     id: "",
     type: "",
+    startDate: "",
+    endDate: "",
+    isActive: false,
   });
   
   // Options state
@@ -49,55 +53,7 @@ const AssessmentEditPage = (props?: {
     return Array.from({ length: maxSequence }, (_, i) => i + 1);
   };
 
-  // Add new option
-  const addOption = () => {
-    if (newOptionText.trim()) {
-      const newOption: Option = {
-        id: Date.now().toString(),
-        text: newOptionText.trim(),
-        sequence: options.length + 1
-      };
-      setOptions([...options, newOption]);
-      setNewOptionText("");
-    }
-  };
-
-  // Remove option
-  const removeOption = (optionId: string) => {
-    const updatedOptions = options
-      .filter(opt => opt.id !== optionId)
-      .map((opt, index) => ({ ...opt, sequence: index + 1 }));
-    setOptions(updatedOptions);
-  };
-
-  // Update option sequence
-  const updateOptionSequence = (optionId: string, newSequence: number) => {
-    const optionToMove = options.find(opt => opt.id === optionId);
-    if (!optionToMove) return;
-
-    // Remove the option from current position
-    const otherOptions = options.filter(opt => opt.id !== optionId);
-    
-    // Insert at new position
-    const updatedOptions = [...otherOptions];
-    updatedOptions.splice(newSequence - 1, 0, optionToMove);
-    
-    // Reassign sequences
-    const resequencedOptions = updatedOptions.map((opt, index) => ({
-      ...opt,
-      sequence: index + 1
-    }));
-    
-    setOptions(resequencedOptions);
-  };
-
-  // Update option text
-  const updateOptionText = (optionId: string, newText: string) => {
-    setOptions(options.map(opt => 
-      opt.id === optionId ? { ...opt, text: newText } : opt
-    ));
-  };
-
+  
   // Fetch tool data when component mounts
   useEffect(() => {
     const fetchData = async () => {
@@ -333,93 +289,48 @@ const AssessmentEditPage = (props?: {
 
             {/* Options Management Section */}
             <div className="card mb-7">
-              <div className="card-header">
-                <h3 className="card-title">Assessment Options</h3>
-              </div>
+              <h3 className="card-title">Assessment Settings</h3>
               <div className="card-body">
-                
-                {/* Add New Option */}
-                <div className="row mb-4">
-                  <div className="col-md-8">
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Enter new option text"
-                      value={newOptionText}
-                      onChange={(e) => setNewOptionText(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && addOption()}
-                    />
-                  </div>
-                  <div className="col-md-4">
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={addOption}
-                      disabled={!newOptionText.trim()}
-                    >
-                      <i className="fas fa-plus me-2"></i>
-                      Add Option
-                    </button>
-                  </div>
+                <input
+                  type="date"
+                  className="form-control mb-3"
+                  placeholder="Start Date"
+                />
+                <input
+                  type="date"
+                  className="form-control mb-3"
+                  placeholder="End Date"
+                />
+                <div className="form-check form-switch">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    id="isActive"
+                    checked={formik.values.isFree}
+                    onChange={() =>
+                      formik.setFieldValue("isFree", !formik.values.isFree)
+                    }
+                  />
+                  <label className="form-check-label" htmlFor="isActive">
+                    Is Active
+                  </label>
+
                 </div>
-
-                {/* Options List */}
-                {options.length > 0 && (
-                  <div className="table-responsive">
-                    <table className="table table-row-bordered">
-                      <thead>
-                        <tr className="fw-bold fs-6 text-gray-800">
-                          <th style={{ width: "80px" }}>Sequence</th>
-                          <th>Option Text</th>
-                          <th style={{ width: "100px" }}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {options
-                          .sort((a, b) => a.sequence - b.sequence)
-                          .map((option) => (
-                          <tr key={option.id}>
-                            <td>
-                              <select
-                                className="form-select form-select-sm"
-                                value={option.sequence}
-                                onChange={(e) => updateOptionSequence(option.id, parseInt(e.target.value))}
-                              >
-                                {generateSequenceOptions(options.length).map(seq => (
-                                  <option key={seq} value={seq}>{seq}</option>
-                                ))}
-                              </select>
-                            </td>
-                            <td>
-                              <input
-                                type="text"
-                                className="form-control form-control-sm"
-                                value={option.text}
-                                onChange={(e) => updateOptionText(option.id, e.target.value)}
-                              />
-                            </td>
-                            <td>
-                              <button
-                                type="button"
-                                className="btn btn-sm btn-danger"
-                                onClick={() => removeOption(option.id)}
-                              >
-                                <i className="fas fa-trash"></i>
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {options.length === 0 && (
-                  <div className="text-center py-4 text-muted">
-                    No options added yet. Add your first option above.
-                  </div>
-                )}
               </div>
+            </div>
+            <div className="card mb-7">
+              <h3 className="card-title">Alot Questionaire</h3>
+              <Dropdown>
+                <Dropdown.Toggle variant="secondary" id="dropdown-basic">
+                  Select Questionaire
+                </Dropdown.Toggle>
+
+                <Dropdown.Menu>
+                  <Dropdown.Item href="#/action-1">Questionaire 1</Dropdown.Item>
+                  <Dropdown.Item href="#/action-2">Questionaire 2</Dropdown.Item>
+                  <Dropdown.Item href="#/action-3">Questionaire 3</Dropdown.Item>
+                </Dropdown.Menu>
+              </Dropdown>
             </div>
 
           </div>

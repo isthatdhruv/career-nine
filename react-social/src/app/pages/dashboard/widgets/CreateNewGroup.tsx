@@ -1,9 +1,10 @@
 import clsx from "clsx";
 import { Form, Formik, Field } from "formik";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
 import Select, { components } from "react-select";
+import { ReadToolData } from "../../Tool/API/Tool_APIs";
 
 /* -------------------- VALIDATION -------------------- */
 const validationSchema = Yup.object().shape({
@@ -18,12 +19,6 @@ const validationSchema = Yup.object().shape({
 });
 
 /* -------------------- DUMMY DATA -------------------- */
-const assessmentOptions = [
-  "Insight Navigator",
-  "Career Navigator",
-  "Subject Navigator",
-];
-
 const studentOptions = [
   { value: "Aarav Sharma", label: "Aarav Sharma" },
   { value: "Priya Verma", label: "Priya Verma" },
@@ -53,6 +48,7 @@ const CheckboxOption = (props: any) => (
 
 const GroupCreatePage = () => {
   const [loading, setLoading] = useState(false);
+  const [assessments, setAssessments] = useState<any[]>([]);
   const navigate = useNavigate();
 
   const initialValues = {
@@ -63,6 +59,22 @@ const GroupCreatePage = () => {
     students: [] as string[],
     admin: "",
   };
+
+  /* -------------------- FETCH ASSESSMENTS -------------------- */
+  useEffect(() => {
+    const fetchAssessments = async () => {
+      try {
+        const res = await ReadToolData();
+
+        // 👉 Adjust if API structure differs
+        setAssessments(res.data);
+      } catch (error) {
+        console.error("Error fetching assessments:", error);
+      }
+    };
+
+    fetchAssessments();
+  }, []);
 
   return (
     <div className="container py-5">
@@ -131,7 +143,7 @@ const GroupCreatePage = () => {
                   />
                 </div>
 
-                {/* Assessment */}
+                {/* ✅ Assessment from API */}
                 <div className="fv-row mb-7">
                   <label className="required fs-6 fw-bold mb-2">
                     Assessment Name :
@@ -139,12 +151,18 @@ const GroupCreatePage = () => {
                   <Field
                     as="select"
                     name="assessmentName"
-                    className="form-control form-control-lg form-control-solid"
+                    className={clsx(
+                      "form-control form-control-lg form-control-solid",
+                      {
+                        "is-invalid":
+                          touched.assessmentName && errors.assessmentName,
+                      }
+                    )}
                   >
                     <option value="">Select Assessment</option>
-                    {assessmentOptions.map((a) => (
-                      <option key={a} value={a}>
-                        {a}
+                    {assessments.map((tool) => (
+                      <option key={tool.id} value={tool.id}>
+                        {tool.name}
                       </option>
                     ))}
                   </Field>
@@ -174,7 +192,7 @@ const GroupCreatePage = () => {
                   />
                 </div>
 
-                {/* Students (MULTI SELECT WITH CHECKBOXES) */}
+                {/* Students (MULTI SELECT) */}
                 <div className="fv-row mb-7">
                   <label className="required fs-6 fw-bold mb-2">
                     Students :
@@ -188,13 +206,19 @@ const GroupCreatePage = () => {
                     components={{ Option: CheckboxOption }}
                     placeholder="Select students"
                     classNamePrefix="react-select"
-                    onChange={(selected) =>
+                    onChange={(selected: any) =>
                       setFieldValue(
                         "students",
                         selected.map((s: any) => s.value)
                       )
                     }
                   />
+
+                  {touched.students && errors.students && (
+                    <div className="text-danger mt-1">
+                      {errors.students as string}
+                    </div>
+                  )}
                 </div>
 
                 {/* Admin */}
@@ -234,6 +258,7 @@ const GroupCreatePage = () => {
                     {!loading ? "Submit" : "Please wait..."}
                   </button>
                 </div>
+
               </div>
             </Form>
           )}
