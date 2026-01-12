@@ -45,9 +45,12 @@ import SelectSectionPage from "../pages/StudentOnlineAssessment/components/Selec
 import SectionInstructionPage from "../pages/StudentOnlineAssessment/components/SectionInstructionPage";
 import {SchoolDashboardPage} from "../pages/dashboard/SchoolDashboardPage";
 import SectionQuestionPage from "../pages/StudentOnlineAssessment/components/SectionQuestionPage";
-import studentList from "../pages/StudentInformation/StudentsList";
+import studentsList from "../pages/StudentInformation/StudentsList";
 // import QuestionaireList from "../pages/CreateAssessment/components/questionaire/QuestionaireListPage";
 import QuestionaireListPage from "../pages/CreateAssessment/components/questionaire/QuestionaireListPage";
+import StudentsList from "../pages/StudentInformation/StudentsList";
+import GroupCreatePage from "../pages/dashboard/widgets/CreateNewGroup";
+import StudentCreatePage from "../pages/dashboard/widgets/CreateNewStudent";
 const PrivateRoutes = () => {
   const StudentsData = lazy(
     () => import("../pages/UniversityResult/StudentData")
@@ -66,7 +69,7 @@ const PrivateRoutes = () => {
     () => import("../pages/GoogleGroups/GroupMembers/GoogleGroups")
   );
 
-  const Groups = lazy(() => import("../pages/GoogleGroups/Groups"));
+  const Groups = lazy(() => import("../pages/dashboard/widgets/Groups"));
 
   const Group = lazy(() => import("../pages/Group/Group"));
 
@@ -210,11 +213,32 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-        <Route path="/school/studentList" element={
+        <Route path="/school/dashboard/studentList" element={
           <SuspensedView>
-            <StudentList />
+            <StudentsList />
           </SuspensedView>
         } />
+        <Route path="/students/${member.id}/dashboard" element={
+          <SuspensedView>
+            <StudentsList />
+          </SuspensedView>
+        } />
+        <Route path="/school/groups" element={
+          <SuspensedView>
+            <Groups />
+          </SuspensedView>
+        } />
+        <Route path="/school/group/create" element={
+          <SuspensedView>
+            <GroupCreatePage />
+          </SuspensedView>
+        } />
+        <Route path="/school/student/create" element={
+          <SuspensedView>
+            <StudentCreatePage />
+          </SuspensedView>
+        } />
+
         <Route
           path="/student/university/result-dashboard"
           element={
@@ -233,7 +257,6 @@ const PrivateRoutes = () => {
                   }
                 />
         */}
-        ```
         <Route
           path="/student/university/result"
           element={
@@ -330,7 +353,6 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-        //careerpage
         <Route
           path="/career"
           element={

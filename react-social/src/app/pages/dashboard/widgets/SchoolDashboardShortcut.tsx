@@ -86,30 +86,36 @@ const SchoolDashboardShortcut: React.FC<Props> = ({
           {/* begin::Row */}
           <div className="row g-0">
             {/* begin::Col */}
-            <div className="col bg-light-warning px-6 py-8 rounded-2 me-7 mb-7">
-              <KTSVG
-                path="/media/icons/duotune/general/gen032.svg"
-                className="svg-icon-3x svg-icon-warning d-block my-2"
-              />
-              <a
-                role="button"
-                onClick={() => navigate("/school/studentList")}
-                className="text-warning fw-semibold fs-6"
+            <div className="col me-7 mb-7">
+              <button
+                type="button"
+                onClick={() => navigate("/school/dashboard/studentList")}
+                className="w-100 bg-light-warning px-6 py-8 rounded-2 border-0 text-start"
                 style={{ cursor: "pointer" }}
               >
-                List of Students
-              </a>
+                <KTSVG
+                  path="/media/icons/duotune/general/gen032.svg"
+                  className="svg-icon-3x svg-icon-warning d-block my-2"
+                />
+                <span className="text-warning fw-semibold fs-6">
+                  List of Students
+                </span>
+              </button>
             </div>
             {/* end::Col */}
             {/* begin::Col */}
             <div className="col bg-light-primary px-6 py-8 rounded-2 mb-7">
-              <KTSVG
-                path="/media/icons/duotune/arrows/arr075.svg"
-                className="svg-icon-3x svg-icon-primary d-block my-2"
-              />
-              <a href="#" className="text-primary fw-semibold fs-6">
-                New Users
-              </a>
+              <button
+                type="button"
+                onClick={() => navigate("/school/groups")}
+                className="btn btn-link text-start p-0 w-100 text-decoration-none"
+              >
+                <KTSVG
+                  path="/media/icons/duotune/arrows/arr075.svg"
+                  className="svg-icon-3x svg-icon-primary d-block my-2"
+                />
+                <span className="text-primary fw-semibold fs-6">Groups</span>
+              </button>
             </div>
             {/* end::Col */}
           </div>

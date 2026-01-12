@@ -304,15 +304,9 @@ const StudentList: React.FC<Props> = ({ className }) => {
           </table>
         </div>
       </div>
-      {/* end::Body */}
 
-      <StudentUploadModal
-        show={showUploadModal}
-        onHide={() => setShowUploadModal(false)}
-        onUpload={handleUpload}
-      />
     </div>
   );
 };
 
-export { StudentList };
+export default StudentList;

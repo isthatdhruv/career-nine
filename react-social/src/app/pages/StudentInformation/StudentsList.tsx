@@ -1,130 +1,229 @@
-import { MDBDataTableV5 } from "mdbreact";
-import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import _ from "underscore";
-import { readStudentData } from "./Student_APIs";
-import studentTable from 
+// CollegeAssignRolePage.tsx
+import React, { useMemo, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 
-export default function Basic() {
-  const [datatable, setDatatable] = React.useState({
-    columns: [
-      {
-        label: "Name",
-        field: "name",
-        width: 150,
-        attributes: {
-          "aria-controls": "DataTable",
-          "aria-label": "Name",
-        },
-      },
-      {
-        label: "Roll No.",
-        field: "rollno",
-        sort: "asc",
-        width: 100,
-      },
-      {
-        label: "Branch",
-        field: "branch",
-        width: 200,
-      },
-      {
-        label: "Batch",
-        field: "batch",
-        width: 200,
-      },
-      {
-        label: "View Details",
-        field: "result",
-        sort: "disabled",
-        width: 100,
-      },
-    ],
+type Student = {
+  id: string;
+  name: string;
+  groupName: string;
+  assessment: "Subject Navigator" | "Career Navigator" | "Insight Navigator";
+  status: "completed" | "pending" | "not-done";
+  avatar: string;
+};
 
-    rows: [
-      {
-        name: "Loading...",
-        collegeEnrollmentNumber: "Loading...",
-        branch: "Loading...",
-        batch: "Loading...",
-        result: <></>,
-      },
-    ],
-  });
+export default function Users() {
+  const navigate = useNavigate();
+  const { state } = useLocation();
 
-  var [studentData, setStudentData] = useState();
-  useEffect(() => {
-    try {
-      readStudentData().then((data) => {
-        setStudentData(data.data);
-        setDatatable({
-          ...datatable,
-          rows: _.map(data.data, (d1: any) => {
-            return {
-              name: d1.firstName,
-              collegeEnrollmentNumber: d1.collegeEnrollmentNumber,
-              branch: d1.branch,
-              batch: d1.batch,
+  const [query, setQuery] = useState("");
+  const [showActiveOnly, setShowActiveOnly] = useState(false);
 
-              result: (
-                <Link
-                  to={{
-                    pathname: "/studentprofile",
-                    search:
-                      "?collegeEnrollmentNumber=" + d1.collegeEnrollmentNumber,
-                  }}
-                >
-                  View Student Profile
-                </Link>
-              ),
-            };
-          }),
-        });
-      });
-    } catch (error) {
-      console.error(error);
-      window.location.replace("/error");
-    }
-  }, []);
+  const students: Student[] = [
+    {
+      id: "1",
+      name: "Aarav Sharma",
+      groupName: "Group A",
+      assessment: "Career Navigator",
+      status: "completed",
+      avatar: "AS",
+    },
+    {
+      id: "2",
+      name: "Priya Verma",
+      groupName: "Group B",
+      assessment: "Insight Navigator",
+      status: "pending",
+      avatar: "PV",
+    },
+    {
+      id: "3",
+      name: "Rohit Mehta",
+      groupName: "Group A",
+      assessment: "Subject Navigator",
+      status: "completed",
+      avatar: "RM",
+    },
+    {
+      id: "4",
+      name: "Sneha Kapoor",
+      groupName: "Group C",
+      assessment: "Career Navigator",
+      status: "not-done",
+      avatar: "SK",
+    },
+    {
+      id: "5",
+      name: "Karan Singh",
+      groupName: "Group B",
+      assessment: "Insight Navigator",
+      status: "completed",
+      avatar: "KS",
+    },
+  ];
 
-  // useEffect(() => {
+  const filteredStudents = useMemo(() => {
+    return students.filter((s) => {
+      const matchesSearch =
+        s.name.toLowerCase().includes(query.toLowerCase()) ||
+        s.groupName.toLowerCase().includes(query.toLowerCase());
 
-  //   fetch('https://kccitm.api.easylearning.guru/student/getmarks', {
-  //     method: 'get'
-  //   })
-  //     .then((response) => {
-  //       return response.json();
-  //     }).then((responseJSON) => {
-  //       console.log(responseJSON, "hey data")
-  //       setData1(responseJSON)
-  //       setDatatable({
-  //         ...datatable, rows: _.map(responseJSON, (d1: any) => {
+      const matchesStatus = showActiveOnly
+        ? s.status === "completed"
+        : true;
 
-  //           return {
-  //             name: d1.name,
-  //             rollno: d1.rollno,
-  //             branch: d1.branch.split(")")[1],
-  //             batch: d1.result[0].session,
-  //             result: <Link to={{ pathname: "/student-details", search: "?rollno=" + d1.rollno }} >View Details</Link>
-  //           }
-  //         })
-  //       })
-
-  //     })
-
-  //     .catch((err) => {
-  //       console.log(err)
-  //     })
-  // },
-  //  [])
+      return matchesSearch && matchesStatus;
+    });
+  }, [query, showActiveOnly]);
 
   return (
-    <MDBDataTableV5
-      hover
-      entriesOptions={[5, 20, 25]}
-      entries={25}
-      pagesAmount={4}
-      data={datatable}
-    />
+    <div className="container-fluid py-4">
+      <style>{`
+        .team-page .card { border-radius: 10px; overflow: hidden; }
+
+        .team-header {
+          display:flex;
+          align-items:center;
+          justify-content: space-between;
+          gap:12px;
+        }
+
+        .member-avatar {
+          width:40px;
+          height:40px;
+          border-radius:50%;
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          color:#fff;
+          font-weight:600;
+          background:#3699ff;
+        }
+
+        .metronic-table thead th {
+          font-weight: 600;
+          padding: 16px 24px;
+          font-size: 14px;
+          background: #fafafb;
+          border-bottom: 1px solid #eff2f5;
+        }
+
+        .metronic-table tbody td {
+          padding: 16px 24px;
+          border-bottom: 1px solid #eff2f5;
+        }
+
+        .metronic-table thead th:first-child,
+        .metronic-table tbody td:first-child {
+          padding-left: 28px !important;
+        }
+
+        .status-pill {
+          padding: 5px 12px;
+          border-radius: 12px;
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        .status-completed { background: #e8fff3; color: #0bb783; }
+        .status-pending { background: #fff8dd; color: #ffa800; }
+        .status-not-done { background: #f8d7da; color: #d33; }
+      `}</style>
+
+      <div className="team-page">
+        {/* HEADER */}
+        <div className="team-header mb-4">
+          <div>
+            <h3 className="mb-0">Students List</h3>
+            <small className="text-muted">
+              Overview of all students enrolled in it.
+            </small>
+          </div>
+
+          {/* ADD STUDENT BUTTON */}
+          <button
+            className="btn btn-sm btn-primary"
+            onClick={() => navigate("/school/student/create")}
+          >
+            + Add Student
+          </button>
+        </div>
+
+        {/* Search & Filter */}
+        <div className="d-flex align-items-center justify-content-between mb-3 gap-3">
+          <div className="d-flex align-items-center gap-2">
+            <input
+              className="form-control form-control-sm"
+              placeholder="Search students"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+
+            <div className="form-check form-switch ms-2">
+              <input
+                className="form-check-input"
+                type="checkbox"
+                id="activeOnly"
+                checked={showActiveOnly}
+                onChange={(e) => setShowActiveOnly(e.target.checked)}
+              />
+              <label
+                className="form-check-label small text-muted"
+                htmlFor="activeOnly"
+              >
+                Students who have Completed Assessments
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* TABLE */}
+        <div className="card shadow-sm">
+          <div className="card-body p-0">
+            <div className="table-responsive metronic-table">
+              <table className="table align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Student Name</th>
+                    <th>Group Name</th>
+                    <th>Allotted Assessment</th>
+                    <th className="text-center">Status</th>
+                    <th className="text-center">Dashboard</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStudents.map((student) => (
+                    <tr key={student.id}>
+                      <td>
+                        <div className="d-flex align-items-center gap-3">
+                          <div className="member-avatar">{student.avatar}</div>
+                          <span className="fw-semibold">{student.name}</span>
+                        </div>
+                      </td>
+                      <td>{student.groupName}</td>
+                      <td>{student.assessment}</td>
+                      <td className="text-center">
+                        <span className={`status-pill status-${student.status}`}>
+                          {student.status.replace("-", " ").toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="text-center">
+                        <button
+                          className="btn btn-sm btn-light-primary"
+                          onClick={() =>
+                            navigate(`/students/${student.id}/dashboard`)
+                          }
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
