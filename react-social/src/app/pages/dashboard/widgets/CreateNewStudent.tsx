@@ -4,12 +4,15 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
 
-// 👉 Replace these with your real APIs
-// import { CreateStudent } from "../API/Student_APIs";
-// import { GetAllTools } from "../API/Tool_APIs";
+// ✅ API
+import { ReadToolData } from "../../Tool/API/Tool_APIs";
 
+/* -------------------- VALIDATION -------------------- */
 const validationSchema = Yup.object().shape({
   studentName: Yup.string().required("Student name is required"),
+  rollNumber: Yup.string().required("Roll number is required"),
+  studentClass: Yup.string().required("Class is required"),
+  instituteName: Yup.string().required("Institute name is required"),
   assessmentId: Yup.string().required("Assessment is required"),
   groupName: Yup.string().required("Group name is required"),
 });
@@ -21,24 +24,21 @@ const StudentCreatePage = () => {
 
   const initialValues = {
     studentName: "",
+    rollNumber: "",
+    studentClass: "",
+    instituteName: "",
     assessmentId: "",
     groupName: "",
   };
 
+  /* -------------------- FETCH ASSESSMENTS -------------------- */
   useEffect(() => {
     const fetchAssessments = async () => {
       try {
-        // const res = await GetAllTools();
-        // setAssessments(res.data);
-
-        // TEMP MOCK DATA
-        setAssessments([
-          { id: "1", name: "Career Aptitude Test" },
-          { id: "2", name: "Personality Assessment" },
-          { id: "3", name: "Skill Evaluation" },
-        ]);
+        const res = await ReadToolData();
+        setAssessments(res.data);
       } catch (error) {
-        console.error(error);
+        console.error("Error fetching assessments:", error);
       }
     };
 
@@ -53,7 +53,6 @@ const StudentCreatePage = () => {
         </div>
 
         <Formik
-          enableReinitialize
           initialValues={initialValues}
           validationSchema={validationSchema}
           onSubmit={async (values, { resetForm }) => {
@@ -61,10 +60,14 @@ const StudentCreatePage = () => {
             try {
               const payload = {
                 name: values.studentName,
+                rollNumber: values.rollNumber,
+                class: values.studentClass,
+                instituteName: values.instituteName,
                 assessmentId: values.assessmentId,
                 groupName: values.groupName,
               };
 
+              console.log("FINAL STUDENT PAYLOAD 👉", payload);
               // await CreateStudent(payload);
 
               resetForm();
@@ -94,18 +97,68 @@ const StudentCreatePage = () => {
                       "form-control form-control-lg form-control-solid",
                       {
                         "is-invalid": touched.studentName && errors.studentName,
-                        "is-valid": touched.studentName && !errors.studentName,
                       }
                     )}
                   />
-                  {touched.studentName && errors.studentName && (
-                    <div className="fv-help-block text-danger">
-                      {errors.studentName}
-                    </div>
-                  )}
                 </div>
 
-                {/* Assessment Dropdown */}
+                {/* Roll Number */}
+                <div className="fv-row mb-7">
+                  <label className="required fs-6 fw-bold mb-2">
+                    Roll Number
+                  </label>
+                  <Field
+                    type="text"
+                    name="rollNumber"
+                    placeholder="Enter roll number"
+                    className={clsx(
+                      "form-control form-control-lg form-control-solid",
+                      {
+                        "is-invalid": touched.rollNumber && errors.rollNumber,
+                      }
+                    )}
+                  />
+                </div>
+
+                {/* Class */}
+                <div className="fv-row mb-7">
+                  <label className="required fs-6 fw-bold mb-2">
+                    Class
+                  </label>
+                  <Field
+                    type="text"
+                    name="studentClass"
+                    placeholder="Enter class (e.g. 10th / B.Tech 3rd Year)"
+                    className={clsx(
+                      "form-control form-control-lg form-control-solid",
+                      {
+                        "is-invalid":
+                          touched.studentClass && errors.studentClass,
+                      }
+                    )}
+                  />
+                </div>
+
+                {/* Institute Name */}
+                <div className="fv-row mb-7">
+                  <label className="required fs-6 fw-bold mb-2">
+                    Institute Name
+                  </label>
+                  <Field
+                    type="text"
+                    name="instituteName"
+                    placeholder="Enter institute name"
+                    className={clsx(
+                      "form-control form-control-lg form-control-solid",
+                      {
+                        "is-invalid":
+                          touched.instituteName && errors.instituteName,
+                      }
+                    )}
+                  />
+                </div>
+
+                {/* Assessment Dropdown (API) */}
                 <div className="fv-row mb-7">
                   <label className="required fs-6 fw-bold mb-2">
                     Allotted Assessment
@@ -118,8 +171,6 @@ const StudentCreatePage = () => {
                       {
                         "is-invalid":
                           touched.assessmentId && errors.assessmentId,
-                        "is-valid":
-                          touched.assessmentId && !errors.assessmentId,
                       }
                     )}
                   >
@@ -130,11 +181,6 @@ const StudentCreatePage = () => {
                       </option>
                     ))}
                   </Field>
-                  {touched.assessmentId && errors.assessmentId && (
-                    <div className="fv-help-block text-danger">
-                      {errors.assessmentId}
-                    </div>
-                  )}
                 </div>
 
                 {/* Group Name */}
@@ -150,15 +196,9 @@ const StudentCreatePage = () => {
                       "form-control form-control-lg form-control-solid",
                       {
                         "is-invalid": touched.groupName && errors.groupName,
-                        "is-valid": touched.groupName && !errors.groupName,
                       }
                     )}
                   />
-                  {touched.groupName && errors.groupName && (
-                    <div className="fv-help-block text-danger">
-                      {errors.groupName}
-                    </div>
-                  )}
                 </div>
 
                 {/* Footer */}
@@ -176,13 +216,7 @@ const StudentCreatePage = () => {
                     className="btn btn-primary"
                     disabled={loading}
                   >
-                    {!loading && "Submit"}
-                    {loading && (
-                      <>
-                        Please wait...
-                        <span className="spinner-border spinner-border-sm ms-2"></span>
-                      </>
-                    )}
+                    {!loading ? "Submit" : "Please wait..."}
                   </button>
                 </div>
 

@@ -16,19 +16,19 @@ const AssessmentTable = (props: {
     columns: [
       {
         label: "Assessment Name",
-        field: "name",
+        field: "assessmentName",
         width: 300,
         attributes: {
           "aria-controls": "DataTable",
           "aria-label": "Assessment Name",
         },
       },
-      {
-        label: "Tool Name",
-        field: "price",
-        sort: "asc",
-        width: 150,
-      },
+      // {
+      //   label: "Tool Name",
+      //   field: "toolName",
+      //   sort: "asc",
+      //   width: 150,
+      // },
       {
         label: "School/College Name",
         field: "type",
@@ -44,14 +44,14 @@ const AssessmentTable = (props: {
     ],
 
     rows: props.data.map((data: any) => ({
-      name: data.name,
-      price: data.price,
+      assessmentName: data.assessmentName,
+      toolName: data.toolName,
       type: data.isFree ? "Free" : "Paid",
       actions: (
         <>
           <button
             onClick={() => {
-              navigate(`/tools/edit/${data.toolId}`, {
+              navigate(`/assessments/edit/${data.assessmentId}`, {
                 state: { data },
               });
             }}
