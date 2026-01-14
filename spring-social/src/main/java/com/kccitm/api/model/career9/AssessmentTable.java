@@ -9,8 +9,8 @@ import javax.persistence.JoinColumn;
 import javax.persistence.OneToOne;
 import javax.persistence.Table;
 
-import com.kccitm.api.model.InstituteDetail;
 import com.kccitm.api.model.career9.Questionaire.Questionnaire;
+import com.kccitm.api.model.career9.school.InstituteDetail;
 
 // import org.springframework.boot.context.properties.bind.DefaultValue;
 

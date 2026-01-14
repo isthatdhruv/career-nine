@@ -1,4 +1,4 @@
-package com.kccitm.api.model;
+package com.kccitm.api.model.career9.school;
 
 import java.io.Serializable;
 import java.util.HashSet;
@@ -18,6 +18,10 @@ import javax.persistence.Transient;
 import javax.validation.constraints.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.kccitm.api.model.ContactPerson;
+import com.kccitm.api.model.InstituteCourse;
+
+import net.bytebuddy.implementation.bind.annotation.Default;
 
 @Entity
 @Table(name = "institute_detail_new")
@@ -44,9 +48,11 @@ public class InstituteDetail implements Serializable {
     private Integer maxStudents;
     private Integer maxContactPersons;
 
+    private Boolean isSchool;
+
     // IMPORTANT FIX: Boolean instead of boolean
     @Column(name = "display")
-    private Boolean display;   // wrapper, can be null
+    private Boolean display; // wrapper, can be null
 
     @Transient
     private String transientField;
@@ -56,12 +62,13 @@ public class InstituteDetail implements Serializable {
     @JsonManagedReference
     private Set<ContactPerson> contactPersons = new HashSet<>();
 
-
     // One-to-Many: Courses
     @JsonManagedReference("inst-course")
     @OneToMany(mappedBy = "institute", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private List<InstituteCourse> instituteCourse;
 
+    @OneToMany(mappedBy = "institute", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    private List<SchoolSession> schoolSession;
 
     public Integer getInstituteCode() {
         return instituteCode;
@@ -148,22 +155,45 @@ public class InstituteDetail implements Serializable {
     public void setInstituteCourse(List<InstituteCourse> instituteCourse) {
         this.instituteCourse = instituteCourse;
     }
+
     public Integer getMaxClass() {
         return maxClass;
     }
+
     public void setMaxClass(Integer maxClass) {
         this.maxClass = maxClass;
     }
+
     public Integer getMaxStudents() {
         return maxStudents;
     }
+
     public void setMaxStudents(Integer maxStudents) {
         this.maxStudents = maxStudents;
     }
+
     public Integer getMaxContactPersons() {
         return maxContactPersons;
     }
+
     public void setMaxContactPersons(Integer maxContactPersons) {
         this.maxContactPersons = maxContactPersons;
     }
+
+    public void setIsSchool(Boolean isSchool) {
+        this.isSchool = isSchool;
+    }
+
+    public Boolean getIsSchool() {
+        return isSchool;
+    }
+
+    public List<SchoolSession> getSchoolSession() {
+        return schoolSession;
+    }
+
+    public void setSchoolSession(List<SchoolSession> schoolSession) {
+        this.schoolSession = schoolSession;
+    }
+
 }

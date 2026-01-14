@@ -13,8 +13,8 @@ import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.kccitm.api.model.InstituteDetail;
 import com.kccitm.api.model.Student;
+import com.kccitm.api.model.career9.school.InstituteDetail;
 
 @Entity
 @Table(name = "user_student")
@@ -29,25 +29,17 @@ public class UserStudent implements Serializable {
     @Column(name = "user_student_id")
     private Long userStudentId;
 
-    // Institute Id 
+    // Institute Id
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(
-        name = "institute_id",
-        referencedColumnName = "institute_code",
-        nullable = false
-    )
+    @JoinColumn(name = "institute_id", referencedColumnName = "institute_code", nullable = false)
     private InstituteDetail institute;
 
-    // Student Detail Id 
+    // Student Detail Id
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(
-        name = "student_detail_id",
-        referencedColumnName = "college_enrollment_number",
-        nullable = false
-    )
+    @JoinColumn(name = "student_detail_id", referencedColumnName = "college_enrollment_number", nullable = false)
     private Student testingStudent;
 
-    // User ID 
+    // User ID
     @Column(name = "user_id", nullable = false)
     private Long userId;
 

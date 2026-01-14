@@ -5,7 +5,7 @@ import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import com.kccitm.api.model.InstituteDetail;
+import com.kccitm.api.model.career9.school.InstituteDetail;
 
 @Repository
 public interface InstituteDetailRepository extends JpaRepository<InstituteDetail, Integer> {

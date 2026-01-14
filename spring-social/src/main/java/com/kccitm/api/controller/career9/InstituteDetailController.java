@@ -20,7 +20,7 @@ import com.kccitm.api.model.ContactPerson;
 import com.kccitm.api.model.InstituteBranch;
 import com.kccitm.api.model.InstituteBranchBatchMapping;
 import com.kccitm.api.model.InstituteCourse;
-import com.kccitm.api.model.InstituteDetail;
+import com.kccitm.api.model.career9.school.InstituteDetail;
 import com.kccitm.api.repository.InstituteBatchRepository;
 import com.kccitm.api.repository.InstituteBranchBatchMappingRepository;
 import com.kccitm.api.repository.InstituteBranchRepository;
@@ -76,42 +76,47 @@ public class InstituteDetailController {
 		return instituteDetail;
 	}
 
-	// @GetMapping(value = "/instituteBatchAndBranchDetail/getbyid/{id}", headers = "Accept=application/json")
-	// public BatchBranchOption getInstituteBatchAndBranchById(@PathVariable("id") int instituteDetailId) {
-	// 	InstituteDetail instituteDetail = instituteDetailRepository.findById(instituteDetailId);
-	// 	instituteDetail.setInstituteCourse(instituteCourseRepository.findByInstituteId(instituteDetailId));
-	// 	for (InstituteCourse ins : instituteDetail.getInstituteCourse()) {
-	// 		ins.setInstituteBranchs(instituteBranchRepository.findByCourseId(ins.getCourseCode()));
-	// 		for (InstituteBranch insb : ins.getInstituteBranchs()) {
-	// 			insb.setInstituteBranchBatchMapping(
-	// 					instituteBranchBatchMappingRepository.findByBranchId(insb.getBranchId()));
-	// 			for (InstituteBranchBatchMapping ibbm : insb.getInstituteBranchBatchMapping()) {
-	// 				ibbm.setInstituteBatch(instituteBatchRepository.findById(ibbm.getBatchId()));
-	// 			}
-	// 		}
-	// 	}
-	// 	BatchBranchOption bbo = new BatchBranchOption(instituteDetail);
-	// 	return bbo;
+	// @GetMapping(value = "/instituteBatchAndBranchDetail/getbyid/{id}", headers =
+	// "Accept=application/json")
+	// public BatchBranchOption getInstituteBatchAndBranchById(@PathVariable("id")
+	// int instituteDetailId) {
+	// InstituteDetail instituteDetail =
+	// instituteDetailRepository.findById(instituteDetailId);
+	// instituteDetail.setInstituteCourse(instituteCourseRepository.findByInstituteId(instituteDetailId));
+	// for (InstituteCourse ins : instituteDetail.getInstituteCourse()) {
+	// ins.setInstituteBranchs(instituteBranchRepository.findByCourseId(ins.getCourseCode()));
+	// for (InstituteBranch insb : ins.getInstituteBranchs()) {
+	// insb.setInstituteBranchBatchMapping(
+	// instituteBranchBatchMappingRepository.findByBranchId(insb.getBranchId()));
+	// for (InstituteBranchBatchMapping ibbm :
+	// insb.getInstituteBranchBatchMapping()) {
+	// ibbm.setInstituteBatch(instituteBatchRepository.findById(ibbm.getBatchId()));
 	// }
-
+	// }
+	// }
+	// BatchBranchOption bbo = new BatchBranchOption(instituteDetail);
+	// return bbo;
+	// }
 
 	// @GetMapping(value = "/delete/{id}", headers = "Accept=application/json")
-	// public InstituteDetail deleteUser(@PathVariable("id") int instituteDetailId) {
-	// 	InstituteDetail instituteDetail = instituteDetailRepository.getOne(instituteDetailId);
-	// 	instituteDetail.setDisplay(false);
-	// 	InstituteDetail r = instituteDetailRepository.save(instituteDetail);
-	// 	return r;
+	// public InstituteDetail deleteUser(@PathVariable("id") int instituteDetailId)
+	// {
+	// InstituteDetail instituteDetail =
+	// instituteDetailRepository.getOne(instituteDetailId);
+	// instituteDetail.setDisplay(false);
+	// InstituteDetail r = instituteDetailRepository.save(instituteDetail);
+	// return r;
 	// }
 	@GetMapping("/delete/{id}")
-    public InstituteDetail deleteUser(@PathVariable("id") Integer id) {
-        Optional<InstituteDetail> cpOpt = instituteDetailRepository.findById(id);
-        if (cpOpt.isPresent()) {
-            InstituteDetail cp = cpOpt.get();
-            instituteDetailRepository.deleteById(id);
-            return cp;
-        }
-        return null;
-    }
+	public InstituteDetail deleteUser(@PathVariable("id") Integer id) {
+		Optional<InstituteDetail> cpOpt = instituteDetailRepository.findById(id);
+		if (cpOpt.isPresent()) {
+			InstituteDetail cp = cpOpt.get();
+			instituteDetailRepository.deleteById(id);
+			return cp;
+		}
+		return null;
+	}
 
 	@PostMapping(value = "/update", consumes = "application/json", produces = "application/json")
 	public InstituteDetail updateInstituteDetail(@RequestBody Map<String, InstituteDetail> payload) {
@@ -122,7 +127,7 @@ public class InstituteDetailController {
 		ObjectMapper mapper = new ObjectMapper()
 				.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
- 		InstituteDetail instituteDetail =  payload.get("values");
+		InstituteDetail instituteDetail = payload.get("values");
 		InstituteDetail saved = instituteDetailRepository.save(instituteDetail);
 
 		return saved;
