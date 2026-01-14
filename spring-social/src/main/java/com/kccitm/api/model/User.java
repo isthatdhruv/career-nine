@@ -36,8 +36,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
  */
 @Entity
 @Table(name = "student_user")
-// @NamedQuery(name = "StudentUser.findAll", query = "SELECT s FROM StudentUser
-// s")
+// @NamedQuery(name = "StudentUser.findAll", query = "SELECT s FROM StudentUsers")
 public class User implements Serializable {
     private static final long serialVersionUID = 1L;
 

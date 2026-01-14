@@ -64,6 +64,19 @@ public class UserController {
         return userRepository.findByName(currentUser.getName());
     }
 
+    @PostMapping(value = "user/auth", headers = "Accept=application/json")
+    public User checkUser(@RequestBody User currentUser) {
+        if (userRepository.findByUsernameAndDobDate(currentUser.getUsername(), currentUser.getDobDate()).isPresent()) {
+
+
+            User user = userRepository.findByUsernameAndDobDate(currentUser.getUsername(), currentUser.getDobDate()).get();
+            user.getId()
+            return user;
+        } else {
+            return null;
+        }
+    }
+
     @GetMapping(value = "user/delete/{id}", headers = "Accept=application/json")
     public User deleteUser(@PathVariable("id") Long userId) {
         User user = userRepository.getOne(userId);
