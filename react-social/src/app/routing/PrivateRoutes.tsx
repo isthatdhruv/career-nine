@@ -52,6 +52,7 @@ import StudentsList from "../pages/StudentInformation/StudentsList";
 import GroupCreatePage from "../pages/dashboard/widgets/CreateNewGroup";
 import StudentCreatePage from "../pages/dashboard/widgets/CreateNewStudent";
 import GroupStudentPage from "../pages/GroupStudent/GroupStudentPage";
+import StudentLoginPage from "../pages/StudentLogin/StudentLoginPage";
 
 const PrivateRoutes = () => {
   const StudentsData = lazy(
@@ -162,6 +163,22 @@ const PrivateRoutes = () => {
         path="/studentAssessment/sections/:sectionId/questions/:questionIndex"
         element={<SectionQuestionPage />}
       />
+      <Route
+          path="/login/reset-password/enter-email"
+          element={
+            <SuspensedView>
+              <LoginEnterEmail />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/student-login"
+          element={
+            <SuspensedView>
+              <StudentLoginPage />
+            </SuspensedView>
+          }
+        />
 
       <Route path="/login" element={<LoginPage />} />
       <Route element={<MasterLayout />}>
@@ -191,14 +208,6 @@ const PrivateRoutes = () => {
             <QuestionaireListPage />
           </SuspensedView>
         } />
-        <Route
-          path="/login/reset-password/enter-email"
-          element={
-            <SuspensedView>
-              <LoginEnterEmail />
-            </SuspensedView>
-          }
-        />
         <Route
           path="/login/reset-password/check-email"
           element={

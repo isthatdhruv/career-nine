@@ -1,5 +1,6 @@
 package com.kccitm.api.repository;
 
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,4 +25,5 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     public Optional<User> findById(Long id);
 
+    Optional<User> findByUsernameAndDobDate(String username, Date dobDate);
 }
