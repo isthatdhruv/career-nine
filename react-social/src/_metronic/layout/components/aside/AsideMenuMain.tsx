@@ -44,6 +44,13 @@ export function AsideMenuMain() {
       />
 
       <AsideMenuItem
+        to="/group-student"
+        icon="/media/icons/duotune/general/gen044.svg"
+        title="Group Student Information"
+        fontIcon="bi-app-indicator"
+      />
+
+      <AsideMenuItem
         to="/tools"
         icon="/media/icons/duotune/general/gen044.svg"
         title="Tools"

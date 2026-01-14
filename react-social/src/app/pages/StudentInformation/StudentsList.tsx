@@ -142,7 +142,7 @@ export default function Users() {
           {/* ADD STUDENT BUTTON */}
           <button
             className="btn btn-sm btn-primary"
-            onClick={() => navigate("/school/student/create")}
+            onClick={() => navigate("/student/registration-form")}
           >
             + Add Student
           </button>

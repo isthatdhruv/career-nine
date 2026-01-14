@@ -73,17 +73,6 @@ const CollegePage = () => {
                     </div>
                   </IconContext.Provider>
                 </Button>
-
-                <Button
-                  variant="outline-primary"
-                  onClick={() => navigate("/students")}
-                >
-                  <IconContext.Provider value={{ style: { paddingBottom: "4px" } }}>
-                    <div>
-                      Add Student <MdPersonAdd size={20} />
-                    </div>
-                  </IconContext.Provider>
-                </Button>
               </div>
             </div>
           </div>
