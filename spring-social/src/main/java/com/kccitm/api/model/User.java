@@ -2,6 +2,7 @@ package com.kccitm.api.model;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -26,6 +27,7 @@ import javax.validation.constraints.NotNull;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 /**
@@ -43,16 +45,23 @@ public class User implements Serializable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String name;
 
     @Email
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String email;
+
+    @Column(nullable = true)
+    @JsonFormat(pattern = "dd-MM-yyyy")
+    private Date dobDate;
+
+    @Column(nullable = true)
+    private String username;
 
     private String imageUrl;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private Boolean emailVerified = false;
 
     @JsonIgnore
@@ -77,13 +86,8 @@ public class User implements Serializable {
     private List<UserRoleGroupMapping> userRoleGroupMappings;
 
     @ManyToMany
-    @JoinTable(
-        name = "user_group_mapping",
-        joinColumns = @JoinColumn(name = "user_id"),
-        inverseJoinColumns = @JoinColumn(name = "group_id")
-    )
+    @JoinTable(name = "user_group_mapping", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "group_id"))
     private Set<Group> groups = new HashSet<>();
-
 
     @Transient
     private List<String> authorityUrls;
@@ -101,8 +105,14 @@ public class User implements Serializable {
 
     }
 
+    public User(int username, Date dobDate) {
+        this.username = username + "";
+        this.dobDate = dobDate;
+        this.provider = AuthProvider.custom_student;
+    }
+
     public User(Faculty r) {
-        this.name = r.getFirstName()+" "+r.getLastName();
+        this.name = r.getFirstName() + " " + r.getLastName();
         this.email = r.getOfficialEmailAddress();
 
     }
@@ -129,6 +139,22 @@ public class User implements Serializable {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public Date getDobDate() {
+        return dobDate;
+    }
+
+    public void setDobDate(Date dobDate) {
+        this.dobDate = dobDate;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
     }
 
     public String getEmail() {
@@ -247,11 +273,12 @@ public class User implements Serializable {
     public void setGoogleUserData(com.google.api.services.directory.model.User googleUserData) {
         this.googleUserData = googleUserData;
     }
-    
-public Set<Group> getGroups() {
-    return groups;
-}
-public void setGroups(Set<Group> groups) {
-    this.groups = groups;
-}
+
+    public Set<Group> getGroups() {
+        return groups;
+    }
+
+    public void setGroups(Set<Group> groups) {
+        this.groups = groups;
+    }
 }
