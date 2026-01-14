@@ -51,6 +51,8 @@ import QuestionaireListPage from "../pages/CreateAssessment/components/questiona
 import StudentsList from "../pages/StudentInformation/StudentsList";
 import GroupCreatePage from "../pages/dashboard/widgets/CreateNewGroup";
 import StudentCreatePage from "../pages/dashboard/widgets/CreateNewStudent";
+import GroupStudentPage from "../pages/GroupStudent/GroupStudentPage";
+
 const PrivateRoutes = () => {
   const StudentsData = lazy(
     () => import("../pages/UniversityResult/StudentData")
@@ -236,6 +238,12 @@ const PrivateRoutes = () => {
         <Route path="/school/student/create" element={
           <SuspensedView>
             <StudentCreatePage />
+          </SuspensedView>
+        } />
+
+        <Route path="/group-student" element={
+          <SuspensedView>
+            <GroupStudentPage />
           </SuspensedView>
         } />
 
