@@ -12,9 +12,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.career9.StudentInfo;
+import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.model.User;
+import com.kccitm.api.repository.Career9.UserStudentRepository;
 
 @RestController
 @RequestMapping("/student-info")
@@ -23,6 +25,8 @@ public class StudentInfoController {
     private UserRepository userRepository;
     @Autowired
     private StudentInfoRepository studentInfoRepository;
+    @Autowired
+    private UserStudentRepository userStudentRepository;
 
     @GetMapping("/getAll")
     public List<StudentInfo> getAllStudentInfo() {
@@ -35,6 +39,8 @@ public class StudentInfoController {
             User user = userRepository.save(new User((int) (Math.random() * 1000),
                     studentInfo.getStudentDob()));
             studentInfo.setUser(user);
+            // UserStudent userStudent = new UserStudent(user, studentInfo);
+            // userStudentRepository.save(userStudent);
             return studentInfoRepository.save(studentInfo);
         } catch (Exception e) {
             System.out.println(e);

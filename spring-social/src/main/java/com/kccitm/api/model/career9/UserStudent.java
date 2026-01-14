@@ -13,6 +13,7 @@ import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.google.api.services.directory.model.User;
 import com.kccitm.api.model.Student;
 import com.kccitm.api.model.career9.school.InstituteDetail;
 
@@ -35,9 +36,9 @@ public class UserStudent implements Serializable {
     private InstituteDetail institute;
 
     // Student Detail Id
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "student_detail_id", referencedColumnName = "college_enrollment_number", nullable = false)
-    private Student testingStudent;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "student_detail_id", referencedColumnName = "student_id", nullable = false)
+    private StudentInfo studentInfo;
 
     // User ID
     @Column(name = "user_id", nullable = false)
@@ -59,12 +60,12 @@ public class UserStudent implements Serializable {
         this.institute = institute;
     }
 
-    public Student getTestingStudent() {
-        return testingStudent;
+    public StudentInfo getStudentInfo() {
+        return studentInfo;
     }
 
-    public void setTestingStudent(Student testingStudent) {
-        this.testingStudent = testingStudent;
+    public void setStudentInfo(StudentInfo studentInfo) {
+        this.studentInfo = studentInfo;
     }
 
     public Long getUserId() {

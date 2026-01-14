@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button, Modal, Alert, Spinner } from "react-bootstrap";
 import { MDBDataTableV5 } from "mdbreact";
 import * as XLSX from "xlsx";
 import { setData } from "./StudentDataComputationExcel";
 import { SchoolOMRRow } from "./DataStructure";
 import { addStudentInfo, StudentInfo } from "../StudentInformation/StudentInfo_APIs";
+import { ReadCollegeData } from "../College/API/College_APIs";
 
 /* ================= MASTER SCHEMA ================= */
 
@@ -46,6 +47,25 @@ export default function UploadExcelFile() {
     columns: any[];
     rows: SchoolOMRRow[];
   }>({ columns: [], rows: [] });
+
+  const [institutes, setInstitutes] = useState<any[]>([]);
+  const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
+
+  useEffect(() => {
+    ReadCollegeData()
+      .then((res: any) => {
+        // Assuming API returns array in res.data or res.data.data - adjust based on actual response structure
+        // Typically axios returns data in .data
+        // Looking at CollegeTable, it uses props.data. 
+        // Let's assume res.data is the list or check structure. 
+        // College_APIs.ts uses axios.get(readCollege).
+        // Safely extract list
+        const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+        console.log("Fetched Institutes:", list);
+        setInstitutes(list);
+      })
+      .catch((err: any) => console.error("Failed to fetch institutes", err));
+  }, []);
 
   /* ================= FILE UPLOAD ================= */
 
@@ -111,6 +131,26 @@ export default function UploadExcelFile() {
     setShowMapping(false);
   };
 
+  /* ================= DATE FORMATTER ================= */
+
+  const formatDate = (val: any): string => {
+      if (!val) return "";
+      let date;
+      // Excel serial date number
+      if (typeof val === 'number') {
+          date = new Date((val - 25569) * 86400 * 1000); 
+      } else {
+          // Attempt string parse
+          const parsed = Date.parse(val);
+          if (!isNaN(parsed)) date = new Date(parsed);
+      }
+
+      if (date && !isNaN(date.getTime())) {
+          return `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
+      }
+      return String(val);
+  };
+
   /* ================= SUBMIT ================= */
 
   const handleSubmit = async () => {
@@ -120,13 +160,21 @@ export default function UploadExcelFile() {
 
     const uploadPromises = rawExcelData.map(async (row) => {
       const obj = { ...DEFAULT_SCHEMA_OBJECT };
+      if (selectedInstitute) {
+          obj.institue_id = Number(selectedInstitute);
+      }
       let isValid = true;
 
       Object.entries(columnMap).forEach(([excelCol, schemaField]) => {
         if (schemaField) {
           const val = row[excelCol];
-          obj[schemaField] = val ?? ""; // Send empty string if undefined/null
           
+          if (schemaField === "studentDob" && val) {
+              obj[schemaField] = formatDate(val);
+          } else {
+              obj[schemaField] = val ?? "";
+          }
+
           // Validation: Check for "ERROR" in specific fields
           if (schemaField==="studentDob" && (val===""||val==="Null"||val==="null")) {
               isValid = false;
@@ -155,7 +203,24 @@ export default function UploadExcelFile() {
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      <Button onClick={() => setShowModal(true)}>Upload Excel</Button>
+      <div className="flex items-center gap-3 mb-3">
+          <select 
+            className="form-select w-auto"
+            value={selectedInstitute}
+            onChange={(e) => {
+                console.log("Selected value:", e.target.value);
+                setSelectedInstitute(e.target.value ? Number(e.target.value) : "");
+            }}
+          >
+              <option value="">-- Select Institute --</option>
+              {institutes.map((inst) => (
+                  <option key={inst.instituteCode} value={inst.instituteCode}>
+                      {inst.instituteName}
+                  </option>
+              ))}
+          </select>
+          <Button onClick={() => setShowModal(true)}>Upload Excel</Button>
+      </div>
       {fileName && <span className="ms-2 mt-2">✅ {fileName}</span>}
 
       <Modal show={showModal} onHide={() => setShowModal(false)} centered>
@@ -216,7 +281,7 @@ export default function UploadExcelFile() {
             </div>
 
           <div className="mt-4 flex justify-end">
-            <Button variant="success" onClick={handleSubmit} disabled={uploading}>
+            <Button variant="success" onClick={handleSubmit} disabled={uploading || !selectedInstitute}>
               {/* {uploading ? <Spinner animation="border" size="sm" /> : "Submit Valid Students"} */}
             </Button>
           </div>
