@@ -18,7 +18,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 @Table(name = "student_assessment_mapping")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class StudentAssessmentMapping implements Serializable {
-
     private static final long serialVersionUID = 1L;
 
     // Primary Key
@@ -35,6 +34,14 @@ public class StudentAssessmentMapping implements Serializable {
     // Assessment ID
     @Column(name = "assessment_id", nullable = false)
     private Long assessmentId;
+
+    public StudentAssessmentMapping(Long userStudent, Long assessmentId) {
+        this.userStudent = new UserStudent(userStudent);
+        this.assessmentId = assessmentId;
+    }
+
+    public StudentAssessmentMapping() {
+    }
 
     public Long getStudentAssessmentId() {
         return studentAssessmentId;

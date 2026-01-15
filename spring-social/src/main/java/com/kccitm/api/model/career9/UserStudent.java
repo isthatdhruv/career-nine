@@ -37,12 +37,28 @@ public class UserStudent implements Serializable {
 
     // Student Detail Id
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "student_detail_id", referencedColumnName = "student_id", nullable = false)
+    @JoinColumn(name = "id", referencedColumnName = "id", nullable = false)
     private StudentInfo studentInfo;
 
     // User ID
     @Column(name = "user_id", nullable = false)
     private Long userId;
+
+    public UserStudent(com.kccitm.api.model.User user, StudentInfo studentInfo2, InstituteDetail institue_id) {
+        // TODO Auto-generated constructor stub
+        this.userId = user.getId();
+        this.studentInfo = studentInfo2;
+        this.institute = institue_id;
+    }
+
+    public UserStudent(Long userStudent) {
+        // TODO Auto-generated constructor stub
+        this.userStudentId = userStudent;
+    }
+
+    public UserStudent() {
+
+    }
 
     public Long getUserStudentId() {
         return userStudentId;

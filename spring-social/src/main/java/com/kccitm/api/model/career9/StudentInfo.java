@@ -39,6 +39,9 @@ public class StudentInfo implements Serializable {
     @Transient
     private String institue_id;
 
+    @Transient
+    private String assesment_id;
+
     @JsonFormat(pattern = "dd-MM-yyyy")
     private Date studentDob;
 
@@ -118,4 +121,13 @@ public class StudentInfo implements Serializable {
     public void setInstitue_id(String institue_id) {
         this.institue_id = institue_id;
     }
+
+    public String getAssesment_id() {
+        return assesment_id;
+    }
+
+    public void setAssesment_id(String assesment_id) {
+        this.assesment_id = assesment_id;
+    }
+
 }

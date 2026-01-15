@@ -15,7 +15,11 @@ import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.RoleRoleGroupMapping;
 import com.kccitm.api.model.User;
 import com.kccitm.api.model.UserRoleGroupMapping;
+import com.kccitm.api.model.career9.StudentAssessmentMapping;
+import com.kccitm.api.model.career9.UserStudent;
+import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
+import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.security.CurrentUser;
 import com.kccitm.api.security.UserPrincipal;
 
@@ -24,6 +28,12 @@ public class UserController {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private UserStudentRepository userStudentRepository;
+
+    @Autowired
+    private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
 
     @GetMapping("/user/me")
     // @PreAuthorize("hasAuthority('USER_ME')")
@@ -65,13 +75,19 @@ public class UserController {
     }
 
     @PostMapping(value = "user/auth", headers = "Accept=application/json")
-    public User checkUser(@RequestBody User currentUser) {
+    public Long checkUser(@RequestBody User currentUser) {
         if (userRepository.findByUsernameAndDobDate(currentUser.getUsername(), currentUser.getDobDate()).isPresent()) {
+            User user = userRepository.findByUsernameAndDobDate(currentUser.getUsername(), currentUser.getDobDate())
+                    .get();
+            if (userStudentRepository.getByUserId(user.getId()).isPresent()) {
 
-
-            User user = userRepository.findByUsernameAndDobDate(currentUser.getUsername(), currentUser.getDobDate()).get();
-            user.getId()
-            return user;
+                UserStudent userStudent = userStudentRepository.getByUserId(user.getId()).get();
+                StudentAssessmentMapping studentAssessmentMapping = studentAssessmentMappingRepository
+                        .getByUserStudent(userStudent);
+                return studentAssessmentMapping.getAssessmentId();
+            } else {
+                return null;
+            }
         } else {
             return null;
         }
