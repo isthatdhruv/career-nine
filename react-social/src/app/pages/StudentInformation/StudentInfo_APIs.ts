@@ -10,6 +10,7 @@ export interface StudentInfo {
     phoneNumber?: number;
     email?: string;
     address?: string;
+    institue_id?: number;
 }
 
 export function getAllStudentInfo() {

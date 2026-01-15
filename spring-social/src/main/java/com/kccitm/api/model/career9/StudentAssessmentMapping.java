@@ -17,7 +17,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 @Entity
 @Table(name = "student_assessment_mapping")
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class StudentAssessment implements Serializable {
+public class StudentAssessmentMapping implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
@@ -29,20 +29,12 @@ public class StudentAssessment implements Serializable {
 
     // Student Id
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(
-        name = "user_student_id",
-        referencedColumnName = "user_student_id",
-        nullable = false
-    )
+    @JoinColumn(name = "user_student_id", referencedColumnName = "user_student_id", nullable = false)
     private UserStudent userStudent;
 
     // Assessment ID
     @Column(name = "assessment_id", nullable = false)
     private Long assessmentId;
-
-    // Status
-    @Column(name = "status", nullable = false)
-
 
     public Long getStudentAssessmentId() {
         return studentAssessmentId;
@@ -69,10 +61,10 @@ public class StudentAssessment implements Serializable {
     }
 
     // public String getStatus() {
-    //     return status;
+    // return status;
     // }
 
     // public void setStatus(String status) {
-    //     this.status = status;
+    // this.status = status;
     // }
 }

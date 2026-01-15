@@ -2,6 +2,7 @@ package com.kccitm.api.model.career9;
 
 import java.io.Serializable;
 import java.util.Date;
+import com.fasterxml.jackson.annotation.JsonFormat;
 
 import javax.persistence.CascadeType;
 import javax.persistence.Entity;
@@ -11,6 +12,7 @@ import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.OneToOne;
 import javax.persistence.Table;
+import javax.persistence.Transient;
 
 import com.kccitm.api.model.Difficulty;
 import com.kccitm.api.model.User;
@@ -34,12 +36,17 @@ public class StudentInfo implements Serializable {
 
     private String address;
 
+    @Transient
+    private String institue_id;
+
+    @JsonFormat(pattern = "dd-MM-yyyy")
     private Date studentDob;
 
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "user_id")
     private User user;
 
+    @JsonFormat(pattern = "dd-MM-yyyy")
     public Date getStudentDob() {
         return studentDob;
     }
@@ -102,5 +109,13 @@ public class StudentInfo implements Serializable {
 
     public void setUser(User user) {
         this.user = user;
+    }
+
+    public String getInstitue_id() {
+        return institue_id;
+    }
+
+    public void setInstitue_id(String institue_id) {
+        this.institue_id = institue_id;
     }
 }
