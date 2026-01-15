@@ -53,6 +53,7 @@ import GroupCreatePage from "../pages/dashboard/widgets/CreateNewGroup";
 import StudentCreatePage from "../pages/dashboard/widgets/CreateNewStudent";
 import GroupStudentPage from "../pages/GroupStudent/GroupStudentPage";
 import StudentLoginPage from "../pages/StudentLogin/StudentLoginPage";
+import AllottedAssessmentPage from "../pages/StudentLogin/AllottedAssessmentPage";
 
 const PrivateRoutes = () => {
   const StudentsData = lazy(
@@ -162,6 +163,11 @@ const PrivateRoutes = () => {
       <Route
         path="/studentAssessment/sections/:sectionId/questions/:questionIndex"
         element={<SectionQuestionPage />}
+      />
+
+      <Route
+        path="/allotted-assessment"
+        element={<AllottedAssessmentPage />}
       />
       <Route
           path="/login/reset-password/enter-email"

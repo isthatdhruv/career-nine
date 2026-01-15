@@ -17,9 +17,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.career9.Questionaire.Questionnaire;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireLanguage;
-import com.kccitm.api.model.career9.Questionaire.QuestionnaireSection;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
+import com.kccitm.api.model.career9.Questionaire.QuestionnaireSection;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireSectionInstruction;
+import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireRepository;
 
 @RestController
@@ -28,6 +29,15 @@ public class QuestionnaireController {
 
     @Autowired
     private QuestionnaireRepository questionnaireRepository;
+
+    @Autowired
+    private AssessmentTableRepository assessmentTableRepository;
+
+    @PostMapping("/questionnaire-lelo")
+    public Questionnaire questionnaireLelo(@RequestBody Long assessmentTableId) {
+        return questionnaireRepository.findById(assessmentTableId)
+                .orElse(null);
+    }
 
     @PostMapping("/create")
     public ResponseEntity<Questionnaire> create(

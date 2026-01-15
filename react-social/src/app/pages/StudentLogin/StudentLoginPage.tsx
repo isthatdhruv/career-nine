@@ -82,8 +82,9 @@ const StudentLoginPage: React.FC = () => {
         if (response.ok) {
           const data = await response.json();
           console.log('Login successful:', data);
+          localStorage.setItem('Assessment id', data);
           // Navigate to the next page
-          window.location.href = '/studentAssessment';
+          window.location.href = '/allotted-assessment';
         } else {
           console.error('Login failed:', response.statusText);
           alert('Invalid credentials. Please try again.');
