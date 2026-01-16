@@ -22,24 +22,24 @@ import com.kccitm.api.model.career9.QuestionSection;
 // @JsonIgnoreProperties(ignoreUnknown = true)
 public class QuestionnaireSection {
 
-    //primary key questionnaire_section_id
-   @Id
-   @GeneratedValue(strategy = GenerationType.IDENTITY)
-   @Column(name = "questionnaire_section_id")
-   private Long questionnaireSectionId;
+    // primary key questionnaire_section_id
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "questionnaire_section_id")
+    private Long questionnaireSectionId;
 
-   // Foreign key to section table
+    // Foreign key to section table
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "section_id") 
+    @JoinColumn(name = "section_id")
     private QuestionSection section;
 
     // Foreign key to section table
     // @OneToMany(fetch = FetchType.EAGER)
     // @JoinColumn(name = "questionnaire_section_instruction_id")
-    // private List<QuestionnaireSectionInstruction> questionnaire_section_instruction;
+    // private List<QuestionnaireSectionInstruction>
+    // questionnaire_section_instruction;
     // changed to Set and LAZY to avoid MultipleBagFetchException
-    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    @JoinColumn(name = "questionnaire_section_id") // FK column on child pointing back to this entity
+    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true, mappedBy = "section")
     private Set<QuestionnaireSectionInstruction> questionnaire_section_instruction;
 
     // Foreign key to questionnaire table
@@ -48,8 +48,7 @@ public class QuestionnaireSection {
     @JsonIgnore
     private Questionnaire questionnaire;
 
-    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    @JoinColumn(name = "questionnaire_section_id") // FK column on child pointing back to this entity
+    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true, mappedBy = "section")
     private Set<QuestionnaireQuestion> question;
 
     // use non-reserved column name
@@ -77,7 +76,7 @@ public class QuestionnaireSection {
         return this.questionnaire_section_instruction;
     }
 
-    public void setInstruction(Set<QuestionnaireSectionInstruction> instruction ) {
+    public void setInstruction(Set<QuestionnaireSectionInstruction> instruction) {
         this.questionnaire_section_instruction = instruction;
     }
 

@@ -6,6 +6,7 @@ import * as Yup from "yup";
 import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
 import { CreateQuestionData, ReadMeasuredQualityTypes } from "../API/Question_APIs";
 import { MQT } from "./MeasuredQualityTypesAsOptionComponent";
+import { ListGamesData } from "../../Games/components/API/GAME_APIs";
 
 const validationSchema = Yup.object().shape({
   questionText: Yup.string().required("Question text is required"),
@@ -32,6 +33,11 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
   const [optionTypes, setOptionTypes] = useState<{ [key: number]: 'text' | 'image' }>({});
   // State for storing Base64 image data per option index
   const [optionImages, setOptionImages] = useState<{ [key: number]: string }>({});
+
+  // Game as option states
+  const [useGameAsOption, setUseGameAsOption] = useState(false);
+  const [games, setGames] = useState<any[]>([]);
+  const [selectedGameId, setSelectedGameId] = useState<string>("");
 
   const initialValues = {
     questionText: "",
@@ -139,40 +145,86 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
     fetchMQT();
   }, []);
 
+  // Fetch games on mount
   useEffect(() => {
-    if (!useMQTAsOptions) {
+    const fetchGames = async () => {
+      try {
+        const response = await ListGamesData();
+        setGames(response.data);
+      } catch {
+        setGames([]);
+      }
+    };
+    fetchGames();
+  }, []);
+
+  // Reset form when useGameAsOption changes
+  useEffect(() => {
+    if (useGameAsOption) {
+      setFormikValues(v => ({ ...v, questionOptions: [] }));
+      setOptionMeasuredQualities({});
+      setUseMQTAsOptions(false);
+    } else {
+      setSelectedGameId("");
+    }
+  }, [useGameAsOption]);
+
+  useEffect(() => {
+    if (!useMQTAsOptions && !useGameAsOption) {
       setFormikValues(v => ({ ...v, questionOptions: [""] }));
       setOptionMeasuredQualities({});
     }
-  }, [useMQTAsOptions]);
+  }, [useMQTAsOptions, useGameAsOption]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const options = formikValues.questionOptions.map((option: any, index: number) => {
-        // Check if this option is in image mode
-        const isImageMode = optionTypes[index] === 'image';
-        
-        // Handle both cases: when useMQTAsOptions is true (options are objects) and false (options are strings)
-        const optionText = isImageMode ? null : (typeof option === 'string' ? option : option.optionText);
-        const optionImageBase64 = isImageMode ? (optionImages[index] || null) : null;
-        const optionScores: any[] = [];
-        
-        if (optionMeasuredQualities[index]) {
-          Object.entries(optionMeasuredQualities[index]).forEach(([typeId, val]: any) => {
-            if (val.checked) {
-              optionScores.push({
-                score: val.score || 1,
-                measuredQualityType: {
-                  measuredQualityTypeId: Number(typeId)
-                }
-              });
-            }
-          });
-        }
-        return { optionText, optionImageBase64, optionScores, correct: false };
-      });
+      let options: any[] = [];
+
+      if (useGameAsOption && selectedGameId) {
+        // Game as option mode - single option with game reference
+        options = [{
+          optionText: null,
+          optionImageBase64: null,
+          optionScores: [],
+          correct: false,
+          isGame: true,
+          game: { gameId: Number(selectedGameId) }
+        }];
+      } else {
+        // Regular options mode
+        options = formikValues.questionOptions.map((option: any, index: number) => {
+          // Check if this option is in image mode
+          const isImageMode = optionTypes[index] === 'image';
+          
+          // Handle both cases: when useMQTAsOptions is true (options are objects) and false (options are strings)
+          const optionText = isImageMode ? null : (typeof option === 'string' ? option : option.optionText);
+          const optionImageBase64 = isImageMode ? (optionImages[index] || null) : null;
+          const optionScores: any[] = [];
+          
+          if (optionMeasuredQualities[index]) {
+            Object.entries(optionMeasuredQualities[index]).forEach(([typeId, val]: any) => {
+              if (val.checked) {
+                optionScores.push({
+                  score: val.score || 1,
+                  measuredQualityType: {
+                    measuredQualityTypeId: Number(typeId)
+                  }
+                });
+              }
+            });
+          }
+          return {
+            optionText,
+            optionImageBase64,
+            optionScores,
+            correct: false,
+            isGame: false,
+            game: null
+          };
+        });
+      }
 
       const payload = {
         questionText: formikValues.questionText,
@@ -189,6 +241,8 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
       setOptionMeasuredQualities({});
       setOptionTypes({});
       setOptionImages({});
+      setSelectedGameId("");
+      setUseGameAsOption(false);
       onHide();
       navigate("/assessment-questions");
     } catch (error) {
@@ -261,7 +315,35 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
           {/* Options */}
           <div className="mb-3">
             <label className="form-label fw-bold">Options:</label>
-            {useMQTAsOptions ? (
+            
+            {/* Game as Option Mode */}
+            {useGameAsOption ? (
+              <div className="p-3 border rounded bg-light">
+                <div className="d-flex align-items-center mb-2">
+                  <span className="me-2 fw-bold">🎮 Select Game:</span>
+                </div>
+                <select
+                  className={clsx("form-control", {
+                    "is-invalid": !selectedGameId,
+                    "is-valid": !!selectedGameId,
+                  })}
+                  value={selectedGameId}
+                  onChange={(e) => setSelectedGameId(e.target.value)}
+                >
+                  <option value="">Select a Game</option>
+                  {games.map((game) => (
+                    <option key={game.gameId} value={game.gameId}>
+                      {game.gameName} (Code: {game.gameCode})
+                    </option>
+                  ))}
+                </select>
+                {selectedGameId && (
+                  <div className="mt-2 text-success small">
+                    ✅ Game selected. This question will launch the selected game.
+                  </div>
+                )}
+              </div>
+            ) : useMQTAsOptions ? (
               <MQT mqt={mqt} formikValues={formikValues} setFormikValues={setFormikValues} />
             ) : (
               formikValues.questionOptions.map((option, index) => {
@@ -377,18 +459,40 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
             />
           </div>
 
-          {/* Use MQT as Options */}
-          <div className="mb-3 form-check">
-            <input
-              type="checkbox"
-              checked={useMQTAsOptions}
-              onChange={() => setUseMQTAsOptions(v => !v)}
-              className="form-check-input"
-              id="useMQTAsOptions"
-            />
-            <label className="form-check-label" htmlFor="useMQTAsOptions">
-              Use Measured Quality Types as Options
-            </label>
+          {/* Use MQT as Options / Use Game as Option */}
+          <div className="mb-3 d-flex gap-4">
+            <div className="form-check">
+              <input
+                type="checkbox"
+                checked={useMQTAsOptions}
+                onChange={() => {
+                  setUseMQTAsOptions(v => !v);
+                  if (!useMQTAsOptions) setUseGameAsOption(false);
+                }}
+                className="form-check-input"
+                id="useMQTAsOptions"
+                disabled={useGameAsOption}
+              />
+              <label className="form-check-label" htmlFor="useMQTAsOptions">
+                Use MQT as Options
+              </label>
+            </div>
+            <div className="form-check">
+              <input
+                type="checkbox"
+                checked={useGameAsOption}
+                onChange={() => {
+                  setUseGameAsOption(v => !v);
+                  if (!useGameAsOption) setUseMQTAsOptions(false);
+                }}
+                className="form-check-input"
+                id="useGameAsOption"
+                disabled={useMQTAsOptions}
+              />
+              <label className="form-check-label" htmlFor="useGameAsOption">
+                🎮 Use Game as Option
+              </label>
+            </div>
           </div>
         </Modal.Body>
         <Modal.Footer>

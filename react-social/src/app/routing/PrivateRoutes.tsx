@@ -24,6 +24,7 @@ import UploadExcelFile from "../pages/UploadExcelFile/UploadExcelFile";
 import Assessments from "../pages/CreateAssessment/Assessment";
 // import AssessmentCreatePage from "../pages/CreateAssessment/components/assessment/AssessmentCreatePage";
 import QuestionareCreateSinglePage from "../pages/CreateAssessment/components/questionaire/QuestionareCreateSinglePage";
+import QuestionareEditSinglePage from "../pages/CreateAssessment/components/questionaire/QuestionareEditSinglePage";
 import AssessmentEditPage from "../pages/CreateAssessment/components/assessment/AssessmentEditandCreatePage";
 import AssessmentToolPage from "../pages/CreateAssessment/components/AssessmentToolPage";
 import AssessmentUploadFile from "../pages/CreateAssessment/components/AssessmentUploadFile";
@@ -54,6 +55,8 @@ import StudentCreatePage from "../pages/dashboard/widgets/CreateNewStudent";
 import GroupStudentPage from "../pages/GroupStudent/GroupStudentPage";
 import StudentLoginPage from "../pages/StudentLogin/StudentLoginPage";
 import AllottedAssessmentPage from "../pages/StudentLogin/AllottedAssessmentPage";
+import GamePage from "../pages/Games/GamePage";
+// import QuestionareEditSinglePage from "../pages/CreateAssessment/components/questionaire/QuestionareEditSinglePage";
 
 const PrivateRoutes = () => {
   const StudentsData = lazy(
@@ -207,6 +210,11 @@ const PrivateRoutes = () => {
         <Route path="/dashboard/school/:id" element={
           <SuspensedView>
             <SchoolDashboardPage />
+          </SuspensedView>
+        } />
+        <Route path="/game-list" element={
+          <SuspensedView>
+            <GamePage />
           </SuspensedView>
         } />
         <Route path="/questionaire/List" element={
@@ -607,6 +615,14 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <QuestionareCreateSinglePage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/questionare/edit/:id"
+          element={
+            <SuspensedView>
+              <QuestionareEditSinglePage />
             </SuspensedView>
           }
         />

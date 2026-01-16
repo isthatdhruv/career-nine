@@ -8,6 +8,7 @@ import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
 import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
 import { CreateQuestionData, ReadMeasuredQualityTypes, ReadQuestionByIdData } from "../API/Question_APIs";
+import { ListGamesData } from "../../Games/components/API/GAME_APIs";
 
 const validationSchema = Yup.object().shape({
   questionText: Yup.string().required("Question text is required"),
@@ -51,6 +52,11 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
   // State for storing Base64 image data per option index
   const [optionImages, setOptionImages] = useState<{ [key: number]: string }>({});
 
+  // Game as option states
+  const [useGameAsOption, setUseGameAsOption] = useState(false);
+  const [games, setGames] = useState<any[]>([]);
+  const [selectedGameId, setSelectedGameId] = useState<string>("");
+
   // Always call this hook at the top level, not conditionally
   useEffect(() => {
     if (questionData.options && questionData.options.length > 0) {
@@ -81,6 +87,12 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
             : `data:image/png;base64,${option.optionImageBase64}`;
         } else {
           types[idx] = 'text';
+        }
+        
+        // Check if this is a game option
+        if (option.isGame && option.game) {
+          setUseGameAsOption(true);
+          setSelectedGameId(String(option.game.gameId));
         }
       });
       
@@ -278,6 +290,20 @@ useEffect(() => {
   fetchMeasuredQualityTypes();
 }, []);
 
+// Fetch games on mount
+useEffect(() => {
+  const fetchGames = async () => {
+    try {
+      const response = await ListGamesData();
+      setGames(response.data);
+    } catch (error) {
+      console.error("Error fetching games:", error);
+      setGames([]);
+    }
+  };
+  fetchGames();
+}, []);
+
 
 // ✅ Keep using useFormik but with enhanced initial values
 const formik = useFormik({
@@ -318,29 +344,47 @@ const formik = useFormik({
       // Sort options by sequence before processing
       const sortedOptions = [...values.options].sort((a, b) => a.sequence - b.sequence);
       
-      // Build options array with optionScores from optionMeasuredQualities
-      const options = sortedOptions.map((option: any, idx: number) => {
-        // Check if this option is in image mode
-        const isImageMode = optionTypes[idx] === 'image';
-        
-        const qualities = optionMeasuredQualities[idx] || {};
-        const optionScores = Object.entries(qualities)
-          .filter(([_, v]) => v && v.checked)
-          .map(([typeId, v]) => ({
-            score: v.score,
-            question_option: option.optionId ? { optionId: option.optionId } : {},
-            measuredQualityType: { measuredQualityTypeId: Number(typeId) },
-          }));
-        return {
-          optionText: isImageMode ? null : option.optionText,
-          optionImageBase64: isImageMode ? (optionImages[idx] || null) : null,
-          description: option.description || "",
-          optionScores,
-          correct: option.correct ?? false,
-          sequence: option.sequence,
-          ...(option.optionId ? { optionId: option.optionId } : {}),
-        };
-      });
+      let options: any[] = [];
+      
+      if (useGameAsOption && selectedGameId) {
+        // Game as option mode - single option with game reference
+        options = [{
+          optionText: null,
+          optionImageBase64: null,
+          description: "",
+          optionScores: [],
+          correct: false,
+          sequence: 1,
+          isGame: true,
+          game: { gameId: Number(selectedGameId) }
+        }];
+      } else {
+        // Build options array with optionScores from optionMeasuredQualities
+        options = sortedOptions.map((option: any, idx: number) => {
+          // Check if this option is in image mode
+          const isImageMode = optionTypes[idx] === 'image';
+          
+          const qualities = optionMeasuredQualities[idx] || {};
+          const optionScores = Object.entries(qualities)
+            .filter(([_, v]) => v && v.checked)
+            .map(([typeId, v]) => ({
+              score: v.score,
+              question_option: option.optionId ? { optionId: option.optionId } : {},
+              measuredQualityType: { measuredQualityTypeId: Number(typeId) },
+            }));
+          return {
+            optionText: isImageMode ? null : option.optionText,
+            optionImageBase64: isImageMode ? (optionImages[idx] || null) : null,
+            description: option.description || "",
+            optionScores,
+            correct: option.correct ?? false,
+            sequence: option.sequence,
+            isGame: false,
+            game: null,
+            ...(option.optionId ? { optionId: option.optionId } : {}),
+          };
+        });
+      }
 
       const payload = {
         id: values.id,
@@ -590,8 +634,52 @@ return (
           {/* Options - Manual implementation since FieldArray won't work with useFormik */}
             <div className="fv-row mb-7">
             <label className="required fs-6 fw-bold mb-2">Options:</label>
-
-            {/* Options Table */}
+            
+            {/* Game as Option checkbox */}
+            <div className="mb-3 d-flex gap-4">
+              <div className="form-check">
+                <input
+                  type="checkbox"
+                  checked={useGameAsOption}
+                  onChange={() => setUseGameAsOption(v => !v)}
+                  className="form-check-input"
+                  id="useGameAsOptionEdit"
+                />
+                <label className="form-check-label" htmlFor="useGameAsOptionEdit">
+                  🎮 Use Game as Option
+                </label>
+              </div>
+            </div>
+            
+            {/* Game Selection Dropdown */}
+            {useGameAsOption ? (
+              <div className="p-3 border rounded bg-light mb-3">
+                <div className="d-flex align-items-center mb-2">
+                  <span className="me-2 fw-bold">🎮 Select Game:</span>
+                </div>
+                <select
+                  className={clsx("form-control form-control-lg form-control-solid", {
+                    "is-invalid text-danger": !selectedGameId,
+                    "is-valid": !!selectedGameId,
+                  })}
+                  value={selectedGameId}
+                  onChange={(e) => setSelectedGameId(e.target.value)}
+                >
+                  <option value="">Select a Game</option>
+                  {games.map((game) => (
+                    <option key={game.gameId} value={game.gameId}>
+                      {game.gameName} (Code: {game.gameCode})
+                    </option>
+                  ))}
+                </select>
+                {selectedGameId && (
+                  <div className="mt-2 text-success">
+                    ✅ Game selected. This question will launch the selected game as an option.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
             <div className="table-responsive">
               <table className="table table-row-bordered">
                 <thead>
@@ -771,6 +859,8 @@ return (
                   <span role="alert">{formik.errors.options}</span>
                 </div>
               </div>
+            )}
+              </>
             )}
           </div>
 

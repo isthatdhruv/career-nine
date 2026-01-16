@@ -25,7 +25,7 @@ export function CreateQuestionaire(questionaire: any) {
 }
 
 export function UpdateQuestionaire(id: string, questionaire: any) {
-  return axios.put(updateQuestionaire + id, questionaire);
+  return axios.put(`${updateQuestionaire}/${id}`, questionaire);
 }
 
 export function DeleteQuestionaire(id: string) {

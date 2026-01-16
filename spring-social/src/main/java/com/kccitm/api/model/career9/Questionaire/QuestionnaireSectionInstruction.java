@@ -16,13 +16,13 @@ import com.kccitm.api.model.career9.LanguagesSupported;
 @Entity
 @Table(name = "Questionnaire_Section_Instruction")
 public class QuestionnaireSectionInstruction {
-    //primary key questionnaire_section_instruction_id
-   @Id
-   @GeneratedValue(strategy = GenerationType.IDENTITY)
-   @Column(name = "questionnaire_section_instruction_id")
-   private Long questionnaireSectionInstructionId;
+    // primary key questionnaire_section_instruction_id
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "questionnaire_section_instruction_id")
+    private Long questionnaireSectionInstructionId;
 
-   // Foreign key to QuestionnaireSection table
+    // Foreign key to QuestionnaireSection table
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "questionnaire_section_id") // explicit join column to avoid auto-generated column name
     @JsonIgnore
@@ -44,7 +44,7 @@ public class QuestionnaireSectionInstruction {
         this.instructionText = instructionText;
     }
 
-   public Long getQuestionnaireSectionInstructionId() {
+    public Long getQuestionnaireSectionInstructionId() {
         return this.questionnaireSectionInstructionId;
     }
 

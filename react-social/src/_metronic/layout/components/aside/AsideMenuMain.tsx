@@ -42,6 +42,12 @@ export function AsideMenuMain() {
         title="Add Contact Person Information"
         fontIcon="bi-app-indicator"
       />
+      <AsideMenuItem
+        to="/game-list"
+        icon="/media/icons/duotune/general/gen044.svg"
+        title="Game List"
+        fontIcon="bi-app-indicator"
+      />
 
       <AsideMenuItem
         to="/group-student"

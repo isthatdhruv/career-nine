@@ -31,7 +31,6 @@ import com.kccitm.api.repository.Career9.AssessmentQuestionRepository;
 import com.kccitm.api.repository.Career9.MeasuredQualityTypesRepository;
 import com.kccitm.api.repository.Career9.QuestionSectionRepository;
 
-
 @RestController
 @RequestMapping("/assessment-questions")
 public class AssessmentQuestionController {
@@ -54,7 +53,9 @@ public class AssessmentQuestionController {
         try {
             if (Files.exists(CACHE_FILE) && Files.size(CACHE_FILE) > 0) {
                 ObjectMapper mapper = new ObjectMapper();
-                List<AssessmentQuestions> cached = mapper.readValue(CACHE_FILE.toFile(), new TypeReference<List<AssessmentQuestions>>() {});
+                List<AssessmentQuestions> cached = mapper.readValue(CACHE_FILE.toFile(),
+                        new TypeReference<List<AssessmentQuestions>>() {
+                        });
                 return Optional.ofNullable(cached);
             }
         } catch (IOException e) {
@@ -79,18 +80,20 @@ public class AssessmentQuestionController {
 
     private List<AssessmentQuestions> fetchAndTransformFromDb() {
         List<AssessmentQuestions> assementQuestionsObject = assessmentQuestionRepository.findAll();
-        assementQuestionsObject.iterator().forEachRemaining(assmentQuestion->{
-            assmentQuestion.getOptions().iterator().forEachRemaining(option->{
-                option.getOptionScores().iterator().forEachRemaining(score->{
-                    score.setMeasuredQualityType(new MeasuredQualityTypes(score.getMeasuredQualityType().getMeasuredQualityTypeId()));
+        assementQuestionsObject.iterator().forEachRemaining(assmentQuestion -> {
+            assmentQuestion.getOptions().iterator().forEachRemaining(option -> {
+                option.getOptionScores().iterator().forEachRemaining(score -> {
+                    score.setMeasuredQualityType(
+                            new MeasuredQualityTypes(score.getMeasuredQualityType().getMeasuredQualityTypeId()));
                     score.setQuestion_option(new AssessmentQuestionOptions(score.getQuestion_option().getOptionId()));
                 });
-            }); 
+            });
         });
         return assementQuestionsObject;
     }
 
-    // When called: return cached JSON if present, otherwise fetch from DB, cache it and return.
+    // When called: return cached JSON if present, otherwise fetch from DB, cache it
+    // and return.
     @GetMapping("/getAll")
     public List<AssessmentQuestions> getAllAssessmentQuestions() {
         try {
@@ -116,25 +119,28 @@ public class AssessmentQuestionController {
     }
 
     @PostMapping(value = "/create", consumes = "application/json")
-    public AssessmentQuestions createAssessmentQuestion(@RequestBody AssessmentQuestions assessmentQuestions) throws Exception{
-        AssessmentQuestions assementQustionObject ;
-        for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
-            option.setQuestion(assessmentQuestions); // set parent question
-            if (option.getOptionScores() != null) {
-                for (OptionScoreBasedOnMEasuredQualityTypes score : option.getOptionScores()) {
-                    score.setQuestion_option(option); // set parent option
+    public AssessmentQuestions createAssessmentQuestion(@RequestBody AssessmentQuestions assessmentQuestions)
+            throws Exception {
+        // Wire up relationships and clean references before saving
+        if (assessmentQuestions.getOptions() != null) {
+            for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
+                option.setQuestion(assessmentQuestions); // set parent question
+                if (option.getOptionScores() != null) {
+                    for (OptionScoreBasedOnMEasuredQualityTypes score : option.getOptionScores()) {
+                        score.setQuestion_option(option); // set parent option
+                        // Ensure MeasuredQualityType has a clean reference object (just ID) to satisfy
+                        // FK constraint
+                        if (score.getMeasuredQualityType() != null
+                                && score.getMeasuredQualityType().getMeasuredQualityTypeId() != null) {
+                            score.setMeasuredQualityType(new MeasuredQualityTypes(
+                                    score.getMeasuredQualityType().getMeasuredQualityTypeId()));
+                        }
+                    }
                 }
             }
         }
 
-        assementQustionObject   = assessmentQuestionRepository.save(assessmentQuestions);
-
-        assementQustionObject.getOptions().iterator().forEachRemaining(option->{
-            option.getOptionScores().iterator().forEachRemaining(score->{
-                score.setMeasuredQualityType(new MeasuredQualityTypes(score.getMeasuredQualityType().getMeasuredQualityTypeId()));
-                score.setQuestion_option(new AssessmentQuestionOptions(score.getQuestion_option().getOptionId()));
-            });
-        });
+        AssessmentQuestions assementQustionObject = assessmentQuestionRepository.save(assessmentQuestions);
 
         // refresh cache after create
         try {
@@ -148,31 +154,44 @@ public class AssessmentQuestionController {
     }
 
     @PutMapping("/update/{id}")
-    public AssessmentQuestions updateAssessmentQuestion(@PathVariable Long id, @RequestBody AssessmentQuestions assessmentQuestions) {
+    public AssessmentQuestions updateAssessmentQuestion(@PathVariable Long id,
+            @RequestBody AssessmentQuestions assessmentQuestions) {
         AssessmentQuestions existingQuestion = assessmentQuestionRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Question not found with ID: " + id));
-        
+
         existingQuestion.setQuestionText(assessmentQuestions.getQuestionText());
         existingQuestion.setQuestionType(assessmentQuestions.getQuestionType());
-        
+
         if (assessmentQuestions.getSection() != null && assessmentQuestions.getSection().getSectionId() != null) {
-            QuestionSection section = questionSectionRepository.findById(assessmentQuestions.getSection().getSectionId()).orElse(null);
+            QuestionSection section = questionSectionRepository
+                    .findById(assessmentQuestions.getSection().getSectionId()).orElse(null);
             if (section != null) {
                 existingQuestion.setSection(section);
             }
         }
-        
+
         if (assessmentQuestions.getOptions() != null && !assessmentQuestions.getOptions().isEmpty()) {
             if (existingQuestion.getOptions() != null) {
                 existingQuestion.getOptions().clear();
             }
-            
+
             for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
                 option.setQuestion(existingQuestion);
+                // Also wire up MQT scores inside options for updates
+                if (option.getOptionScores() != null) {
+                    for (OptionScoreBasedOnMEasuredQualityTypes score : option.getOptionScores()) {
+                        score.setQuestion_option(option);
+                        if (score.getMeasuredQualityType() != null
+                                && score.getMeasuredQualityType().getMeasuredQualityTypeId() != null) {
+                            score.setMeasuredQualityType(new MeasuredQualityTypes(
+                                    score.getMeasuredQualityType().getMeasuredQualityTypeId()));
+                        }
+                    }
+                }
             }
             existingQuestion.setOptions(assessmentQuestions.getOptions());
         }
-        
+
         AssessmentQuestions saved = assessmentQuestionRepository.save(existingQuestion);
 
         // refresh cache after update
@@ -200,9 +219,7 @@ public class AssessmentQuestionController {
 
         return ResponseEntity.ok("AssessmentQuestion and all related options/relationships deleted successfully.");
     }
-    
+
     // Many-to-Many relationship management endpoints for MeasuredQualityTypes
-    
-    
 
 }

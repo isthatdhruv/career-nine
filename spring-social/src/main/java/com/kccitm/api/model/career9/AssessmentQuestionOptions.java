@@ -14,7 +14,9 @@ import javax.persistence.JoinColumn;
 import javax.persistence.Lob;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
+import javax.persistence.OneToOne;
 import javax.persistence.Table;
+import javax.validation.constraints.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -31,7 +33,10 @@ public class AssessmentQuestionOptions implements Serializable {
     private Long optionId;
 
     private String optionText;
+
     private boolean isCorrect;
+
+    private String optionDescription;
 
     @ManyToOne
     @JoinColumn(name = "fk_assessment_questions", nullable = false)
@@ -46,6 +51,13 @@ public class AssessmentQuestionOptions implements Serializable {
     @Column(name = "option_image", columnDefinition = "LONGBLOB")
     @JsonIgnore
     private byte[] optionImage;
+
+    @Column(name = "is_game", nullable = false)
+    private Boolean isGame;
+
+    @OneToOne
+    @JoinColumn(name = "fk_game_table", nullable = true)
+    private GameTable game;
 
     public AssessmentQuestionOptions(Long optionId) {
         this.optionId = optionId;
@@ -126,5 +138,33 @@ public class AssessmentQuestionOptions implements Serializable {
 
     public void setOptionScores(List<OptionScoreBasedOnMEasuredQualityTypes> optionScores) {
         this.optionScores = optionScores;
+    }
+
+    public static long getSerialversionuid() {
+        return serialVersionUID;
+    }
+
+    public Boolean getIsGame() {
+        return isGame;
+    }
+
+    public void setIsGame(Boolean isGame) {
+        this.isGame = isGame;
+    }
+
+    public GameTable getGame() {
+        return game;
+    }
+
+    public void setGame(GameTable game) {
+        this.game = game;
+    }
+
+    public String getOptionDescription() {
+        return optionDescription;
+    }
+
+    public void setOptionDescription(String optionDescription) {
+        this.optionDescription = optionDescription;
     }
 }

@@ -3,6 +3,10 @@ package com.kccitm.api.controller.career9.Questionaire;
 import java.util.List;
 import java.util.Optional;
 
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.transaction.Transactional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +24,6 @@ import com.kccitm.api.model.career9.Questionaire.QuestionnaireLanguage;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireSection;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireSectionInstruction;
-import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireRepository;
 
 @RestController
@@ -30,8 +33,8 @@ public class QuestionnaireController {
     @Autowired
     private QuestionnaireRepository questionnaireRepository;
 
-    @Autowired
-    private AssessmentTableRepository assessmentTableRepository;
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @PostMapping("/questionnaire-lelo")
     public Questionnaire questionnaireLelo(@RequestBody Long assessmentTableId) {
@@ -94,19 +97,28 @@ public class QuestionnaireController {
     }
 
     @PutMapping("/update/{id}")
+    @Transactional
     public ResponseEntity<Questionnaire> update(
             @PathVariable Long id,
             @RequestBody Questionnaire questionnaire) {
 
         return questionnaireRepository.findById(id)
                 .map(existing -> {
+                    // Update basic fields
+                    existing.setName(questionnaire.getName());
                     existing.setModeId(questionnaire.getModeId());
                     existing.setPrice(questionnaire.getPrice());
                     existing.setIsFree(questionnaire.getIsFree());
                     existing.setTool(questionnaire.getTool());
+                    existing.setDisplay(questionnaire.getDisplay());
+
+                    // Update languages using the new helper method
+                    updateLanguages(existing, questionnaire.getLanguages());
+
+                    // Update sections using the new helper method
+                    updateSections(existing, questionnaire.getSections());
 
                     Questionnaire updated = questionnaireRepository.save(existing);
-
                     return ResponseEntity.ok(updated);
                 })
                 .orElseGet(() -> ResponseEntity.notFound().build());
@@ -121,5 +133,165 @@ public class QuestionnaireController {
 
         questionnaireRepository.deleteById(id);
         return ResponseEntity.noContent().build();
+    }
+
+    private void updateLanguages(Questionnaire existing, java.util.List<QuestionnaireLanguage> incomingList) {
+        if (incomingList == null) {
+            existing.getLanguages().clear();
+            return;
+        }
+
+        // Map incoming by ID for O(1) lookup
+        java.util.Map<Long, QuestionnaireLanguage> incomingMap = incomingList.stream()
+                .filter(l -> l.getId() != null)
+                .collect(java.util.stream.Collectors.toMap(
+                        QuestionnaireLanguage::getId,
+                        l -> l,
+                        (existingValue, newValue) -> existingValue));
+
+        // A. Remove missing (orphans)
+        existing.getLanguages().removeIf(existingLang -> existingLang.getId() != null &&
+                !incomingMap.containsKey(existingLang.getId()));
+
+        // B. Update existing and Add new
+        for (QuestionnaireLanguage incoming : incomingList) {
+            if (incoming.getId() == null) {
+                // New item
+                incoming.setQuestionnaire(existing);
+                existing.getLanguages().add(incoming);
+            } else {
+                // Update existing
+                existing.getLanguages().stream()
+                        .filter(l -> l.getId().equals(incoming.getId()))
+                        .findFirst()
+                        .ifPresent(l -> {
+                            l.setLanguage(incoming.getLanguage()); // Update mutable fields
+                            l.setInstructions(incoming.getInstructions());
+                            // Add other fields to update if any
+                        });
+            }
+        }
+    }
+
+    private void updateSections(Questionnaire existing, java.util.List<QuestionnaireSection> incomingList) {
+        if (incomingList == null) {
+            existing.getSections().clear();
+            return;
+        }
+
+        java.util.Map<Long, QuestionnaireSection> incomingMap = incomingList.stream()
+                .filter(s -> s.getQuestionnaireSectionId() != null)
+                .collect(java.util.stream.Collectors.toMap(
+                        QuestionnaireSection::getQuestionnaireSectionId,
+                        s -> s,
+                        (existingValue, newValue) -> existingValue));
+
+        // A. Remove missing sections
+        existing.getSections().removeIf(existingSection -> existingSection.getQuestionnaireSectionId() != null &&
+                !incomingMap.containsKey(existingSection.getQuestionnaireSectionId()));
+
+        // B. Update existing and Add new
+        for (QuestionnaireSection incoming : incomingList) {
+            if (incoming.getQuestionnaireSectionId() == null) {
+                // New Section
+                incoming.setQuestionnaire(existing);
+                // Ensure children have back-reference
+                if (incoming.getInstruction() != null)
+                    incoming.getInstruction().forEach(i -> i.setSection(incoming));
+                if (incoming.getQuestions() != null)
+                    incoming.getQuestions().forEach(q -> q.setSection(incoming));
+
+                existing.getSections().add(incoming);
+            } else {
+                // Update Existing Section
+                existing.getSections().stream()
+                        .filter(s -> s.getQuestionnaireSectionId().equals(incoming.getQuestionnaireSectionId()))
+                        .findFirst()
+                        .ifPresent(existingSection -> {
+                            existingSection.setOrder(incoming.getOrder());
+                            existingSection.setSection(incoming.getSection());
+
+                            // Recursive Update for Instructions
+                            updateInstructions(existingSection, incoming.getInstruction());
+
+                            // Recursive Update for Questions
+                            updateQuestions(existingSection, incoming.getQuestions());
+                        });
+            }
+        }
+    }
+
+    private void updateInstructions(QuestionnaireSection existingSection,
+            java.util.Set<QuestionnaireSectionInstruction> incomingSet) {
+        if (incomingSet == null) {
+            existingSection.getInstruction().clear();
+            return;
+        }
+
+        // Convert Set to List for easier handling or just stream the Set
+        java.util.Map<Long, QuestionnaireSectionInstruction> incomingMap = incomingSet.stream()
+                .filter(i -> i.getQuestionnaireSectionInstructionId() != null)
+                .collect(java.util.stream.Collectors.toMap(
+                        QuestionnaireSectionInstruction::getQuestionnaireSectionInstructionId,
+                        i -> i,
+                        (existingValue, newValue) -> existingValue));
+
+        // Remove
+        existingSection.getInstruction().removeIf(exist -> exist.getQuestionnaireSectionInstructionId() != null &&
+                !incomingMap.containsKey(exist.getQuestionnaireSectionInstructionId()));
+
+        // Add / Update
+        for (QuestionnaireSectionInstruction incoming : incomingSet) {
+            if (incoming.getQuestionnaireSectionInstructionId() == null) {
+                incoming.setSection(existingSection);
+                existingSection.getInstruction().add(incoming);
+            } else {
+                existingSection.getInstruction().stream()
+                        .filter(i -> i.getQuestionnaireSectionInstructionId()
+                                .equals(incoming.getQuestionnaireSectionInstructionId()))
+                        .findFirst()
+                        .ifPresent(exist -> {
+                            exist.setInstructionText(incoming.getInstructionText());
+                            exist.setLanguage(incoming.getLanguage());
+                        });
+            }
+        }
+    }
+
+    private void updateQuestions(QuestionnaireSection existingSection,
+            java.util.Set<QuestionnaireQuestion> incomingSet) {
+        if (incomingSet == null) {
+            existingSection.getQuestions().clear();
+            return;
+        }
+
+        java.util.Map<Long, QuestionnaireQuestion> incomingMap = incomingSet.stream()
+                .filter(q -> q.getQuestionnaireQuestionId() != null)
+                .collect(java.util.stream.Collectors.toMap(
+                        QuestionnaireQuestion::getQuestionnaireQuestionId,
+                        q -> q,
+                        (existingValue, newValue) -> existingValue));
+
+        // Remove
+        existingSection.getQuestions().removeIf(exist -> exist.getQuestionnaireQuestionId() != null &&
+                !incomingMap.containsKey(exist.getQuestionnaireQuestionId()));
+
+        // Add / Update
+        for (QuestionnaireQuestion incoming : incomingSet) {
+            if (incoming.getQuestionnaireQuestionId() == null) {
+                incoming.setSection(existingSection);
+                existingSection.getQuestions().add(incoming);
+            } else {
+                existingSection.getQuestions().stream()
+                        .filter(q -> q.getQuestionnaireQuestionId().equals(incoming.getQuestionnaireQuestionId()))
+                        .findFirst()
+                        .ifPresent(exist -> {
+                            exist.setOrder(incoming.getOrder());
+                            exist.setExcelQuestionHeader(incoming.getExcelQuestionHeader());
+                            // Update the question reference if it changed
+                            exist.setQuestion(incoming.getQuestion());
+                        });
+            }
+        }
     }
 }
