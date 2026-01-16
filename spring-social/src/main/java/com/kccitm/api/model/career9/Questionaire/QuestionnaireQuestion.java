@@ -15,7 +15,6 @@ import com.kccitm.api.model.career9.AssessmentQuestions;
 
 @Entity
 @Table(name = "Questionnaire_Question")
-
 public class QuestionnaireQuestion {
     // primary key questionnaire_question_id
     @Id

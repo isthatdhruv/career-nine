@@ -103,8 +103,8 @@
       "languageQuestion" : [ ],
       "languageOption" : [ ]
     },
-    "questionText" : "MARATHI CHe",
-    "languageQuestionId" : 23,
+    "questionText" : "खाली भारतात सामान्यपणे पुरस्कृत केलेल्या 15 विशाल क्षेत्रांची यादी आहे. आपल्या कामात, आपल्या आवडींच्या आणि आकांक्षांच्या सर्वात मोठ्या संबंधात शीर्ष 5 क्षेत्र निवडण्याचे काम आहे. जर कोणत्याही क्षेत्राचा अर्थ स्पष्टीकरण आवश्यक असेल तर, कृपया प्रदान केलेल्या सहाय्य विभागावर दृष्टी टाका.",
+    "languageQuestionId" : 40,
     "originalQuestionId" : 6
   } ],
   "id" : 6
@@ -119,20 +119,6 @@
     "optionText" : "I finish early and check answers.",
     "optionScores" : [ {
       "score" : 4,
-      "question_option" : {
-        "optionId" : 56,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 17,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 10
     } ],
     "correct" : false
@@ -141,20 +127,6 @@
     "optionText" : "I finish just on time.",
     "optionScores" : [ {
       "score" : 3,
-      "question_option" : {
-        "optionId" : 57,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 17,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 11
     } ],
     "correct" : false
@@ -163,20 +135,6 @@
     "optionText" : "I leave a few questions.",
     "optionScores" : [ {
       "score" : 2,
-      "question_option" : {
-        "optionId" : 58,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 17,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 12
     } ],
     "correct" : false
@@ -185,20 +143,6 @@
     "optionText" : "I need more time.",
     "optionScores" : [ {
       "score" : 1,
-      "question_option" : {
-        "optionId" : 59,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 17,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 13
     } ],
     "correct" : false
@@ -222,20 +166,6 @@
     "optionText" : "Instantly know how much is left",
     "optionScores" : [ {
       "score" : 4,
-      "question_option" : {
-        "optionId" : 60,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 15,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 14
     } ],
     "correct" : false
@@ -244,20 +174,6 @@
     "optionText" : "Try to guess the amount roughly",
     "optionScores" : [ {
       "score" : 3,
-      "question_option" : {
-        "optionId" : 61,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 15,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 15
     } ],
     "correct" : false
@@ -266,20 +182,6 @@
     "optionText" : "Need to write and subtract",
     "optionScores" : [ {
       "score" : 2,
-      "question_option" : {
-        "optionId" : 62,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 15,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 16
     } ],
     "correct" : false
@@ -288,20 +190,6 @@
     "optionText" : "I need help of a calculator",
     "optionScores" : [ {
       "score" : 1,
-      "question_option" : {
-        "optionId" : 63,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 15,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 17
     } ],
     "correct" : false
@@ -325,20 +213,6 @@
     "optionText" : "I create new plots and characters",
     "optionScores" : [ {
       "score" : 4,
-      "question_option" : {
-        "optionId" : 64,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 20,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 18
     } ],
     "correct" : false
@@ -347,20 +221,6 @@
     "optionText" : "I take help from stories I’ve read",
     "optionScores" : [ {
       "score" : 3,
-      "question_option" : {
-        "optionId" : 65,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 20,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 19
     } ],
     "correct" : false
@@ -369,20 +229,6 @@
     "optionText" : "I write basic but clear stories",
     "optionScores" : [ {
       "score" : 2,
-      "question_option" : {
-        "optionId" : 66,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 20,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 20
     } ],
     "correct" : false
@@ -391,20 +237,6 @@
     "optionText" : "I struggle to think of ideas",
     "optionScores" : [ {
       "score" : 1,
-      "question_option" : {
-        "optionId" : 67,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 20,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 21
     } ],
     "correct" : false
@@ -428,20 +260,6 @@
     "optionText" : "I know most of the words.",
     "optionScores" : [ {
       "score" : 4,
-      "question_option" : {
-        "optionId" : 68,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 13,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 22
     } ],
     "correct" : false
@@ -450,20 +268,6 @@
     "optionText" : "I know some of them.",
     "optionScores" : [ {
       "score" : 3,
-      "question_option" : {
-        "optionId" : 69,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 13,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 23
     } ],
     "correct" : false
@@ -472,20 +276,6 @@
     "optionText" : "I guess most answers.",
     "optionScores" : [ {
       "score" : 2,
-      "question_option" : {
-        "optionId" : 70,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 13,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 24
     } ],
     "correct" : false
@@ -494,20 +284,6 @@
     "optionText" : "I struggle with it.",
     "optionScores" : [ {
       "score" : 1,
-      "question_option" : {
-        "optionId" : 71,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 13,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 25
     } ],
     "correct" : false
@@ -531,20 +307,6 @@
     "optionText" : "I find it fascinating and understand quickly.",
     "optionScores" : [ {
       "score" : 4,
-      "question_option" : {
-        "optionId" : 72,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 19,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 26
     } ],
     "correct" : false
@@ -553,20 +315,6 @@
     "optionText" : "I can understand with some explanation",
     "optionScores" : [ {
       "score" : 3,
-      "question_option" : {
-        "optionId" : 73,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 19,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 27
     } ],
     "correct" : false
@@ -575,20 +323,6 @@
     "optionText" : "I find it confusing and hard to grasp.",
     "optionScores" : [ {
       "score" : 2,
-      "question_option" : {
-        "optionId" : 74,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 19,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 28
     } ],
     "correct" : false
@@ -597,20 +331,6 @@
     "optionText" : "I have no interest and can’t understand it.",
     "optionScores" : [ {
       "score" : 1,
-      "question_option" : {
-        "optionId" : 75,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 19,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 29
     } ],
     "correct" : false
@@ -634,20 +354,6 @@
     "optionText" : "I can help resolve it by listening to both sides.",
     "optionScores" : [ {
       "score" : 4,
-      "question_option" : {
-        "optionId" : 76,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 14,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 30
     } ],
     "correct" : false
@@ -656,20 +362,6 @@
     "optionText" : "I try to mediate but sometimes make it worse.",
     "optionScores" : [ {
       "score" : 3,
-      "question_option" : {
-        "optionId" : 77,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 14,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 31
     } ],
     "correct" : false
@@ -678,20 +370,6 @@
     "optionText" : "I avoid getting involved.",
     "optionScores" : [ {
       "score" : 2,
-      "question_option" : {
-        "optionId" : 78,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 14,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 32
     } ],
     "correct" : false
@@ -700,20 +378,6 @@
     "optionText" : "I often end up taking sides without thinking.",
     "optionScores" : [ {
       "score" : 1,
-      "question_option" : {
-        "optionId" : 79,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 14,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 33
     } ],
     "correct" : false
@@ -737,20 +401,6 @@
     "optionText" : "I make precise folds and manage detailing well.",
     "optionScores" : [ {
       "score" : 4,
-      "question_option" : {
-        "optionId" : 80,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 22,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 34
     } ],
     "correct" : false
@@ -759,20 +409,6 @@
     "optionText" : "I finish with minor errors or less precision.",
     "optionScores" : [ {
       "score" : 3,
-      "question_option" : {
-        "optionId" : 81,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 22,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 35
     } ],
     "correct" : false
@@ -781,20 +417,6 @@
     "optionText" : "I complete it but with less accuracy and more time.",
     "optionScores" : [ {
       "score" : 2,
-      "question_option" : {
-        "optionId" : 82,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 22,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 36
     } ],
     "correct" : false
@@ -803,20 +425,6 @@
     "optionText" : "I struggle and it often lacks detail.",
     "optionScores" : [ {
       "score" : 1,
-      "question_option" : {
-        "optionId" : 83,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 22,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 37
     } ],
     "correct" : false
@@ -840,20 +448,6 @@
     "optionText" : "I can arrange elements harmoniously and notice small misalignments.",
     "optionScores" : [ {
       "score" : 4,
-      "question_option" : {
-        "optionId" : 84,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 16,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 38
     } ],
     "correct" : false
@@ -862,20 +456,6 @@
     "optionText" : "I can make it look good, but it might not be perfect.",
     "optionScores" : [ {
       "score" : 3,
-      "question_option" : {
-        "optionId" : 85,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 16,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 39
     } ],
     "correct" : false
@@ -884,20 +464,6 @@
     "optionText" : "I struggle with layout and proportions.",
     "optionScores" : [ {
       "score" : 2,
-      "question_option" : {
-        "optionId" : 86,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 16,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 40
     } ],
     "correct" : false
@@ -906,20 +472,6 @@
     "optionText" : "I can’t create a visually appealing design.",
     "optionScores" : [ {
       "score" : 1,
-      "question_option" : {
-        "optionId" : 87,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 16,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 41
     } ],
     "correct" : false
@@ -943,20 +495,6 @@
     "optionText" : "I develop winning strategies and make successful decisions.",
     "optionScores" : [ {
       "score" : 4,
-      "question_option" : {
-        "optionId" : 88,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 18,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 42
     } ],
     "correct" : false
@@ -965,20 +503,6 @@
     "optionText" : "I do well but sometimes make less effective decisions.",
     "optionScores" : [ {
       "score" : 3,
-      "question_option" : {
-        "optionId" : 89,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 18,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 43
     } ],
     "correct" : false
@@ -987,20 +511,6 @@
     "optionText" : "I find it challenging and often adjust my strategies.",
     "optionScores" : [ {
       "score" : 2,
-      "question_option" : {
-        "optionId" : 90,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 18,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 44
     } ],
     "correct" : false
@@ -1009,20 +519,6 @@
     "optionText" : "I struggle to create effective strategies and make slow progress.",
     "optionScores" : [ {
       "score" : 1,
-      "question_option" : {
-        "optionId" : 91,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 18,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 45
     } ],
     "correct" : false
@@ -1046,20 +542,6 @@
     "optionText" : "I perform smoothly and excel in the sport.",
     "optionScores" : [ {
       "score" : 4,
-      "question_option" : {
-        "optionId" : 92,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 21,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 46
     } ],
     "correct" : false
@@ -1068,20 +550,6 @@
     "optionText" : "I do well but have occasional coordination issues.",
     "optionScores" : [ {
       "score" : 3,
-      "question_option" : {
-        "optionId" : 93,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 21,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 47
     } ],
     "correct" : false
@@ -1090,20 +558,6 @@
     "optionText" : "I find some movements challenging and need extra practice.",
     "optionScores" : [ {
       "score" : 2,
-      "question_option" : {
-        "optionId" : 94,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 21,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 48
     } ],
     "correct" : false
@@ -1112,20 +566,6 @@
     "optionText" : "I struggle with coordination and basic movements.",
     "optionScores" : [ {
       "score" : 1,
-      "question_option" : {
-        "optionId" : 95,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 21,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 49
     } ],
     "correct" : false
@@ -1224,7 +664,7 @@
     "sectionId" : 3,
     "sectionName" : "Section B",
     "sectionDescription" : "Section B Insight Navigator\n",
-    "questionId" : [ 26, 27 ]
+    "questionId" : [ 26, 27, 47 ]
   },
   "languageQuestions" : [ ],
   "id" : 26
@@ -1314,7 +754,7 @@
     "sectionId" : 3,
     "sectionName" : "Section B",
     "sectionDescription" : "Section B Insight Navigator\n",
-    "questionId" : [ 26, 27 ]
+    "questionId" : [ 26, 27, 47 ]
   },
   "languageQuestions" : [ ],
   "id" : 27
@@ -1339,7 +779,7 @@
     "sectionId" : 5,
     "sectionName" : "Section D",
     "sectionDescription" : "Section D Insight Navigator ",
-    "questionId" : [ 28, 29, 30, 31, 32, 33 ]
+    "questionId" : [ 28, 29, 30, 31, 32, 33, 46 ]
   },
   "languageQuestions" : [ {
     "language" : {
@@ -1374,7 +814,7 @@
     "sectionId" : 5,
     "sectionName" : "Section D",
     "sectionDescription" : "Section D Insight Navigator ",
-    "questionId" : [ 28, 29, 30, 31, 32, 33 ]
+    "questionId" : [ 28, 29, 30, 31, 32, 33, 46 ]
   },
   "languageQuestions" : [ {
     "language" : {
@@ -1409,7 +849,7 @@
     "sectionId" : 5,
     "sectionName" : "Section D",
     "sectionDescription" : "Section D Insight Navigator ",
-    "questionId" : [ 28, 29, 30, 31, 32, 33 ]
+    "questionId" : [ 28, 29, 30, 31, 32, 33, 46 ]
   },
   "languageQuestions" : [ {
     "language" : {
@@ -1444,7 +884,7 @@
     "sectionId" : 5,
     "sectionName" : "Section D",
     "sectionDescription" : "Section D Insight Navigator ",
-    "questionId" : [ 28, 29, 30, 31, 32, 33 ]
+    "questionId" : [ 28, 29, 30, 31, 32, 33, 46 ]
   },
   "languageQuestions" : [ {
     "language" : {
@@ -1479,7 +919,7 @@
     "sectionId" : 5,
     "sectionName" : "Section D",
     "sectionDescription" : "Section D Insight Navigator ",
-    "questionId" : [ 28, 29, 30, 31, 32, 33 ]
+    "questionId" : [ 28, 29, 30, 31, 32, 33, 46 ]
   },
   "languageQuestions" : [ {
     "language" : {
@@ -1514,7 +954,7 @@
     "sectionId" : 5,
     "sectionName" : "Section D",
     "sectionDescription" : "Section D Insight Navigator ",
-    "questionId" : [ 28, 29, 30, 31, 32, 33 ]
+    "questionId" : [ 28, 29, 30, 31, 32, 33, 46 ]
   },
   "languageQuestions" : [ {
     "language" : {
@@ -2009,37 +1449,9 @@
     "optionText" : "asd",
     "optionScores" : [ {
       "score" : 1,
-      "question_option" : {
-        "optionId" : 235,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 1,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 58
     }, {
       "score" : 2,
-      "question_option" : {
-        "optionId" : 235,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 2,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 59
     } ],
     "correct" : false
@@ -2048,37 +1460,9 @@
     "optionText" : "pdf",
     "optionScores" : [ {
       "score" : 1,
-      "question_option" : {
-        "optionId" : 236,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 3,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 60
     }, {
       "score" : 2,
-      "question_option" : {
-        "optionId" : 236,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 4,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 61
     } ],
     "correct" : false
@@ -2087,37 +1471,9 @@
     "optionText" : "sad",
     "optionScores" : [ {
       "score" : 2,
-      "question_option" : {
-        "optionId" : 237,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 5,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 62
     }, {
       "score" : 1,
-      "question_option" : {
-        "optionId" : 237,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 6,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 63
     } ],
     "correct" : false
@@ -2126,37 +1482,9 @@
     "optionText" : "pdf",
     "optionScores" : [ {
       "score" : 2,
-      "question_option" : {
-        "optionId" : 238,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 1,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 64
     }, {
       "score" : 2,
-      "question_option" : {
-        "optionId" : 238,
-        "optionText" : null,
-        "optionScores" : null,
-        "correct" : false
-      },
-      "measuredQualityType" : {
-        "measuredQuality" : null,
-        "optionScores" : null,
-        "measuredQualityTypeId" : 4,
-        "measuredQualityTypeName" : null,
-        "measuredQualityTypeDescription" : null,
-        "measuredQualityTypeDisplayName" : null
-      },
       "scoreId" : 65
     } ],
     "correct" : false
@@ -2169,4 +1497,214 @@
   },
   "languageQuestions" : [ ],
   "id" : 45
+}, {
+  "questionId" : 46,
+  "questionText" : "asd",
+  "questionType" : "multiple-choice",
+  "flag" : true,
+  "maxOptionsAllowed" : 5,
+  "options" : [ {
+    "optionId" : 239,
+    "optionText" : "Conventional",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 240,
+    "optionText" : "Investigative",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 241,
+    "optionText" : "Enterprising",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 242,
+    "optionText" : "Social",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 243,
+    "optionText" : "Interpersonal",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 244,
+    "optionText" : "Visual-Spatial",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 245,
+    "optionText" : "Musical",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 246,
+    "optionText" : "Intrapersonal",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 247,
+    "optionText" : "Naturalistic",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 248,
+    "optionText" : "Logical",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 249,
+    "optionText" : "Bodily-Kinesthetic",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 250,
+    "optionText" : "Linguistic",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 251,
+    "optionText" : "Communication",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 252,
+    "optionText" : "Decision making & problem solving",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 253,
+    "optionText" : "Computational",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 254,
+    "optionText" : "Form perception",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 255,
+    "optionText" : "Speed and accuracy",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 256,
+    "optionText" : "Logical reasoning",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 257,
+    "optionText" : "Technical",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 258,
+    "optionText" : "Creativity",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 259,
+    "optionText" : "Motor movement",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 260,
+    "optionText" : "Finger dexterity",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 261,
+    "optionText" : "Doer",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 262,
+    "optionText" : "Thinker",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 263,
+    "optionText" : "Creator",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 264,
+    "optionText" : "Helper",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 265,
+    "optionText" : "Persuader",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 266,
+    "optionText" : "Organizer",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 267,
+    "optionText" : "R",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 268,
+    "optionText" : "I",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 269,
+    "optionText" : "A",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 270,
+    "optionText" : "Helper",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 271,
+    "optionText" : "Agriculture",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 272,
+    "optionText" : "Art",
+    "optionScores" : [ ],
+    "correct" : false
+  }, {
+    "optionId" : 273,
+    "optionText" : "Cultural Studies",
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 5,
+    "sectionName" : "Section D",
+    "sectionDescription" : "Section D Insight Navigator ",
+    "questionId" : [ 28, 29, 30, 31, 32, 33, 46 ]
+  },
+  "languageQuestions" : [ ],
+  "id" : 46
+}, {
+  "questionId" : 47,
+  "questionText" : "This is a test Question For image uploading",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 1,
+  "options" : [ {
+    "optionId" : 274,
+    "optionText" : null,
+    "optionScores" : [ ],
+    "correct" : false
+  } ],
+  "section" : {
+    "sectionId" : 3,
+    "sectionName" : "Section B",
+    "sectionDescription" : "Section B Insight Navigator\n",
+    "questionId" : [ 26, 27, 47 ]
+  },
+  "languageQuestions" : [ ],
+  "id" : 47
 } ]
