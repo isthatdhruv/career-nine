@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import data from "../../data.json";
+import { useAssessment } from "../../StudentLogin/AssessmentContext";
 
 type Language = {
   languageId: number;
@@ -16,24 +16,27 @@ type Instruction = {
 const SectionInstructionPage: React.FC = () => {
   const { sectionId } = useParams();
   const navigate = useNavigate();
+  const { assessmentData } = useAssessment();
 
   const [instructions, setInstructions] = useState<Instruction[]>([]);
 
   useEffect(() => {
-    const questionnaire = data[0];
+    if (assessmentData && assessmentData[0]) {
+      const questionnaire = assessmentData[0];
 
-    // 🔍 Find section by sectionId
-    const section = questionnaire.sections.find(
-      (sec: any) => String(sec.section.sectionId) === String(sectionId)
-    );
+      // 🔍 Find section by sectionId
+      const section = questionnaire.sections.find(
+        (sec: any) => String(sec.section.sectionId) === String(sectionId)
+      );
 
-    if (!section || !section.instruction) {
-      setInstructions([]);
-      return;
+      if (!section || !section.instruction) {
+        setInstructions([]);
+        return;
+      }
+
+      setInstructions(section.instruction);
     }
-
-    setInstructions(section.instruction);
-  }, [sectionId]);
+  }, [sectionId, assessmentData]);
 
   return (
     <div
