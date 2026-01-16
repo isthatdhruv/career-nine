@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import data from "../../data.json";
+import { useAssessment } from "../../StudentLogin/AssessmentContext";
 
 type Option = {
   optionId: number;
@@ -42,9 +42,9 @@ type QuestionnaireLanguage = {
 const SectionQuestionPage: React.FC = () => {
   const { sectionId, questionIndex } = useParams();
   const navigate = useNavigate();
+  const { assessmentData } = useAssessment();
 
-  const questionnaire = data[0];
-
+  const [questionnaire, setQuestionnaire] = useState<any>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [languages, setLanguages] = useState<QuestionnaireLanguage[]>([]);
@@ -59,16 +59,21 @@ const SectionQuestionPage: React.FC = () => {
   const [elapsedTime, setElapsedTime] = useState<number>(0);
 
   useEffect(() => {
-    const section = questionnaire.sections.find(
-      (sec: any) => String(sec.section.sectionId) === String(sectionId)
-    );
-    if (!section) return;
+    if (assessmentData && assessmentData[0]) {
+      const questionnaireData = assessmentData[0];
+      setQuestionnaire(questionnaireData);
 
-    setQuestions(section.questions || []);
-    setCurrentIndex(Number(questionIndex) || 0);
-    
-    setLanguages(questionnaire.languages || []);
-  }, [sectionId, questionIndex]);
+      const section = questionnaireData.sections.find(
+        (sec: any) => String(sec.section.sectionId) === String(sectionId)
+      );
+      if (!section) return;
+
+      setQuestions(section.questions || []);
+      setCurrentIndex(Number(questionIndex) || 0);
+      
+      setLanguages(questionnaireData.languages || []);
+    }
+  }, [sectionId, questionIndex, assessmentData]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -85,7 +90,7 @@ const SectionQuestionPage: React.FC = () => {
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  if (!questions.length) {
+  if (!questionnaire || !questions.length) {
     return <div className="text-center mt-5">No questions found</div>;
   }
 

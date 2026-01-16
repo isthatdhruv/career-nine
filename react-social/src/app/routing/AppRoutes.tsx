@@ -6,7 +6,7 @@
  */
 
 import { FC, lazy, Suspense } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import TopBarProgress from "react-topbar-progress-indicator";
 import { getCSSVariableValue } from "../../_metronic/assets/ts/_utils";
 import { WithChildren } from "../../_metronic/helpers";
@@ -50,43 +50,74 @@ const AppRoutes: FC = () => {
   const { currentUser } = useAuth();
 
   return (
-    <BrowserRouter basename={PUBLIC_URL}>
-      <Routes>
-        <Route element={<App />}>
-          <Route path="/student-details" element={<StudentDetailPage />} />
-          <Route path="/oauth2/redirect" element={<AuthRedirectPage />} />
-          <Route path="error/*" element={<ErrorsPage />} />
-          
-          {/* <Route path="compiler/compiler-edit" element={<CompilerPageEdit />} /> */}
-          <Route
-            path="/thankyou"
-            element={
-              <SuspensedView>
-                <ThankYouPage />
-              </SuspensedView>
-            }
-          />
-          <Route
-          path="/student/registration-form"
+    <Routes>
+      <Route element={<App />}>
+        <Route path="/student-details" element={<StudentDetailPage />} />
+        <Route path="/oauth2/redirect" element={<AuthRedirectPage />} />
+        <Route path="error/*" element={<ErrorsPage />} />
+        
+        {/* <Route path="compiler/compiler-edit" element={<CompilerPageEdit />} /> */}
+        <Route
+          path="/thankyou"
+          element={
+            <SuspensedView>
+              <ThankYouPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+        path="/student/registration-form"
+        element={
+          <SuspensedView>
+            <StudentRegistrationForm />
+          </SuspensedView>
+        }
+      />
+      <Route
+        path="/student/registration-existing"
+        element={
+          <SuspensedView>
+            <StudentRegistrationFormExisting />
+          </SuspensedView>
+        }
+      />
+      {/* <Route path="/questionaire/List" element={
+        <SuspensedView>
+          <QuestionaireListPage />
+        </SuspensedView>
+      } /> */}
+      <Route
+        path="/faculty/registration-form"
+        element={
+          <SuspensedView>
+            <FacultyRegistrationForm />
+          </SuspensedView>
+        }
+      />
+      <Route
+        path="/re-fillForm/*"
+        element={
+          <SuspensedView>
+            <ReFillFormPage/>
+          </SuspensedView>
+        }
+      />
+      <Route
+        path="/student/uni-roll-no/update"
+        element={
+          <SuspensedView>
+           <UniRollNoUpdate/>
+          </SuspensedView>
+        }
+      />
+        
+        <Route  path="/student/registration-form"
           element={
             <SuspensedView>
               <StudentRegistrationForm />
             </SuspensedView>
           }
         />
-        <Route
-          path="/student/registration-existing"
-          element={
-            <SuspensedView>
-              <StudentRegistrationFormExisting />
-            </SuspensedView>
-          }
-        />
-        {/* <Route path="/questionaire/List" element={
-          <SuspensedView>
-            <QuestionaireListPage />
-          </SuspensedView>
-        } /> */}
         <Route
           path="/faculty/registration-form"
           element={
@@ -99,104 +130,71 @@ const AppRoutes: FC = () => {
           path="/re-fillForm/*"
           element={
             <SuspensedView>
-              <ReFillFormPage/>
+              <ReFillFormPage />
             </SuspensedView>
           }
         />
         <Route
-          path="/student/uni-roll-no/update"
+          path="faculty/re-fillForm/*"
           element={
             <SuspensedView>
-             <UniRollNoUpdate/>
+              <FacultyReFillFormPage />
             </SuspensedView>
           }
         />
-          
-          <Route  path="/student/registration-form"
-            element={
-              <SuspensedView>
-                <StudentRegistrationForm />
-              </SuspensedView>
-            }
-          />
-          <Route
-            path="/faculty/registration-form"
-            element={
-              <SuspensedView>
-                <FacultyRegistrationForm />
-              </SuspensedView>
-            }
-          />
-          <Route
-            path="/re-fillForm/*"
-            element={
-              <SuspensedView>
-                <ReFillFormPage />
-              </SuspensedView>
-            }
-          />
-          <Route
-            path="faculty/re-fillForm/*"
-            element={
-              <SuspensedView>
-                <FacultyReFillFormPage />
-              </SuspensedView>
-            }
-          />
-          <Route
-            path="classroom/*"
-            element={
-              <SuspensedView>
-                <ClassRoomPage/>
-              </SuspensedView>
-            }
-          />
-         
+        <Route
+          path="classroom/*"
+          element={
+            <SuspensedView>
+              <ClassRoomPage/>
+            </SuspensedView>
+          }
+        />
+       
 
-          <Route path="logout" element={<Logout />} />
+        <Route path="logout" element={<Logout />} />
 
-          <Route path="registrar/logout" element={<Logout />} />
+        <Route path="registrar/logout" element={<Logout />} />
 
-          <Route path="student/logout" element={<Logout />} />
+        <Route path="student/logout" element={<Logout />} />
 
-          <Route path="faculty/logout" element={<Logout />} />
+        <Route path="faculty/logout" element={<Logout />} />
 
-          <Route path="roles/logout" element={<Logout />} />
+        <Route path="roles/logout" element={<Logout />} />
 
-          <>
-              <Route path="/*" element={<PrivateRoutes />} />
-              <Route index element={<Navigate to="/dashboard" />} />
-            </>
-
-          {/* {currentUser ? (
-            <>
-              <Route path="/*" element={<PrivateRoutes />} />
-              <Route index element={<Navigate to="/dashboard" />} />
-            </>
-          ) : (
-            <>
-              <Route path="auth/*" element={<AuthPage />} />
-              <Route path="*" element={<Navigate to="/auth" />} />
-            </>
-          )
-          } */}
-
-          {/* {currentUser ? (
-            roles && roles!.lastIndexOf("/temp-student") === -1 ?
-              <>
-                <Route path="/*" element={<PrivateRoutes />} />
-                <Route index element={<Navigate to="/dashboard" />} />
-              </>
-              : <>
-                <Route path="auth/*" element={<ErrorsPage />} />
-              </>
-          ) : (<>
-            <Route path="auth/*" element={<AuthPage />} />
+        <>
+            <Route path="/*" element={<PrivateRoutes />} />
+            <Route index element={<Navigate to="/dashboard" />} />
           </>
-          )} */}
-        </Route>
-      </Routes>
-    </BrowserRouter>
+
+        {/* {currentUser ? (
+          <>
+            <Route path="/*" element={<PrivateRoutes />} />
+            <Route index element={<Navigate to="/dashboard" />} />
+          </>
+        ) : (
+          <>
+            <Route path="auth/*" element={<AuthPage />} />
+            <Route path="*" element={<Navigate to="/auth" />} />
+          </>
+        )
+        } */}
+
+        {/* {currentUser ? (
+          roles && roles!.lastIndexOf("/temp-student") === -1 ?
+            <>
+              <Route path="/*" element={<PrivateRoutes />} />
+              <Route index element={<Navigate to="/dashboard" />} />
+            </>
+            : <>
+              <Route path="auth/*" element={<ErrorsPage />} />
+            </>
+        ) : (<>
+          <Route path="auth/*" element={<AuthPage />} />
+        </>
+        )} */}
+      </Route>
+    </Routes>
   );
 };
 

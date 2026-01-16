@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
-const API_URL = process.env.REACT_APP_API_URL;
-const readQuestionSection = `${API_URL}/question-sections/getAll`;
+import { useAssessment } from "../../StudentLogin/AssessmentContext";
 
 type Section = {
   sectionId: string | number;
@@ -12,25 +10,27 @@ type Section = {
 
 const SelectSectionPage: React.FC = () => {
   const [sections, setSections] = useState<Section[]>([]);
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-
-  const fetchSections = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(readQuestionSection);
-      const data = await response.json();
-      setSections(data || []);
-    } catch (error) {
-      console.error("Failed to fetch sections:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { assessmentData, loading } = useAssessment();
 
   useEffect(() => {
-    fetchSections();
-  }, []);
+    if (assessmentData && assessmentData[0]) {
+      try {
+        const questionnaire = assessmentData[0];
+        
+        // Extract sections from assessmentData
+        const sectionsData = questionnaire.sections.map((item: any) => ({
+          sectionId: item.section.sectionId,
+          sectionName: item.section.sectionName,
+          sectionDescription: item.section.sectionDescription || "",
+        }));
+        
+        setSections(sectionsData || []);
+      } catch (error) {
+        console.error("Failed to process sections:", error);
+      }
+    }
+  }, [assessmentData]);
 
   const handleSectionClick = (section: Section) => {
     navigate(`/studentAssessment/sections/${section.sectionId}`);
