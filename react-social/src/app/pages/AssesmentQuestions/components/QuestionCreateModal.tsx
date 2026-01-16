@@ -28,6 +28,11 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
   const [useMQTAsOptions, setUseMQTAsOptions] = useState(false);
   const navigate = useNavigate();
 
+  // State for tracking option type (text vs image) per option index
+  const [optionTypes, setOptionTypes] = useState<{ [key: number]: 'text' | 'image' }>({});
+  // State for storing Base64 image data per option index
+  const [optionImages, setOptionImages] = useState<{ [key: number]: string }>({});
+
   const initialValues = {
     questionText: "",
     questionType: "",
@@ -74,8 +79,32 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
       const newMeasured = { ...optionMeasuredQualities };
       delete newMeasured[index];
       setOptionMeasuredQualities(newMeasured);
+      // Also remove option type and image data
+      setOptionTypes(prev => { const n = {...prev}; delete n[index]; return n; });
+      setOptionImages(prev => { const n = {...prev}; delete n[index]; return n; });
       return { ...prev, questionOptions: newOptions };
     });
+  };
+
+  // Toggle option type between text and image
+  const toggleOptionType = (index: number) => {
+    setOptionTypes(prev => ({
+      ...prev,
+      [index]: prev[index] === 'image' ? 'text' : 'image'
+    }));
+  };
+
+  // Handle image file selection and convert to Base64
+  const handleImageSelect = (index: number, file: File | null) => {
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setOptionImages(prev => ({ ...prev, [index]: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setOptionImages(prev => { const n = {...prev}; delete n[index]; return n; });
+    }
   };
 
   const updateOption = (index: number, value: string) => {
@@ -122,10 +151,14 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
     setLoading(true);
     try {
       const options = formikValues.questionOptions.map((option: any, index: number) => {
+        // Check if this option is in image mode
+        const isImageMode = optionTypes[index] === 'image';
+        
         // Handle both cases: when useMQTAsOptions is true (options are objects) and false (options are strings)
-        const optionText = typeof option === 'string' ? option : option.optionText;
+        const optionText = isImageMode ? null : (typeof option === 'string' ? option : option.optionText);
+        const optionImageBase64 = isImageMode ? (optionImages[index] || null) : null;
         const optionScores: any[] = [];
-        console.log(optionText)
+        
         if (optionMeasuredQualities[index]) {
           Object.entries(optionMeasuredQualities[index]).forEach(([typeId, val]: any) => {
             if (val.checked) {
@@ -138,7 +171,7 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
             }
           });
         }
-        return { optionText, optionScores, correct: false };
+        return { optionText, optionImageBase64, optionScores, correct: false };
       });
 
       const payload = {
@@ -154,6 +187,8 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
       await CreateQuestionData(payload);
       setFormikValues(initialValues);
       setOptionMeasuredQualities({});
+      setOptionTypes({});
+      setOptionImages({});
       onHide();
       navigate("/assessment-questions");
     } catch (error) {
@@ -229,53 +264,103 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
             {useMQTAsOptions ? (
               <MQT mqt={mqt} formikValues={formikValues} setFormikValues={setFormikValues} />
             ) : (
-              formikValues.questionOptions.map((option, index) => (
-                <div key={index} className="d-flex align-items-center gap-2 mb-2">
-                  <input
-                    type="text"
-                    value={option}
-                    onChange={e => updateOption(index, e.target.value)}
-                    placeholder={`Option ${index + 1}`}
-                    className={clsx("form-control", { "is-invalid": !option, "is-valid": !!option })}
-                  />
-                  <Dropdown>
-                    <Dropdown.Toggle variant="secondary" size="sm">MQTs</Dropdown.Toggle>
-                    <Dropdown.Menu style={{ minWidth: 250 }}>
-                      <Dropdown.Header>Measured Quality Types</Dropdown.Header>
-                      <div style={{ maxHeight: 250, overflowY: "auto", padding: 8 }}>
-                        {mqt.map((type, i) => (
-                          <div key={type.measuredQualityTypeId} className="d-flex align-items-center mb-2">
-                            <input
-                              type="checkbox"
-                              checked={!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked}
-                              onChange={() => handleQualityToggle(index, type.measuredQualityTypeId)}
-                              className="form-check-input me-2"
+              formikValues.questionOptions.map((option, index) => {
+                const isImageMode = optionTypes[index] === 'image';
+                return (
+                <div key={index} className="mb-3 p-3 border rounded bg-light">
+                  {/* Toggle Switch for Text/Image */}
+                  <div className="d-flex align-items-center mb-2">
+                    <span className="me-2 fw-bold">Option {index + 1}:</span>
+                    <div className="form-check form-switch ms-auto">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        role="switch"
+                        id={`modal-option-type-${index}`}
+                        checked={isImageMode}
+                        onChange={() => toggleOptionType(index)}
+                      />
+                      <label className="form-check-label" htmlFor={`modal-option-type-${index}`}>
+                        {isImageMode ? '📷 Image' : '📝 Text'}
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="d-flex align-items-start gap-2">
+                    {isImageMode ? (
+                      <div className="flex-grow-1">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleImageSelect(index, e.target.files?.[0] || null)}
+                          className="form-control form-control-sm mb-2"
+                        />
+                        {optionImages[index] && (
+                          <div className="position-relative d-inline-block">
+                            <img 
+                              src={optionImages[index]} 
+                              alt={`Option ${index + 1}`}
+                              style={{ maxWidth: 120, maxHeight: 80, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }}
                             />
-                            <label className="me-2 mb-0">{type.measuredQualityTypeName}</label>
-                            {!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked && (
-                              <input
-                                type="number"
-                                min={0}
-                                max={100}
-                                value={optionMeasuredQualities[index][type.measuredQualityTypeId]?.score ?? 0}
-                                onChange={e => handleQualityScoreChange(index, type.measuredQualityTypeId, Number(e.target.value))}
-                                className="form-control form-control-sm ms-2"
-                                style={{ width: 70 }}
-                              />
-                            )}
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-danger position-absolute"
+                              style={{ top: -8, right: -8, padding: '2px 8px', fontSize: 10 }}
+                              onClick={() => handleImageSelect(index, null)}
+                            >
+                              ×
+                            </button>
                           </div>
-                        ))}
+                        )}
                       </div>
-                    </Dropdown.Menu>
-                  </Dropdown>
-                  {formikValues.questionOptions.length > 1 && (
-                    <Button variant="danger" size="sm" onClick={() => removeOption(index)}>-</Button>
-                  )}
-                  {index === formikValues.questionOptions.length - 1 && (
-                    <Button variant="primary" size="sm" onClick={addOption}>+</Button>
-                  )}
+                    ) : (
+                      <input
+                        type="text"
+                        value={option}
+                        onChange={e => updateOption(index, e.target.value)}
+                        placeholder={`Option ${index + 1}`}
+                        className={clsx("form-control flex-grow-1", { "is-invalid": !option, "is-valid": !!option })}
+                      />
+                    )}
+                    <Dropdown>
+                      <Dropdown.Toggle variant="secondary" size="sm">MQTs</Dropdown.Toggle>
+                      <Dropdown.Menu style={{ minWidth: 250 }}>
+                        <Dropdown.Header>Measured Quality Types</Dropdown.Header>
+                        <div style={{ maxHeight: 250, overflowY: "auto", padding: 8 }}>
+                          {mqt.map((type, i) => (
+                            <div key={type.measuredQualityTypeId} className="d-flex align-items-center mb-2">
+                              <input
+                                type="checkbox"
+                                checked={!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked}
+                                onChange={() => handleQualityToggle(index, type.measuredQualityTypeId)}
+                                className="form-check-input me-2"
+                              />
+                              <label className="me-2 mb-0">{type.measuredQualityTypeName}</label>
+                              {!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked && (
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  value={optionMeasuredQualities[index][type.measuredQualityTypeId]?.score ?? 0}
+                                  onChange={e => handleQualityScoreChange(index, type.measuredQualityTypeId, Number(e.target.value))}
+                                  className="form-control form-control-sm ms-2"
+                                  style={{ width: 70 }}
+                                />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </Dropdown.Menu>
+                    </Dropdown>
+                    {formikValues.questionOptions.length > 1 && (
+                      <Button variant="danger" size="sm" onClick={() => removeOption(index)}>-</Button>
+                    )}
+                    {index === formikValues.questionOptions.length - 1 && (
+                      <Button variant="primary" size="sm" onClick={addOption}>+</Button>
+                    )}
+                  </div>
                 </div>
-              ))
+              )})
             )}
           </div>
 

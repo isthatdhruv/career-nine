@@ -46,11 +46,20 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
   // State for measured qualities per option: { [optionIdx]: { [typeId]: { checked: boolean, score: number } } }
   const [optionMeasuredQualities, setOptionMeasuredQualities] = useState<Record<number, Record<number, { checked: boolean, score: number }>>>({});
 
+  // State for tracking option type (text vs image) per option index
+  const [optionTypes, setOptionTypes] = useState<{ [key: number]: 'text' | 'image' }>({});
+  // State for storing Base64 image data per option index
+  const [optionImages, setOptionImages] = useState<{ [key: number]: string }>({});
+
   // Always call this hook at the top level, not conditionally
   useEffect(() => {
     if (questionData.options && questionData.options.length > 0) {
       const qualities: Record<number, Record<number, { checked: boolean, score: number }>> = {};
+      const types: { [key: number]: 'text' | 'image' } = {};
+      const images: { [key: number]: string } = {};
+      
       questionData.options.forEach((option: any, idx: number) => {
+        // Load measured quality scores
         if (option.optionScores && Array.isArray(option.optionScores)) {
           qualities[idx] = {};
           option.optionScores.forEach((scoreObj: any) => {
@@ -62,8 +71,22 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
             }
           });
         }
+        
+        // Load existing images - check if optionImageBase64 exists
+        if (option.optionImageBase64) {
+          types[idx] = 'image';
+          // If it's already a data URL, use as is; otherwise prepend the data URL prefix
+          images[idx] = option.optionImageBase64.startsWith('data:') 
+            ? option.optionImageBase64 
+            : `data:image/png;base64,${option.optionImageBase64}`;
+        } else {
+          types[idx] = 'text';
+        }
       });
+      
       setOptionMeasuredQualities(qualities);
+      setOptionTypes(types);
+      setOptionImages(images);
     }
   }, [questionData]);
 
@@ -144,6 +167,28 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
       },
     }));
   };
+
+  // Toggle option type between text and image
+  const toggleOptionType = (index: number) => {
+    setOptionTypes(prev => ({
+      ...prev,
+      [index]: prev[index] === 'image' ? 'text' : 'image'
+    }));
+  };
+
+  // Handle image file selection and convert to Base64
+  const handleImageSelect = (index: number, file: File | null) => {
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setOptionImages(prev => ({ ...prev, [index]: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setOptionImages(prev => { const n = {...prev}; delete n[index]; return n; });
+    }
+  };
+
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
@@ -275,6 +320,9 @@ const formik = useFormik({
       
       // Build options array with optionScores from optionMeasuredQualities
       const options = sortedOptions.map((option: any, idx: number) => {
+        // Check if this option is in image mode
+        const isImageMode = optionTypes[idx] === 'image';
+        
         const qualities = optionMeasuredQualities[idx] || {};
         const optionScores = Object.entries(qualities)
           .filter(([_, v]) => v && v.checked)
@@ -284,7 +332,8 @@ const formik = useFormik({
             measuredQualityType: { measuredQualityTypeId: Number(typeId) },
           }));
         return {
-          optionText: option.optionText,
+          optionText: isImageMode ? null : option.optionText,
+          optionImageBase64: isImageMode ? (optionImages[idx] || null) : null,
           description: option.description || "",
           optionScores,
           correct: option.correct ?? false,
@@ -391,6 +440,10 @@ const removeOption = (index: number) => {
       });
       return newQualities;
     });
+    
+    // Also remove option type and image data
+    setOptionTypes(prev => { const n = {...prev}; delete n[index]; return n; });
+    setOptionImages(prev => { const n = {...prev}; delete n[index]; return n; });
   }
 };
 
@@ -566,29 +619,76 @@ return (
                         </select>
                       </td>
                       <td>
-                        <div className="mb-2">
-                          <input
-                            type="text"
-                            placeholder={`Enter option ${option.sequence}`}
-                            value={option.optionText}
-                            onChange={e => updateOption(index, e.target.value)}
-                            className={clsx(
-                              "form-control form-control-sm",
-                              {
-                                "is-invalid text-danger": !option.optionText,
-                                "is-valid": !!option.optionText,
-                              }
-                            )}
-                          />
+                        {/* Toggle Switch for Text/Image */}
+                        <div className="d-flex align-items-center mb-2">
+                          <div className="form-check form-switch">
+                            <input
+                              className="form-check-input"
+                              type="checkbox"
+                              role="switch"
+                              id={`edit-option-type-${index}`}
+                              checked={optionTypes[index] === 'image'}
+                              onChange={() => toggleOptionType(index)}
+                            />
+                            <label className="form-check-label small" htmlFor={`edit-option-type-${index}`}>
+                              {optionTypes[index] === 'image' ? '📷' : '📝'}
+                            </label>
+                          </div>
                         </div>
-                        <textarea
-                          placeholder={`Enter description for option ${option.sequence} (optional)`}
-                          value={option.description || ""}
-                          onChange={e => updateOptionDescription(index, e.target.value)}
-                          className="form-control form-control-sm"
-                          rows={2}
-                          style={{ resize: "vertical" }}
-                        />
+                        
+                        {optionTypes[index] === 'image' ? (
+                          <div>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleImageSelect(index, e.target.files?.[0] || null)}
+                              className="form-control form-control-sm mb-2"
+                            />
+                            {optionImages[index] && (
+                              <div className="position-relative d-inline-block">
+                                <img 
+                                  src={optionImages[index]} 
+                                  alt={`Option ${option.sequence}`}
+                                  style={{ maxWidth: 100, maxHeight: 60, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }}
+                                />
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-danger position-absolute"
+                                  style={{ top: -6, right: -6, padding: '1px 5px', fontSize: 10 }}
+                                  onClick={() => handleImageSelect(index, null)}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            <div className="mb-2">
+                              <input
+                                type="text"
+                                placeholder={`Enter option ${option.sequence}`}
+                                value={option.optionText}
+                                onChange={e => updateOption(index, e.target.value)}
+                                className={clsx(
+                                  "form-control form-control-sm",
+                                  {
+                                    "is-invalid text-danger": !option.optionText,
+                                    "is-valid": !!option.optionText,
+                                  }
+                                )}
+                              />
+                            </div>
+                            <textarea
+                              placeholder={`Description (optional)`}
+                              value={option.description || ""}
+                              onChange={e => updateOptionDescription(index, e.target.value)}
+                              className="form-control form-control-sm"
+                              rows={2}
+                              style={{ resize: "vertical" }}
+                            />
+                          </>
+                        )}
                       </td>
                       <td>
                         <Dropdown>

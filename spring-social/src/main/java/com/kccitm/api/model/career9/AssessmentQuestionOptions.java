@@ -1,20 +1,25 @@
 package com.kccitm.api.model.career9;
 
 import java.io.Serializable;
+import java.util.Base64;
 import java.util.List;
 
 import javax.persistence.CascadeType;
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
+import javax.persistence.Lob;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Entity
 @Table(name = "assessment_question_options")
@@ -37,6 +42,11 @@ public class AssessmentQuestionOptions implements Serializable {
     @JsonIgnoreProperties({ "question_option", "measuredQualityType" })
     private List<OptionScoreBasedOnMEasuredQualityTypes> optionScores;
 
+    @Lob
+    @Column(name = "option_image", columnDefinition = "LONGBLOB")
+    @JsonIgnore
+    private byte[] optionImage;
+
     public AssessmentQuestionOptions(Long optionId) {
         this.optionId = optionId;
     }
@@ -56,6 +66,38 @@ public class AssessmentQuestionOptions implements Serializable {
 
     public String getOptionText() {
         return optionText;
+    }
+
+    // Raw byte[] getter/setter (internal use)
+    @JsonIgnore
+    public byte[] getOptionImage() {
+        return optionImage;
+    }
+
+    @JsonIgnore
+    public void setOptionImage(byte[] optionImage) {
+        this.optionImage = optionImage;
+    }
+
+    // Base64 getter for JSON serialization - returns image as Base64 string
+    @JsonProperty("optionImageBase64")
+    public String getOptionImageBase64() {
+        if (optionImage != null && optionImage.length > 0) {
+            return Base64.getEncoder().encodeToString(optionImage);
+        }
+        return null;
+    }
+
+    // Base64 setter for JSON deserialization - accepts Base64 string from frontend
+    @JsonProperty("optionImageBase64")
+    public void setOptionImageBase64(String base64) {
+        if (base64 != null && !base64.isEmpty()) {
+            // Remove data URL prefix if present (e.g., "data:image/png;base64,")
+            String data = base64.contains(",") ? base64.split(",")[1] : base64;
+            this.optionImage = Base64.getDecoder().decode(data);
+        } else {
+            this.optionImage = null;
+        }
     }
 
     public void setOptionText(String optionText) {

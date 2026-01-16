@@ -29,7 +29,6 @@ public class AssessmentTableController {
     @Autowired
     private QuestionnaireRepository questionnaireRepository;
 
-
     @GetMapping("/getAll")
     // @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public ResponseEntity<List<AssessmentTable>> getAllAssessments() {
@@ -43,6 +42,7 @@ public class AssessmentTableController {
         return assessment.map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
+
     @GetMapping("/getby/{id}")
     public List<Questionnaire> getQuestionnaireById(@PathVariable Long id) {
 
@@ -50,6 +50,7 @@ public class AssessmentTableController {
 
         return questionnaireRepository.findAllByQuestionnaireId(questionnaireId);
     }
+
     @PostMapping("/create")
     public ResponseEntity<AssessmentTable> createAssessment(@RequestBody java.util.Map<String, Object> requestBody) {
         AssessmentTable assessment = new AssessmentTable();
