@@ -1,16 +1,23 @@
 package com.kccitm.api.controller.career9;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import com.kccitm.api.repository.Career9.AssessmentTableRepository;
-import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireRepository;
-import com.kccitm.api.model.career9.AssessmentTable;
-import com.kccitm.api.model.career9.Questionaire.Questionnaire;
-
 import java.util.List;
 import java.util.Optional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.kccitm.api.model.career9.AssessmentTable;
+import com.kccitm.api.model.career9.Questionaire.Questionnaire;
+import com.kccitm.api.repository.Career9.AssessmentTableRepository;
+import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireRepository;
 
 @RestController
 @RequestMapping("/assessments")
@@ -21,6 +28,7 @@ public class AssessmentTableController {
 
     @Autowired
     private QuestionnaireRepository questionnaireRepository;
+
 
     @GetMapping("/getAll")
     // @org.springframework.transaction.annotation.Transactional(readOnly = true)
@@ -35,7 +43,13 @@ public class AssessmentTableController {
         return assessment.map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
+    @GetMapping("/getby/{id}")
+    public List<Questionnaire> getQuestionnaireById(@PathVariable Long id) {
 
+        Long questionnaireId = assessmentTableRepository.findById(id).get().getQuestionnaire().getQuestionnaireId();
+
+        return questionnaireRepository.findAllByQuestionnaireId(questionnaireId);
+    }
     @PostMapping("/create")
     public ResponseEntity<AssessmentTable> createAssessment(@RequestBody java.util.Map<String, Object> requestBody) {
         AssessmentTable assessment = new AssessmentTable();
