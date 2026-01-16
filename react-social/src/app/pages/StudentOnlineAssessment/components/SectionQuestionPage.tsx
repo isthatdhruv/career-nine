@@ -31,6 +31,7 @@ type Question = {
     questionText: string;
     options: Option[];
     languageQuestions?: LanguageQuestion[];
+    maxOptionsAllowed: number;
   };
 };
 
@@ -48,6 +49,8 @@ const SectionQuestionPage: React.FC = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [languages, setLanguages] = useState<QuestionnaireLanguage[]>([]);
+  const [currentSection, setCurrentSection] = useState<any>(null);
+  const [showWarning, setShowWarning] = useState<boolean>(false);
 
   const [answers, setAnswers] = useState<Record<string, Record<number, number[]>>>(
     {}
@@ -68,6 +71,7 @@ const SectionQuestionPage: React.FC = () => {
       );
       if (!section) return;
 
+      setCurrentSection(section);
       setQuestions(section.questions || []);
       setCurrentIndex(Number(questionIndex) || 0);
       
@@ -99,6 +103,39 @@ const SectionQuestionPage: React.FC = () => {
 
   const selectedOptions = answers[sectionId!]?.[qId] || [];
 
+  // Check if this is the last question of the last section
+  const isLastSection = () => {
+    if (!questionnaire) return false;
+    const currentSectionIndex = questionnaire.sections.findIndex(
+      (s: any) => String(s.section.sectionId) === String(sectionId)
+    );
+    return currentSectionIndex === questionnaire.sections.length - 1;
+  };
+
+  const isLastQuestionOfLastSection = () => {
+    return isLastSection() && currentIndex === questions.length - 1;
+  };
+
+  // Check if all questions are answered
+  const areAllQuestionsAnswered = (): boolean => {
+    if (!questionnaire) return false;
+    
+    for (const section of questionnaire.sections) {
+      const secId = String(section.section.sectionId);
+      for (const q of section.questions) {
+        const qId = q.questionnaireQuestionId;
+        
+        // Check if question is answered
+        const isAnswered = answers[secId]?.[qId]?.length > 0;
+        
+        if (!isAnswered) {
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+
   const markSkipped = () => {
     setSkipped((prev) => {
       const s = new Set(prev[sectionId!] || []);
@@ -111,14 +148,29 @@ const SectionQuestionPage: React.FC = () => {
     setAnswers((prev) => {
       const sec = prev[sectionId!] || {};
       const arr = sec[qId] || [];
-      const updated = arr.includes(optionId)
-        ? arr.filter((x) => x !== optionId)
-        : [...arr, optionId];
 
-      return {
-        ...prev,
-        [sectionId!]: { ...sec, [qId]: updated },
-      };
+      // Check if the maximum number of options is already selected
+      if (arr.includes(optionId)) {
+        // If the option is already selected, remove it
+        const updated = arr.filter((x) => x !== optionId);
+        return {
+          ...prev,
+          [sectionId!]: { ...sec, [qId]: updated },
+        };
+      } else if (
+        question.question.maxOptionsAllowed === 0 || // Allow unlimited selection if maxOptionsAllowed is 0
+        arr.length < question.question.maxOptionsAllowed
+      ) {
+        // If the maximum number of options is not reached, add the option
+        const updated = [...arr, optionId];
+        return {
+          ...prev,
+          [sectionId!]: { ...sec, [qId]: updated },
+        };
+      }
+
+      // If the maximum number of options is reached, return the current state
+      return prev;
     });
 
     setSkipped((prev) => {
@@ -175,6 +227,20 @@ const SectionQuestionPage: React.FC = () => {
     }
   };
 
+  const handleSubmitAssessment = () => {
+    if (areAllQuestionsAnswered()) {
+      // Navigate to completion page
+      navigate("/studentAssessment/completed");
+    } else {
+      // Show warning message
+      setShowWarning(true);
+      // Hide warning after 5 seconds
+      setTimeout(() => {
+        setShowWarning(false);
+      }, 5000);
+    }
+  };
+
   const getQuestionColor = (secId: string, qId: number) => {
     if (answers[secId]?.[qId]?.length) return "#0d6efd";
     if (savedForLater[secId]?.has(qId)) return "#6f42c1";
@@ -217,7 +283,7 @@ const SectionQuestionPage: React.FC = () => {
         <div
           style={{
             borderBottom: "2px solid #e0e0e0",
-            padding: "10px 15px 15px 15px", // Top padding (10px) provides space for the logo
+            padding: "10px 15px 15px 15px",
             background: "#fff",
           }}
         >
@@ -299,8 +365,25 @@ const SectionQuestionPage: React.FC = () => {
           padding: 20,
         }}
       >
-        <div className="card shadow-sm" style={{ width: 1000, maxWidth: "96%" }}>
+        <div className="card shadow-sm" style={{ width: 1000, maxWidth: "96%", minHeight: "650px" }}>
           <div className="card-body p-5">
+            {/* Section Name Badge */}
+            <div className="mb-3">
+              <span
+                style={{
+                  background: "#e7f3ff",
+                  color: "#0d6efd",
+                  padding: "6px 16px",
+                  borderRadius: "20px",
+                  fontSize: "0.875rem",
+                  fontWeight: 600,
+                  display: "inline-block",
+                }}
+              >
+                {currentSection?.section?.sectionName}
+              </span>
+            </div>
+
             <div className="d-flex justify-content-between align-items-center mb-4">
               <h6 className="text-muted mb-0">
                 Question {currentIndex + 1} of {questions.length}
@@ -318,6 +401,23 @@ const SectionQuestionPage: React.FC = () => {
                 ⏱️ {formatTime(elapsedTime)}
               </div>
             </div>
+
+            {/* Warning Message */}
+            {showWarning && (
+              <div
+                className="alert alert-warning alert-dismissible fade show"
+                role="alert"
+                style={{ marginBottom: "20px" }}
+              >
+                <strong>⚠️ Warning!</strong> Please answer all questions before submitting the assessment. Some questions are still Saved for Later, Skipped, or Not Visited.
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setShowWarning(false)}
+                  aria-label="Close"
+                ></button>
+              </div>
+            )}
 
             {languages.length > 0 ? (
               <div
@@ -354,11 +454,20 @@ const SectionQuestionPage: React.FC = () => {
               <h4 className="mb-4">{question.question.questionText}</h4>
             )}
 
+            {/* Display maxOptionsAllowed */}
+            <div className="text-muted mb-3">
+              <small>
+                You can select up to <strong>{question.question.maxOptionsAllowed}</strong> option(s).
+              </small>
+            </div>
+
             <div className="mt-4">
               {question.question.options.map((opt) => (
                 <label
                   key={opt.optionId}
-                  className="border rounded p-3 d-block mb-3"
+                  className={`border rounded p-3 d-block mb-3 ${
+                    selectedOptions.includes(opt.optionId) ? "bg-light" : ""
+                  }`}
                   style={{ cursor: "pointer" }}
                 >
                   <div className="d-flex align-items-start">
@@ -367,6 +476,11 @@ const SectionQuestionPage: React.FC = () => {
                       className="me-3 mt-1"
                       checked={selectedOptions.includes(opt.optionId)}
                       onChange={() => toggleOption(opt.optionId)}
+                      disabled={
+                        question.question.maxOptionsAllowed > 0 &&
+                        !selectedOptions.includes(opt.optionId) &&
+                        selectedOptions.length >= question.question.maxOptionsAllowed
+                      }
                     />
                     {languages.length > 0 ? (
                       <div
@@ -413,11 +527,17 @@ const SectionQuestionPage: React.FC = () => {
                     Save for Later
                   </button>
                 )}
-                <button className="btn btn-primary" onClick={goNext}>
-                  {currentIndex === questions.length - 1
-                    ? "NEXT SECTION"
-                    : "NEXT"}
-                </button>
+                {isLastQuestionOfLastSection() ? (
+                  <button className="btn btn-success" onClick={handleSubmitAssessment}>
+                    SUBMIT ASSESSMENT
+                  </button>
+                ) : (
+                  <button className="btn btn-primary" onClick={goNext}>
+                    {currentIndex === questions.length - 1
+                      ? "NEXT SECTION"
+                      : "NEXT"}
+                  </button>
+                )}
               </div>
             </div>
           </div>
