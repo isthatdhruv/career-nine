@@ -136,6 +136,50 @@ const SectionQuestionPage: React.FC = () => {
     return true;
   };
 
+  const generateSubmissionJSON = () => {
+    const answersList: any[] = [];
+
+    // Iterate through all sections and questions
+    if (questionnaire && questionnaire.sections) {
+      for (const section of questionnaire.sections) {
+        const secId = String(section.section.sectionId);
+        
+        for (const q of section.questions) {
+          const questionnaireQuestionId = q.questionnaireQuestionId;
+          const selectedOptionIds = answers[secId]?.[questionnaireQuestionId] || [];
+
+          // For each selected option, create a separate entry
+          if (selectedOptionIds.length > 0) {
+            for (const optionId of selectedOptionIds) {
+              const entry = {
+                questionnaireQuestionId: questionnaireQuestionId,
+                optionId: optionId
+              };
+
+              answersList.push(entry);
+            }
+          }
+        }
+      }
+    }
+
+    // Get user_student_id from questionnaire data
+    const userStudentId = questionnaire?.userStudent?.userStudentId || null;
+    
+    // Get assessment_id from localStorage
+    const assessmentId = localStorage.getItem('assessmentId') 
+      ? parseInt(localStorage.getItem('assessmentId')!) 
+      : null;
+
+    const submissionData = {
+      userStudentId: userStudentId,
+      assessmentId: assessmentId,
+      answers: answersList
+    };
+
+    return submissionData;
+  };
+
   const markSkipped = () => {
     setSkipped((prev) => {
       const s = new Set(prev[sectionId!] || []);
@@ -227,10 +271,40 @@ const SectionQuestionPage: React.FC = () => {
     }
   };
 
-  const handleSubmitAssessment = () => {
+  const handleSubmitAssessment = async () => {
     if (areAllQuestionsAnswered()) {
-      // Navigate to completion page
-      navigate("/studentAssessment/completed");
+      try {
+        // Generate the submission JSON
+        const submissionJSON = generateSubmissionJSON();
+        console.log("=== ASSESSMENT SUBMISSION DATA ===");
+        console.log(JSON.stringify(submissionJSON, null, 2));
+        console.log("=== END OF SUBMISSION DATA ===");
+
+        // Send POST request to backend
+        const response = await fetch("http://localhost:8080/assessment-answer/submit", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify(submissionJSON)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to submit assessment: ${errorText}`);
+        }
+
+        const result = await response.json();
+        console.log("=== SUBMISSION SUCCESSFUL ===");
+        console.log("Saved answers:", result);
+        
+        // Navigate to completion page
+        navigate("/studentAssessment/completed");
+      } catch (error) {
+        console.error("Error submitting assessment:", error);
+        alert("Failed to submit assessment. Please try again.");
+      }
     } else {
       // Show warning message
       setShowWarning(true);
