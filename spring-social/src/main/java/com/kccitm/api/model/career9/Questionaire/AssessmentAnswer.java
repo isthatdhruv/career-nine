@@ -29,12 +29,12 @@ public class AssessmentAnswer implements Serializable {
 
     // ✅ FIXED
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "user_student_id")
+    @JoinColumn(name = "user_student_id", referencedColumnName = "user_student_id")
     private UserStudent userStudent;
 
     // ✅ FIXED
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "assessment_id")
+    @JoinColumn(name = "assessment_id", referencedColumnName = "assessment_id")
     private AssessmentTable assessment;
 
     // OK

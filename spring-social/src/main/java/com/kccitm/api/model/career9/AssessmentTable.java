@@ -22,6 +22,7 @@ public class AssessmentTable implements java.io.Serializable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "assessment_id")
     private Long id;
 
     private String AssessmentName;
