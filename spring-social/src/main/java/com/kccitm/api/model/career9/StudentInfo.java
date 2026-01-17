@@ -2,7 +2,6 @@ package com.kccitm.api.model.career9;
 
 import java.io.Serializable;
 import java.util.Date;
-import com.fasterxml.jackson.annotation.JsonFormat;
 
 import javax.persistence.CascadeType;
 import javax.persistence.Entity;
@@ -14,10 +13,12 @@ import javax.persistence.OneToOne;
 import javax.persistence.Table;
 import javax.persistence.Transient;
 
-import com.kccitm.api.model.Difficulty;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.kccitm.api.model.User;
 
 @Entity
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 @Table(name = "student_info")
 public class StudentInfo implements Serializable {
     private static final long serialVersionUID = 1L;
