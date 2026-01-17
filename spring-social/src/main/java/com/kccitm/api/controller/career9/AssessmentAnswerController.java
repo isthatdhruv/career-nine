@@ -8,11 +8,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.Questionaire.AssessmentAnswer;
+import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
-import com.kccitm.api.repository.Career9.AssessmentTableRepository;
-import com.kccitm.api.repository.Career9.AssessmentQuestionOptionsRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 
 @RestController
@@ -24,14 +22,14 @@ public class AssessmentAnswerController {
     @Autowired
     private UserStudentRepository userStudentRepository;
 
-    @GetMapping(value = "/getAll", headers = "Accept=application/json")
-    public int getAllAssessmentAnswers() {
-        return assessmentAnswerRepository.findAll().size();
-    }
-
     @GetMapping(value = "/getByStudent/{studentId}", headers = "Accept=application/json")
     public List<AssessmentAnswer> getAssessmentAnswersByStudent(@PathVariable("studentId") Long studentId) {
         UserStudent userStudent = userStudentRepository.findById(studentId).orElse(null);
         return assessmentAnswerRepository.findByUserStudent(userStudent);
+    }
+
+    @GetMapping(value = "/getAll", headers = "Accept=application/json")
+    public List<AssessmentAnswer> getAllAssessmentAnswers() {
+        return assessmentAnswerRepository.findAll();
     }
 }

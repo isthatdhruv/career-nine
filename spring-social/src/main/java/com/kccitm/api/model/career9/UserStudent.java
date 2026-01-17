@@ -13,13 +13,11 @@ import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.google.api.services.directory.model.User;
-import com.kccitm.api.model.Student;
 import com.kccitm.api.model.career9.school.InstituteDetail;
 
 @Entity
 @Table(name = "user_student")
-@JsonIgnoreProperties(ignoreUnknown = true)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class UserStudent implements Serializable {
 
     private static final long serialVersionUID = 1L;

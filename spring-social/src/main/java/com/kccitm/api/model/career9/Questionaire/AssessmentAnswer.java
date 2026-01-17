@@ -11,7 +11,6 @@ import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.kccitm.api.model.career9.AssessmentQuestionOptions;
 import com.kccitm.api.model.career9.AssessmentTable;
@@ -20,30 +19,33 @@ import com.kccitm.api.model.career9.UserStudent;
 
 @Entity
 @Table(name = "assessment_answer")
-@JsonIgnoreProperties(ignoreUnknown = true)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class AssessmentAnswer implements Serializable {
 
-    private static final long serialVersionUID = 1L;
-
-    // Primary key
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "assessment_answer_id")
     private Long assessmentAnswerId;
 
-    @Column(name = "user_student_id")
+    // ✅ FIXED
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "user_student_id")
     private UserStudent userStudent;
 
-    @Column(name = "assessment_id")
-    private AssessmentTable assessmentId;
+    // ✅ FIXED
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "assessment_id")
+    private AssessmentTable assessment;
 
-    //QuestionnaireQuestion ID
+    // OK
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "questionnaire_question_id")
-    private QuestionnaireQuestion questionnaireQuestionId;
+    private QuestionnaireQuestion questionnaireQuestion;
 
-    @Column(name = "option_id")
-    private AssessmentQuestionOptions optionId;
+    // ✅ FIXED
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "option_id")
+    private AssessmentQuestionOptions option;
 
     public AssessmentAnswer() {
     }
@@ -63,22 +65,23 @@ public class AssessmentAnswer implements Serializable {
         this.userStudent = userStudent;
     }
 
-    public AssessmentTable getAssessmentId() {
-        return assessmentId;
-    }   
-    public void setAssessmentId(AssessmentTable assessmentId) {
-        this.assessmentId = assessmentId;
-    }   
-    public QuestionnaireQuestion getQuestionnaireQuestionId() {
-        return questionnaireQuestionId;
-    }   
-    public void setQuestionnaireQuestionId(QuestionnaireQuestion questionnaireQuestionId) {
-        this.questionnaireQuestionId = questionnaireQuestionId;
-    }   
-    public AssessmentQuestionOptions getOptionId() {
-        return optionId;    
+    public AssessmentTable getAssessment() {
+        return assessment;
     }
-    public void setOptionId(AssessmentQuestionOptions optionId) {
-        this.optionId = optionId;
-    }   
+
+    public void setAssessment(AssessmentTable assessment) {
+        this.assessment = assessment;
+    }
+    public QuestionnaireQuestion getQuestionnaireQuestion() {
+        return questionnaireQuestion;
+    }
+    public void setQuestionnaireQuestion(QuestionnaireQuestion questionnaireQuestion) {
+        this.questionnaireQuestion = questionnaireQuestion;
+    }
+    public AssessmentQuestionOptions getOption() {
+        return option;
+    }
+    public void setOption(AssessmentQuestionOptions option) {
+        this.option = option;
+    }
 }
