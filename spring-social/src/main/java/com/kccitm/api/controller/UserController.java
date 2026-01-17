@@ -90,6 +90,8 @@ public class UserController {
                 StudentAssessmentMapping studentAssessmentMapping = studentAssessmentMappingRepository
                         .getByUserStudent(userStudent);
                 return studentAssessmentMapping.getAssessmentId();
+
+                
             } else {
                 return null;
             }
