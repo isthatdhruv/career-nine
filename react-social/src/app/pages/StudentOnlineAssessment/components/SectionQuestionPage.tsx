@@ -164,11 +164,13 @@ const SectionQuestionPage: React.FC = () => {
     }
 
     // Get user_student_id from questionnaire data
-    const userStudentId = questionnaire?.userStudent?.userStudentId || null;
+    const userStudentId = localStorage.getItem('User Student id') 
+      ? parseInt(localStorage.getItem('User Student id')!) 
+      : null;
     
     // Get assessment_id from localStorage
-    const assessmentId = localStorage.getItem('assessmentId') 
-      ? parseInt(localStorage.getItem('assessmentId')!) 
+    const assessmentId = localStorage.getItem('Assessment id') 
+      ? parseInt(localStorage.getItem('Assessment id')!) 
       : null;
 
     const submissionData = {
