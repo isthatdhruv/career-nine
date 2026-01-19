@@ -2,7 +2,8 @@ import { useNavigate } from "react-router-dom";
 import { useAssessment } from "./AssessmentContext";
 
 export default function AllottedAssessmentPage() {
-  const assessmentId = localStorage.getItem('Assessment id');
+  const assessmentId = localStorage.getItem('assessmentId');
+  const userStudentId = localStorage.getItem('UserStudentId');
   const navigate = useNavigate();
   const { fetchAssessmentData, loading } = useAssessment();
 

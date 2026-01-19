@@ -144,7 +144,7 @@
     "sectionId" : 2,
     "sectionName" : "Section A",
     "sectionDescription" : "Section A Insight Navigator",
-    "questionId" : [ 6, 44, 45, 47 ]
+    "questionId" : [ 6, 44, 45, 47, 72, 74, 75 ]
   },
   "languageQuestions" : [ {
     "language" : {
@@ -1986,7 +1986,7 @@
     "sectionId" : 2,
     "sectionName" : "Section A",
     "sectionDescription" : "Section A Insight Navigator",
-    "questionId" : [ 6, 44, 45, 47 ]
+    "questionId" : [ 6, 44, 45, 47, 72, 74, 75 ]
   },
   "languageQuestions" : [ ],
   "id" : 44
@@ -2061,7 +2061,7 @@
     "sectionId" : 2,
     "sectionName" : "Section A",
     "sectionDescription" : "Section A Insight Navigator",
-    "questionId" : [ 6, 44, 45, 47 ]
+    "questionId" : [ 6, 44, 45, 47, 72, 74, 75 ]
   },
   "languageQuestions" : [ ],
   "id" : 45
@@ -2408,9 +2408,9 @@
     "optionScores" : [ ],
     "isGame" : true,
     "game" : {
-      "gameId" : 2,
-      "gameName" : "Rabbit's Path",
-      "gameCode" : 102
+      "gameId" : 3,
+      "gameName" : "Hydro Tube",
+      "gameCode" : 103
     },
     "correct" : false,
     "optionImageBase64" : null
@@ -2419,7 +2419,7 @@
     "sectionId" : 2,
     "sectionName" : "Section A",
     "sectionDescription" : "Section A Insight Navigator",
-    "questionId" : [ 6, 44, 45, 47 ]
+    "questionId" : [ 6, 44, 45, 47, 72, 74, 75 ]
   },
   "languageQuestions" : [ ],
   "id" : 47
@@ -3149,4 +3149,88 @@
   },
   "languageQuestions" : [ ],
   "id" : 71
+}, {
+  "questionId" : 72,
+  "questionText" : "Game 2",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 0,
+  "options" : [ {
+    "optionId" : 321,
+    "optionText" : null,
+    "optionDescription" : null,
+    "optionScores" : [ ],
+    "isGame" : true,
+    "game" : {
+      "gameId" : 2,
+      "gameName" : "Rabbit's Path",
+      "gameCode" : 102
+    },
+    "correct" : false,
+    "optionImageBase64" : null
+  } ],
+  "section" : {
+    "sectionId" : 2,
+    "sectionName" : "Section A",
+    "sectionDescription" : "Section A Insight Navigator",
+    "questionId" : [ 6, 44, 45, 47, 72, 74, 75 ]
+  },
+  "languageQuestions" : [ ],
+  "id" : 72
+}, {
+  "questionId" : 74,
+  "questionText" : "Game 3",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 0,
+  "options" : [ {
+    "optionId" : 322,
+    "optionText" : null,
+    "optionDescription" : null,
+    "optionScores" : [ ],
+    "isGame" : true,
+    "game" : {
+      "gameId" : 3,
+      "gameName" : "Hydro Tube",
+      "gameCode" : 103
+    },
+    "correct" : false,
+    "optionImageBase64" : null
+  } ],
+  "section" : {
+    "sectionId" : 2,
+    "sectionName" : "Section A",
+    "sectionDescription" : "Section A Insight Navigator",
+    "questionId" : [ 6, 44, 45, 47, 72, 74, 75 ]
+  },
+  "languageQuestions" : [ ],
+  "id" : 74
+}, {
+  "questionId" : 75,
+  "questionText" : "Game 1",
+  "questionType" : "multiple-choice",
+  "flag" : false,
+  "maxOptionsAllowed" : 0,
+  "options" : [ {
+    "optionId" : 323,
+    "optionText" : null,
+    "optionDescription" : null,
+    "optionScores" : [ ],
+    "isGame" : true,
+    "game" : {
+      "gameId" : 1,
+      "gameName" : "Jungle Spot",
+      "gameCode" : 101
+    },
+    "correct" : false,
+    "optionImageBase64" : null
+  } ],
+  "section" : {
+    "sectionId" : 2,
+    "sectionName" : "Section A",
+    "sectionDescription" : "Section A Insight Navigator",
+    "questionId" : [ 6, 44, 45, 47, 72, 74, 75 ]
+  },
+  "languageQuestions" : [ ],
+  "id" : 75
 } ]
