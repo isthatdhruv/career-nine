@@ -16,11 +16,9 @@ import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
 import javax.persistence.OneToOne;
 import javax.persistence.Table;
-import javax.validation.constraints.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Entity
@@ -44,7 +42,6 @@ public class AssessmentQuestionOptions implements Serializable {
     private AssessmentQuestions question;
 
     @OneToMany(mappedBy = "question_option", cascade = CascadeType.ALL)
-    @JsonIgnoreProperties({ "question_option", "measuredQualityType" })
     private List<OptionScoreBasedOnMEasuredQualityTypes> optionScores;
 
     @Lob

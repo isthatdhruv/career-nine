@@ -46,10 +46,12 @@ public class OptionScoreBasedOnMEasuredQualityTypes implements Serializable {
         this.score = score;
     }
     public AssessmentQuestionOptions getQuestion_option() {
+        AssessmentQuestionOptions question_option = new AssessmentQuestionOptions(this.question_option.getOptionId());
         return question_option;
     }
     public void setQuestion_option(AssessmentQuestionOptions question_option) {
-        this.question_option = question_option;
+        AssessmentQuestionOptions question_option_Temp = new AssessmentQuestionOptions(question_option.getOptionId());
+        this.question_option = question_option_Temp;
     }
     
     public MeasuredQualityTypes getMeasuredQualityType() {

@@ -2,6 +2,7 @@ package com.kccitm.api.controller.career9.Questionaire;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
@@ -282,6 +283,7 @@ public class QuestionnaireController {
                 incoming.setSection(existingSection);
                 existingSection.getQuestions().add(incoming);
             } else {
+                try{
                 existingSection.getQuestions().stream()
                         .filter(q -> q.getQuestionnaireQuestionId().equals(incoming.getQuestionnaireQuestionId()))
                         .findFirst()
@@ -291,6 +293,10 @@ public class QuestionnaireController {
                             // Update the question reference if it changed
                             exist.setQuestion(incoming.getQuestion());
                         });
+                    }catch(Exception e){
+                        Set<QuestionnaireQuestion> existingQuestions = existingSection.getQuestions();
+                        e.printStackTrace();    
+                    }
             }
         }
     }
