@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback } from "react";
 import { doc, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "../../../firebase";
 
 // === TYPES ===
 export type AnimalReactionData = {
@@ -49,13 +49,28 @@ type DataContextType = {
   studentName: string;
   studentClass: string;
   setStudentInfo: (name: string, className: string) => void;
-  saveAnimalReaction: (data: Omit<AnimalReactionData, "timestamp">) => Promise<void>;
-  saveRabbitPath: (data: Omit<RabbitPathData, "timestamp">) => Promise<void>;
-  saveHydroTube: (data: Omit<HydroTubeData, "timestamp">) => Promise<void>;
+  saveAnimalReaction: (data: Omit<AnimalReactionData, "timestamp">, userStudentId?: string) => Promise<void>;
+  saveRabbitPath: (data: Omit<RabbitPathData, "timestamp">, userStudentId?: string) => Promise<void>;
+  saveHydroTube: (data: Omit<HydroTubeData, "timestamp">, userStudentId?: string) => Promise<void>;
   isSaving: boolean;
 };
 
 const DataContext = createContext<DataContextType | null>(null);
+
+// Helper to get userStudentId from localStorage or fallback
+function getUserStudentId(providedId?: string): string | null {
+  if (providedId && providedId.trim()) {
+    return providedId.trim();
+  }
+  // Fallback to localStorage
+  if (typeof window !== 'undefined') {
+    const storedId = localStorage.getItem('userStudentId');
+    if (storedId && storedId.trim()) {
+      return storedId.trim();
+    }
+  }
+  return null;
+}
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const [studentName, setStudentName] = useState("");
@@ -67,70 +82,101 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setStudentClass(className);
   }, []);
 
-  const getDocId = useCallback(() => studentName.trim().toLowerCase(), [studentName]);
-
-  const saveAnimalReaction = useCallback(async (data: Omit<AnimalReactionData, "timestamp">) => {
-    if (!studentName) {
-      console.warn("Cannot save: studentName not set");
+  const saveAnimalReaction = useCallback(async (data: Omit<AnimalReactionData, "timestamp">, providedUserId?: string) => {
+    const docId = getUserStudentId(providedUserId);
+    if (!docId) {
+      console.error("❌ Cannot save Animal Reaction: userStudentId not found in params or localStorage");
       return;
     }
+    
     setIsSaving(true);
+    console.log("📤 Saving Animal Reaction to Firestore...");
+    console.log("   Document ID:", docId);
+    console.log("   Data:", data);
+    
     try {
-      await setDoc(doc(db, "game_results", getDocId()), {
-        name: studentName,
-        ...(studentClass ? { className: studentClass } : {}),
-        animal_reaction: { ...data, timestamp: new Date().toISOString() },
-        timestamp: new Date().toISOString(),
-      }, { merge: true });
-      console.log("Animal reaction saved");
-    } catch (e) {
-      console.error("Save failed:", e);
+      const saveData = {
+        userStudentId: docId,
+        animal_reaction: { 
+          ...data, 
+          timestamp: new Date().toISOString() 
+        },
+        lastUpdated: new Date().toISOString(),
+      };
+      
+      await setDoc(doc(db, "game_results", docId), saveData, { merge: true });
+      console.log("✅ Animal Reaction saved successfully for:", docId);
+    } catch (e: any) {
+      console.error("❌ Failed to save Animal Reaction:", e?.message || e);
+      throw e;
     } finally {
       setIsSaving(false);
     }
-  }, [studentName, studentClass, getDocId]);
+  }, []);
 
-  const saveRabbitPath = useCallback(async (data: Omit<RabbitPathData, "timestamp">) => {
-    if (!studentName) {
-      console.warn("Cannot save: studentName not set");
+  const saveRabbitPath = useCallback(async (data: Omit<RabbitPathData, "timestamp">, providedUserId?: string) => {
+    const docId = getUserStudentId(providedUserId);
+    if (!docId) {
+      console.error("❌ Cannot save Rabbit Path: userStudentId not found in params or localStorage");
       return;
     }
+    
     setIsSaving(true);
+    console.log("📤 Saving Rabbit Path to Firestore...");
+    console.log("   Document ID:", docId);
+    console.log("   Data:", data);
+    
     try {
-      await setDoc(doc(db, "game_results", getDocId()), {
-        name: studentName,
-        ...(studentClass ? { className: studentClass } : {}),
-        rabbit_path: { ...data, timestamp: new Date().toISOString() },
-        timestamp: new Date().toISOString(),
-      }, { merge: true });
-      console.log("Rabbit path saved");
-    } catch (e) {
-      console.error("Save failed:", e);
+      const saveData = {
+        userStudentId: docId,
+        rabbit_path: { 
+          ...data, 
+          timestamp: new Date().toISOString() 
+        },
+        lastUpdated: new Date().toISOString(),
+      };
+      
+      await setDoc(doc(db, "game_results", docId), saveData, { merge: true });
+      console.log("✅ Rabbit Path saved successfully for:", docId);
+    } catch (e: any) {
+      console.error("❌ Failed to save Rabbit Path:", e?.message || e);
+      throw e;
     } finally {
       setIsSaving(false);
     }
-  }, [studentName, studentClass, getDocId]);
+  }, []);
 
-  const saveHydroTube = useCallback(async (data: Omit<HydroTubeData, "timestamp">) => {
-    if (!studentName) {
-      console.warn("Cannot save: studentName not set");
+  const saveHydroTube = useCallback(async (data: Omit<HydroTubeData, "timestamp">, providedUserId?: string) => {
+    const docId = getUserStudentId(providedUserId);
+    if (!docId) {
+      console.error("❌ Cannot save Hydro Tube: userStudentId not found in params or localStorage");
       return;
     }
+    
     setIsSaving(true);
+    console.log("📤 Saving Hydro Tube to Firestore...");
+    console.log("   Document ID:", docId);
+    console.log("   Data:", data);
+    
     try {
-      await setDoc(doc(db, "game_results", getDocId()), {
-        name: studentName,
-        ...(studentClass ? { className: studentClass } : {}),
-        hydro_tube: { ...data, timestamp: new Date().toISOString() },
-        timestamp: new Date().toISOString(),
-      }, { merge: true });
-      console.log("Hydro tube saved");
-    } catch (e) {
-      console.error("Save failed:", e);
+      const saveData = {
+        userStudentId: docId,
+        hydro_tube: { 
+          ...data, 
+          timestamp: new Date().toISOString() 
+        },
+        lastUpdated: new Date().toISOString(),
+      };
+      
+      await setDoc(doc(db, "game_results", docId), saveData, { merge: true });
+      console.log("✅ Hydro Tube saved successfully for:", docId);
+    } catch (e: any) {
+      console.error("❌ Failed to save Hydro Tube:", e?.message || e);
+      throw e;
     } finally {
       setIsSaving(false);
     }
-  }, [studentName, studentClass, getDocId]);
+  }, []);
 
   return (
     <DataContext.Provider value={{
