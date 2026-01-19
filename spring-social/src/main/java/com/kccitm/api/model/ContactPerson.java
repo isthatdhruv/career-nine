@@ -12,7 +12,7 @@ import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 import javax.validation.constraints.NotNull;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.kccitm.api.model.career9.school.InstituteDetail;
 
 @Entity
@@ -37,9 +37,9 @@ public class ContactPerson implements Serializable {
 
     // Many contact persons belong to one institute
     // contact person
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "institute_code")
-    @JsonIgnore
+    @JsonBackReference
     private InstituteDetail institute;
 
     public Long getId() {
