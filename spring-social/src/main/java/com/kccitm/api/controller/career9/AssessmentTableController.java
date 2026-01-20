@@ -39,8 +39,7 @@ public class AssessmentTableController {
     @GetMapping("/{id}")
     public ResponseEntity<AssessmentTable> getAssessmentById(@PathVariable Long id) {
         Optional<AssessmentTable> assessment = assessmentTableRepository.findById(id);
-        return assessment.map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        return assessment.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @GetMapping("/getby/{id}")

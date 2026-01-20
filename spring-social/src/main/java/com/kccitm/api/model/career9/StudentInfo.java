@@ -4,6 +4,7 @@ import java.io.Serializable;
 import java.util.Date;
 
 import javax.persistence.CascadeType;
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
@@ -12,6 +13,7 @@ import javax.persistence.JoinColumn;
 import javax.persistence.OneToOne;
 import javax.persistence.Table;
 import javax.persistence.Transient;
+import javax.persistence.criteria.CriteriaBuilder.In;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -37,8 +39,8 @@ public class StudentInfo implements Serializable {
 
     private String address;
 
-    @Transient
-    private String institue_id;
+    @Column(name = "institute_id")
+    private Integer instituteId;
 
     @Transient
     private String assesment_id;
@@ -115,12 +117,12 @@ public class StudentInfo implements Serializable {
         this.user = user;
     }
 
-    public String getInstitue_id() {
-        return institue_id;
+    public Integer getInstituteId() {
+        return instituteId;
     }
 
-    public void setInstitue_id(String institue_id) {
-        this.institue_id = institue_id;
+    public void setInstituteId(Integer instituteId) {
+        this.instituteId = instituteId;
     }
 
     public String getAssesment_id() {

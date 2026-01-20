@@ -36,8 +36,8 @@ public class AssessmentQuestionOptions implements Serializable {
 
     private String optionDescription;
 
-    @ManyToOne
-    @JoinColumn(name = "fk_assessment_questions", nullable = false)
+    @ManyToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "fk_assessment_questions")
     @JsonBackReference
     private AssessmentQuestions question;
 
