@@ -1,228 +1,343 @@
-// CollegeAssignRolePage.tsx
-import React, { useMemo, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+// StudentsList.tsx
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { getStudentsWithMappingByInstituteId, getAllAssessments, bulkAlotAssessment, Assessment } from "./StudentInfo_APIs";
 
 type Student = {
-  id: string;
+  id: number;
   name: string;
-  groupName: string;
-  assessment: "Subject Navigator" | "Career Navigator" | "Insight Navigator";
-  status: "completed" | "pending" | "not-done";
-  avatar: string;
+  schoolRollNumber: string;
+  selectedAssessment: string;
+  userStudentId: number;
 };
 
-export default function Users() {
+export default function StudentsList() {
   const navigate = useNavigate();
-  const { state } = useLocation();
-
+  const [students, setStudents] = useState<Student[]>([]);
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
-  const [showActiveOnly, setShowActiveOnly] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
 
-  const students: Student[] = [
-    {
-      id: "1",
-      name: "Aarav Sharma",
-      groupName: "Group A",
-      assessment: "Career Navigator",
-      status: "completed",
-      avatar: "AS",
-    },
-    {
-      id: "2",
-      name: "Priya Verma",
-      groupName: "Group B",
-      assessment: "Insight Navigator",
-      status: "pending",
-      avatar: "PV",
-    },
-    {
-      id: "3",
-      name: "Rohit Mehta",
-      groupName: "Group A",
-      assessment: "Subject Navigator",
-      status: "completed",
-      avatar: "RM",
-    },
-    {
-      id: "4",
-      name: "Sneha Kapoor",
-      groupName: "Group C",
-      assessment: "Career Navigator",
-      status: "not-done",
-      avatar: "SK",
-    },
-    {
-      id: "5",
-      name: "Karan Singh",
-      groupName: "Group B",
-      assessment: "Insight Navigator",
-      status: "completed",
-      avatar: "KS",
-    },
-  ];
+  useEffect(() => {
+    const instituteId = localStorage.getItem('instituteId');
+    
+    // Fetch assessments
+    getAllAssessments()
+      .then(response => {
+        setAssessments(response.data);
+      })
+      .catch(error => {
+        console.error("Error fetching assessments:", error);
+      });
+
+    if (instituteId) {
+      setLoading(true);
+      getStudentsWithMappingByInstituteId(Number(instituteId))
+        .then(response => {
+          const studentData = response.data.map((student: any) => ({
+            id: student.id,
+            name: student.name || "",
+            schoolRollNumber: student.schoolRollNumber || "",
+            selectedAssessment: student.assessmentId ? String(student.assessmentId) : "",
+            userStudentId: student.userStudentId,
+          }));
+          setStudents(studentData);
+        })
+        .catch(error => {
+          console.error("Error fetching student info:", error);
+        })
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleAssessmentChange = (studentId: number, assessment: string) => {
+    setStudents(prev => 
+      prev.map(s => 
+        s.id === studentId ? { ...s, selectedAssessment: assessment } : s
+      )
+    );
+    setHasChanges(true);
+  };
+
+  const handleSave = async () => {
+    const assignments = students
+      .filter(s => s.selectedAssessment)
+      .map(s => ({
+        userStudentId: s.userStudentId,
+        assessmentId: Number(s.selectedAssessment),
+      }));
+
+    if (assignments.length === 0) {
+      alert("No assessments selected to save.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await bulkAlotAssessment(assignments);
+      alert("Assessments saved successfully!");
+      setHasChanges(false);
+    } catch (error) {
+      console.error("Error saving assessments:", error);
+      alert("Failed to save assessments. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const filteredStudents = useMemo(() => {
     return students.filter((s) => {
-      const matchesSearch =
+      return (
         s.name.toLowerCase().includes(query.toLowerCase()) ||
-        s.groupName.toLowerCase().includes(query.toLowerCase());
-
-      const matchesStatus = showActiveOnly
-        ? s.status === "completed"
-        : true;
-
-      return matchesSearch && matchesStatus;
+        s.schoolRollNumber.toLowerCase().includes(query.toLowerCase()) ||
+        s.id.toString().includes(query)
+      );
     });
-  }, [query, showActiveOnly]);
+  }, [students, query]);
 
   return (
-    <div className="container-fluid py-4">
-      <style>{`
-        .team-page .card { border-radius: 10px; overflow: hidden; }
-
-        .team-header {
-          display:flex;
-          align-items:center;
-          justify-content: space-between;
-          gap:12px;
-        }
-
-        .member-avatar {
-          width:40px;
-          height:40px;
-          border-radius:50%;
-          display:inline-flex;
-          align-items:center;
-          justify-content:center;
-          color:#fff;
-          font-weight:600;
-          background:#3699ff;
-        }
-
-        .metronic-table thead th {
-          font-weight: 600;
-          padding: 16px 24px;
-          font-size: 14px;
-          background: #fafafb;
-          border-bottom: 1px solid #eff2f5;
-        }
-
-        .metronic-table tbody td {
-          padding: 16px 24px;
-          border-bottom: 1px solid #eff2f5;
-        }
-
-        .metronic-table thead th:first-child,
-        .metronic-table tbody td:first-child {
-          padding-left: 28px !important;
-        }
-
-        .status-pill {
-          padding: 5px 12px;
-          border-radius: 12px;
-          font-size: 12px;
-          font-weight: 600;
-        }
-
-        .status-completed { background: #e8fff3; color: #0bb783; }
-        .status-pending { background: #fff8dd; color: #ffa800; }
-        .status-not-done { background: #f8d7da; color: #d33; }
-      `}</style>
-
-      <div className="team-page">
-        {/* HEADER */}
-        <div className="team-header mb-4">
-          <div>
-            <h3 className="mb-0">Students List</h3>
-            <small className="text-muted">
-              Overview of all students enrolled in it.
-            </small>
+    <div className="min-vh-100" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%)', padding: '2rem' }}>
+      {/* Header Card */}
+      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px' }}>
+        <div className="card-body p-4">
+          <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
+            <div>
+              <h2 className="mb-1 fw-bold" style={{ color: '#1a1a2e' }}>
+                <i className="bi bi-people-fill me-2" style={{ color: '#4361ee' }}></i>
+                Students List
+              </h2>
+              <p className="text-muted mb-0">
+                Manage students and assign assessments for your institute
+              </p>
+            </div>
+            <button
+              className="btn btn-primary d-flex align-items-center gap-2"
+              style={{
+                background: 'linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '0.6rem 1.2rem',
+                fontWeight: 600,
+              }}
+              onClick={() => navigate("/student/registration-form")}
+            >
+              <i className="bi bi-plus-lg"></i>
+              Add Student
+            </button>
           </div>
-
-          {/* ADD STUDENT BUTTON */}
-          <button
-            className="btn btn-sm btn-primary"
-            onClick={() => navigate("/student/registration-form")}
-          >
-            + Add Student
-          </button>
         </div>
+      </div>
 
-        {/* Search & Filter */}
-        <div className="d-flex align-items-center justify-content-between mb-3 gap-3">
-          <div className="d-flex align-items-center gap-2">
-            <input
-              className="form-control form-control-sm"
-              placeholder="Search students"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-
-            <div className="form-check form-switch ms-2">
+      {/* Search Bar */}
+      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px' }}>
+        <div className="card-body p-4">
+          <div className="d-flex align-items-center gap-3 flex-wrap">
+            <div className="position-relative flex-grow-1" style={{ maxWidth: '400px' }}>
+              <i className="bi bi-search position-absolute" style={{ left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#9e9e9e' }}></i>
               <input
-                className="form-check-input"
-                type="checkbox"
-                id="activeOnly"
-                checked={showActiveOnly}
-                onChange={(e) => setShowActiveOnly(e.target.checked)}
+                className="form-control"
+                placeholder="Search by name, roll number, or ID..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                style={{
+                  paddingLeft: '42px',
+                  borderRadius: '10px',
+                  border: '2px solid #e0e0e0',
+                  padding: '0.7rem 1rem 0.7rem 42px',
+                }}
               />
-              <label
-                className="form-check-label small text-muted"
-                htmlFor="activeOnly"
-              >
-                Students who have Completed Assessments
-              </label>
+            </div>
+            <div className="d-flex align-items-center gap-2">
+              <span className="badge bg-primary px-3 py-2" style={{ borderRadius: '20px', fontSize: '0.9rem' }}>
+                {filteredStudents.length} Students
+              </span>
+              {hasChanges && (
+                <span className="badge bg-warning text-dark px-3 py-2" style={{ borderRadius: '20px', fontSize: '0.9rem' }}>
+                  <i className="bi bi-exclamation-circle me-1"></i>
+                  Unsaved Changes
+                </span>
+              )}
             </div>
           </div>
         </div>
+      </div>
 
-        {/* TABLE */}
-        <div className="card shadow-sm">
-          <div className="card-body p-0">
-            <div className="table-responsive metronic-table">
+      {/* Table Card */}
+      <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
+        <div className="card-body p-0">
+          {loading ? (
+            <div className="text-center py-5">
+              <div className="spinner-border text-primary" role="status">
+                <span className="visually-hidden">Loading...</span>
+              </div>
+              <p className="mt-3 text-muted">Loading students...</p>
+            </div>
+          ) : filteredStudents.length === 0 ? (
+            <div className="text-center py-5">
+              <div 
+                className="mx-auto mb-3"
+                style={{ 
+                  width: '80px', 
+                  height: '80px', 
+                  borderRadius: '50%', 
+                  background: '#f0f0f0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <i className="bi bi-inbox" style={{ fontSize: '2rem', color: '#bdbdbd' }}></i>
+              </div>
+              <h5 className="text-muted">No Students Found</h5>
+              <p className="text-muted mb-0">Try adjusting your search or add new students</p>
+            </div>
+          ) : (
+            <div className="table-responsive">
               <table className="table align-middle mb-0">
                 <thead>
-                  <tr>
-                    <th>Student Name</th>
-                    <th>Group Name</th>
-                    <th>Allotted Assessment</th>
-                    <th className="text-center">Status</th>
-                    <th className="text-center">Dashboard</th>
+                  <tr style={{ background: '#f8f9fa' }}>
+                    <th style={{ padding: '16px 24px', fontWeight: 600, color: '#1a1a2e', borderBottom: '2px solid #e0e0e0' }}>
+                      ID
+                    </th>
+                    <th style={{ padding: '16px 24px', fontWeight: 600, color: '#1a1a2e', borderBottom: '2px solid #e0e0e0' }}>
+                      Student Name
+                    </th>
+                    <th style={{ padding: '16px 24px', fontWeight: 600, color: '#1a1a2e', borderBottom: '2px solid #e0e0e0' }}>
+                      Roll Number
+                    </th>
+                    <th style={{ padding: '16px 24px', fontWeight: 600, color: '#1a1a2e', borderBottom: '2px solid #e0e0e0', minWidth: '220px' }}>
+                      Assessment
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredStudents.map((student) => (
-                    <tr key={student.id}>
-                      <td>
-                        <div className="d-flex align-items-center gap-3">
-                          <div className="member-avatar">{student.avatar}</div>
-                          <span className="fw-semibold">{student.name}</span>
-                        </div>
-                      </td>
-                      <td>{student.groupName}</td>
-                      <td>{student.assessment}</td>
-                      <td className="text-center">
-                        <span className={`status-pill status-${student.status}`}>
-                          {student.status.replace("-", " ").toUpperCase()}
+                  {filteredStudents.map((student, index) => (
+                    <tr 
+                      key={student.id}
+                      style={{ 
+                        background: index % 2 === 0 ? '#fff' : '#fafbfc',
+                        transition: 'background 0.2s'
+                      }}
+                    >
+                      <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
+                        <span 
+                          className="badge"
+                          style={{ 
+                            background: 'rgba(67, 97, 238, 0.1)', 
+                            color: '#4361ee',
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            fontWeight: 600,
+                            fontSize: '0.85rem'
+                          }}
+                        >
+                          #{student.id}
                         </span>
                       </td>
-                      <td className="text-center">
-                        <button
-                          className="btn btn-sm btn-light-primary"
-                          onClick={() =>
-                            navigate(`/students/${student.id}/dashboard`)
-                          }
+                      <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
+                        <div className="d-flex align-items-center gap-3">
+                          <div 
+                            style={{
+                              width: '42px',
+                              height: '42px',
+                              borderRadius: '50%',
+                              background: 'linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#fff',
+                              fontWeight: 600,
+                              fontSize: '0.9rem'
+                            }}
+                          >
+                            {student.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                          </div>
+                          <span className="fw-semibold" style={{ color: '#1a1a2e' }}>{student.name}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
+                        <span style={{ fontWeight: 500, color: '#555' }}>
+                          {student.schoolRollNumber || '-'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
+                        <select
+                          className="form-select"
+                          value={student.selectedAssessment}
+                          onChange={(e) => handleAssessmentChange(student.id, e.target.value)}
+                          style={{
+                            borderRadius: '8px',
+                            border: '2px solid #e0e0e0',
+                            padding: '8px 12px',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            background: student.selectedAssessment ? 'rgba(67, 97, 238, 0.05)' : '#fff'
+                          }}
                         >
-                          View
-                        </button>
+                          <option value="">-- Select Assessment --</option>
+                          {assessments.map((assessment) => (
+                            <option key={assessment.id} value={assessment.id}>
+                              {assessment.assessmentName}
+                            </option>
+                          ))}
+                        </select>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
+          )}
         </div>
+
+        {/* Save Button Footer */}
+        {!loading && filteredStudents.length > 0 && (
+          <div 
+            className="card-footer bg-white border-top p-4"
+            style={{ borderRadius: '0 0 16px 16px' }}
+          >
+            <div className="d-flex justify-content-between align-items-center">
+              <span className="text-muted">
+                <i className="bi bi-info-circle me-2"></i>
+                Select assessments for students and click save to apply changes
+              </span>
+              <button
+                className="btn btn-lg d-flex align-items-center gap-2"
+                onClick={handleSave}
+                disabled={!hasChanges || saving}
+                style={{
+                  background: (hasChanges && !saving)
+                    ? 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)' 
+                    : '#e0e0e0',
+                  color: (hasChanges && !saving) ? '#fff' : '#9e9e9e',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '0.8rem 2rem',
+                  fontWeight: 600,
+                  boxShadow: (hasChanges && !saving) ? '0 8px 20px rgba(76, 175, 80, 0.3)' : 'none',
+                  transition: 'all 0.3s ease',
+                  cursor: (hasChanges && !saving) ? 'pointer' : 'not-allowed'
+                }}
+              >
+                {saving ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <i className="bi bi-check2-circle"></i>
+                    Save Changes
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

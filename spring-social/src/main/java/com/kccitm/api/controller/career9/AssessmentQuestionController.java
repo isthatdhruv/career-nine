@@ -111,7 +111,9 @@ public class AssessmentQuestionController {
     public AssessmentQuestions createAssessmentQuestion(@RequestBody AssessmentQuestions assessmentQuestions)
             throws Exception {
         // Wire up relationships and clean references before saving
+        
         AssessmentQuestions assementQustionObject = assessmentQuestionRepository.save(assessmentQuestions);
+
         return assementQustionObject.getId() != null ? assementQustionObject : null;
     }
 

@@ -115,7 +115,7 @@ const QuestionTable = (props: {
     columns: [
       { label: "Question Text", field: "questionText", width: 300 },
       { label: "Question Type", field: "questionType", sort: "asc", width: 150 },
-      { label: "Section", field: "sectionType", sort: "asc", width: 150 },
+      // { label: "Section", field: "sectionType", sort: "asc", width: 150 },
       { label: "Actions", field: "actions", sort: "disabled", width: 200 },
     ],
 

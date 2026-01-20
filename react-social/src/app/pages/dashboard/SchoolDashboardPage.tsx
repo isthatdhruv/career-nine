@@ -1,5 +1,5 @@
 /* eslint-disable jsx-a11y/anchor-is-valid */
-import { FC } from "react";
+import { FC, useEffect } from "react";
 import { useIntl } from "react-intl";
 import { PageTitle } from "../../../_metronic/layout/core";
 import {
@@ -16,6 +16,8 @@ import {
 } from "../../../_metronic/partials/widgets";
 import  StudentList  from "./widgets/StudentList";
 import { SchoolDashboardShortcut } from "./widgets/SchoolDashboardShortcut";
+import { useLocation, useParams } from "react-router-dom";
+// import { getStudentInfoByInstituteId } from "../StudentInformation/StudentInfo_APIs";
 
 const SchoolDashboardContent: FC = () => (
   <>
@@ -90,6 +92,14 @@ const SchoolDashboardContent: FC = () => (
 
 const SchoolDashboardPage: FC = () => {
   const intl = useIntl();
+  const { id } = useParams();
+
+  console.log('Institute ID from params:', id);
+  // Update localStorage whenever this page is opened or instituteId changes
+  useEffect(() => {
+    localStorage.setItem('instituteId', id ?? '');
+  }, [id]);
+
   return (
     <>
       <PageTitle breadcrumbs={[]}>
