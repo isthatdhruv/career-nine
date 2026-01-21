@@ -4,6 +4,9 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"
 const SCENE_SRC = "/game-scenes/2nd/game-scene-2nd.png";
 const RABBIT_SRC = "/game-scenes/2nd/rabbit-nobg.png";
 
+// How to play video path - place video at: public/assets/game/rabbit-path-tutorial.mp4
+const HOW_TO_PLAY_VIDEO_PATH = "/assets/game/rabbit-path-tutorial.mp4";
+
 type Phase = "ready" | "show" | "input" | "feedback" | "paused" | "trial_done" | "done";
 
 type StonePos = {
@@ -124,6 +127,9 @@ const generateClass4Sequence = (
 };
 
 export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }: RabbitPathGameProps) {
+  // Flow states: Video -> Trial -> Main Game
+  const [showHowToPlayVideo, setShowHowToPlayVideo] = useState(true); // Start with video (required)
+  
   // Game State
   const [phase, setPhase] = useState<Phase>("ready");
   const [isTrial, setIsTrial] = useState(true);
@@ -266,15 +272,17 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
     clearTimers();
     
     if (isTrial && !correct) {
+      // Retry same trial round with a new sequence after showing feedback
       timers.current.push(window.setTimeout(() => {
-        // Retry same trial round
+        // Restart the same trial round (trialRound stays the same)
+        startRoundRef.current(trialRound);
       }, 1500));
     } else {
       timers.current.push(window.setTimeout(() => handleNextRound(), correct ? 1000 : 700));
     }
     
     setPhase("feedback");
-  }, [isTrial, round, moveRabbitTo, clearTimers, handleNextRound]);
+  }, [isTrial, round, trialRound, moveRabbitTo, clearTimers, handleNextRound]);
 
   const finishAfterBuffer = useCallback(() => {
     setPhase(prev => {
@@ -390,6 +398,11 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
     setPhase("ready");
     setTimeout(() => startRoundRef.current(round), 50);
   }, [round]);
+
+  // Handle video completion - move to trial mode
+  const handleVideoComplete = useCallback(() => {
+    setShowHowToPlayVideo(false);
+  }, []);
 
   const handleGameControl = useCallback(() => {
     if (phase === "ready") {
@@ -509,6 +522,115 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
           </p>
         </div>
         <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  // How To Play Video Screen - shown first (required)
+  if (showHowToPlayVideo) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(135deg, #1e3a5f 0%, #0f1f33 50%, #1a2d47 100%)',
+          padding: '16px',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            background: 'linear-gradient(135deg, rgba(30, 58, 95, 0.9), rgba(15, 31, 51, 0.95))',
+            borderRadius: '24px',
+            padding: '24px',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+            border: '2px solid rgba(59, 130, 246, 0.3)',
+            maxWidth: '600px',
+            width: '100%',
+            textAlign: 'center',
+            zIndex: 10,
+          }}
+        >
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '16px' }}>
+            <span style={{ fontSize: '32px' }}>🎬</span>
+            <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#93c5fd', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+              How To Play
+            </h1>
+          </div>
+          
+          <p style={{ color: '#60a5fa', fontSize: '14px', marginBottom: '20px' }}>
+            Watch this short tutorial before starting, {playerName}!
+          </p>
+
+          {/* Video Container */}
+          <div
+            style={{
+              background: '#000',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              marginBottom: '20px',
+              border: '3px solid rgba(59, 130, 246, 0.4)',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.4)',
+            }}
+          >
+            <video
+              src={HOW_TO_PLAY_VIDEO_PATH}
+              controls
+              autoPlay
+              style={{
+                width: '100%',
+                maxHeight: '300px',
+                display: 'block',
+              }}
+              onEnded={handleVideoComplete}
+            >
+              Your browser does not support the video tag.
+            </video>
+          </div>
+
+          {/* Info Text */}
+          <div style={{ 
+            background: 'rgba(59, 130, 246, 0.2)', 
+            borderRadius: '12px', 
+            padding: '12px 16px', 
+            marginBottom: '20px',
+            border: '1px solid rgba(59, 130, 246, 0.3)' 
+          }}>
+            <p style={{ color: '#93c5fd', fontSize: '13px' }}>
+              🐰 Watch the rabbit hop on stones, then repeat the sequence!<br />
+              <span style={{ color: 'rgba(147, 197, 253, 0.8)' }}>After the video: <strong>2 practice rounds</strong> → <strong>{TOTAL_ROUNDS} main rounds</strong></span>
+            </p>
+          </div>
+
+          <button
+            onClick={handleVideoComplete}
+            style={{
+              width: '100%',
+              padding: '14px 24px',
+              fontSize: '16px',
+              fontWeight: 700,
+              color: '#0f1f33',
+              background: 'linear-gradient(to right, #60a5fa, #3b82f6, #60a5fa)',
+              border: '2px solid rgba(147, 197, 253, 0.5)',
+              borderRadius: '14px',
+              cursor: 'pointer',
+              boxShadow: '0 8px 20px rgba(59, 130, 246, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+            }}
+          >
+            I Understand, Start Practice!
+            <span style={{ fontSize: '18px' }}>🎯</span>
+          </button>
+        </div>
       </div>
     );
   }

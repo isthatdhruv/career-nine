@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 
+// How to play video path - place video at: public/assets/game/hydro-tube-tutorial.mp4
+const HOW_TO_PLAY_VIDEO_PATH = "/assets/game/hydro-tube-tutorial.mp4";
+
 interface HydroTubeGameProps {
   userStudentId: string;
   playerName: string;
@@ -42,9 +45,28 @@ const patterns: Pattern[] = [
       [270, 90, 0, 0, 0, 180, 0, 0, 270, 0, 90, 90, 0, 0, 0, 0]
     ],
   },
+  {
+    id: 2,
+    name: "Pattern C",
+    tileTypes: {
+      1: "t-pipe", 2: "bend", 3: "straight", 4: "bend",
+      5: "straight", 6: "bend", 7: "t-pipe", 8: "straight",
+      9: "bend", 10: "straight", 11: "bend", 12: "straight",
+      13: "straight", 14: "bend", 15: "straight", 16: "bend",
+    },
+    solutions: [
+      // rotations for tiles 1..16 (0/90/180/270)
+      [90, 180, 90, 270, 0, 90, 180, 0, 0, 90, 270, 0, 0, 180, 90, 90]
+    ]
+  }
 ];
 
 export function HydroTubeGame({ userStudentId, playerName, onComplete, onExit }: HydroTubeGameProps) {
+  // Flow states: Video -> Trial -> Main Game
+  const [showHowToPlayVideo, setShowHowToPlayVideo] = useState(true);
+  const [isTrial, setIsTrial] = useState(true);
+  const [trialComplete, setTrialComplete] = useState(false);
+
   const [tileRotations, setTileRotations] = useState<Record<number, number>>({});
   const [isWon, setIsWon] = useState(false);
   const [patternId, setPatternId] = useState(0);
@@ -55,23 +77,32 @@ export function HydroTubeGame({ userStudentId, playerName, onComplete, onExit }:
   const [timeLeft, setTimeLeft] = useState(180);
   const [isInitialized, setIsInitialized] = useState(false);
   const [gameEnded, setGameEnded] = useState(false);
-  
+
   const [curiousClicks, setCuriousClicks] = useState(0);
   const [highlightedTile, setHighlightedTile] = useState<number | null>(null);
-  
+
   const [tilesCorrect, setTilesCorrect] = useState(0);
   const [totalSolutionTiles, setTotalSolutionTiles] = useState(16);
 
   const currentPattern = patterns[patternId];
 
+  // Initialize: Trial uses Pattern C (id: 2), Main game uses random patterns
   useEffect(() => {
-    const randomPatternId = Math.floor(Math.random() * patterns.length);
-    setPatternId(randomPatternId);
+    if (isTrial) {
+      // Trial mode: use Pattern C (id: 2)
+      setPatternId(2);
+    } else {
+      // Main game: use random pattern (excluding pattern C used in trial)
+      const availablePatterns = patterns.filter(p => p.id !== 2);
+      const randomIndex = Math.floor(Math.random() * availablePatterns.length);
+      setPatternId(availablePatterns[randomIndex].id);
+    }
     setIsInitialized(true);
-  }, []);
+  }, [isTrial]);
 
   useEffect(() => {
-    if (!isInitialized) return;
+    // Don't run timer during video or trial mode
+    if (!isInitialized || showHowToPlayVideo || isTrial) return;
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
@@ -111,7 +142,7 @@ export function HydroTubeGame({ userStudentId, playerName, onComplete, onExit }:
       timestamp: new Date().toISOString(),
       gameType: 'hydro-tube'
     };
-    
+
     console.log("Hydro tube game data:", gameData);
     onComplete(gameData);
   }, [gameEnded, completedPatterns.length, aimlessRotations, curiousClicks, tilesCorrect, totalSolutionTiles, timeLeft, userStudentId, playerName, onComplete]);
@@ -128,9 +159,9 @@ export function HydroTubeGame({ userStudentId, playerName, onComplete, onExit }:
 
   const calculateProgress = useCallback((currentRotations: Record<number, number>): { correct: number; total: number } => {
     const playerRotations = Array.from({ length: 16 }, (_, i) => currentRotations[i + 1] || 0);
-    
+
     let bestCorrectCount = 0;
-    
+
     currentPattern.solutions.forEach((solution) => {
       let correctCount = 0;
       solution.forEach((solRot, i) => {
@@ -143,23 +174,32 @@ export function HydroTubeGame({ userStudentId, playerName, onComplete, onExit }:
         bestCorrectCount = correctCount;
       }
     });
-    
+
     return { correct: bestCorrectCount, total: 16 };
   }, [currentPattern.solutions]);
 
   const loadNextPattern = () => {
+    if (isTrial) {
+      // Trial complete - show trial complete screen
+      setTrialComplete(true);
+      setIsWon(false);
+      return;
+    }
+
     const newCompletedPatterns = [...completedPatterns, patternId];
     setCompletedPatterns(newCompletedPatterns);
-    
+
     if (newCompletedPatterns.length >= 2) {
       setTilesCorrect(16);
       setGameEnded(true);
       return;
     }
-    const nextPatternId = patterns.findIndex(p => !newCompletedPatterns.includes(p.id));
     
-    if (nextPatternId !== -1) {
-      setPatternId(nextPatternId);
+    // Find next pattern (excluding pattern C which is used for trial)
+    const availablePatterns = patterns.filter(p => p.id !== 2 && !newCompletedPatterns.includes(p.id));
+    
+    if (availablePatterns.length > 0) {
+      setPatternId(availablePatterns[0].id);
       setTileRotations({});
       setIsWon(false);
       setLastClickedTile(null);
@@ -168,35 +208,63 @@ export function HydroTubeGame({ userStudentId, playerName, onComplete, onExit }:
     }
   };
 
+  // Handle video completion
+  const handleVideoComplete = useCallback(() => {
+    setShowHowToPlayVideo(false);
+  }, []);
+
+  // Start main game after trial
+  const handleStartMainGame = useCallback(() => {
+    setTrialComplete(false);
+    setIsTrial(false);
+    setTileRotations({});
+    setIsWon(false);
+    setLastClickedTile(null);
+    setConsecutiveClicks(0);
+    setHighlightedTile(null);
+    setTimeLeft(180);
+    setCompletedPatterns([]);
+    // Reset main game stats
+    setAimlessRotations(0);
+    setCuriousClicks(0);
+    setTilesCorrect(0);
+  }, []);
+
   const handleTileClick = (tileNumber: number) => {
-    if (isWon) return; 
+    if (isWon) return;
 
-    if (tileNumber === highlightedTile) {
-      setCuriousClicks(prev => prev + 1);
-      setHighlightedTile(null);
-    }
-
-    if (lastClickedTile === tileNumber) {
-      const newConsecutiveClicks = consecutiveClicks + 1;
-      setConsecutiveClicks(newConsecutiveClicks);
-      if (newConsecutiveClicks === 4) {
-        setAimlessRotations(prev => prev + 1);
-        setConsecutiveClicks(0);
+    // Only track curious clicks and aimless rotations during main game (not trial)
+    if (!isTrial) {
+      if (tileNumber === highlightedTile) {
+        setCuriousClicks(prev => prev + 1);
+        setHighlightedTile(null);
       }
-    } else {
-      setLastClickedTile(tileNumber);
-      setConsecutiveClicks(1);
+
+      if (lastClickedTile === tileNumber) {
+        const newConsecutiveClicks = consecutiveClicks + 1;
+        setConsecutiveClicks(newConsecutiveClicks);
+        if (newConsecutiveClicks === 4) {
+          setAimlessRotations(prev => prev + 1);
+          setConsecutiveClicks(0);
+        }
+      } else {
+        setLastClickedTile(tileNumber);
+        setConsecutiveClicks(1);
+      }
     }
 
     setTileRotations((prev) => {
       const currentRotation = prev[tileNumber] || 0;
       const newRotation = (currentRotation + 90) % 360;
       const newState = { ...prev, [tileNumber]: newRotation };
-      
-      const progress = calculateProgress(newState);
-      setTilesCorrect(progress.correct);
-      setTotalSolutionTiles(progress.total);
-      
+
+      // Only track progress during main game
+      if (!isTrial) {
+        const progress = calculateProgress(newState);
+        setTilesCorrect(progress.correct);
+        setTotalSolutionTiles(progress.total);
+      }
+
       if (checkWin(newState)) {
         setTimeout(() => setIsWon(true), 500);
       }
@@ -258,6 +326,212 @@ export function HydroTubeGame({ userStudentId, playerName, onComplete, onExit }:
 
   const progressPercent = (completedPatterns.length / 2) * 100;
 
+  // How To Play Video Screen
+  if (showHowToPlayVideo) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(135deg, #0c4a6e 0%, #075985 30%, #0369a1 50%, #0284c7 75%, #0ea5e9 100%)',
+          padding: '16px',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            background: 'linear-gradient(135deg, rgba(12, 74, 110, 0.95), rgba(7, 89, 133, 0.95))',
+            borderRadius: '24px',
+            padding: '24px',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+            border: '2px solid rgba(56, 189, 248, 0.3)',
+            maxWidth: '600px',
+            width: '100%',
+            textAlign: 'center',
+            zIndex: 10,
+          }}
+        >
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '16px' }}>
+            <span style={{ fontSize: '32px' }}>🎬</span>
+            <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#7dd3fc', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+              How To Play
+            </h1>
+          </div>
+          
+          <p style={{ color: '#38bdf8', fontSize: '14px', marginBottom: '20px' }}>
+            Watch this short tutorial before starting, {playerName}!
+          </p>
+
+          {/* Video Container */}
+          <div
+            style={{
+              background: '#000',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              marginBottom: '20px',
+              border: '3px solid rgba(56, 189, 248, 0.4)',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.4)',
+            }}
+          >
+            <video
+              src={HOW_TO_PLAY_VIDEO_PATH}
+              controls
+              autoPlay
+              style={{
+                width: '100%',
+                maxHeight: '300px',
+                display: 'block',
+              }}
+              onEnded={handleVideoComplete}
+            >
+              Your browser does not support the video tag.
+            </video>
+          </div>
+
+          {/* Info Text */}
+          <div style={{ 
+            background: 'rgba(56, 189, 248, 0.2)', 
+            borderRadius: '12px', 
+            padding: '12px 16px', 
+            marginBottom: '20px',
+            border: '1px solid rgba(56, 189, 248, 0.3)' 
+          }}>
+            <p style={{ color: '#7dd3fc', fontSize: '13px' }}>
+              🚰 Rotate the pipes to connect the water flow!<br />
+              <span style={{ color: 'rgba(186, 230, 253, 0.8)' }}>After the video: <strong>1 practice pattern</strong> → <strong>2 main patterns</strong></span>
+            </p>
+          </div>
+
+          <button
+            onClick={handleVideoComplete}
+            style={{
+              width: '100%',
+              padding: '14px 24px',
+              fontSize: '16px',
+              fontWeight: 700,
+              color: '#0c4a6e',
+              background: 'linear-gradient(to right, #38bdf8, #0ea5e9, #38bdf8)',
+              border: '2px solid rgba(125, 211, 252, 0.5)',
+              borderRadius: '14px',
+              cursor: 'pointer',
+              boxShadow: '0 8px 20px rgba(56, 189, 248, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+            }}
+          >
+            I Understand, Start Practice!
+            <span style={{ fontSize: '18px' }}>🎯</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Trial Complete Screen
+  if (trialComplete) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(135deg, #0c4a6e 0%, #075985 30%, #0369a1 50%, #0284c7 75%, #0ea5e9 100%)',
+          padding: '16px',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            background: 'linear-gradient(135deg, rgba(12, 74, 110, 0.95), rgba(7, 89, 133, 0.95))',
+            borderRadius: '24px',
+            padding: '32px',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+            border: '2px solid rgba(34, 197, 94, 0.4)',
+            maxWidth: '420px',
+            width: '100%',
+            textAlign: 'center',
+            zIndex: 10,
+          }}
+        >
+          {/* Checkmark Icon */}
+          <div style={{ marginBottom: '16px' }}>
+            <div
+              style={{
+                width: '80px',
+                height: '80px',
+                margin: '0 auto',
+                background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 8px 20px rgba(34, 197, 94, 0.3)',
+              }}
+            >
+              <span style={{ fontSize: '40px' }}>✅</span>
+            </div>
+          </div>
+
+          <h1 style={{ fontSize: '28px', fontWeight: 800, color: '#4ade80', marginBottom: '4px', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+            Practice Complete!
+          </h1>
+          <p style={{ color: '#86efac', fontSize: '16px', marginBottom: '24px' }}>
+            Great job solving Pattern C!
+          </p>
+
+          {/* Info about main game */}
+          <div style={{ 
+            background: 'rgba(56, 189, 248, 0.2)', 
+            borderRadius: '12px', 
+            padding: '12px 16px', 
+            marginBottom: '24px',
+            border: '1px solid rgba(56, 189, 248, 0.3)' 
+          }}>
+            <p style={{ color: '#7dd3fc', fontSize: '14px', fontWeight: 600 }}>
+              🎮 Ready for the real challenge?<br />
+              <span style={{ color: 'rgba(186, 230, 253, 0.8)', fontWeight: 400 }}>2 patterns await! You have 3 minutes.</span>
+            </p>
+          </div>
+
+          <button
+            onClick={handleStartMainGame}
+            style={{
+              width: '100%',
+              padding: '16px 24px',
+              fontSize: '18px',
+              fontWeight: 700,
+              color: '#0c4a6e',
+              background: 'linear-gradient(to right, #38bdf8, #0ea5e9, #38bdf8)',
+              border: '2px solid rgba(125, 211, 252, 0.5)',
+              borderRadius: '14px',
+              cursor: 'pointer',
+              boxShadow: '0 8px 20px rgba(56, 189, 248, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+            }}
+          >
+            Start Main Game
+            <span style={{ fontSize: '20px' }}>💧</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -285,24 +559,26 @@ export function HydroTubeGame({ userStudentId, playerName, onComplete, onExit }:
       <div style={{ position: 'absolute', top: '10%', left: '5%', fontSize: '48px', opacity: 0.3, animation: 'bounce 2s infinite' }}>💧</div>
       <div style={{ position: 'absolute', bottom: '15%', right: '8%', fontSize: '40px', opacity: 0.25, animation: 'bounce 2.5s infinite' }}>💧</div>
 
-      {/* Progress Bar */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '8px',
-        background: 'linear-gradient(to right, #0c4a6e, #075985, #0c4a6e)',
-        zIndex: 30,
-      }}>
+      {/* Progress Bar - only show during main game */}
+      {!isTrial && (
         <div style={{
-          height: '100%',
-          width: `${progressPercent}%`,
-          background: 'linear-gradient(to right, #38bdf8, #7dd3fc, #38bdf8)',
-          transition: 'width 0.3s ease-out',
-          boxShadow: '0 0 10px rgba(56, 189, 248, 0.5)',
-        }} />
-      </div>
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '8px',
+          background: 'linear-gradient(to right, #0c4a6e, #075985, #0c4a6e)',
+          zIndex: 30,
+        }}>
+          <div style={{
+            height: '100%',
+            width: `${progressPercent}%`,
+            background: 'linear-gradient(to right, #38bdf8, #7dd3fc, #38bdf8)',
+            transition: 'width 0.3s ease-out',
+            boxShadow: '0 0 10px rgba(56, 189, 248, 0.5)',
+          }} />
+        </div>
+      )}
 
       {/* Player Info - Top Left */}
       <div style={{
@@ -326,32 +602,45 @@ export function HydroTubeGame({ userStudentId, playerName, onComplete, onExit }:
         </div>
       </div>
 
-      {/* Timer - Top Center */}
+      {/* Timer/Practice Badge - Top Center */}
       <div style={{
         position: 'absolute',
         top: '20px',
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 20,
-        background: timeLeft < 30 
-          ? 'linear-gradient(to bottom, rgba(220, 38, 38, 0.95), rgba(185, 28, 28, 0.95))'
-          : 'linear-gradient(to bottom, rgba(12, 74, 110, 0.95), rgba(7, 89, 133, 0.95))',
+        background: isTrial 
+          ? 'linear-gradient(to bottom, rgba(234, 179, 8, 0.95), rgba(202, 138, 4, 0.95))'
+          : timeLeft < 30
+            ? 'linear-gradient(to bottom, rgba(220, 38, 38, 0.95), rgba(185, 28, 28, 0.95))'
+            : 'linear-gradient(to bottom, rgba(12, 74, 110, 0.95), rgba(7, 89, 133, 0.95))',
         padding: '10px 24px',
         borderRadius: '14px',
-        border: timeLeft < 30 ? '2px solid rgba(248, 113, 113, 0.5)' : '2px solid rgba(56, 189, 248, 0.5)',
+        border: isTrial 
+          ? '2px solid rgba(253, 224, 71, 0.5)'
+          : timeLeft < 30 ? '2px solid rgba(248, 113, 113, 0.5)' : '2px solid rgba(56, 189, 248, 0.5)',
         boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '20px' }}>⏱️</span>
-          <span style={{ 
-            color: timeLeft < 30 ? '#fca5a5' : '#7dd3fc', 
-            fontWeight: 900, 
-            fontSize: '24px',
-            animation: timeLeft < 30 ? 'pulse 1s infinite' : 'none'
-          }}>
-            {formatTime(timeLeft)}
-          </span>
-        </div>
+        {isTrial ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '20px' }}>🎯</span>
+            <span style={{ color: '#fef08a', fontWeight: 700, fontSize: '18px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              Practice
+            </span>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '20px' }}>⏱️</span>
+            <span style={{
+              color: timeLeft < 30 ? '#fca5a5' : '#7dd3fc',
+              fontWeight: 900,
+              fontSize: '24px',
+              animation: timeLeft < 30 ? 'pulse 1s infinite' : 'none'
+            }}>
+              {formatTime(timeLeft)}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Controls - Top Right */}
@@ -381,56 +670,84 @@ export function HydroTubeGame({ userStudentId, playerName, onComplete, onExit }:
         </button>
       </div>
 
-      {/* Stats Cards - Left Side */}
-      <div style={{
-        position: 'absolute',
-        top: '80px',
-        left: '16px',
-        zIndex: 20,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '12px',
-      }}>
+      {/* Stats Cards - Left Side (only during main game) */}
+      {!isTrial && (
         <div style={{
-          background: 'rgba(12, 74, 110, 0.9)',
-          padding: '12px 16px',
-          borderRadius: '12px',
-          border: '1px solid rgba(251, 191, 36, 0.4)',
-          boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+          position: 'absolute',
+          top: '80px',
+          left: '16px',
+          zIndex: 20,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
         }}>
-          <div style={{ fontSize: '10px', color: 'rgba(253, 230, 138, 0.7)', textTransform: 'uppercase', letterSpacing: '1px' }}>Aimless Rotations</div>
-          <div style={{ color: '#fbbf24', fontWeight: 700, fontSize: '20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            🔄 {aimlessRotations}
+          <div style={{
+            background: 'rgba(12, 74, 110, 0.9)',
+            padding: '12px 16px',
+            borderRadius: '12px',
+            border: '1px solid rgba(251, 191, 36, 0.4)',
+            boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+          }}>
+            <div style={{ fontSize: '10px', color: 'rgba(253, 230, 138, 0.7)', textTransform: 'uppercase', letterSpacing: '1px' }}>Aimless Rotations</div>
+            <div style={{ color: '#fbbf24', fontWeight: 700, fontSize: '20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              🔄 {aimlessRotations}
+            </div>
+          </div>
+          <div style={{
+            background: 'rgba(12, 74, 110, 0.9)',
+            padding: '12px 16px',
+            borderRadius: '12px',
+            border: '1px solid rgba(192, 132, 252, 0.4)',
+            boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+          }}>
+            <div style={{ fontSize: '10px', color: 'rgba(216, 180, 254, 0.7)', textTransform: 'uppercase', letterSpacing: '1px' }}>Curious Clicks</div>
+            <div style={{ color: '#c084fc', fontWeight: 700, fontSize: '20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              ✨ {curiousClicks}
+            </div>
+          </div>
+          <div style={{
+            background: 'rgba(12, 74, 110, 0.9)',
+            padding: '12px 16px',
+            borderRadius: '12px',
+            border: '1px solid rgba(74, 222, 128, 0.4)',
+            boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+          }}>
+            <div style={{ fontSize: '10px', color: 'rgba(134, 239, 172, 0.7)', textTransform: 'uppercase', letterSpacing: '1px' }}>Pattern</div>
+            <div style={{ color: '#4ade80', fontWeight: 700, fontSize: '16px' }}>
+              {currentPattern.name}
+            </div>
+            <div style={{ fontSize: '11px', color: 'rgba(134, 239, 172, 0.6)', marginTop: '2px' }}>
+              {completedPatterns.length}/2 Complete
+            </div>
           </div>
         </div>
+      )}
+
+      {/* Practice Info Card - Left Side (only during trial) */}
+      {isTrial && (
         <div style={{
-          background: 'rgba(12, 74, 110, 0.9)',
-          padding: '12px 16px',
-          borderRadius: '12px',
-          border: '1px solid rgba(192, 132, 252, 0.4)',
-          boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+          position: 'absolute',
+          top: '80px',
+          left: '16px',
+          zIndex: 20,
         }}>
-          <div style={{ fontSize: '10px', color: 'rgba(216, 180, 254, 0.7)', textTransform: 'uppercase', letterSpacing: '1px' }}>Curious Clicks</div>
-          <div style={{ color: '#c084fc', fontWeight: 700, fontSize: '20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            ✨ {curiousClicks}
+          <div style={{
+            background: 'rgba(12, 74, 110, 0.9)',
+            padding: '12px 16px',
+            borderRadius: '12px',
+            border: '1px solid rgba(253, 224, 71, 0.4)',
+            boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+          }}>
+            <div style={{ fontSize: '10px', color: 'rgba(253, 224, 71, 0.7)', textTransform: 'uppercase', letterSpacing: '1px' }}>Practice Pattern</div>
+            <div style={{ color: '#fef08a', fontWeight: 700, fontSize: '16px' }}>
+              Pattern C
+            </div>
+            <div style={{ fontSize: '11px', color: 'rgba(253, 224, 71, 0.6)', marginTop: '2px' }}>
+              No time limit
+            </div>
           </div>
         </div>
-        <div style={{
-          background: 'rgba(12, 74, 110, 0.9)',
-          padding: '12px 16px',
-          borderRadius: '12px',
-          border: '1px solid rgba(74, 222, 128, 0.4)',
-          boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
-        }}>
-          <div style={{ fontSize: '10px', color: 'rgba(134, 239, 172, 0.7)', textTransform: 'uppercase', letterSpacing: '1px' }}>Pattern</div>
-          <div style={{ color: '#4ade80', fontWeight: 700, fontSize: '16px' }}>
-            {currentPattern.name}
-          </div>
-          <div style={{ fontSize: '11px', color: 'rgba(134, 239, 172, 0.6)', marginTop: '2px' }}>
-            {completedPatterns.length}/2 Complete
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Main Game Area */}
       <div style={{
@@ -441,11 +758,11 @@ export function HydroTubeGame({ userStudentId, playerName, onComplete, onExit }:
         alignItems: 'center',
       }}>
         {/* Tap SVG - positioned top-left of grid */}
-        <div style={{ 
-          position: 'absolute', 
-          top: '-100px', 
-          left: '-10px', 
-          zIndex: 15 
+        <div style={{
+          position: 'absolute',
+          top: '-100px',
+          left: '-10px',
+          zIndex: 15
         }}>
           <svg viewBox="0 0 120 150" style={{ width: '100px', height: '120px', filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))' }}>
             <rect x="25" y="5" width="70" height="22" fill="#94a3b8" stroke="#64748b" strokeWidth="3" rx="11" />
@@ -471,12 +788,12 @@ export function HydroTubeGame({ userStudentId, playerName, onComplete, onExit }:
         {/* Game Frame */}
         <div style={{
           position: 'relative',
-          background: isWon 
+          background: isWon
             ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
             : 'linear-gradient(135deg, #475569 0%, #334155 100%)',
           padding: '16px',
           borderRadius: '20px',
-          boxShadow: isWon 
+          boxShadow: isWon
             ? '0 15px 50px rgba(5, 150, 105, 0.5)'
             : '0 15px 50px rgba(0,0,0,0.4)',
           border: isWon ? '4px solid #10b981' : '4px solid #64748b',
@@ -545,7 +862,7 @@ export function HydroTubeGame({ userStudentId, playerName, onComplete, onExit }:
                   style={{
                     width: '80px',
                     height: '80px',
-                    background: isHighlighted 
+                    background: isHighlighted
                       ? 'linear-gradient(145deg, #fef3c7 0%, #fde68a 100%)'
                       : 'linear-gradient(145deg, #ffffff 0%, #f1f5f9 100%)',
                     cursor: isWon ? 'default' : 'pointer',
@@ -556,12 +873,12 @@ export function HydroTubeGame({ userStudentId, playerName, onComplete, onExit }:
                     justifyContent: 'center',
                     overflow: 'hidden',
                     borderRadius: '8px',
-                    boxShadow: isHighlighted 
+                    boxShadow: isHighlighted
                       ? 'inset 0 0 15px #f59e0b, 0 0 20px #f59e0b'
                       : 'inset 0 2px 6px rgba(0,0,0,0.08)',
-                    border: isHighlighted 
+                    border: isHighlighted
                       ? '3px solid #f59e0b'
-                      : isWon 
+                      : isWon
                         ? '2px solid #10b981'
                         : '1px solid #e2e8f0',
                     animation: isHighlighted ? 'pulse 1.5s infinite' : 'none',
@@ -576,9 +893,9 @@ export function HydroTubeGame({ userStudentId, playerName, onComplete, onExit }:
 
         {/* Bucket SVG */}
         <div style={{ marginTop: '-10px', display: 'flex', justifyContent: 'flex-end', width: '100%', paddingRight: '20px' }}>
-          <svg viewBox="0 0 150 160" style={{ 
-            width: '100px', 
-            height: '110px', 
+          <svg viewBox="0 0 150 160" style={{
+            width: '100px',
+            height: '110px',
             filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))',
             animation: isWon ? 'bounce 1s infinite' : 'none'
           }}>
