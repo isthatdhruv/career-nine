@@ -89,11 +89,11 @@ public class UserController {
 
                 UserStudent userStudent = userStudentRepository.getByUserId(user.getId()).get();
                 List<StudentAssessmentMapping> studentAssessmentMapping = studentAssessmentMappingRepository
-                        .findByUserStudentUserStudentId(userStudent.getUserId());
+                        .findByUserStudentUserStudentId(userStudent.getUserStudentId());
 
                 HashMap<String, Object> response = new HashMap<>();
                 response.put("userStudentId", userStudent.getUserStudentId());
-                response.put("assessmentId", studentAssessmentMapping.get(studentAssessmentMapping.size() - 1).getAssessmentId());
+                response.put("assessmentId", studentAssessmentMapping.get(0).getAssessmentId());
                 return response;
             } else {
                 return null;
