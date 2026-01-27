@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { MDBDataTableV5 } from "mdbreact";
 import { Link } from "react-router-dom";
-import { ReadQuestionaireData } from "../../API/Create_Questionaire_APIs";
+import { ReadQuestionaireDataList } from "../../API/Create_Questionaire_APIs";
 
 const QuestionaireListPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -52,7 +52,7 @@ const QuestionaireListPage: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await ReadQuestionaireData();
+      const response = await ReadQuestionaireDataList();
       const data = response.data || [];
       console.log("Fetched questionnaire data:", data);
       

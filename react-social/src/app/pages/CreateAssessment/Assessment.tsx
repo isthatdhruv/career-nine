@@ -3,7 +3,7 @@ import { Button } from "react-bootstrap";
 import { IconContext } from "react-icons";
 import { MdQuestionAnswer } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
-import { ReadAssessmentData } from "./API/Create_Assessment_APIs";
+import { ReadAssessmentList } from "./API/Create_Assessment_APIs";
 import { AssessmentTable } from "./components";
 import AssessmentCreateModal from "./components/assessment/AssessmentCreateModal";
 
@@ -15,15 +15,11 @@ const AssessmentPage = () => {
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
 
- 
-
- 
-
   // Initial load
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await ReadAssessmentData();
+        const response = await ReadAssessmentList();
         console.log("Fetched assessment data:", response.data);
         setAssessmentData(response.data || []);
       } catch (error) {
@@ -39,7 +35,7 @@ const AssessmentPage = () => {
     if (pageLoading[0] === "true") {
       const fetchData = async () => {
         try {
-          const response = await ReadAssessmentData();
+          const response = await ReadAssessmentList();
           console.log("Refreshed assessment data:", response.data);
           setAssessmentData(response.data || []);
         } catch (error) {

@@ -65,6 +65,30 @@ public class Questionnaire implements Serializable {
     @Column(name = "display")
     private Boolean display;
 
+    public Questionnaire() {
+    }
+
+    public Questionnaire(Long questionnaireId, Tool tool, List<QuestionnaireLanguage> languages, List<QuestionnaireSection> section, Integer modeId, BigDecimal price, Boolean isFree, String name, Boolean display) {
+        this.questionnaireId = questionnaireId;
+        this.tool = tool;
+        this.languages = languages;
+        this.section = section;
+        this.modeId = modeId;
+        this.price = price;
+        this.isFree = isFree;
+        this.name = name;
+        this.display = display;
+    }
+
+    public Questionnaire(Long questionnaireId, String name,  Integer modeId ) {
+        this.questionnaireId = questionnaireId;
+       
+        this.modeId = modeId;
+       
+        this.name = name;
+      
+    }
+
     public Boolean getDisplay() {
         return display;
     }

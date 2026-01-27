@@ -3,6 +3,7 @@ const API_URL = process.env.REACT_APP_API_URL;
 
 
 const readQuestionaireData = `${API_URL}/api/questionnaire/get`;
+const readQuestionaireDataList= `${API_URL}/api/questionnaire/get/list`;
 const readQuestionaireById = `${API_URL}/api/questionnaire/getbyid/`;
 const createQuestionaire = `${API_URL}/api/questionnaire/create`;
 const updateQuestionaire = `${API_URL}/api/questionnaire/update`;
@@ -14,6 +15,10 @@ const readLanguageData = `${API_URL}/language-supported/getAll`;
 
 export function ReadQuestionaireData() {
   return axios.get(readQuestionaireData);
+}
+
+export function ReadQuestionaireDataList() {
+  return axios.get(readQuestionaireDataList);
 }
 
 export function ReadQuestionaireById(id: string) {
@@ -35,3 +40,5 @@ export function DeleteQuestionaire(id: string) {
 export function ReadLanguageData() {
   return axios.get(readLanguageData);
 }
+
+
