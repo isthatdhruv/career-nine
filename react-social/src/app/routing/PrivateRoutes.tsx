@@ -57,7 +57,7 @@ import StudentLoginPage from "../pages/StudentLogin/StudentLoginPage";
 import AllottedAssessmentPage from "../pages/StudentLogin/AllottedAssessmentPage";
 import GamePage from "../pages/Games/GamePage";
 // import QuestionareEditSinglePage from "../pages/CreateAssessment/components/questionaire/QuestionareEditSinglePage";
-
+import DashboardAdminPage from "../pages/demo-dashboard-v2/dashboard-admin";
 const PrivateRoutes = () => {
   const StudentsData = lazy(
     () => import("../pages/UniversityResult/StudentData")
@@ -91,6 +91,7 @@ const PrivateRoutes = () => {
   const CourseBranchBatchPageForm = lazy(
     () => import("../pages/StudentRegistration/CourseBranchBatchPage")
   );
+
 
   const StudentList = lazy(
     () => import("../pages/StudentInformation/StudentsList")
@@ -180,6 +181,14 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
+         <Route
+          path="/"
+          element={
+            <SuspensedView>
+              <LoginEnterEmail />
+            </SuspensedView>
+          }
+        />
         <Route
           path="/student-login"
           element={
@@ -192,7 +201,7 @@ const PrivateRoutes = () => {
       <Route path="/login" element={<LoginPage />} />
       <Route element={<MasterLayout />}>
         <Route path="auth/*" element={<Navigate to="/dashboard" />} />
-        <Route path="dashboard" element={<DashboardWrapper />} />
+        <Route path="dashboard" element={<DashboardAdminPage />} />
 
         <Route path="/school/dashboard/:id" element={
           <SuspensedView>
