@@ -88,12 +88,12 @@ public class UserController {
             if (userStudentRepository.getByUserId(user.getId()).isPresent()) {
 
                 UserStudent userStudent = userStudentRepository.getByUserId(user.getId()).get();
-                StudentAssessmentMapping studentAssessmentMapping = studentAssessmentMappingRepository
-                        .getByUserStudent(userStudent);
+                List<StudentAssessmentMapping> studentAssessmentMapping = studentAssessmentMappingRepository
+                        .findByUserStudentUserStudentId(userStudent.getUserId());
 
                 HashMap<String, Object> response = new HashMap<>();
                 response.put("userStudentId", userStudent.getUserStudentId());
-                response.put("assessmentId", studentAssessmentMapping.getAssessmentId());
+                response.put("assessmentId", studentAssessmentMapping.get(studentAssessmentMapping.size() - 1).getAssessmentId());
                 return response;
             } else {
                 return null;

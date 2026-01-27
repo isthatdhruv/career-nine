@@ -9,7 +9,7 @@ import com.kccitm.api.model.career9.UserStudent;
 
 public interface StudentAssessmentMappingRepository extends JpaRepository<StudentAssessmentMapping, Long> {
 
-    StudentAssessmentMapping getByUserStudent(UserStudent userStudentId);
+    List<StudentAssessmentMapping> findByUserStudent(UserStudent userStudentId);
     
     List<StudentAssessmentMapping> findByUserStudentUserStudentId(Long userStudentId);
 
