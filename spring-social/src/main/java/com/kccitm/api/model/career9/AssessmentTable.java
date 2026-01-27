@@ -27,7 +27,7 @@ public class AssessmentTable implements java.io.Serializable {
 
     private String AssessmentName;
 
-    @Column(columnDefinition = "boolean default false")
+    @Column(name = "is_active")
     private Boolean isActive;
 
     private Boolean modeofAssessment;

@@ -1,15 +1,28 @@
 import { useNavigate } from "react-router-dom";
 import { useAssessment } from "./AssessmentContext";
-
+import axios from "axios";
 export default function AllottedAssessmentPage() {
-  const assessmentId = localStorage.getItem('Assessment id');
+  const assessmentId = localStorage.getItem('assessmentId');
+  const userStudentId = localStorage.getItem('UserStudentId');
   const navigate = useNavigate();
   const { fetchAssessmentData, loading } = useAssessment();
 
+  const loadAssessmentisActive = async (assessmentId: string) => {
+    const assessmentData = await axios.get(`${process.env.REACT_APP_API_URL}/assessments/${assessmentId}`);
+    const isActive = assessmentData.data.isActive;
+    return isActive;
+  };
   const handleStartAssessment = async () => {
+
+
     if (assessmentId) {
-      await fetchAssessmentData(assessmentId);
-      navigate('/studentAssessment');
+      const isActive = await loadAssessmentisActive(assessmentId);
+      if (isActive) {
+        await fetchAssessmentData(assessmentId);
+        navigate('/studentAssessment');
+      } else {
+        alert("This assessment is not active.");
+      }
     }
   };
 

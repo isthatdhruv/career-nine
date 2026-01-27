@@ -25,11 +25,11 @@ public class OptionScoreBasedOnMEasuredQualityTypes implements Serializable {
     private Integer score;
 
     @ManyToOne
-    @JoinColumn(name = "fk_assessment_questions_option", nullable = false)
+    @JoinColumn(name = "fk_assessment_questions_option")
     private AssessmentQuestionOptions question_option;
 
     @ManyToOne
-    @JoinColumn(name = "fk_quality_type", nullable = false)
+    @JoinColumn(name = "fk_quality_type")
     private MeasuredQualityTypes measuredQualityType;
 
     //getters and setters
@@ -46,10 +46,12 @@ public class OptionScoreBasedOnMEasuredQualityTypes implements Serializable {
         this.score = score;
     }
     public AssessmentQuestionOptions getQuestion_option() {
+        AssessmentQuestionOptions question_option = new AssessmentQuestionOptions(this.question_option.getOptionId());
         return question_option;
     }
     public void setQuestion_option(AssessmentQuestionOptions question_option) {
-        this.question_option = question_option;
+        AssessmentQuestionOptions question_option_Temp = new AssessmentQuestionOptions(question_option.getOptionId());
+        this.question_option = question_option_Temp;
     }
     
     public MeasuredQualityTypes getMeasuredQualityType() {

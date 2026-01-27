@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
-import { Button, Modal, Alert, Spinner } from "react-bootstrap";
+import React, { useState, useEffect, useRef } from "react";
+import { Button, Modal, Alert, Spinner, ProgressBar } from "react-bootstrap";
 import { MDBDataTableV5 } from "mdbreact";
 import * as XLSX from "xlsx";
 import { setData } from "./StudentDataComputationExcel";
 import { SchoolOMRRow } from "./DataStructure";
-import { addStudentInfo, StudentInfo } from "../StudentInformation/StudentInfo_APIs";
+import { addStudentInfo, StudentInfo, getAllAssessments, Assessment } from "../StudentInformation/StudentInfo_APIs";
 import { ReadCollegeData } from "../College/API/College_APIs";
 
 /* ================= MASTER SCHEMA ================= */
@@ -28,7 +28,9 @@ const DEFAULT_SCHEMA_OBJECT: Record<string, any> = {
   email: "",
   address: "",
   studentDob: "",
-  user: null
+  user: null,
+  instituteId: null,
+  assesment_id: null
 };
 
 /* ================= COMPONENT ================= */
@@ -42,6 +44,8 @@ export default function UploadExcelFile() {
   const [showMapping, setShowMapping] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<{ success: number; skipped: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [tableData, setTableData] = useState<{
     columns: any[];
@@ -50,29 +54,29 @@ export default function UploadExcelFile() {
 
   const [institutes, setInstitutes] = useState<any[]>([]);
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [selectedAssessment, setSelectedAssessment] = useState<number | "">("");
 
   useEffect(() => {
     ReadCollegeData()
       .then((res: any) => {
-        // Assuming API returns array in res.data or res.data.data - adjust based on actual response structure
-        // Typically axios returns data in .data
-        // Looking at CollegeTable, it uses props.data. 
-        // Let's assume res.data is the list or check structure. 
-        // College_APIs.ts uses axios.get(readCollege).
-        // Safely extract list
         const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
         console.log("Fetched Institutes:", list);
         setInstitutes(list);
       })
       .catch((err: any) => console.error("Failed to fetch institutes", err));
+
+    getAllAssessments()
+      .then((res) => {
+        setAssessments(res.data);
+        console.log("Fetched Assessments:", res.data);
+      })
+      .catch((err) => console.error("Failed to fetch assessments", err));
   }, []);
 
   /* ================= FILE UPLOAD ================= */
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
+  const processFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const data = new Uint8Array(e.target?.result as ArrayBuffer);
@@ -88,19 +92,17 @@ export default function UploadExcelFile() {
 
       const initialMap: Record<string, string> = {};
       headers.forEach((h) => (initialMap[h] = ""));
-      
-      // Auto-map if possible (case-insensitive)
+
       headers.forEach(h => {
-          const lowerH = h.toLowerCase();
-          const match = SCHEMA_FIELDS.find(f => f.toLowerCase() === lowerH || 
-            (f === 'schoolRollNumber' && lowerH.includes('roll')) || 
-            (f === 'phoneNumber' && (lowerH.includes('phone') || lowerH.includes('mobile')))
-          );
-          if (match) initialMap[h] = match;
+        const lowerH = h.toLowerCase();
+        const match = SCHEMA_FIELDS.find(f => f.toLowerCase() === lowerH ||
+          (f === 'schoolRollNumber' && lowerH.includes('roll')) ||
+          (f === 'phoneNumber' && (lowerH.includes('phone') || lowerH.includes('mobile')))
+        );
+        if (match) initialMap[h] = match;
       });
 
       setColumnMap(initialMap);
-
       setShowMapping(true);
       setTableData({ columns: [], rows: [] });
       setUploadResult(null);
@@ -111,10 +113,44 @@ export default function UploadExcelFile() {
     setShowModal(false);
   };
 
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    processFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))) {
+      processFile(file);
+    }
+  };
+
   /* ================= APPLY MAPPING ================= */
 
   const applyMapping = () => {
     const processed = setData(rawExcelData, columnMap);
+
+    // Format dates in the processed data for preview
+    const formattedProcessed = processed.map((row: any) => {
+      const newRow = { ...row };
+      if (newRow.studentDob) {
+        newRow.studentDob = formatDate(newRow.studentDob);
+      }
+      return newRow;
+    });
 
     const selectedFields = Array.from(
       new Set(Object.values(columnMap).filter((v) => v))
@@ -127,72 +163,73 @@ export default function UploadExcelFile() {
       width: 150,
     }));
 
-    setTableData({ columns, rows: processed });
+    setTableData({ columns, rows: formattedProcessed });
     setShowMapping(false);
   };
 
   /* ================= DATE FORMATTER ================= */
 
   const formatDate = (val: any): string => {
-      if (!val) return "";
-      let date;
-      // Excel serial date number
-      if (typeof val === 'number') {
-          date = new Date((val - 25569) * 86400 * 1000); 
-      } else {
-          // Attempt string parse
-          const parsed = Date.parse(val);
-          if (!isNaN(parsed)) date = new Date(parsed);
-      }
+    if (!val) return "";
+    let date;
+    if (typeof val === 'number') {
+      date = new Date((val - 25569) * 86400 * 1000);
+    } else {
+      const parsed = Date.parse(val);
+      if (!isNaN(parsed)) date = new Date(parsed);
+    }
 
-      if (date && !isNaN(date.getTime())) {
-          return `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
-      }
-      return String(val);
+    if (date && !isNaN(date.getTime())) {
+      return `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
+    }
+    return String(val);
   };
 
   /* ================= SUBMIT ================= */
 
   const handleSubmit = async () => {
-    // setUploading(true);
+    setUploading(true);
     let successCount = 0;
     let skippedCount = 0;
 
     const uploadPromises = rawExcelData.map(async (row) => {
       const obj = { ...DEFAULT_SCHEMA_OBJECT };
       if (selectedInstitute) {
-          obj.institue_id = Number(selectedInstitute);
+        obj.instituteId = Number(selectedInstitute);
+      }
+      if (selectedAssessment) {
+        obj.assesment_id = String(selectedAssessment);
       }
       let isValid = true;
 
       Object.entries(columnMap).forEach(([excelCol, schemaField]) => {
         if (schemaField) {
           const val = row[excelCol];
-          
-          if (schemaField === "studentDob" && val) {
-              obj[schemaField] = formatDate(val);
-          } else {
-              obj[schemaField] = val ?? "";
-          }
 
-          // Validation: Check for "ERROR" in specific fields
-          if (schemaField==="studentDob" && (val===""||val==="Null"||val==="null")) {
+          if (schemaField === "studentDob") {
+            // Skip student if DOB is missing, empty, null, or undefined
+            if (!val || val === "" || val === "Null" || val === "null" || val === undefined) {
               isValid = false;
+            } else {
+              obj[schemaField] = formatDate(val);
+            }
+          } else {
+            obj[schemaField] = val ?? "";
           }
         }
       });
 
       if (!isValid) {
-          skippedCount++;
-          return;
+        skippedCount++;
+        return;
       }
 
       try {
-          await addStudentInfo(obj as StudentInfo);
-          successCount++;
+        await addStudentInfo(obj as StudentInfo);
+        successCount++;
       } catch (error) {
-          console.error("Failed to upload info for row", row, error);
-          skippedCount++; 
+        console.error("Failed to upload info for row", row, error);
+        skippedCount++;
       }
     });
 
@@ -201,91 +238,350 @@ export default function UploadExcelFile() {
     setUploading(false);
   };
 
+  const getMappedFieldsCount = () => Object.values(columnMap).filter(v => v).length;
+
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="flex items-center gap-3 mb-3">
-          <select 
-            className="form-select w-auto"
-            value={selectedInstitute}
-            onChange={(e) => {
-                console.log("Selected value:", e.target.value);
-                setSelectedInstitute(e.target.value ? Number(e.target.value) : "");
+    <div className="min-vh-100" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%)', padding: '2rem' }}>
+      {/* Header Section */}
+      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px', overflow: 'hidden' }}>
+        <div className="card-body p-4">
+          <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
+            <div>
+              <h2 className="mb-1 fw-bold" style={{ color: '#1a1a2e' }}>
+                <i className="bi bi-file-earmark-spreadsheet me-2" style={{ color: '#4361ee' }}></i>
+                Student Data Import
+              </h2>
+              <p className="text-muted mb-0">Upload and map Excel files to import student information</p>
+            </div>
+            <div className="d-flex align-items-center gap-3">
+              <div className="position-relative">
+                <select
+                  className="form-select shadow-sm"
+                  style={{
+                    minWidth: '220px',
+                    borderRadius: '10px',
+                    border: '2px solid #e0e0e0',
+                    padding: '0.6rem 1rem',
+                    fontWeight: 500,
+                    transition: 'all 0.3s ease'
+                  }}
+                  value={selectedInstitute}
+                  onChange={(e) => {
+                    console.log("Selected value:", e.target.value);
+                    setSelectedInstitute(e.target.value ? Number(e.target.value) : "");
+                  }}
+                >
+                  <option value="">🏫 Select Institute</option>
+                  {institutes.map((inst) => (
+                    <option key={inst.instituteCode} value={inst.instituteCode}>
+                      {inst.instituteName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="position-relative">
+                <select
+                  className="form-select shadow-sm"
+                  style={{
+                    minWidth: '220px',
+                    borderRadius: '10px',
+                    border: '2px solid #e0e0e0',
+                    padding: '0.6rem 1rem',
+                    fontWeight: 500,
+                    transition: 'all 0.3s ease'
+                  }}
+                  value={selectedAssessment}
+                  onChange={(e) => {
+                    console.log("Selected assessment:", e.target.value);
+                    setSelectedAssessment(e.target.value ? Number(e.target.value) : "");
+                  }}
+                >
+                  <option value="">📝 Select Assessment</option>
+                  {assessments.map((assessment) => (
+                    <option key={assessment.id} value={assessment.id}>
+                      {assessment.assessmentName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Upload Area */}
+      <div
+        className={`card border-0 shadow-sm mb-4 ${isDragging ? 'border-primary' : ''}`}
+        style={{
+          borderRadius: '16px',
+          cursor: 'pointer',
+          border: isDragging ? '3px dashed #4361ee' : '3px dashed transparent',
+          background: isDragging ? 'rgba(67, 97, 238, 0.05)' : 'white',
+          transition: 'all 0.3s ease'
+        }}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <div className="card-body p-5 text-center">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleFileUpload}
+            style={{ display: 'none' }}
+          />
+          <div
+            className="mx-auto mb-3 d-flex align-items-center justify-content-center"
+            style={{
+              width: '80px',
+              height: '80px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)',
+              boxShadow: '0 10px 30px rgba(67, 97, 238, 0.3)'
             }}
           >
-              <option value="">-- Select Institute --</option>
-              {institutes.map((inst) => (
-                  <option key={inst.instituteCode} value={inst.instituteCode}>
-                      {inst.instituteName}
-                  </option>
-              ))}
-          </select>
-          <Button onClick={() => setShowModal(true)}>Upload Excel</Button>
-      </div>
-      {fileName && <span className="ms-2 mt-2">✅ {fileName}</span>}
+            <i className="bi bi-cloud-arrow-up-fill text-white" style={{ fontSize: '2rem' }}></i>
+          </div>
+          <h4 className="fw-semibold mb-2" style={{ color: '#1a1a2e' }}>
+            {isDragging ? 'Drop your file here!' : 'Upload Excel File'}
+          </h4>
+          <p className="text-muted mb-3">
+            Drag & drop your Excel file here, or <span style={{ color: '#4361ee', fontWeight: 600 }}>browse</span>
+          </p>
+          <div className="d-flex justify-content-center gap-2 flex-wrap">
+            <span className="badge bg-light text-dark px-3 py-2" style={{ borderRadius: '20px' }}>
+              <i className="bi bi-file-earmark-excel me-1" style={{ color: '#107C41' }}></i> .xlsx
+            </span>
+            <span className="badge bg-light text-dark px-3 py-2" style={{ borderRadius: '20px' }}>
+              <i className="bi bi-file-earmark-excel me-1" style={{ color: '#107C41' }}></i> .xls
+            </span>
+          </div>
 
-      <Modal show={showModal} onHide={() => setShowModal(false)} centered>
-        <Modal.Body>
-          <input type="file" accept=".xlsx,.xls" onChange={handleFileUpload} />
-        </Modal.Body>
-      </Modal>
-      
-      {uploadResult && (
-          <Alert variant="info" className="mt-3">
-              Upload Complete. Success: <strong>{uploadResult.success}</strong>. Skipped (Errors/Invalid): <strong>{uploadResult.skipped}</strong>.
-          </Alert>
-      )}
-
-      {excelColumns.length > 0 && showMapping && (
-        <div className="bg-white p-4 mt-4 rounded shadow">
-          <h5>Map Excel Columns</h5>
-
-          {excelColumns.map((col) => (
-            <div key={col} className="flex gap-3 mb-2 items-center">
-              <div className="w-64">{col}</div>
-              <select
-                className="form-select"
-                value={columnMap[col]}
-                onChange={(e) =>
-                  setColumnMap({ ...columnMap, [col]: e.target.value })
-                }
-              >
-                <option value="">-- Ignore --</option>
-                {SCHEMA_FIELDS.map((f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
-                ))}
-              </select>
+          {fileName && (
+            <div className="mt-4 p-3 rounded-3" style={{ background: '#e8f5e9', display: 'inline-block' }}>
+              <i className="bi bi-check-circle-fill me-2" style={{ color: '#4caf50' }}></i>
+              <span className="fw-medium" style={{ color: '#2e7d32' }}>{fileName}</span>
             </div>
-          ))}
+          )}
+        </div>
+      </div>
 
-          <Button className="mt-3" onClick={applyMapping}>
-            Show Preview
-          </Button>
+      {/* Upload Result Alert */}
+      {uploadResult && (
+        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px', overflow: 'hidden' }}>
+          <div className="card-body p-0">
+            <div className="d-flex">
+              <div className="p-4 d-flex align-items-center justify-content-center"
+                style={{ background: 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)', minWidth: '80px' }}>
+                <i className="bi bi-check-circle-fill text-white" style={{ fontSize: '2rem' }}></i>
+              </div>
+              <div className="p-4 flex-grow-1">
+                <h5 className="mb-2 fw-bold" style={{ color: '#1a1a2e' }}>Upload Complete!</h5>
+                <div className="d-flex gap-4 flex-wrap">
+                  <div>
+                    <span className="text-muted">Successful:</span>
+                    <span className="ms-2 badge bg-success px-3 py-2" style={{ fontSize: '0.95rem' }}>{uploadResult.success}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted">Skipped:</span>
+                    <span className="ms-2 badge bg-warning text-dark px-3 py-2" style={{ fontSize: '0.95rem' }}>{uploadResult.skipped}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
-      {tableData.rows.length > 0 && !showMapping && (
-        <>
-            <div className="mt-4">
-                <Button variant="secondary" size="sm" onClick={() => setShowMapping(true)} className="mb-2">Back to Mapping</Button>
-                <MDBDataTableV5
-                    hover
-                    bordered
-                    striped
-                    entries={25}
-                    data={tableData}
-                    scrollY
-                    maxHeight="65vh"
-                />
+      {/* Column Mapping Section */}
+      {excelColumns.length > 0 && showMapping && (
+        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px' }}>
+          <div className="card-header bg-white border-0 p-4 pb-0">
+            <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+              <div>
+                <h4 className="mb-1 fw-bold" style={{ color: '#1a1a2e' }}>
+                  <i className="bi bi-arrow-left-right me-2" style={{ color: '#4361ee' }}></i>
+                  Map Excel Columns
+                </h4>
+                <p className="text-muted mb-0">Connect your Excel columns to the database fields</p>
+              </div>
+              <div className="d-flex align-items-center gap-2">
+                <span className="badge bg-primary px-3 py-2" style={{ borderRadius: '20px' }}>
+                  {getMappedFieldsCount()} of {excelColumns.length} mapped
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="card-body p-4">
+            <div className="row g-3">
+              {excelColumns.map((col, index) => (
+                <div key={col} className="col-12 col-md-6 col-lg-4">
+                  <div
+                    className="p-3 rounded-3 h-100"
+                    style={{
+                      background: columnMap[col] ? 'rgba(67, 97, 238, 0.08)' : '#f8f9fa',
+                      border: columnMap[col] ? '2px solid rgba(67, 97, 238, 0.3)' : '2px solid transparent',
+                      transition: 'all 0.3s ease'
+                    }}
+                  >
+                    <label className="d-block mb-2">
+                      <span className="badge bg-secondary me-2" style={{ borderRadius: '6px' }}>{index + 1}</span>
+                      <span className="fw-semibold" style={{ color: '#1a1a2e' }}>{col}</span>
+                    </label>
+                    <select
+                      className="form-select"
+                      style={{
+                        borderRadius: '8px',
+                        border: '2px solid #e0e0e0',
+                        fontWeight: 500
+                      }}
+                      value={columnMap[col]}
+                      onChange={(e) =>
+                        setColumnMap({ ...columnMap, [col]: e.target.value })
+                      }
+                    >
+                      <option value="">⏭️ Ignore this column</option>
+                      {SCHEMA_FIELDS.map((f) => (
+                        <option key={f} value={f}>
+                          ✓ {f}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              ))}
             </div>
 
-          <div className="mt-4 flex justify-end">
-            <Button variant="success" onClick={handleSubmit} disabled={uploading || !selectedInstitute}>
-              {/* {uploading ? <Spinner animation="border" size="sm" /> : "Submit Valid Students"} */}
-            </Button>
+            <div className="text-center mt-4 pt-3 border-top">
+              <Button
+                size="lg"
+                onClick={applyMapping}
+                disabled={getMappedFieldsCount() === 0}
+                style={{
+                  background: 'linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '0.8rem 2.5rem',
+                  fontWeight: 600,
+                  boxShadow: '0 8px 20px rgba(67, 97, 238, 0.3)',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                <i className="bi bi-eye me-2"></i>
+                Preview Data
+              </Button>
+            </div>
           </div>
-        </>
+        </div>
+      )}
+
+      {/* Data Preview Table */}
+      {tableData.rows.length > 0 && !showMapping && (
+        <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
+          <div className="card-header bg-white border-0 p-4 pb-0">
+            <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+              <div>
+                <h4 className="mb-1 fw-bold" style={{ color: '#1a1a2e' }}>
+                  <i className="bi bi-table me-2" style={{ color: '#4361ee' }}></i>
+                  Data Preview
+                </h4>
+                <p className="text-muted mb-0">
+                  <span className="badge bg-info text-dark me-2">{tableData.rows.length} records</span>
+                  Review your data before submitting
+                </p>
+              </div>
+              <Button
+                variant="outline-secondary"
+                onClick={() => setShowMapping(true)}
+                style={{ borderRadius: '10px', fontWeight: 500 }}
+              >
+                <i className="bi bi-arrow-left me-2"></i>
+                Back to Mapping
+              </Button>
+            </div>
+          </div>
+          <div className="card-body p-4">
+            <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid #e0e0e0' }}>
+              <MDBDataTableV5
+                hover
+                bordered
+                striped
+                entries={25}
+                data={tableData}
+                scrollY
+                maxHeight="60vh"
+                className="mb-0"
+              />
+            </div>
+
+            <div className="d-flex justify-content-end align-items-center gap-3 mt-4 pt-3 border-top">
+              {(!selectedInstitute || !selectedAssessment) && (
+                <span className="text-warning">
+                  <i className="bi bi-exclamation-triangle me-1"></i>
+                  {!selectedInstitute && !selectedAssessment
+                    ? "Please select an institute and assessment first"
+                    : !selectedInstitute
+                      ? "Please select an institute first"
+                      : "Please select an assessment first"}
+                </span>
+              )}
+              <Button
+                size="lg"
+                onClick={handleSubmit}
+                disabled={uploading || !selectedInstitute || !selectedAssessment}
+                style={{
+                  background: uploading
+                    ? '#6c757d'
+                    : 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '0.8rem 2.5rem',
+                  fontWeight: 600,
+                  boxShadow: uploading ? 'none' : '0 8px 20px rgba(76, 175, 80, 0.3)',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                {uploading ? (
+                  <>
+                    <Spinner animation="border" size="sm" className="me-2" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <i className="bi bi-cloud-upload me-2"></i>
+                    Submit {tableData.rows.length} Students
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!fileName && excelColumns.length === 0 && (
+        <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
+          <div className="card-body p-5 text-center">
+            <div
+              className="mx-auto mb-4"
+              style={{
+                width: '120px',
+                height: '120px',
+                borderRadius: '50%',
+                background: '#f0f0f0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <i className="bi bi-inbox" style={{ fontSize: '3rem', color: '#bdbdbd' }}></i>
+            </div>
+            <h4 className="fw-semibold mb-2" style={{ color: '#757575' }}>No File Uploaded</h4>
+            <p className="text-muted mb-0">Upload an Excel file to get started with student data import</p>
+          </div>
+        </div>
       )}
     </div>
   );

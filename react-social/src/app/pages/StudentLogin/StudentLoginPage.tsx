@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 
 const StudentLoginPage: React.FC = () => {
   const [userId, setUserId] = useState('');
   const [dob, setDob] = useState('');
   const [errors, setErrors] = useState({ userId: '', dob: '' });
   const [touched, setTouched] = useState({ userId: false, dob: false });
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const validateUserId = (id: string): string => {
     if (!id) {
@@ -20,6 +21,21 @@ const StudentLoginPage: React.FC = () => {
     if (!date) {
       return 'Date of Birth is required';
     }
+    // Validate dd-mm-yyyy format
+    const regex = /^(\d{2})-(\d{2})-(\d{4})$/;
+    const match = date.match(regex);
+    if (!match) {
+      return 'Please enter date in dd-mm-yyyy format';
+    }
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10);
+    const year = parseInt(match[3], 10);
+    if (month < 1 || month > 12) {
+      return 'Invalid month';
+    }
+    if (day < 1 || day > 31) {
+      return 'Invalid day';
+    }
     return '';
   };
 
@@ -32,7 +48,21 @@ const StudentLoginPage: React.FC = () => {
   };
 
   const handleDobChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+    let value = e.target.value;
+    
+    // Remove any non-numeric characters except hyphens
+    value = value.replace(/[^\d-]/g, '');
+    
+    // Auto-format as dd-mm-yyyy
+    const digits = value.replace(/-/g, '');
+    if (digits.length <= 2) {
+      value = digits;
+    } else if (digits.length <= 4) {
+      value = `${digits.slice(0, 2)}-${digits.slice(2)}`;
+    } else {
+      value = `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4, 8)}`;
+    }
+    
     setDob(value);
     if (touched.dob) {
       setErrors(prev => ({ ...prev, dob: validateDob(value) }));
@@ -49,6 +79,23 @@ const StudentLoginPage: React.FC = () => {
     setErrors(prev => ({ ...prev, dob: validateDob(dob) }));
   };
 
+  // Handle calendar date picker selection
+  const handleCalendarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const dateValue = e.target.value; // yyyy-mm-dd format from date input
+    if (dateValue) {
+      const [year, month, day] = dateValue.split('-');
+      const formattedDate = `${day}-${month}-${year}`; // Convert to dd-mm-yyyy
+      setDob(formattedDate);
+      if (touched.dob) {
+        setErrors(prev => ({ ...prev, dob: validateDob(formattedDate) }));
+      }
+    }
+  };
+
+  const openCalendar = () => {
+    (dateInputRef.current as any)?.showPicker?.() || dateInputRef.current?.click();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -62,8 +109,8 @@ const StudentLoginPage: React.FC = () => {
 
     // If no errors, send the POST request
     if (!userIdError && !dobError) {
-      // Format the date to dd-MM-yyyy
-      const formattedDob = new Date(dob).toLocaleDateString('en-GB').replace(/\//g, '-'); // 'en-GB' ensures dd/MM/yyyy format, replace '/' with '-'
+      // Date is already in dd-mm-yyyy format
+      const formattedDob = dob;
 
       const requestBody = {
         dobDate: formattedDob,
@@ -136,18 +183,36 @@ const StudentLoginPage: React.FC = () => {
               )}
             </div>
 
-            {/* DOB Section with Calendar Picker */}
+            {/* DOB Section with dd-mm-yyyy format and calendar */}
             <div className="mb-5">
-              <label htmlFor="dob" className="form-label" style={{ fontSize: '0.95rem', fontWeight: '500' }}>Date of Birth</label>
-              <input
-                type="date"
-                className={`form-control ${touched.dob && errors.dob ? 'is-invalid' : touched.dob && !errors.dob ? 'is-valid' : ''}`}
-                id="dob"
-                value={dob}
-                onChange={handleDobChange}
-                onBlur={handleDobBlur}
-                style={{ padding: '0.75rem', fontSize: '1rem' }}
-              />
+              <label htmlFor="dob" className="form-label" style={{ fontSize: '0.95rem', fontWeight: '500' }}>Date of Birth (dd-mm-yyyy)</label>
+              <div className="input-group">
+                <input
+                  type="text"
+                  className={`form-control ${touched.dob && errors.dob ? 'is-invalid' : touched.dob && !errors.dob ? 'is-valid' : ''}`}
+                  id="dob"
+                  placeholder="dd-mm-yyyy"
+                  maxLength={10}
+                  value={dob}
+                  onChange={handleDobChange}
+                  onBlur={handleDobBlur}
+                  style={{ padding: '0.75rem', fontSize: '1rem' }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-outline-secondary"
+                  onClick={openCalendar}
+                  style={{ borderColor: '#ced4da' }}
+                >
+                  📅
+                </button>
+                <input
+                  type="date"
+                  ref={dateInputRef}
+                  onChange={handleCalendarChange}
+                  style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
+                />
+              </div>
               {touched.dob && errors.dob && (
                 <div className="invalid-feedback" style={{ display: 'block' }}>
                   {errors.dob}

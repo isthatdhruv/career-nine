@@ -1,11 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAssessment } from "../../StudentLogin/AssessmentContext";
+import { AssessmentGameWrapper } from "./AssessmentGameWrapper";
+
+type GameTable = {
+  gameId: number;
+  gameName: string;
+  gameCode: number;
+};
 
 type Option = {
   optionId: number;
   optionText: string;
   languageOptions?: LanguageOption[];
+  isGame?: boolean;
+  game?: GameTable;
 };
 
 type LanguageOption = {
@@ -51,6 +60,10 @@ const SectionQuestionPage: React.FC = () => {
   const [languages, setLanguages] = useState<QuestionnaireLanguage[]>([]);
   const [currentSection, setCurrentSection] = useState<any>(null);
   const [showWarning, setShowWarning] = useState<boolean>(false);
+  
+  // Game-related state
+  const [isGameActive, setIsGameActive] = useState<boolean>(false);
+  const [activeGameCode, setActiveGameCode] = useState<number | null>(null);
 
   const [answers, setAnswers] = useState<Record<string, Record<number, number[]>>>(
     {}
@@ -164,7 +177,9 @@ const SectionQuestionPage: React.FC = () => {
     }
 
     // Get user_student_id from questionnaire data
-    const userStudentId = questionnaire?.userStudent?.userStudentId || null;
+    const userStudentId = localStorage.getItem('userStudentId') 
+      ? parseInt(localStorage.getItem('userStudentId')!) 
+      : null;
     
     // Get assessment_id from localStorage
     const assessmentId = localStorage.getItem('assessmentId') 
@@ -337,6 +352,70 @@ const SectionQuestionPage: React.FC = () => {
     );
     return langOption ? langOption.optionText : option.optionText;
   };
+
+  // Game handlers
+  const handleLaunchGame = (gameCode: number) => {
+    setActiveGameCode(gameCode);
+    setIsGameActive(true);
+  };
+
+  const handleGameComplete = () => {
+    // Auto-select the game option when game is completed
+    if (activeGameCode && sectionId) {
+      const gameOption = question.question.options.find(
+        opt => opt.isGame && opt.game?.gameCode === activeGameCode
+      );
+      if (gameOption) {
+        // Directly update answers to mark this question as answered (blue)
+        setAnswers((prev) => {
+          const sec = prev[sectionId] || {};
+          const arr = sec[qId] || [];
+          
+          // Only add if not already selected
+          if (!arr.includes(gameOption.optionId)) {
+            const updated = [...arr, gameOption.optionId];
+            console.log(`✅ Game completed! Marking question ${qId} as answered with option ${gameOption.optionId}`);
+            return {
+              ...prev,
+              [sectionId]: { ...sec, [qId]: updated },
+            };
+          }
+          return prev;
+        });
+        
+        // Remove from skipped if it was there
+        setSkipped((prev) => {
+          const s = new Set(prev[sectionId] || []);
+          s.delete(qId);
+          return { ...prev, [sectionId]: s };
+        });
+      }
+    }
+    setIsGameActive(false);
+    setActiveGameCode(null);
+  };
+
+  const handleGameExit = () => {
+    // Don't auto-select if user exits without completing
+    setIsGameActive(false);
+    setActiveGameCode(null);
+  };
+
+  // Render game wrapper if active
+  if (isGameActive && activeGameCode) {
+    const userStudentId = localStorage.getItem('User Student id') || '';
+    const userName = localStorage.getItem('userName') || 'Student';
+    
+    return (
+      <AssessmentGameWrapper
+        gameCode={activeGameCode}
+        userStudentId={userStudentId}
+        playerName={userName}
+        onComplete={handleGameComplete}
+        onExit={handleGameExit}
+      />
+    );
+  }
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#f8f9fa" }}>
@@ -536,52 +615,117 @@ const SectionQuestionPage: React.FC = () => {
             </div>
 
             <div className="mt-4">
-              {question.question.options.map((opt) => (
-                <label
-                  key={opt.optionId}
-                  className={`border rounded p-3 d-block mb-3 ${
-                    selectedOptions.includes(opt.optionId) ? "bg-light" : ""
-                  }`}
-                  style={{ cursor: "pointer" }}
-                >
-                  <div className="d-flex align-items-start">
-                    <input
-                      type="checkbox"
-                      className="me-3 mt-1"
-                      checked={selectedOptions.includes(opt.optionId)}
-                      onChange={() => toggleOption(opt.optionId)}
-                      disabled={
-                        question.question.maxOptionsAllowed > 0 &&
-                        !selectedOptions.includes(opt.optionId) &&
-                        selectedOptions.length >= question.question.maxOptionsAllowed
-                      }
-                    />
-                    {languages.length > 0 ? (
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: languages.length > 1 ? "1fr 1px 1fr" : "1fr",
-                          gap: 15,
-                          flex: 1,
-                        }}
-                      >
-                        {languages.map((lang, index) => (
-                          <React.Fragment key={lang.language.languageId}>
-                            <div style={{ fontSize: "0.95rem", lineHeight: "1.5" }}>
-                              {getOptionText(opt, lang.language.languageId)}
+              {question.question.options.map((opt) => {
+                // Check if this is a game-type option
+                if (opt.isGame && opt.game) {
+                  return (
+                    <div
+                      key={opt.optionId}
+                      className="border rounded p-4 mb-3 bg-gradient-to-r from-purple-50 to-pink-50"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="font-bold text-purple-900 mb-2">
+                            🎮 Game: {opt.game.gameName}
+                          </div>
+                          {languages.length > 0 ? (
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: languages.length > 1 ? "1fr 1px 1fr" : "1fr",
+                                gap: 15,
+                              }}
+                            >
+                              {languages.map((lang, index) => (
+                                <React.Fragment key={lang.language.languageId}>
+                                  <div style={{ fontSize: "0.95rem", lineHeight: "1.5" }}>
+                                    {getOptionText(opt, lang.language.languageId)}
+                                  </div>
+                                  {index === 0 && languages.length > 1 && (
+                                    <div style={{ width: 1, backgroundColor: "#dee2e6" }} />
+                                  )}
+                                </React.Fragment>
+                              ))}
                             </div>
-                            {index === 0 && languages.length > 1 && (
-                              <div style={{ width: 1, backgroundColor: "#dee2e6" }} />
-                            )}
-                          </React.Fragment>
-                        ))}
+                          ) : (
+                            <span>{opt.optionText}</span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleLaunchGame(opt.game!.gameCode)}
+                          style={{
+                            marginLeft: '16px',
+                            background: selectedOptions.includes(opt.optionId) 
+                              ? 'linear-gradient(to right, #22c55e, #16a34a)' 
+                              : 'linear-gradient(to right, #8b5cf6, #d946ef)',
+                            color: 'white',
+                            padding: '12px 24px',
+                            borderRadius: '9999px',
+                            fontWeight: 700,
+                            fontSize: '14px',
+                            border: 'none',
+                            cursor: selectedOptions.includes(opt.optionId) ? 'default' : 'pointer',
+                            boxShadow: '0 4px 15px rgba(139, 92, 246, 0.4)',
+                            transition: 'all 0.2s ease',
+                            opacity: selectedOptions.includes(opt.optionId) ? 0.8 : 1,
+                          }}
+                          disabled={selectedOptions.includes(opt.optionId)}
+                        >
+                          {selectedOptions.includes(opt.optionId) ? '✓ Completed' : '🎮 Launch Game'}
+                        </button>
                       </div>
-                    ) : (
-                      <span>{opt.optionText}</span>
-                    )}
-                  </div>
-                </label>
-              ))}
+                    </div>
+                  );
+                }
+
+                // Regular non-game option
+                return (
+                  <label
+                    key={opt.optionId}
+                    className={`border rounded p-3 d-block mb-3 ${
+                      selectedOptions.includes(opt.optionId) ? "bg-light" : ""
+                    }`}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <div className="d-flex align-items-start">
+                      <input
+                        type="checkbox"
+                        className="me-3 mt-1"
+                        checked={selectedOptions.includes(opt.optionId)}
+                        onChange={() => toggleOption(opt.optionId)}
+                        disabled={
+                          question.question.maxOptionsAllowed > 0 &&
+                          !selectedOptions.includes(opt.optionId) &&
+                          selectedOptions.length >= question.question.maxOptionsAllowed
+                        }
+                      />
+                      {languages.length > 0 ? (
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: languages.length > 1 ? "1fr 1px 1fr" : "1fr",
+                            gap: 15,
+                            flex: 1,
+                          }}
+                        >
+                          {languages.map((lang, index) => (
+                            <React.Fragment key={lang.language.languageId}>
+                              <div style={{ fontSize: "0.95rem", lineHeight: "1.5" }}>
+                                {getOptionText(opt, lang.language.languageId)}
+                              </div>
+                              {index === 0 && languages.length > 1 && (
+                                <div style={{ width: 1, backgroundColor: "#dee2e6" }} />
+                              )}
+                            </React.Fragment>
+                          ))}
+                        </div>
+                      ) : (
+                        <span>{opt.optionText}</span>
+                      )}
+                    </div>
+                  </label>
+                );
+              })}
             </div>
 
             <div className="d-flex justify-content-between mt-4">

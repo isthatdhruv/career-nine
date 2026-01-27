@@ -81,7 +81,7 @@ public class UserController {
     }
 
     @PostMapping(value = "user/auth", headers = "Accept=application/json")
-    public Map<String, Long> checkUser(@RequestBody User currentUser) {
+    public HashMap<String, Object> checkUser(@RequestBody User currentUser) {
         if (userRepository.findByUsernameAndDobDate(currentUser.getUsername(), currentUser.getDobDate()).isPresent()) {
             User user = userRepository.findByUsernameAndDobDate(currentUser.getUsername(), currentUser.getDobDate())
                     .get();
@@ -90,8 +90,8 @@ public class UserController {
                 UserStudent userStudent = userStudentRepository.getByUserId(user.getId()).get();
                 StudentAssessmentMapping studentAssessmentMapping = studentAssessmentMappingRepository
                         .getByUserStudent(userStudent);
-                
-                Map<String, Long> response = new HashMap<>();
+
+                HashMap<String, Object> response = new HashMap<>();
                 response.put("userStudentId", userStudent.getUserStudentId());
                 response.put("assessmentId", studentAssessmentMapping.getAssessmentId());
                 return response;

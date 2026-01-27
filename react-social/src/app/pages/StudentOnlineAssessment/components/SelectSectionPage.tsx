@@ -14,7 +14,12 @@ const SelectSectionPage: React.FC = () => {
   const { assessmentData, loading } = useAssessment();
 
   useEffect(() => {
-    if (assessmentData && assessmentData[0]) {
+    console.log("Assessment Data:", assessmentData);
+    if (assessmentData.isActive === 0) {
+      alert("Assessment is not active.");
+      navigate("/studentLogin");
+    }
+    else if (assessmentData && assessmentData[0]) {
       try {
         const questionnaire = assessmentData[0];
         

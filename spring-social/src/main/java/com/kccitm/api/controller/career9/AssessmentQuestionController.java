@@ -80,15 +80,15 @@ public class AssessmentQuestionController {
 
     private List<AssessmentQuestions> fetchAndTransformFromDb() {
         List<AssessmentQuestions> assementQuestionsObject = assessmentQuestionRepository.findAll();
-        assementQuestionsObject.iterator().forEachRemaining(assmentQuestion -> {
-            assmentQuestion.getOptions().iterator().forEachRemaining(option -> {
-                option.getOptionScores().iterator().forEachRemaining(score -> {
-                    score.setMeasuredQualityType(
-                            new MeasuredQualityTypes(score.getMeasuredQualityType().getMeasuredQualityTypeId()));
-                    score.setQuestion_option(new AssessmentQuestionOptions(score.getQuestion_option().getOptionId()));
-                });
-            });
-        });
+        // assementQuestionsObject.iterator().forEachRemaining(assmentQuestion -> {
+        //     assmentQuestion.getOptions().iterator().forEachRemaining(option -> {
+        //         option.getOptionScores().iterator().forEachRemaining(score -> {
+        //             score.setMeasuredQualityType(
+        //                     new MeasuredQualityTypes(score.getMeasuredQualityType().getMeasuredQualityTypeId()));
+        //             score.setQuestion_option(new AssessmentQuestionOptions(score.getQuestion_option().getOptionId()));
+        //         });
+        //     });
+        // });
         return assementQuestionsObject;
     }
 
@@ -96,20 +96,9 @@ public class AssessmentQuestionController {
     // and return.
     @GetMapping("/getAll")
     public List<AssessmentQuestions> getAllAssessmentQuestions() {
-        try {
-            Optional<List<AssessmentQuestions>> cached = readCache();
-            if (cached.isPresent() && !cached.get().isEmpty()) {
-                logger.info("Returning assessment questions from cache file: {}", CACHE_FILE.toAbsolutePath());
-                return cached.get();
-            }
-        } catch (Exception e) {
-            // Continue to DB fetch if cache read fails
-            logger.warn("Failed to read cache or cache empty, falling back to DB", e);
-        }
-
-        // Cache not present or empty: fetch from DB, transform and write cache
+       
         List<AssessmentQuestions> fromDb = fetchAndTransformFromDb();
-        writeCache(fromDb);
+
         return fromDb;
     }
 
@@ -122,88 +111,63 @@ public class AssessmentQuestionController {
     public AssessmentQuestions createAssessmentQuestion(@RequestBody AssessmentQuestions assessmentQuestions)
             throws Exception {
         // Wire up relationships and clean references before saving
-        if (assessmentQuestions.getOptions() != null) {
-            for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
-                option.setQuestion(assessmentQuestions); // set parent question
-                if (option.getOptionScores() != null) {
-                    for (OptionScoreBasedOnMEasuredQualityTypes score : option.getOptionScores()) {
-                        score.setQuestion_option(option); // set parent option
-                        // Ensure MeasuredQualityType has a clean reference object (just ID) to satisfy
-                        // FK constraint
-                        if (score.getMeasuredQualityType() != null
-                                && score.getMeasuredQualityType().getMeasuredQualityTypeId() != null) {
-                            score.setMeasuredQualityType(new MeasuredQualityTypes(
-                                    score.getMeasuredQualityType().getMeasuredQualityTypeId()));
-                        }
-                    }
-                }
-            }
-        }
-
+        
         AssessmentQuestions assementQustionObject = assessmentQuestionRepository.save(assessmentQuestions);
-
-        // refresh cache after create
-        try {
-            List<AssessmentQuestions> refreshed = fetchAndTransformFromDb();
-            writeCache(refreshed);
-        } catch (Exception e) {
-            logger.warn("Failed to refresh assessment questions cache after create", e);
-        }
 
         return assementQustionObject.getId() != null ? assementQustionObject : null;
     }
 
     @PutMapping("/update/{id}")
-    public AssessmentQuestions updateAssessmentQuestion(@PathVariable Long id,
-            @RequestBody AssessmentQuestions assessmentQuestions) {
-        AssessmentQuestions existingQuestion = assessmentQuestionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Question not found with ID: " + id));
+    // public AssessmentQuestions updateAssessmentQuestion(@PathVariable Long id,
+    //         @RequestBody AssessmentQuestions assessmentQuestions) {
+    //     AssessmentQuestions existingQuestion = assessmentQuestionRepository.findById(id)
+    //             .orElseThrow(() -> new RuntimeException("Question not found with ID: " + id));
 
-        existingQuestion.setQuestionText(assessmentQuestions.getQuestionText());
-        existingQuestion.setQuestionType(assessmentQuestions.getQuestionType());
+    //     existingQuestion.setQuestionText(assessmentQuestions.getQuestionText());
+    //     existingQuestion.setQuestionType(assessmentQuestions.getQuestionType());
 
-        if (assessmentQuestions.getSection() != null && assessmentQuestions.getSection().getSectionId() != null) {
-            QuestionSection section = questionSectionRepository
-                    .findById(assessmentQuestions.getSection().getSectionId()).orElse(null);
-            if (section != null) {
-                existingQuestion.setSection(section);
-            }
-        }
+    //     if (assessmentQuestions.getSection() != null && assessmentQuestions.getSection().getSectionId() != null) {
+    //         QuestionSection section = questionSectionRepository
+    //                 .findById(assessmentQuestions.getSection().getSectionId()).orElse(null);
+    //         if (section != null) {
+    //             existingQuestion.setSection(section);
+    //         }
+    //     }
 
-        if (assessmentQuestions.getOptions() != null && !assessmentQuestions.getOptions().isEmpty()) {
-            if (existingQuestion.getOptions() != null) {
-                existingQuestion.getOptions().clear();
-            }
+    //     if (assessmentQuestions.getOptions() != null && !assessmentQuestions.getOptions().isEmpty()) {
+    //         if (existingQuestion.getOptions() != null) {
+    //             existingQuestion.getOptions().clear();
+    //         }
 
-            for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
-                option.setQuestion(existingQuestion);
-                // Also wire up MQT scores inside options for updates
-                if (option.getOptionScores() != null) {
-                    for (OptionScoreBasedOnMEasuredQualityTypes score : option.getOptionScores()) {
-                        score.setQuestion_option(option);
-                        if (score.getMeasuredQualityType() != null
-                                && score.getMeasuredQualityType().getMeasuredQualityTypeId() != null) {
-                            score.setMeasuredQualityType(new MeasuredQualityTypes(
-                                    score.getMeasuredQualityType().getMeasuredQualityTypeId()));
-                        }
-                    }
-                }
-            }
-            existingQuestion.setOptions(assessmentQuestions.getOptions());
-        }
+    //         for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
+    //             option.setQuestion(existingQuestion);
+    //             // Also wire up MQT scores inside options for updates
+    //             if (option.getOptionScores() != null) {
+    //                 for (OptionScoreBasedOnMEasuredQualityTypes score : option.getOptionScores()) {
+    //                     score.setQuestion_option(option);
+    //                     if (score.getMeasuredQualityType() != null
+    //                             && score.getMeasuredQualityType().getMeasuredQualityTypeId() != null) {
+    //                         score.setMeasuredQualityType(new MeasuredQualityTypes(
+    //                                 score.getMeasuredQualityType().getMeasuredQualityTypeId()));
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //         existingQuestion.setOptions(assessmentQuestions.getOptions());
+    //     }
 
-        AssessmentQuestions saved = assessmentQuestionRepository.save(existingQuestion);
+    //     AssessmentQuestions saved = assessmentQuestionRepository.save(existingQuestion);
 
-        // refresh cache after update
-        try {
-            List<AssessmentQuestions> refreshed = fetchAndTransformFromDb();
-            writeCache(refreshed);
-        } catch (Exception e) {
-            logger.warn("Failed to refresh assessment questions cache after update", e);
-        }
+    //     // refresh cache after update
+    //     try {
+    //         List<AssessmentQuestions> refreshed = fetchAndTransformFromDb();
+    //         writeCache(refreshed);
+    //     } catch (Exception e) {
+    //         logger.warn("Failed to refresh assessment questions cache after update", e);
+    //     }
 
-        return saved;
-    }
+    //     return saved;
+    // }
 
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<String> deleteAssessmentQuestion(@PathVariable Long id) {

@@ -317,14 +317,14 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
               };
 
               console.log("Payload to submit:", payload);
-              // await CreateQuestionData(payload);
+              await CreateQuestionData(payload);
               setFormikValues(initialValues);
               setOptionMeasuredQualities({});
               setOptionTypes({});
               setOptionImages({});
               setSelectedGameId("");
               setUseGameAsOption(false);
-              // navigate("/assessment-questions");
+              navigate("/assessment-questions");
             } catch (error) {
               console.error("Error creating question:", error);
               // window.location.replace("/error");
