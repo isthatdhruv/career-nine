@@ -86,6 +86,11 @@ public class QuestionnaireController {
         return allQuestionnaires;
     }
 
+    @GetMapping(value = "/get/list", headers = "Accept=application/json")
+    public List<Questionnaire> getAllQuestionnaires() {
+        return questionnaireRepository.findQuestionnaireList();
+    }
+
     @GetMapping("/getbyid/{id}")
     public ResponseEntity<Questionnaire> getById(
             @PathVariable Long id) {
@@ -283,20 +288,20 @@ public class QuestionnaireController {
                 incoming.setSection(existingSection);
                 existingSection.getQuestions().add(incoming);
             } else {
-                try{
-                existingSection.getQuestions().stream()
-                        .filter(q -> q.getQuestionnaireQuestionId().equals(incoming.getQuestionnaireQuestionId()))
-                        .findFirst()
-                        .ifPresent(exist -> {
-                            exist.setOrder(incoming.getOrder());
-                            exist.setExcelQuestionHeader(incoming.getExcelQuestionHeader());
-                            // Update the question reference if it changed
-                            exist.setQuestion(incoming.getQuestion());
-                        });
-                    }catch(Exception e){
-                        Set<QuestionnaireQuestion> existingQuestions = existingSection.getQuestions();
-                        e.printStackTrace();    
-                    }
+                try {
+                    existingSection.getQuestions().stream()
+                            .filter(q -> q.getQuestionnaireQuestionId().equals(incoming.getQuestionnaireQuestionId()))
+                            .findFirst()
+                            .ifPresent(exist -> {
+                                exist.setOrder(incoming.getOrder());
+                                exist.setExcelQuestionHeader(incoming.getExcelQuestionHeader());
+                                // Update the question reference if it changed
+                                exist.setQuestion(incoming.getQuestion());
+                            });
+                } catch (Exception e) {
+                    Set<QuestionnaireQuestion> existingQuestions = existingSection.getQuestions();
+                    e.printStackTrace();
+                }
             }
         }
     }

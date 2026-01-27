@@ -36,6 +36,11 @@ public class AssessmentTableController {
         return ResponseEntity.ok(assessments);
     }
 
+    @GetMapping("/get/list")
+    public List<AssessmentTable> getAllAssessment() {
+        return assessmentTableRepository.findAssessmentList();
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<AssessmentTable> getAssessmentById(@PathVariable Long id) {
         Optional<AssessmentTable> assessment = assessmentTableRepository.findById(id);
@@ -52,7 +57,7 @@ public class AssessmentTableController {
 
     @PostMapping("/create")
     public ResponseEntity<AssessmentTable> createAssessment(@RequestBody java.util.Map<String, Object> requestBody) {
-        AssessmentTable assessment = new AssessmentTable();
+        AssessmentTable assessment = new AssessmentTable(null, null);
 
         // Set basic fields from request body
         if (requestBody.get("AssessmentName") != null) {

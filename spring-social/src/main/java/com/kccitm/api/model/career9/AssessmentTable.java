@@ -10,7 +10,6 @@ import javax.persistence.OneToOne;
 import javax.persistence.Table;
 
 import com.kccitm.api.model.career9.Questionaire.Questionnaire;
-import com.kccitm.api.model.career9.school.InstituteDetail;
 
 // import org.springframework.boot.context.properties.bind.DefaultValue;
 
@@ -51,6 +50,14 @@ public class AssessmentTable implements java.io.Serializable {
         this.id = id;
     }
 
+    public AssessmentTable(String AssessmentName,  String starDate ) {
+        this.starDate = starDate;
+        this.AssessmentName= AssessmentName;
+      
+    }
+
+    public AssessmentTable(){
+    }
     public String getAssessmentName() {
         return AssessmentName;
     }
