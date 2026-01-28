@@ -19,6 +19,7 @@ import javax.persistence.JoinColumn;
 import javax.persistence.JoinTable;
 import javax.persistence.ManyToMany;
 import javax.persistence.OneToMany;
+import javax.persistence.OneToOne;
 import javax.persistence.Table;
 import javax.persistence.Transient;
 import javax.validation.constraints.Email;
@@ -29,6 +30,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.kccitm.api.model.career9.StudentInfo;
 
 /**
  * The persistent class for the student_user database table.
@@ -46,7 +48,11 @@ public class User implements Serializable {
 
     @Column(nullable = true)
     private String name;
-
+    
+    @OneToOne
+    @JoinColumn(name = "student_info_id", referencedColumnName = "id", nullable = true)
+    private StudentInfo studentInfo;
+    
     @Email
     @Column(nullable = true)
     private String email;

@@ -295,24 +295,24 @@ const SectionQuestionPage: React.FC = () => {
         console.log(JSON.stringify(submissionJSON, null, 2));
         console.log("=== END OF SUBMISSION DATA ===");
 
-        // // Send POST request to backend
-        // const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/assessment-answer/submit`, {
-        //   method: "POST",
-        //   headers: {
-        //     "Content-Type": "application/json",
-        //     "Accept": "application/json"
-        //   },
-        //   body: JSON.stringify(submissionJSON)
-        // });
+        // Send POST request to backend
+        const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/assessment-answer/submit`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify(submissionJSON)
+        });
 
-        // if (!response.ok) {
-        //   const errorText = await response.text();
-        //   throw new Error(`Failed to submit assessment: ${errorText}`);
-        // }
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to submit assessment: ${errorText}`);
+        }
 
-        // const result = await response.json();
+        const result = await response.json();
         console.log("=== SUBMISSION SUCCESSFUL ===");
-        // console.log("Saved answers:", result);
+        console.log("Saved answers:", result);
         
         // Navigate to completion page
         navigate("/studentAssessment/completed");
