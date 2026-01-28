@@ -48,8 +48,8 @@ public class StudentInfoController {
 
 @GetMapping("/getStudentAnswersWithDetails")
 public ResponseEntity<?> getStudentAnswersWithDetails(
-        @RequestParam Integer userStudentId,
-        @RequestParam Integer assessmentId) {
+        @RequestParam Long userStudentId,
+        @RequestParam Long assessmentId) {
     
     System.out.println("=== DEBUG INFO ===");
     System.out.println("Received request - userStudentId: " + userStudentId + ", assessmentId: " + assessmentId);
