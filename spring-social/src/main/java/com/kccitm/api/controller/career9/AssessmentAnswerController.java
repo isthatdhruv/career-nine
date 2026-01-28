@@ -74,123 +74,83 @@ public class AssessmentAnswerController {
     @PostMapping(value = "/submit", headers = "Accept=application/json")
     public ResponseEntity<?> submitAssessmentAnswers(@RequestBody Map<String, Object> submissionData) {
         try {
-            // Extract userStudentId and assessmentId
-            Long userStudentId = submissionData.get("userStudentId") != null 
-                ? ((Number) submissionData.get("userStudentId")).longValue() 
-                : null;
-            Long assessmentId = submissionData.get("assessmentId") != null 
-                ? ((Number) submissionData.get("assessmentId")).longValue() 
-                : null;
+            // 1. Basic Extraction & Validation
+            Long userStudentId = ((Number) submissionData.get("userStudentId")).longValue();
+            Long assessmentId = ((Number) submissionData.get("assessmentId")).longValue();
 
-            if (userStudentId == null || assessmentId == null) {
-                return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
-            }
-
-            // Fetch UserStudent and AssessmentTable
             UserStudent userStudent = userStudentRepository.findById(userStudentId)
-                .orElseThrow(() -> new RuntimeException("UserStudent not found with id: " + userStudentId));
-            
+                    .orElseThrow(() -> new RuntimeException("UserStudent not found"));
+
             AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
-                .orElseThrow(() -> new RuntimeException("Assessment not found with id: " + assessmentId));
+                    .orElseThrow(() -> new RuntimeException("Assessment not found"));
 
-            StudentAssessmentMapping studentAssessmentMapping = studentAssessmentMappingRepository
-                .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
-                .orElseGet(() -> {
-                    StudentAssessmentMapping mapping = new StudentAssessmentMapping();
-                    mapping.setUserStudent(userStudent);
-                    mapping.setAssessmentId(assessmentId);
-                    return studentAssessmentMappingRepository.save(mapping);
-                });
+            // 2. Manage Mapping (Required for AssessmentRawScore)
+            StudentAssessmentMapping mapping = studentAssessmentMappingRepository
+                    .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                    .orElseGet(() -> {
+                        StudentAssessmentMapping newMapping = new StudentAssessmentMapping();
+                        newMapping.setUserStudent(userStudent);
+                        newMapping.setAssessmentId(assessmentId);
+                        return studentAssessmentMappingRepository.save(newMapping);
+                    });
 
-            // Extract answers list
-            @SuppressWarnings("unchecked")
             List<Map<String, Object>> answers = (List<Map<String, Object>>) submissionData.get("answers");
 
-            if (answers == null || answers.isEmpty()) {
-                return ResponseEntity.badRequest().body("No answers provided");
-            }
+            // Data structures for score calculation
+            Map<Long, Integer> qualityTypeScores = new HashMap<>();
+            Map<Long, MeasuredQualityTypes> qualityTypeCache = new HashMap<>();
 
-            List<AssessmentAnswer> savedAnswers = new ArrayList<>();
-            Map<Long, Integer> rawScoresByQualityType = new HashMap<>();
-            Map<Long, MeasuredQualityTypes> qualityTypeLookup = new HashMap<>();
+            // 3. Process Answers
+            for (Map<String, Object> ansMap : answers) {
+                Long qId = ((Number) ansMap.get("questionnaireQuestionId")).longValue();
+                Long oId = ((Number) ansMap.get("optionId")).longValue();
 
-            // Process each answer
-            for (Map<String, Object> answer : answers) {
-                Long questionnaireQuestionId = answer.get("questionnaireQuestionId") != null 
-                    ? ((Number) answer.get("questionnaireQuestionId")).longValue() 
-                    : null;
-                Long optionId = answer.get("optionId") != null 
-                    ? ((Number) answer.get("optionId")).longValue() 
-                    : null;
+                QuestionnaireQuestion question = questionnaireQuestionRepository.findById(qId).orElse(null);
+                AssessmentQuestionOptions option = assessmentQuestionOptionsRepository.findById(oId).orElse(null);
 
-                if (questionnaireQuestionId == null || optionId == null) {
-                    continue; // Skip invalid entries
-                }
+                if (question != null && option != null) {
+                    // Save AssessmentAnswer
+                    AssessmentAnswer ans = new AssessmentAnswer();
+                    ans.setUserStudent(userStudent);
+                    ans.setAssessment(assessment);
+                    ans.setQuestionnaireQuestion(question);
+                    ans.setOption(option);
+                    assessmentAnswerRepository.save(ans);
 
-                // Fetch QuestionnaireQuestion and AssessmentQuestionOptions
-                QuestionnaireQuestion questionnaireQuestion = questionnaireQuestionRepository
-                    .findById(questionnaireQuestionId)
-                    .orElse(null);
-                
-                AssessmentQuestionOptions option = assessmentQuestionOptionsRepository
-                    .findById(optionId)
-                    .orElse(null);
+                    // Accumulate Scores for RawScore table
+                    List<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository.findByOptionId(oId);
+                    for (OptionScoreBasedOnMEasuredQualityTypes s : scores) {
+                        MeasuredQualityTypes type = s.getMeasuredQualityType();
+                        Long typeId = type.getMeasuredQualityTypeId();
 
-                if (questionnaireQuestion == null || option == null) {
-                    continue; // Skip if entities not found
-                }
-
-                // Create new AssessmentAnswer entity
-                AssessmentAnswer assessmentAnswer = new AssessmentAnswer();
-                assessmentAnswer.setUserStudent(userStudent);
-                assessmentAnswer.setAssessment(assessment);
-                assessmentAnswer.setQuestionnaireQuestion(questionnaireQuestion);
-                assessmentAnswer.setOption(option);
-
-                // Save to database
-                AssessmentAnswer saved = assessmentAnswerRepository.save(assessmentAnswer);
-                savedAnswers.add(saved);
-
-                // Capture raw score contributions for this option
-                List<OptionScoreBasedOnMEasuredQualityTypes> optionScores = optionScoreRepository.findByOptionId(optionId);
-                for (OptionScoreBasedOnMEasuredQualityTypes optionScore : optionScores) {
-                    MeasuredQualityTypes qualityType = optionScore.getMeasuredQualityType();
-                    if (qualityType == null || qualityType.getMeasuredQualityTypeId() == null) {
-                        continue;
+                        qualityTypeScores.merge(typeId, s.getScore(), Integer::sum);
+                        qualityTypeCache.putIfAbsent(typeId, type);
                     }
-
-                    Long qualityTypeId = qualityType.getMeasuredQualityTypeId();
-                    int optionScoreValue = optionScore.getScore() != null ? optionScore.getScore() : 0;
-                    rawScoresByQualityType.merge(qualityTypeId, optionScoreValue, Integer::sum);
-                    qualityTypeLookup.putIfAbsent(qualityTypeId, qualityType);
                 }
             }
 
-            // Clear any existing raw scores for this student/assessment mapping and save new ones
-            assessmentRawScoreRepository.deleteByStudentAssessmentMappingStudentAssessmentId(
-                studentAssessmentMapping.getStudentAssessmentId());
+            // 4. Update Raw Scores (Delete old, Save new)
+            assessmentRawScoreRepository
+                    .deleteByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId());
 
-            List<AssessmentRawScore> savedRawScores = new ArrayList<>();
-            for (Map.Entry<Long, Integer> entry : rawScoresByQualityType.entrySet()) {
-                MeasuredQualityTypes qualityType = qualityTypeLookup.get(entry.getKey());
-                AssessmentRawScore rawScore = new AssessmentRawScore();
-                rawScore.setStudentAssessmentMapping(studentAssessmentMapping);
-                rawScore.setMeasuredQualityType(qualityType);
-                rawScore.setMeasuredQuality(qualityType != null ? qualityType.getMeasuredQuality() : null);
-                rawScore.setRawScore(entry.getValue());
-                savedRawScores.add(assessmentRawScoreRepository.save(rawScore));
+            List<AssessmentRawScore> finalScores = new ArrayList<>();
+            for (Map.Entry<Long, Integer> entry : qualityTypeScores.entrySet()) {
+                MeasuredQualityTypes mqt = qualityTypeCache.get(entry.getKey());
+
+                AssessmentRawScore ars = new AssessmentRawScore();
+                ars.setStudentAssessmentMapping(mapping);
+                ars.setMeasuredQualityType(mqt);
+                // Crucial: Also link the parent 'MeasuredQuality' from the type
+                ars.setMeasuredQuality(mqt.getMeasuredQuality());
+                ars.setRawScore(entry.getValue());
+
+                finalScores.add(assessmentRawScoreRepository.save(ars));
             }
 
-            Map<String, Object> responseBody = new HashMap<>();
-            responseBody.put("savedAnswers", savedAnswers);
-            responseBody.put("rawScores", savedRawScores);
-
-            return ResponseEntity.ok(responseBody);
+            return ResponseEntity.ok(Map.of("status", "success", "scoresSaved", finalScores.size()));
 
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body("Error saving assessment answers: " + e.getMessage());
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
         }
     }
 }
