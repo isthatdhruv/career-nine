@@ -885,6 +885,37 @@ return (
                             </div>
                           </Dropdown.Menu>
                         </Dropdown>
+                        
+                        {/* Display Selected Measured Qualities */}
+                        {optionMeasuredQualities[index] && Object.keys(optionMeasuredQualities[index]).length > 0 && (
+                          <div className="mt-2">
+                            <div className="small text-muted mb-1">Selected Qualities:</div>
+                            <div className="d-flex flex-wrap gap-1">
+                              {Object.entries(optionMeasuredQualities[index])
+                                .filter(([_, value]) => value.checked)
+                                .map(([typeId, value]) => {
+                                  const qualityType = mqt.find(q => q.measuredQualityTypeId === Number(typeId));
+                                  return qualityType ? (
+                                    <div
+                                      key={typeId}
+                                      className="badge bg-primary d-flex align-items-center gap-1"
+                                      style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem' }}
+                                    >
+                                      <span>{qualityType.measuredQualityTypeName}</span>
+                                      <span className="badge bg-light text-dark ms-1">{value.score}</span>
+                                      <button
+                                        type="button"
+                                        className="btn-close btn-close-white"
+                                        style={{ fontSize: '0.5rem', padding: 0, width: '0.6rem', height: '0.6rem' }}
+                                        onClick={() => handleQualityToggle(index, Number(typeId))}
+                                        aria-label="Remove"
+                                      />
+                                    </div>
+                                  ) : null;
+                                })}
+                            </div>
+                          </div>
+                        )}
                       </td>
                       <td>
                         <div className="d-flex gap-1">
