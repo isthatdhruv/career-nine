@@ -35,11 +35,8 @@ public class AssessmentTable implements java.io.Serializable {
 
     private String endDate;
 
+    @OneToOne(cascade = javax.persistence.CascadeType.ALL)
     @JoinColumn(name = "questionnaire_id")
-    @OneToOne(fetch = javax.persistence.FetchType.LAZY, optional = true)
-    @org.hibernate.annotations.NotFound(action = org.hibernate.annotations.NotFoundAction.IGNORE)
-    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
-    @com.fasterxml.jackson.annotation.JsonIgnore
     private Questionnaire questionnaire;
 
     public Long getId() {
@@ -50,10 +47,12 @@ public class AssessmentTable implements java.io.Serializable {
         this.id = id;
     }
 
-    public AssessmentTable(String AssessmentName,  String starDate ) {
+    public AssessmentTable(Long id, String assessmentName, String starDate, String endDate, Boolean isActive) {
+        this.id = id;
+        this.AssessmentName = assessmentName;
         this.starDate = starDate;
-        this.AssessmentName= AssessmentName;
-      
+        this.endDate = endDate;
+        this.isActive = isActive;
     }
 
     public AssessmentTable(){
@@ -105,4 +104,5 @@ public class AssessmentTable implements java.io.Serializable {
     public void setQuestionnaire(Questionnaire questionnaire) {
         this.questionnaire = questionnaire;
     }
+
 }

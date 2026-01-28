@@ -8,6 +8,7 @@ import * as Yup from "yup";
 import { ReadAssessmentByIdData, UpdateAssessmentData, CreateAssessmentData } from "../../API/Create_Assessment_APIs";
 import { ReadQuestionaireData } from "../../API/Create_Questionaire_APIs";
 import { Dropdown, Form } from "react-bootstrap";
+import { data } from "jquery";
 
 const validationSchema = Yup.object().shape({
   assessmentName: Yup.string().required("Assessment name is required"),
@@ -24,6 +25,12 @@ const AssessmentEditPage = (props?: {
     endDate: "",
     isActive: false,
     modeofAssessment: false,
+    questionnaires: [
+      {
+        questionnaireId: 0,
+        questionnaireName: "",
+      },
+    ],
   });
   
  
@@ -31,22 +38,22 @@ const AssessmentEditPage = (props?: {
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
-  const [questionnaires, setQuestionnaires] = useState<any[]>([]);
+  // const [questionnaires, setQuestionnaires] = useState<any[]>([]);
   const [selectedQuestionnaireId, setSelectedQuestionnaireId] = useState<number | null>(null);
 
   // Fetch questionnaires when component mounts
-  useEffect(() => {
-    const fetchQuestionnaires = async () => {
-      try {
-        const response = await ReadQuestionaireData();
-        console.log("Loaded questionnaires:", response.data);
-        setQuestionnaires(response.data);
-      } catch (error) {
-        console.error("Error fetching questionnaires:", error);
-      }
-    };
-    fetchQuestionnaires();
-  }, []);
+  // useEffect(() => {
+  //   const fetchQuestionnaires = async () => {
+  //     try {
+  //       const response = await ReadQuestionaireData();
+  //       console.log("Loaded questionnaires:", response.data);
+  //       setQuestionnaires(response.data);
+  //     } catch (error) {
+  //       console.error("Error fetching questionnaires:", error);
+  //     }
+  //   };
+  //   fetchQuestionnaires();
+  // }, []);
 
   // Fetch tool data when component mounts
   useEffect(() => {
@@ -63,7 +70,9 @@ const AssessmentEditPage = (props?: {
             endDate: response.data.endDate || "",
             isActive: response.data.isActive || false,
             modeofAssessment: response.data.modeofAssessment || false,
+            questionnaires: response.data.questionnaires || [],
           };
+          console.log("Transformed assessment data:", transformedData);
           setAssessmentData(transformedData);
           
           // Pre-select questionnaire if exists
@@ -103,6 +112,7 @@ const AssessmentEditPage = (props?: {
       endDate: assessmentData.endDate || "",
       isActive: assessmentData.isActive || false,
       modeofAssessment: assessmentData.modeofAssessment || false,
+      questionnaires: assessmentData.questionnaires?.map((q: any) => q.questionnaireId) || [],
     },
     validationSchema: validationSchema,
     onSubmit: async (values) => {
@@ -271,11 +281,11 @@ const AssessmentEditPage = (props?: {
             <div className="card mb-7">
               <h3 className="card-title">Select Questionnaire</h3>
               <div className="card-body">
-                {questionnaires.length === 0 ? (
+                {/* {assessmentData.questionnaires.length === 0 ? (
                   <div className="text-muted">No questionnaires available</div>
-                ) : (
+                ) : ( */}
                   <div className="d-flex flex-column gap-3">
-                    {questionnaires.map((q: any, index: number) => {
+                    {assessmentData.questionnaires.map((q: any, index: number) => {
                       const qId = q.questionnaireId || q.id;
                       return (
                         <label
@@ -310,7 +320,7 @@ const AssessmentEditPage = (props?: {
                       );
                     })}
                   </div>
-                )}
+                {/* )} */}
               </div>
             </div>
 
