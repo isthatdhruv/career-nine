@@ -57,6 +57,9 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
   const [games, setGames] = useState<any[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string>("");
 
+  // Search state for each option's measured quality dropdown
+  const [qualitySearchTerms, setQualitySearchTerms] = useState<{ [key: number]: string }>({});
+
   // Always call this hook at the top level, not conditionally
   useEffect(() => {
     if (questionData.options && questionData.options.length > 0) {
@@ -201,6 +204,16 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
     }
   };
 
+  // Filter measured quality types based on search term
+  const getFilteredMeasuredQualities = (optionIndex: number) => {
+    const searchTerm = qualitySearchTerms[optionIndex] || "";
+    if (!searchTerm.trim()) return mqt;
+    
+    return mqt.filter((type: any) => 
+      type.measuredQualityTypeName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  };
+
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
@@ -218,10 +231,13 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
           // Process the question data to extract section properly
           const fetchedQuestion = questionResponse.data;
 
-
           const processedData = {
             ...fetchedQuestion,
-            section: fetchedQuestion.section?.section || "",
+            section: fetchedQuestion.section?.sectionId 
+              ? { sectionId: String(fetchedQuestion.section.sectionId) }
+              : fetchedQuestion.section?.section 
+              ? { sectionId: String(fetchedQuestion.section.section) }
+              : { sectionId: "" },
             questionOptions: fetchedQuestion.options
               ? fetchedQuestion.options.map((option: any) => option.optionText || option)
               : [""]
@@ -236,7 +252,11 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
           if (locationData) {
             const processedLocationData = {
               ...locationData,
-              section: locationData.section?.section || locationData.section || "",
+              section: locationData.section?.sectionId 
+                ? { sectionId: String(locationData.section.sectionId) }
+                : locationData.section?.section 
+                ? { sectionId: String(locationData.section.section) }
+                : { sectionId: "" },
               questionOptions: locationData.options
                 ? locationData.options.map((option: any) => option.optionText || option)
                 : locationData.questionOptions || [""]
@@ -252,7 +272,11 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
         if (locationData) {
           const processedLocationData = {
             ...locationData,
-            section: locationData.section?.section || locationData.section || "",
+            section: locationData.section?.sectionId 
+              ? { sectionId: String(locationData.section.sectionId) }
+              : locationData.section?.section 
+              ? { sectionId: String(locationData.section.section) }
+              : { sectionId: "" },
             questionOptions: locationData.options
               ? locationData.options.map((option: any) => option.optionText || option)
               : locationData.questionOptions || [""]
@@ -599,8 +623,9 @@ return (
             <select
               value={formik.values.section?.sectionId || ""}
               onChange={e => {
-                const selectedSection = sections.find(s => String(s.sectionId) === e.target.value);
-                formik.setFieldValue("section", selectedSection ? { sectionId: String(selectedSection.sectionId) } : { sectionId: "" });
+                const selectedSectionId = e.target.value;
+                formik.setFieldValue("section", { sectionId: selectedSectionId });
+                console.log("Selected section ID:", selectedSectionId);
               }}
               className={clsx(
                 "form-control form-control-lg form-control-solid",
@@ -616,7 +641,7 @@ return (
             >
               <option value="">Select Section</option>
               {sections.map(section => (
-                <option key={section.sectionId} value={section.sectionId}>
+                <option key={section.sectionId} value={String(section.sectionId)}>
                   {section.sectionName}
                   {section.sectionDescription && ` - ${section.sectionDescription}`}
                 </option>
@@ -779,7 +804,7 @@ return (
                         )}
                       </td>
                       <td>
-                        <Dropdown>
+                        <Dropdown autoClose="outside">
                           <Dropdown.Toggle
                             variant="secondary"
                             id={`dropdown-option-${index}`}
@@ -787,40 +812,76 @@ return (
                           >
                             Quality Types
                           </Dropdown.Toggle>
-                          <Dropdown.Menu style={{ minWidth: 250 }}>
+                          <Dropdown.Menu style={{ minWidth: 300 }}>
                             <Dropdown.Header>Measured Quality Types</Dropdown.Header>
-                            <div style={{ maxHeight: 250, overflowY: "auto", padding: 8 }}>
-                              {mqt.map((type: any, i: number) => (
-                                <div key={type.measuredQualityTypeId}>
-                                  <div className="d-flex align-items-center mb-2">
-                                    <input
-                                      type="checkbox"
-                                      checked={!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked}
-                                      onChange={() => handleQualityToggle(index, type.measuredQualityTypeId)}
-                                      className="form-check-input me-2"
-                                      id={`option-${index}-type-${type.measuredQualityTypeId}`}
-                                    />
-                                    <label htmlFor={`option-${index}-type-${type.measuredQualityTypeId}`} className="me-2 mb-0">
-                                      {type.measuredQualityTypeName}
-                                    </label>
-                                    {!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked && (
+                            
+                            {/* Search Bar */}
+                            <div className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="text"
+                                className="form-control form-control-sm"
+                                placeholder="🔍 Search quality types..."
+                                value={qualitySearchTerms[index] || ""}
+                                onChange={(e) => {
+                                  setQualitySearchTerms(prev => ({
+                                    ...prev,
+                                    [index]: e.target.value
+                                  }));
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                            
+                            <Dropdown.Divider />
+                            
+                            <div style={{ maxHeight: 250, overflowY: "auto", padding: 8 }} onClick={(e) => e.stopPropagation()}>
+                              {getFilteredMeasuredQualities(index).length > 0 ? (
+                                getFilteredMeasuredQualities(index).map((type: any, i: number) => (
+                                  <div key={type.measuredQualityTypeId}>
+                                    <div className="d-flex align-items-center mb-2">
                                       <input
-                                        type="number"
-                                        min={0}
-                                        max={100}
-                                        value={optionMeasuredQualities[index][type.measuredQualityTypeId]?.score ?? 0}
-                                        onChange={e =>
-                                          handleQualityScoreChange(index, type.measuredQualityTypeId, Number(e.target.value))
-                                        }
-                                        placeholder="Score"
-                                        className="form-control form-control-sm ms-2"
-                                        style={{ width: 70 }}
+                                        type="checkbox"
+                                        checked={!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked}
+                                        onChange={() => handleQualityToggle(index, type.measuredQualityTypeId)}
+                                        className="form-check-input me-2"
+                                        id={`option-${index}-type-${type.measuredQualityTypeId}`}
+                                        onClick={(e) => e.stopPropagation()}
                                       />
-                                    )}
+                                      <label 
+                                        htmlFor={`option-${index}-type-${type.measuredQualityTypeId}`} 
+                                        className="me-2 mb-0"
+                                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleQualityToggle(index, type.measuredQualityTypeId);
+                                        }}
+                                      >
+                                        {type.measuredQualityTypeName}
+                                      </label>
+                                      {!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked && (
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          max={100}
+                                          value={optionMeasuredQualities[index][type.measuredQualityTypeId]?.score ?? 0}
+                                          onChange={e =>
+                                            handleQualityScoreChange(index, type.measuredQualityTypeId, Number(e.target.value))
+                                          }
+                                          placeholder="Score"
+                                          className="form-control form-control-sm ms-2"
+                                          style={{ width: 70 }}
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                      )}
+                                    </div>
+                                    {i < getFilteredMeasuredQualities(index).length - 1 && <hr style={{ margin: '4px 0' }} />}
                                   </div>
-                                  {i < mqt.length - 1 && <hr style={{ margin: '4px 0' }} />}
+                                ))
+                              ) : (
+                                <div className="text-muted text-center py-2">
+                                  No matching quality types found
                                 </div>
-                              ))}
+                              )}
                             </div>
                           </Dropdown.Menu>
                         </Dropdown>
@@ -914,4 +975,3 @@ return (
 };
 
 export default QuestionEditPage;
-
