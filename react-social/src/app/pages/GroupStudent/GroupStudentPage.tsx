@@ -1,695 +1,416 @@
-import React, { useMemo, useState } from "react";
+import React, { useState, useEffect } from "react";
+import { ReadCollegeData } from "../College/API/College_APIs";
+import { getStudentsWithMappingByInstituteId, getAllAssessments, Assessment } from "../StudentInformation/StudentInfo_APIs";
 
 type Student = {
-  id: string;
+  id: number;
   name: string;
-  class: string;
-  assessment: "Subject Navigator" | "Career Navigator" | "Insight Navigator";
-  status: "completed" | "pending" | "not-done";
-  avatar: string;
-};
-
-type GroupedStudent = {
-  id: string;
-  name: string;
-  class: string;
-  groupName: string;
-  assessment: string;
-  status: string;
-  avatar: string;
+  schoolRollNumber: string;
+  selectedAssessment: string;
+  userStudentId: number;
+  assessmentName?: string;
+  phoneNumber?: string;
+  studentDob?: string;
+  username?: string;
 };
 
 export default function Users() {
+  const [institutes, setInstitutes] = useState<any[]>([]);
+  const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
+  const [students, setStudents] = useState<Student[]>([]);
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
-  const [showActiveOnly, setShowActiveOnly] = useState(false);
-  
-  // Group management states
-  const [selectedGroup, setSelectedGroup] = useState("");
-  const [checkedStudents, setCheckedStudents] = useState<string[]>([]);
-  const [groupedStudents, setGroupedStudents] = useState<GroupedStudent[]>([]);
-  const [showModal, setShowModal] = useState(false);
-  const [customGroups, setCustomGroups] = useState<string[]>([]);
-  const [showCustomInput, setShowCustomInput] = useState(false);
-  const [customGroupName, setCustomGroupName] = useState("");
 
-  const allStudents: Student[] = [
-    {
-      id: "1",
-      name: "Aarav Sharma",
-      class: "Class 10A",
-      assessment: "Career Navigator",
-      status: "completed",
-      avatar: "AS",
-    },
-    {
-      id: "2",
-      name: "Priya Verma",
-      class: "Class 10B",
-      assessment: "Insight Navigator",
-      status: "pending",
-      avatar: "PV",
-    },
-    {
-      id: "3",
-      name: "Rohit Mehta",
-      class: "Class 10A",
-      assessment: "Subject Navigator",
-      status: "completed",
-      avatar: "RM",
-    },
-    {
-      id: "4",
-      name: "Sneha Kapoor",
-      class: "Class 11C",
-      assessment: "Career Navigator",
-      status: "not-done",
-      avatar: "SK",
-    },
-    {
-      id: "5",
-      name: "Karan Singh",
-      class: "Class 10B",
-      assessment: "Insight Navigator",
-      status: "completed",
-      avatar: "KS",
-    },
-    {
-      id: "6",
-      name: "Ananya Patel",
-      class: "Class 11A",
-      assessment: "Career Navigator",
-      status: "pending",
-      avatar: "AP",
-    },
-    {
-      id: "7",
-      name: "Vikram Reddy",
-      class: "Class 10C",
-      assessment: "Subject Navigator",
-      status: "completed",
-      avatar: "VR",
-    },
-  ];
+  useEffect(() => {
+    ReadCollegeData()
+      .then((res: any) => {
+        const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+        console.log("Fetched Institutes:", list);
+        setInstitutes(list);
+      })
+      .catch((err: any) => console.error("Failed to fetch institutes", err));
 
-  // Get unique group names from existing grouped students
-  const groupNames = useMemo(() => {
-    const existingGroups = Array.from(new Set(groupedStudents.map(s => s.groupName))).sort();
-    return [...existingGroups, ...customGroups.filter(g => !existingGroups.includes(g))];
-  }, [groupedStudents, customGroups]);
+    // Fetch assessments
+    getAllAssessments()
+      .then(response => {
+        setAssessments(response.data);
+      })
+      .catch(error => {
+        console.error("Error fetching assessments:", error);
+      });
+  }, []);
 
-  // Get ungrouped students (not in groupedStudents)
-  const ungroupedStudents = useMemo(() => {
-    const groupedIds = new Set(groupedStudents.map(s => s.id));
-    return allStudents.filter(s => !groupedIds.has(s.id));
-  }, [groupedStudents]);
+  useEffect(() => {
+    if (selectedInstitute) {
+      setLoading(true);
+      getStudentsWithMappingByInstituteId(Number(selectedInstitute))
+        .then(response => {
+          const studentData = response.data.map((student: any) => {
+            const assessmentId = student.assessmentId ? String(student.assessmentId) : "";
+            const assessment = assessments.find(a => a.id === Number(assessmentId));
+            
+            return {
+              id: student.id,
+              name: student.name || "",
+              phoneNumber: student.phoneNumber || "",
+              studentDob: student.studentDob || "",
+              schoolRollNumber: student.schoolRollNumber || "",
+              selectedAssessment: assessmentId,
+              userStudentId: student.userStudentId,
+              assessmentName: assessment?.assessmentName || "",
+              username: student.username || ""
+            };
+          });
+          console.log("Loaded students:", studentData);
+          setStudents(studentData);
+        })
+        .catch(error => {
+          console.error("Error fetching student info:", error);
+        })
+        .finally(() => setLoading(false));
+    }
+  }, [selectedInstitute, assessments]);
 
-  // Handle checkbox toggle for students in the table
-  const handleCheckboxToggle = (studentId: string) => {
-    setCheckedStudents(prev => {
-      if (prev.includes(studentId)) {
-        return prev.filter(id => id !== studentId);
-      } else {
-        return [...prev, studentId];
-      }
-    });
+  const filteredStudents = students.filter((s) => {
+    return (
+      s.name.toLowerCase().includes(query.toLowerCase()) ||
+      s.schoolRollNumber.toLowerCase().includes(query.toLowerCase()) ||
+      s.userStudentId.toString().includes(query)
+    );
+  });
+
+  const getSelectedInstituteName = () => {
+    const institute = institutes.find(inst => inst.instituteCode === selectedInstitute);
+    return institute?.instituteName || "";
   };
 
-  // Handle group selection change
-  const handleGroupChange = (value: string) => {
-    if (value === "others") {
-      setShowCustomInput(true);
-      setSelectedGroup("");
-    } else {
-      setShowCustomInput(false);
-      setSelectedGroup(value);
-      setCustomGroupName("");
-    }
-  };
-
-  // Open modal when Add Group is clicked
-  const handleOpenModal = () => {
-    if (checkedStudents.length === 0) {
-      alert("Please select at least one student from the table");
-      return;
-    }
-    setShowModal(true);
-  };
-
-  // Submit grouping
-  const handleSubmitGrouping = () => {
-    let finalGroupName = selectedGroup;
-
-    // If custom input is shown, use the custom group name
-    if (showCustomInput) {
-      if (!customGroupName.trim()) {
-        alert("Please enter a group name");
-        return;
-      }
-      finalGroupName = customGroupName.trim();
-      
-      // Add to custom groups if not already exists
-      if (!customGroups.includes(finalGroupName) && !groupNames.includes(finalGroupName)) {
-        setCustomGroups(prev => [...prev, finalGroupName]);
-      }
-    } else if (!selectedGroup) {
-      alert("Please select a group");
-      return;
-    }
-
-    const newGroupedStudents = allStudents
-      .filter(s => checkedStudents.includes(s.id))
-      .map(s => ({
-        id: s.id,
-        name: s.name,
-        class: s.class,
-        groupName: finalGroupName,
-        assessment: s.assessment,
-        status: s.status,
-        avatar: s.avatar,
-      }));
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "";
     
-    setGroupedStudents(prev => [...prev, ...newGroupedStudents]);
+    // Extract just the date part (YYYY-MM-DD) from the ISO string
+    const datePart = dateString.split('T')[0];
     
-    // Reset states
-    setSelectedGroup("");
-    setCustomGroupName("");
-    setShowCustomInput(false);
-    setCheckedStudents([]);
-    setShowModal(false);
+    // Convert to a more readable format (DD-MM-YYYY)
+    const date = new Date(datePart);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    
+    return `${day}-${month}-${year}`;
   };
-
-  const filteredStudents = useMemo(() => {
-    return ungroupedStudents.filter((s) => {
-      const matchesSearch =
-        s.name.toLowerCase().includes(query.toLowerCase()) ||
-        s.class.toLowerCase().includes(query.toLowerCase());
-
-      const matchesStatus = showActiveOnly
-        ? s.status === "completed"
-        : true;
-
-      return matchesSearch && matchesStatus;
-    });
-  }, [ungroupedStudents, query, showActiveOnly]);
-
-  // Get checked students details for display in modal
-  const checkedStudentsDetails = useMemo(() => {
-    return ungroupedStudents.filter(s => checkedStudents.includes(s.id));
-  }, [checkedStudents, ungroupedStudents]);
 
   return (
-    <div className="container-fluid py-4">
+    <div className="min-vh-100" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%)', padding: '2rem' }}>
       <style>{`
-        .team-page .card { border-radius: 10px; overflow: hidden; }
-
-        .team-header {
-          display:flex;
-          align-items:center;
-          justify-content: space-between;
-          gap:12px;
-        }
-
-        .member-avatar {
-          width:40px;
-          height:40px;
-          border-radius:50%;
-          display:inline-flex;
-          align-items:center;
-          justify-content:center;
-          color:#fff;
-          font-weight:600;
-          background:#3699ff;
-        }
-
-        .metronic-table thead th {
-          font-weight: 600;
-          padding: 16px 24px;
-          font-size: 14px;
-          background: #fafafb;
-          border-bottom: 1px solid #eff2f5;
-        }
-
-        .metronic-table tbody td {
-          padding: 16px 24px;
-          border-bottom: 1px solid #eff2f5;
-        }
-
-        .metronic-table thead th:first-child,
-        .metronic-table tbody td:first-child {
-          padding-left: 28px !important;
-        }
-
-        .status-pill {
-          padding: 5px 12px;
-          border-radius: 12px;
-          font-size: 12px;
-          font-weight: 600;
-        }
-
-        .status-completed { background: #e8fff3; color: #0bb783; }
-        .status-pending { background: #fff8dd; color: #ffa800; }
-        .status-not-done { background: #f8d7da; color: #d33; }
-
-        .form-check-input {
-          border: 2px solid #3f4254 !important;
-          cursor: pointer;
-        }
-
-        .form-check-input:checked {
-          background-color: #3699ff !important;
-          border-color: #3699ff !important;
-        }
-
-        /* Modal Styles */
-        .modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.5);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1050;
-        }
-
-        .modal-content-custom {
-          background: white;
-          border-radius: 12px;
-          width: 90%;
-          max-width: 600px;
-          max-height: 80vh;
-          overflow-y: auto;
-          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-        }
-
-        .modal-header-custom {
-          padding: 20px 24px;
-          border-bottom: 1px solid #eff2f5;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-
-        .modal-body-custom {
-          padding: 24px;
-        }
-
-        .modal-footer-custom {
-          padding: 16px 24px;
-          border-top: 1px solid #eff2f5;
-          display: flex;
-          gap: 12px;
-          justify-content: flex-end;
-        }
-
-        .close-btn {
-          background: none;
-          border: none;
-          font-size: 24px;
-          cursor: pointer;
-          color: #7e8299;
-          line-height: 1;
-          padding: 0;
-          width: 32px;
-          height: 32px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 4px;
-        }
-
-        .close-btn:hover {
-          background: #f5f8fa;
-          color: #181c32;
-        }
-
-        .selected-student-item {
-          padding: 12px;
-          background: #f9fafb;
-          border: 1px solid #eff2f5;
-          border-radius: 8px;
-          margin-bottom: 8px;
-        }
-
-        .btn {
-          padding: 8px 16px;
-          border-radius: 6px;
-          border: none;
-          cursor: pointer;
-          font-weight: 500;
-          transition: all 0.2s;
-        }
-
-        .btn-success {
-          background: #50cd89;
-          color: white;
-        }
-
-        .btn-success:hover {
-          background: #47be7d;
-        }
-
-        .btn-primary {
-          background: #3699ff;
-          color: white;
-        }
-
-        .btn-primary:hover {
-          background: #187de4;
-        }
-
-        .btn-light {
-          background: #f5f8fa;
-          color: #7e8299;
-        }
-
-        .btn-light:hover {
-          background: #e4e6ef;
-        }
-
-        .btn-light-primary {
-          background: #e1f0ff;
-          color: #3699ff;
-        }
-
-        .btn-light-primary:hover {
-          background: #c9e5ff;
-        }
-
-        .btn-sm {
-          padding: 6px 12px;
-          font-size: 13px;
-        }
-
-        .form-select {
+        .form-select-custom {
           width: 100%;
-          padding: 10px 12px;
-          border: 1px solid #e4e6ef;
-          border-radius: 6px;
-          font-size: 14px;
+          padding: 1rem 1.25rem;
+          font-size: 1rem;
+          font-weight: 500;
+          border: 2px solid #e0e0e0;
+          border-radius: 12px;
+          transition: all 0.3s ease;
+          background-color: white;
           cursor: pointer;
         }
 
-        .form-select:focus {
+        .form-select-custom:focus {
           outline: none;
-          border-color: #3699ff;
-          box-shadow: 0 0 0 3px rgba(54, 153, 255, 0.1);
+          border-color: #4361ee;
+          box-shadow: 0 0 0 4px rgba(67, 97, 238, 0.1);
         }
 
-        .form-control {
-          width: 100%;
-          padding: 10px 12px;
-          border: 1px solid #e4e6ef;
-          border-radius: 6px;
-          font-size: 14px;
-        }
-
-        .form-control:focus {
-          outline: none;
-          border-color: #3699ff;
-          box-shadow: 0 0 0 3px rgba(54, 153, 255, 0.1);
-        }
-
-        .form-label {
-          display: block;
-          margin-bottom: 8px;
-          font-size: 14px;
-          color: #181c32;
-        }
-
-        .fw-semibold {
-          font-weight: 600;
-        }
-
-        .badge {
-          padding: 6px 12px;
-          border-radius: 6px;
-          font-size: 12px;
-          font-weight: 500;
-        }
-
-        .bg-light {
-          background: #f5f8fa !important;
-        }
-
-        .text-dark {
-          color: #181c32 !important;
-        }
-
-        .text-muted {
-          color: #7e8299;
+        .form-select-custom:hover {
+          border-color: #4361ee;
         }
       `}</style>
 
-      <div className="team-page">
-        {/* HEADER */}
-        <div className="team-header mb-4">
-          <div>
-            <h3 className="mb-0">Students List</h3>
-            <small className="text-muted">
-              Overview of all students enrolled in it.
-            </small>
-          </div>
-
-          {/* GROUP BUTTONS */}
-          <div className="d-flex gap-2">
-            <button
-              className="btn btn-sm btn-success"
-              onClick={handleOpenModal}
-            >
-              + Add Group
-            </button>
-          </div>
-        </div>
-
-        {/* GROUPED STUDENTS TABLE */}
-        {groupedStudents.length > 0 && (
-          <div className="card shadow-sm mb-4">
-            <div className="card-header bg-light">
-              <h5 className="mb-0">Grouped Students</h5>
-            </div>
-            <div className="card-body p-0">
-              <div className="table-responsive metronic-table">
-                <table className="table align-middle mb-0">
-                  <thead>
-                    <tr>
-                      <th>Student Name</th>
-                      <th>Class</th>
-                      <th>Group Name</th>
-                      <th>Allotted Assessment</th>
-                      <th className="text-center">Status</th>
-                      <th className="text-center">Dashboard</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {groupedStudents.map((student) => (
-                      <tr key={student.id}>
-                        <td>
-                          <div className="d-flex align-items-center gap-3">
-                            <div className="member-avatar">{student.avatar}</div>
-                            <span className="fw-semibold">{student.name}</span>
-                          </div>
-                        </td>
-                        <td>{student.class}</td>
-                        <td>
-                          <span className="badge bg-light text-dark">
-                            {student.groupName}
-                          </span>
-                        </td>
-                        <td>{student.assessment}</td>
-                        <td className="text-center">
-                          <span className={`status-pill status-${student.status}`}>
-                            {student.status.replace("-", " ").toUpperCase()}
-                          </span>
-                        </td>
-                        <td className="text-center">
-                          <button className="btn btn-sm btn-light-primary">
-                            View
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+      {!selectedInstitute ? (
+        // Institute Selection Card
+        <div className="row justify-content-center">
+          <div className="col-12 col-md-8 col-lg-6">
+            <div className="card border-0 shadow-sm" style={{ borderRadius: '16px', overflow: 'hidden' }}>
+              <div className="card-header text-center text-white" style={{ background: 'linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)', padding: '2rem' }}>
+                <h2 className="mb-2 fw-bold">
+                  <i className="bi bi-building me-2"></i>
+                  Institute Selection
+                </h2>
+                <p className="mb-0 opacity-90">
+                  Select an institute to manage students and groups
+                </p>
               </div>
-            </div>
-          </div>
-        )}
 
-        {/* Search */}
-        <div className="d-flex align-items-center justify-content-between mb-3 gap-3">
-          <div className="d-flex align-items-center gap-2">
-            <input
-              className="form-control form-control-sm"
-              placeholder="Search students"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                border: '1px solid #e4e6ef',
-                borderRadius: '6px',
-                fontSize: '14px',
-                width: '300px'
-              }}
-            />
-          </div>
-        </div>
-
-        {/* UNGROUPED STUDENTS TABLE */}
-        <div className="card shadow-sm">
-          <div className="card-header bg-light">
-            <h5 className="mb-0 px-2">All Students</h5>
-          </div>
-          <div className="card-body p-0">
-            <div className="table-responsive metronic-table">
-              <table className="table align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th style={{ width: '50px' }}></th>
-                    <th>Student Name</th>
-                    <th>Allotted Assessment</th>
-                    <th className="text-center">Status</th>
-                    <th className="text-center">Dashboard</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredStudents.length > 0 ? (
-                    filteredStudents.map((student) => (
-                      <tr key={student.id}>
-                        <td>
-                          <input
-                            type="checkbox"
-                            className="form-check-input"
-                            checked={checkedStudents.includes(student.id)}
-                            onChange={() => handleCheckboxToggle(student.id)}
-                          />
-                        </td>
-                        <td>
-                          <div className="d-flex align-items-center gap-3">
-                            <div className="member-avatar">{student.avatar}</div>
-                            <span className="fw-semibold">{student.name}</span>
-                          </div>
-                        </td>
-                        <td>{student.assessment}</td>
-                        <td className="text-center">
-                          <span className={`status-pill status-${student.status}`}>
-                            {student.status.replace("-", " ").toUpperCase()}
-                          </span>
-                        </td>
-                        <td className="text-center">
-                          <button className="btn btn-sm btn-light-primary">
-                            View
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={5} className="text-center text-muted" style={{ padding: '40px' }}>
-                        {ungroupedStudents.length === 0 
-                          ? "All students have been grouped" 
-                          : "No students found matching your search"}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* MODAL */}
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-content-custom" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header-custom">
-              <h5 className="mb-0">Add Students to Group</h5>
-              <button className="close-btn" onClick={() => setShowModal(false)}>
-                ×
-              </button>
-            </div>
-            
-            <div className="modal-body-custom">
-              {/* Group Selection Dropdown */}
-              <div className="mb-4">
-                <label className="form-label fw-semibold">Group Name</label>
-                <select
-                  className="form-select"
-                  value={showCustomInput ? "others" : selectedGroup}
-                  onChange={(e) => handleGroupChange(e.target.value)}
+              <div className="card-body text-center" style={{ padding: '3rem', background: 'white' }}>
+                <div 
+                  className="mx-auto mb-4"
+                  style={{
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 10px 30px rgba(67, 97, 238, 0.3)'
+                  }}
                 >
-                  <option value="">Choose a group...</option>
-                  {groupNames.map((group) => (
-                    <option key={group} value={group}>
-                      {group}
-                    </option>
-                  ))}
-                  <option value="others">Others</option>
-                </select>
-              </div>
+                  <i className="bi bi-buildings-fill text-white" style={{ fontSize: '2.5rem' }}></i>
+                </div>
 
-              {/* Custom Group Name Input */}
-              {showCustomInput && (
+                <h4 className="mb-3 fw-semibold" style={{ color: '#1a1a2e' }}>
+                  Choose Your Institute
+                </h4>
+                <p className="text-muted mb-4">
+                  Please select the institute you want to work with
+                </p>
+
                 <div className="mb-4">
-                  <label className="form-label fw-semibold">Enter Group Name</label>
+                  <select
+                    className="form-select-custom"
+                    value={selectedInstitute}
+                    onChange={(e) => {
+                      console.log("Selected value:", e.target.value);
+                      setSelectedInstitute(e.target.value ? Number(e.target.value) : "");
+                    }}
+                  >
+                    <option value="">🏫 Select Institute</option>
+                    {institutes.map((inst) => (
+                      <option key={inst.instituteCode} value={inst.instituteCode}>
+                        {inst.instituteName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {!selectedInstitute && (
+                  <div className="text-muted">
+                    <i className="bi bi-info-circle me-1"></i>
+                    No institute selected
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        // Students List Section
+        <>
+          {/* Header Card */}
+          <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px' }}>
+            <div className="card-body p-4">
+              <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                <div>
+                  <div className="d-flex align-items-center gap-2 mb-2">
+                    <button
+                      className="btn btn-sm btn-outline-secondary"
+                      onClick={() => {
+                        setSelectedInstitute("");
+                        setStudents([]);
+                        setQuery("");
+                      }}
+                      style={{ borderRadius: '8px', padding: '4px 12px' }}
+                    >
+                      <i className="bi bi-arrow-left me-1"></i>
+                      Change Institute
+                    </button>
+                    <span className="badge bg-primary px-3 py-2" style={{ borderRadius: '20px', fontSize: '0.9rem' }}>
+                      {getSelectedInstituteName()}
+                    </span>
+                  </div>
+                  <h2 className="mb-1 fw-bold" style={{ color: '#1a1a2e' }}>
+                    <i className="bi bi-people-fill me-2" style={{ color: '#4361ee' }}></i>
+                    Students List
+                  </h2>
+                  <p className="text-muted mb-0">
+                    View all students enrolled in the selected institute
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Search Bar */}
+          <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px' }}>
+            <div className="card-body p-4">
+              <div className="d-flex align-items-center gap-3 flex-wrap">
+                <div className="position-relative flex-grow-1" style={{ maxWidth: '400px' }}>
+                  <i className="bi bi-search position-absolute" style={{ left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#9e9e9e' }}></i>
                   <input
-                    type="text"
                     className="form-control"
-                    placeholder="Enter custom group name..."
-                    value={customGroupName}
-                    onChange={(e) => setCustomGroupName(e.target.value)}
-                    autoFocus
+                    placeholder="Search by name, roll number, or user ID..."
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    style={{
+                      paddingLeft: '42px',
+                      borderRadius: '10px',
+                      border: '2px solid #e0e0e0',
+                      padding: '0.7rem 1rem 0.7rem 42px',
+                    }}
                   />
                 </div>
-              )}
-
-              {/* Selected Students */}
-              <div>
-                <label className="form-label fw-semibold">
-                  Selected Students ({checkedStudentsDetails.length})
-                </label>
-                <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                  {checkedStudentsDetails.map((student) => (
-                    <div key={student.id} className="selected-student-item">
-                      <div className="d-flex align-items-center gap-3">
-                        <div className="member-avatar" style={{ width: '36px', height: '36px', fontSize: '13px' }}>
-                          {student.avatar}
-                        </div>
-                        <div>
-                          <div className="fw-semibold">{student.name}</div>
-                          <small className="text-muted">{student.class}</small>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                <div className="d-flex align-items-center gap-2">
+                  <span className="badge bg-primary px-3 py-2" style={{ borderRadius: '20px', fontSize: '0.9rem' }}>
+                    {filteredStudents.length} Students
+                  </span>
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="modal-footer-custom">
-              <button
-                className="btn btn-light"
-                onClick={() => {
-                  setShowModal(false);
-                  setSelectedGroup("");
-                  setCustomGroupName("");
-                  setShowCustomInput(false);
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleSubmitGrouping}
-              >
-                Submit Grouping
-              </button>
+          {/* Table Card */}
+          <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
+            <div className="card-body p-0">
+              {loading ? (
+                <div className="text-center py-5">
+                  <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                  </div>
+                  <p className="mt-3 text-muted">Loading students...</p>
+                </div>
+              ) : filteredStudents.length === 0 ? (
+                <div className="text-center py-5">
+                  <div 
+                    className="mx-auto mb-3"
+                    style={{ 
+                      width: '80px', 
+                      height: '80px', 
+                      borderRadius: '50%', 
+                      background: '#f0f0f0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <i className="bi bi-inbox" style={{ fontSize: '2rem', color: '#bdbdbd' }}></i>
+                  </div>
+                  <h5 className="text-muted">No Students Found</h5>
+                  <p className="text-muted mb-0">Try adjusting your search or add new students</p>
+                </div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table align-middle mb-0">
+                    <thead>
+                      <tr style={{ background: '#f8f9fa' }}>
+                        <th style={{ padding: '16px 24px', fontWeight: 600, color: '#1a1a2e', borderBottom: '2px solid #e0e0e0' }}>
+                          User ID
+                        </th>
+                        <th style={{ padding: '16px 24px', fontWeight: 600, color: '#1a1a2e', borderBottom: '2px solid #e0e0e0' }}>
+                          Username
+                        </th>
+                        <th style={{ padding: '16px 24px', fontWeight: 600, color: '#1a1a2e', borderBottom: '2px solid #e0e0e0' }}>
+                          Roll Number
+                        </th>
+                        <th style={{ padding: '16px 24px', fontWeight: 600, color: '#1a1a2e', borderBottom: '2px solid #e0e0e0' }}>
+                          Student Name
+                        </th>
+                        <th style={{ padding: '16px 24px', fontWeight: 600, color: '#1a1a2e', borderBottom: '2px solid #e0e0e0' }}>
+                          Allotted Assessment
+                        </th>
+                        <th style={{ padding: '16px 24px', fontWeight: 600, color: '#1a1a2e', borderBottom: '2px solid #e0e0e0' }}>
+                          Phone Number
+                        </th>
+                        <th style={{ padding: '16px 24px', fontWeight: 600, color: '#1a1a2e', borderBottom: '2px solid #e0e0e0' }}>
+                          DOB
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredStudents.map((student, index) => (
+                        <tr 
+                          key={student.userStudentId}
+                          style={{ 
+                            background: index % 2 === 0 ? '#fff' : '#fafbfc',
+                            transition: 'background 0.2s'
+                          }}
+                        >
+                          <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
+                            <span 
+                              className="badge"
+                              style={{ 
+                                background: 'rgba(67, 97, 238, 0.1)', 
+                                color: '#4361ee',
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                fontWeight: 600,
+                                fontSize: '0.85rem'
+                              }}
+                            >
+                              #{student.userStudentId}
+                            </span>
+                          </td>
+                          <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
+                            <span className="fw-semibold" style={{ color: '#1a1a2e' }}>{student.username}</span>
+                          </td>
+                          <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
+                            <span style={{ fontWeight: 500, color: '#555' }}>
+                              {student.schoolRollNumber || '-'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
+                            <span className="fw-semibold" style={{ color: '#1a1a2e' }}>{student.name}</span>
+                          </td>
+                          <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
+                            {student.assessmentName ? (
+                              <span 
+                                className="badge"
+                                style={{ 
+                                  background: 'rgba(67, 97, 238, 0.1)', 
+                                  color: '#4361ee',
+                                  padding: '8px 16px',
+                                  borderRadius: '8px',
+                                  fontWeight: 600,
+                                  fontSize: '0.85rem'
+                                }}
+                              >
+                                {student.assessmentName}
+                              </span>
+                            ) : (
+                              <span className="text-muted">
+                                <i className="bi bi-dash-circle me-1"></i>
+                                Not Assigned
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
+                            {student.phoneNumber ? (
+                              <div className="d-flex align-items-center gap-2">
+                                <i className="bi bi-telephone-fill" style={{ color: '#4361ee' }}></i>
+                                <span style={{ fontWeight: 500, color: '#555' }}>
+                                  {student.phoneNumber}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-muted">
+                                <i className="bi bi-dash-circle me-1"></i>
+                                Not Available
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
+                            {student.studentDob ? (
+                              <div className="d-flex align-items-center gap-2">
+                                <i className="bi bi-calendar-event-fill" style={{ color: '#4361ee' }}></i>
+                                <span style={{ fontWeight: 500, color: '#555' }}>
+                                  {formatDate(student.studentDob)}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-muted">
+                                <i className="bi bi-dash-circle me-1"></i>
+                                Not Available
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
