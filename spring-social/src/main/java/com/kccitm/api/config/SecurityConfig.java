@@ -92,7 +92,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 "http://localhost:3000",
                 "http://192.168.3.78:3000",
                 "http://192.168.0.204:3000",
-                "https://192.168.0.204:3000"));
+                "https://192.168.0.204:3000","https://dashboard.career-9.com"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);

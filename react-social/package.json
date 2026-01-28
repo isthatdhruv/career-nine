@@ -103,7 +103,8 @@
     "format": "prettier --write .",
     "rtl": "webpack --config=rtl.config.js",
     "start:staging": "env-cmd -f staging.env npm start",
-    "build:stage": " env-cmd -f staging.env npm run-script build"
+    "build:stage": " env-cmd -f staging.env npm run-script build",
+    "build:production": " env-cmd -f production.env npm run-script build"
   },
   "eslintConfig": {
     "extends": [
