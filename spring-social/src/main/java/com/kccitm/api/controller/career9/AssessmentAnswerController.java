@@ -15,8 +15,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.kccitm.api.model.career9.AssessmentRawScore;
 import com.kccitm.api.model.career9.AssessmentQuestionOptions;
+import com.kccitm.api.model.career9.AssessmentRawScore;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.MeasuredQualityTypes;
 import com.kccitm.api.model.career9.OptionScoreBasedOnMEasuredQualityTypes;
@@ -24,13 +24,13 @@ import com.kccitm.api.model.career9.Questionaire.AssessmentAnswer;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.UserStudent;
+import com.kccitm.api.repository.AssessmentRawScoreRepository;
 import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
 import com.kccitm.api.repository.Career9.AssessmentQuestionOptionsRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.OptionScoreBasedOnMeasuredQualityTypesRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
-import com.kccitm.api.repository.AssessmentRawScoreRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 
 @RestController
