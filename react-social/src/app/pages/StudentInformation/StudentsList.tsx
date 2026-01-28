@@ -2,8 +2,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getStudentsWithMappingByInstituteId, getAllAssessments, bulkAlotAssessment, Assessment } from "./StudentInfo_APIs";
+import StudentAnswerExcelModal from "./StudentAnswerExcelModal";
 
-type Student = {
+export type Student = {
   id: number;
   name: string;
   schoolRollNumber: string;
@@ -19,6 +20,10 @@ export default function StudentsList() {
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
   const [hasChanges, setHasChanges] = useState(false);
+  
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
   useEffect(() => {
     const instituteId = localStorage.getItem('instituteId');
@@ -43,6 +48,7 @@ export default function StudentsList() {
             selectedAssessment: student.assessmentId ? String(student.assessmentId) : "",
             userStudentId: student.userStudentId,
           }));
+          console.log("Loaded students:", studentData); // Debug log
           setStudents(studentData);
         })
         .catch(error => {
@@ -89,12 +95,25 @@ export default function StudentsList() {
     }
   };
 
+  const handleDownloadClick = (student: Student) => {
+    console.log("Download clicked for student:", student); // Debug log
+    console.log("User Student ID:", student.userStudentId); // Debug log
+    console.log("Assessment ID:", student.selectedAssessment); // Debug log
+    setSelectedStudent(student);
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setSelectedStudent(null);
+  };
+
   const filteredStudents = useMemo(() => {
     return students.filter((s) => {
       return (
         s.name.toLowerCase().includes(query.toLowerCase()) ||
         s.schoolRollNumber.toLowerCase().includes(query.toLowerCase()) ||
-        s.id.toString().includes(query)
+        s.userStudentId.toString().includes(query) // Changed from s.id to s.userStudentId
       );
     });
   }, [students, query]);
@@ -140,7 +159,7 @@ export default function StudentsList() {
               <i className="bi bi-search position-absolute" style={{ left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#9e9e9e' }}></i>
               <input
                 className="form-control"
-                placeholder="Search by name, roll number, or ID..."
+                placeholder="Search by name, roll number, or user ID..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 style={{
@@ -201,7 +220,7 @@ export default function StudentsList() {
                 <thead>
                   <tr style={{ background: '#f8f9fa' }}>
                     <th style={{ padding: '16px 24px', fontWeight: 600, color: '#1a1a2e', borderBottom: '2px solid #e0e0e0' }}>
-                      ID
+                      User ID
                     </th>
                     <th style={{ padding: '16px 24px', fontWeight: 600, color: '#1a1a2e', borderBottom: '2px solid #e0e0e0' }}>
                       Student Name
@@ -212,12 +231,15 @@ export default function StudentsList() {
                     <th style={{ padding: '16px 24px', fontWeight: 600, color: '#1a1a2e', borderBottom: '2px solid #e0e0e0', minWidth: '220px' }}>
                       Assessment
                     </th>
+                    <th style={{ padding: '16px 24px', fontWeight: 600, color: '#1a1a2e', borderBottom: '2px solid #e0e0e0' }}>
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredStudents.map((student, index) => (
                     <tr 
-                      key={student.id}
+                      key={student.userStudentId}
                       style={{ 
                         background: index % 2 === 0 ? '#fff' : '#fafbfc',
                         transition: 'background 0.2s'
@@ -235,7 +257,7 @@ export default function StudentsList() {
                             fontSize: '0.85rem'
                           }}
                         >
-                          #{student.id}
+                          #{student.userStudentId}
                         </span>
                       </td>
                       <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
@@ -285,6 +307,22 @@ export default function StudentsList() {
                             </option>
                           ))}
                         </select>
+                      </td>
+
+                      <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
+                        <button
+                          className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1"
+                          onClick={() => handleDownloadClick(student)}
+                          style={{
+                            borderRadius: '8px',
+                            padding: '6px 12px',
+                            fontWeight: 500,
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          <i className="bi bi-download"></i>
+                          Download
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -339,6 +377,15 @@ export default function StudentsList() {
           </div>
         )}
       </div>
+
+      {/* Student Answer Excel Modal */}
+      {showModal && selectedStudent && (
+        <StudentAnswerExcelModal
+          show={showModal}
+          onHide={handleCloseModal}
+          student={selectedStudent}
+        />
+      )}
     </div>
   );
 }

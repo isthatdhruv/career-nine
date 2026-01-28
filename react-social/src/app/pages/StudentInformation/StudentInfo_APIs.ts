@@ -40,6 +40,13 @@ export interface StudentWithMapping {
     assessmentId?: number;
 }
 
+export interface StudentAnswerDetail {
+    questionId: number;
+    questionText: string;
+    optionId: number;
+    optionText: string;
+}
+
 export function getStudentInfoByInstituteId(instituteId: number) {
     return axios.get<StudentInfo[]>(`${STUDENT_INFO_BASE}/getByInstituteId/${instituteId}`);
 }
@@ -71,4 +78,23 @@ export function getAllAssessments() {
 
 export function bulkAlotAssessment(assignments: BulkAssessmentAssignment[]) {
     return axios.post(`${STUDENT_INFO_BASE}/bulkAlotAssessment`, assignments);
+}
+
+// New API to get student answers with question and option details
+export function getStudentAnswersWithDetails(userStudentId: number, assessmentId: number) {
+    console.log("API Call - Endpoint:", `${STUDENT_INFO_BASE}/getStudentAnswersWithDetails`);
+    console.log("API Call - Params:", { userStudentId, assessmentId });
+    
+    return axios.get<StudentAnswerDetail[]>(`${STUDENT_INFO_BASE}/getStudentAnswersWithDetails`, {
+        params: {
+            userStudentId,
+            assessmentId
+        }
+    }).then(response => {
+        console.log("API Success:", response);
+        return response;
+    }).catch(error => {
+        console.error("API Error:", error.response?.data || error.message);
+        throw error;
+    });
 }
