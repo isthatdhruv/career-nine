@@ -23,6 +23,7 @@ const QuestionTable = (props: {
   const navigate = useNavigate();
   const [selectedMeasuredQualityTypesByQuestion, setSelectedMeasuredQualityTypesByQuestion] = useState<{ [key: number]: any[] }>({});
   const [measuredQualityTypes, setMeasuredQualityTypes] = useState<any[]>([]);
+  const [searchText, setSearchText] = useState("");
 
   // ✅ State for modal
   const [showLanguageModal, setShowLanguageModal] = useState(false);
@@ -111,15 +112,22 @@ const QuestionTable = (props: {
   //   }
   // };
 
+  const filteredData = props.data.filter((item: any) =>
+    (item.questionText ?? "")
+      .toString()
+      .toLowerCase()
+      .includes(searchText.trim().toLowerCase())
+  );
+
   const datatable = {
     columns: [
-      { label: "Question Text", field: "questionText", width: 300 },
-      { label: "Question Type", field: "questionType", sort: "asc", width: 150 },
+      { label: "Question Text", field: "questionText", width: 300 , sort: "asc",},
+      { label: "Question Type", field: "questionType", width: 150 },
       // { label: "Section", field: "sectionType", sort: "asc", width: 150 },
       { label: "Actions", field: "actions", sort: "disabled", width: 200 },
     ],
 
-    rows: props.data.map((data: any) => ({
+    rows: filteredData.map((data: any) => ({
       questionText: <div>{data.questionText}</div>,
       questionType: <div>{data.questionType}</div>,
       sectionType: (
@@ -182,13 +190,25 @@ const QuestionTable = (props: {
   
   return (
     <>
+      <div className="d-flex justify-content-end mb-2">
+        <input
+          type="search"
+          className="form-control"
+          placeholder="Search question text..."
+          value={searchText}
+          onChange={(event) => setSearchText(event.target.value)}
+          style={{ maxWidth: "360px" }}
+        />
+      </div>
       <MDBDataTableV5
         hover
         scrollY
         maxHeight="160vh"
-        entriesOptions={[5, 20, 25]}
-        entries={25}
+        entriesOptions={[100, 150, 200, 500]}
+        entries={100}
         pagesAmount={4}
+        searchTop={false}
+        searchBottom={false}
         data={datatable}
       />
 
