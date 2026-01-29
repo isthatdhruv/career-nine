@@ -64,6 +64,7 @@ public class AssessmentQuestionOptions implements Serializable {
         super();
     }
 
+    
     // Getters and Setters
     public Long getOptionId() {
         return optionId;
@@ -164,4 +165,6 @@ public class AssessmentQuestionOptions implements Serializable {
     public void setOptionDescription(String optionDescription) {
         this.optionDescription = optionDescription;
     }
+
+
 }

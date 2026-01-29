@@ -38,6 +38,7 @@ type Question = {
   questionnaireQuestionId: number;
   question: {
     questionText: string;
+    questionType?: string;
     options: Option[];
     languageQuestions?: LanguageQuestion[];
     maxOptionsAllowed: number;
@@ -60,12 +61,16 @@ const SectionQuestionPage: React.FC = () => {
   const [languages, setLanguages] = useState<QuestionnaireLanguage[]>([]);
   const [currentSection, setCurrentSection] = useState<any>(null);
   const [showWarning, setShowWarning] = useState<boolean>(false);
-  
+
   // Game-related state
   const [isGameActive, setIsGameActive] = useState<boolean>(false);
   const [activeGameCode, setActiveGameCode] = useState<number | null>(null);
 
   const [answers, setAnswers] = useState<Record<string, Record<number, number[]>>>(
+    {}
+  );
+  // For ranking questions: sectionId -> questionId -> optionId -> rank
+  const [rankingAnswers, setRankingAnswers] = useState<Record<string, Record<number, Record<number, number>>>>(
     {}
   );
   const [savedForLater, setSavedForLater] = useState<Record<string, Set<number>>>(
@@ -87,7 +92,7 @@ const SectionQuestionPage: React.FC = () => {
       setCurrentSection(section);
       setQuestions(section.questions || []);
       setCurrentIndex(Number(questionIndex) || 0);
-      
+
       setLanguages(questionnaireData.languages || []);
     }
   }, [sectionId, questionIndex, assessmentData]);
@@ -132,15 +137,22 @@ const SectionQuestionPage: React.FC = () => {
   // Check if all questions are answered
   const areAllQuestionsAnswered = (): boolean => {
     if (!questionnaire) return false;
-    
+
     for (const section of questionnaire.sections) {
       const secId = String(section.section.sectionId);
       for (const q of section.questions) {
         const qId = q.questionnaireQuestionId;
-        
+
         // Check if question is answered
-        const isAnswered = answers[secId]?.[qId]?.length > 0;
-        
+        const isRankingQuestion = q.question.questionType === "ranking";
+        let isAnswered = false;
+        if (isRankingQuestion) {
+          const rankings = rankingAnswers[secId]?.[qId] || {};
+          isAnswered = Object.keys(rankings).length > 0;
+        } else {
+          isAnswered = answers[secId]?.[qId]?.length > 0;
+        }
+
         if (!isAnswered) {
           return false;
         }
@@ -156,20 +168,37 @@ const SectionQuestionPage: React.FC = () => {
     if (questionnaire && questionnaire.sections) {
       for (const section of questionnaire.sections) {
         const secId = String(section.section.sectionId);
-        
+
         for (const q of section.questions) {
           const questionnaireQuestionId = q.questionnaireQuestionId;
-          const selectedOptionIds = answers[secId]?.[questionnaireQuestionId] || [];
+          const isRankingQuestion = q.question.questionType === "ranking";
 
-          // For each selected option, create a separate entry
-          if (selectedOptionIds.length > 0) {
-            for (const optionId of selectedOptionIds) {
+          if (isRankingQuestion) {
+            // Handle ranking questions
+            const rankings = rankingAnswers[secId]?.[questionnaireQuestionId] || {};
+
+            for (const [optionIdStr, rank] of Object.entries(rankings)) {
               const entry = {
                 questionnaireQuestionId: questionnaireQuestionId,
-                optionId: optionId
+                optionId: parseInt(optionIdStr),
+                rankOrder: rank
               };
-
               answersList.push(entry);
+            }
+          } else {
+            // Handle regular single/multiple choice questions
+            const selectedOptionIds = answers[secId]?.[questionnaireQuestionId] || [];
+
+            // For each selected option, create a separate entry
+            if (selectedOptionIds.length > 0) {
+              for (const optionId of selectedOptionIds) {
+                const entry = {
+                  questionnaireQuestionId: questionnaireQuestionId,
+                  optionId: optionId
+                };
+
+                answersList.push(entry);
+              }
             }
           }
         }
@@ -177,13 +206,13 @@ const SectionQuestionPage: React.FC = () => {
     }
 
     // Get user_student_id from questionnaire data
-    const userStudentId = localStorage.getItem('userStudentId') 
-      ? parseInt(localStorage.getItem('userStudentId')!) 
+    const userStudentId = localStorage.getItem('userStudentId')
+      ? parseInt(localStorage.getItem('userStudentId')!)
       : null;
-    
+
     // Get assessment_id from localStorage
-    const assessmentId = localStorage.getItem('assessmentId') 
-      ? parseInt(localStorage.getItem('assessmentId')!) 
+    const assessmentId = localStorage.getItem('assessmentId')
+      ? parseInt(localStorage.getItem('assessmentId')!)
       : null;
 
     const submissionData = {
@@ -237,6 +266,61 @@ const SectionQuestionPage: React.FC = () => {
       s.delete(qId);
       return { ...prev, [sectionId!]: s };
     });
+  };
+
+  // Ranking question handlers
+  const handleRankChange = (optionId: number, rank: number | null) => {
+    setRankingAnswers((prev) => {
+      const sec = prev[sectionId!] || {};
+      const questionRankings = sec[qId] || {};
+
+      if (rank === null) {
+        // Remove rank
+        const { [optionId]: removed, ...rest } = questionRankings;
+        return {
+          ...prev,
+          [sectionId!]: { ...sec, [qId]: rest },
+        };
+      } else {
+        // Set rank
+        return {
+          ...prev,
+          [sectionId!]: {
+            ...sec,
+            [qId]: { ...questionRankings, [optionId]: rank },
+          },
+        };
+      }
+    });
+
+    // Remove from skipped when answer is provided
+    if (rank !== null) {
+      setSkipped((prev) => {
+        const s = new Set(prev[sectionId!] || []);
+        s.delete(qId);
+        return { ...prev, [sectionId!]: s };
+      });
+    }
+  };
+
+  const getAvailableRanks = (currentOptionId: number): number[] => {
+    const questionRankings = rankingAnswers[sectionId!]?.[qId] || {};
+    const usedRanks = new Set(
+      Object.entries(questionRankings)
+        .filter(([optId]) => parseInt(optId) !== currentOptionId)
+        .map(([, rank]) => rank)
+    );
+
+    const maxRanks = question.question.maxOptionsAllowed;
+    const availableRanks: number[] = [];
+
+    for (let i = 1; i <= maxRanks; i++) {
+      if (!usedRanks.has(i)) {
+        availableRanks.push(i);
+      }
+    }
+
+    return availableRanks;
   };
 
   const saveForLaterFn = () => {
@@ -296,7 +380,7 @@ const SectionQuestionPage: React.FC = () => {
         console.log("=== END OF SUBMISSION DATA ===");
 
         // Send POST request to backend
-        const response = await fetch(`${process.env.REACT_APP_API_BASE_URL}/assessment-answer/submit`, {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/assessment-answer/submit`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -313,7 +397,7 @@ const SectionQuestionPage: React.FC = () => {
         const result = await response.json();
         console.log("=== SUBMISSION SUCCESSFUL ===");
         console.log("Saved answers:", result);
-        
+
         // Navigate to completion page
         navigate("/studentAssessment/completed");
       } catch (error) {
@@ -370,7 +454,7 @@ const SectionQuestionPage: React.FC = () => {
         setAnswers((prev) => {
           const sec = prev[sectionId] || {};
           const arr = sec[qId] || [];
-          
+
           // Only add if not already selected
           if (!arr.includes(gameOption.optionId)) {
             const updated = [...arr, gameOption.optionId];
@@ -382,7 +466,7 @@ const SectionQuestionPage: React.FC = () => {
           }
           return prev;
         });
-        
+
         // Remove from skipped if it was there
         setSkipped((prev) => {
           const s = new Set(prev[sectionId] || []);
@@ -405,7 +489,7 @@ const SectionQuestionPage: React.FC = () => {
   if (isGameActive && activeGameCode) {
     const userStudentId = localStorage.getItem('User Student id') || '';
     const userName = localStorage.getItem('userName') || 'Student';
-    
+
     return (
       <AssessmentGameWrapper
         gameCode={activeGameCode}
@@ -466,7 +550,7 @@ const SectionQuestionPage: React.FC = () => {
         {/* Question Navigation - Scrollable area */}
         <div style={{ flex: 1, overflowY: "auto", padding: 15 }}>
           <h6 className="fw-bold mb-3" style={{ fontSize: "0.975rem", color: "black" }}>
-             Question Status
+            Question Status
           </h6>
           {questionnaire.sections.map((sec: any) => (
             <div key={sec.section.sectionId} className="mb-4">
@@ -610,7 +694,15 @@ const SectionQuestionPage: React.FC = () => {
             {/* Display maxOptionsAllowed */}
             <div className="text-muted mb-3">
               <small>
-                You can select up to <strong>{question.question.maxOptionsAllowed}</strong> option(s).
+                {question.question.questionType === "ranking" ? (
+                  <>
+                    Please rank <strong>{question.question.maxOptionsAllowed}</strong> option(s) in order of preference (1 = most important).
+                  </>
+                ) : (
+                  <>
+                    You can select up to <strong>{question.question.maxOptionsAllowed}</strong> option(s).
+                  </>
+                )}
               </small>
             </div>
 
@@ -655,8 +747,8 @@ const SectionQuestionPage: React.FC = () => {
                           onClick={() => handleLaunchGame(opt.game!.gameCode)}
                           style={{
                             marginLeft: '16px',
-                            background: selectedOptions.includes(opt.optionId) 
-                              ? 'linear-gradient(to right, #22c55e, #16a34a)' 
+                            background: selectedOptions.includes(opt.optionId)
+                              ? 'linear-gradient(to right, #22c55e, #16a34a)'
                               : 'linear-gradient(to right, #8b5cf6, #d946ef)',
                             color: 'white',
                             padding: '12px 24px',
@@ -679,12 +771,74 @@ const SectionQuestionPage: React.FC = () => {
                 }
 
                 // Regular non-game option
+                const isRankingQuestion = question.question.questionType === "ranking";
+
+                if (isRankingQuestion) {
+                  // Ranking question UI with dropdown
+                  const currentRank = rankingAnswers[sectionId!]?.[qId]?.[opt.optionId];
+                  const availableRanks = getAvailableRanks(opt.optionId);
+
+                  return (
+                    <div
+                      key={opt.optionId}
+                      className={`border rounded p-3 d-block mb-3 ${currentRank ? "bg-light" : ""}`}
+                      style={{ display: "flex", alignItems: "center", gap: "15px" }}
+                    >
+                      <div style={{ minWidth: "80px" }}>
+                        <select
+                          className="form-select form-select-sm"
+                          value={currentRank || ""}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            handleRankChange(opt.optionId, value ? parseInt(value) : null);
+                          }}
+                          style={{ width: "70px" }}
+                        >
+                          <option value="">Rank</option>
+                          {currentRank && !availableRanks.includes(currentRank) ? (
+                            <option value={currentRank}>{currentRank}</option>
+                          ) : null}
+                          {availableRanks.map((rank) => (
+                            <option key={rank} value={rank}>
+                              {rank}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        {languages.length > 0 ? (
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: languages.length > 1 ? "1fr 1px 1fr" : "1fr",
+                              gap: 15,
+                            }}
+                          >
+                            {languages.map((lang, index) => (
+                              <React.Fragment key={lang.language.languageId}>
+                                <div style={{ fontSize: "0.95rem", lineHeight: "1.5" }}>
+                                  {getOptionText(opt, lang.language.languageId)}
+                                </div>
+                                {index === 0 && languages.length > 1 && (
+                                  <div style={{ width: 1, backgroundColor: "#dee2e6" }} />
+                                )}
+                              </React.Fragment>
+                            ))}
+                          </div>
+                        ) : (
+                          <span>{opt.optionText}</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Regular checkbox UI for single/multiple choice
                 return (
                   <label
                     key={opt.optionId}
-                    className={`border rounded p-3 d-block mb-3 ${
-                      selectedOptions.includes(opt.optionId) ? "bg-light" : ""
-                    }`}
+                    className={`border rounded p-3 d-block mb-3 ${selectedOptions.includes(opt.optionId) ? "bg-light" : ""
+                      }`}
                     style={{ cursor: "pointer" }}
                   >
                     <div className="d-flex align-items-start">

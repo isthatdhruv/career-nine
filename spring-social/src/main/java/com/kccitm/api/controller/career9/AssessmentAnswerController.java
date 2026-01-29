@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.transaction.Transactional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -70,6 +72,7 @@ public class AssessmentAnswerController {
         return assessmentAnswerRepository.findAll();
     }
 
+    @Transactional
     @PostMapping(value = "/submit", headers = "Accept=application/json")
     public ResponseEntity<?> submitAssessmentAnswers(@RequestBody Map<String, Object> submissionData) {
         try {
@@ -103,6 +106,9 @@ public class AssessmentAnswerController {
             for (Map<String, Object> ansMap : answers) {
                 Long qId = ((Number) ansMap.get("questionnaireQuestionId")).longValue();
                 Long oId = ((Number) ansMap.get("optionId")).longValue();
+                Integer rankOrder = ansMap.containsKey("rankOrder")
+                        ? ((Number) ansMap.get("rankOrder")).intValue()
+                        : null;
 
                 QuestionnaireQuestion question = questionnaireQuestionRepository.findById(qId).orElse(null);
                 AssessmentQuestionOptions option = assessmentQuestionOptionsRepository.findById(oId).orElse(null);
@@ -114,6 +120,12 @@ public class AssessmentAnswerController {
                     ans.setAssessment(assessment);
                     ans.setQuestionnaireQuestion(question);
                     ans.setOption(option);
+
+                    // Set rankOrder if present (for ranking questions)
+                    if (rankOrder != null) {
+                        ans.setRankOrder(rankOrder);
+                    }
+
                     assessmentAnswerRepository.save(ans);
 
                     // Accumulate Scores for RawScore table

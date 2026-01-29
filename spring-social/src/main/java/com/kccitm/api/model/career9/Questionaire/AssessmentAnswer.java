@@ -47,6 +47,8 @@ public class AssessmentAnswer implements Serializable {
     @JoinColumn(name = "option_id")
     private AssessmentQuestionOptions option;
 
+    private Integer rankOrder;
+
     public AssessmentAnswer() {
     }
 
@@ -83,5 +85,11 @@ public class AssessmentAnswer implements Serializable {
     }
     public void setOption(AssessmentQuestionOptions option) {
         this.option = option;
+    }
+    public Integer getRankOrder() {
+        return rankOrder;
+    }
+    public void setRankOrder(Integer rankOrder) {
+        this.rankOrder = rankOrder;
     }
 }
