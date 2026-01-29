@@ -18,6 +18,8 @@ yarn.lock
 .env.test.local
 .env.production.local
 
+./spring-social/application.yml
+./spring-social/src/main/resources/application.yml
 # IDE and Editor files
 .vscode/
 .idea/
