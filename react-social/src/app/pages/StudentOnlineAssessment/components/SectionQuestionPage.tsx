@@ -12,6 +12,7 @@ type GameTable = {
 type Option = {
   optionId: number;
   optionText: string;
+  optionImageBase64?: string | null;
   languageOptions?: LanguageOption[];
   isGame?: boolean;
   game?: GameTable;
@@ -437,6 +438,41 @@ const SectionQuestionPage: React.FC = () => {
     return langOption ? langOption.optionText : option.optionText;
   };
 
+  // Helper function to check if option has an image
+  const hasOptionImage = (option: Option): boolean => {
+    return !!(option.optionImageBase64 && option.optionImageBase64.trim() !== '');
+  };
+
+  // Helper function to get the image source (handles both data URL and raw base64)
+  const getOptionImageSrc = (option: Option): string => {
+    if (!option.optionImageBase64) return '';
+    // If it's already a data URL, use as is; otherwise prepend the data URL prefix
+    return option.optionImageBase64.startsWith('data:')
+      ? option.optionImageBase64
+      : `data:image/png;base64,${option.optionImageBase64}`;
+  };
+
+  // Helper function to render option content (image or text)
+  const renderOptionContent = (option: Option, languageId?: number) => {
+    if (hasOptionImage(option)) {
+      return (
+        <img
+          src={getOptionImageSrc(option)}
+          alt={option.optionText || 'Option image'}
+          style={{
+            maxWidth: '200px',
+            maxHeight: '150px',
+            objectFit: 'contain',
+            borderRadius: '8px',
+            border: '1px solid #e0e0e0',
+          }}
+        />
+      );
+    }
+    // Fall back to text
+    return languageId !== undefined ? getOptionText(option, languageId) : option.optionText;
+  };
+
   // Game handlers
   const handleLaunchGame = (gameCode: number) => {
     setActiveGameCode(gameCode);
@@ -669,7 +705,7 @@ const SectionQuestionPage: React.FC = () => {
                   <React.Fragment key={lang.language.languageId}>
                     <div>
                       <h6 className="fw-bold mb-3">
-                        {lang.language.languageName}
+                        {/* {lang.language.languageName} */}
                       </h6>
                       <div
                         style={{
@@ -806,7 +842,9 @@ const SectionQuestionPage: React.FC = () => {
                         </select>
                       </div>
                       <div style={{ flex: 1 }}>
-                        {languages.length > 0 ? (
+                        {hasOptionImage(opt) ? (
+                          renderOptionContent(opt)
+                        ) : languages.length > 0 ? (
                           <div
                             style={{
                               display: "grid",
@@ -853,7 +891,11 @@ const SectionQuestionPage: React.FC = () => {
                           selectedOptions.length >= question.question.maxOptionsAllowed
                         }
                       />
-                      {languages.length > 0 ? (
+                      {hasOptionImage(opt) ? (
+                        <div style={{ flex: 1 }}>
+                          {renderOptionContent(opt)}
+                        </div>
+                      ) : languages.length > 0 ? (
                         <div
                           style={{
                             display: "grid",
