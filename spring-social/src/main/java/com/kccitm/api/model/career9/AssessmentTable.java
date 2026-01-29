@@ -47,9 +47,9 @@ public class AssessmentTable implements java.io.Serializable {
         this.id = id;
     }
 
-    public AssessmentTable(Long id, String assessmentName, String starDate, String endDate, Boolean isActive) {
+    public AssessmentTable(Long id, String AssessmentName, String starDate, String endDate, Boolean isActive) {
         this.id = id;
-        this.AssessmentName = assessmentName;
+        this.AssessmentName = AssessmentName;
         this.starDate = starDate;
         this.endDate = endDate;
         this.isActive = isActive;
@@ -61,8 +61,8 @@ public class AssessmentTable implements java.io.Serializable {
         return AssessmentName;
     }
 
-    public void setAssessmentName(String assessmentName) {
-        this.AssessmentName = assessmentName;
+    public void setAssessmentName(String AssessmentName) {
+        this.AssessmentName = AssessmentName;
     }
 
     public Boolean getIsActive() {

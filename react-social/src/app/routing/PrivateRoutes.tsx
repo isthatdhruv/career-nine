@@ -22,10 +22,10 @@ import ToolCreatePage from "../pages/Tool/components/ToolCreatePage";
 import UploadExcelFile from "../pages/UploadExcelFile/UploadExcelFile";
 // Update these paths to the correct locations of your components
 import Assessments from "../pages/CreateAssessment/Assessment";
-// import AssessmentCreatePage from "../pages/CreateAssessment/components/assessment/AssessmentCreatePage";
+import AssessmentCreatePage from "../pages/CreateAssessment/components/assessment/AssessmentEditandCreatePage";
 import QuestionareCreateSinglePage from "../pages/CreateAssessment/components/questionaire/QuestionareCreateSinglePage";
 import QuestionareEditSinglePage from "../pages/CreateAssessment/components/questionaire/QuestionareEditSinglePage";
-import AssessmentEditPage from "../pages/CreateAssessment/components/assessment/AssessmentEditandCreatePage";
+// import AssessmentEditPage from "../pages/CreateAssessment/components/assessment/AssessmentEditandCreatePage";
 import AssessmentToolPage from "../pages/CreateAssessment/components/AssessmentToolPage";
 import AssessmentUploadFile from "../pages/CreateAssessment/components/AssessmentUploadFile";
 import AssessmentSection from "../pages/CreateAssessment/components/AssessmentSection";
@@ -56,6 +56,7 @@ import GroupStudentPage from "../pages/GroupStudent/GroupStudentPage";
 import StudentLoginPage from "../pages/StudentLogin/StudentLoginPage";
 import AllottedAssessmentPage from "../pages/StudentLogin/AllottedAssessmentPage";
 import GamePage from "../pages/Games/GamePage";
+import AssessmentEditPage from "../pages/CreateAssessment/components/assessment/AssessmentEditPage";
 // import QuestionareEditSinglePage from "../pages/CreateAssessment/components/questionaire/QuestionareEditSinglePage";
 import DashboardAdminPage from "../pages/demo-dashboard-v2/dashboard-admin";
 const PrivateRoutes = () => {
@@ -640,7 +641,7 @@ const PrivateRoutes = () => {
           path="/assessments/create"
           element={
             <SuspensedView>
-              <AssessmentEditPage />
+              <AssessmentCreatePage />
             </SuspensedView>
           }
         />

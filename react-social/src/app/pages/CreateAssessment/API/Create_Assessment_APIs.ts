@@ -3,7 +3,7 @@ const API_URL = process.env.REACT_APP_API_URL;
 
 const readAssessment = `${API_URL}/assessments/getAll`;
 const readAssessmentList = `${API_URL}/assessments/get/list`
-const readAssessmentById = `${API_URL}/assessments/getbyid/`;
+const readAssessmentById = `${API_URL}/assessments/getById/`;
 const createAssessment = `${API_URL}/assessments/create`;
 const updateAssessment = `${API_URL}/assessments/update`;
 const deleteAssessment = `${API_URL}/assessments/delete/`;

@@ -5,7 +5,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
-import { ReadAssessmentByIdData, UpdateAssessmentData, CreateAssessmentData } from "../../API/Create_Assessment_APIs";
+import { ReadAssessmentByIdData, UpdateAssessmentData } from "../../API/Create_Assessment_APIs";
 import { ReadQuestionaireData } from "../../API/Create_Questionaire_APIs";
 import { Dropdown, Form } from "react-bootstrap";
 import { data } from "jquery";
@@ -14,22 +14,17 @@ const validationSchema = Yup.object().shape({
   AssessmentName: Yup.string().required("Assessment name is required"),
 });
 
-
 const AssessmentEditPage = (props?: {
   setPageLoading?: any;
-  data?: any; // Accept data as prop if passed
+  data?: any;
 }) => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
-  const isEditMode = !!id;
   const [questionnaires, setQuestionnaires] = useState<any[]>([]);
   const [selectedQuestionnaireId, setSelectedQuestionnaireId] = useState<number | null>(null);
 
-  // Prefer data from props, then location.state, then fallback to empty
-
-  // Helper to normalize assessment data (always use 'AssessmentName' in state)
   function normalizeAssessmentData(data: any) {
     if (!data) return {
       id: "",
@@ -51,13 +46,8 @@ const AssessmentEditPage = (props?: {
     };
   }
 
-  const initialAssessmentData = normalizeAssessmentData(
-    props?.data || (location.state as any)?.data
-  );
+  const [assessmentData, setAssessmentData] = useState<any>(normalizeAssessmentData(props?.data || (location.state as any)?.data));
 
-  const [assessmentData, setAssessmentData] = useState<any>(initialAssessmentData);
-
-  // Fetch questionnaires when component mounts
   useEffect(() => {
     const fetchQuestionnaires = async () => {
       try {
@@ -70,27 +60,8 @@ const AssessmentEditPage = (props?: {
     fetchQuestionnaires();
   }, []);
 
-  // Set assessment data from props/location.state if present, else fetch from API
   useEffect(() => {
-    let didSet = false;
-    // Prefer props.data
-    if (props?.data) {
-      const norm = normalizeAssessmentData(props.data);
-      setAssessmentData(norm);
-      if (norm.questionnaire?.questionnaireId) {
-        setSelectedQuestionnaireId(norm.questionnaire.questionnaireId);
-      }
-      didSet = true;
-    } else if ((location.state as any)?.data) {
-      const norm = normalizeAssessmentData((location.state as any).data);
-      setAssessmentData(norm);
-      if (norm.questionnaire?.questionnaireId) {
-        setSelectedQuestionnaireId(norm.questionnaire.questionnaireId);
-      }
-      didSet = true;
-    }
-    // Only fetch from API if not already set
-    if (!didSet && id) {
+    if (id) {
       const fetchData = async () => {
         try {
           setLoading(true);
@@ -108,55 +79,47 @@ const AssessmentEditPage = (props?: {
       };
       fetchData();
     }
-  }, [id, location.state, props?.data]);
+  }, [id]);
 
   const formik = useFormik({
     enableReinitialize: true,
     initialValues: {
       id: assessmentData.id || id || "",
-      AssessmentName: assessmentData.AssessmentName || assessmentData.assessmentName || "",
+      assessmentName: assessmentData.AssessmentName || assessmentData.assessmentName || "",
       startDate: assessmentData.startDate || assessmentData.starDate || "",
       endDate: assessmentData.endDate || "",
       isActive: assessmentData.isActive || false,
       modeofAssessment: assessmentData.modeofAssessment || false,
       questionnaires: assessmentData.questionnaires?.map((q: any) => q.questionnaireId) || [],
     },
-    validationSchema: validationSchema,
+    validationSchema: Yup.object().shape({
+      assessmentName: Yup.string().required("Assessment name is required"),
+    }),
     onSubmit: async (values) => {
       setLoading(true);
       try {
-        // Always send 'AssessmentName' in payload
         const payload: any = {
-          AssessmentName: values.AssessmentName,
+          id: values.id,
+          assessmentName: values.assessmentName,
           starDate: values.startDate,
           endDate: values.endDate,
           isActive: values.isActive,
           modeofAssessment: values.modeofAssessment,
         };
-
-        // Add questionnaire if selected (use questionnaireId to match backend model)
         if (selectedQuestionnaireId) {
           payload.questionnaire = { questionnaireId: selectedQuestionnaireId };
         }
-
         let response;
-        if (isEditMode && values.id) {
-          // Update existing assessment
+        if (id && values.id) {
           response = await UpdateAssessmentData(values.id, payload);
-        } else {
-          // Create new assessment
-          response = await CreateAssessmentData(payload);
         }
-
         navigate("/assessments");
-
         if (props?.setPageLoading) {
           props.setPageLoading(["true"]);
         }
-
       } catch (error) {
         const errorMessage = (error as any)?.response?.data?.message || (error as any)?.message || "Unknown error occurred";
-        alert(`Failed to ${isEditMode ? "update" : "create"} assessment: ${errorMessage}`);
+        alert(`Failed to update assessment: ${errorMessage}`);
       } finally {
         setLoading(false);
       }
@@ -167,7 +130,7 @@ const AssessmentEditPage = (props?: {
     <div className="container py-5">
       <div className="card shadow-sm py-5">
         <div className="card-header d-flex justify-content-between align-items-center">
-          <h1 className="mb-0">{isEditMode ? "Edit" : "Create"} Assessment</h1>
+          <h1 className="mb-0">Edit Assessment</h1>
           <button
             className="btn btn-sm btn-icon btn-active-color-primary"
             onClick={() => navigate(-1)}
@@ -181,14 +144,11 @@ const AssessmentEditPage = (props?: {
             />
           </button>
         </div>
-
         <form
           className="form w-100 fv-plugins-bootstrap5 fv-plugins-framework"
           onSubmit={formik.handleSubmit}
         >
           <div className="card-body">
-
-            {/* Assessment Name */}
             <div className="fv-row mb-7">
               <label className="required fs-6 fw-bold mb-2">
                 Assessment Name:
@@ -196,32 +156,27 @@ const AssessmentEditPage = (props?: {
               <input
                 type="text"
                 placeholder="Enter Assessment Name"
-                {...formik.getFieldProps("AssessmentName")}
+                {...formik.getFieldProps("assessmentName")}
                 className={clsx(
                   "form-control form-control-lg form-control-solid",
                   {
                     "is-invalid text-danger":
-                      formik.touched.AssessmentName && formik.errors.AssessmentName,
+                      formik.touched.assessmentName && formik.errors.assessmentName,
                   },
                   {
                     "is-valid":
-                      formik.touched.AssessmentName && !formik.errors.AssessmentName,
+                      formik.touched.assessmentName && !formik.errors.assessmentName,
                   }
                 )}
               />
-              {formik.touched.AssessmentName && formik.errors.AssessmentName && (
+              {formik.touched.assessmentName && formik.errors.assessmentName && (
                 <div className="fv-plugins-message-container">
                   <div className="fv-help-block text-danger">
-                    <span role="alert">{String(formik.errors.AssessmentName)}</span>
+                    <span role="alert">{String(formik.errors.assessmentName)}</span>
                   </div>
                 </div>
               )}
             </div>
-
-            {/* Assessment Price Type */}
-
-
-            {/* Options Management Section */}
             <div className="card mb-7">
               <h3 className="card-title">Assessment Settings</h3>
               <div className="card-body">
@@ -313,13 +268,10 @@ const AssessmentEditPage = (props?: {
                       );
                     })}
                   </div>
-                )} 
+                )}
               </div>
             </div>
-
           </div>
-
-          {/* Footer */}
           <div className="card-footer d-flex justify-content-end">
             <button
               type="button"
@@ -333,7 +285,7 @@ const AssessmentEditPage = (props?: {
               className="btn btn-primary"
               disabled={loading}
             >
-              {!loading && <span className="indicator-label">{isEditMode ? "Update" : "Create"}</span>}
+              {!loading && <span className="indicator-label">Update</span>}
               {loading && (
                 <span
                   className="indicator-progress"

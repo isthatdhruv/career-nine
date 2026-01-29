@@ -56,6 +56,12 @@ public class AssessmentTableController {
         return questionnaireRepository.findAllByQuestionnaireId(questionnaireId);
     }
 
+    @GetMapping("/getById/{id}")
+    public ResponseEntity<AssessmentTable> getAssessmentDetailsById(@PathVariable Long id) {
+        Optional<AssessmentTable> assessment = assessmentTableRepository.findById(id);
+        return assessment.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     @PostMapping("/create")
     public ResponseEntity<AssessmentTable> createAssessment(@RequestBody java.util.Map<String, Object> requestBody) {
         AssessmentTable assessment = new AssessmentTable();
