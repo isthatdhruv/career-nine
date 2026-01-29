@@ -19,14 +19,14 @@ const validationSchema = Yup.object().shape({
   options: Yup.array()
     .of(Yup.object().shape({
       optionText: Yup.string().required("Option cannot be empty"),
-      description: Yup.string().optional(),
+      optionDescription: Yup.string().optional(),
     }))
     .min(1, "At least one option is required"),
 });
 
 interface Option {
   optionText: string;
-  description?: string;
+  optionDescription?: string;
   correct: boolean;
   sequence: number;
   optionId?: string;
@@ -40,7 +40,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
     questionText: "",
     questionType: "",
     section: "",
-    questionOptions: [""],
+    options: [{ optionText: "", optionDescription: "", correct: false, sequence: 1 }],
     id: "",
   });
 
@@ -66,7 +66,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
       const qualities: Record<number, Record<number, { checked: boolean, score: number }>> = {};
       const types: { [key: number]: 'text' | 'image' } = {};
       const images: { [key: number]: string } = {};
-      
+
       questionData.options.forEach((option: any, idx: number) => {
         // Load measured quality scores
         if (option.optionScores && Array.isArray(option.optionScores)) {
@@ -80,25 +80,25 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
             }
           });
         }
-        
+
         // Load existing images - check if optionImageBase64 exists
         if (option.optionImageBase64) {
           types[idx] = 'image';
           // If it's already a data URL, use as is; otherwise prepend the data URL prefix
-          images[idx] = option.optionImageBase64.startsWith('data:') 
-            ? option.optionImageBase64 
+          images[idx] = option.optionImageBase64.startsWith('data:')
+            ? option.optionImageBase64
             : `data:image/png;base64,${option.optionImageBase64}`;
         } else {
           types[idx] = 'text';
         }
-        
+
         // Check if this is a game option
         if (option.isGame && option.game) {
           setUseGameAsOption(true);
           setSelectedGameId(String(option.game.gameId));
         }
       });
-      
+
       setOptionMeasuredQualities(qualities);
       setOptionTypes(types);
       setOptionImages(images);
@@ -114,22 +114,22 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
   const updateOptionSequence = (index: number, newSequence: number) => {
     const currentOptions = [...formik.values.options];
     const optionToMove = currentOptions[index];
-    
+
     // Remove the option from current position
     const otherOptions = currentOptions.filter((_, i) => i !== index);
-    
+
     // Insert at new position
     const updatedOptions = [...otherOptions];
     updatedOptions.splice(newSequence - 1, 0, optionToMove);
-    
+
     // Reassign sequences
     const resequencedOptions = updatedOptions.map((opt, idx) => ({
       ...opt,
       sequence: idx + 1
     }));
-    
+
     formik.setFieldValue("options", resequencedOptions);
-    
+
     // Update measured qualities mapping to maintain proper indexing
     const newQualities: Record<number, Record<number, { checked: boolean; score: number }>> = {};
     resequencedOptions.forEach((_, newIdx) => {
@@ -142,7 +142,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
       } else {
         originalIdx = newIdx >= index ? newIdx : newIdx - 1;
       }
-      
+
       if (optionMeasuredQualities[originalIdx]) {
         newQualities[newIdx] = optionMeasuredQualities[originalIdx];
       }
@@ -200,7 +200,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
       };
       reader.readAsDataURL(file);
     } else {
-      setOptionImages(prev => { const n = {...prev}; delete n[index]; return n; });
+      setOptionImages(prev => { const n = { ...prev }; delete n[index]; return n; });
     }
   };
 
@@ -208,8 +208,8 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
   const getFilteredMeasuredQualities = (optionIndex: number) => {
     const searchTerm = qualitySearchTerms[optionIndex] || "";
     if (!searchTerm.trim()) return mqt;
-    
-    return mqt.filter((type: any) => 
+
+    return mqt.filter((type: any) =>
       type.measuredQualityTypeName.toLowerCase().includes(searchTerm.toLowerCase())
     );
   };
@@ -233,14 +233,14 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
 
           const processedData = {
             ...fetchedQuestion,
-            section: fetchedQuestion.section?.sectionId 
+            section: fetchedQuestion.section?.sectionId
               ? { sectionId: String(fetchedQuestion.section.sectionId) }
-              : fetchedQuestion.section?.section 
-              ? { sectionId: String(fetchedQuestion.section.section) }
-              : { sectionId: "" },
+              : fetchedQuestion.section?.section
+                ? { sectionId: String(fetchedQuestion.section.section) }
+                : { sectionId: "" },
             questionOptions: fetchedQuestion.options
               ? fetchedQuestion.options.map((option: any) => option.optionText || option)
-              : [""]
+              : [{ optionText: "", optionDescription: "", correct: false, sequence: 1 }],
           };
 
           console.log("Processed data with section:", processedData.section);
@@ -252,11 +252,11 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
           if (locationData) {
             const processedLocationData = {
               ...locationData,
-              section: locationData.section?.sectionId 
+              section: locationData.section?.sectionId
                 ? { sectionId: String(locationData.section.sectionId) }
-                : locationData.section?.section 
-                ? { sectionId: String(locationData.section.section) }
-                : { sectionId: "" },
+                : locationData.section?.section
+                  ? { sectionId: String(locationData.section.section) }
+                  : { sectionId: "" },
               questionOptions: locationData.options
                 ? locationData.options.map((option: any) => option.optionText || option)
                 : locationData.questionOptions || [""]
@@ -272,11 +272,11 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
         if (locationData) {
           const processedLocationData = {
             ...locationData,
-            section: locationData.section?.sectionId 
+            section: locationData.section?.sectionId
               ? { sectionId: String(locationData.section.sectionId) }
-              : locationData.section?.section 
-              ? { sectionId: String(locationData.section.section) }
-              : { sectionId: "" },
+              : locationData.section?.section
+                ? { sectionId: String(locationData.section.section) }
+                : { sectionId: "" },
             questionOptions: locationData.options
               ? locationData.options.map((option: any) => option.optionText || option)
               : locationData.questionOptions || [""]
@@ -285,7 +285,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
         }
       }
     };
-    
+
     const fetchSections = async () => {
       try {
         const response = await ReadQuestionSectionData();
@@ -301,704 +301,706 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
   }, [id, location.state]);
 
 
-useEffect(() => {
-  const fetchMeasuredQualityTypes = async () => {
-    try {
-      const response = await ReadMeasuredQualityTypes();
-      console.log("Fetched sections for edit:", response.data);
-      setMqt(response.data);
-    } catch (error) {
-      console.error("Error fetching sections:", error);
-    }
-  };
-  fetchMeasuredQualityTypes();
-}, []);
+  useEffect(() => {
+    const fetchMeasuredQualityTypes = async () => {
+      try {
+        const response = await ReadMeasuredQualityTypes();
+        console.log("Fetched sections for edit:", response.data);
+        setMqt(response.data);
+      } catch (error) {
+        console.error("Error fetching sections:", error);
+      }
+    };
+    fetchMeasuredQualityTypes();
+  }, []);
 
-// Fetch games on mount
-useEffect(() => {
-  const fetchGames = async () => {
-    try {
-      const response = await ListGamesData();
-      setGames(response.data);
-    } catch (error) {
-      console.error("Error fetching games:", error);
-      setGames([]);
-    }
-  };
-  fetchGames();
-}, []);
+  // Fetch games on mount
+  useEffect(() => {
+    const fetchGames = async () => {
+      try {
+        const response = await ListGamesData();
+        setGames(response.data);
+      } catch (error) {
+        console.error("Error fetching games:", error);
+        setGames([]);
+      }
+    };
+    fetchGames();
+  }, []);
 
 
-// ✅ Keep using useFormik but with enhanced initial values
-const formik = useFormik({
-  enableReinitialize: true,
-  initialValues: {
-    id: questionData.id || id,
-    questionId: questionData.questionId || questionData.id || id,
-    questionText: questionData.questionText || "",
-    questionType: questionData.questionType || "",
-    maxOptionsAllowed: questionData.maxOptionsAllowed || 0,
-    section: questionData.section && typeof questionData.section === "object" && "sectionId" in questionData.section
-      ? { sectionId: String(questionData.section.sectionId) }
-      : questionData.section
-      ? { sectionId: String(questionData.section) }
-      : { sectionId: "" },
-    options:
-      questionData.options && questionData.options.length > 0
-        ? questionData.options.map((option: any, idx: number) => ({
+  // ✅ Keep using useFormik but with enhanced initial values
+  const formik = useFormik({
+    enableReinitialize: true,
+    initialValues: {
+      id: questionData.id || id,
+      questionId: questionData.questionId || questionData.id || id,
+      questionText: questionData.questionText || "",
+      questionType: questionData.questionType || "",
+      maxOptionsAllowed: questionData.maxOptionsAllowed || 0,
+      section: questionData.section && typeof questionData.section === "object" && "sectionId" in questionData.section
+        ? { sectionId: String(questionData.section.sectionId) }
+        : questionData.section
+          ? { sectionId: String(questionData.section) }
+          : { sectionId: "" },
+      options:
+        questionData.options && questionData.options.length > 0
+          ? questionData.options.map((option: any, idx: number) => ({
             optionText: option.optionText || "",
-            description: option.description || "",
+            optionDescription: option.optionDescription || "",
             correct: option.correct ?? false,
             sequence: option.sequence || idx + 1,
             ...(option.optionId ? { optionId: option.optionId } : {}),
           }))
-        : [
+          : [
             {
               optionText: "",
-              description: "",
+              optionDescription: "",
               correct: false,
               sequence: 1,
             },
           ],
-  },
-  // validationSchema: validationSchema,
-  onSubmit: async (values) => {
-    setLoading(true);
-    try {
-      // Sort options by sequence before processing
-      const sortedOptions = [...values.options].sort((a, b) => a.sequence - b.sequence);
-      
-      let options: any[] = [];
-      
-      if (useGameAsOption && selectedGameId) {
-        // Game as option mode - single option with game reference
-        options = [{
-          optionText: null,
-          optionImageBase64: null,
-          description: "",
-          optionScores: [],
-          correct: false,
-          sequence: 1,
-          isGame: true,
-          game: { gameId: Number(selectedGameId) }
-        }];
-      } else {
-        // Build options array with optionScores from optionMeasuredQualities
-        options = sortedOptions.map((option: any, idx: number) => {
-          // Check if this option is in image mode
-          const isImageMode = optionTypes[idx] === 'image';
-          
-          const qualities = optionMeasuredQualities[idx] || {};
-          const optionScores = Object.entries(qualities)
-            .filter(([_, v]) => v && v.checked)
-            .map(([typeId, v]) => ({
-              score: v.score,
-              question_option: option.optionId ? { optionId: option.optionId } : {},
-              measuredQualityType: { measuredQualityTypeId: Number(typeId) },
-            }));
-          return {
-            optionText: isImageMode ? null : option.optionText,
-            optionImageBase64: isImageMode ? (optionImages[idx] || null) : null,
-            description: option.description || "",
-            optionScores,
-            correct: option.correct ?? false,
-            sequence: option.sequence,
-            isGame: false,
-            game: null,
-            ...(option.optionId ? { optionId: option.optionId } : {}),
-          };
-        });
-      }
+    },
+    // validationSchema: validationSchema,
+    onSubmit: async (values) => {
+      setLoading(true);
+      try {
+        // Sort options by sequence before processing
+        const sortedOptions = [...values.options].sort((a, b) => a.sequence - b.sequence);
 
-      const payload = {
-        id: values.id,
-        questionId: values.questionId,
-        questionText: values.questionText,
-        questionType: values.questionType,
-        maxOptionsAllowed: Number(values.maxOptionsAllowed) || 0,
-        options,
-        section: { sectionId: values.section.sectionId },
+        let options: any[] = [];
+
+        if (useGameAsOption && selectedGameId) {
+          // Game as option mode - single option with game reference
+          options = [{
+            optionText: null,
+            optionImageBase64: null,
+            optionDescription: "",
+            optionScores: [],
+            correct: false,
+            sequence: 1,
+            isGame: true,
+            game: { gameId: Number(selectedGameId) }
+          }];
+        } else {
+          // Build options array with optionScores from optionMeasuredQualities
+          options = sortedOptions.map((option: any, idx: number) => {
+            // Check if this option is in image mode
+            const isImageMode = optionTypes[idx] === 'image';
+
+            const qualities = optionMeasuredQualities[idx] || {};
+            const optionScores = Object.entries(qualities)
+              .filter(([_, v]) => v && v.checked)
+              .map(([typeId, v]) => ({
+                score: v.score,
+                question_option: option.optionId ? { optionId: option.optionId } : {},
+                measuredQualityType: { measuredQualityTypeId: Number(typeId) },
+              }));
+            return {
+              optionText: isImageMode ? null : option.optionText,
+              optionImageBase64: isImageMode ? (optionImages[idx] || null) : null,
+              optionDescription: option.optionDescription || "",
+              optionScores,
+              correct: option.correct ?? false,
+              sequence: option.sequence,
+              isGame: false,
+              game: null,
+              ...(option.optionId ? { optionId: option.optionId } : {}),
+            };
+          });
+        }
+
+        const payload = {
+          id: values.id,
+          questionId: values.questionId,
+          questionText: values.questionText,
+          questionType: values.questionType,
+          maxOptionsAllowed: Number(values.maxOptionsAllowed) || 0,
+          options,
+          section: { sectionId: values.section.sectionId },
+        };
+
+        console.log("Submitting payload:", payload);
+        await CreateQuestionData(payload);
+        navigate("/assessment-questions");
+
+        if (props?.setPageLoading) {
+          props.setPageLoading(["true"]);
+        }
+      } catch (error) {
+        console.error("Full error object:", error);
+        if (typeof error === "object" && error !== null) {
+          console.error("Error response:", (error as any).response);
+          console.error("Error message:", (error as any).message);
+          console.error("Error status:", (error as any).response?.status);
+          console.error("Error data:", (error as any).response?.data);
+
+          const errorMessage = (error as any).response?.data?.message || (error as any).message || "Unknown error occurred";
+          alert(`Failed to update question: ${errorMessage}`);
+        } else {
+          alert("Failed to update question: Unknown error occurred");
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+  });
+
+  // Debug effect to log formik values
+  useEffect(() => {
+    console.log("Current questionData:", questionData);
+    console.log("Current formik section:", formik.values.section);
+    console.log("Available sections:", sections);
+  }, [questionData, formik.values.section, sections]);
+
+  if (loading) {
+    return (
+      <div className="container py-5">
+        <div className="text-center">
+          <div className="spinner-border" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="mt-2">Loading question...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ Helper functions for managing options array (since we can't use FieldArray)
+  const addOption = () => {
+    const currentOptions = [...formik.values.options];
+    const lastOption = currentOptions[currentOptions.length - 1];
+    if (lastOption && lastOption.optionText.trim() !== "") {
+      const newOption = {
+        optionText: "",
+        optionDescription: "",
+        correct: false,
+        sequence: currentOptions.length + 1, // Auto-increment sequence
       };
-      
-      console.log("Submitting payload:", payload);
-      await CreateQuestionData(payload);
-      navigate("/assessment-questions");
-      
-      if (props?.setPageLoading) {
-        props.setPageLoading(["true"]);
-      }
-    } catch (error) {
-      console.error("Full error object:", error);
-      if (typeof error === "object" && error !== null) {
-        console.error("Error response:", (error as any).response);
-        console.error("Error message:", (error as any).message);
-        console.error("Error status:", (error as any).response?.status);
-        console.error("Error data:", (error as any).response?.data);
-
-        const errorMessage = (error as any).response?.data?.message || (error as any).message || "Unknown error occurred";
-        alert(`Failed to update question: ${errorMessage}`);
-      } else {
-        alert("Failed to update question: Unknown error occurred");
-      }
-    } finally {
-      setLoading(false);
+      formik.setFieldValue("options", [...currentOptions, newOption]);
+      setOptionMeasuredQualities((prev) => ({
+        ...prev,
+        [currentOptions.length]: {},
+      }));
+    } else {
+      alert("Please fill the current option before adding a new one.");
     }
-  },
-});
+  };
 
-// Debug effect to log formik values
-useEffect(() => {
-  console.log("Current questionData:", questionData);
-  console.log("Current formik section:", formik.values.section);
-  console.log("Available sections:", sections);
-}, [questionData, formik.values.section, sections]);
+  const removeOption = (index: number) => {
+    const currentOptions = [...formik.values.options];
+    if (currentOptions.length > 1) {
+      const newOptions = currentOptions.filter((_, i) => i !== index);
+      // Reassign sequences after removal
+      const resequencedOptions = newOptions.map((opt, idx) => ({
+        ...opt,
+        sequence: idx + 1
+      }));
+      formik.setFieldValue("options", resequencedOptions);
 
-if (loading) {
+      // Update measured qualities mapping
+      setOptionMeasuredQualities((prev) => {
+        const newQualities: Record<number, Record<number, { checked: boolean; score: number }>> = {};
+        Object.keys(prev).forEach((key) => {
+          const k = Number(key);
+          if (k < index) newQualities[k] = prev[k];
+          else if (k > index) newQualities[k - 1] = prev[k];
+        });
+        return newQualities;
+      });
+
+      // Also remove option type and image data
+      setOptionTypes(prev => { const n = { ...prev }; delete n[index]; return n; });
+      setOptionImages(prev => { const n = { ...prev }; delete n[index]; return n; });
+    }
+  };
+
+  const updateOption = (index: number, value: string) => {
+    const currentOptions = [...formik.values.options];
+    currentOptions[index].optionText = value;
+    formik.setFieldValue("options", currentOptions);
+  };
+
+  const updateOptionDescription = (index: number, value: string) => {
+    const currentOptions = [...formik.values.options];
+    currentOptions[index].optionDescription = value;
+    formik.setFieldValue("options", currentOptions);
+  };
+
+
   return (
     <div className="container py-5">
-      <div className="text-center">
-        <div className="spinner-border" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </div>
-        <p className="mt-2">Loading question...</p>
-      </div>
-    </div>
-  );
-}
-
-// ✅ Helper functions for managing options array (since we can't use FieldArray)
-const addOption = () => {
-  const currentOptions = [...formik.values.options];
-  const lastOption = currentOptions[currentOptions.length - 1];
-  if (lastOption && lastOption.optionText.trim() !== "") {
-    const newOption = {
-      optionText: "",
-      description: "",
-      correct: false,
-      sequence: currentOptions.length + 1, // Auto-increment sequence
-    };
-    formik.setFieldValue("options", [...currentOptions, newOption]);
-    setOptionMeasuredQualities((prev) => ({
-      ...prev,
-      [currentOptions.length]: {},
-    }));
-  } else {
-    alert("Please fill the current option before adding a new one.");
-  }
-};
-
-const removeOption = (index: number) => {
-  const currentOptions = [...formik.values.options];
-  if (currentOptions.length > 1) {
-    const newOptions = currentOptions.filter((_, i) => i !== index);
-    // Reassign sequences after removal
-    const resequencedOptions = newOptions.map((opt, idx) => ({
-      ...opt,
-      sequence: idx + 1
-    }));
-    formik.setFieldValue("options", resequencedOptions);
-    
-    // Update measured qualities mapping
-    setOptionMeasuredQualities((prev) => {
-      const newQualities: Record<number, Record<number, { checked: boolean; score: number }>> = {};
-      Object.keys(prev).forEach((key) => {
-        const k = Number(key);
-        if (k < index) newQualities[k] = prev[k];
-        else if (k > index) newQualities[k - 1] = prev[k];
-      });
-      return newQualities;
-    });
-    
-    // Also remove option type and image data
-    setOptionTypes(prev => { const n = {...prev}; delete n[index]; return n; });
-    setOptionImages(prev => { const n = {...prev}; delete n[index]; return n; });
-  }
-};
-
-const updateOption = (index: number, value: string) => {
-  const currentOptions = [...formik.values.options];
-  currentOptions[index].optionText = value;
-  formik.setFieldValue("options", currentOptions);
-};
-
-const updateOptionDescription = (index: number, value: string) => {
-  const currentOptions = [...formik.values.options];
-  currentOptions[index].description = value;
-  formik.setFieldValue("options", currentOptions);
-};
-
-
-return (
-  <div className="container py-5">
-    <div className="card shadow-sm py-5">
-      <div className="card-header d-flex justify-content-between align-items-center">
-        <h1 className="mb-0">Edit Assessment Question</h1>
-        <button
-          className="btn btn-sm btn-icon btn-active-color-primary"
-          onClick={() => navigate(-1)}
-          aria-label="Close"
-        >
-          <UseAnimations
-            animation={menu2}
-            size={28}
-            strokeColor={"#181C32"}
-            reverse={true}
-          />
-        </button>
-      </div>
-
-      <form
-        className="form w-100 fv-plugins-bootstrap5 fv-plugins-framework"
-        onSubmit={formik.handleSubmit}
-      >
-        <div className="card-body">
-
-          {/* Question Text */}
-          <div className="fv-row mb-7">
-            <label className="required fs-6 fw-bold mb-2">
-              Question Text:
-            </label>
-            <textarea
-              placeholder="Enter Question Text"
-              rows={4}
-              {...formik.getFieldProps("questionText")}
-              className={clsx(
-                "form-control form-control-lg form-control-solid",
-                {
-                  "is-invalid text-danger":
-                    formik.touched.questionText && formik.errors.questionText,
-                },
-                {
-                  "is-valid":
-                    formik.touched.questionText && !formik.errors.questionText,
-                }
-              )}
+      <div className="card shadow-sm py-5">
+        <div className="card-header d-flex justify-content-between align-items-center">
+          <h1 className="mb-0">Edit Assessment Question</h1>
+          <button
+            className="btn btn-sm btn-icon btn-active-color-primary"
+            onClick={() => navigate(-1)}
+            aria-label="Close"
+          >
+            <UseAnimations
+              animation={menu2}
+              size={28}
+              strokeColor={"#181C32"}
+              reverse={true}
             />
-            {formik.touched.questionText && formik.errors.questionText && (
-              <div className="fv-plugins-message-container">
-                <div className="fv-help-block text-danger">
-                  <span role="alert">{String(formik.errors.questionText)}</span>
-                </div>
-              </div>
-            )}
-          </div>
+          </button>
+        </div>
 
-          {/* Question Type */}
-          <div className="fv-row mb-7">
-            <label className="required fs-6 fw-bold mb-2">
-              Question Type:
-            </label>
-            <select
-              {...formik.getFieldProps("questionType")}
-              className={clsx(
-                "form-control form-control-lg form-control-solid",
-                {
-                  "is-invalid text-danger":
-                    formik.touched.questionType && formik.errors.questionType,
-                },
-                {
-                  "is-valid":
-                    formik.touched.questionType && !formik.errors.questionType,
-                }
-              )}
-            >
-              <option value="">Select Question Type</option>
-              <option value="multiple-choice">Multiple Choice</option>
-              <option value="single-choice">Single Choice</option>
-            </select>
-            {formik.touched.questionType && formik.errors.questionType && (
-              <div className="fv-plugins-message-container">
-                <div className="fv-help-block text-danger">
-                  <span role="alert">{String(formik.errors.questionType)}</span>
-                </div>
-              </div>
-            )}
-          </div>
+        <form
+          className="form w-100 fv-plugins-bootstrap5 fv-plugins-framework"
+          onSubmit={formik.handleSubmit}
+        >
+          <div className="card-body">
 
-          {/* Section Type */}
-          <div className="fv-row mb-7">
-            <label className="required fs-6 fw-bold mb-2">
-              Section
-            </label>
-            <select
-              value={formik.values.section?.sectionId || ""}
-              onChange={e => {
-                const selectedSectionId = e.target.value;
-                formik.setFieldValue("section", { sectionId: selectedSectionId });
-                console.log("Selected section ID:", selectedSectionId);
-              }}
-              className={clsx(
-                "form-control form-control-lg form-control-solid",
-                {
-                  "is-invalid text-danger":
-                    formik.touched.section && formik.errors.section,
-                },
-                {
-                  "is-valid":
-                    formik.touched.section && !formik.errors.section,
-                }
-              )}
-            >
-              <option value="">Select Section</option>
-              {sections.map(section => (
-                <option key={section.sectionId} value={String(section.sectionId)}>
-                  {section.sectionName}
-                  {section.sectionDescription && ` - ${section.sectionDescription}`}
-                </option>
-              ))}
-            </select>
-            {formik.touched.section && formik.errors.section && (
-              <div className="fv-plugins-message-container">
-                <div className="fv-help-block text-danger">
-                  <span role="alert">{String(formik.errors.section)}</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Options - Manual implementation since FieldArray won't work with useFormik */}
+            {/* Question Text */}
             <div className="fv-row mb-7">
-            <label className="required fs-6 fw-bold mb-2">Options:</label>
-            
-            {/* Game as Option checkbox */}
-            <div className="mb-3 d-flex gap-4">
-              <div className="form-check">
-                <input
-                  type="checkbox"
-                  checked={useGameAsOption}
-                  onChange={() => setUseGameAsOption(v => !v)}
-                  className="form-check-input"
-                  id="useGameAsOptionEdit"
-                />
-                <label className="form-check-label" htmlFor="useGameAsOptionEdit">
-                  🎮 Use Game as Option
-                </label>
-              </div>
-            </div>
-            
-            {/* Game Selection Dropdown */}
-            {useGameAsOption ? (
-              <div className="p-3 border rounded bg-light mb-3">
-                <div className="d-flex align-items-center mb-2">
-                  <span className="me-2 fw-bold">🎮 Select Game:</span>
-                </div>
-                <select
-                  className={clsx("form-control form-control-lg form-control-solid", {
-                    "is-invalid text-danger": !selectedGameId,
-                    "is-valid": !!selectedGameId,
-                  })}
-                  value={selectedGameId}
-                  onChange={(e) => setSelectedGameId(e.target.value)}
-                >
-                  <option value="">Select a Game</option>
-                  {games.map((game) => (
-                    <option key={game.gameId} value={game.gameId}>
-                      {game.gameName} (Code: {game.gameCode})
-                    </option>
-                  ))}
-                </select>
-                {selectedGameId && (
-                  <div className="mt-2 text-success">
-                    ✅ Game selected. This question will launch the selected game as an option.
-                  </div>
+              <label className="required fs-6 fw-bold mb-2">
+                Question Text:
+              </label>
+              <textarea
+                placeholder="Enter Question Text"
+                rows={4}
+                {...formik.getFieldProps("questionText")}
+                className={clsx(
+                  "form-control form-control-lg form-control-solid",
+                  {
+                    "is-invalid text-danger":
+                      formik.touched.questionText && formik.errors.questionText,
+                  },
+                  {
+                    "is-valid":
+                      formik.touched.questionText && !formik.errors.questionText,
+                  }
                 )}
+              />
+              {formik.touched.questionText && formik.errors.questionText && (
+                <div className="fv-plugins-message-container">
+                  <div className="fv-help-block text-danger">
+                    <span role="alert">{String(formik.errors.questionText)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Question Type */}
+            <div className="fv-row mb-7">
+              <label className="required fs-6 fw-bold mb-2">
+                Question Type:
+              </label>
+              <select
+                {...formik.getFieldProps("questionType")}
+                className={clsx(
+                  "form-control form-control-lg form-control-solid",
+                  {
+                    "is-invalid text-danger":
+                      formik.touched.questionType && formik.errors.questionType,
+                  },
+                  {
+                    "is-valid":
+                      formik.touched.questionType && !formik.errors.questionType,
+                  }
+                )}
+              >
+                <option value="">Select Question Type</option>
+                <option value="multiple-choice">Multiple Choice</option>
+                <option value="single-choice">Single Choice</option>
+                <option value="ranking">Ranking</option>
+
+              </select>
+              {formik.touched.questionType && formik.errors.questionType && (
+                <div className="fv-plugins-message-container">
+                  <div className="fv-help-block text-danger">
+                    <span role="alert">{String(formik.errors.questionType)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Section Type */}
+            <div className="fv-row mb-7">
+              <label className="required fs-6 fw-bold mb-2">
+                Section
+              </label>
+              <select
+                value={formik.values.section?.sectionId || ""}
+                onChange={e => {
+                  const selectedSectionId = e.target.value;
+                  formik.setFieldValue("section", { sectionId: selectedSectionId });
+                  console.log("Selected section ID:", selectedSectionId);
+                }}
+                className={clsx(
+                  "form-control form-control-lg form-control-solid",
+                  {
+                    "is-invalid text-danger":
+                      formik.touched.section && formik.errors.section,
+                  },
+                  {
+                    "is-valid":
+                      formik.touched.section && !formik.errors.section,
+                  }
+                )}
+              >
+                <option value="">Select Section</option>
+                {sections.map(section => (
+                  <option key={section.sectionId} value={String(section.sectionId)}>
+                    {section.sectionName}
+                    {section.sectionDescription && ` - ${section.sectionDescription}`}
+                  </option>
+                ))}
+              </select>
+              {formik.touched.section && formik.errors.section && (
+                <div className="fv-plugins-message-container">
+                  <div className="fv-help-block text-danger">
+                    <span role="alert">{String(formik.errors.section)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Options - Manual implementation since FieldArray won't work with useFormik */}
+            <div className="fv-row mb-7">
+              <label className="required fs-6 fw-bold mb-2">Options:</label>
+
+              {/* Game as Option checkbox */}
+              <div className="mb-3 d-flex gap-4">
+                <div className="form-check">
+                  <input
+                    type="checkbox"
+                    checked={useGameAsOption}
+                    onChange={() => setUseGameAsOption(v => !v)}
+                    className="form-check-input"
+                    id="useGameAsOptionEdit"
+                  />
+                  <label className="form-check-label" htmlFor="useGameAsOptionEdit">
+                    🎮 Use Game as Option
+                  </label>
+                </div>
               </div>
-            ) : (
-              <>
-            <div className="table-responsive">
-              <table className="table table-row-bordered">
-                <thead>
-                  <tr className="fw-bold fs-6 text-gray-800">
-                    <th style={{ minWidth: "80px" }}>Sequence</th>
-                    <th>Option Text & Description</th>
-                    <th style={{ minWidth: "200px" }}>Measured Quality Types</th>
-                    <th style={{ minWidth: "100px" }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {formik.values.options
-                    .sort((a, b) => a.sequence - b.sequence)
-                    .map((option, index) => (
-                    <tr key={index}>
-                      <td>
-                        <select
-                          className="form-select form-select-sm"
-                          value={option.sequence}
-                          onChange={(e) => updateOptionSequence(index, parseInt(e.target.value))}
-                        >
-                          {generateSequenceOptions(formik.values.options.length).map(seq => (
-                            <option key={seq} value={seq}>{seq}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td>
-                        {/* Toggle Switch for Text/Image */}
-                        <div className="d-flex align-items-center mb-2">
-                          <div className="form-check form-switch">
-                            <input
-                              className="form-check-input"
-                              type="checkbox"
-                              role="switch"
-                              id={`edit-option-type-${index}`}
-                              checked={optionTypes[index] === 'image'}
-                              onChange={() => toggleOptionType(index)}
-                            />
-                            <label className="form-check-label small" htmlFor={`edit-option-type-${index}`}>
-                              {optionTypes[index] === 'image' ? '📷' : '📝'}
-                            </label>
-                          </div>
-                        </div>
-                        
-                        {optionTypes[index] === 'image' ? (
-                          <div>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => handleImageSelect(index, e.target.files?.[0] || null)}
-                              className="form-control form-control-sm mb-2"
-                            />
-                            {optionImages[index] && (
-                              <div className="position-relative d-inline-block">
-                                <img 
-                                  src={optionImages[index]} 
-                                  alt={`Option ${option.sequence}`}
-                                  style={{ maxWidth: 100, maxHeight: 60, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }}
-                                />
-                                <button
-                                  type="button"
-                                  className="btn btn-sm btn-danger position-absolute"
-                                  style={{ top: -6, right: -6, padding: '1px 5px', fontSize: 10 }}
-                                  onClick={() => handleImageSelect(index, null)}
+
+              {/* Game Selection Dropdown */}
+              {useGameAsOption ? (
+                <div className="p-3 border rounded bg-light mb-3">
+                  <div className="d-flex align-items-center mb-2">
+                    <span className="me-2 fw-bold">🎮 Select Game:</span>
+                  </div>
+                  <select
+                    className={clsx("form-control form-control-lg form-control-solid", {
+                      "is-invalid text-danger": !selectedGameId,
+                      "is-valid": !!selectedGameId,
+                    })}
+                    value={selectedGameId}
+                    onChange={(e) => setSelectedGameId(e.target.value)}
+                  >
+                    <option value="">Select a Game</option>
+                    {games.map((game) => (
+                      <option key={game.gameId} value={game.gameId}>
+                        {game.gameName} (Code: {game.gameCode})
+                      </option>
+                    ))}
+                  </select>
+                  {selectedGameId && (
+                    <div className="mt-2 text-success">
+                      ✅ Game selected. This question will launch the selected game as an option.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="table-responsive">
+                    <table className="table table-row-bordered">
+                      <thead>
+                        <tr className="fw-bold fs-6 text-gray-800">
+                          <th style={{ minWidth: "80px" }}>Sequence</th>
+                          <th>Option Text & Description</th>
+                          <th style={{ minWidth: "200px" }}>Measured Quality Types</th>
+                          <th style={{ minWidth: "100px" }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {formik.values.options
+                          .sort((a, b) => a.sequence - b.sequence)
+                          .map((option, index) => (
+                            <tr key={index}>
+                              <td>
+                                <select
+                                  className="form-select form-select-sm"
+                                  value={option.sequence}
+                                  onChange={(e) => updateOptionSequence(index, parseInt(e.target.value))}
                                 >
-                                  ×
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <>
-                            <div className="mb-2">
-                              <input
-                                type="text"
-                                placeholder={`Enter option ${option.sequence}`}
-                                value={option.optionText}
-                                onChange={e => updateOption(index, e.target.value)}
-                                className={clsx(
-                                  "form-control form-control-sm",
-                                  {
-                                    "is-invalid text-danger": !option.optionText,
-                                    "is-valid": !!option.optionText,
-                                  }
-                                )}
-                              />
-                            </div>
-                            <textarea
-                              placeholder={`Description (optional)`}
-                              value={option.description || ""}
-                              onChange={e => updateOptionDescription(index, e.target.value)}
-                              className="form-control form-control-sm"
-                              rows={2}
-                              style={{ resize: "vertical" }}
-                            />
-                          </>
-                        )}
-                      </td>
-                      <td>
-                        <Dropdown autoClose="outside">
-                          <Dropdown.Toggle
-                            variant="secondary"
-                            id={`dropdown-option-${index}`}
-                            size="sm"
-                          >
-                            Quality Types
-                          </Dropdown.Toggle>
-                          <Dropdown.Menu style={{ minWidth: 300 }}>
-                            <Dropdown.Header>Measured Quality Types</Dropdown.Header>
-                            
-                            {/* Search Bar */}
-                            <div className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                              <input
-                                type="text"
-                                className="form-control form-control-sm"
-                                placeholder="🔍 Search quality types..."
-                                value={qualitySearchTerms[index] || ""}
-                                onChange={(e) => {
-                                  setQualitySearchTerms(prev => ({
-                                    ...prev,
-                                    [index]: e.target.value
-                                  }));
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            </div>
-                            
-                            <Dropdown.Divider />
-                            
-                            <div style={{ maxHeight: 250, overflowY: "auto", padding: 8 }} onClick={(e) => e.stopPropagation()}>
-                              {getFilteredMeasuredQualities(index).length > 0 ? (
-                                getFilteredMeasuredQualities(index).map((type: any, i: number) => (
-                                  <div key={type.measuredQualityTypeId}>
-                                    <div className="d-flex align-items-center mb-2">
+                                  {generateSequenceOptions(formik.values.options.length).map(seq => (
+                                    <option key={seq} value={seq}>{seq}</option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td>
+                                {/* Toggle Switch for Text/Image */}
+                                <div className="d-flex align-items-center mb-2">
+                                  <div className="form-check form-switch">
+                                    <input
+                                      className="form-check-input"
+                                      type="checkbox"
+                                      role="switch"
+                                      id={`edit-option-type-${index}`}
+                                      checked={optionTypes[index] === 'image'}
+                                      onChange={() => toggleOptionType(index)}
+                                    />
+                                    <label className="form-check-label small" htmlFor={`edit-option-type-${index}`}>
+                                      {optionTypes[index] === 'image' ? '📷' : '📝'}
+                                    </label>
+                                  </div>
+                                </div>
+
+                                {optionTypes[index] === 'image' ? (
+                                  <div>
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      onChange={(e) => handleImageSelect(index, e.target.files?.[0] || null)}
+                                      className="form-control form-control-sm mb-2"
+                                    />
+                                    {optionImages[index] && (
+                                      <div className="position-relative d-inline-block">
+                                        <img
+                                          src={optionImages[index]}
+                                          alt={`Option ${option.sequence}`}
+                                          style={{ maxWidth: 100, maxHeight: 60, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }}
+                                        />
+                                        <button
+                                          type="button"
+                                          className="btn btn-sm btn-danger position-absolute"
+                                          style={{ top: -6, right: -6, padding: '1px 5px', fontSize: 10 }}
+                                          onClick={() => handleImageSelect(index, null)}
+                                        >
+                                          ×
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="mb-2">
                                       <input
-                                        type="checkbox"
-                                        checked={!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked}
-                                        onChange={() => handleQualityToggle(index, type.measuredQualityTypeId)}
-                                        className="form-check-input me-2"
-                                        id={`option-${index}-type-${type.measuredQualityTypeId}`}
+                                        type="text"
+                                        placeholder={`Enter option ${option.sequence}`}
+                                        value={option.optionText}
+                                        onChange={e => updateOption(index, e.target.value)}
+                                        className={clsx(
+                                          "form-control form-control-sm",
+                                          {
+                                            "is-invalid text-danger": !option.optionText,
+                                            "is-valid": !!option.optionText,
+                                          }
+                                        )}
+                                      />
+                                    </div>
+                                    <textarea
+                                      placeholder={`Description (optional)`}
+                                      value={option.optionDescription || ""}
+                                      onChange={e => updateOptionDescription(index, e.target.value)}
+                                      className="form-control form-control-sm"
+                                      rows={2}
+                                      style={{ resize: "vertical" }}
+                                    />
+                                  </>
+                                )}
+                              </td>
+                              <td>
+                                <Dropdown autoClose="outside">
+                                  <Dropdown.Toggle
+                                    variant="secondary"
+                                    id={`dropdown-option-${index}`}
+                                    size="sm"
+                                  >
+                                    Quality Types
+                                  </Dropdown.Toggle>
+                                  <Dropdown.Menu style={{ minWidth: 300 }}>
+                                    <Dropdown.Header>Measured Quality Types</Dropdown.Header>
+
+                                    {/* Search Bar */}
+                                    <div className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                                      <input
+                                        type="text"
+                                        className="form-control form-control-sm"
+                                        placeholder="🔍 Search quality types..."
+                                        value={qualitySearchTerms[index] || ""}
+                                        onChange={(e) => {
+                                          setQualitySearchTerms(prev => ({
+                                            ...prev,
+                                            [index]: e.target.value
+                                          }));
+                                        }}
                                         onClick={(e) => e.stopPropagation()}
                                       />
-                                      <label 
-                                        htmlFor={`option-${index}-type-${type.measuredQualityTypeId}`} 
-                                        className="me-2 mb-0"
-                                        style={{ cursor: 'pointer', userSelect: 'none' }}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleQualityToggle(index, type.measuredQualityTypeId);
-                                        }}
-                                      >
-                                        {type.measuredQualityTypeName}
-                                      </label>
-                                      {!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked && (
-                                        <input
-                                          type="number"
-                                          min={0}
-                                          max={100}
-                                          value={optionMeasuredQualities[index][type.measuredQualityTypeId]?.score ?? 0}
-                                          onChange={e =>
-                                            handleQualityScoreChange(index, type.measuredQualityTypeId, Number(e.target.value))
-                                          }
-                                          placeholder="Score"
-                                          className="form-control form-control-sm ms-2"
-                                          style={{ width: 70 }}
-                                          onClick={(e) => e.stopPropagation()}
-                                        />
+                                    </div>
+
+                                    <Dropdown.Divider />
+
+                                    <div style={{ maxHeight: 250, overflowY: "auto", padding: 8 }} onClick={(e) => e.stopPropagation()}>
+                                      {getFilteredMeasuredQualities(index).length > 0 ? (
+                                        getFilteredMeasuredQualities(index).map((type: any, i: number) => (
+                                          <div key={type.measuredQualityTypeId}>
+                                            <div className="d-flex align-items-center mb-2">
+                                              <input
+                                                type="checkbox"
+                                                checked={!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked}
+                                                onChange={() => handleQualityToggle(index, type.measuredQualityTypeId)}
+                                                className="form-check-input me-2"
+                                                id={`option-${index}-type-${type.measuredQualityTypeId}`}
+                                                onClick={(e) => e.stopPropagation()}
+                                              />
+                                              <label
+                                                htmlFor={`option-${index}-type-${type.measuredQualityTypeId}`}
+                                                className="me-2 mb-0"
+                                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleQualityToggle(index, type.measuredQualityTypeId);
+                                                }}
+                                              >
+                                                {type.measuredQualityTypeName}
+                                              </label>
+                                              {!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked && (
+                                                <input
+                                                  type="number"
+                                                  min={0}
+                                                  max={100}
+                                                  value={optionMeasuredQualities[index][type.measuredQualityTypeId]?.score ?? 0}
+                                                  onChange={e =>
+                                                    handleQualityScoreChange(index, type.measuredQualityTypeId, Number(e.target.value))
+                                                  }
+                                                  placeholder="Score"
+                                                  className="form-control form-control-sm ms-2"
+                                                  style={{ width: 70 }}
+                                                  onClick={(e) => e.stopPropagation()}
+                                                />
+                                              )}
+                                            </div>
+                                            {i < getFilteredMeasuredQualities(index).length - 1 && <hr style={{ margin: '4px 0' }} />}
+                                          </div>
+                                        ))
+                                      ) : (
+                                        <div className="text-muted text-center py-2">
+                                          No matching quality types found
+                                        </div>
                                       )}
                                     </div>
-                                    {i < getFilteredMeasuredQualities(index).length - 1 && <hr style={{ margin: '4px 0' }} />}
-                                  </div>
-                                ))
-                              ) : (
-                                <div className="text-muted text-center py-2">
-                                  No matching quality types found
-                                </div>
-                              )}
-                            </div>
-                          </Dropdown.Menu>
-                        </Dropdown>
-                        
-                        {/* Display Selected Measured Qualities */}
-                        {optionMeasuredQualities[index] && Object.keys(optionMeasuredQualities[index]).length > 0 && (
-                          <div className="mt-2">
-                            <div className="small text-muted mb-1">Selected Qualities:</div>
-                            <div className="d-flex flex-wrap gap-1">
-                              {Object.entries(optionMeasuredQualities[index])
-                                .filter(([_, value]) => value.checked)
-                                .map(([typeId, value]) => {
-                                  const qualityType = mqt.find(q => q.measuredQualityTypeId === Number(typeId));
-                                  return qualityType ? (
-                                    <div
-                                      key={typeId}
-                                      className="badge bg-primary d-flex align-items-center gap-1"
-                                      style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem' }}
-                                    >
-                                      <span>{qualityType.measuredQualityTypeName}</span>
-                                      <span className="badge bg-light text-dark ms-1">{value.score}</span>
-                                      <button
-                                        type="button"
-                                        className="btn-close btn-close-white"
-                                        style={{ fontSize: '0.5rem', padding: 0, width: '0.6rem', height: '0.6rem' }}
-                                        onClick={() => handleQualityToggle(index, Number(typeId))}
-                                        aria-label="Remove"
-                                      />
+                                  </Dropdown.Menu>
+                                </Dropdown>
+
+                                {/* Display Selected Measured Qualities */}
+                                {optionMeasuredQualities[index] && Object.keys(optionMeasuredQualities[index]).length > 0 && (
+                                  <div className="mt-2">
+                                    <div className="small text-muted mb-1">Selected Qualities:</div>
+                                    <div className="d-flex flex-wrap gap-1">
+                                      {Object.entries(optionMeasuredQualities[index])
+                                        .filter(([_, value]) => value.checked)
+                                        .map(([typeId, value]) => {
+                                          const qualityType = mqt.find(q => q.measuredQualityTypeId === Number(typeId));
+                                          return qualityType ? (
+                                            <div
+                                              key={typeId}
+                                              className="badge bg-primary d-flex align-items-center gap-1"
+                                              style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem' }}
+                                            >
+                                              <span>{qualityType.measuredQualityTypeName}</span>
+                                              <span className="badge bg-light text-dark ms-1">{value.score}</span>
+                                              <button
+                                                type="button"
+                                                className="btn-close btn-close-white"
+                                                style={{ fontSize: '0.5rem', padding: 0, width: '0.6rem', height: '0.6rem' }}
+                                                onClick={() => handleQualityToggle(index, Number(typeId))}
+                                                aria-label="Remove"
+                                              />
+                                            </div>
+                                          ) : null;
+                                        })}
                                     </div>
-                                  ) : null;
-                                })}
-                            </div>
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        <div className="d-flex gap-1">
-                          {formik.values.options.length > 1 && (
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-danger"
-                              onClick={() => removeOption(index)}
-                            >
-                              <i className="fas fa-trash"></i>
-                            </button>
-                          )}
-                          {index === formik.values.options.length - 1 && (
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-primary"
-                              onClick={addOption}
-                            >
-                              <i className="fas fa-plus"></i>
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                                  </div>
+                                )}
+                              </td>
+                              <td>
+                                <div className="d-flex gap-1">
+                                  {formik.values.options.length > 1 && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-danger"
+                                      onClick={() => removeOption(index)}
+                                    >
+                                      <i className="fas fa-trash"></i>
+                                    </button>
+                                  )}
+                                  {index === formik.values.options.length - 1 && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-primary"
+                                      onClick={addOption}
+                                    >
+                                      <i className="fas fa-plus"></i>
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {typeof formik.errors.options === "string" && (
+                    <div className="fv-plugins-message-container">
+                      <div className="fv-help-block text-danger">
+                        <span role="alert">{formik.errors.options}</span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
-            {typeof formik.errors.options === "string" && (
-              <div className="fv-plugins-message-container">
-                <div className="fv-help-block text-danger">
-                  <span role="alert">{formik.errors.options}</span>
-                </div>
-              </div>
-            )}
-              </>
-            )}
-          </div>
+            {/* Max Options Allowed */}
+            <div className="fv-row mb-7">
+              <label className="fs-6 fw-bold mb-2">Max Options Allowed</label>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={formik.values.maxOptionsAllowed}
+                onChange={e =>
+                  formik.setFieldValue("maxOptionsAllowed", e.target.value)
+                }
+                placeholder="Max Options Allowed"
+                className="form-control form-control-lg form-control-solid"
+                style={{ width: 200 }}
+              />
+            </div>
+          </div> {/* Close card-body */}
 
-          {/* Max Options Allowed */}
-          <div className="fv-row mb-7">
-            <label className="fs-6 fw-bold mb-2">Max Options Allowed</label>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={formik.values.maxOptionsAllowed}
-              onChange={e =>
-                formik.setFieldValue("maxOptionsAllowed", e.target.value)
-              }
-              placeholder="Max Options Allowed"
-              className="form-control form-control-lg form-control-solid"
-              style={{ width: 200 }}
-            />
+          <div className="card-footer d-flex justify-content-end">
+            <button
+              type="button"
+              className="btn btn-light me-2"
+              onClick={() => navigate("/assessment-questions")}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={loading}
+            >
+              {!loading && <span className="indicator-label">Update</span>}
+              {loading && (
+                <span
+                  className="indicator-progress"
+                  style={{ display: "block" }}
+                >
+                  Please wait...{" "}
+                  <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
+                </span>
+              )}
+            </button>
           </div>
-        </div> {/* Close card-body */}
-
-        <div className="card-footer d-flex justify-content-end">
-          <button
-            type="button"
-            className="btn btn-light me-2"
-            onClick={() => navigate("/assessment-questions")}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={loading}
-          >
-            {!loading && <span className="indicator-label">Update</span>}
-            {loading && (
-              <span
-                className="indicator-progress"
-                style={{ display: "block" }}
-              >
-                Please wait...{" "}
-                <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
-              </span>
-            )}
-          </button>
-        </div>
         </form>
       </div>
     </div>

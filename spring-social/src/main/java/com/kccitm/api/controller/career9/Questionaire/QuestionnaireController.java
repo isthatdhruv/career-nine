@@ -26,6 +26,7 @@ import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireSection;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireSectionInstruction;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireRepository;
+import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireSectionRepository;
 
 @RestController
 @RequestMapping("/api/questionnaire")
@@ -33,6 +34,9 @@ public class QuestionnaireController {
 
     @Autowired
     private QuestionnaireRepository questionnaireRepository;
+    
+    @Autowired
+    private QuestionnaireSectionRepository questionnaireSectionRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -108,6 +112,22 @@ public class QuestionnaireController {
             @PathVariable Long id,
             @RequestBody Questionnaire questionnaire) {
 
+        if(questionnaire.getSections()!=null){
+            for(QuestionnaireSection section :questionnaire.getSections()){
+                section.setQuestionnaire(questionnaire);
+                if(section.getQuestions()!=null){
+                    for(QuestionnaireQuestion question: section.getQuestions()){
+                        question.setSection(section);
+                    }
+                }
+                if(section.getInstruction()!=null){
+                    for(QuestionnaireSectionInstruction instruction: section.getInstruction()){
+                        instruction.setSection(section);
+                    }
+                }
+            }
+        }
+
         return questionnaireRepository.findById(id)
                 .map(existing -> {
                     // Update basic fields
@@ -181,6 +201,10 @@ public class QuestionnaireController {
 
     private void updateSections(Questionnaire existing, java.util.List<QuestionnaireSection> incomingList) {
         if (incomingList == null) {
+            // Only remove the mapping, not the section entity itself
+            for (QuestionnaireSection section : existing.getSections()) {
+                section.setQuestionnaire(null);
+            }
             existing.getSections().clear();
             return;
         }
@@ -192,9 +216,15 @@ public class QuestionnaireController {
                         s -> s,
                         (existingValue, newValue) -> existingValue));
 
-        // A. Remove missing sections
-        existing.getSections().removeIf(existingSection -> existingSection.getQuestionnaireSectionId() != null &&
-                !incomingMap.containsKey(existingSection.getQuestionnaireSectionId()));
+        // A. Remove missing sections (remove mapping only)
+        existing.getSections().removeIf(existingSection -> {
+            boolean toRemove = existingSection.getQuestionnaireSectionId() != null &&
+                    !incomingMap.containsKey(existingSection.getQuestionnaireSectionId());
+            if (toRemove) {
+                existingSection.setQuestionnaire(null);
+            }
+            return toRemove;
+        });
 
         // B. Update existing and Add new
         for (QuestionnaireSection incoming : incomingList) {

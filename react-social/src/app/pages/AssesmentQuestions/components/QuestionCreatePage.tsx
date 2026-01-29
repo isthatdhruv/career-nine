@@ -368,6 +368,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                 <option value="">Select Question Type</option>
                 <option value="multiple-choice">Multiple Choice</option>
                 <option value="single-choice">Single Choice</option>
+                <option value="ranking">Ranking</option>
 
               </select>
             </div>
@@ -500,7 +501,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                         />
                       )}
                       
-                      <Dropdown>
+                      {/* <Dropdown>
                         <Dropdown.Toggle
                           variant="secondary"
                           id={`dropdown-option-${index}`}
@@ -544,7 +545,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                             ))}
                           </div>
                         </Dropdown.Menu>
-                      </Dropdown>
+                      </Dropdown> */}
                       {formikValues.questionOptions.length > 1 && (
                         <button
                           type="button"
