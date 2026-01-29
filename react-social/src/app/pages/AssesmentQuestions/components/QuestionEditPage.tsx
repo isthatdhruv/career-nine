@@ -863,7 +863,6 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                                               {!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked && (
                                                 <input
                                                   type="number"
-                                                  min={0}
                                                   max={100}
                                                   value={optionMeasuredQualities[index][type.measuredQualityTypeId]?.score ?? 0}
                                                   onChange={e =>

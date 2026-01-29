@@ -49,10 +49,10 @@ const StudentLoginPage: React.FC = () => {
 
   const handleDobChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value;
-    
+
     // Remove any non-numeric characters except hyphens
     value = value.replace(/[^\d-]/g, '');
-    
+
     // Auto-format as dd-mm-yyyy
     const digits = value.replace(/-/g, '');
     if (digits.length <= 2) {
@@ -62,7 +62,7 @@ const StudentLoginPage: React.FC = () => {
     } else {
       value = `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4, 8)}`;
     }
-    
+
     setDob(value);
     if (touched.dob) {
       setErrors(prev => ({ ...prev, dob: validateDob(value) }));
@@ -118,7 +118,7 @@ const StudentLoginPage: React.FC = () => {
       };
 
       try {
-        const response = await fetch('http://localhost:8080/user/auth', {
+        const response = await fetch(`${process.env.REACT_APP_API_URL}/user/auth`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -220,8 +220,8 @@ const StudentLoginPage: React.FC = () => {
               )}
             </div>
 
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="btn btn-primary w-100 mt-5"
               style={{ padding: '0.75rem', fontSize: '1.1rem', fontWeight: '500' }}
             >
