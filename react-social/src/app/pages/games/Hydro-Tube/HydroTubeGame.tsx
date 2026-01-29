@@ -52,11 +52,13 @@ const patterns: Pattern[] = [
       1: "t-pipe", 2: "bend", 3: "straight", 4: "bend",
       5: "straight", 6: "bend", 7: "t-pipe", 8: "straight",
       9: "bend", 10: "straight", 11: "bend", 12: "straight",
-      13: "straight", 14: "bend", 15: "straight", 16: "bend",
+      13: "bend", 14: "straight", 15: "straight", 16: "bend",
     },
     solutions: [
       // rotations for tiles 1..16 (0/90/180/270)
-      [90, 180, 90, 270, 0, 90, 180, 0, 0, 90, 270, 0, 0, 180, 90, 90]
+      // [90, 180, 90, 270, 0, 90, 180, 0, 0, 90, 270, 0, 0, 180, 90, 90],
+      [270, 90, 0, 0, 0, 270, 0, 0, 0, 90, 180, 0, 270, 90, 90, 90]
+
     ]
   }
 ];
@@ -194,10 +196,10 @@ export function HydroTubeGame({ userStudentId, playerName, onComplete, onExit }:
       setGameEnded(true);
       return;
     }
-    
+
     // Find next pattern (excluding pattern C which is used for trial)
     const availablePatterns = patterns.filter(p => p.id !== 2 && !newCompletedPatterns.includes(p.id));
-    
+
     if (availablePatterns.length > 0) {
       setPatternId(availablePatterns[0].id);
       setTileRotations({});
@@ -363,7 +365,7 @@ export function HydroTubeGame({ userStudentId, playerName, onComplete, onExit }:
               How To Play
             </h1>
           </div>
-          
+
           <p style={{ color: '#38bdf8', fontSize: '14px', marginBottom: '20px' }}>
             Watch this short tutorial before starting, {playerName}!
           </p>
@@ -395,12 +397,12 @@ export function HydroTubeGame({ userStudentId, playerName, onComplete, onExit }:
           </div>
 
           {/* Info Text */}
-          <div style={{ 
-            background: 'rgba(56, 189, 248, 0.2)', 
-            borderRadius: '12px', 
-            padding: '12px 16px', 
+          <div style={{
+            background: 'rgba(56, 189, 248, 0.2)',
+            borderRadius: '12px',
+            padding: '12px 16px',
             marginBottom: '20px',
-            border: '1px solid rgba(56, 189, 248, 0.3)' 
+            border: '1px solid rgba(56, 189, 248, 0.3)'
           }}>
             <p style={{ color: '#7dd3fc', fontSize: '13px' }}>
               🚰 Rotate the pipes to connect the water flow!<br />
@@ -492,12 +494,12 @@ export function HydroTubeGame({ userStudentId, playerName, onComplete, onExit }:
           </p>
 
           {/* Info about main game */}
-          <div style={{ 
-            background: 'rgba(56, 189, 248, 0.2)', 
-            borderRadius: '12px', 
-            padding: '12px 16px', 
+          <div style={{
+            background: 'rgba(56, 189, 248, 0.2)',
+            borderRadius: '12px',
+            padding: '12px 16px',
             marginBottom: '24px',
-            border: '1px solid rgba(56, 189, 248, 0.3)' 
+            border: '1px solid rgba(56, 189, 248, 0.3)'
           }}>
             <p style={{ color: '#7dd3fc', fontSize: '14px', fontWeight: 600 }}>
               🎮 Ready for the real challenge?<br />
@@ -609,14 +611,14 @@ export function HydroTubeGame({ userStudentId, playerName, onComplete, onExit }:
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 20,
-        background: isTrial 
+        background: isTrial
           ? 'linear-gradient(to bottom, rgba(234, 179, 8, 0.95), rgba(202, 138, 4, 0.95))'
           : timeLeft < 30
             ? 'linear-gradient(to bottom, rgba(220, 38, 38, 0.95), rgba(185, 28, 28, 0.95))'
             : 'linear-gradient(to bottom, rgba(12, 74, 110, 0.95), rgba(7, 89, 133, 0.95))',
         padding: '10px 24px',
         borderRadius: '14px',
-        border: isTrial 
+        border: isTrial
           ? '2px solid rgba(253, 224, 71, 0.5)'
           : timeLeft < 30 ? '2px solid rgba(248, 113, 113, 0.5)' : '2px solid rgba(56, 189, 248, 0.5)',
         boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
