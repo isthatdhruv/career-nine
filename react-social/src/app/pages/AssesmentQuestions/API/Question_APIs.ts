@@ -2,6 +2,7 @@ import axios from "axios";
 const API_URL = process.env.REACT_APP_API_URL;
 
 const readQuestions = `${API_URL}/assessment-questions/getAll`;
+const readQuestionsList = `${API_URL}/assessment-questions/getAllList`;
 const readQuestionById = `${API_URL}/assessment-questions/get/`;
 const createQuestion = `${API_URL}/assessment-questions/create`;
 const updateQuestion = `${API_URL}/assessment-questions/update`;
@@ -15,6 +16,10 @@ export function updateOptionScoreData(optionScores: any) {
 
 export function ReadQuestionsData() {
   return axios.get(readQuestions);
+}
+
+export function ReadQuestionsDataList() {
+  return axios.get(readQuestionsList);
 }
 export function ReadMeasuredQualityTypes() {
   return axios.get(readMeasuredQualityTypes);

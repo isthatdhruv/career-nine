@@ -106,6 +106,15 @@ public class AssessmentQuestionController {
     public AssessmentQuestions getAssessmentQuestionById(@PathVariable Long id) {
         return assessmentQuestionRepository.findById(id).orElse(null);
     }
+    @GetMapping("/getAllList")
+    public List<AssessmentQuestions> findAllQuestionsProjection() {
+       
+        List<AssessmentQuestions> fromDb = assessmentQuestionRepository.findAllQuestionsProjection();
+
+        return fromDb;
+    }
+
+    
 
     @PostMapping(value = "/create", consumes = "application/json")
     public AssessmentQuestions createAssessmentQuestion(@RequestBody AssessmentQuestions assessmentQuestions)

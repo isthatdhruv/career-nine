@@ -52,6 +52,16 @@ public class AssessmentQuestions implements Serializable {
     @JsonIgnoreProperties("assessmentQuestion")
     private List<LanguageQuestion> languageQuestions;
 
+    // Constructor for projection
+    public AssessmentQuestions(Long questionId, String questionText, String questionType) {
+        this.questionId = questionId;
+        this.questionText = questionText;
+        this.questionType = questionType;
+    }
+
+    public AssessmentQuestions() {
+    }
+
     // --- getters and setters ---
     public int getmaxOptionsAllowed() {
         return maxOptionsAllowed;

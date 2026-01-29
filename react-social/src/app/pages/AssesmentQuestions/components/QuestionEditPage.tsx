@@ -6,7 +6,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
-import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
+import { ReadQuestionSectionData, ReadQuestionSectionDataList } from "../../QuestionSections/API/Question_Section_APIs";
 import { CreateQuestionData, ReadMeasuredQualityTypes, ReadQuestionByIdData } from "../API/Question_APIs";
 import { ListGamesData } from "../../Games/components/API/GAME_APIs";
 
@@ -218,39 +218,52 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
 
-  // Fetch question data and sections when component mounts
+  // Fetch all data when component mounts
   useEffect(() => {
-    const fetchData = async () => {
-      if (id) {
-        try {
-          setLoading(true);
-          // Fetch question data by ID
-          const questionResponse = await ReadQuestionByIdData(id);
-          console.log("Fetched question data:", questionResponse.data);
+    const fetchAllData = async () => {
+      setLoading(true);
+      try {
+        // Fetch question data
+        let questionDataResult = null;
+        if (id) {
+          try {
+            const questionResponse = await ReadQuestionByIdData(id);
+            console.log("Fetched question data:", questionResponse.data);
+            const fetchedQuestion = questionResponse.data;
 
-          // Process the question data to extract section properly
-          const fetchedQuestion = questionResponse.data;
-
-          const processedData = {
-            ...fetchedQuestion,
-            section: fetchedQuestion.section?.sectionId
-              ? { sectionId: String(fetchedQuestion.section.sectionId) }
-              : fetchedQuestion.section?.section
-                ? { sectionId: String(fetchedQuestion.section.section) }
-                : { sectionId: "" },
-            questionOptions: fetchedQuestion.options
-              ? fetchedQuestion.options.map((option: any) => option.optionText || option)
-              : [{ optionText: "", optionDescription: "", correct: false, sequence: 1 }],
-          };
-
-          console.log("Processed data with section:", processedData.section);
-          setQuestionData(processedData);
-        } catch (error) {
-          console.error("Error fetching question:", error);
-          // Try to get data from location state as fallback
+            questionDataResult = {
+              ...fetchedQuestion,
+              section: fetchedQuestion.section?.sectionId
+                ? { sectionId: String(fetchedQuestion.section.sectionId) }
+                : fetchedQuestion.section?.section
+                  ? { sectionId: String(fetchedQuestion.section.section) }
+                  : { sectionId: "" },
+              questionOptions: fetchedQuestion.options
+                ? fetchedQuestion.options.map((option: any) => option.optionText || option)
+                : [{ optionText: "", optionDescription: "", correct: false, sequence: 1 }],
+            };
+            // console.log("Processed data with section:", questionDataResult.section);
+          } catch (error) {
+            console.error("Error fetching question:", error);
+            const locationData = (location.state as any)?.data;
+            if (locationData) {
+              questionDataResult = {
+                ...locationData,
+                section: locationData.section?.sectionId
+                  ? { sectionId: String(locationData.section.sectionId) }
+                  : locationData.section?.section
+                    ? { sectionId: String(locationData.section.section) }
+                    : { sectionId: "" },
+                questionOptions: locationData.options
+                  ? locationData.options.map((option: any) => option.optionText || option)
+                  : locationData.questionOptions || [""]
+              };
+            }
+          }
+        } else {
           const locationData = (location.state as any)?.data;
           if (locationData) {
-            const processedLocationData = {
+            questionDataResult = {
               ...locationData,
               section: locationData.section?.sectionId
                 ? { sectionId: String(locationData.section.sectionId) }
@@ -261,72 +274,49 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                 ? locationData.options.map((option: any) => option.optionText || option)
                 : locationData.questionOptions || [""]
             };
-            setQuestionData(processedLocationData);
           }
-        } finally {
-          setLoading(false);
         }
-      } else {
-        // Fallback to location state if no ID in URL
-        const locationData = (location.state as any)?.data;
-        if (locationData) {
-          const processedLocationData = {
-            ...locationData,
-            section: locationData.section?.sectionId
-              ? { sectionId: String(locationData.section.sectionId) }
-              : locationData.section?.section
-                ? { sectionId: String(locationData.section.section) }
-                : { sectionId: "" },
-            questionOptions: locationData.options
-              ? locationData.options.map((option: any) => option.optionText || option)
-              : locationData.questionOptions || [""]
-          };
-          setQuestionData(processedLocationData);
+        if (questionDataResult) setQuestionData(questionDataResult);
+
+        // Fetch sections
+        let sectionsResult: any[] = [];
+        try {
+          const response = await ReadQuestionSectionDataList();
+          console.log("Fetched sections for edit:", response.data);
+          sectionsResult = response.data;
+        } catch (error) {
+          console.error("Error fetching sections:", error);
         }
+        setSections(sectionsResult);
+
+        // Fetch measured quality types
+        let mqtResult: any[] = [];
+        try {
+          const response = await ReadMeasuredQualityTypes();
+          console.log("Fetched measured quality types:", response.data);
+          mqtResult = response.data;
+        } catch (error) {
+          console.error("Error fetching measured quality types:", error);
+        }
+        setMqt(mqtResult);
+
+        // Fetch games
+        let gamesResult: any[] = [];
+        try {
+          const response = await ListGamesData();
+          gamesResult = response.data;
+        } catch (error) {
+          console.error("Error fetching games:", error);
+          gamesResult = [];
+        }
+        setGames(gamesResult);
+      } finally {
+        setLoading(false);
       }
     };
 
-    const fetchSections = async () => {
-      try {
-        const response = await ReadQuestionSectionData();
-        console.log("Fetched sections for edit:", response.data);
-        setSections(response.data);
-      } catch (error) {
-        console.error("Error fetching sections:", error);
-      }
-    };
-
-    fetchData();
-    fetchSections();
+    fetchAllData();
   }, [id, location.state]);
-
-
-  useEffect(() => {
-    const fetchMeasuredQualityTypes = async () => {
-      try {
-        const response = await ReadMeasuredQualityTypes();
-        console.log("Fetched sections for edit:", response.data);
-        setMqt(response.data);
-      } catch (error) {
-        console.error("Error fetching sections:", error);
-      }
-    };
-    fetchMeasuredQualityTypes();
-  }, []);
-
-  // Fetch games on mount
-  useEffect(() => {
-    const fetchGames = async () => {
-      try {
-        const response = await ListGamesData();
-        setGames(response.data);
-      } catch (error) {
-        console.error("Error fetching games:", error);
-        setGames([]);
-      }
-    };
-    fetchGames();
-  }, []);
 
 
   // ✅ Keep using useFormik but with enhanced initial values
@@ -363,6 +353,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
     },
     // validationSchema: validationSchema,
     onSubmit: async (values) => {
+      console.log("Submitting form with values:", values);
       setLoading(true);
       try {
         // Sort options by sequence before processing
@@ -447,11 +438,11 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
   });
 
   // Debug effect to log formik values
-  useEffect(() => {
-    console.log("Current questionData:", questionData);
-    console.log("Current formik section:", formik.values.section);
-    console.log("Available sections:", sections);
-  }, [questionData, formik.values.section, sections]);
+  // useEffect(() => {
+  //   console.log("Current questionData:", questionData);
+  //   console.log("Current formik section:", formik.values.section);
+  //   console.log("Available sections:", sections);
+  // }, [questionData, formik.values.section, sections]);
 
   if (loading) {
     return (
@@ -515,16 +506,25 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
     }
   };
 
-  const updateOption = (index: number, value: string) => {
+  const updateOption = (sequence: number, value: string) => {
     const currentOptions = [...formik.values.options];
-    currentOptions[index].optionText = value;
-    formik.setFieldValue("options", currentOptions);
+    const optionIndex = currentOptions.findIndex(opt => opt.sequence === sequence);
+    if (optionIndex !== -1) {
+      currentOptions[optionIndex].optionText = value;
+      formik.setFieldValue("options", currentOptions);
+    }
   };
 
-  const updateOptionDescription = (index: number, value: string) => {
+  const updateOptionDescription = (sequence: number, value: string) => {
     const currentOptions = [...formik.values.options];
-    currentOptions[index].optionDescription = value;
-    formik.setFieldValue("options", currentOptions);
+    const optionIndex = currentOptions.findIndex(opt => opt.sequence === sequence);
+    console.log("Updating description for option index:", optionIndex, "with value:", value);
+    if (optionIndex !== -1) {
+          console.log("Before update:", currentOptions[optionIndex]);
+
+      currentOptions[optionIndex].optionDescription = value;
+      formik.setFieldValue("options", currentOptions);
+    }
   };
 
 
@@ -784,7 +784,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                                         type="text"
                                         placeholder={`Enter option ${option.sequence}`}
                                         value={option.optionText}
-                                        onChange={e => updateOption(index, e.target.value)}
+                                        onChange={e => updateOption(option.sequence, e.target.value)}
                                         className={clsx(
                                           "form-control form-control-sm",
                                           {
@@ -796,8 +796,17 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                                     </div>
                                     <textarea
                                       placeholder={`Description (optional)`}
-                                      value={option.optionDescription || ""}
-                                      onChange={e => updateOptionDescription(index, e.target.value)}
+                                      value={option.optionDescription}
+                                      onChange={e => {
+    const currentOptions = [...formik.values.options];
+    const optionIndex = currentOptions.findIndex(opt => opt.sequence === option.sequence);
+    console.log("Updating description for option index:", optionIndex, "with value:", e.target.value);
+    if (optionIndex !== -1) {
+          console.log("Before update:", currentOptions[optionIndex]);
+
+      currentOptions[optionIndex].optionDescription = e.target.value;
+      formik.setFieldValue("options", currentOptions);
+    }}}
                                       className="form-control form-control-sm"
                                       rows={2}
                                       style={{ resize: "vertical" }}

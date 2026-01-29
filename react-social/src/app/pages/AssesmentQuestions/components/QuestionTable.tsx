@@ -43,74 +43,34 @@ const QuestionTable = (props: {
   }, []);
 
   // Load existing selections when component mounts
-  useEffect(() => {
-    const loadExistingSelections = async () => {
-      const newSelections: {[key: number]: any[]} = {};
+  // useEffect(() => {
+  //   const loadExistingSelections = async () => {
+  //     const newSelections: {[key: number]: any[]} = {};
       
-      for (const question of props.data) {
-        try {
-          const response = await GetMeasuredQualityTypesForQuestion(question.id);
-          newSelections[question.id] = response.data.map((type: any) => type.measuredQualityTypeId);
-        } catch (error) {
-          if ((error as any)?.response?.status === 404) {
-            console.log(`Question ${question.id} not found, skipping...`);
-          } else {
-            console.error(`Error loading quality types for question ${question.id}:`, error);
-          }
-          newSelections[question.id] = [];
-        }
-      }
-      
-      setSelectedMeasuredQualityTypesByQuestion(newSelections);
-    };
-    
-    if (props.data && props.data.length > 0) {
-      loadExistingSelections();
-    } else {
-      setSelectedMeasuredQualityTypesByQuestion({});
-    }
-  }, [props.data]);
-
-  // Handle measured quality type selection changes with real-time API calls
-  // const handleMeasuredQualityTypeSelectionChange = async (questionId: number, newValue: any[]) => {
-  //   const currentValue = selectedMeasuredQualityTypesByQuestion[questionId] || [];
-    
-  //   // Find newly selected types
-  //   const newlySelected = newValue.filter(typeId => !currentValue.includes(typeId));
-    
-  //   // Find deselected types
-  //   const deselected = currentValue.filter(typeId => !newValue.includes(typeId));
-    
-  //   try {
-  //     // Assign new types
-  //     for (const typeId of newlySelected) {
-  //       await AssignMeasuredQualityTypeToQuestion(typeId, questionId);
-  //       console.log(`MeasuredQualityType ${typeId} assigned to Question ${questionId}`);
+  //     for (const question of props.data) {
+  //       try {
+  //         const response = await GetMeasuredQualityTypesForQuestion(question.id);
+  //         newSelections[question.id] = response.data.map((type: any) => type.measuredQualityTypeId);
+  //       } catch (error) {
+  //         if ((error as any)?.response?.status === 404) {
+  //           console.log(`Question ${question.id} not found, skipping...`);
+  //         } else {
+  //           console.error(`Error loading quality types for question ${question.id}:`, error);
+  //         }
+  //         newSelections[question.id] = [];
+  //       }
   //     }
       
-  //     // Remove deselected types
-  //     for (const typeId of deselected) {
-  //       await RemoveMeasuredQualityTypeFromQuestion(typeId, questionId);
-  //       console.log(`MeasuredQualityType ${typeId} removed from Question ${questionId}`);
-  //     }
-      
-  //     // Update state only after successful API calls
-  //     setSelectedMeasuredQualityTypesByQuestion(prev => ({
-  //       ...prev,
-  //       [questionId]: newValue
-  //     }));
-      
-  //   } catch (error) {
-  //     console.error('Error updating MeasuredQualityType assignments:', error);
-  //     alert('Failed to update MeasuredQualityType assignments. Please try again.');
-      
-  //     // Revert to previous state on error
-  //     setSelectedMeasuredQualityTypesByQuestion(prev => ({
-  //       ...prev,
-  //       [questionId]: currentValue
-  //     }));
+  //     setSelectedMeasuredQualityTypesByQuestion(newSelections);
+  //   };
+    
+  //   if (props.data && props.data.length > 0) {
+  //     loadExistingSelections();
+  //   } else {
+  //     setSelectedMeasuredQualityTypesByQuestion({});
   //   }
-  // };
+  // }, [props.data]);
+
 
   const filteredData = props.data.filter((item: any) =>
     (item.questionText ?? "")

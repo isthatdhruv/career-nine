@@ -35,7 +35,13 @@ public class QuestionSection implements Serializable {
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "section"})
     private List<AssessmentQuestions> questions;
 
+public QuestionSection() {
+    }
 
+    public QuestionSection(Long sectionId, String sectionName) {
+        this.sectionId = sectionId;
+        this.sectionName = sectionName;
+    }
 
     // Getters and Setters
     public Long getSectionId() {
