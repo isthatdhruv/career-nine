@@ -165,6 +165,8 @@ public ResponseEntity<?> getStudentAnswersWithDetails(
                 studentData.put("phoneNumber", si.getPhoneNumber());
                 studentData.put("email", si.getEmail());
                 studentData.put("instituteId", si.getInstituteId());
+                studentData.put("studentDob", si.getStudentDob());
+                studentData.put("username", si.getUser().getUsername());
 
                 // Find UserStudent for this StudentInfo to get userStudentId
                 try {
@@ -195,6 +197,7 @@ public ResponseEntity<?> getStudentAnswersWithDetails(
 
                 result.add(studentData);
             }
+            
             return result;
         } catch (Exception e) {
             System.out.println("Error in getStudentsWithMappingByInstituteId: " + e.getMessage());

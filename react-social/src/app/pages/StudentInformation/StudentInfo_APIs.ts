@@ -14,6 +14,7 @@ export interface StudentInfo {
     institute_id?: number;
     instituteId?: number;
     assesment_id?: string;
+    studentDob?: string;
 }
 
 export interface Assessment {
@@ -38,6 +39,7 @@ export interface StudentWithMapping {
     instituteId?: number;
     userStudentId: number;
     assessmentId?: number;
+    studentDob?: string;
 }
 
 export interface StudentAnswerDetail {
