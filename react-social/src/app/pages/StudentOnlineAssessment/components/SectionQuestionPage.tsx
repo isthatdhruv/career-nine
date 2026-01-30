@@ -219,6 +219,7 @@ const SectionQuestionPage: React.FC = () => {
     const submissionData = {
       userStudentId: userStudentId,
       assessmentId: assessmentId,
+      status: 'completed',
       answers: answersList
     };
 

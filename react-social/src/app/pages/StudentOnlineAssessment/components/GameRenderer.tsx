@@ -1,7 +1,7 @@
 import React from "react";
-import { HydroTubeGame } from "../../Games/Hydro-Tube/HydroTubeGame";
-import { JungleSpotGame } from "../../Games/Jungle-Spot/JungleSpotGame";
-import { RabbitPathGame } from "../../Games/Rabbit-Path/RabbitPathGame";
+import { HydroTubeGame } from "../../games/Hydro-Tube/HydroTubeGame";
+import { JungleSpotGame } from "../../games/Jungle-Spot/JungleSpotGame";
+import { RabbitPathGame } from "../../games/Rabbit-Path/RabbitPathGame";
 
 interface GameRendererProps {
   gameCode: number;
@@ -28,7 +28,7 @@ export function GameRenderer({ gameCode, userStudentId, playerName, onComplete, 
           onExit={onExit}
         />
       );
-    
+
     case 102:
       return (
         <RabbitPathGame
@@ -38,7 +38,7 @@ export function GameRenderer({ gameCode, userStudentId, playerName, onComplete, 
           onExit={onExit}
         />
       );
-    
+
     case 103:
       return (
         <HydroTubeGame
@@ -48,7 +48,7 @@ export function GameRenderer({ gameCode, userStudentId, playerName, onComplete, 
           onExit={onExit}
         />
       );
-    
+
     default:
       return (
         <div className="min-h-screen bg-red-100 flex items-center justify-center">

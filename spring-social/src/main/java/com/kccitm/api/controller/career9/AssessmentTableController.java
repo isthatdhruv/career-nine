@@ -1,5 +1,6 @@
 package com.kccitm.api.controller.career9;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,7 +16,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.career9.AssessmentTable;
+import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.Questionaire.Questionnaire;
+import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireRepository;
 
@@ -25,6 +28,9 @@ public class AssessmentTableController {
 
     @Autowired
     private AssessmentTableRepository assessmentTableRepository;
+
+    @Autowired
+    private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
 
     @Autowired
     private QuestionnaireRepository questionnaireRepository;
@@ -43,9 +49,36 @@ public class AssessmentTableController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<AssessmentTable> getAssessmentById(@PathVariable Long id) {
+    public ResponseEntity<HashMap<String, Object>> getAssessmentById(@PathVariable Long id) {
         Optional<AssessmentTable> assessment = assessmentTableRepository.findById(id);
-        return assessment.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+        HashMap<String, Object> response = new HashMap<>();
+        if (assessment.isPresent()) {
+            response.put("isActive", assessment.get().getIsActive());
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{assessmentId}/student/{userStudentId}")
+    public ResponseEntity<HashMap<String, Object>> getAssessmentStatusForStudent(
+            @PathVariable Long assessmentId, @PathVariable Long userStudentId) {
+        Optional<AssessmentTable> assessment = assessmentTableRepository.findById(assessmentId);
+        Optional<StudentAssessmentMapping> studentAssessmentMapping = studentAssessmentMappingRepository
+                .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+        HashMap<String, Object> response = new HashMap<>();
+
+        if (assessment.isPresent()) {
+            response.put("isActive", assessment.get().getIsActive());
+        } else {
+            response.put("isActive", false);
+        }
+
+        if (studentAssessmentMapping.isPresent()) {
+            response.put("studentStatus", studentAssessmentMapping.get().getStatus());
+        } else {
+            response.put("studentStatus", null);
+        }
+
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/getby/{id}")

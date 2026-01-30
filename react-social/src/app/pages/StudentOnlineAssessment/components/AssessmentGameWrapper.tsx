@@ -1,6 +1,6 @@
 import React, { useCallback } from "react";
 import { GameRenderer } from "./GameRenderer";
-import { useGameData } from "../../Games/Data-Context/DataContext";
+import { useGameData } from "../../games/Data-Context/DataContext";
 
 interface AssessmentGameWrapperProps {
   gameCode: number;
@@ -17,14 +17,14 @@ export function AssessmentGameWrapper({
   onComplete,
   onExit
 }: AssessmentGameWrapperProps) {
-  
+
   const { saveAnimalReaction, saveRabbitPath, saveHydroTube } = useGameData();
-  
+
   const handleGameComplete = useCallback(async (data: any) => {
     console.log("=== Game Complete Handler Called ===");
     console.log("Received data:", data);
     console.log("Game code:", gameCode);
-    
+
     try {
       // Save to Firestore via DataContext based on game type
       switch (gameCode) {
@@ -42,7 +42,7 @@ export function AssessmentGameWrapper({
           }, userStudentId);
           console.log("✅ Jungle-Spot results saved via DataContext!");
           break;
-          
+
         case 102: // Rabbit-Path
           console.log("Saving Rabbit-Path via DataContext...");
           await saveRabbitPath({
@@ -53,7 +53,7 @@ export function AssessmentGameWrapper({
           }, userStudentId);
           console.log("✅ Rabbit-Path results saved via DataContext!");
           break;
-          
+
         case 103: // Hydro-Tube
           console.log("Saving Hydro-Tube via DataContext...");
           await saveHydroTube({
@@ -67,7 +67,7 @@ export function AssessmentGameWrapper({
           }, userStudentId);
           console.log("✅ Hydro-Tube results saved via DataContext!");
           break;
-          
+
         default:
           console.warn("Unknown game code:", gameCode);
       }
@@ -75,7 +75,7 @@ export function AssessmentGameWrapper({
       console.error("❌ Failed to save game results:", error);
       console.error("Error message:", error?.message);
     }
-    
+
     // Always call onComplete to close the game UI
     onComplete();
   }, [onComplete, userStudentId, gameCode, saveAnimalReaction, saveRabbitPath, saveHydroTube]);

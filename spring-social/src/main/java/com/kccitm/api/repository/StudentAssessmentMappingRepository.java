@@ -11,9 +11,12 @@ import com.kccitm.api.model.career9.UserStudent;
 public interface StudentAssessmentMappingRepository extends JpaRepository<StudentAssessmentMapping, Long> {
 
     List<StudentAssessmentMapping> findByUserStudent(UserStudent userStudentId);
-    
+
     List<StudentAssessmentMapping> findByUserStudentUserStudentId(Long userStudentId);
 
-    Optional<StudentAssessmentMapping> findFirstByUserStudentUserStudentIdAndAssessmentId(Long userStudentId, Long assessmentId);
+    Optional<StudentAssessmentMapping> findFirstByUserStudentUserStudentIdAndAssessmentId(Long userStudentId,
+            Long assessmentId);
+
+    Optional<StudentAssessmentMapping> findByAssessmentId(Long assessmentId);
 
 }

@@ -86,7 +86,12 @@ public class AssessmentAnswerController {
             AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
                     .orElseThrow(() -> new RuntimeException("Assessment not found"));
 
-            // 2. Manage Mapping (Required for AssessmentRawScore)
+            // 2. Extract status if provided
+            String status = submissionData.containsKey("status")
+                    ? (String) submissionData.get("status")
+                    : null;
+
+            // 3. Manage Mapping (Required for AssessmentRawScore)
             StudentAssessmentMapping mapping = studentAssessmentMappingRepository
                     .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
                     .orElseGet(() -> {
@@ -95,6 +100,12 @@ public class AssessmentAnswerController {
                         newMapping.setAssessmentId(assessmentId);
                         return studentAssessmentMappingRepository.save(newMapping);
                     });
+
+            // Update status if provided
+            if (status != null) {
+                mapping.setStatus(status);
+                studentAssessmentMappingRepository.save(mapping);
+            }
 
             List<Map<String, Object>> answers = (List<Map<String, Object>>) submissionData.get("answers");
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAssessment } from "../../StudentLogin/AssessmentContext";
+import axios from "axios";
 
 type Section = {
   sectionId: string | number;
@@ -14,28 +15,55 @@ const SelectSectionPage: React.FC = () => {
   const { assessmentData, loading } = useAssessment();
 
   useEffect(() => {
-    console.log("Assessment Data:", assessmentData);
-    if (assessmentData.isActive === 0) {
-      alert("Assessment is not active.");
-      navigate("/studentLogin");
-    }
-    else if (assessmentData && assessmentData[0]) {
-      try {
-        const questionnaire = assessmentData[0];
-        
-        // Extract sections from assessmentData
-        const sectionsData = questionnaire.sections.map((item: any) => ({
-          sectionId: item.section.sectionId,
-          sectionName: item.section.sectionName,
-          sectionDescription: item.section.sectionDescription || "",
-        }));
-        
-        setSections(sectionsData || []);
-      } catch (error) {
-        console.error("Failed to process sections:", error);
+    const checkStudentStatus = async () => {
+      const assessmentId = localStorage.getItem('assessmentId');
+      const userStudentId = localStorage.getItem('userStudentId');
+
+      if (assessmentId && userStudentId) {
+        try {
+          const response = await axios.get(
+            `${process.env.REACT_APP_API_URL}/assessments/${assessmentId}/student/${userStudentId}`
+          );
+          const { isActive, studentStatus } = response.data;
+
+          // If assessment is not active OR student has already completed it, redirect
+          if (!isActive) {
+            alert("This assessment is not active.");
+            navigate("/student-login");
+            return;
+          }
+
+          if (studentStatus === 'completed') {
+            alert("You have already completed this assessment.");
+            navigate("/student-login");
+            return;
+          }
+        } catch (error) {
+          console.error("Error checking student status:", error);
+        }
       }
-    }
-  }, [assessmentData]);
+
+      // Process assessment data if checks pass
+      if (assessmentData && assessmentData[0]) {
+        try {
+          const questionnaire = assessmentData[0];
+
+          // Extract sections from assessmentData
+          const sectionsData = questionnaire.sections.map((item: any) => ({
+            sectionId: item.section.sectionId,
+            sectionName: item.section.sectionName,
+            sectionDescription: item.section.sectionDescription || "",
+          }));
+
+          setSections(sectionsData || []);
+        } catch (error) {
+          console.error("Failed to process sections:", error);
+        }
+      }
+    };
+
+    checkStudentStatus();
+  }, [assessmentData, navigate]);
 
   const handleSectionClick = (section: Section) => {
     navigate(`/studentAssessment/sections/${section.sectionId}`);
@@ -93,8 +121,8 @@ const SelectSectionPage: React.FC = () => {
                   }}
                   onClick={() => handleSectionClick(section)}
                   onMouseEnter={(e) =>
-                    (e.currentTarget.style.boxShadow =
-                      "0 4px 12px rgba(0,0,0,0.08)")
+                  (e.currentTarget.style.boxShadow =
+                    "0 4px 12px rgba(0,0,0,0.08)")
                   }
                   onMouseLeave={(e) =>
                     (e.currentTarget.style.boxShadow = "none")

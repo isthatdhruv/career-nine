@@ -129,8 +129,8 @@ const StudentLoginPage: React.FC = () => {
         if (response.ok) {
           const data = await response.json();
           console.log('Login successful:', data);
-          localStorage.setItem('assessmentId', data.assessmentId);
           localStorage.setItem('userStudentId', data.userStudentId);
+          localStorage.setItem('allottedAssessments', JSON.stringify(data.assessments));
           // Navigate to the next page
           window.location.href = '/allotted-assessment';
         } else {

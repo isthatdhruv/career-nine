@@ -26,6 +26,9 @@ public class StudentAssessmentMapping implements Serializable {
     @Column(name = "student_assessment_id")
     private Long studentAssessmentId;
 
+    @Column(name = "status")
+    private String status;
+
     // Student Id
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_student_id", referencedColumnName = "user_student_id", nullable = false)
@@ -49,6 +52,14 @@ public class StudentAssessmentMapping implements Serializable {
 
     public void setStudentAssessmentId(Long studentAssessmentId) {
         this.studentAssessmentId = studentAssessmentId;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 
     public UserStudent getUserStudent() {
