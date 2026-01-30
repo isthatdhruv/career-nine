@@ -13,6 +13,7 @@ import { DeleteCollegeData } from "../API/College_APIs";
 import CollegeEditModal from "./CollegeEditModal";
 import CollegeInfoModal from "./CollegeInfoModal";
 import CollegeAssignRoleModal from "../components/CollegeAssignRoleModal";
+import CollegeDetailModal from "../components/CollegeDetailModal";
 
 // Layout reference image (local path)
 const layoutImagePath = "/mnt/data/556d6c4d-1033-4fd7-8d4f-f02d4f436ce2.png";
@@ -62,6 +63,11 @@ const CollegeTable = (props: {
   // Info modal state: typed as ModalData | undefined
   const [infoModalShow, setInfoModalShow] = useState(false);
   const [infoModalData, setInfoModalData] = useState<ModalData | undefined>(
+    undefined
+  );
+
+  const [detailModalShow, setDetailModalShow] = useState(false);
+  const [detailModalData, setDetailModalData] = useState<ModalData | undefined>(
     undefined
   );
 
@@ -217,6 +223,17 @@ const CollegeTable = (props: {
                   Info
                 </Dropdown.Item>
 
+                {/* Add Details */}
+                <Dropdown.Item
+                  onClick={() => {
+                    setDetailModalData(toModalData(data));
+                    setDetailModalShow(true);
+                  }}
+                >
+                  <AiOutlineInfoCircle size={18} className="me-2" />
+                  Add Details
+                </Dropdown.Item>
+
                 {/* Assign Role */}
                 <Dropdown.Item
                   onClick={() => {
@@ -336,6 +353,13 @@ const CollegeTable = (props: {
         show={infoModalShow}
         onHide={() => setInfoModalShow(false)}
         data={infoModalData}
+        setPageLoading={props.setPageLoading}
+      />
+      {/* Detail modal */}
+      <CollegeDetailModal
+        show={detailModalShow}
+        onHide={() => setDetailModalShow(false)}
+        data={detailModalData}
         setPageLoading={props.setPageLoading}
       />
 

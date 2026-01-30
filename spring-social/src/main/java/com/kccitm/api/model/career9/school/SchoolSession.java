@@ -1,5 +1,8 @@
 package com.kccitm.api.model.career9.school;
 
+import java.io.Serializable;
+import java.util.List;
+
 import javax.persistence.CascadeType;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
@@ -11,9 +14,7 @@ import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
-import java.io.Serializable;
-import java.util.Date;
-import java.util.List;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "school_session")
@@ -26,17 +27,15 @@ public class SchoolSession implements Serializable {
 
     private String sessionYear;
 
-    @OneToMany(mappedBy = "schoolSession", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "schoolSession", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private List<SchoolClasses> schoolClasses;
 
-    @ManyToOne
-    @JoinColumn(name = "institute_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JsonIgnore
+    @JoinColumn(name = "institute_id", referencedColumnName = "institute_code", nullable = false)
     private InstituteDetail institute;
 
-    private Date startDate;
-
-    private Date endDate;
-
+    // Getters and Setters
     public Integer getId() {
         return id;
     }
@@ -53,27 +52,24 @@ public class SchoolSession implements Serializable {
         this.sessionYear = sessionYear;
     }
 
-    public Date getStartDate() {
-        return startDate;
-    }
-
-    public void setStartDate(Date startDate) {
-        this.startDate = startDate;
-    }
-
-    public Date getEndDate() {
-        return endDate;
-    }
-
-    public void setEndDate(Date endDate) {
-        this.endDate = endDate;
-    }
-
     public List<SchoolClasses> getSchoolClasses() {
         return schoolClasses;
     }
 
     public void setSchoolClasses(List<SchoolClasses> schoolClasses) {
         this.schoolClasses = schoolClasses;
+    }
+
+    public InstituteDetail getInstitute() {
+        return institute;
+    }
+
+    public void setInstitute(InstituteDetail institute) {
+        this.institute = institute;
+    }
+
+    // Helper method to get instituteCode (optional, for convenience)
+    public Integer getInstituteCode() {
+        return institute != null ? institute.getInstituteCode() : null;
     }
 }

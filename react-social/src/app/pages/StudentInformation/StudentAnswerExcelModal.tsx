@@ -16,6 +16,63 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
   const [answers, setAnswers] = useState<StudentAnswerDetail[]>([]);
   const [error, setError] = useState<string>("");
 
+  const normalizeAnswers = (data: any): StudentAnswerDetail[] => {
+    const rawList = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.data)
+        ? data.data
+        : data && typeof data === "object"
+          ? Object.values(data)
+          : [];
+
+    return rawList
+      .map((item: any) => {
+        const questionText =
+          item.questionText?.questionText ??
+          item.questionText?.text ??
+          item.question?.questionText ??
+          item.question?.text ??
+          item.questionText ??
+          item.questiontext ??
+          item.question_text;
+
+        const optionText =
+          item.optionText?.optionText ??
+          item.optionText?.text ??
+          item.option?.optionText ??
+          item.option?.text ??
+          item.optionText ??
+          item.optiontext ??
+          item.option_text;
+
+        const sectionName =
+          item.sectionName?.sectionName ??
+          item.sectionName?.text ??
+          item.section?.sectionName ??
+          item.section?.name ??
+          item.sectionName ??
+          item.sectionname ??
+          item.section_name;
+
+        const excelQuestionHeader =
+          item.excelQuestionHeader?.excelQuestionHeader ??
+          item.excelQuestionHeader?.text ??
+          item.excelQuestionHeader ??
+          item.excelquestionheader ??
+          item.excel_question_header;
+
+        return {
+          questionId: item.questionId ?? item.questionid ?? item.question_id,
+          questionText,
+          optionId: item.optionId ?? item.optionid ?? item.option_id,
+          optionText,
+          sectionName,
+          excelQuestionHeader,
+        };
+      })
+      .filter((item) => item.questionText || item.optionText || item.sectionName || item.excelQuestionHeader);
+  };
+
   useEffect(() => {
     const fetchStudentAnswers = async () => {
       if (!show || !student.selectedAssessment) return;
@@ -34,7 +91,9 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
         );
         
         console.log("API Response:", response);
-        setAnswers(response.data);
+        const normalized = normalizeAnswers(response.data);
+        console.log("Normalized answers count:", normalized.length);
+        setAnswers(normalized);
       } catch (err: any) {
         console.error("Error fetching answers:", err);
         console.error("Error details:", err.response?.data);
@@ -53,6 +112,8 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
       // Prepare data for Excel
       const excelData = answers.map((answer, index) => ({
         "S.No": index + 1,
+        "Section": answer.sectionName || "",
+        "Excel Header": answer.excelQuestionHeader || "",
         "Question": answer.questionText,
         "Selected Answer": answer.optionText
       }));
@@ -63,6 +124,8 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
       // Set column widths
       worksheet['!cols'] = [
         { wch: 8 },   // S.No
+        { wch: 25 },  // Section
+        { wch: 30 },  // Excel Header
         { wch: 60 },  // Question
         { wch: 30 }   // Selected Answer
       ];
@@ -155,8 +218,8 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
                         <div className="d-flex align-items-center gap-2">
                           <i className="bi bi-hash" style={{ color: '#4361ee' }}></i>
                           <div>
-                            <small className="text-muted d-block">Student ID</small>
-                            <strong style={{ color: '#1a1a2e', fontSize: '0.9rem' }}>#{student.id}</strong>
+                            <small className="text-muted d-block">User ID</small>
+                            <strong style={{ color: '#1a1a2e', fontSize: '0.9rem' }}>#{student.userStudentId}</strong>
                           </div>
                         </div>
                       </div>
@@ -209,6 +272,8 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
                       <thead style={{ background: '#f8f9fa', position: 'sticky', top: 0, zIndex: 1 }}>
                         <tr>
                           <th style={{ padding: '12px 16px', fontWeight: 600, color: '#1a1a2e', width: '60px' }}>S.No</th>
+                          <th style={{ padding: '12px 16px', fontWeight: 600, color: '#1a1a2e', width: '200px' }}>Section</th>
+                          <th style={{ padding: '12px 16px', fontWeight: 600, color: '#1a1a2e', width: '220px' }}>Excel Header</th>
                           <th style={{ padding: '12px 16px', fontWeight: 600, color: '#1a1a2e' }}>Question Text</th>
                           <th style={{ padding: '12px 16px', fontWeight: 600, color: '#1a1a2e', width: '250px' }}>Selected Answer</th>
                         </tr>
@@ -220,6 +285,14 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
                               <span className="badge bg-light text-dark" style={{ fontSize: '0.85rem' }}>
                                 {index + 1}
                               </span>
+                            </td>
+                            <td style={{ padding: '12px 16px', color: '#333' }}>
+                              <span className="badge bg-light text-dark" style={{ fontSize: '0.85rem' }}>
+                                {answer.sectionName || 'N/A'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px 16px', color: '#333' }}>
+                              {answer.excelQuestionHeader || 'N/A'}
                             </td>
                             <td style={{ padding: '12px 16px', color: '#333' }}>
                               {answer.questionText}

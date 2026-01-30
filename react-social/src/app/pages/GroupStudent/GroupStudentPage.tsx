@@ -21,6 +21,7 @@ export default function Users() {
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
+  const [selectedStudents, setSelectedStudents] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     ReadCollegeData()
@@ -100,6 +101,26 @@ export default function Users() {
     return `${day}-${month}-${year}`;
   };
 
+  const handleCheckboxChange = (userStudentId: number) => {
+    setSelectedStudents(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(userStudentId)) {
+        newSet.delete(userStudentId);
+      } else {
+        newSet.add(userStudentId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedStudents.size === filteredStudents.length) {
+      setSelectedStudents(new Set());
+    } else {
+      setSelectedStudents(new Set(filteredStudents.map(s => s.userStudentId)));
+    }
+  };
+
   return (
     <div className="min-vh-100" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%)', padding: '2rem' }}>
       <style>{`
@@ -123,6 +144,13 @@ export default function Users() {
 
         .form-select-custom:hover {
           border-color: #4361ee;
+        }
+
+        .custom-checkbox {
+          width: 20px;
+          height: 20px;
+          cursor: pointer;
+          accent-color: #4361ee;
         }
       `}</style>
 
@@ -208,6 +236,7 @@ export default function Users() {
                         setSelectedInstitute("");
                         setStudents([]);
                         setQuery("");
+                        setSelectedStudents(new Set());
                       }}
                       style={{ borderRadius: '8px', padding: '4px 12px' }}
                     >
@@ -253,6 +282,11 @@ export default function Users() {
                   <span className="badge bg-primary px-3 py-2" style={{ borderRadius: '20px', fontSize: '0.9rem' }}>
                     {filteredStudents.length} Students
                   </span>
+                  {selectedStudents.size > 0 && (
+                    <span className="badge bg-success px-3 py-2" style={{ borderRadius: '20px', fontSize: '0.9rem' }}>
+                      {selectedStudents.size} Selected
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -292,6 +326,14 @@ export default function Users() {
                   <table className="table align-middle mb-0">
                     <thead>
                       <tr style={{ background: '#f8f9fa' }}>
+                        <th style={{ padding: '16px 24px', fontWeight: 600, color: '#1a1a2e', borderBottom: '2px solid #e0e0e0', width: '60px' }}>
+                          <input
+                            type="checkbox"
+                            className="custom-checkbox"
+                            checked={selectedStudents.size === filteredStudents.length && filteredStudents.length > 0}
+                            onChange={handleSelectAll}
+                          />
+                        </th>
                         <th style={{ padding: '16px 24px', fontWeight: 600, color: '#1a1a2e', borderBottom: '2px solid #e0e0e0' }}>
                           User ID
                         </th>
@@ -324,6 +366,14 @@ export default function Users() {
                             transition: 'background 0.2s'
                           }}
                         >
+                          <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
+                            <input
+                              type="checkbox"
+                              className="custom-checkbox"
+                              checked={selectedStudents.has(student.userStudentId)}
+                              onChange={() => handleCheckboxChange(student.userStudentId)}
+                            />
+                          </td>
                           <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
                             <span 
                               className="badge"
@@ -414,4 +464,4 @@ export default function Users() {
       )}
     </div>
   );
-}
+} 

@@ -1,12 +1,13 @@
 package com.kccitm.api.controller;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,9 +17,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.User;
+import com.kccitm.api.model.career9.Questionaire.AssessmentAnswer;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
+import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
 import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
@@ -39,7 +42,7 @@ public class StudentInfoController {
     @Autowired
     private InstituteDetailRepository instituteDetailRepository;
     @Autowired
-    private NamedParameterJdbcTemplate jdbcTemplate;
+    private AssessmentAnswerRepository assessmentAnswerRepository;
 
     @GetMapping("/getAll")
     public List<StudentInfo> getAllStudentInfo() {
@@ -47,57 +50,99 @@ public class StudentInfoController {
     }
 
 @GetMapping("/getStudentAnswersWithDetails")
-public ResponseEntity<?> getStudentAnswersWithDetails(
-        @RequestParam Integer userStudentId,
-        @RequestParam Integer assessmentId) {
-    
-    System.out.println("=== DEBUG INFO ===");
-    System.out.println("Received request - userStudentId: " + userStudentId + ", assessmentId: " + assessmentId);
-    
-    try {
-        // First, let's check if there are any answers for this user_student_id
-        String debugQuery = "SELECT COUNT(*) as count FROM assessment_answer WHERE user_student_id = :userStudentId";
-        List<Map<String, Object>> debugResults = jdbcTemplate.queryForList(debugQuery,
-                Map.of("userStudentId", userStudentId));
-        System.out.println("Total answers for user_student_id " + userStudentId + ": " + debugResults.get(0).get("count"));
+    public ResponseEntity<?> getStudentAnswersWithDetails(
+            @RequestParam Long userStudentId,
+            @RequestParam Long assessmentId) {
         
-        // Check for this specific assessment
-        String debugQuery2 = "SELECT COUNT(*) as count FROM assessment_answer WHERE user_student_id = :userStudentId AND assessment_id = :assessmentId";
-        List<Map<String, Object>> debugResults2 = jdbcTemplate.queryForList(debugQuery2,
-                Map.of("userStudentId", userStudentId, "assessmentId", assessmentId));
-        System.out.println("Answers for user_student_id " + userStudentId + " and assessment " + assessmentId + ": " + debugResults2.get(0).get("count"));
+        System.out.println("=== DEBUG INFO ===");
+        System.out.println("Received request - userStudentId: " + userStudentId + ", assessmentId: " + assessmentId);
         
-        // Main query to get answers with question and option details
-        String query = "SELECT aq.question_id as questionId, " +
-                      "aq.question_text as questionText, " +
-                      "aqo.option_id as optionId, " +
-                      "aqo.option_text as optionText " +
-                      "FROM assessment_answer aa " +
-                      "INNER JOIN assessment_questions aq ON aa.questionnaire_question_id = aq.question_id " +
-                      "INNER JOIN assessment_question_options aqo ON aa.option_id = aqo.option_id " +
-                      "WHERE aa.user_student_id = :userStudentId " +
-                      "AND aa.assessment_id = :assessmentId " +
-                      "ORDER BY aq.question_id";
-        
-        List<Map<String, Object>> results = jdbcTemplate.queryForList(query,
-                Map.of("userStudentId", userStudentId, "assessmentId", assessmentId));
-        
-        System.out.println("Final query results count: " + results.size());
-        if (results.size() > 0) {
-            System.out.println("First result: " + results.get(0));
-        }
-        System.out.println("=================");
-        
-        return ResponseEntity.ok(results);
-        
-    } catch (Exception e) {
-        System.err.println("Error: " + e.getMessage());
-        e.printStackTrace();
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "Error fetching student answers: " + e.getMessage()));
-    }
-}
+        try {
+            // Check if there are any answers for this user_student_id
+            Long totalAnswers = assessmentAnswerRepository.countByUserStudent_UserStudentId(userStudentId);
+            System.out.println("Total answers for user_student_id " + userStudentId + ": " + totalAnswers);
+            
+            // Check for this specific assessment
+            Long assessmentAnswers = assessmentAnswerRepository
+                    .countByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
+            System.out.println("Answers for user_student_id " + userStudentId + " and assessment " + 
+                    assessmentId + ": " + assessmentAnswers);
+            
+            // Get answers with question and option details using JOIN FETCH
+            List<AssessmentAnswer> answers = assessmentAnswerRepository
+                    .findByUserStudentIdAndAssessmentIdWithDetails(userStudentId, assessmentId);
+            
+            // Convert to Map format (similar to JDBC result)
+            List<Map<String, Object>> results = new ArrayList<>();
+            
+            for (AssessmentAnswer answer : answers) {
+                Map<String, Object> resultMap = new HashMap<>();
+                
+                // Add question details from QuestionnaireQuestion
+                if (answer.getQuestionnaireQuestion() != null) {
+                    resultMap.put("questionId", answer.getQuestionnaireQuestion().getQuestionnaireQuestionId());
 
+                    if (answer.getQuestionnaireQuestion().getQuestion() != null) {
+                        resultMap.put("questionText",
+                                answer.getQuestionnaireQuestion().getQuestion().getQuestionText());
+                    } else {
+                        resultMap.put("questionText", null);
+                    }
+
+                    String excelHeader = answer.getQuestionnaireQuestion().getExcelQuestionHeader();
+                    if (excelHeader == null || excelHeader.trim().isEmpty()) {
+                        excelHeader = (answer.getQuestionnaireQuestion().getQuestion() != null)
+                                ? answer.getQuestionnaireQuestion().getQuestion().getQuestionText()
+                                : null;
+                    }
+                    resultMap.put("excelQuestionHeader", excelHeader);
+
+                    if (answer.getQuestionnaireQuestion().getSection() != null
+                            && answer.getQuestionnaireQuestion().getSection().getSection() != null) {
+                        resultMap.put("sectionName",
+                                answer.getQuestionnaireQuestion().getSection().getSection().getSectionName());
+                    } else {
+                        resultMap.put("sectionName", null);
+                    }
+                } else {
+                    resultMap.put("questionId", null);
+                    resultMap.put("questionText", null);
+                    resultMap.put("excelQuestionHeader", null);
+                    resultMap.put("sectionName", null);
+                }
+                
+                // Add option details from AssessmentQuestionOptions
+                if (answer.getOption() != null) {
+                    resultMap.put("optionId", answer.getOption().getOptionId());
+                    resultMap.put("optionText", answer.getOption().getOptionText());
+                } else {
+                    resultMap.put("optionId", null);
+                    resultMap.put("optionText", null);
+                }
+                
+                results.add(resultMap);
+            }
+            
+            System.out.println("Final query results count: " + results.size());
+            if (results.size() > 0) {
+                System.out.println("First result: " + results.get(0));
+            }
+            System.out.println("=================");
+            
+            return ResponseEntity.ok(results);
+            
+        } catch (Exception e) {
+            System.err.println("Error: " + e.getMessage());
+            e.printStackTrace();
+            
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Error fetching student answers: " + e.getMessage());
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(errorResponse);
+        }
+    }
+    
     @PostMapping("/add")
     public StudentAssessmentMapping addStudentInfo(@RequestBody StudentInfo studentInfo) {
         try {
