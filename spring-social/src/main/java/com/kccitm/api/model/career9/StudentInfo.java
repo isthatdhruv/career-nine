@@ -13,7 +13,6 @@ import javax.persistence.JoinColumn;
 import javax.persistence.OneToOne;
 import javax.persistence.Table;
 import javax.persistence.Transient;
-import javax.persistence.criteria.CriteriaBuilder.In;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -38,6 +37,10 @@ public class StudentInfo implements Serializable {
     private String email;
 
     private String address;
+
+    private String gender;
+
+    private Integer sibling;
 
     @Column(name = "institute_id")
     private Integer instituteId;
@@ -131,6 +134,22 @@ public class StudentInfo implements Serializable {
 
     public void setAssesment_id(String assesment_id) {
         this.assesment_id = assesment_id;
+    }
+
+    public String getGender() {
+        return gender;
+    }
+
+    public void setGender(String gender) {
+        this.gender = gender;
+    }
+
+    public Integer getSibling() {
+        return sibling;
+    }
+
+    public void setSibling(Integer sibling) {
+        this.sibling = sibling;
     }
 
 }
