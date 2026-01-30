@@ -82,11 +82,15 @@ export function bulkAlotAssessment(assignments: BulkAssessmentAssignment[]) {
     return axios.post(`${STUDENT_INFO_BASE}/bulkAlotAssessment`, assignments);
 }
 
+export function bulkRemoveAssessment(removals: BulkAssessmentAssignment[]) {
+    return axios.post(`${STUDENT_INFO_BASE}/bulkRemoveAssessment`, removals);
+}
+
 // New API to get student answers with question and option details
 export function getStudentAnswersWithDetails(userStudentId: number, assessmentId: number) {
     console.log("API Call - Endpoint:", `${STUDENT_INFO_BASE}/getStudentAnswersWithDetails`);
     console.log("API Call - Params:", { userStudentId, assessmentId });
-    
+
     return axios.get<StudentAnswerDetail[]>(`${STUDENT_INFO_BASE}/getStudentAnswersWithDetails`, {
         params: {
             userStudentId,

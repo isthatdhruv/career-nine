@@ -10,6 +10,7 @@ export type Student = {
   schoolRollNumber: string;
   selectedAssessment: string;
   userStudentId: number;
+  assignedAssessmentIds: number[];
 };
 
 export default function StudentsList() {
@@ -20,14 +21,14 @@ export default function StudentsList() {
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
   const [hasChanges, setHasChanges] = useState(false);
-  
+
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
   useEffect(() => {
     const instituteId = localStorage.getItem('instituteId');
-    
+
     // Fetch assessments
     getAllAssessments()
       .then(response => {
@@ -41,13 +42,20 @@ export default function StudentsList() {
       setLoading(true);
       getStudentsWithMappingByInstituteId(Number(instituteId))
         .then(response => {
-          const studentData = response.data.map((student: any) => ({
-            id: student.id,
-            name: student.name || "",
-            schoolRollNumber: student.schoolRollNumber || "",
-            selectedAssessment: student.assessmentId ? String(student.assessmentId) : "",
-            userStudentId: student.userStudentId,
-          }));
+          const studentData = response.data.map((student: any) => {
+            // Ensure assignedAssessmentIds is always an array
+            const assignedIds = Array.isArray(student.assignedAssessmentIds)
+              ? student.assignedAssessmentIds
+              : [];
+            return {
+              id: student.id,
+              name: student.name || "",
+              schoolRollNumber: student.schoolRollNumber || "",
+              selectedAssessment: "",
+              userStudentId: student.userStudentId,
+              assignedAssessmentIds: assignedIds,
+            };
+          });
           console.log("Loaded students:", studentData); // Debug log
           setStudents(studentData);
         })
@@ -60,33 +68,54 @@ export default function StudentsList() {
     }
   }, []);
 
-  const handleAssessmentChange = (studentId: number, assessment: string) => {
-    setStudents(prev => 
-      prev.map(s => 
-        s.id === studentId ? { ...s, selectedAssessment: assessment } : s
+  const handleAssessmentChange = (studentId: number, assessmentId: string) => {
+    setStudents(prev =>
+      prev.map(s =>
+        s.id === studentId ? { ...s, selectedAssessment: assessmentId } : s
       )
     );
     setHasChanges(true);
   };
 
   const handleSave = async () => {
+    // Collect all new assignments
     const assignments = students
-      .filter(s => s.selectedAssessment)
+      .filter(s => s.selectedAssessment && !s.assignedAssessmentIds.includes(Number(s.selectedAssessment)))
       .map(s => ({
         userStudentId: s.userStudentId,
         assessmentId: Number(s.selectedAssessment),
       }));
 
     if (assignments.length === 0) {
-      alert("No assessments selected to save.");
+      alert("No new assessments to save.");
       return;
     }
 
     setSaving(true);
     try {
       await bulkAlotAssessment(assignments);
-      alert("Assessments saved successfully!");
+      alert(`${assignments.length} assessment(s) saved successfully!`);
       setHasChanges(false);
+
+      // Refresh data
+      const instituteId = localStorage.getItem('instituteId');
+      if (instituteId) {
+        const response = await getStudentsWithMappingByInstituteId(Number(instituteId));
+        const studentData = response.data.map((student: any) => {
+          const assignedIds = Array.isArray(student.assignedAssessmentIds)
+            ? student.assignedAssessmentIds
+            : [];
+          return {
+            id: student.id,
+            name: student.name || "",
+            schoolRollNumber: student.schoolRollNumber || "",
+            selectedAssessment: "",
+            userStudentId: student.userStudentId,
+            assignedAssessmentIds: assignedIds,
+          };
+        });
+        setStudents(studentData);
+      }
     } catch (error) {
       console.error("Error saving assessments:", error);
       alert("Failed to save assessments. Please try again.");
@@ -197,12 +226,12 @@ export default function StudentsList() {
             </div>
           ) : filteredStudents.length === 0 ? (
             <div className="text-center py-5">
-              <div 
+              <div
                 className="mx-auto mb-3"
-                style={{ 
-                  width: '80px', 
-                  height: '80px', 
-                  borderRadius: '50%', 
+                style={{
+                  width: '80px',
+                  height: '80px',
+                  borderRadius: '50%',
                   background: '#f0f0f0',
                   display: 'flex',
                   alignItems: 'center',
@@ -238,18 +267,18 @@ export default function StudentsList() {
                 </thead>
                 <tbody>
                   {filteredStudents.map((student, index) => (
-                    <tr 
+                    <tr
                       key={student.userStudentId}
-                      style={{ 
+                      style={{
                         background: index % 2 === 0 ? '#fff' : '#fafbfc',
                         transition: 'background 0.2s'
                       }}
                     >
                       <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
-                        <span 
+                        <span
                           className="badge"
-                          style={{ 
-                            background: 'rgba(67, 97, 238, 0.1)', 
+                          style={{
+                            background: 'rgba(67, 97, 238, 0.1)',
                             color: '#4361ee',
                             padding: '6px 12px',
                             borderRadius: '8px',
@@ -262,7 +291,7 @@ export default function StudentsList() {
                       </td>
                       <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
                         <div className="d-flex align-items-center gap-3">
-                          <div 
+                          <div
                             style={{
                               width: '42px',
                               height: '42px',
@@ -288,24 +317,34 @@ export default function StudentsList() {
                       </td>
                       <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
                         <select
-                          className="form-select"
                           value={student.selectedAssessment}
                           onChange={(e) => handleAssessmentChange(student.id, e.target.value)}
                           style={{
+                            width: '100%',
+                            minWidth: '200px',
+                            padding: '10px 12px',
                             borderRadius: '8px',
                             border: '2px solid #e0e0e0',
-                            padding: '8px 12px',
-                            fontWeight: 500,
+                            background: student.selectedAssessment ? 'rgba(67, 97, 238, 0.05)' : '#fff',
                             cursor: 'pointer',
-                            background: student.selectedAssessment ? 'rgba(67, 97, 238, 0.05)' : '#fff'
+                            fontWeight: 500,
+                            fontSize: '0.9rem',
                           }}
                         >
                           <option value="">-- Select Assessment --</option>
-                          {assessments.map((assessment) => (
-                            <option key={assessment.id} value={assessment.id}>
-                              {assessment.assessmentName}
-                            </option>
-                          ))}
+                          {assessments.map((assessment) => {
+                            const isAlreadyAssigned = student.assignedAssessmentIds.includes(assessment.id);
+                            return (
+                              <option
+                                key={assessment.id}
+                                value={assessment.id}
+                                disabled={isAlreadyAssigned}
+                                style={{ color: isAlreadyAssigned ? '#999' : '#333' }}
+                              >
+                                {assessment.assessmentName}{isAlreadyAssigned ? ' (Assigned)' : ''}
+                              </option>
+                            );
+                          })}
                         </select>
                       </td>
 
@@ -334,7 +373,7 @@ export default function StudentsList() {
 
         {/* Save Button Footer */}
         {!loading && filteredStudents.length > 0 && (
-          <div 
+          <div
             className="card-footer bg-white border-top p-4"
             style={{ borderRadius: '0 0 16px 16px' }}
           >
@@ -349,7 +388,7 @@ export default function StudentsList() {
                 disabled={!hasChanges || saving}
                 style={{
                   background: (hasChanges && !saving)
-                    ? 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)' 
+                    ? 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)'
                     : '#e0e0e0',
                   color: (hasChanges && !saving) ? '#fff' : '#9e9e9e',
                   border: 'none',

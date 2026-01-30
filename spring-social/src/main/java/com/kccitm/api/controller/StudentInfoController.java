@@ -46,57 +46,59 @@ public class StudentInfoController {
         return studentInfoRepository.findAll();
     }
 
-@GetMapping("/getStudentAnswersWithDetails")
-public ResponseEntity<?> getStudentAnswersWithDetails(
-        @RequestParam Long userStudentId,
-        @RequestParam Long assessmentId) {
-    
-    System.out.println("=== DEBUG INFO ===");
-    System.out.println("Received request - userStudentId: " + userStudentId + ", assessmentId: " + assessmentId);
-    
-    try {
-        // First, let's check if there are any answers for this user_student_id
-        String debugQuery = "SELECT COUNT(*) as count FROM assessment_answer WHERE user_student_id = :userStudentId";
-        List<Map<String, Object>> debugResults = jdbcTemplate.queryForList(debugQuery,
-                Map.of("userStudentId", userStudentId));
-        System.out.println("Total answers for user_student_id " + userStudentId + ": " + debugResults.get(0).get("count"));
-        
-        // Check for this specific assessment
-        String debugQuery2 = "SELECT COUNT(*) as count FROM assessment_answer WHERE user_student_id = :userStudentId AND assessment_id = :assessmentId";
-        List<Map<String, Object>> debugResults2 = jdbcTemplate.queryForList(debugQuery2,
-                Map.of("userStudentId", userStudentId, "assessmentId", assessmentId));
-        System.out.println("Answers for user_student_id " + userStudentId + " and assessment " + assessmentId + ": " + debugResults2.get(0).get("count"));
-        
-        // Main query to get answers with question and option details
-        String query = "SELECT aq.question_id as questionId, " +
-                      "aq.question_text as questionText, " +
-                      "aqo.option_id as optionId, " +
-                      "aqo.option_text as optionText " +
-                      "FROM assessment_answer aa " +
-                      "INNER JOIN assessment_questions aq ON aa.questionnaire_question_id = aq.question_id " +
-                      "INNER JOIN assessment_question_options aqo ON aa.option_id = aqo.option_id " +
-                      "WHERE aa.user_student_id = :userStudentId " +
-                      "AND aa.assessment_id = :assessmentId " +
-                      "ORDER BY aq.question_id";
-        
-        List<Map<String, Object>> results = jdbcTemplate.queryForList(query,
-                Map.of("userStudentId", userStudentId, "assessmentId", assessmentId));
-        
-        System.out.println("Final query results count: " + results.size());
-        if (results.size() > 0) {
-            System.out.println("First result: " + results.get(0));
+    @GetMapping("/getStudentAnswersWithDetails")
+    public ResponseEntity<?> getStudentAnswersWithDetails(
+            @RequestParam Long userStudentId,
+            @RequestParam Long assessmentId) {
+
+        System.out.println("=== DEBUG INFO ===");
+        System.out.println("Received request - userStudentId: " + userStudentId + ", assessmentId: " + assessmentId);
+
+        try {
+            // First, let's check if there are any answers for this user_student_id
+            String debugQuery = "SELECT COUNT(*) as count FROM assessment_answer WHERE user_student_id = :userStudentId";
+            List<Map<String, Object>> debugResults = jdbcTemplate.queryForList(debugQuery,
+                    Map.of("userStudentId", userStudentId));
+            System.out.println(
+                    "Total answers for user_student_id " + userStudentId + ": " + debugResults.get(0).get("count"));
+
+            // Check for this specific assessment
+            String debugQuery2 = "SELECT COUNT(*) as count FROM assessment_answer WHERE user_student_id = :userStudentId AND assessment_id = :assessmentId";
+            List<Map<String, Object>> debugResults2 = jdbcTemplate.queryForList(debugQuery2,
+                    Map.of("userStudentId", userStudentId, "assessmentId", assessmentId));
+            System.out.println("Answers for user_student_id " + userStudentId + " and assessment " + assessmentId + ": "
+                    + debugResults2.get(0).get("count"));
+
+            // Main query to get answers with question and option details
+            String query = "SELECT aq.question_id as questionId, " +
+                    "aq.question_text as questionText, " +
+                    "aqo.option_id as optionId, " +
+                    "aqo.option_text as optionText " +
+                    "FROM assessment_answer aa " +
+                    "INNER JOIN assessment_questions aq ON aa.questionnaire_question_id = aq.question_id " +
+                    "INNER JOIN assessment_question_options aqo ON aa.option_id = aqo.option_id " +
+                    "WHERE aa.user_student_id = :userStudentId " +
+                    "AND aa.assessment_id = :assessmentId " +
+                    "ORDER BY aq.question_id";
+
+            List<Map<String, Object>> results = jdbcTemplate.queryForList(query,
+                    Map.of("userStudentId", userStudentId, "assessmentId", assessmentId));
+
+            System.out.println("Final query results count: " + results.size());
+            if (results.size() > 0) {
+                System.out.println("First result: " + results.get(0));
+            }
+            System.out.println("=================");
+
+            return ResponseEntity.ok(results);
+
+        } catch (Exception e) {
+            System.err.println("Error: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error fetching student answers: " + e.getMessage()));
         }
-        System.out.println("=================");
-        
-        return ResponseEntity.ok(results);
-        
-    } catch (Exception e) {
-        System.err.println("Error: " + e.getMessage());
-        e.printStackTrace();
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "Error fetching student answers: " + e.getMessage()));
     }
-}
 
     @PostMapping("/add")
     public StudentAssessmentMapping addStudentInfo(@RequestBody StudentInfo studentInfo) {
@@ -138,8 +140,17 @@ public ResponseEntity<?> getStudentAnswersWithDetails(
             Long userStudentId = assignment.get("userStudentId");
             Long assessmentId = assignment.get("assessmentId");
             if (userStudentId != null && assessmentId != null) {
-                StudentAssessmentMapping mapping = new StudentAssessmentMapping(userStudentId, assessmentId);
-                savedMappings.add(studentAssessmentMappingRepository.save(mapping));
+                // Check if mapping already exists
+                java.util.Optional<StudentAssessmentMapping> existingMapping = studentAssessmentMappingRepository
+                        .findFirstByUserStudentUserStudentIdAndAssessmentId(
+                                userStudentId, assessmentId);
+
+                if (existingMapping.isEmpty()) {
+                    // Only create new mapping if it doesn't exist
+                    StudentAssessmentMapping mapping = new StudentAssessmentMapping(userStudentId, assessmentId);
+                    savedMappings.add(studentAssessmentMappingRepository.save(mapping));
+                }
+                // If mapping exists, skip (don't create duplicate)
             }
         }
         return savedMappings;
@@ -175,11 +186,19 @@ public ResponseEntity<?> getStudentAnswersWithDetails(
                         UserStudent us = userStudentList.get(0); // Take the first one if multiple exist
                         studentData.put("userStudentId", us.getUserStudentId());
 
-                        // Get current assessment mapping if exists - use userStudentId directly
+                        // Get ALL assessment mappings for this student
                         List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
                                 .findByUserStudentUserStudentId(us.getUserStudentId());
+
+                        // Return all assigned assessment IDs
+                        List<Long> assignedAssessmentIds = new java.util.ArrayList<>();
+                        for (StudentAssessmentMapping mapping : mappings) {
+                            assignedAssessmentIds.add(mapping.getAssessmentId());
+                        }
+                        studentData.put("assignedAssessmentIds", assignedAssessmentIds);
+
+                        // Also keep the latest for backward compatibility
                         if (!mappings.isEmpty()) {
-                            // Get the latest mapping (last one)
                             StudentAssessmentMapping latestMapping = mappings.get(mappings.size() - 1);
                             studentData.put("assessmentId", latestMapping.getAssessmentId());
                         } else {
@@ -188,16 +207,18 @@ public ResponseEntity<?> getStudentAnswersWithDetails(
                     } else {
                         studentData.put("userStudentId", null);
                         studentData.put("assessmentId", null);
+                        studentData.put("assignedAssessmentIds", new java.util.ArrayList<>());
                     }
                 } catch (Exception e) {
                     System.out.println("Error finding mapping for student " + si.getId() + ": " + e.getMessage());
                     studentData.put("userStudentId", null);
                     studentData.put("assessmentId", null);
+                    studentData.put("assignedAssessmentIds", new java.util.ArrayList<>());
                 }
 
                 result.add(studentData);
             }
-            
+
             return result;
         } catch (Exception e) {
             System.out.println("Error in getStudentsWithMappingByInstituteId: " + e.getMessage());

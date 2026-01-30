@@ -19,8 +19,8 @@ type Pattern = {
 
 const patterns: Pattern[] = [
   {
-    id: 0,
-    name: "Pattern A",
+    id: 2,
+    name: "Pattern C",
     tileTypes: {
       1: "t-pipe", 2: "bend", 3: "bend", 4: "straight",
       5: "straight", 6: "bend", 7: "straight", 8: "bend",
@@ -46,8 +46,8 @@ const patterns: Pattern[] = [
     ],
   },
   {
-    id: 2,
-    name: "Pattern C",
+    id: 0,
+    name: "Pattern A",
     tileTypes: {
       1: "t-pipe", 2: "bend", 3: "straight", 4: "bend",
       5: "straight", 6: "bend", 7: "t-pipe", 8: "straight",
@@ -780,10 +780,26 @@ export function HydroTubeGame({ userStudentId, playerName, onComplete, onExit }:
             <path d="M 54 72 Q 54 82 60 92 Q 60 98 60 105" stroke="#bae6fd" strokeWidth="16" fill="none" strokeLinecap="round" />
             <path d="M 56 72 Q 56 82 60 92 Q 60 98 60 105" stroke="#e0f2fe" strokeWidth="12" fill="none" strokeLinecap="round" />
             <ellipse cx="60" cy="105" rx="10" ry="6" fill="#bae6fd" stroke="#93c5fd" strokeWidth="2" />
-            <circle cx="60" cy="115" r="5" fill="#60a5fa" opacity="0.8">
-              <animate attributeName="cy" values="115;125;135;145" dur="1.2s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.8;0.6;0.4;0.2" dur="1.2s" repeatCount="indefinite" />
-            </circle>
+            {/* Waterfall Effect */}
+            <defs>
+              <linearGradient id="waterfallGradient" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.8" />
+                <stop offset="100%" stopColor="#93c5fd" stopOpacity="0.1" />
+              </linearGradient>
+            </defs>
+            {/* Main Stream */}
+            <path d="M 60 105 L 60 160" stroke="url(#waterfallGradient)" strokeWidth="14" strokeLinecap="butt" />
+
+            {/* Inner Flow */}
+            <path d="M 60 105 L 60 160" stroke="#60a5fa" strokeWidth="8" strokeOpacity="0.5" strokeLinecap="butt" />
+
+            {/* Rushing Water Lines */}
+            <path d="M 58 105 L 58 160" stroke="white" strokeWidth="2" strokeDasharray="5 10" strokeOpacity="0.4">
+              <animate attributeName="stroke-dashoffset" values="15;0" dur="0.2s" repeatCount="indefinite" />
+            </path>
+            <path d="M 62 105 L 62 160" stroke="white" strokeWidth="2" strokeDasharray="7 12" strokeOpacity="0.3">
+              <animate attributeName="stroke-dashoffset" values="19;0" dur="0.25s" repeatCount="indefinite" />
+            </path>
           </svg>
         </div>
 

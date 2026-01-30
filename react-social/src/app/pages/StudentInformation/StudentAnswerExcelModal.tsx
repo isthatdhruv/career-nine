@@ -19,7 +19,7 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
   useEffect(() => {
     const fetchStudentAnswers = async () => {
       if (!show || !student.selectedAssessment) return;
-      
+
       setLoading(true);
       setError("");
       try {
@@ -27,12 +27,12 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
           userStudentId: student.userStudentId,
           assessmentId: student.selectedAssessment
         });
-        
+
         const response = await getStudentAnswersWithDetails(
           student.userStudentId,
           Number(student.selectedAssessment)
         );
-        
+
         console.log("API Response:", response);
         setAnswers(response.data);
       } catch (err: any) {
@@ -59,7 +59,7 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
 
       // Create worksheet
       const worksheet = XLSX.utils.json_to_sheet(excelData);
-      
+
       // Set column widths
       worksheet['!cols'] = [
         { wch: 8 },   // S.No
@@ -76,7 +76,7 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
 
       // Download file
       XLSX.writeFile(workbook, filename);
-      
+
       alert(`Download successful for ${student.name}!`);
       onHide();
     } catch (error) {
@@ -92,8 +92,8 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
   return (
     <>
       {/* Backdrop */}
-      <div 
-        className="modal-backdrop fade show" 
+      <div
+        className="modal-backdrop fade show"
         onClick={onHide}
         style={{ zIndex: 1040 }}
       ></div>
@@ -225,10 +225,10 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
                               {answer.questionText}
                             </td>
                             <td style={{ padding: '12px 16px' }}>
-                              <span 
+                              <span
                                 className="badge"
-                                style={{ 
-                                  background: 'rgba(67, 97, 238, 0.1)', 
+                                style={{
+                                  background: 'rgba(67, 97, 238, 0.1)',
                                   color: '#4361ee',
                                   padding: '6px 12px',
                                   borderRadius: '6px',
