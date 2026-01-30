@@ -21,8 +21,6 @@ import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.kccitm.api.model.ContactPerson;
 import com.kccitm.api.model.InstituteCourse;
 
-import net.bytebuddy.implementation.bind.annotation.Default;
-
 @Entity
 @Table(name = "institute_detail_new")
 public class InstituteDetail implements Serializable {
@@ -75,6 +73,7 @@ public class InstituteDetail implements Serializable {
     }
 
     public void setInstituteCode(Integer instituteCode) {
+        
         this.instituteCode = instituteCode;
     }
 
@@ -195,5 +194,10 @@ public class InstituteDetail implements Serializable {
     public void setSchoolSession(List<SchoolSession> schoolSession) {
         this.schoolSession = schoolSession;
     }
+
+    // public Integer getId() {
+    //     // TODO Auto-generated method stub
+    //     throw new UnsupportedOperationException("Unimplemented method 'getId'");
+    // }
 
 }

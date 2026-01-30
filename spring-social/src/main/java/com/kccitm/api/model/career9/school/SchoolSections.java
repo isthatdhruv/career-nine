@@ -10,6 +10,8 @@ import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 @Entity
 @Table(name = "school_sections")
 public class SchoolSections implements Serializable {
@@ -21,11 +23,14 @@ public class SchoolSections implements Serializable {
 
     private String sectionName;
 
-    private Integer capacity;
-
     @ManyToOne
+    @JsonIgnore
     @JoinColumn(name = "school_classes_id", nullable = false)
     private SchoolClasses schoolClasses;
+
+    public void setSchoolClass(SchoolClasses schoolClasses) {
+        this.schoolClasses = schoolClasses;
+    }
 
     public Integer getId() {
         return id;
@@ -43,11 +48,4 @@ public class SchoolSections implements Serializable {
         this.sectionName = sectionName;
     }
 
-    public Integer getCapacity() {
-        return capacity;
-    }
-
-    public void setCapacity(Integer capacity) {
-        this.capacity = capacity;
-    }
 }

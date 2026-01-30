@@ -47,6 +47,8 @@ export interface StudentAnswerDetail {
     questionText: string;
     optionId: number;
     optionText: string;
+    sectionName?: string | null;
+    excelQuestionHeader?: string | null;
 }
 
 export function getStudentInfoByInstituteId(instituteId: number) {

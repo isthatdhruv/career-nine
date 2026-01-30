@@ -59,6 +59,7 @@ import GamePage from "../pages/Games/GamePage";
 import AssessmentEditPage from "../pages/CreateAssessment/components/assessment/AssessmentEditPage";
 // import QuestionareEditSinglePage from "../pages/CreateAssessment/components/questionaire/QuestionareEditSinglePage";
 import DashboardAdminPage from "../pages/demo-dashboard-v2/dashboard-admin";
+import DemographicDetailsPage from "../pages/StudentLogin/DemographicDetailsPage";
 import ThankYouPage from "../pages/StudentOnlineAssessment/components/ThankYouPage";
 const PrivateRoutes = () => {
   const StudentsData = lazy(
@@ -175,10 +176,13 @@ const PrivateRoutes = () => {
         path="/studentAssessment/sections/:sectionId/questions/:questionIndex"
         element={<SectionQuestionPage />}
       />
-
       <Route
         path="/allotted-assessment"
         element={<AllottedAssessmentPage />}
+      />
+      <Route
+        path="/demographics"
+        element={<DemographicDetailsPage />}
       />
       <Route
         path="/login/reset-password/enter-email"
