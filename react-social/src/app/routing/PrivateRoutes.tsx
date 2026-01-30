@@ -22,10 +22,10 @@ import ToolCreatePage from "../pages/Tool/components/ToolCreatePage";
 import UploadExcelFile from "../pages/UploadExcelFile/UploadExcelFile";
 // Update these paths to the correct locations of your components
 import Assessments from "../pages/CreateAssessment/Assessment";
-import AssessmentCreatePage from "../pages/CreateAssessment/components/assessment/AssessmentEditandCreatePage";
+// import AssessmentCreatePage from "../pages/CreateAssessment/components/assessment/AssessmentCreatePage";
 import QuestionareCreateSinglePage from "../pages/CreateAssessment/components/questionaire/QuestionareCreateSinglePage";
 import QuestionareEditSinglePage from "../pages/CreateAssessment/components/questionaire/QuestionareEditSinglePage";
-// import AssessmentEditPage from "../pages/CreateAssessment/components/assessment/AssessmentEditandCreatePage";
+import AssessmentEditPage from "../pages/CreateAssessment/components/assessment/AssessmentEditandCreatePage";
 import AssessmentToolPage from "../pages/CreateAssessment/components/AssessmentToolPage";
 import AssessmentUploadFile from "../pages/CreateAssessment/components/AssessmentUploadFile";
 import AssessmentSection from "../pages/CreateAssessment/components/AssessmentSection";
@@ -56,11 +56,12 @@ import GroupStudentPage from "../pages/GroupStudent/GroupStudentPage";
 import StudentLoginPage from "../pages/StudentLogin/StudentLoginPage";
 import AllottedAssessmentPage from "../pages/StudentLogin/AllottedAssessmentPage";
 import GamePage from "../pages/Games/GamePage";
-import AssessmentEditPage from "../pages/CreateAssessment/components/assessment/AssessmentEditPage";
 // import QuestionareEditSinglePage from "../pages/CreateAssessment/components/questionaire/QuestionareEditSinglePage";
 import DashboardAdminPage from "../pages/demo-dashboard-v2/dashboard-admin";
 import DemographicDetailsPage from "../pages/StudentLogin/DemographicDetailsPage";
 import ThankYouPage from "../pages/StudentOnlineAssessment/components/ThankYouPage";
+import GeneralInstructionsPage from "../pages/StudentOnlineAssessment/components/GeneralInstructionsPage";
+
 const PrivateRoutes = () => {
   const StudentsData = lazy(
     () => import("../pages/UniversityResult/StudentData")
@@ -168,11 +169,6 @@ const PrivateRoutes = () => {
         element={<SectionInstructionPage />}
       />
       <Route
-        path="/completed"
-        element={<ThankYouPage />}
-      />
-
-      <Route
         path="/studentAssessment/sections/:sectionId/questions/:questionIndex"
         element={<SectionQuestionPage />}
       />
@@ -181,8 +177,16 @@ const PrivateRoutes = () => {
         element={<AllottedAssessmentPage />}
       />
       <Route
+        path="/general-instructions"
+        element={<GeneralInstructionsPage />}
+      />
+      <Route
         path="/demographics"
         element={<DemographicDetailsPage />}
+      />
+      <Route
+        path="/completed"
+        element={<ThankYouPage />}
       />
       <Route
         path="/login/reset-password/enter-email"
@@ -651,7 +655,7 @@ const PrivateRoutes = () => {
           path="/assessments/create"
           element={
             <SuspensedView>
-              <AssessmentCreatePage />
+              <AssessmentEditPage />
             </SuspensedView>
           }
         />
