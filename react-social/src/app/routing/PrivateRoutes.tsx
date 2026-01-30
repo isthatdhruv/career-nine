@@ -44,7 +44,7 @@ import ListPage from "../pages/List/CreateList";
 import Assessment from "../pages/StudentOnlineAssessment/components/SelectSectionPage";
 import SelectSectionPage from "../pages/StudentOnlineAssessment/components/SelectSectionPage";
 import SectionInstructionPage from "../pages/StudentOnlineAssessment/components/SectionInstructionPage";
-import {SchoolDashboardPage} from "../pages/dashboard/SchoolDashboardPage";
+import { SchoolDashboardPage } from "../pages/dashboard/SchoolDashboardPage";
 import SectionQuestionPage from "../pages/StudentOnlineAssessment/components/SectionQuestionPage";
 import studentsList from "../pages/StudentInformation/StudentsList";
 // import QuestionaireList from "../pages/CreateAssessment/components/questionaire/QuestionaireListPage";
@@ -59,6 +59,7 @@ import GamePage from "../pages/Games/GamePage";
 // import QuestionareEditSinglePage from "../pages/CreateAssessment/components/questionaire/QuestionareEditSinglePage";
 import DashboardAdminPage from "../pages/demo-dashboard-v2/dashboard-admin";
 import DemographicDetailsPage from "../pages/StudentLogin/DemographicDetailsPage";
+import ThankYouPage from "../pages/StudentOnlineAssessment/components/ThankYouPage";
 const PrivateRoutes = () => {
   const StudentsData = lazy(
     () => import("../pages/UniversityResult/StudentData")
@@ -178,29 +179,29 @@ const PrivateRoutes = () => {
         element={<DemographicDetailsPage />}
       />
       <Route
-          path="/login/reset-password/enter-email"
-          element={
-            <SuspensedView>
-              <LoginEnterEmail />
-            </SuspensedView>
-          }
-        />
-         <Route
-          path="/"
-          element={
-            <SuspensedView>
-              <LoginEnterEmail />
-            </SuspensedView>
-          }
-        />
-        <Route
-          path="/student-login"
-          element={
-            <SuspensedView>
-              <StudentLoginPage />
-            </SuspensedView>
-          }
-        />
+        path="/login/reset-password/enter-email"
+        element={
+          <SuspensedView>
+            <LoginEnterEmail />
+          </SuspensedView>
+        }
+      />
+      <Route
+        path="/"
+        element={
+          <SuspensedView>
+            <LoginEnterEmail />
+          </SuspensedView>
+        }
+      />
+      <Route
+        path="/student-login"
+        element={
+          <SuspensedView>
+            <StudentLoginPage />
+          </SuspensedView>
+        }
+      />
 
       <Route path="/login" element={<LoginPage />} />
       <Route element={<MasterLayout />}>
@@ -639,7 +640,7 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-        
+
         <Route
           path="/assessments/create"
           element={

@@ -49,35 +49,35 @@ public class StudentInfoController {
         return studentInfoRepository.findAll();
     }
 
-@GetMapping("/getStudentAnswersWithDetails")
+    @GetMapping("/getStudentAnswersWithDetails")
     public ResponseEntity<?> getStudentAnswersWithDetails(
             @RequestParam Long userStudentId,
             @RequestParam Long assessmentId) {
-        
+
         System.out.println("=== DEBUG INFO ===");
         System.out.println("Received request - userStudentId: " + userStudentId + ", assessmentId: " + assessmentId);
-        
+
         try {
             // Check if there are any answers for this user_student_id
             Long totalAnswers = assessmentAnswerRepository.countByUserStudent_UserStudentId(userStudentId);
             System.out.println("Total answers for user_student_id " + userStudentId + ": " + totalAnswers);
-            
+
             // Check for this specific assessment
             Long assessmentAnswers = assessmentAnswerRepository
                     .countByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
-            System.out.println("Answers for user_student_id " + userStudentId + " and assessment " + 
+            System.out.println("Answers for user_student_id " + userStudentId + " and assessment " +
                     assessmentId + ": " + assessmentAnswers);
-            
+
             // Get answers with question and option details using JOIN FETCH
             List<AssessmentAnswer> answers = assessmentAnswerRepository
                     .findByUserStudentIdAndAssessmentIdWithDetails(userStudentId, assessmentId);
-            
+
             // Convert to Map format (similar to JDBC result)
             List<Map<String, Object>> results = new ArrayList<>();
-            
+
             for (AssessmentAnswer answer : answers) {
                 Map<String, Object> resultMap = new HashMap<>();
-                
+
                 // Add question details from QuestionnaireQuestion
                 if (answer.getQuestionnaireQuestion() != null) {
                     resultMap.put("questionId", answer.getQuestionnaireQuestion().getQuestionnaireQuestionId());
@@ -110,7 +110,7 @@ public class StudentInfoController {
                     resultMap.put("excelQuestionHeader", null);
                     resultMap.put("sectionName", null);
                 }
-                
+
                 // Add option details from AssessmentQuestionOptions
                 if (answer.getOption() != null) {
                     resultMap.put("optionId", answer.getOption().getOptionId());
@@ -119,30 +119,30 @@ public class StudentInfoController {
                     resultMap.put("optionId", null);
                     resultMap.put("optionText", null);
                 }
-                
+
                 results.add(resultMap);
             }
-            
+
             System.out.println("Final query results count: " + results.size());
             if (results.size() > 0) {
                 System.out.println("First result: " + results.get(0));
             }
             System.out.println("=================");
-            
+
             return ResponseEntity.ok(results);
-            
+
         } catch (Exception e) {
             System.err.println("Error: " + e.getMessage());
             e.printStackTrace();
-            
+
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("error", "Error fetching student answers: " + e.getMessage());
-            
+
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(errorResponse);
         }
     }
-    
+
     @PostMapping("/add")
     public StudentAssessmentMapping addStudentInfo(@RequestBody StudentInfo studentInfo) {
         try {
@@ -242,7 +242,7 @@ public class StudentInfoController {
 
                 result.add(studentData);
             }
-            
+
             return result;
         } catch (Exception e) {
             System.out.println("Error in getStudentsWithMappingByInstituteId: " + e.getMessage());

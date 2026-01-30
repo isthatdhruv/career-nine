@@ -49,10 +49,10 @@ const StudentLoginPage: React.FC = () => {
 
   const handleDobChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value;
-    
+
     // Remove any non-numeric characters except hyphens
     value = value.replace(/[^\d-]/g, '');
-    
+
     // Auto-format as dd-mm-yyyy
     const digits = value.replace(/-/g, '');
     if (digits.length <= 2) {
@@ -62,7 +62,7 @@ const StudentLoginPage: React.FC = () => {
     } else {
       value = `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4, 8)}`;
     }
-    
+
     setDob(value);
     if (touched.dob) {
       setErrors(prev => ({ ...prev, dob: validateDob(value) }));
@@ -118,7 +118,7 @@ const StudentLoginPage: React.FC = () => {
       };
 
       try {
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/user/auth`, {
+        const response = await fetch('http://localhost:8080/user/auth', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -159,10 +159,10 @@ const StudentLoginPage: React.FC = () => {
       left: 0,
       overflow: 'auto'
     }}>
-      <div 
-        className="card shadow-lg" 
-        style={{ 
-          width: '550px', 
+      <div
+        className="card shadow-lg"
+        style={{
+          width: '550px',
           maxWidth: '95%',
           borderRadius: '20px',
           border: 'none',
@@ -170,7 +170,7 @@ const StudentLoginPage: React.FC = () => {
       >
         <div className="card-body p-5">
           {/* Logo/Icon */}
-          <div 
+          <div
             style={{
               width: "80px",
               height: "80px",
@@ -190,10 +190,10 @@ const StudentLoginPage: React.FC = () => {
             </svg>
           </div>
 
-          <h2 
-            className="text-center mb-2" 
-            style={{ 
-              fontSize: '2.25rem', 
+          <h2
+            className="text-center mb-2"
+            style={{
+              fontSize: '2.25rem',
               fontWeight: '700',
               color: '#2d3748',
               marginBottom: '0.5rem',
@@ -201,10 +201,10 @@ const StudentLoginPage: React.FC = () => {
           >
             Assessment Login
           </h2>
-          <p 
-            className="text-center mb-5" 
-            style={{ 
-              color: '#718096', 
+          <p
+            className="text-center mb-5"
+            style={{
+              color: '#718096',
               fontSize: '1rem',
               marginBottom: '2rem',
             }}
@@ -215,11 +215,11 @@ const StudentLoginPage: React.FC = () => {
           <form onSubmit={handleSubmit}>
             {/* User ID Section */}
             <div className="mb-4">
-              <label 
-                htmlFor="userId" 
-                className="form-label" 
-                style={{ 
-                  fontSize: '0.95rem', 
+              <label
+                htmlFor="userId"
+                className="form-label"
+                style={{
+                  fontSize: '0.95rem',
                   fontWeight: '600',
                   color: '#4a5568',
                   marginBottom: '0.5rem',
@@ -228,7 +228,7 @@ const StudentLoginPage: React.FC = () => {
                 User ID
               </label>
               <div style={{ position: 'relative' }}>
-                <div 
+                <div
                   style={{
                     position: 'absolute',
                     left: '1rem',
@@ -250,7 +250,7 @@ const StudentLoginPage: React.FC = () => {
                   value={userId}
                   onChange={handleUserIdChange}
                   onBlur={handleUserIdBlur}
-                  style={{ 
+                  style={{
                     padding: '0.875rem 1rem 0.875rem 3rem',
                     fontSize: '1rem',
                     borderRadius: '10px',
@@ -280,11 +280,11 @@ const StudentLoginPage: React.FC = () => {
 
             {/* DOB Section */}
             <div className="mb-5">
-              <label 
-                htmlFor="dob" 
-                className="form-label" 
-                style={{ 
-                  fontSize: '0.95rem', 
+              <label
+                htmlFor="dob"
+                className="form-label"
+                style={{
+                  fontSize: '0.95rem',
                   fontWeight: '600',
                   color: '#4a5568',
                   marginBottom: '0.5rem',
@@ -293,7 +293,7 @@ const StudentLoginPage: React.FC = () => {
                 Date of Birth
               </label>
               <div style={{ position: 'relative' }}>
-                <div 
+                <div
                   style={{
                     position: 'absolute',
                     left: '1rem',
@@ -320,7 +320,7 @@ const StudentLoginPage: React.FC = () => {
                     value={dob}
                     onChange={handleDobChange}
                     onBlur={handleDobBlur}
-                    style={{ 
+                    style={{
                       padding: '0.875rem 1rem 0.875rem 3rem',
                       fontSize: '1rem',
                       borderRadius: '10px 0 0 10px',
@@ -344,7 +344,7 @@ const StudentLoginPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={openCalendar}
-                    style={{ 
+                    style={{
                       border: `2px solid ${touched.dob && errors.dob ? '#e53e3e' : '#e2e8f0'}`,
                       borderLeft: 'none',
                       background: 'white',
@@ -378,10 +378,10 @@ const StudentLoginPage: React.FC = () => {
               )}
             </div>
 
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="btn w-100"
-              style={{ 
+              style={{
                 padding: '0.875rem',
                 fontSize: '1.1rem',
                 fontWeight: '600',
@@ -405,11 +405,11 @@ const StudentLoginPage: React.FC = () => {
               Sign In
             </button>
 
-            <div 
-              className="text-center mt-4" 
-              style={{ 
-                color: '#718096', 
-                fontSize: '0.9rem' 
+            <div
+              className="text-center mt-4"
+              style={{
+                color: '#718096',
+                fontSize: '0.9rem'
               }}
             >
               Need help? Contact your administrator
