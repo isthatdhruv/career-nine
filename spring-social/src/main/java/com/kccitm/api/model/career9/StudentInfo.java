@@ -19,7 +19,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.kccitm.api.model.User;
 
 @Entity
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
 @Table(name = "student_info")
 public class StudentInfo implements Serializable {
     private static final long serialVersionUID = 1L;
@@ -41,6 +41,12 @@ public class StudentInfo implements Serializable {
     private String gender;
 
     private Integer sibling;
+
+    private String family;
+
+    private String schoolBoard;
+
+    private Integer studentClass;
 
     @Column(name = "institute_id")
     private Integer instituteId;
@@ -150,6 +156,34 @@ public class StudentInfo implements Serializable {
 
     public void setSibling(Integer sibling) {
         this.sibling = sibling;
+    }
+
+    public static long getSerialversionuid() {
+        return serialVersionUID;
+    }
+
+    public String getFamily() {
+        return family;
+    }
+
+    public void setFamily(String family) {
+        this.family = family;
+    }
+
+    public String getSchoolBoard() {
+        return schoolBoard;
+    }
+
+    public void setSchoolBoard(String schoolBoard) {
+        this.schoolBoard = schoolBoard;
+    }
+
+    public Integer getStudentClass() {
+        return studentClass;
+    }
+
+    public void setStudentClass(Integer studentClass) {
+        this.studentClass = studentClass;
     }
 
 }

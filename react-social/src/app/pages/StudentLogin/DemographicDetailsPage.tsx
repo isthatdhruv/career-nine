@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 type DemographicData = {
   name: string;
@@ -32,6 +33,7 @@ const DemographicDetailsPage: React.FC = () => {
 
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validateField = (field: keyof DemographicData, value: string): string => {
     switch (field) {
@@ -46,37 +48,37 @@ const DemographicDetailsPage: React.FC = () => {
           return "Name should only contain letters and spaces";
         }
         return "";
-      
+
       case "gender":
         if (!value) {
           return "Please select your gender";
         }
         return "";
-      
+
       case "grade":
         if (!value) {
           return "Please select your grade";
         }
         return "";
-      
+
       case "schoolBoard":
         if (!value) {
           return "Please select your school board";
         }
         return "";
-      
+
       case "siblings":
         if (!value) {
           return "Please select number of siblings";
         }
         return "";
-      
+
       case "livingWith":
         if (!value) {
           return "Please select who you live with";
         }
         return "";
-      
+
       default:
         return "";
     }
@@ -98,9 +100,9 @@ const DemographicDetailsPage: React.FC = () => {
     return isValid;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Mark all fields as touched
     const allTouched: Record<string, boolean> = {};
     Object.keys(formData).forEach(key => {
@@ -109,24 +111,68 @@ const DemographicDetailsPage: React.FC = () => {
     setTouched(allTouched);
 
     // Validate all fields
-    if (validateForm()) {
-      // Store data if needed (localStorage, context, API call)
-      console.log("Demographic Data:", formData);
-      
-      // Redirect to allotted assessment
-      navigate("/allotted-assessment");
-    } else {
+    if (!validateForm()) {
       // Scroll to first error
       const firstError = document.querySelector('.is-invalid');
       if (firstError) {
         firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
+      return;
+    }
+
+    // Get userStudentId from localStorage
+    const userStudentId = localStorage.getItem('userStudentId');
+    if (!userStudentId) {
+      alert("Session expired. Please login again.");
+      navigate("/login");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Parse grade to get class number (e.g., "3rd Grade" -> 3)
+      const classMatch = formData.grade.match(/(\d+)/);
+      const studentClass = classMatch ? parseInt(classMatch[1]) : null;
+
+      // Parse siblings (handle "3 or more")
+      let sibling: number | null = null;
+      if (formData.siblings === "3 or more") {
+        sibling = 3;
+      } else if (formData.siblings) {
+        sibling = parseInt(formData.siblings);
+      }
+
+      const payload = {
+        userStudentId: parseInt(userStudentId),
+        name: formData.name.trim(),
+        gender: formData.gender,
+        studentClass: studentClass,
+        schoolBoard: formData.schoolBoard,
+        sibling: sibling,
+        family: formData.livingWith,
+      };
+
+      console.log("Submitting demographics:", payload);
+
+      await axios.post(
+        `${process.env.REACT_APP_API_URL}/student-info/updateDemographics`,
+        payload
+      );
+
+      // Redirect to allotted assessment
+      navigate("/allotted-assessment");
+    } catch (error: any) {
+      console.error("Error saving demographics:", error);
+      alert(error.response?.data?.error || "Failed to save demographics. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleChange = (field: keyof DemographicData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    
+
     // Validate field on change if it was touched
     if (touched[field]) {
       const error = validateField(field, value);
@@ -151,10 +197,10 @@ const DemographicDetailsPage: React.FC = () => {
         padding: "2rem 1rem",
       }}
     >
-      <div 
-        className="card shadow-lg" 
-        style={{ 
-          width: "100%", 
+      <div
+        className="card shadow-lg"
+        style={{
+          width: "100%",
           maxWidth: "650px",
           borderRadius: "20px",
           border: "none",
@@ -163,7 +209,7 @@ const DemographicDetailsPage: React.FC = () => {
         <div className="card-body p-5">
           {/* Header */}
           <div className="text-center mb-4">
-            <div 
+            <div
               style={{
                 width: "70px",
                 height: "70px",
@@ -181,9 +227,9 @@ const DemographicDetailsPage: React.FC = () => {
                 <circle cx="12" cy="7" r="4" />
               </svg>
             </div>
-            <h2 
-              style={{ 
-                fontSize: "2rem", 
+            <h2
+              style={{
+                fontSize: "2rem",
                 fontWeight: 700,
                 color: "#2d3748",
                 marginBottom: "0.5rem",
@@ -199,10 +245,10 @@ const DemographicDetailsPage: React.FC = () => {
           <form onSubmit={handleSubmit} noValidate>
             {/* Basic Information Section */}
             <div className="mb-4">
-              <h5 
-                style={{ 
-                  fontSize: "1.1rem", 
-                  fontWeight: 600, 
+              <h5
+                style={{
+                  fontSize: "1.1rem",
+                  fontWeight: 600,
                   color: "#4a5568",
                   marginBottom: "1rem",
                   paddingBottom: "0.5rem",
@@ -250,13 +296,12 @@ const DemographicDetailsPage: React.FC = () => {
                       style={{
                         flex: 1,
                         padding: "0.75rem 1rem",
-                        border: `2px solid ${
-                          errors.gender && touched.gender 
-                            ? "#e53e3e" 
-                            : formData.gender === option 
-                            ? "#667eea" 
+                        border: `2px solid ${errors.gender && touched.gender
+                          ? "#e53e3e"
+                          : formData.gender === option
+                            ? "#667eea"
                             : "#e2e8f0"
-                        }`,
+                          }`,
                         borderRadius: "10px",
                         cursor: "pointer",
                         transition: "all 0.2s ease",
@@ -307,10 +352,10 @@ const DemographicDetailsPage: React.FC = () => {
 
             {/* School Life Section */}
             <div className="mb-4">
-              <h5 
-                style={{ 
-                  fontSize: "1.1rem", 
-                  fontWeight: 600, 
+              <h5
+                style={{
+                  fontSize: "1.1rem",
+                  fontWeight: 600,
                   color: "#4a5568",
                   marginBottom: "1rem",
                   paddingBottom: "0.5rem",
@@ -383,10 +428,10 @@ const DemographicDetailsPage: React.FC = () => {
 
             {/* Family Background Section */}
             <div className="mb-4">
-              <h5 
-                style={{ 
-                  fontSize: "1.1rem", 
-                  fontWeight: 600, 
+              <h5
+                style={{
+                  fontSize: "1.1rem",
+                  fontWeight: 600,
                   color: "#4a5568",
                   marginBottom: "1rem",
                   paddingBottom: "0.5rem",
@@ -460,27 +505,42 @@ const DemographicDetailsPage: React.FC = () => {
             <button
               type="submit"
               className="btn w-100"
+              disabled={isSubmitting}
               style={{
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                background: isSubmitting
+                  ? "#a0aec0"
+                  : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                 color: "white",
                 padding: "0.875rem",
                 borderRadius: "10px",
                 fontSize: "1.05rem",
                 fontWeight: 600,
                 border: "none",
-                boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)",
+                boxShadow: isSubmitting ? "none" : "0 4px 15px rgba(102, 126, 234, 0.4)",
                 transition: "all 0.3s ease",
+                cursor: isSubmitting ? "not-allowed" : "pointer",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = "0 6px 20px rgba(102, 126, 234, 0.5)";
+                if (!isSubmitting) {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow = "0 6px 20px rgba(102, 126, 234, 0.5)";
+                }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "0 4px 15px rgba(102, 126, 234, 0.4)";
+                if (!isSubmitting) {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "0 4px 15px rgba(102, 126, 234, 0.4)";
+                }
               }}
             >
-              Save and Continue to Assessment
+              {isSubmitting ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  Saving...
+                </>
+              ) : (
+                "Save and Continue to Assessment"
+              )}
             </button>
           </form>
         </div>

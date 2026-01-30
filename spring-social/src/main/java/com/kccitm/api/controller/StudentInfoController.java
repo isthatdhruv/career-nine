@@ -280,4 +280,66 @@ public class StudentInfoController {
         studentInfoRepository.deleteById(id);
     }
 
+    @PostMapping("/updateDemographics")
+    public ResponseEntity<?> updateDemographics(@RequestBody Map<String, Object> request) {
+        try {
+            Long userStudentId = Long.valueOf(request.get("userStudentId").toString());
+
+            // Find UserStudent by userStudentId
+            UserStudent userStudent = userStudentRepository.findById(userStudentId)
+                    .orElse(null);
+
+            if (userStudent == null) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "Student not found with userStudentId: " + userStudentId);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+            }
+
+            // Get associated StudentInfo
+            StudentInfo studentInfo = userStudent.getStudentInfo();
+
+            // Update fields if present in request
+            if (request.containsKey("name")) {
+                studentInfo.setName(request.get("name").toString());
+            }
+            if (request.containsKey("gender")) {
+                studentInfo.setGender(request.get("gender").toString());
+            }
+            if (request.containsKey("sibling")) {
+                Object siblingVal = request.get("sibling");
+                if (siblingVal != null) {
+                    studentInfo.setSibling(Integer.valueOf(siblingVal.toString()));
+                }
+            }
+            if (request.containsKey("family")) {
+                studentInfo.setFamily(request.get("family").toString());
+            }
+            if (request.containsKey("schoolBoard")) {
+                studentInfo.setSchoolBoard(request.get("schoolBoard").toString());
+            }
+            if (request.containsKey("studentClass")) {
+                Object classVal = request.get("studentClass");
+                if (classVal != null) {
+                    studentInfo.setStudentClass(Integer.valueOf(classVal.toString()));
+                }
+            }
+
+            // Save updated StudentInfo
+            StudentInfo saved = studentInfoRepository.save(studentInfo);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Demographics updated successfully");
+            response.put("studentInfo", saved);
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            System.err.println("Error updating demographics: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Failed to update demographics: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
+
 }
