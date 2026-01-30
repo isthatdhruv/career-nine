@@ -185,7 +185,7 @@ const PrivateRoutes = () => {
         element={<DemographicDetailsPage />}
       />
       <Route
-        path="/completed"
+        path="/studentAssessment/completed"
         element={<ThankYouPage />}
       />
       <Route

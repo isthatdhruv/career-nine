@@ -16,17 +16,17 @@ const ThankYouPage: React.FC = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 minHeight: '100vh',
-                background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 padding: '20px',
                 fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
             }}
         >
             <div
                 style={{
-                    backgroundColor: 'white',
-                    padding: '40px 60px',
-                    borderRadius: '15px',
-                    boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                    padding: '50px 70px',
+                    borderRadius: '24px',
+                    boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
                     textAlign: 'center',
                     maxWidth: '600px',
                     width: '100%',
@@ -35,21 +35,30 @@ const ThankYouPage: React.FC = () => {
             >
                 <div
                     style={{
-                        fontSize: '80px',
-                        color: '#28a745',
-                        marginBottom: '20px',
+                        width: '100px',
+                        height: '100px',
+                        background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 30px auto',
+                        boxShadow: '0 8px 25px rgba(34, 197, 94, 0.4)',
                         animation: 'scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                     }}
                 >
-                    ✓
+                    <span style={{ fontSize: '50px', color: 'white' }}>✓</span>
                 </div>
 
                 <h1
                     style={{
-                        color: '#333',
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        backgroundClip: 'text',
                         fontSize: '2.5rem',
                         marginBottom: '20px',
-                        fontWeight: '600',
+                        fontWeight: '700',
                     }}
                 >
                     Thank You!
@@ -57,10 +66,10 @@ const ThankYouPage: React.FC = () => {
 
                 <p
                     style={{
-                        color: '#666',
-                        fontSize: '1.2rem',
+                        color: '#4a5568',
+                        fontSize: '1.15rem',
                         marginBottom: '40px',
-                        lineHeight: '1.6',
+                        lineHeight: '1.8',
                     }}
                 >
                     You have successfully completed your assessment.
@@ -71,29 +80,27 @@ const ThankYouPage: React.FC = () => {
                 <button
                     onClick={handleGoHome}
                     style={{
-                        backgroundColor: '#007bff',
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                         color: 'white',
                         border: 'none',
-                        padding: '12px 30px',
+                        padding: '14px 40px',
                         borderRadius: '50px',
-                        fontSize: '1rem',
+                        fontSize: '1.05rem',
                         fontWeight: '600',
                         cursor: 'pointer',
-                        transition: 'transform 0.2s, box-shadow 0.2s, background-color 0.2s',
-                        boxShadow: '0 4px 6px rgba(0, 123, 255, 0.2)',
+                        transition: 'transform 0.2s, box-shadow 0.2s',
+                        boxShadow: '0 6px 20px rgba(102, 126, 234, 0.4)',
                     }}
                     onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = '0 6px 12px rgba(0, 123, 255, 0.3)';
-                        e.currentTarget.style.backgroundColor = '#0056b3';
+                        e.currentTarget.style.transform = 'translateY(-3px)';
+                        e.currentTarget.style.boxShadow = '0 10px 30px rgba(102, 126, 234, 0.5)';
                     }}
                     onMouseLeave={(e) => {
                         e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 4px 6px rgba(0, 123, 255, 0.2)';
-                        e.currentTarget.style.backgroundColor = '#007bff';
+                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.4)';
                     }}
                 >
-                    Back to Home
+                    ← Back to Home
                 </button>
             </div>
 
@@ -114,3 +121,4 @@ const ThankYouPage: React.FC = () => {
 };
 
 export default ThankYouPage;
+

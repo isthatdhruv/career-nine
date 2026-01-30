@@ -52,7 +52,7 @@ const GeneralInstructionsPage: React.FC = () => {
               lineHeight: "1.2",
             }}
           >
-            Hi there! Welcome to your discovery journey.
+            Hi there! Please read the instructions carefully.
           </h2>
 
           <p
