@@ -303,6 +303,15 @@ const SectionQuestionPage: React.FC = () => {
 
   // Ranking question handlers
   const handleRankChange = (optionId: number, rank: number | null) => {
+    // Calculate current rank count before update to determine if we should auto-advance
+    const currentRankings = rankingAnswers[sectionId!]?.[qId] || {};
+    const currentRankCount = Object.keys(currentRankings).length;
+    const maxAllowed = question.question.maxOptionsAllowed;
+
+    // Will auto-advance if: setting a rank (not removing), and this will reach maxAllowed
+    const isAddingRank = rank !== null && !currentRankings[optionId];
+    const willAutoAdvance = isAddingRank && (currentRankCount + 1) === maxAllowed;
+
     setRankingAnswers((prev) => {
       const sec = prev[sectionId!] || {};
       const questionRankings = sec[qId] || {};
@@ -333,6 +342,27 @@ const SectionQuestionPage: React.FC = () => {
         s.delete(qId);
         return { ...prev, [sectionId!]: s };
       });
+    }
+
+    // Auto-advance to next question after a short delay
+    if (willAutoAdvance) {
+      setTimeout(() => {
+        if (currentIndex < questions.length - 1) {
+          const newIndex = currentIndex + 1;
+          setCurrentIndex(newIndex);
+          navigate(`/studentAssessment/sections/${sectionId}/questions/${newIndex}`);
+        } else {
+          // Last question of section - check for next section
+          const idx = questionnaire.sections.findIndex(
+            (s: any) => String(s.section.sectionId) === String(sectionId)
+          );
+          const next = questionnaire.sections[idx + 1];
+          if (next) {
+            navigate(`/studentAssessment/sections/${next.section.sectionId}/questions/0`);
+          }
+          // If it's the last section, stay on the question (user needs to submit)
+        }
+      }, 400); // 400ms delay so user can see their selection
     }
   };
 
@@ -470,10 +500,16 @@ const SectionQuestionPage: React.FC = () => {
     }
   };
 
-  const getQuestionColor = (secId: string, qId: number) => {
-    if (answers[secId]?.[qId]?.length) return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
-    if (savedForLater[secId]?.has(qId)) return "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)";
-    if (skipped[secId]?.has(qId)) return "linear-gradient(135deg, #f87171 0%, #dc2626 100%)";
+  const getQuestionColor = (secId: string, questionId: number) => {
+    // Check regular answers
+    if (answers[secId]?.[questionId]?.length) return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+    // Check ranking answers
+    const rankingCount = Object.keys(rankingAnswers[secId]?.[questionId] || {}).length;
+    if (rankingCount > 0) return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+    // Check saved for later
+    if (savedForLater[secId]?.has(questionId)) return "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)";
+    // Check skipped
+    if (skipped[secId]?.has(questionId)) return "linear-gradient(135deg, #f87171 0%, #dc2626 100%)";
     return "#d1d5db";
   };
 
