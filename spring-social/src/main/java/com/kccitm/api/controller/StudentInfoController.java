@@ -46,6 +46,8 @@ public class StudentInfoController {
     private AssessmentAnswerRepository assessmentAnswerRepository;
     @Autowired
     private AssessmentRawScoreRepository assessmentRawScoreRepository;
+    @Autowired
+    private com.kccitm.api.repository.Career9.AssessmentTableRepository assessmentTableRepository;
 
     @GetMapping("/getAll")
     public List<StudentInfo> getAllStudentInfo() {
@@ -243,6 +245,24 @@ public class StudentInfoController {
                         }
                         studentData.put("assignedAssessmentIds", assignedAssessmentIds);
 
+                        // Return full assessment details (id, name, status)
+                        List<java.util.Map<String, Object>> assessmentDetails = new java.util.ArrayList<>();
+                        for (StudentAssessmentMapping mapping : mappings) {
+                            java.util.Map<String, Object> detail = new java.util.HashMap<>();
+                            detail.put("assessmentId", mapping.getAssessmentId());
+                            detail.put("status", mapping.getStatus());
+                            // Get assessment name
+                            java.util.Optional<com.kccitm.api.model.career9.AssessmentTable> assessment = assessmentTableRepository
+                                    .findById(mapping.getAssessmentId());
+                            if (assessment.isPresent()) {
+                                detail.put("assessmentName", assessment.get().getAssessmentName());
+                            } else {
+                                detail.put("assessmentName", "Unknown");
+                            }
+                            assessmentDetails.add(detail);
+                        }
+                        studentData.put("assessments", assessmentDetails);
+
                         // Also keep the latest for backward compatibility
                         if (!mappings.isEmpty()) {
                             StudentAssessmentMapping latestMapping = mappings.get(mappings.size() - 1);
@@ -254,12 +274,14 @@ public class StudentInfoController {
                         studentData.put("userStudentId", null);
                         studentData.put("assessmentId", null);
                         studentData.put("assignedAssessmentIds", new java.util.ArrayList<>());
+                        studentData.put("assessments", new java.util.ArrayList<>());
                     }
                 } catch (Exception e) {
                     System.out.println("Error finding mapping for student " + si.getId() + ": " + e.getMessage());
                     studentData.put("userStudentId", null);
                     studentData.put("assessmentId", null);
                     studentData.put("assignedAssessmentIds", new java.util.ArrayList<>());
+                    studentData.put("assessments", new java.util.ArrayList<>());
                 }
 
                 result.add(studentData);

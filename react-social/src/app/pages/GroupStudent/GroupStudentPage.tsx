@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
 import { ReadCollegeData } from "../College/API/College_APIs";
 import { getStudentsWithMappingByInstituteId, getAllAssessments, Assessment } from "../StudentInformation/StudentInfo_APIs";
 
@@ -12,9 +13,16 @@ type Student = {
   phoneNumber?: string;
   studentDob?: string;
   username?: string;
+  assessments?: StudentAssessmentInfo[];
 };
 
-export default function Users() {
+type StudentAssessmentInfo = {
+  assessmentId: number;
+  assessmentName: string;
+  status: string;
+};
+
+export default function GroupStudentPage() {
   const [institutes, setInstitutes] = useState<any[]>([]);
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
   const [students, setStudents] = useState<Student[]>([]);
@@ -22,6 +30,11 @@ export default function Users() {
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedStudents, setSelectedStudents] = useState<Set<number>>(new Set());
+
+  // Modal state
+  const [showAssessmentModal, setShowAssessmentModal] = useState(false);
+  const [modalStudent, setModalStudent] = useState<Student | null>(null);
+  const [studentAssessments, setStudentAssessments] = useState<StudentAssessmentInfo[]>([]);
 
   useEffect(() => {
     ReadCollegeData()
@@ -60,7 +73,8 @@ export default function Users() {
               selectedAssessment: assessmentId,
               userStudentId: student.userStudentId,
               assessmentName: assessment?.assessmentName || "",
-              username: student.username || ""
+              username: student.username || "",
+              assessments: student.assessments || []
             };
           });
           console.log("Loaded students:", studentData);
@@ -119,6 +133,37 @@ export default function Users() {
     } else {
       setSelectedStudents(new Set(filteredStudents.map(s => s.userStudentId)));
     }
+  };
+
+  const handleViewAssessments = (student: Student) => {
+    setModalStudent(student);
+    setShowAssessmentModal(true);
+    // Use pre-loaded assessments from the student object
+    setStudentAssessments(student.assessments || []);
+  };
+
+  const getStatusBadge = (status: string) => {
+    const colors: Record<string, { bg: string; text: string }> = {
+      completed: { bg: "#d1fae5", text: "#059669" },
+      ongoing: { bg: "#dbeafe", text: "#2563eb" },
+      notstarted: { bg: "#fef3c7", text: "#d97706" },
+    };
+    const style = colors[status] || colors.notstarted;
+    return (
+      <span
+        style={{
+          backgroundColor: style.bg,
+          color: style.text,
+          padding: "4px 10px",
+          borderRadius: "12px",
+          fontSize: "0.75rem",
+          fontWeight: 600,
+          textTransform: "capitalize",
+        }}
+      >
+        {status === "notstarted" ? "Not Started" : status}
+      </span>
+    );
   };
 
   return (
@@ -350,26 +395,23 @@ export default function Users() {
                             <span className="fw-semibold" style={{ color: '#1a1a2e' }}>{student.name}</span>
                           </td>
                           <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
-                            {student.assessmentName ? (
-                              <span 
-                                className="badge"
-                                style={{ 
-                                  background: 'rgba(67, 97, 238, 0.1)', 
-                                  color: '#4361ee',
-                                  padding: '8px 16px',
-                                  borderRadius: '8px',
-                                  fontWeight: 600,
-                                  fontSize: '0.85rem'
-                                }}
-                              >
-                                {student.assessmentName}
-                              </span>
-                            ) : (
-                              <span className="text-muted">
-                                <i className="bi bi-dash-circle me-1"></i>
-                                Not Assigned
-                              </span>
-                            )}
+                            <button
+                              className="btn btn-sm d-flex align-items-center gap-1"
+                              onClick={() => handleViewAssessments(student)}
+                              style={{
+                                background: 'rgba(67, 97, 238, 0.1)',
+                                color: '#4361ee',
+                                border: '1px solid rgba(67, 97, 238, 0.3)',
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                fontWeight: 500,
+                                fontSize: '0.85rem',
+                                transition: 'all 0.2s',
+                              }}
+                            >
+                              <i className="bi bi-list-ul"></i>
+                              View
+                            </button>
                           </td>
                           <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
                             {student.phoneNumber ? (
@@ -437,6 +479,112 @@ export default function Users() {
             <p className="text-muted mb-0">
               Please select an institute from the dropdown above to view students
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Assessment List Modal */}
+      {showAssessmentModal && modalStudent && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+          onClick={() => setShowAssessmentModal(false)}
+        >
+          <div
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '20px',
+              maxWidth: '500px',
+              width: '90%',
+              maxHeight: '80vh',
+              overflow: 'hidden',
+              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.15)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)',
+                padding: '1rem 1.25rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+              }}
+            >
+              <div>
+                <h5 className="mb-0 text-white fw-bold" style={{ fontSize: '1.1rem' }}>
+                  <i className="bi bi-journal-bookmark me-2"></i>
+                  Assigned Assessments
+                </h5>
+                <p className="mb-0 text-white mt-1" style={{ fontSize: '0.85rem', opacity: 0.9 }}>
+                  {modalStudent.name}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-close btn-close-white"
+                onClick={() => setShowAssessmentModal(false)}
+                style={{ marginTop: '2px' }}
+              ></button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '1rem', maxHeight: '60vh', overflowY: 'auto' }}>
+              {studentAssessments.length === 0 ? (
+                <div className="text-center py-4">
+                  <i className="bi bi-inbox text-muted" style={{ fontSize: '2.5rem', opacity: 0.5 }}></i>
+                  <p className="mt-2 text-muted mb-0">No assessments assigned</p>
+                </div>
+              ) : (
+                <div className="d-flex flex-column gap-2">
+                  {studentAssessments.map((assessment) => (
+                    <div
+                      key={assessment.assessmentId}
+                      className="d-flex align-items-center justify-content-between p-3"
+                      style={{
+                        backgroundColor: '#f8fafc',
+                        borderRadius: '10px',
+                        border: '1px solid #e2e8f0',
+                      }}
+                    >
+                      <div>
+                        <h6 className="mb-1 fw-semibold" style={{ color: '#1a1a2e', fontSize: '0.95rem' }}>
+                          {assessment.assessmentName}
+                        </h6>
+                        <div className="d-flex align-items-center gap-2">
+                          {getStatusBadge(assessment.status)}
+                          <span className="text-muted" style={{ fontSize: '0.75rem' }}>
+                            ID: {assessment.assessmentId}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid #e2e8f0' }}>
+              <button
+                className="btn btn-secondary w-100"
+                onClick={() => setShowAssessmentModal(false)}
+                style={{ borderRadius: '10px' }}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
