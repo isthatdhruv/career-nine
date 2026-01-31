@@ -10,6 +10,7 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
+import javax.persistence.PrePersist;
 import javax.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -26,7 +27,7 @@ public class StudentAssessmentMapping implements Serializable {
     @Column(name = "student_assessment_id")
     private Long studentAssessmentId;
 
-    @Column(name = "status")
+    @Column(name = "status", columnDefinition = "varchar(20) default 'notstarted'")
     private String status;
 
     // Student Id
@@ -37,6 +38,13 @@ public class StudentAssessmentMapping implements Serializable {
     // Assessment ID
     @Column(name = "assessment_id", nullable = false)
     private Long assessmentId;
+
+    @PrePersist
+    public void prePersist() {
+        if (this.status == null) {
+            this.status = "notstarted";
+        }
+    }
 
     public StudentAssessmentMapping(Long userStudent, Long assessmentId) {
         this.userStudent = new UserStudent(userStudent);

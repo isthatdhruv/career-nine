@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
@@ -34,6 +34,50 @@ const DemographicDetailsPage: React.FC = () => {
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch existing demographics on mount
+  useEffect(() => {
+    const fetchDemographics = async () => {
+      const userStudentId = localStorage.getItem('userStudentId');
+      if (!userStudentId) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const response = await axios.get(
+          `${process.env.REACT_APP_API_URL}/student-info/getDemographics/${userStudentId}`
+        );
+
+        const data = response.data;
+
+        // Map backend data to form fields
+        const mappedData: DemographicData = {
+          name: data.name || "",
+          gender: data.gender || "",
+          grade: data.studentClass ? `${data.studentClass}${data.studentClass === 3 ? 'rd' : data.studentClass === 4 || data.studentClass === 5 ? 'th' : ''} Grade` : "",
+          schoolBoard: data.schoolBoard || "",
+          siblings: data.sibling !== null && data.sibling !== undefined 
+            ? (data.sibling >= 3 ? "3 or more" : String(data.sibling))
+            : "",
+          livingWith: data.family || "",
+        };
+
+        setFormData(mappedData);
+      } catch (error: any) {
+        // If no data found (404), that's okay - user hasn't filled form yet
+        if (error.response?.status !== 404) {
+          console.error("Error fetching demographics:", error);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDemographics();
+  }, []);
+
 
   const validateField = (field: keyof DemographicData, value: string): string => {
     switch (field) {
@@ -197,6 +241,14 @@ const DemographicDetailsPage: React.FC = () => {
         padding: "2rem 1rem",
       }}
     >
+      {isLoading ? (
+        <div className="text-center">
+          <div className="spinner-border text-light" role="status" style={{ width: "3rem", height: "3rem" }}>
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="mt-3 text-white fw-semibold">Loading your information...</p>
+        </div>
+      ) : (
       <div
         className="card shadow-lg"
         style={{
@@ -545,6 +597,7 @@ const DemographicDetailsPage: React.FC = () => {
           </form>
         </div>
       </div>
+      )}
     </div>
   );
 };

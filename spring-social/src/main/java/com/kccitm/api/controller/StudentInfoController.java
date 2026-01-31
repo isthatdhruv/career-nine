@@ -280,6 +280,48 @@ public class StudentInfoController {
         studentInfoRepository.deleteById(id);
     }
 
+    @GetMapping("/getDemographics/{userStudentId}")
+    public ResponseEntity<?> getDemographics(@PathVariable("userStudentId") Long userStudentId) {
+        try {
+            // Find UserStudent by userStudentId
+            UserStudent userStudent = userStudentRepository.findById(userStudentId)
+                    .orElse(null);
+
+            if (userStudent == null) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "Student not found with userStudentId: " + userStudentId);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+            }
+
+            // Get associated StudentInfo
+            StudentInfo studentInfo = userStudent.getStudentInfo();
+
+            if (studentInfo == null) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "Student info not found for userStudentId: " + userStudentId);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+            }
+
+            // Build response with demographic data
+            Map<String, Object> response = new HashMap<>();
+            response.put("name", studentInfo.getName());
+            response.put("gender", studentInfo.getGender());
+            response.put("studentClass", studentInfo.getStudentClass());
+            response.put("schoolBoard", studentInfo.getSchoolBoard());
+            response.put("sibling", studentInfo.getSibling());
+            response.put("family", studentInfo.getFamily());
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            System.err.println("Error fetching demographics: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Failed to fetch demographics: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
+
     @PostMapping("/updateDemographics")
     public ResponseEntity<?> updateDemographics(@RequestBody Map<String, Object> request) {
         try {

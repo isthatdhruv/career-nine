@@ -17,10 +17,14 @@ export default function StudentsList() {
   const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [studentsLoading, setStudentsLoading] = useState(true);
+  const [assessmentsLoading, setAssessmentsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
   const [hasChanges, setHasChanges] = useState(false);
+
+  // Computed loading state - true if either students or assessments are loading
+  const loading = studentsLoading || assessmentsLoading;
 
   // Modal state
   const [showModal, setShowModal] = useState(false);
@@ -30,16 +34,22 @@ export default function StudentsList() {
     const instituteId = localStorage.getItem('instituteId');
 
     // Fetch assessments
+    setAssessmentsLoading(true);
     getAllAssessments()
       .then(response => {
         setAssessments(response.data);
+        console.log("Loaded assessments:", response.data); // Debug log
       })
       .catch(error => {
         console.error("Error fetching assessments:", error);
+      })
+      .finally(() => {
+        setAssessmentsLoading(false);
       });
 
+    // Fetch students
     if (instituteId) {
-      setLoading(true);
+      setStudentsLoading(true);
       getStudentsWithMappingByInstituteId(Number(instituteId))
         .then(response => {
           const studentData = response.data.map((student: any) => {
@@ -62,9 +72,11 @@ export default function StudentsList() {
         .catch(error => {
           console.error("Error fetching student info:", error);
         })
-        .finally(() => setLoading(false));
+        .finally(() => {
+          setStudentsLoading(false);
+        });
     } else {
-      setLoading(false);
+      setStudentsLoading(false);
     }
   }, []);
 

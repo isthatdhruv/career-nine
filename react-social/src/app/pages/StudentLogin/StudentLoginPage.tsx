@@ -118,7 +118,7 @@ const StudentLoginPage: React.FC = () => {
       };
 
       try {
-        const response = await fetch('http://localhost:8080/user/auth', {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/user/auth`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
