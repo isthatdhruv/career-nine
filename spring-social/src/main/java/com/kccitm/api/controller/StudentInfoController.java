@@ -24,6 +24,7 @@ import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
 import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
+import com.kccitm.api.repository.AssessmentRawScoreRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
@@ -43,6 +44,8 @@ public class StudentInfoController {
     private InstituteDetailRepository instituteDetailRepository;
     @Autowired
     private AssessmentAnswerRepository assessmentAnswerRepository;
+    @Autowired
+    private AssessmentRawScoreRepository assessmentRawScoreRepository;
 
     @GetMapping("/getAll")
     public List<StudentInfo> getAllStudentInfo() {
@@ -380,6 +383,53 @@ public class StudentInfoController {
             e.printStackTrace();
             Map<String, String> error = new HashMap<>();
             error.put("error", "Failed to update demographics: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
+
+    @PostMapping("/resetAssessment")
+    @javax.transaction.Transactional
+    public ResponseEntity<?> resetAssessment(@RequestBody Map<String, Long> request) {
+        try {
+            Long userStudentId = request.get("userStudentId");
+            Long assessmentId = request.get("assessmentId");
+
+            if (userStudentId == null || assessmentId == null) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "userStudentId and assessmentId are required");
+                return ResponseEntity.badRequest().body(error);
+            }
+
+            // Find the mapping
+            java.util.Optional<StudentAssessmentMapping> mappingOpt = studentAssessmentMappingRepository
+                    .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+
+            if (mappingOpt.isEmpty()) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "No assessment mapping found for this student and assessment");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+            }
+
+            StudentAssessmentMapping mapping = mappingOpt.get();
+
+            // Delete raw scores for this mapping
+            assessmentRawScoreRepository.deleteByStudentAssessmentMappingStudentAssessmentId(
+                    mapping.getStudentAssessmentId());
+
+            // Reset status to 'notstarted'
+            mapping.setStatus("notstarted");
+            studentAssessmentMappingRepository.save(mapping);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Assessment reset successfully");
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            System.err.println("Error resetting assessment: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Failed to reset assessment: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
         }
     }

@@ -12,6 +12,7 @@ type Assessment = {
 export default function AllottedAssessmentPage() {
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [loadingId, setLoadingId] = useState<number | null>(null);
+  const [showOngoingModal, setShowOngoingModal] = useState(false);
   const navigate = useNavigate();
   const { fetchAssessmentData } = useAssessment();
 
@@ -40,6 +41,12 @@ export default function AllottedAssessmentPage() {
       return; // Button should be disabled, but just in case
     }
 
+    // Check if ongoing - show styled modal to contact administrator
+    if (assessment.studentStatus === 'ongoing') {
+      setShowOngoingModal(true);
+      return;
+    }
+
     // Check if active
     if (!assessment.isActive) {
       alert("This assessment is not currently active.");
@@ -51,6 +58,16 @@ export default function AllottedAssessmentPage() {
     try {
       // Store the selected assessment ID for use in other pages
       localStorage.setItem('assessmentId', String(assessment.assessmentId));
+
+      // Update status to 'ongoing' on the backend
+      await fetch(`${process.env.REACT_APP_API_URL}/assessments/startAssessment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userStudentId: Number(userStudentId),
+          assessmentId: assessment.assessmentId
+        })
+      });
 
       await fetchAssessmentData(String(assessment.assessmentId));
       navigate('/general-instructions');
@@ -403,6 +420,111 @@ export default function AllottedAssessmentPage() {
           </div>
         )}
       </div>
+
+      {/* Ongoing Assessment Modal */}
+      {showOngoingModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+          onClick={() => setShowOngoingModal(false)}
+        >
+          <div
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '24px',
+              padding: '2.5rem',
+              maxWidth: '420px',
+              width: '90%',
+              textAlign: 'center',
+              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)',
+              animation: 'fadeIn 0.3s ease',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Warning Icon */}
+            <div
+              style={{
+                width: '80px',
+                height: '80px',
+                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 1.5rem',
+                boxShadow: '0 8px 24px rgba(245, 158, 11, 0.4)',
+              }}
+            >
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+
+            {/* Title */}
+            <h3
+              style={{
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                color: '#1f2937',
+                marginBottom: '0.75rem',
+              }}
+            >
+              Assessment In Progress
+            </h3>
+
+            {/* Message */}
+            <p
+              style={{
+                color: '#6b7280',
+                fontSize: '1rem',
+                lineHeight: '1.6',
+                marginBottom: '2rem',
+              }}
+            >
+              Your assessment is currently in progress. Please contact your <strong>administrator</strong> to reset your assessment if needed.
+            </p>
+
+            {/* Close Button */}
+            <button
+              onClick={() => setShowOngoingModal(false)}
+              style={{
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                border: 'none',
+                padding: '0.875rem 2.5rem',
+                borderRadius: '12px',
+                fontSize: '1rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+                transition: 'all 0.3s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.5)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.4)';
+              }}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

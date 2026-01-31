@@ -81,6 +81,34 @@ public class AssessmentTableController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/student/{userStudentId}")
+    public ResponseEntity<List<HashMap<String, Object>>> getAssessmentsForStudent(
+            @PathVariable Long userStudentId) {
+        // Get all assessment mappings for this student
+        List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
+                .findByUserStudentUserStudentId(userStudentId);
+
+        java.util.ArrayList<HashMap<String, Object>> result = new java.util.ArrayList<>();
+
+        for (StudentAssessmentMapping mapping : mappings) {
+            HashMap<String, Object> assessmentInfo = new HashMap<>();
+            assessmentInfo.put("assessmentId", mapping.getAssessmentId());
+            assessmentInfo.put("status", mapping.getStatus());
+
+            // Get assessment name
+            Optional<AssessmentTable> assessment = assessmentTableRepository.findById(mapping.getAssessmentId());
+            if (assessment.isPresent()) {
+                assessmentInfo.put("assessmentName", assessment.get().getAssessmentName());
+            } else {
+                assessmentInfo.put("assessmentName", "Unknown Assessment");
+            }
+
+            result.add(assessmentInfo);
+        }
+
+        return ResponseEntity.ok(result);
+    }
+
     @GetMapping("/getby/{id}")
     public List<Questionnaire> getQuestionnaireById(@PathVariable Long id) {
 
@@ -162,6 +190,42 @@ public class AssessmentTableController {
         }
         assessmentTableRepository.deleteById(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/startAssessment")
+    public ResponseEntity<HashMap<String, Object>> startAssessment(
+            @RequestBody java.util.Map<String, Long> request) {
+        Long userStudentId = request.get("userStudentId");
+        Long assessmentId = request.get("assessmentId");
+
+        HashMap<String, Object> response = new HashMap<>();
+
+        if (userStudentId == null || assessmentId == null) {
+            response.put("success", false);
+            response.put("error", "userStudentId and assessmentId are required");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        Optional<StudentAssessmentMapping> mappingOpt = studentAssessmentMappingRepository
+                .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+
+        if (mappingOpt.isEmpty()) {
+            response.put("success", false);
+            response.put("error", "No assessment mapping found");
+            return ResponseEntity.status(404).body(response);
+        }
+
+        StudentAssessmentMapping mapping = mappingOpt.get();
+
+        // Only update if not completed
+        if (!"completed".equals(mapping.getStatus())) {
+            mapping.setStatus("ongoing");
+            studentAssessmentMappingRepository.save(mapping);
+        }
+
+        response.put("success", true);
+        response.put("status", mapping.getStatus());
+        return ResponseEntity.ok(response);
     }
 
 }

@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getStudentsWithMappingByInstituteId, getAllAssessments, bulkAlotAssessment, Assessment } from "./StudentInfo_APIs";
 import StudentAnswerExcelModal from "./StudentAnswerExcelModal";
+import ResetAssessmentModal from "./ResetAssessmentModal";
 
 export type Student = {
   id: number;
@@ -29,6 +30,10 @@ export default function StudentsList() {
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+
+  // Reset modal state
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetStudent, setResetStudent] = useState<Student | null>(null);
 
   useEffect(() => {
     const instituteId = localStorage.getItem('instituteId');
@@ -147,6 +152,42 @@ export default function StudentsList() {
   const handleCloseModal = () => {
     setShowModal(false);
     setSelectedStudent(null);
+  };
+
+  const handleResetClick = (student: Student) => {
+    setResetStudent(student);
+    setShowResetModal(true);
+  };
+
+  const handleCloseResetModal = () => {
+    setShowResetModal(false);
+    setResetStudent(null);
+  };
+
+  const handleResetSuccess = async () => {
+    // Refresh students data
+    const instituteId = localStorage.getItem('instituteId');
+    if (instituteId) {
+      try {
+        const response = await getStudentsWithMappingByInstituteId(Number(instituteId));
+        const studentData = response.data.map((student: any) => {
+          const assignedIds = Array.isArray(student.assignedAssessmentIds)
+            ? student.assignedAssessmentIds
+            : [];
+          return {
+            id: student.id,
+            name: student.name || "",
+            schoolRollNumber: student.schoolRollNumber || "",
+            selectedAssessment: "",
+            userStudentId: student.userStudentId,
+            assignedAssessmentIds: assignedIds,
+          };
+        });
+        setStudents(studentData);
+      } catch (error) {
+        console.error("Error refreshing students:", error);
+      }
+    }
   };
 
   const filteredStudents = useMemo(() => {
@@ -361,19 +402,36 @@ export default function StudentsList() {
                       </td>
 
                       <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
-                        <button
-                          className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1"
-                          onClick={() => handleDownloadClick(student)}
-                          style={{
-                            borderRadius: '8px',
-                            padding: '6px 12px',
-                            fontWeight: 500,
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          <i className="bi bi-download"></i>
-                          Download
-                        </button>
+                        <div className="d-flex gap-2">
+                          <button
+                            className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1"
+                            onClick={() => handleDownloadClick(student)}
+                            style={{
+                              borderRadius: '8px',
+                              padding: '6px 12px',
+                              fontWeight: 500,
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <i className="bi bi-download"></i>
+                            Download
+                          </button>
+                          <button
+                            className="btn btn-outline-warning btn-sm d-flex align-items-center gap-1"
+                            onClick={() => handleResetClick(student)}
+                            disabled={student.assignedAssessmentIds.length === 0}
+                            title={student.assignedAssessmentIds.length === 0 ? "No assessments assigned" : "Reset assessment"}
+                            style={{
+                              borderRadius: '8px',
+                              padding: '6px 12px',
+                              fontWeight: 500,
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <i className="bi bi-arrow-counterclockwise"></i>
+                            Reset
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -435,6 +493,17 @@ export default function StudentsList() {
           show={showModal}
           onHide={handleCloseModal}
           student={selectedStudent}
+        />
+      )}
+
+      {/* Reset Assessment Modal */}
+      {resetStudent && (
+        <ResetAssessmentModal
+          show={showResetModal}
+          onClose={handleCloseResetModal}
+          userStudentId={resetStudent.userStudentId}
+          studentName={resetStudent.name}
+          onResetSuccess={handleResetSuccess}
         />
       )}
     </div>

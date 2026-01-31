@@ -106,3 +106,11 @@ export function getStudentAnswersWithDetails(userStudentId: number, assessmentId
         throw error;
     });
 }
+
+// Reset assessment - sets status to 'notstarted' and deletes raw scores
+export function resetAssessment(userStudentId: number, assessmentId: number) {
+    return axios.post(`${STUDENT_INFO_BASE}/resetAssessment`, {
+        userStudentId,
+        assessmentId
+    });
+}
