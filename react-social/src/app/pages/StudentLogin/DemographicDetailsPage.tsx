@@ -35,6 +35,7 @@ const DemographicDetailsPage: React.FC = () => {
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [originalData, setOriginalData] = useState<DemographicData | null>(null);
 
   // Fetch existing demographics on mount
   useEffect(() => {
@@ -65,6 +66,7 @@ const DemographicDetailsPage: React.FC = () => {
         };
 
         setFormData(mappedData);
+        setOriginalData(mappedData); // Store original for comparison
       } catch (error: any) {
         // If no data found (404), that's okay - user hasn't filled form yet
         if (error.response?.status !== 404) {
@@ -173,6 +175,22 @@ const DemographicDetailsPage: React.FC = () => {
     }
 
     setIsSubmitting(true);
+
+    // Check if data has changed from original
+    const hasChanges = !originalData || 
+      formData.name !== originalData.name ||
+      formData.gender !== originalData.gender ||
+      formData.grade !== originalData.grade ||
+      formData.schoolBoard !== originalData.schoolBoard ||
+      formData.siblings !== originalData.siblings ||
+      formData.livingWith !== originalData.livingWith;
+
+    // If no changes, just navigate without API call
+    if (!hasChanges) {
+      navigate("/allotted-assessment");
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       // Parse grade to get class number (e.g., "3rd Grade" -> 3)

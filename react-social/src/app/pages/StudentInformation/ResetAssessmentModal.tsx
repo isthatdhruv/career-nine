@@ -179,19 +179,20 @@ export default function ResetAssessmentModal({
           <div className="modal-content border-0 shadow-lg" style={{ borderRadius: "20px" }}>
             {/* Header */}
             <div
-              className="modal-header border-0 pb-0"
+              className="modal-header border-0"
               style={{
                 background: "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
                 borderRadius: "20px 20px 0 0",
-                padding: "1.5rem",
+                padding: "1rem 1.25rem",
+                alignItems: "flex-start",
               }}
             >
-              <div>
-                <h5 className="mb-1 text-white fw-bold">
+              <div style={{ flex: 1 }}>
+                <h5 className="mb-0 text-white fw-bold" style={{ fontSize: "1.1rem" }}>
                   <i className="bi bi-arrow-counterclockwise me-2"></i>
                   Reset Assessment
                 </h5>
-                <p className="mb-0 text-white-50" style={{ fontSize: "0.9rem" }}>
+                <p className="mb-0 text-white mt-1" style={{ fontSize: "0.85rem", opacity: 0.9 }}>
                   {studentName}
                 </p>
               </div>
@@ -199,6 +200,7 @@ export default function ResetAssessmentModal({
                 type="button"
                 className="btn-close btn-close-white"
                 onClick={handleClose}
+                style={{ marginTop: "2px" }}
               ></button>
             </div>
 

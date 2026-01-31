@@ -89,7 +89,7 @@ export default function AllottedAssessmentPage() {
   const getStatusLabel = (status: string | null, isActive: boolean) => {
     if (status === 'completed') return 'Completed';
     if (!isActive) return 'Inactive';
-    if (status === 'ongoing') return 'In Progress';
+    if (status === 'ongoing') return 'Ongoing';
     return 'Not Started';
   };
 
