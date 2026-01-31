@@ -126,11 +126,11 @@ export default function Users() {
       <style>{`
         .form-select-custom {
           width: 100%;
-          padding: 1rem 1.25rem;
-          font-size: 1rem;
+          padding: 0.7rem 1rem;
+          font-size: 0.95rem;
           font-weight: 500;
           border: 2px solid #e0e0e0;
-          border-radius: 12px;
+          border-radius: 10px;
           transition: all 0.3s ease;
           background-color: white;
           cursor: pointer;
@@ -152,107 +152,56 @@ export default function Users() {
           cursor: pointer;
           accent-color: #4361ee;
         }
+
+        .institute-dropdown-container {
+          max-width: 350px;
+          margin-bottom: 1.5rem;
+        }
       `}</style>
 
-      {!selectedInstitute ? (
-        // Institute Selection Card
-        <div className="row justify-content-center">
-          <div className="col-12 col-md-8 col-lg-6">
-            <div className="card border-0 shadow-sm" style={{ borderRadius: '16px', overflow: 'hidden' }}>
-              <div className="card-header text-center text-white" style={{ background: 'linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)', padding: '2rem' }}>
-                <h2 className="mb-2 fw-bold">
-                  <i className="bi bi-building me-2"></i>
-                  Institute Selection
-                </h2>
-                <p className="mb-0 opacity-90">
-                  Select an institute to manage students and groups
-                </p>
-              </div>
+      {/* Institute Dropdown - Always visible at top left */}
+      <div className="institute-dropdown-container">
+        <label className="form-label mb-2 d-flex align-items-center gap-2" style={{ fontWeight: 600, color: '#1a1a2e', fontSize: '0.95rem' }}>
+          <i className="bi bi-building" style={{ color: '#4361ee' }}></i>
+          Select Institute
+        </label>
+        <select
+          className="form-select-custom"
+          value={selectedInstitute}
+          onChange={(e) => {
+            console.log("Selected value:", e.target.value);
+            const newValue = e.target.value ? Number(e.target.value) : "";
+            setSelectedInstitute(newValue);
+            if (!newValue) {
+              setStudents([]);
+              setQuery("");
+              setSelectedStudents(new Set());
+            }
+          }}
+        >
+          <option value="">🏫 Select Institute</option>
+          {institutes.map((inst) => (
+            <option key={inst.instituteCode} value={inst.instituteCode}>
+              {inst.instituteName}
+            </option>
+          ))}
+        </select>
+      </div>
 
-              <div className="card-body text-center" style={{ padding: '3rem', background: 'white' }}>
-                <div 
-                  className="mx-auto mb-4"
-                  style={{
-                    width: '80px',
-                    height: '80px',
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 10px 30px rgba(67, 97, 238, 0.3)'
-                  }}
-                >
-                  <i className="bi bi-buildings-fill text-white" style={{ fontSize: '2.5rem' }}></i>
-                </div>
-
-                <h4 className="mb-3 fw-semibold" style={{ color: '#1a1a2e' }}>
-                  Choose Your Institute
-                </h4>
-                <p className="text-muted mb-4">
-                  Please select the institute you want to work with
-                </p>
-
-                <div className="mb-4">
-                  <select
-                    className="form-select-custom"
-                    value={selectedInstitute}
-                    onChange={(e) => {
-                      console.log("Selected value:", e.target.value);
-                      setSelectedInstitute(e.target.value ? Number(e.target.value) : "");
-                    }}
-                  >
-                    <option value="">🏫 Select Institute</option>
-                    {institutes.map((inst) => (
-                      <option key={inst.instituteCode} value={inst.instituteCode}>
-                        {inst.instituteName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {!selectedInstitute && (
-                  <div className="text-muted">
-                    <i className="bi bi-info-circle me-1"></i>
-                    No institute selected
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        // Students List Section
+      {/* Students List Section - Only shown when institute is selected */}
+      {selectedInstitute && (
         <>
           {/* Header Card */}
           <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px' }}>
             <div className="card-body p-4">
               <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
                 <div>
-                  <div className="d-flex align-items-center gap-2 mb-2">
-                    <button
-                      className="btn btn-sm btn-outline-secondary"
-                      onClick={() => {
-                        setSelectedInstitute("");
-                        setStudents([]);
-                        setQuery("");
-                        setSelectedStudents(new Set());
-                      }}
-                      style={{ borderRadius: '8px', padding: '4px 12px' }}
-                    >
-                      <i className="bi bi-arrow-left me-1"></i>
-                      Change Institute
-                    </button>
-                    <span className="badge bg-primary px-3 py-2" style={{ borderRadius: '20px', fontSize: '0.9rem' }}>
-                      {getSelectedInstituteName()}
-                    </span>
-                  </div>
                   <h2 className="mb-1 fw-bold" style={{ color: '#1a1a2e' }}>
                     <i className="bi bi-people-fill me-2" style={{ color: '#4361ee' }}></i>
                     Students List
                   </h2>
                   <p className="text-muted mb-0">
-                    View all students enrolled in the selected institute
+                    View all students enrolled in {getSelectedInstituteName()}
                   </p>
                 </div>
               </div>
@@ -462,6 +411,35 @@ export default function Users() {
           </div>
         </>
       )}
+
+      {/* No Institute Selected Message */}
+      {!selectedInstitute && (
+        <div className="card border-0 shadow-sm" style={{ borderRadius: '16px' }}>
+          <div className="card-body text-center py-5">
+            <div 
+              className="mx-auto mb-4"
+              style={{
+                width: '80px',
+                height: '80px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 10px 30px rgba(67, 97, 238, 0.3)'
+              }}
+            >
+              <i className="bi bi-buildings-fill text-white" style={{ fontSize: '2.5rem' }}></i>
+            </div>
+            <h4 className="mb-3 fw-semibold" style={{ color: '#1a1a2e' }}>
+              Select an Institute
+            </h4>
+            <p className="text-muted mb-0">
+              Please select an institute from the dropdown above to view students
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
-} 
+}
