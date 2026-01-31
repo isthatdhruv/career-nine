@@ -556,6 +556,7 @@ const SectionQuestionPage: React.FC = () => {
             objectFit: 'contain',
             borderRadius: '8px',
             border: '1px solid #e0e0e0',
+            filter: 'brightness(0.85) contrast(1.15)',
           }}
         />
       );
@@ -780,9 +781,10 @@ const SectionQuestionPage: React.FC = () => {
         <div
           className="card"
           style={{
-            width: 1000,
-            maxWidth: "98%",
-            minHeight: "650px",
+            width: "auto",
+            minWidth: "900px",
+            maxWidth: "1200px",
+            minHeight: "auto",
             borderRadius: "24px",
             border: "none",
             boxShadow: "0 20px 60px rgba(0,0,0,0.15)"
@@ -808,7 +810,7 @@ const SectionQuestionPage: React.FC = () => {
             </div>
 
             <div className="d-flex justify-content-between align-items-center mb-4">
-              <h6 style={{ color: "#4a5568", fontWeight: 600, marginBottom: 0, fontSize: "1rem" }}>
+              <h6 style={{ color: "#2d3748", fontWeight: 700, marginBottom: 0, fontSize: "1.1rem" }}>
                 Question {currentIndex + 1} of {questions.length}
               </h6>
               <div
@@ -860,9 +862,11 @@ const SectionQuestionPage: React.FC = () => {
                       </h6>
                       <div
                         style={{
-                          fontSize: "1.1rem",
-                          lineHeight: "1.6",
+                          fontSize: "1.2rem",
+                          lineHeight: "1.7",
                           whiteSpace: "pre-line",
+                          color: "#1a202c",
+                          fontWeight: 500,
                         }}
                       >
                         {getQuestionText(lang.language.languageId)}
@@ -875,12 +879,12 @@ const SectionQuestionPage: React.FC = () => {
                 ))}
               </div>
             ) : (
-              <h4 className="mb-4">{question.question.questionText}</h4>
+              <h4 className="mb-4" style={{ fontSize: "1.2rem", color: "#1a202c", fontWeight: 500 }}>{question.question.questionText}</h4>
             )}
 
             {/* Display maxOptionsAllowed */}
             <div className="text-muted mb-3">
-              <small>
+              <small style={{ fontSize: "1.1rem", color: "#4a5568", fontWeight: 500 }}>
                 {question.question.questionType === "ranking" ? (
                   <>
                     Please rank <strong>{question.question.maxOptionsAllowed}</strong> option(s) in order of preference (1 = most important).
@@ -909,7 +913,7 @@ const SectionQuestionPage: React.FC = () => {
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
-                            <div className="font-bold text-purple-900 mb-2">
+                            <div className="font-bold text-purple-900 mb-2" style={{ fontSize: "1.1rem", color: "#2d3748" }}>
                               🎮 Game: {opt.game.gameName}
                             </div>
                             {languages.length > 0 ? (
@@ -922,7 +926,7 @@ const SectionQuestionPage: React.FC = () => {
                               >
                                 {languages.map((lang, index) => (
                                   <React.Fragment key={lang.language.languageId}>
-                                    <div style={{ fontSize: "0.95rem", lineHeight: "1.5" }}>
+                                    <div style={{ fontSize: "1.2rem", lineHeight: "1.6", color: "#2d3748" }}>
                                       {getOptionText(opt, lang.language.languageId)}
                                     </div>
                                     {index === 0 && languages.length > 1 && (
@@ -932,7 +936,7 @@ const SectionQuestionPage: React.FC = () => {
                                 ))}
                               </div>
                             ) : (
-                              <span>{opt.optionText}</span>
+                              <span style={{ fontSize: "1.2rem", color: "#2d3748" }}>{opt.optionText}</span>
                             )}
                           </div>
                           <button
@@ -973,7 +977,7 @@ const SectionQuestionPage: React.FC = () => {
                         className={`border rounded p-3 d-block mb-2 ${currentRank ? "bg-light" : ""}`}
                         style={{ display: "flex", alignItems: "center", gap: "15px" }}
                       >
-                        <div style={{ minWidth: "80px" }}>
+                        <div style={{ minWidth: "120px" }}>
                           <select
                             className="form-select form-select-sm"
                             value={currentRank || ""}
@@ -981,7 +985,7 @@ const SectionQuestionPage: React.FC = () => {
                               const value = e.target.value;
                               handleRankChange(opt.optionId, value ? parseInt(value) : null);
                             }}
-                            style={{ width: "70px" }}
+                            style={{ width: "110px", fontSize: "1rem", fontWeight: 600, color: "#2d3748" }}
                           >
                             <option value="">Rank</option>
                             {currentRank && !availableRanks.includes(currentRank) ? (
@@ -1007,7 +1011,7 @@ const SectionQuestionPage: React.FC = () => {
                             >
                               {languages.map((lang, index) => (
                                 <React.Fragment key={lang.language.languageId}>
-                                  <div style={{ fontSize: "0.95rem", lineHeight: "1.5" }}>
+                                  <div style={{ fontSize: "1.2rem", lineHeight: "1.6", color: "#2d3748" }}>
                                     {getOptionText(opt, lang.language.languageId)}
                                   </div>
                                   {index === 0 && languages.length > 1 && (
@@ -1017,7 +1021,7 @@ const SectionQuestionPage: React.FC = () => {
                               ))}
                             </div>
                           ) : (
-                            <span>{opt.optionText}</span>
+                            <span style={{ fontSize: "1.2rem", color: "#2d3748" }}>{opt.optionText}</span>
                           )}
                         </div>
                       </div>
@@ -1059,7 +1063,7 @@ const SectionQuestionPage: React.FC = () => {
                           >
                             {languages.map((lang, index) => (
                               <React.Fragment key={lang.language.languageId}>
-                                <div style={{ fontSize: "0.95rem", lineHeight: "1.5" }}>
+                                <div style={{ fontSize: "1.2rem", lineHeight: "1.6", color: "#2d3748" }}>
                                   {getOptionText(opt, lang.language.languageId)}
                                 </div>
                                 {index === 0 && languages.length > 1 && (
@@ -1069,7 +1073,7 @@ const SectionQuestionPage: React.FC = () => {
                             ))}
                           </div>
                         ) : (
-                          <span>{opt.optionText}</span>
+                          <span style={{ fontSize: "1.2rem", color: "#2d3748" }}>{opt.optionText}</span>
                         )}
                       </div>
                     </label>
