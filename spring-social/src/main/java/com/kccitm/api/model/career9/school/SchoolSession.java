@@ -13,6 +13,7 @@ import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
+import javax.persistence.Transient;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -34,6 +35,9 @@ public class SchoolSession implements Serializable {
     @JsonIgnore
     @JoinColumn(name = "institute_id", referencedColumnName = "institute_code", nullable = false)
     private InstituteDetail institute;
+
+    @Transient
+    private Integer instituteCode;
 
     // Getters and Setters
     public Integer getId() {
@@ -70,6 +74,13 @@ public class SchoolSession implements Serializable {
 
     // Helper method to get instituteCode (optional, for convenience)
     public Integer getInstituteCode() {
+        if (instituteCode != null) {
+            return instituteCode;
+        }
         return institute != null ? institute.getInstituteCode() : null;
+    }
+
+    public void setInstituteCode(Integer instituteCode) {
+        this.instituteCode = instituteCode;
     }
 }

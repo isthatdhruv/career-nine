@@ -8,9 +8,8 @@ const deleteCollege = `${API_URL}/instituteDetail/delete/`;
 const createSession = `${API_URL}/schoolSession/create`;
 
 export function CreateSessionData(values: any) {
-  return axios.post(createSession ,{
-    values
-  });
+  console.log("API Call - CreateSessionData with values:", values);
+  return axios.post(createSession, values);
 }
 export function ReadCollegeData() {
   return axios.get(readCollege);
