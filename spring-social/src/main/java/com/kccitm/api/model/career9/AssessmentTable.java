@@ -9,6 +9,7 @@ import javax.persistence.JoinColumn;
 import javax.persistence.OneToOne;
 import javax.persistence.Table;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kccitm.api.model.career9.Questionaire.Questionnaire;
 
 // import org.springframework.boot.context.properties.bind.DefaultValue;
@@ -24,6 +25,7 @@ public class AssessmentTable implements java.io.Serializable {
     @Column(name = "assessment_id")
     private Long id;
 
+    @JsonProperty("AssessmentName")
     private String AssessmentName;
 
     @Column(name = "is_active")
@@ -55,8 +57,9 @@ public class AssessmentTable implements java.io.Serializable {
         this.isActive = isActive;
     }
 
-    public AssessmentTable(){
+    public AssessmentTable() {
     }
+
     public String getAssessmentName() {
         return AssessmentName;
     }

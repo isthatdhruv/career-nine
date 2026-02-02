@@ -7,7 +7,7 @@ import { PageTitle } from "../../../_metronic/layout/core";
 import { getCSSVariableValue } from "../../../_metronic/assets/ts/_utils";
 import { toAbsoluteUrl } from "../../../_metronic/helpers";
 import { useThemeMode } from "../../../_metronic/partials/layout/theme-mode/ThemeModeProvider";
-import { getStudentsWithMappingByInstituteId } from "../StudentInformation/StudentInfo_APIs";
+import { getStudentsWithMappingByInstituteId, StudentWithMapping } from "../StudentInformation/StudentInfo_APIs";
 
 type DashboardRole = "principal" | "teacher" | "student";
 
@@ -49,15 +49,15 @@ const dashboards: Record<DashboardRole, RoleData> = {
         tone: "primary",
       },
       {
-        title: "Career readiness",
-        value: "78%",
-        helper: "Suitability index (Career Navigator)",
+        title: "Completed Assessment",
+        value: "304",
+        helper: "Finished Navigator Assessment",
         tone: "success",
       },
       {
-        title: "Exploration complete",
-        value: "68%",
-        helper: "Finished Insight Navigator",
+        title: "Assessment Not Started",
+        value: "338",
+        helper: "Not Started Navigator Assessment",
         tone: "info",
       },
       {
@@ -523,34 +523,169 @@ const dashboards: Record<DashboardRole, RoleData> = {
 const cssColor = (variable: string, fallback: string) =>
   (getCSSVariableValue(variable) || fallback).trim() || fallback;
 
-const DashboardAdminContent: FC<{ studentCount: number | null }> = ({ studentCount }) => {
+// Modal types for student lists
+type ModalType = 'total' | 'ongoing' | 'completed' | 'notstarted' | null;
+
+// Student list modal component
+const StudentListModal: FC<{
+  show: boolean;
+  onClose: () => void;
+  title: string;
+  students: StudentWithMapping[];
+}> = ({ show, onClose, title, students }) => {
+  if (!show) return null;
+
+  return (
+    <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={onClose}>
+      <div className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" onClick={e => e.stopPropagation()}>
+        <div className="modal-content">
+          <div className="modal-header">
+            <h5 className="modal-title fw-bold">{title}</h5>
+            <button type="button" className="btn-close" onClick={onClose}></button>
+          </div>
+          <div className="modal-body">
+            {students.length === 0 ? (
+              <div className="text-center text-muted py-5">No students found</div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-row-bordered table-row-gray-200 align-middle gs-0 gy-3">
+                  <thead>
+                    <tr className="fw-bold text-muted bg-light">
+                      <th className="ps-4 min-w-50px">#</th>
+                      <th className="min-w-150px">Name</th>
+                      <th className="min-w-100px">Roll Number</th>
+                      <th className="min-w-200px">Assessment Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {students.map((student, index) => (
+                      <tr key={student.userStudentId}>
+                        <td className="ps-4">{index + 1}</td>
+                        <td className="fw-semibold text-gray-800">{student.name || 'N/A'}</td>
+                        <td className="text-gray-600">{student.schoolRollNumber || 'N/A'}</td>
+                        <td>
+                          {student.assessments && student.assessments.length > 0 ? (
+                            <div className="d-flex flex-wrap gap-1">
+                              {student.assessments.map((assessment, idx) => (
+                                <span
+                                  key={idx}
+                                  className={`badge ${assessment.status === 'completed'
+                                    ? 'badge-light-success'
+                                    : assessment.status === 'inprogress'
+                                      ? 'badge-light-warning'
+                                      : 'badge-light-secondary'
+                                    }`}
+                                  title={assessment.assessmentName}
+                                >
+                                  {assessment.assessmentName}: {assessment.status}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="badge badge-light-secondary">No assessments</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+          <div className="modal-footer">
+            <span className="text-muted me-auto">Total: {students.length} students</span>
+            <button type="button" className="btn btn-light-primary" onClick={onClose}>Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+interface DashboardAdminContentProps {
+  students: StudentWithMapping[];
+  isLoading: boolean;
+}
+
+const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoading }) => {
   const { mode } = useThemeMode();
   const navigate = useNavigate();
   const [role, setRole] = useState<DashboardRole>("principal");
   const [now, setNow] = useState(new Date());
-  
+  const [activeModal, setActiveModal] = useState<ModalType>(null);
+
+  // Compute student stats from assessment data
+  const studentStats = useMemo(() => {
+    const total = students.length;
+
+    // Not started: students with at least one assessment that has 'notstarted' status
+    const notStarted = students.filter(student =>
+      student.assessments?.some(a => a.status === 'notstarted')
+    );
+
+    // Ongoing (In Progress): students with at least one assessment that has 'inprogress' status
+    const ongoing = students.filter(student =>
+      student.assessments?.some(a => a.status === 'inprogress')
+    );
+
+    // Completed: students where ALL assessments have 'completed' status
+    const completed = students.filter(student =>
+      student.assessments && student.assessments.length > 0 &&
+      student.assessments.every(a => a.status === 'completed')
+    );
+
+    return {
+      total,
+      notStartedCount: notStarted.length,
+      ongoingCount: ongoing.length,
+      completedCount: completed.length,
+      notStartedStudents: notStarted,
+      ongoingStudents: ongoing,
+      completedStudents: completed,
+      allStudents: students,
+    };
+  }, [students]);
+
   // Create a mutable copy of dashboards data with dynamic student count
   const data = useMemo(() => {
     const roleData = { ...dashboards[role] };
-    
-    // Update the first stat (Total students) with actual count
-    if (role === "principal" && studentCount !== null) {
+
+    // Update the stats with actual counts for principal view
+    // Order: Total → Ongoing → Completed → Not Started
+    if (role === "principal") {
       roleData.stats = [...roleData.stats];
       roleData.stats[0] = {
         ...roleData.stats[0],
-        value: studentCount.toString(),
+        title: "Total students",
+        value: isLoading ? "..." : studentStats.total.toString(),
+        helper: "Across all grades",
+        tone: "primary",
       };
-    } else if (role === "principal" && studentCount === null) {
-      // Show loading state
-      roleData.stats = [...roleData.stats];
-      roleData.stats[0] = {
-        ...roleData.stats[0],
-        value: "...",
+      roleData.stats[1] = {
+        ...roleData.stats[1],
+        title: "Ongoing Assessment",
+        value: isLoading ? "..." : studentStats.ongoingCount.toString(),
+        helper: "Assessment in progress",
+        tone: "warning",
+      };
+      roleData.stats[2] = {
+        ...roleData.stats[2],
+        title: "Completed Assessment",
+        value: isLoading ? "..." : studentStats.completedCount.toString(),
+        helper: "Finished all assessments",
+        tone: "success",
+      };
+      roleData.stats[3] = {
+        ...roleData.stats[3],
+        title: "Not Started",
+        value: isLoading ? "..." : studentStats.notStartedCount.toString(),
+        helper: "Assessment not started",
+        tone: "danger",
       };
     }
-    
+
     return roleData;
-  }, [role, studentCount]);
+  }, [role, isLoading, studentStats]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30000);
@@ -718,12 +853,12 @@ const DashboardAdminContent: FC<{ studentCount: number | null }> = ({ studentCou
   const handleNavigateToStudentList = () => {
     // Optional: Verify instituteId exists before navigating
     const instituteId = localStorage.getItem('instituteId');
-    
+
     if (!instituteId) {
       alert('Institute ID not found. Please reload the page.');
       return;
     }
-    
+
     navigate("/school/dashboard/studentList");
   };
 
@@ -791,31 +926,61 @@ const DashboardAdminContent: FC<{ studentCount: number | null }> = ({ studentCou
         </div>
 
         <div className="row g-4 row-cols-1 row-cols-md-2 row-cols-xl-4">
-          {data.stats.map((stat, index) => (
-            <div className="col" key={stat.title}>
-              <div className="card shadow-sm h-100">
-                <div className="card-body py-4 d-flex flex-column gap-3">
-                  <div className="d-flex align-items-center justify-content-between">
-                    <span className="text-gray-600 fw-semibold text-uppercase fs-8">
-                      {stat.title}
-                    </span>
-                    <span className={`badge badge-light-${stat.tone}`}>{stat.helper}</span>
+          {data.stats.map((stat, index) => {
+            // All 4 cards are clickable in principal view
+            const isClickable = role === "principal";
+            // Order: 0=total, 1=ongoing, 2=completed, 3=notstarted
+            const modalType: ModalType = index === 0 ? 'total' : index === 1 ? 'ongoing' : index === 2 ? 'completed' : index === 3 ? 'notstarted' : null;
+
+            return (
+              <div className="col" key={stat.title}>
+                <div
+                  className={`card shadow-sm h-100 ${isClickable ? 'cursor-pointer' : ''}`}
+                  onClick={isClickable ? () => setActiveModal(modalType) : undefined}
+                  style={isClickable ? { cursor: 'pointer', transition: 'transform 0.2s' } : undefined}
+                  onMouseEnter={isClickable ? (e) => (e.currentTarget.style.transform = 'scale(1.02)') : undefined}
+                  onMouseLeave={isClickable ? (e) => (e.currentTarget.style.transform = 'scale(1)') : undefined}
+                >
+                  <div className="card-body py-4 d-flex flex-column gap-3">
+                    <div className="d-flex align-items-center justify-content-between">
+                      <span className="text-gray-600 fw-semibold text-uppercase fs-8">
+                        {stat.title}
+                      </span>
+                      <span className={`badge badge-light-${stat.tone}`}>{stat.helper}</span>
+                    </div>
+                    <div className="d-flex align-items-end justify-content-between">
+                      {isLoading && role === "principal" ? (
+                        <div className="d-flex align-items-center gap-2">
+                          <span className="spinner-border spinner-border-sm text-primary" role="status">
+                            <span className="visually-hidden">Loading...</span>
+                          </span>
+                          <span className="text-muted fs-6">Loading...</span>
+                        </div>
+                      ) : (
+                        <span className="fw-bolder fs-2 text-gray-800">{stat.value}</span>
+                      )}
+                      {isClickable && !isLoading && (
+                        <span className="text-muted fs-8">
+                          <i className="bi bi-eye-fill me-1"></i>View
+                        </span>
+                      )}
+                    </div>
+                    {index === 0 && role === "principal" && (
+                      <button
+                        className="btn btn-sm btn-primary mt-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleNavigateToStudentList();
+                        }}
+                      >
+                        List of Students
+                      </button>
+                    )}
                   </div>
-                  <div className="d-flex align-items-end justify-content-between">
-                    <span className="fw-bolder fs-2 text-gray-800">{stat.value}</span>
-                  </div>
-                  {index === 0 && role === "principal" && (
-                    <button
-                      className="btn btn-sm btn-primary mt-2"
-                      onClick={handleNavigateToStudentList}
-                    >
-                      List of Students
-                    </button>
-                  )}
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="row g-5">
@@ -991,6 +1156,32 @@ const DashboardAdminContent: FC<{ studentCount: number | null }> = ({ studentCou
           </div>
         )}
       </div>
+
+      {/* Student List Modals */}
+      <StudentListModal
+        show={activeModal === 'total'}
+        onClose={() => setActiveModal(null)}
+        title="All Students"
+        students={studentStats.allStudents}
+      />
+      <StudentListModal
+        show={activeModal === 'ongoing'}
+        onClose={() => setActiveModal(null)}
+        title="Students with Ongoing Assessments"
+        students={studentStats.ongoingStudents}
+      />
+      <StudentListModal
+        show={activeModal === 'completed'}
+        onClose={() => setActiveModal(null)}
+        title="Students with Completed Assessments"
+        students={studentStats.completedStudents}
+      />
+      <StudentListModal
+        show={activeModal === 'notstarted'}
+        onClose={() => setActiveModal(null)}
+        title="Students with Not Started Assessments"
+        students={studentStats.notStartedStudents}
+      />
     </>
   );
 };
@@ -998,25 +1189,29 @@ const DashboardAdminContent: FC<{ studentCount: number | null }> = ({ studentCou
 const InstituteDashboard: FC = () => {
   const intl = useIntl();
   const { id } = useParams();
-  const [studentCount, setStudentCount] = useState<number | null>(null);
+  const [students, setStudents] = useState<StudentWithMapping[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Store instituteId in localStorage and fetch student count
+  // Store instituteId in localStorage and fetch student data
   useEffect(() => {
     if (id) {
       localStorage.setItem('instituteId', id);
       localStorage.setItem('instituteName', ''); // Placeholder for institute name
       console.log('Institute ID saved to localStorage:', id);
 
-      // Fetch students to get the count
+      setIsLoading(true);
+      // Fetch students with full data
       getStudentsWithMappingByInstituteId(Number(id))
         .then(response => {
-          const count = response.data.length;
-          setStudentCount(count);
-          console.log('Total students fetched:', count);
+          setStudents(response.data);
+          console.log('Students fetched:', response.data.length);
         })
         .catch(error => {
           console.error('Error fetching students:', error);
-          setStudentCount(0); // Set to 0 on error
+          setStudents([]);
+        })
+        .finally(() => {
+          setIsLoading(false);
         });
     }
   }, [id]);
@@ -1026,7 +1221,7 @@ const InstituteDashboard: FC = () => {
       <PageTitle breadcrumbs={[]}>
         {intl.formatMessage({ id: "MENU.DASHBOARD" })}
       </PageTitle>
-      <DashboardAdminContent studentCount={studentCount} />
+      <DashboardAdminContent students={students} isLoading={isLoading} />
     </>
   );
 };

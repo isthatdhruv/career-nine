@@ -225,7 +225,7 @@ const StudentLoginPage: React.FC = () => {
                   marginBottom: '0.5rem',
                 }}
               >
-                User ID
+                Username
               </label>
               <div style={{ position: 'relative' }}>
                 <div

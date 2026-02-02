@@ -47,14 +47,18 @@ const AssessmentEditPage = (props?: {
   }
 
   const [assessmentData, setAssessmentData] = useState<any>(normalizeAssessmentData(props?.data || (location.state as any)?.data));
+  const [questionnairesLoading, setQuestionnairesLoading] = useState(true);
 
   useEffect(() => {
     const fetchQuestionnaires = async () => {
+      setQuestionnairesLoading(true);
       try {
         const response = await ReadQuestionaireData();
         setQuestionnaires(response.data);
       } catch (error) {
         console.error("Error fetching questionnaires:", error);
+      } finally {
+        setQuestionnairesLoading(false);
       }
     };
     fetchQuestionnaires();
@@ -100,7 +104,7 @@ const AssessmentEditPage = (props?: {
       try {
         const payload: any = {
           id: values.id,
-          assessmentName: values.assessmentName,
+          AssessmentName: values.assessmentName,
           starDate: values.startDate,
           endDate: values.endDate,
           isActive: values.isActive,
@@ -229,7 +233,14 @@ const AssessmentEditPage = (props?: {
             <div className="card mb-7">
               <h3 className="card-title">Select Questionnaire</h3>
               <div className="card-body">
-                {questionnaires.length === 0 ? (
+                {questionnairesLoading ? (
+                  <div className="d-flex align-items-center gap-2 py-4">
+                    <span className="spinner-border spinner-border-sm text-primary" role="status">
+                      <span className="visually-hidden">Loading...</span>
+                    </span>
+                    <span className="text-muted">Loading questionnaires...</span>
+                  </div>
+                ) : questionnaires.length === 0 ? (
                   <div className="text-muted">No questionnaires available</div>
                 ) : (
                   <div className="d-flex flex-column gap-3">
@@ -238,11 +249,10 @@ const AssessmentEditPage = (props?: {
                       return (
                         <label
                           key={qId ?? index}
-                          className={`d-flex align-items-center p-3 rounded border cursor-pointer ${
-                            selectedQuestionnaireId === qId
-                              ? "border-primary bg-light-primary"
-                              : "border-secondary"
-                          }`}
+                          className={`d-flex align-items-center p-3 rounded border cursor-pointer ${selectedQuestionnaireId === qId
+                            ? "border-primary bg-light-primary"
+                            : "border-secondary"
+                            }`}
                           style={{ cursor: "pointer", transition: "all 0.2s ease" }}
                         >
                           <input
