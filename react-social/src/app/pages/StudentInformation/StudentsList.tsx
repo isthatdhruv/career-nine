@@ -95,13 +95,26 @@ export default function StudentsList() {
   };
 
   const handleSave = async () => {
-    // Collect all new assignments
-    const assignments = students
+    // Prevent multiple concurrent submissions
+    if (saving) {
+      return;
+    }
+
+    // Collect all new assignments and deduplicate
+    const assignmentMap = new Map<string, { userStudentId: number; assessmentId: number }>();
+    students
       .filter(s => s.selectedAssessment && !s.assignedAssessmentIds.includes(Number(s.selectedAssessment)))
-      .map(s => ({
-        userStudentId: s.userStudentId,
-        assessmentId: Number(s.selectedAssessment),
-      }));
+      .forEach(s => {
+        const key = `${s.userStudentId}-${s.selectedAssessment}`;
+        if (!assignmentMap.has(key)) {
+          assignmentMap.set(key, {
+            userStudentId: s.userStudentId,
+            assessmentId: Number(s.selectedAssessment),
+          });
+        }
+      });
+
+    const assignments = Array.from(assignmentMap.values());
 
     if (assignments.length === 0) {
       alert("No new assessments to save.");

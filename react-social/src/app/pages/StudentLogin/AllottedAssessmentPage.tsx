@@ -149,7 +149,7 @@ export default function AllottedAssessmentPage() {
           </p>
         </header>
 
-        {assessments.length === 0 ? (
+        {assessments.filter((a) => a.isActive).length === 0 ? (
           <div
             style={{
               backgroundColor: 'white',
@@ -198,7 +198,7 @@ export default function AllottedAssessmentPage() {
               gap: '2rem',
             }}
           >
-            {assessments.map((assessment) => {
+            {assessments.filter((a) => a.isActive).map((assessment) => {
               const statusStyles = getStatusColor(assessment.studentStatus, assessment.isActive);
               const label = getStatusLabel(assessment.studentStatus, assessment.isActive);
               const icon = getStatusIcon(assessment.studentStatus, assessment.isActive);
