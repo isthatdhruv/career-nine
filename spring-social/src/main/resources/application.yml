@@ -1,6 +1,6 @@
 spring:
   profiles:
-    active: dev
+    active: staging
 
 server:
   port: 8080
@@ -103,7 +103,7 @@ spring:
     password: Career-qCsfeuECc3MW    # password: Google.com1
 
   jpa:
-    show-sql: true
+    show-sql: false
     hibernate:
       naming-strategy: org.hibernate.cfg.EJB3NamingStrategy
       ddl-auto: update

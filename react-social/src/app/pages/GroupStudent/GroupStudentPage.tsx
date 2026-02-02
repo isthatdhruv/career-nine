@@ -60,7 +60,7 @@ export default function GroupStudentPage() {
   const [downloadAnswers, setDownloadAnswers] = useState<StudentAnswerDetail[]>([]);
   const [downloadError, setDownloadError] = useState<string>("");
   const [downloading, setDownloading] = useState(false);
-
+  const [showStudentUsernameDownload, setShowStudentUsernameDownload] = useState(false);
   // Reset modal state
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetStudent, setResetStudent] = useState<Student | null>(null);
@@ -295,7 +295,7 @@ export default function GroupStudentPage() {
       alert("Assessment reset successfully!");
       setShowResetConfirm(false);
       setShowResetModal(false);
-      
+
       // Refresh student data
       if (selectedInstitute) {
         const response = await getStudentsWithMappingByInstituteId(
@@ -423,6 +423,58 @@ export default function GroupStudentPage() {
       (inst) => inst.instituteCode === selectedInstitute
     );
     return institute?.instituteName || "";
+  };
+
+  const handleDownloadStudentList = () => {
+    if (filteredStudents.length === 0) {
+      alert("No students to download.");
+      return;
+    }
+
+    try {
+      // Prepare data for Excel
+      const excelData = filteredStudents.map((student, index) => ({
+        "S.No": index + 1,
+        "User ID": student.userStudentId,
+        "Username": student.username || "N/A",
+        "Student Name": student.name,
+        // "Roll Number": student.schoolRollNumber || "N/A",
+        // "Phone Number": student.phoneNumber || "N/A",
+        "Date of Birth": student.studentDob ? formatDate(student.studentDob) : "N/A",
+        "Institute": getSelectedInstituteName(),
+      }));
+
+      // Create worksheet
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+      // Set column widths
+      worksheet["!cols"] = [
+        { wch: 8 },   // S.No
+        { wch: 12 },  // User ID
+        { wch: 20 },  // Username
+        { wch: 30 },  // Student Name
+        { wch: 18 },  // Roll Number
+        { wch: 18 },  // Phone Number
+        { wch: 15 },  // Date of Birth
+        { wch: 30 },  // Institute
+      ];
+
+      // Create workbook
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
+
+      // Generate filename
+      const instituteName = getSelectedInstituteName().replace(/\s+/g, "_");
+      const filename = `${instituteName}_Students_${Date.now()}.xlsx`;
+
+      // Download file
+      XLSX.writeFile(workbook, filename);
+
+      alert(`Student list downloaded successfully!`);
+    } catch (error) {
+      console.error("Error downloading student list:", error);
+      alert("Failed to download student list. Please try again.");
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -653,6 +705,29 @@ export default function GroupStudentPage() {
                       Unsaved Changes
                     </span>
                   )}
+                  <button
+                    className="btn btn-success d-flex align-items-center gap-2"
+                    onClick={handleDownloadStudentList}
+                    disabled={filteredStudents.length === 0}
+                    style={{
+                      background: filteredStudents.length > 0
+                        ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
+                        : "#e0e0e0",
+                      border: "none",
+                      borderRadius: "10px",
+                      padding: "0.6rem 1.2rem",
+                      fontWeight: 600,
+                      color: filteredStudents.length > 0 ? "#fff" : "#9e9e9e",
+                      cursor: filteredStudents.length > 0 ? "pointer" : "not-allowed",
+                      transition: "all 0.3s ease",
+                      boxShadow: filteredStudents.length > 0
+                        ? "0 4px 15px rgba(16, 185, 129, 0.3)"
+                        : "none",
+                    }}
+                  >
+                    <i className="bi bi-download"></i>
+                    Download List
+                  </button>
                 </div>
               </div>
             </div>
@@ -714,7 +789,7 @@ export default function GroupStudentPage() {
                             className="custom-checkbox"
                             checked={
                               selectedStudents.size ===
-                                filteredStudents.length &&
+                              filteredStudents.length &&
                               filteredStudents.length > 0
                             }
                             onChange={handleSelectAll}

@@ -12,11 +12,13 @@ import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.PrePersist;
 import javax.persistence.Table;
+import javax.persistence.UniqueConstraint;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
-@Table(name = "student_assessment_mapping")
+@Table(name = "student_assessment_mapping", 
+       uniqueConstraints = @UniqueConstraint(columnNames = {"user_student_id", "assessment_id"}))
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class StudentAssessmentMapping implements Serializable {
     private static final long serialVersionUID = 1L;
