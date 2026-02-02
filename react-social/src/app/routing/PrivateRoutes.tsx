@@ -61,6 +61,7 @@ import DashboardAdminPage from "../pages/demo-dashboard-v2/dashboard-admin";
 import DemographicDetailsPage from "../pages/StudentLogin/DemographicDetailsPage";
 import ThankYouPage from "../pages/StudentOnlineAssessment/components/ThankYouPage";
 import GeneralInstructionsPage from "../pages/StudentOnlineAssessment/components/GeneralInstructionsPage";
+import InstituteDashboard from "../pages/dashboard/InstituteDashboard";
 
 const PrivateRoutes = () => {
   const StudentsData = lazy(
@@ -220,7 +221,7 @@ const PrivateRoutes = () => {
 
         <Route path="/school/dashboard/:id" element={
           <SuspensedView>
-            <SchoolDashboardPage />
+            <InstituteDashboard />
           </SuspensedView>
         } />
         <Route

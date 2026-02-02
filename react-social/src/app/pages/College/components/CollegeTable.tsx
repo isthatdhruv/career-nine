@@ -13,7 +13,7 @@ import { DeleteCollegeData } from "../API/College_APIs";
 import CollegeEditModal from "./CollegeEditModal";
 import CollegeInfoModal from "./CollegeInfoModal";
 import CollegeAssignRoleModal from "../components/CollegeAssignRoleModal";
-import CollegeDetailModal from "../components/CollegeDetailModal";
+import CollegeDetailModal from "./CollegeSectionSessionGradeModal";
 
 // Layout reference image (local path)
 const layoutImagePath = "/mnt/data/556d6c4d-1033-4fd7-8d4f-f02d4f436ce2.png";
