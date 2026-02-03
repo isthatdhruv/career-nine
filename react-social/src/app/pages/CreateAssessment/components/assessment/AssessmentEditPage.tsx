@@ -7,12 +7,6 @@ import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
 import { ReadAssessmentByIdData, UpdateAssessmentData } from "../../API/Create_Assessment_APIs";
 import { ReadQuestionaireData } from "../../API/Create_Questionaire_APIs";
-import { Dropdown, Form } from "react-bootstrap";
-import { data } from "jquery";
-
-const validationSchema = Yup.object().shape({
-  AssessmentName: Yup.string().required("Assessment name is required"),
-});
 
 const AssessmentEditPage = (props?: {
   setPageLoading?: any;
