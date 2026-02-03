@@ -1,6 +1,5 @@
 package com.kccitm.api.controller;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,14 +16,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.User;
-import com.kccitm.api.model.career9.Questionaire.AssessmentAnswer;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
+import com.kccitm.api.model.userDefinedModel.ExcelOptionData;
+import com.kccitm.api.repository.AssessmentRawScoreRepository;
 import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
 import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
-import com.kccitm.api.repository.AssessmentRawScoreRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
@@ -55,97 +54,12 @@ public class StudentInfoController {
     }
 
     @GetMapping("/getStudentAnswersWithDetails")
-    public ResponseEntity<?> getStudentAnswersWithDetails(
+    public ExcelOptionData getStudentAnswersWithDetails(
             @RequestParam Long userStudentId,
             @RequestParam Long assessmentId) {
-
-        System.out.println("=== DEBUG INFO ===");
-        System.out.println("Received request - userStudentId: " + userStudentId + ", assessmentId: " + assessmentId);
-
-        try {
-            // Check if there are any answers for this user_student_id
-            Long totalAnswers = assessmentAnswerRepository.countByUserStudent_UserStudentId(userStudentId);
-            System.out.println("Total answers for user_student_id " + userStudentId + ": " + totalAnswers);
-
-            // Check for this specific assessment
-            Long assessmentAnswers = assessmentAnswerRepository
-                    .countByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
-            System.out.println("Answers for user_student_id " + userStudentId + " and assessment " +
-                    assessmentId + ": " + assessmentAnswers);
-
-            // Get answers with question and option details using JOIN FETCH
-            List<AssessmentAnswer> answers = assessmentAnswerRepository
-                    .findByUserStudentIdAndAssessmentIdWithDetails(userStudentId, assessmentId);
-
-            // Convert to Map format (similar to JDBC result)
-            List<Map<String, Object>> results = new ArrayList<>();
-
-            for (AssessmentAnswer answer : answers) {
-                Map<String, Object> resultMap = new HashMap<>();
-
-                // Add question details from QuestionnaireQuestion
-                if (answer.getQuestionnaireQuestion() != null) {
-                    resultMap.put("questionId", answer.getQuestionnaireQuestion().getQuestionnaireQuestionId());
-
-                    if (answer.getQuestionnaireQuestion().getQuestion() != null) {
-                        resultMap.put("questionText",
-                                answer.getQuestionnaireQuestion().getQuestion().getQuestionText());
-                    } else {
-                        resultMap.put("questionText", null);
-                    }
-
-                    String excelHeader = answer.getQuestionnaireQuestion().getExcelQuestionHeader();
-                    if (excelHeader == null || excelHeader.trim().isEmpty()) {
-                        excelHeader = (answer.getQuestionnaireQuestion().getQuestion() != null)
-                                ? answer.getQuestionnaireQuestion().getQuestion().getQuestionText()
-                                : null;
-                    }
-                    resultMap.put("excelQuestionHeader", excelHeader);
-
-                    if (answer.getQuestionnaireQuestion().getSection() != null
-                            && answer.getQuestionnaireQuestion().getSection().getSection() != null) {
-                        resultMap.put("sectionName",
-                                answer.getQuestionnaireQuestion().getSection().getSection().getSectionName());
-                    } else {
-                        resultMap.put("sectionName", null);
-                    }
-                } else {
-                    resultMap.put("questionId", null);
-                    resultMap.put("questionText", null);
-                    resultMap.put("excelQuestionHeader", null);
-                    resultMap.put("sectionName", null);
-                }
-
-                // Add option details from AssessmentQuestionOptions
-                if (answer.getOption() != null) {
-                    resultMap.put("optionId", answer.getOption().getOptionId());
-                    resultMap.put("optionText", answer.getOption().getOptionText());
-                } else {
-                    resultMap.put("optionId", null);
-                    resultMap.put("optionText", null);
-                }
-
-                results.add(resultMap);
-            }
-
-            System.out.println("Final query results count: " + results.size());
-            if (results.size() > 0) {
-                System.out.println("First result: " + results.get(0));
-            }
-            System.out.println("=================");
-
-            return ResponseEntity.ok(results);
-
-        } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
-            e.printStackTrace();
-
-            Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("error", "Error fetching student answers: " + e.getMessage());
-
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(errorResponse);
-        }
+                var data=assessmentAnswerRepository.iDoNotKnow(userStudentId, assessmentId);
+               return new ExcelOptionData(userStudentRepository.getNameByUserID(userStudentId),
+               assessmentAnswerRepository.findByUserStudentIdAndAssessmentIdWithDetails(userStudentId,assessmentId));
     }
 
     @PostMapping("/add")
