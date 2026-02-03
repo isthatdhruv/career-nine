@@ -10,7 +10,8 @@ import AssessmentCreateModal from "./components/assessment/AssessmentCreateModal
 const AssessmentPage = () => {
   const [assessmentData, setAssessmentData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [sections, setSections] = useState<any[]>([]); 
+  const [isDataLoading, setIsDataLoading] = useState(true);
+  const [sections, setSections] = useState<any[]>([]);
   const [pageLoading, setPageLoading] = useState(["false"]);
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -18,6 +19,7 @@ const AssessmentPage = () => {
   // Initial load
   useEffect(() => {
     const fetchData = async () => {
+      setIsDataLoading(true);
       try {
         const response = await ReadAssessmentList();
         console.log("Fetched assessment data:", response.data);
@@ -25,6 +27,8 @@ const AssessmentPage = () => {
       } catch (error) {
         console.error("Error fetching assessments:", error);
         setAssessmentData([]);
+      } finally {
+        setIsDataLoading(false);
       }
     };
     fetchData();
@@ -34,14 +38,17 @@ const AssessmentPage = () => {
   useEffect(() => {
     if (pageLoading[0] === "true") {
       const fetchData = async () => {
+        setIsDataLoading(true);
         try {
           const response = await ReadAssessmentList();
           console.log("Refreshed assessment data:", response.data);
           setAssessmentData(response.data || []);
         } catch (error) {
           console.error("Error refreshing assessments:", error);
+        } finally {
+          setIsDataLoading(false);
+          setPageLoading(["false"]);
         }
-        setPageLoading(["false"]);
       };
       fetchData();
     }
@@ -50,14 +57,14 @@ const AssessmentPage = () => {
 
   return (
     <div className="card">
-      {loading && (
+      {(loading || isDataLoading) && (
         <span className="indicator-progress m-5" style={{ display: "block" }}>
           Please wait...{" "}
           <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
         </span>
       )}
 
-      {!loading && (
+      {!loading && !isDataLoading && (
         <div className="card-header border-0 pt-6">
           <div className="card-title">
             <h1>Assessments</h1>
@@ -82,7 +89,7 @@ const AssessmentPage = () => {
         </div>
       )}
 
-      {!loading && (
+      {!loading && !isDataLoading && (
         <div className="card-body pt-5">
           <AssessmentTable
             data={assessmentData}

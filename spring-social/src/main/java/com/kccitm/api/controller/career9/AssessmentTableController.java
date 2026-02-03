@@ -179,6 +179,7 @@ public class AssessmentTableController {
             return ResponseEntity.notFound().build();
         }
         assessment.setId(id);
+        assessment.setAssessmentName(assessment.getAssessmentName());
         AssessmentTable updatedAssessment = assessmentTableRepository.save(assessment);
         return ResponseEntity.ok(updatedAssessment);
     }

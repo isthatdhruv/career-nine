@@ -10,7 +10,7 @@
 
 # production
 /build
-
+/public
 # misc
 .DS_Store
 .env.local
@@ -30,7 +30,9 @@ yarn-error.log*
 *.njsproj
 *.sln
 *.sw?
-
+**/build/*
+/build/*
+.env
 # Package locks (optional - uncomment if you want to ignore them)
 # yarn.lock
 # package-lock.json

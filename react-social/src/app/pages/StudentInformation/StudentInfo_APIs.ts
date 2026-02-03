@@ -30,6 +30,12 @@ export interface BulkAssessmentAssignment {
     assessmentId: number;
 }
 
+export interface AssessmentDetail {
+    assessmentId: number;
+    assessmentName: string;
+    status: string; // 'notstarted' | 'inprogress' | 'completed'
+}
+
 export interface StudentWithMapping {
     id: number;
     name: string;
@@ -40,6 +46,9 @@ export interface StudentWithMapping {
     userStudentId: number;
     assessmentId?: number;
     studentDob?: string;
+    username?: string;
+    assessments?: AssessmentDetail[];
+    assignedAssessmentIds?: number[];
 }
 
 export interface StudentAnswerDetail {

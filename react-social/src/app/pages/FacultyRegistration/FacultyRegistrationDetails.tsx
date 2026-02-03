@@ -162,13 +162,13 @@ export default function Basic() {
       statusData:
         data.generate == "FI"
           ? "Initial Registrations"
-          : "" || data.generate == "RA"
+          :  data.generate == "RA"
           ? "Registrar Accepted"
-          : "" || data.generate == "RR"
+          : data.generate == "RR"
           ? "Registrar Rejected"
-          : "" || data.generate == "MS"
+          :  data.generate == "MS"
           ? "Mail Sent"
-          : "" || data.generate == "FU"
+          : data.generate == "FU"
           ? "Faculty Updated"
           : "",
       designationData: data.designation,

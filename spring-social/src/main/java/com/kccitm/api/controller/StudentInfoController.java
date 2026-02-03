@@ -74,10 +74,10 @@ public class StudentInfoController {
             UserStudent userStudentSAVED = userStudentRepository.save(userStudent);
 
             // Use assessment ID from request, default to 11 if not provided
-            Long assessmentId = 11L;
-            if (studentInfo.getAssesment_id() != null && !studentInfo.getAssesment_id().isEmpty()) {
-                assessmentId = Long.parseLong(studentInfo.getAssesment_id());
-            }
+            
+            // if (studentInfo.getAssesment_id() != null && !studentInfo.getAssesment_id().isEmpty()) {
+               var assessmentId = Long.parseLong(studentInfo.getAssesment_id());
+            // }
 
             StudentAssessmentMapping studentAssessmentMapping = studentAssessmentMappingRepository.save(
                     new StudentAssessmentMapping(userStudentSAVED.getUserStudentId(), assessmentId));
@@ -95,14 +95,27 @@ public class StudentInfoController {
     }
 
     @PostMapping("/bulkAlotAssessment")
-    public List<StudentAssessmentMapping> bulkAlotAssessment(
+    @org.springframework.transaction.annotation.Transactional
+    public synchronized List<StudentAssessmentMapping> bulkAlotAssessment(
             @RequestBody List<java.util.Map<String, Long>> assignments) {
         List<StudentAssessmentMapping> savedMappings = new java.util.ArrayList<>();
+        
+        // Deduplicate assignments in the request itself
+        java.util.Set<String> processedKeys = new java.util.HashSet<>();
+        
         for (java.util.Map<String, Long> assignment : assignments) {
             Long userStudentId = assignment.get("userStudentId");
             Long assessmentId = assignment.get("assessmentId");
+            
             if (userStudentId != null && assessmentId != null) {
-                // Check if mapping already exists
+                // Check for duplicates within the same request
+                String key = userStudentId + "-" + assessmentId;
+                if (processedKeys.contains(key)) {
+                    continue; // Skip duplicate in same request
+                }
+                processedKeys.add(key);
+                
+                // Check if mapping already exists in database
                 java.util.Optional<StudentAssessmentMapping> existingMapping = studentAssessmentMappingRepository
                         .findFirstByUserStudentUserStudentIdAndAssessmentId(
                                 userStudentId, assessmentId);
