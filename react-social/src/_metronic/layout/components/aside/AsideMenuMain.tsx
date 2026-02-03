@@ -58,7 +58,7 @@ export function AsideMenuMain() {
       <AsideMenuItem
         to="/upload-excel"
         icon="/media/icons/duotune/general/gen044.svg"
-        title="Upload Excel File"
+        title="Add Students in Bulk"
         fontIcon="bi-app-indicator"
       />
       <AsideMenuItem

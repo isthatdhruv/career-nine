@@ -1,5 +1,5 @@
 package com.kccitm.api.repository.Career9;
-import java.util.List;
+import java.util.ArrayList;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.kccitm.api.model.career9.Questionaire.AssessmentAnswer;
+import com.kccitm.api.model.userDefinedModel.QuestionOptionID;
 
 @Repository
 public interface AssessmentAnswerRepository extends JpaRepository<AssessmentAnswer, Long> {
@@ -19,10 +20,23 @@ public interface AssessmentAnswerRepository extends JpaRepository<AssessmentAnsw
     Long countByUserStudent_UserStudentIdAndAssessment_Id(Long userStudentId, Long assessmentId);
     
     // Main query with JOIN FETCH to load related entities
-    @Query("SELECT aa FROM AssessmentAnswer aa " +
+    @Query("SELECT new com.kccitm.api.model.userDefinedModel.QuestionOptionID(aa.questionnaireQuestion.questionnaireQuestionId, aa.option.optionId ) FROM AssessmentAnswer aa " +
            "WHERE aa.userStudent.userStudentId = :userStudentId " +
            "AND aa.assessment.id = :assessmentId")
-    List<AssessmentAnswer> findByUserStudentIdAndAssessmentIdWithDetails(
+    ArrayList<QuestionOptionID> findByUserStudentIdAndAssessmentIdWithDetails(
+            @Param("userStudentId") Long userStudentId,
+            @Param("assessmentId") Long assessmentId);
+
+            @Query("SELECT"+
+            " new com.kccitm.api.model.userDefinedModel.QuestionOptionID(aa.questionnaireQuestion.questionnaireQuestionId, aa.option.optionId , " +
+            "new com.kccitm.api.model.userDefinedModel.MeasuredQualityList(os.score, mqt.measured_quality_type_name, mq.measured_quality_name )" +
+           "FROM AssessmentAnswer aa " +
+           "JOIN aa.option.optionScores os " +
+           "JOIN os.measuredQualityType mqt " +
+           "JOIN mqt.measuredQuality mq " +
+           "WHERE aa.userStudent.userStudentId = :userStudentId " +
+           "AND aa.assessment.id = :assessmentId")
+    ArrayList<Object> iDoNotKnow(
             @Param("userStudentId") Long userStudentId,
             @Param("assessmentId") Long assessmentId);
 }
