@@ -89,6 +89,10 @@ export function getAllAssessments() {
     return axios.get<Assessment[]>(`${ASSESSMENTS_BASE}/getAll`);
 }
 
+export function getAssessmentIdNameMap() {
+    return axios.get<Record<string, string>>(`${ASSESSMENTS_BASE}/get/list-ids`);
+}
+
 export function bulkAlotAssessment(assignments: BulkAssessmentAssignment[]) {
     return axios.post(`${STUDENT_INFO_BASE}/bulkAlotAssessment`, assignments);
 }

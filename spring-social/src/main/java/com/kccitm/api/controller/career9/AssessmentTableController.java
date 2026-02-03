@@ -1,5 +1,6 @@
 package com.kccitm.api.controller.career9;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -191,6 +192,14 @@ public class AssessmentTableController {
         }
         assessmentTableRepository.deleteById(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/get/list-ids")
+    public HashMap<Long, String> getAllAssessmentIds() {
+        HashMap<Long, String> assessmentIdandName = new HashMap<>();
+        assessmentTableRepository.findAll()
+                .forEach(assessment -> assessmentIdandName.put(assessment.getId(), assessment.getAssessmentName()));
+        return assessmentIdandName;
     }
 
     @PostMapping("/startAssessment")

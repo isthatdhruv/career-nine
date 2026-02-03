@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { getStudentsWithMappingByInstituteId, getAllAssessments, bulkAlotAssessment, Assessment } from "./StudentInfo_APIs";
 import StudentAnswerExcelModal from "./StudentAnswerExcelModal";
 import ResetAssessmentModal from "./ResetAssessmentModal";
+import CreateStudentModal from "./CreateStudentModal";
 
 export type Student = {
   id: number;
@@ -30,6 +31,9 @@ export default function StudentsList() {
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+
+  // Add Student Modal state
+  const [showAddModal, setShowAddModal] = useState(false);
 
   // Reset modal state
   const [showResetModal, setShowResetModal] = useState(false);
@@ -237,7 +241,7 @@ export default function StudentsList() {
                 padding: '0.6rem 1.2rem',
                 fontWeight: 600,
               }}
-              onClick={() => navigate("/student/registration-form")}
+              onClick={() => setShowAddModal(true)}
             >
               <i className="bi bi-plus-lg"></i>
               Add Student
@@ -519,6 +523,12 @@ export default function StudentsList() {
           onResetSuccess={handleResetSuccess}
         />
       )}
+
+      {/* Add Student Modal */}
+      <CreateStudentModal
+        show={showAddModal}
+        onHide={() => setShowAddModal(false)}
+      />
     </div>
   );
 }
