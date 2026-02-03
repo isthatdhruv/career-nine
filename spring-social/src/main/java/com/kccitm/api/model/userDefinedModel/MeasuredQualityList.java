@@ -3,15 +3,25 @@ package com.kccitm.api.model.userDefinedModel;
 public class MeasuredQualityList {
     String NameMeasuredQuealityType;
     Integer OptionScore; 
+    String NameMeasuredQuality;
 
         public MeasuredQualityList() {
     }
 
-    public MeasuredQualityList(String NameMeasuredQuealityType, Integer OptionScore) {
+    public MeasuredQualityList(String NameMeasuredQuealityType, Integer OptionScore , String NameMeasuredQuality) {
+         this.NameMeasuredQuality = NameMeasuredQuality;
         this.NameMeasuredQuealityType = NameMeasuredQuealityType;
         this.OptionScore = OptionScore;
+
     }
 
+    public String getNameMeasuredQuality() {
+        return NameMeasuredQuality;
+    }
+
+    public void setNameMeasuredQuality(String NameMeasuredQuality) {
+        this.NameMeasuredQuality = NameMeasuredQuality;
+    }
 
     public String getNameMeasuredQuealityType() {
         return NameMeasuredQuealityType;

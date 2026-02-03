@@ -1,8 +1,10 @@
 package com.kccitm.api.controller;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -20,6 +22,8 @@ import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.userDefinedModel.ExcelOptionData;
+import com.kccitm.api.model.userDefinedModel.MeasuredQualityList;
+import com.kccitm.api.model.userDefinedModel.QuestionOptionID;
 import com.kccitm.api.repository.AssessmentRawScoreRepository;
 import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
 import com.kccitm.api.repository.Career9.StudentInfoRepository;
@@ -29,7 +33,7 @@ import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
 
 @RestController
-@RequestMapping("/student-info")
+@RequestMapping("/student-info") 
 public class StudentInfoController {
     @Autowired
     private UserRepository userRepository;
@@ -57,9 +61,38 @@ public class StudentInfoController {
     public ExcelOptionData getStudentAnswersWithDetails(
             @RequestParam Long userStudentId,
             @RequestParam Long assessmentId) {
-                var data=assessmentAnswerRepository.iDoNotKnow(userStudentId, assessmentId);
-               return new ExcelOptionData(userStudentRepository.getNameByUserID(userStudentId),
-               assessmentAnswerRepository.findByUserStudentIdAndAssessmentIdWithDetails(userStudentId,assessmentId));
+        
+        var assessmentAnswers = assessmentAnswerRepository.findByUserStudentIdAndAssessmentIdWithDetails(userStudentId, assessmentId);
+        
+        // Transform AssessmentAnswer entities to QuestionOptionID DTOs
+        ArrayList<QuestionOptionID> questionOptionList = assessmentAnswers.stream()
+            .map(aa -> {
+                // Create measured quality list from option scores
+                ArrayList<MeasuredQualityList> measuredList = new ArrayList<>();
+                if (aa.getOption() != null && aa.getOption().getOptionScores() != null) {
+                    measuredList = aa.getOption().getOptionScores().stream()
+                        .map(os -> new MeasuredQualityList(
+                            os.getMeasuredQualityType().getMeasuredQualityTypeName(),
+                            os.getScore(),
+                            os.getMeasuredQualityType().getMeasuredQuality() != null 
+                                ? os.getMeasuredQualityType().getMeasuredQuality().getMeasuredQualityName() 
+                                : null
+                        ))
+                        .collect(Collectors.toCollection(ArrayList::new));
+                }
+                
+                return new QuestionOptionID(
+                    aa.getQuestionnaireQuestion().getQuestionnaireQuestionId(),
+                    aa.getOption().getOptionId(),
+                    measuredList
+                );
+            })
+            .collect(Collectors.toCollection(ArrayList::new));
+        
+        return new ExcelOptionData(
+            userStudentRepository.getNameByUserID(userStudentId),
+            questionOptionList
+        );
     }
 
     @PostMapping("/add")
