@@ -8,7 +8,7 @@ import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
 import { ReadQuestionSectionData, ReadQuestionSectionDataList } from "../../QuestionSections/API/Question_Section_APIs";
 import { CreateQuestionData, ReadMeasuredQualityTypes, ReadQuestionByIdData } from "../API/Question_APIs";
-import { ListGamesData } from "../../games/components/API/GAME_APIs";
+import { ListGamesData } from "../../Games/components/API/GAME_APIs";
 
 const validationSchema = Yup.object().shape({
   questionText: Yup.string().required("Question text is required"),

@@ -141,9 +141,49 @@ public class AssessmentQuestionController {
     @PostMapping(value = "/create", consumes = "application/json")
     public AssessmentQuestions createAssessmentQuestion(@RequestBody AssessmentQuestions assessmentQuestions)
             throws Exception {
-        // Wire up relationships and clean references before saving
-        
+        // Wire up relationships before saving
+
+        // Validate and set section relationship
+        if (assessmentQuestions.getSection() != null && assessmentQuestions.getSection().getSectionId() != null) {
+            QuestionSection section = questionSectionRepository
+                    .findById(assessmentQuestions.getSection().getSectionId()).orElse(null);
+            if (section != null) {
+                assessmentQuestions.setSection(section);
+            }
+        }
+
+        // Wire up options and their scores
+        if (assessmentQuestions.getOptions() != null && !assessmentQuestions.getOptions().isEmpty()) {
+            for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
+                // Wire the back-reference from option to question
+                option.setQuestion(assessmentQuestions);
+
+                // Wire up measured quality type scores for each option
+                if (option.getOptionScores() != null) {
+                    for (OptionScoreBasedOnMEasuredQualityTypes score : option.getOptionScores()) {
+                        // Set the back-reference from score to option
+                        score.setQuestion_option(option);
+
+                        // Use ID-only reference for MeasuredQualityType
+                        if (score.getMeasuredQualityType() != null
+                                && score.getMeasuredQualityType().getMeasuredQualityTypeId() != null) {
+                            score.setMeasuredQualityType(new MeasuredQualityTypes(
+                                    score.getMeasuredQualityType().getMeasuredQualityTypeId()));
+                        }
+                    }
+                }
+            }
+        }
+
         AssessmentQuestions assementQustionObject = assessmentQuestionRepository.save(assessmentQuestions);
+
+        // Refresh cache after create
+        try {
+            List<AssessmentQuestions> refreshed = fetchAndTransformFromDb();
+            writeCache(refreshed);
+        } catch (Exception e) {
+            logger.warn("Failed to refresh assessment questions cache after create", e);
+        }
 
         return assementQustionObject.getId() != null ? assementQustionObject : null;
     }

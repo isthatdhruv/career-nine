@@ -10,6 +10,7 @@ import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Entity
@@ -26,6 +27,7 @@ public class OptionScoreBasedOnMEasuredQualityTypes implements Serializable {
 
     @ManyToOne
     @JoinColumn(name = "fk_assessment_questions_option")
+    @JsonBackReference
     private AssessmentQuestionOptions question_option;
 
     @ManyToOne
@@ -46,12 +48,10 @@ public class OptionScoreBasedOnMEasuredQualityTypes implements Serializable {
         this.score = score;
     }
     public AssessmentQuestionOptions getQuestion_option() {
-        AssessmentQuestionOptions question_option = new AssessmentQuestionOptions(this.question_option.getOptionId());
         return question_option;
     }
     public void setQuestion_option(AssessmentQuestionOptions question_option) {
-        AssessmentQuestionOptions question_option_Temp = new AssessmentQuestionOptions(question_option.getOptionId());
-        this.question_option = question_option_Temp;
+        this.question_option = question_option;
     }
     
     public MeasuredQualityTypes getMeasuredQualityType() {

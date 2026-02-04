@@ -40,7 +40,7 @@ public class QuestionnaireSection {
     // questionnaire_section_instruction;
     // changed to Set and LAZY to avoid MultipleBagFetchException
 
-    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = false, mappedBy = "section")
+    @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true, mappedBy = "section")
     private Set<QuestionnaireSectionInstruction> questionnaire_section_instruction;
 
     // Foreign key to questionnaire table

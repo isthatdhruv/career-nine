@@ -6,7 +6,7 @@ import * as Yup from "yup";
 import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
 import { CreateQuestionData, ReadMeasuredQualityTypes } from "../API/Question_APIs";
 import { MQT } from "./MeasuredQualityTypesAsOptionComponent";
-import { ListGamesData } from "../../games/components/API/GAME_APIs";
+import { ListGamesData } from "../../Games/components/API/GAME_APIs";
 
 const validationSchema = Yup.object().shape({
   questionText: Yup.string().required("Question text is required"),

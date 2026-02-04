@@ -6,7 +6,7 @@ import java.util.Set;
 
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
-import javax.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -20,11 +20,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.model.career9.LanguagesSupported;
 import com.kccitm.api.model.career9.Questionaire.Questionnaire;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireLanguage;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireSection;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireSectionInstruction;
+import com.kccitm.api.repository.Career9.LanguagesSupportedRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireSectionRepository;
 
@@ -34,9 +36,12 @@ public class QuestionnaireController {
 
     @Autowired
     private QuestionnaireRepository questionnaireRepository;
-    
+
     @Autowired
     private QuestionnaireSectionRepository questionnaireSectionRepository;
+
+    @Autowired
+    private LanguagesSupportedRepository languagesSupportedRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -55,6 +60,15 @@ public class QuestionnaireController {
         if (questionnaire.getLanguages() != null) {
             for (QuestionnaireLanguage language : questionnaire.getLanguages()) {
                 language.setQuestionnaire(questionnaire);
+                // Resolve language entity reference
+                if (language.getLanguage() != null && language.getLanguage().getLanguageId() != null) {
+                    LanguagesSupported managedLanguage = languagesSupportedRepository
+                            .findById(language.getLanguage().getLanguageId())
+                            .orElse(null);
+                    if (managedLanguage != null) {
+                        language.setLanguage(managedLanguage);
+                    }
+                }
             }
         }
 
@@ -74,6 +88,15 @@ public class QuestionnaireController {
                 if (section.getInstruction() != null) {
                     for (QuestionnaireSectionInstruction instruction : section.getInstruction()) {
                         instruction.setSection(section);
+                        // Resolve language entity reference
+                        if (instruction.getLanguage() != null && instruction.getLanguage().getLanguageId() != null) {
+                            LanguagesSupported managedLanguage = languagesSupportedRepository
+                                    .findById(instruction.getLanguage().getLanguageId())
+                                    .orElse(null);
+                            if (managedLanguage != null) {
+                                instruction.setLanguage(managedLanguage);
+                            }
+                        }
                     }
                 }
             }
@@ -96,6 +119,7 @@ public class QuestionnaireController {
     }
 
     @GetMapping("/getbyid/{id}")
+    @Transactional(readOnly = true)
     public ResponseEntity<Questionnaire> getById(
             @PathVariable Long id) {
 
@@ -112,6 +136,20 @@ public class QuestionnaireController {
             @PathVariable Long id,
             @RequestBody Questionnaire questionnaire) {
 
+        // Resolve language references for questionnaire languages
+        if (questionnaire.getLanguages() != null) {
+            for (QuestionnaireLanguage language : questionnaire.getLanguages()) {
+                if (language.getLanguage() != null && language.getLanguage().getLanguageId() != null) {
+                    LanguagesSupported managedLanguage = languagesSupportedRepository
+                            .findById(language.getLanguage().getLanguageId())
+                            .orElse(null);
+                    if (managedLanguage != null) {
+                        language.setLanguage(managedLanguage);
+                    }
+                }
+            }
+        }
+
         if(questionnaire.getSections()!=null){
             for(QuestionnaireSection section :questionnaire.getSections()){
                 section.setQuestionnaire(questionnaire);
@@ -123,6 +161,15 @@ public class QuestionnaireController {
                 if(section.getInstruction()!=null){
                     for(QuestionnaireSectionInstruction instruction: section.getInstruction()){
                         instruction.setSection(section);
+                        // Resolve language entity reference
+                        if (instruction.getLanguage() != null && instruction.getLanguage().getLanguageId() != null) {
+                            LanguagesSupported managedLanguage = languagesSupportedRepository
+                                    .findById(instruction.getLanguage().getLanguageId())
+                                    .orElse(null);
+                            if (managedLanguage != null) {
+                                instruction.setLanguage(managedLanguage);
+                            }
+                        }
                     }
                 }
             }

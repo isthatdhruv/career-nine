@@ -6,7 +6,7 @@ import * as Yup from "yup";
 import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
 import { CreateQuestionData, ReadMeasuredQualityTypes } from "../API/Question_APIs";
 import { MQT } from "./MeasuredQualityTypesAsOptionComponent"; // Adjust the import based on your file structure
-import { ListGamesData } from "../../games/components/API/GAME_APIs";
+import { ListGamesData } from "../../Games/components/API/GAME_APIs";
 
 const validationSchema = Yup.object().shape({
   questionText: Yup.string().required("Question text is required"),
@@ -501,7 +501,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                         />
                       )}
                       
-                      {/* <Dropdown>
+                      <Dropdown>
                         <Dropdown.Toggle
                           variant="secondary"
                           id={`dropdown-option-${index}`}
@@ -513,8 +513,8 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                           <Dropdown.Header>Measured Quality Types</Dropdown.Header>
                           <div style={{ maxHeight: 250, overflowY: "auto", padding: 8 }}>
                             {mqt.map((type: any, i: number) => (
-                              <>
-                                <div key={type.measuredQualityTypeId} className="d-flex align-items-center mb-2">
+                              <div key={type.measuredQualityTypeId}>
+                                <div className="d-flex align-items-center mb-2">
                                   <input
                                     type="checkbox"
                                     checked={!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked}
@@ -541,11 +541,11 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                                   )}
                                 </div>
                                 {i < mqt.length - 1 && <hr style={{ margin: '4px 0' }} />}
-                              </>
+                              </div>
                             ))}
                           </div>
                         </Dropdown.Menu>
-                      </Dropdown> */}
+                      </Dropdown>
                       {formikValues.questionOptions.length > 1 && (
                         <button
                           type="button"

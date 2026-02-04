@@ -225,20 +225,28 @@ const QuestionareEditSinglePage: React.FC = () => {
         price: 0,
         isFree: "true",
         toolId: "",
-        languages: [] as string[],
+        languages: ["English"] as string[], // English selected by default
         sectionIds: [] as string[],
         sectionQuestions: {} as { [sectionId: string]: string[] },
         sectionQuestionsOrder: {} as { [sectionId: string]: { [questionId: string]: number } },
       };
     }
 
-    // Extract languages from questionnaire data
-    const selectedLanguages = (questionnaireData.languages || []).map((l: any) => 
+    console.log("=== INITIALIZING EDIT FORM ===");
+    console.log("Questionnaire Data:", questionnaireData);
+
+    // Extract languages from questionnaire data - always include English
+    const extractedLanguages = (questionnaireData.languages || []).map((l: any) =>
       l.language?.languageName || l.languageName || ""
     ).filter(Boolean);
 
-    // Extract instructions per language
-    const instructions: { [lang: string]: string } = { "English": "" };
+    // Ensure English is always included
+    const selectedLanguages = Array.from(new Set(["English", ...extractedLanguages]));
+
+    // Extract instructions per language - Initialize with empty strings for all languages
+    const instructions: { [lang: string]: string } = {};
+
+    // First, populate from questionnaire data
     (questionnaireData.languages || []).forEach((l: any) => {
       const langName = l.language?.languageName || l.languageName || "";
       if (langName) {
@@ -246,23 +254,30 @@ const QuestionareEditSinglePage: React.FC = () => {
       }
     });
 
+    // Ensure at least English exists (for backward compatibility)
+    if (!instructions["English"]) {
+      instructions["English"] = "";
+    }
+
+    console.log("Initialized instructions:", instructions);
+
     // Extract section IDs
-    const sectionIds = (questionnaireData.sections || []).map((s: any) => 
+    const sectionIds = (questionnaireData.sections || []).map((s: any) =>
       String(s.section?.sectionId || s.sectionId || "")
     ).filter(Boolean);
 
     // Extract section questions and order
     const sectionQuestions: { [sectionId: string]: string[] } = {};
     const sectionQuestionsOrder: { [sectionId: string]: { [questionId: string]: number } } = {};
-    
+
     (questionnaireData.sections || []).forEach((section: any) => {
       const sectionId = String(section.section?.sectionId || section.sectionId || "");
       if (sectionId) {
-        const questionIds = (section.questions || []).map((q: any) => 
+        const questionIds = (section.questions || []).map((q: any) =>
           String(q.question?.questionId || q.questionId || "")
         ).filter(Boolean);
         sectionQuestions[sectionId] = questionIds;
-        
+
         // Build order map
         const orderMap: { [questionId: string]: number } = {};
         (section.questions || []).forEach((q: any) => {
@@ -290,13 +305,26 @@ const QuestionareEditSinglePage: React.FC = () => {
       }
     });
 
+    console.log("Initialized section instructions:", sectionInstructions);
+
+    // Extract tool ID - handle all possible field name variations
+    const extractedToolId = String(
+      questionnaireData.tool?.toolId ||
+      questionnaireData.tool?.id ||
+      questionnaireData.tool?.tool_id ||
+      questionnaireData.toolId ||
+      ""
+    );
+
+    console.log("Extracted tool ID:", extractedToolId);
+
     return {
       name: questionnaireData.name || "",
       instructions,
       sectionInstructions,
-      price: questionnaireData.price || 0,
-      isFree: questionnaireData.isFree ? "true" : "false",
-      toolId: String(questionnaireData.tool?.toolId || questionnaireData.toolId || ""),
+      price: Number(questionnaireData.price) || 0,
+      isFree: questionnaireData.isFree === true || questionnaireData.isFree === "true" ? "true" : "false",
+      toolId: extractedToolId,
       languages: selectedLanguages,
       sectionIds,
       sectionQuestions,
@@ -321,23 +349,36 @@ const QuestionareEditSinglePage: React.FC = () => {
       } : { toolId: Number(values.toolId) };
 
       // Build the languages array with instructions
-      const languagesPayload = (values.languages || []).map((langName: string, idx: number) => {
-        const langObj = languages.find((l: any) => l.languageName === langName);
-        // Find existing language entry if updating
-        const existingLang = (questionnaireData?.languages || []).find((l: any) => 
-          (l.language?.languageName || l.languageName) === langName
-        );
-        return {
-          id: existingLang?.id || null,
-          language: langObj ? {
-            languageId: langObj.languageId,
-            languageName: langObj.languageName,
-            languageQuestion: [],
-            languageOption: []
-          } : { languageName: langName },
-          instructions: values.instructions?.[langName] || ""
-        };
-      });
+      // Include English + all selected languages to ensure English instructions are always saved
+      const languagesToIncludeGeneral = Array.from(new Set(["English", ...(values.languages || [])]));
+
+      const languagesPayload = languagesToIncludeGeneral
+        .map((langName: string) => {
+          const langObj = languages.find((l: any) => l.languageName === langName);
+          // Find existing language entry if updating
+          const existingLang = (questionnaireData?.languages || []).find((l: any) =>
+            (l.language?.languageName || l.languageName) === langName
+          );
+          const instructionText = values.instructions?.[langName] || "";
+
+          // Language object must be valid
+          if (!langObj || !langObj.languageId) {
+            console.warn(`Language not found for general instructions: ${langName}`);
+            return null;
+          }
+
+          return {
+            id: existingLang?.id || null,
+            language: {
+              languageId: langObj.languageId,
+              languageName: langObj.languageName
+            },
+            instructions: instructionText
+          };
+        })
+        .filter((lang: any) => lang !== null);
+
+      console.log("Languages payload (with instructions):", languagesPayload);
 
       // Build the sections array with questions and instructions
       const sectionsPayload = (values.sectionIds || []).map((sectionId: string, sectionIdx: number) => {
@@ -403,24 +444,42 @@ const QuestionareEditSinglePage: React.FC = () => {
         });
 
         // Build section instructions array
+        // Include English + all selected languages to ensure all filled instructions are saved
         const sectionInstructionsData = values.sectionInstructions?.[sectionId] || {};
-        const instructionPayload = (values.languages || []).map((langName: string, langIdx: number) => {
-          const langObj = languages.find((l: any) => l.languageName === langName);
-          // Find existing instruction
-          const existingInst = (existingSection?.instruction || []).find((inst: any) =>
-            (inst.language?.languageName || inst.languageName) === langName
-          );
-          return {
-            questionnaireSectionInstructionId: existingInst?.questionnaireSectionInstructionId || null,
-            language: langObj ? {
-              languageId: langObj.languageId,
-              languageName: langObj.languageName,
-              languageQuestion: [],
-              languageOption: []
-            } : { languageName: langName },
-            instructionText: sectionInstructionsData[langName] || ""
-          };
-        }).filter((inst: any) => inst.instructionText);
+        const languagesToInclude = Array.from(new Set(["English", ...(values.languages || [])]));
+
+        const instructionPayload = languagesToInclude
+          .map((langName: string) => {
+            const langObj = languages.find((l: any) => l.languageName === langName);
+            // Find existing instruction
+            const existingInst = (existingSection?.instruction || []).find((inst: any) =>
+              (inst.language?.languageName || inst.languageName) === langName
+            );
+            const instructionText = sectionInstructionsData[langName] || "";
+
+            // Only include instructions with non-empty text
+            if (!instructionText || !instructionText.trim()) {
+              return null;
+            }
+
+            // Language object must be valid
+            if (!langObj || !langObj.languageId) {
+              console.warn(`Language not found for: ${langName}`);
+              return null;
+            }
+
+            return {
+              questionnaireSectionInstructionId: existingInst?.questionnaireSectionInstructionId || null,
+              language: {
+                languageId: langObj.languageId,
+                languageName: langObj.languageName
+              },
+              instructionText: instructionText.trim()
+            };
+          })
+          .filter((inst: any) => inst !== null); // Remove null entries
+
+        console.log(`Section ${sectionId} instructions payload:`, instructionPayload);
 
         return {
           questionnaireSectionId: existingSection?.questionnaireSectionId || null,
@@ -547,7 +606,10 @@ const QuestionareEditSinglePage: React.FC = () => {
           validationSchema={validationSchema}
           onSubmit={handleSubmit}
         >
-          {({ errors, touched, values, setFieldValue }) => (
+          {({ errors, touched, values, setFieldValue }) => {
+            // Debug log to verify values are being set
+            console.log("=== FORMIK VALUES ===", values);
+            return (
             <>
               <Form className="form w-100 fv-plugins-bootstrap5 fv-plugins-framework">
                 <div className="card-body">
@@ -736,16 +798,16 @@ const QuestionareEditSinglePage: React.FC = () => {
                           English Instructions (Default):
                         </label>
                         <Field name="instructions.English">
-                          {({ field, form }: any) => (
+                          {({ field }: any) => (
                             <textarea
-                              {...field}
+                              name={field.name}
+                              value={field.value || ""}
                               rows={4}
                               placeholder="Enter general instructions for the questionnaire in English"
                               className="form-control form-control-lg form-control-solid"
                               style={{ resize: "vertical" }}
-                              onChange={(e) => {
-                                setFieldValue("instructions.English", e.target.value);
-                              }}
+                              onChange={field.onChange}
+                              onBlur={field.onBlur}
                             />
                           )}
                         </Field>
@@ -760,23 +822,23 @@ const QuestionareEditSinglePage: React.FC = () => {
                           </h6>
                           {values.languages
                             .filter(lang => lang !== "English")
-                            .map((language, index) => (
+                            .map((language) => (
                             <div key={language} className="fv-row mb-7">
                               <label className="fs-6 fw-bold mb-2">
                                 <i className="fas fa-language text-muted me-1"></i>
                                 {language} Instructions:
                               </label>
                               <Field name={`instructions.${language}`}>
-                                {({ field, form }: any) => (
+                                {({ field }: any) => (
                                   <textarea
-                                    {...field}
+                                    name={field.name}
+                                    value={field.value || ""}
                                     rows={4}
                                     placeholder={`Enter general instructions for the questionnaire in ${language}`}
                                     className="form-control form-control-lg form-control-solid"
                                     style={{ resize: "vertical" }}
-                                    onChange={(e) => {
-                                      setFieldValue(`instructions.${language}`, e.target.value);
-                                    }}
+                                    onChange={field.onChange}
+                                    onBlur={field.onBlur}
                                   />
                                 )}
                               </Field>
@@ -996,16 +1058,16 @@ const QuestionareEditSinglePage: React.FC = () => {
                                     English Instructions:
                                   </label>
                                   <Field name={`sectionInstructions.${sectionId}.English`}>
-                                    {({ field, form }: any) => (
+                                    {({ field }: any) => (
                                       <textarea
-                                        {...field}
+                                        name={field.name}
+                                        value={field.value || ""}
                                         rows={3}
                                         placeholder={`Enter specific instructions for ${sectionName} in English`}
                                         className="form-control form-control-solid"
                                         style={{ resize: "vertical" }}
-                                        onChange={(e) => {
-                                          setFieldValue(`sectionInstructions.${sectionId}.English`, e.target.value);
-                                        }}
+                                        onChange={field.onChange}
+                                        onBlur={field.onBlur}
                                       />
                                     )}
                                   </Field>
@@ -1023,16 +1085,16 @@ const QuestionareEditSinglePage: React.FC = () => {
                                             {language} Instructions (Optional):
                                           </label>
                                           <Field name={`sectionInstructions.${sectionId}.${language}`}>
-                                            {({ field, form }: any) => (
+                                            {({ field }: any) => (
                                               <textarea
-                                                {...field}
+                                                name={field.name}
+                                                value={field.value || ""}
                                                 rows={3}
                                                 placeholder={`Enter specific instructions for ${sectionName} in ${language} (optional)`}
                                                 className="form-control form-control-solid"
                                                 style={{ resize: "vertical" }}
-                                                onChange={(e) => {
-                                                  setFieldValue(`sectionInstructions.${sectionId}.${language}`, e.target.value);
-                                                }}
+                                                onChange={field.onChange}
+                                                onBlur={field.onBlur}
                                               />
                                             )}
                                           </Field>
@@ -1201,7 +1263,8 @@ const QuestionareEditSinglePage: React.FC = () => {
                 </Modal.Footer>
               </Modal>
             </>
-          )}
+          );
+          }}
         </Formik>
 
         {/* Modals */}

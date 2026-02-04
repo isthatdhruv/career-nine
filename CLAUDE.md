@@ -195,6 +195,191 @@ public interface EntityRepository extends JpaRepository<Entity, Long> {
 
 **Common Queries:** Use Spring Data JPA method naming conventions
 
+### Career9 Controllers & Endpoints
+
+All career9 controllers are located in `controller/career9/` package.
+
+#### Questionnaire Management
+
+**QuestionnaireController** (`/api/questionnaire`)
+- `POST /create` - Create questionnaire with sections, questions, languages
+- `GET /get` - Get all questionnaires with full data
+- `GET /get/list` - Get questionnaire list (projection)
+- `GET /getbyid/{id}` - Get questionnaire by ID
+- `PUT /update/{id}` - Update questionnaire (handles complex nested updates)
+- `DELETE /delete/{id}` - Delete questionnaire
+- `POST /questionnaire-lelo` - Get questionnaire by ID (legacy endpoint)
+
+**QuestionnaireLanguageController** (`/api/questionnaire-language`)
+- `POST /create` - Create questionnaire language settings
+- `GET /getAll` - Get all questionnaire languages
+- `GET /getbyid/{id}` - Get by ID
+- `PUT /update/{id}` - Update language settings
+- `DELETE /delete/{id}` - Delete language settings
+
+#### Assessment Management
+
+**AssessmentTableController** (`/assessments`)
+- `POST /create` - Create assessment instance (links to questionnaire)
+- `GET /getAll` - Get all assessments
+- `GET /get/list` - Get assessment list
+- `GET /{id}` - Get assessment status (isActive)
+- `GET /getById/{id}` - Get assessment details by ID
+- `GET /getby/{id}` - Get questionnaire for assessment
+- `GET /{assessmentId}/student/{userStudentId}` - Get assessment status for student
+- `GET /student/{userStudentId}` - Get all assessments for student
+- `GET /get/list-ids` - Get assessment ID-name map
+- `POST /startAssessment` - Start assessment (sets status to "ongoing")
+- `PUT /update/{id}` - Update assessment
+- `DELETE /{id}` - Delete assessment
+
+**AssessmentQuestionController** (`/assessment-questions`)
+- `GET /getAll` - Get all questions (with caching)
+- `GET /getAllList` - Get questions projection (without options/scores)
+- `GET /get/{id}` - Get question by ID
+- `POST /create` - Create assessment question
+- `PUT /update/{id}` - Update question (replaces options entirely)
+- `DELETE /delete/{id}` - Delete question
+- `GET /export-excel` - Export all questions to Excel (with MQT scores)
+- `POST /import-excel` - Import questions from Excel (bulk create/update)
+
+**AssessmentQuestionOptionsController** (`/assessment-question-options`)
+- `GET /getAll` - Get all options
+- `GET /get/{id}` - Get option by ID
+- `GET /by-question/{questionId}` - Get options for question
+- `POST /create` - Create option
+- `PUT /update/{id}` - Update option
+- `DELETE /delete/{id}` - Delete option
+
+**AssessmentAnswerController** (`/assessment-answer`)
+- `GET /getAll` - Get all assessment answers
+- `GET /getByStudent/{studentId}` - Get answers for student
+- `POST /submit` - Submit student answers and calculate raw scores
+
+Key features:
+- Validates UserStudent and AssessmentTable existence
+- Creates/updates StudentAssessmentMapping with status
+- Saves each answer to AssessmentAnswer table
+- Accumulates scores from OptionScoreBasedOnMEasuredQualityTypes
+- Deletes old AssessmentRawScore entries for the mapping
+- Saves new AssessmentRawScore entries per MeasuredQualityType
+
+#### Scoring System
+
+**ToolController** (`/tools`)
+- `GET /getAll` - Get all psychometric tools
+- `GET /get/{id}` - Get tool by ID
+- `POST /create` - Create tool (auto-sets price=0 if free)
+- `PUT /update/{id}` - Update tool
+- `DELETE /delete/{id}` - Delete tool (clears measured quality mappings)
+- `POST /{toolId}/measured-qualities/{qualityId}` - Add quality to tool
+- `DELETE /{toolId}/measured-qualities/{qualityId}` - Remove quality from tool
+- `GET /{toolId}/measured-qualities` - Get tool's measured qualities
+
+**MeasuredQualitiesController** (`/measured-qualities`)
+- `GET /getAll` - Get all measured qualities
+- `GET /get/{id}` - Get quality by ID
+- `POST /create` - Create measured quality
+- `PUT /update/{id}` - Update quality (name, description, displayName)
+- `DELETE /delete/{id}` - Delete quality (nullifies child types)
+- `POST /{qualityId}/tools/{toolId}` - Add tool to quality
+- `DELETE /{qualityId}/tools/{toolId}` - Remove tool from quality
+- `GET /{qualityId}/tools` - Get quality's tools
+
+**MeasuredQualityTypesController** (`/measured-quality-types`)
+- `GET /getAll` - Get all quality types
+- `GET /get/{id}` - Get type by ID
+- `POST /create` - Create quality type
+- `PUT /update/{id}` - Update type (name, description, displayName)
+- `DELETE /delete/{id}` - Delete type (nullifies option scores)
+- `POST /{typeId}/careers/{careerId}` - Add career to type
+- `DELETE /{typeId}/careers/{careerId}` - Remove career from type
+- `GET /{typeId}/careers` - Get type's careers
+- `PUT /{typeId}/assign-quality/{qualityId}` - Assign type to quality
+- `PUT /{typeId}/remove-quality` - Remove type from quality
+
+**OptionScoreController** (`/option-scores`)
+- `GET /getAll` - Get all option scores
+- `GET /get/{id}` - Get score by ID
+- `POST /create` - Create option scores (batch)
+- `PUT /update/{id}` - Update option score
+- `DELETE /delete/{id}` - Delete option score
+
+**CareerController** (`/career`)
+- `GET /getAll` - Get all careers
+- `GET /get/{id}` - Get career by ID
+- `GET /{id}/measured-quality-types` - Get quality types for career
+- `POST /create` - Create career
+- `PUT /update/{id}` - Update career (title, description)
+- `DELETE /delete/{id}` - Delete career (clears quality type mappings)
+
+#### Multi-Language Support
+
+**LanguagesSupportedController** (`/language-supported`)
+- `GET /getAll` - Get all supported languages
+- `GET /get/{id}` - Get language by ID
+- `POST /create` - Create supported language
+
+**LanguageQuestionController** (`/language-question`)
+- `GET /getAll` - Get all language questions
+- `GET /get/{id}` - Get language question by ID
+- `POST /create` - Create language question (simple)
+- `POST /create-with-options` - Create language question with options (replaces existing)
+
+Key behavior:
+- Deletes existing translations for same questionId + languageId
+- Sets bidirectional relationships for options
+- Links options to language and languageQuestion
+
+**LanguageOptionsController** (`/language-options`)
+- Similar CRUD for language options
+
+#### Section Management
+
+**QuestionSectionController** (`/question-sections`)
+- `GET /getAll` - Get all sections
+- `GET /getAllList` - Get sections projection
+- `GET /get/{id}` - Get section by ID
+- `GET /{id}/questions` - Get questions in section
+- `POST /create` - Create section
+- `PUT /update/{id}` - Update section (name, description)
+- `DELETE /delete/{id}` - Delete section (nullifies question.section)
+
+#### Student Management
+
+**StudentController** (`/student/*`)
+- `GET /student/get` - Get all students
+- `GET /student/getbyid/{id}` - Get student by ID with full data
+- `POST /student/save-csv` - Save student from CSV
+- `POST /student/update` - Update student registration
+- `POST /student-email/update` - Generate official email
+- `GET /generate_pdf` - Generate student ID card PDF
+- `GET /generate_id_card` - Generate and email ID card
+- `POST /student/getSavetoDatabase` - Bulk save students
+- `POST /student/emailChecker` - Check if email exists
+- `GET /email-validation-official` - Validate kccitm.edu.in email
+- `GET /email-validation-official-confermation` - Verify OTP
+
+Key integrations:
+- Google Admin API for user/group management
+- Mandrill for email sending
+- PDF generation service
+- Google Cloud Storage for file uploads
+
+#### Institute Management
+
+**InstituteDetailController** (`/institute-detail` or similar)
+- CRUD for institutes/schools
+- Manages institute sessions, courses, contact persons
+
+**SchoolSessionController** (`/school-session` or similar)
+- Session management for schools
+
+#### Game Integration
+
+**GameTableController** (`/game-table` or similar)
+- CRUD for game-based assessment options
+
 ### Authentication Flow
 
 **OAuth2 Providers:** Google, GitHub, Facebook
