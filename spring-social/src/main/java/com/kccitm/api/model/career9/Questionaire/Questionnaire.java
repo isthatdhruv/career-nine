@@ -45,7 +45,16 @@ public class Questionnaire implements Serializable {
     @JsonIgnoreProperties("questionnaire")
     private List<QuestionnaireSection> section;
 
-    
+    @Column(name = "type", nullable = true)
+    private Boolean type;
+
+    public Boolean getType() {
+        return type;
+    }
+
+    public void setType(Boolean type) {
+        this.type = type;
+    }
 
     // Mode id
     @Column(name = "mode_id")
@@ -68,7 +77,9 @@ public class Questionnaire implements Serializable {
     public Questionnaire() {
     }
 
-    public Questionnaire(Long questionnaireId, Tool tool, List<QuestionnaireLanguage> languages, List<QuestionnaireSection> section, Integer modeId, BigDecimal price, Boolean isFree, String name, Boolean display) {
+    public Questionnaire(Long questionnaireId, Tool tool, List<QuestionnaireLanguage> languages,
+            List<QuestionnaireSection> section, Integer modeId, BigDecimal price, Boolean isFree, String name,
+            Boolean display) {
         this.questionnaireId = questionnaireId;
         this.tool = tool;
         this.languages = languages;
@@ -80,17 +91,17 @@ public class Questionnaire implements Serializable {
         this.display = display;
     }
 
-    public Questionnaire(Long questionnaireId, String name,  Integer modeId ) {
+    public Questionnaire(Long questionnaireId, String name, Integer modeId) {
         this.questionnaireId = questionnaireId;
-       
+
         this.modeId = modeId;
-       
+
         this.name = name;
-      
+
     }
 
-     public Questionnaire(Long questionnaireId) {
-        this.questionnaireId = questionnaireId; 
+    public Questionnaire(Long questionnaireId) {
+        this.questionnaireId = questionnaireId;
     }
 
     public Boolean getDisplay() {
@@ -172,5 +183,5 @@ public class Questionnaire implements Serializable {
     public void setName(String name) {
         this.name = name;
     }
-  
+
 }
