@@ -11,7 +11,8 @@ import {
   GetMeasuredQualityTypesForQuestion,
   ReadMeasuredQualityTypes,
   RemoveMeasuredQualityTypeFromQuestion,
-  ExportQuestionsToExcel // Import the new export function
+  ExportQuestionsToExcel, // Import the new export function
+  ImportQuestionsFromExcel
 } from "../API/Question_APIs";
 import QuestionLanguageModal from "./QuestionLanguageModal";  // ✅ import modal
 

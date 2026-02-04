@@ -16,10 +16,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-<<<<<<< HEAD
-
-=======
->>>>>>> dhruv-from-palak
 
 import com.kccitm.api.model.ContactPerson;
 import com.kccitm.api.repository.ContactPersonRepository;
