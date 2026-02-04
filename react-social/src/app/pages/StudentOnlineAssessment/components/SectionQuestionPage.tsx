@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAssessment } from "../../StudentLogin/AssessmentContext";
+import { usePreventReload } from "../../StudentLogin/usePreventReload";
 import { AssessmentGameWrapper } from "./AssessmentGameWrapper";
 
 type GameTable = {
@@ -55,6 +56,7 @@ const SectionQuestionPage: React.FC = () => {
   const { sectionId, questionIndex } = useParams();
   const navigate = useNavigate();
   const { assessmentData } = useAssessment();
+  usePreventReload();
 
   const [questionnaire, setQuestionnaire] = useState<any>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -67,18 +69,51 @@ const SectionQuestionPage: React.FC = () => {
   const [isGameActive, setIsGameActive] = useState<boolean>(false);
   const [activeGameCode, setActiveGameCode] = useState<number | null>(null);
 
-  const [answers, setAnswers] = useState<Record<string, Record<number, number[]>>>(
-    {}
-  );
+  // Load initial state from localStorage
+  const [answers, setAnswers] = useState<Record<string, Record<number, number[]>>>(() => {
+    const stored = localStorage.getItem('assessmentAnswers');
+    return stored ? JSON.parse(stored) : {};
+  });
   // For ranking questions: sectionId -> questionId -> optionId -> rank
-  const [rankingAnswers, setRankingAnswers] = useState<Record<string, Record<number, Record<number, number>>>>(
-    {}
-  );
-  const [savedForLater, setSavedForLater] = useState<Record<string, Set<number>>>(
-    {}
-  );
-  const [skipped, setSkipped] = useState<Record<string, Set<number>>>({});
-  const [elapsedTime, setElapsedTime] = useState<number>(0);
+  const [rankingAnswers, setRankingAnswers] = useState<Record<string, Record<number, Record<number, number>>>>(() => {
+    const stored = localStorage.getItem('assessmentRankingAnswers');
+    return stored ? JSON.parse(stored) : {};
+  });
+  const [savedForLater, setSavedForLater] = useState<Record<string, Set<number>>>(() => {
+    const stored = localStorage.getItem('assessmentSavedForLater');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Convert arrays back to Sets
+      const result: Record<string, Set<number>> = {};
+      for (const key in parsed) {
+        result[key] = new Set(parsed[key]);
+      }
+      return result;
+    }
+    return {};
+  });
+  const [skipped, setSkipped] = useState<Record<string, Set<number>>>(() => {
+    const stored = localStorage.getItem('assessmentSkipped');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Convert arrays back to Sets
+      const result: Record<string, Set<number>> = {};
+      for (const key in parsed) {
+        result[key] = new Set(parsed[key]);
+      }
+      return result;
+    }
+    return {};
+  });
+  const [elapsedTime, setElapsedTime] = useState<number>(() => {
+    const stored = localStorage.getItem('assessmentElapsedTime');
+    return stored ? parseInt(stored) : 0;
+  });
+  // Track completed games: gameCode -> boolean
+  const [completedGames, setCompletedGames] = useState<Record<number, boolean>>(() => {
+    const stored = localStorage.getItem('assessmentCompletedGames');
+    return stored ? JSON.parse(stored) : {};
+  });
 
   useEffect(() => {
     if (assessmentData && assessmentData[0]) {
@@ -97,6 +132,44 @@ const SectionQuestionPage: React.FC = () => {
       setLanguages(questionnaireData.languages || []);
     }
   }, [sectionId, questionIndex, assessmentData]);
+
+  // Save answers to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('assessmentAnswers', JSON.stringify(answers));
+  }, [answers]);
+
+  // Save ranking answers to localStorage
+  useEffect(() => {
+    localStorage.setItem('assessmentRankingAnswers', JSON.stringify(rankingAnswers));
+  }, [rankingAnswers]);
+
+  // Save savedForLater to localStorage (convert Sets to arrays for JSON)
+  useEffect(() => {
+    const toStore: Record<string, number[]> = {};
+    for (const key in savedForLater) {
+      toStore[key] = Array.from(savedForLater[key]);
+    }
+    localStorage.setItem('assessmentSavedForLater', JSON.stringify(toStore));
+  }, [savedForLater]);
+
+  // Save skipped to localStorage (convert Sets to arrays for JSON)
+  useEffect(() => {
+    const toStore: Record<string, number[]> = {};
+    for (const key in skipped) {
+      toStore[key] = Array.from(skipped[key]);
+    }
+    localStorage.setItem('assessmentSkipped', JSON.stringify(toStore));
+  }, [skipped]);
+
+  // Save elapsed time to localStorage
+  useEffect(() => {
+    localStorage.setItem('assessmentElapsedTime', String(elapsedTime));
+  }, [elapsedTime]);
+
+  // Save completed games to localStorage
+  useEffect(() => {
+    localStorage.setItem('assessmentCompletedGames', JSON.stringify(completedGames));
+  }, [completedGames]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -574,6 +647,12 @@ const SectionQuestionPage: React.FC = () => {
   const handleGameComplete = () => {
     // Auto-select the game option when game is completed
     if (activeGameCode && sectionId) {
+      // Mark this game as completed
+      setCompletedGames((prev) => ({
+        ...prev,
+        [activeGameCode]: true,
+      }));
+
       const gameOption = question.question.options.find(
         opt => opt.isGame && opt.game?.gameCode === activeGameCode
       );
@@ -944,7 +1023,7 @@ const SectionQuestionPage: React.FC = () => {
                             onClick={() => handleLaunchGame(opt.game!.gameCode)}
                             style={{
                               marginLeft: '16px',
-                              background: selectedOptions.includes(opt.optionId)
+                              background: (selectedOptions.includes(opt.optionId) || (opt.game && completedGames[opt.game.gameCode]))
                                 ? 'linear-gradient(to right, #22c55e, #16a34a)'
                                 : 'linear-gradient(to right, #8b5cf6, #d946ef)',
                               color: 'white',
@@ -953,14 +1032,14 @@ const SectionQuestionPage: React.FC = () => {
                               fontWeight: 700,
                               fontSize: '14px',
                               border: 'none',
-                              cursor: selectedOptions.includes(opt.optionId) ? 'default' : 'pointer',
+                              cursor: (selectedOptions.includes(opt.optionId) || (opt.game && completedGames[opt.game.gameCode])) ? 'default' : 'pointer',
                               boxShadow: '0 4px 15px rgba(139, 92, 246, 0.4)',
                               transition: 'all 0.2s ease',
-                              opacity: selectedOptions.includes(opt.optionId) ? 0.8 : 1,
+                              opacity: (selectedOptions.includes(opt.optionId) || (opt.game && completedGames[opt.game.gameCode])) ? 0.8 : 1,
                             }}
-                            disabled={selectedOptions.includes(opt.optionId)}
+                            disabled={selectedOptions.includes(opt.optionId) || (opt.game && completedGames[opt.game.gameCode])}
                           >
-                            {selectedOptions.includes(opt.optionId) ? '✓ Completed' : '🎮 Launch Game'}
+                            {(selectedOptions.includes(opt.optionId) || (opt.game && completedGames[opt.game.gameCode])) ? '✓ Completed' : '🎮 Launch Game'}
                           </button>
                         </div>
                       </div>

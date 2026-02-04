@@ -15,7 +15,7 @@ spring:
   profiles: dev
   datasource:
     # url: jdbc:mysql://localhost:3306/kareer-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
-    url: jdbc:mysql://192.168.10.73:3306/kareer-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     username: root
     password: Career-qCsfeuECc3MW
     # password: MyStrongPass@123
@@ -74,7 +74,6 @@ app:
   cors:
     allowedOrigins: http://35.227.40.232:3000,http://localhost:3001,http://192.168.1.11:3000,http://35.196.122.199:3000,http://192.168.0.204:3000,http://192.168.0.204:3000,http://localhost:3000,https://localhost:3000,https://localhost:8080,https://192.168.0.204:8080,https://localhost,https://localhost:80,https://staging.student.kccitm.in/,https://student.kccitm.in/,https://erp.aktu.ac.in/,https://leetcode.com,http://192.168.0.204:8443//http://localhost:8080
   oauth2:
-  
     # After successfully authenticating with the OAuth2 Provider,
     # we'll be generating an auth token for the user and sending the token to the
     # redirectUri mentioned by the client in the /oauth2/authorize request.
@@ -100,7 +99,7 @@ spring:
   datasource:
     url: jdbc:mysql://mysql_db_api:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     username: root
-    password: Career-qCsfeuECc3MW    # password: Google.com1
+    password: Career-qCsfeuECc3MW # password: Google.com1
 
   jpa:
     show-sql: false
@@ -249,4 +248,3 @@ app:
   mandrill: WXX3fC00pJTZgonjnVvkgQ
 
 ---
-

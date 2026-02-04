@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAssessment } from "../../StudentLogin/AssessmentContext";
+import { usePreventReload } from "../../StudentLogin/usePreventReload";
 import axios from "axios";
 
 type Section = {
@@ -13,6 +14,7 @@ const SelectSectionPage: React.FC = () => {
   const [sections, setSections] = useState<Section[]>([]);
   const navigate = useNavigate();
   const { assessmentData, loading } = useAssessment();
+  usePreventReload();
 
   useEffect(() => {
     const checkStudentStatus = async () => {
