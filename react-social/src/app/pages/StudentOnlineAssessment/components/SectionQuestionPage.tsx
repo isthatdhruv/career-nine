@@ -787,7 +787,8 @@ const SectionQuestionPage: React.FC = () => {
             minHeight: "auto",
             borderRadius: "24px",
             border: "none",
-            boxShadow: "0 20px 60px rgba(0,0,0,0.15)"
+            boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+            background: "white"
           }}
         >
           <div className="card-body p-5">

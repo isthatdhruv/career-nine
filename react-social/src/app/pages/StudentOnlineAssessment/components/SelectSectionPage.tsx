@@ -76,13 +76,9 @@ const SelectSectionPage: React.FC = () => {
         alignItems: "center",
         justifyContent: "center",
         minHeight: "100vh",
-        width: "100vw",
         background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        position: "fixed",
-        top: 0,
-        left: 0,
         padding: "2rem 1rem",
-        overflow: "auto",
+        overflowY: "auto",
       }}
     >
       <div

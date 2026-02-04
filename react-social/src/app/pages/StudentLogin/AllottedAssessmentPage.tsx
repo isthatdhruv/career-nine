@@ -42,10 +42,10 @@ export default function AllottedAssessmentPage() {
     }
 
     // Check if ongoing - show styled modal to contact administrator
-    if (assessment.studentStatus === 'ongoing') {
-      setShowOngoingModal(true);
-      return;
-    }
+    // if (assessment.studentStatus === 'ongoing') {
+    //   setShowOngoingModal(true);
+    //   return;
+    // }
 
     // Check if active
     if (!assessment.isActive) {
