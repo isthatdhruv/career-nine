@@ -1,7 +1,7 @@
 import { MDBDataTableV5 } from "mdbreact";
 import { useEffect, useState } from "react";
 import { AiFillEdit } from "react-icons/ai";
-import { FaLightbulb } from "react-icons/fa";
+import { FaLightbulb, FaFileDownload } from "react-icons/fa"; // Added download icon
 import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
@@ -10,7 +10,8 @@ import {
   DeleteQuestionData,
   GetMeasuredQualityTypesForQuestion,
   ReadMeasuredQualityTypes,
-  RemoveMeasuredQualityTypeFromQuestion
+  RemoveMeasuredQualityTypeFromQuestion,
+  ExportQuestionsToExcel // Import the new export function
 } from "../API/Question_APIs";
 import QuestionLanguageModal from "./QuestionLanguageModal";  // ✅ import modal
 
@@ -71,6 +72,28 @@ const QuestionTable = (props: {
   //   }
   // }, [props.data]);
 
+
+  /**
+   * Handle Excel export download
+   * This function calls the API to download all assessment questions in Excel format
+   * The Excel file includes questions, options, sections, and measured quality type scores
+   */
+  const handleExportToExcel = async () => {
+    try {
+      // Show loading state (optional)
+      props.setPageLoading(["true"]);
+
+      // Call the API to get the Excel file
+      await ExportQuestionsToExcel();
+
+      // Hide loading state
+      props.setPageLoading([]);
+    } catch (error) {
+      console.error("Error exporting questions to Excel:", error);
+      alert("Failed to export questions. Please try again.");
+      props.setPageLoading([]);
+    }
+  };
 
   const filteredData = props.data.filter((item: any) =>
     (item.questionText ?? "")
@@ -150,7 +173,19 @@ const QuestionTable = (props: {
   
   return (
     <>
-      <div className="d-flex justify-content-end mb-2">
+      {/* Header section with search and download button */}
+      <div className="d-flex justify-content-end mb-2 gap-2">
+        {/* Download Excel button - exports all questions with their details */}
+        <button
+          onClick={handleExportToExcel}
+          className="btn btn-success d-flex align-items-center"
+          title="Download all questions in Excel format"
+        >
+          <FaFileDownload size={18} className="me-2" />
+          Download Excel
+        </button>
+
+        {/* Search input for filtering questions */}
         <input
           type="search"
           className="form-control"

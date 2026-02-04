@@ -1,15 +1,31 @@
 package com.kccitm.api.controller.career9;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
+import org.apache.poi.ss.usermodel.BorderStyle;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -194,5 +210,203 @@ public class AssessmentQuestionController {
     }
 
     // Many-to-Many relationship management endpoints for MeasuredQualityTypes
+
+    /**
+     * Export all assessment questions to Excel format
+     *
+     * This endpoint generates an Excel file containing all assessment questions with their:
+     * - Question details (ID, text, type, max options allowed)
+     * - Section information
+     * - All options for each question
+     * - Measured quality type scores for each option
+     *
+     * The Excel format is designed to support both export and import operations,
+     * allowing users to add new questions in the same format and re-import them.
+     *
+     * @return ResponseEntity containing the Excel file as byte array
+     * @throws Exception if Excel generation fails
+     */
+    @GetMapping("/export-excel")
+    public ResponseEntity<byte[]> exportQuestionsToExcel() throws Exception {
+        logger.info("Starting Excel export for assessment questions");
+
+        // Fetch all questions with their complete data (options, sections, scores)
+        List<AssessmentQuestions> questions = fetchAndTransformFromDb();
+
+        // Fetch all measured quality types to create dynamic columns
+        List<MeasuredQualityTypes> allMeasuredQualityTypes = measuredQualityTypesRepository.findAll();
+
+        // Create a new Excel workbook and sheet
+        Workbook workbook = new XSSFWorkbook();
+        Sheet sheet = workbook.createSheet("Assessment Questions");
+
+        // Create header cell style with bold font and colored background
+        CellStyle headerStyle = workbook.createCellStyle();
+        Font headerFont = workbook.createFont();
+        headerFont.setBold(true);
+        headerFont.setColor(IndexedColors.WHITE.getIndex());
+        headerStyle.setFont(headerFont);
+        headerStyle.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
+        headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        headerStyle.setBorderBottom(BorderStyle.THIN);
+        headerStyle.setBorderTop(BorderStyle.THIN);
+        headerStyle.setBorderRight(BorderStyle.THIN);
+        headerStyle.setBorderLeft(BorderStyle.THIN);
+
+        // Create header row with all column titles
+        Row headerRow = sheet.createRow(0);
+        int colNum = 0;
+
+        // Define base columns (question and option information)
+        String[] baseHeaders = {
+            "Question ID",
+            "Question Text",
+            "Question Type",
+            "Section ID",
+            "Section Name",
+            "Max Options Allowed",
+            "Option ID",
+            "Option Text",
+            "Option Description",
+            "Is Correct",
+            "Is Game",
+            "Game ID"
+        };
+
+        // Add base headers to the sheet
+        for (String header : baseHeaders) {
+            Cell cell = headerRow.createCell(colNum++);
+            cell.setCellValue(header);
+            cell.setCellStyle(headerStyle);
+        }
+
+        // Create a map to store measured quality type column indices
+        // This map helps us know which column corresponds to which quality type
+        Map<Long, Integer> mqtColumnMap = new HashMap<>();
+
+        // Add dynamic columns for each measured quality type
+        // Each quality type gets its own column for scores
+        for (MeasuredQualityTypes mqt : allMeasuredQualityTypes) {
+            Cell cell = headerRow.createCell(colNum);
+            cell.setCellValue("MQT: " + mqt.getMeasuredQualityTypeName());
+            cell.setCellStyle(headerStyle);
+
+            // Store the column index for this quality type
+            mqtColumnMap.put(mqt.getMeasuredQualityTypeId(), colNum);
+            colNum++;
+        }
+
+        // Populate data rows
+        int rowNum = 1;
+
+        // Iterate through all questions
+        for (AssessmentQuestions question : questions) {
+            // Get question's section information
+            QuestionSection section = question.getSection();
+            String sectionId = section != null ? section.getSectionId().toString() : "";
+            String sectionName = section != null ? section.getSectionName() : "";
+
+            // Get all options for this question
+            List<AssessmentQuestionOptions> options = question.getOptions();
+
+            // If question has no options, still create one row to show the question
+            if (options == null || options.isEmpty()) {
+                Row row = sheet.createRow(rowNum++);
+                colNum = 0;
+
+                // Fill in question details
+                row.createCell(colNum++).setCellValue(question.getQuestionId());
+                row.createCell(colNum++).setCellValue(question.getQuestionText() != null ? question.getQuestionText() : "");
+                row.createCell(colNum++).setCellValue(question.getQuestionType() != null ? question.getQuestionType() : "");
+                row.createCell(colNum++).setCellValue(sectionId);
+                row.createCell(colNum++).setCellValue(sectionName);
+                row.createCell(colNum++).setCellValue(question.getmaxOptionsAllowed());
+
+                // Leave option columns empty
+                for (int i = 0; i < 6; i++) {
+                    row.createCell(colNum++).setCellValue("");
+                }
+            } else {
+                // Create a row for each option of the question
+                for (AssessmentQuestionOptions option : options) {
+                    Row row = sheet.createRow(rowNum++);
+                    colNum = 0;
+
+                    // Fill in question details (repeated for each option row)
+                    row.createCell(colNum++).setCellValue(question.getQuestionId());
+                    row.createCell(colNum++).setCellValue(question.getQuestionText() != null ? question.getQuestionText() : "");
+                    row.createCell(colNum++).setCellValue(question.getQuestionType() != null ? question.getQuestionType() : "");
+                    row.createCell(colNum++).setCellValue(sectionId);
+                    row.createCell(colNum++).setCellValue(sectionName);
+                    row.createCell(colNum++).setCellValue(question.getmaxOptionsAllowed());
+
+                    // Fill in option details
+                    row.createCell(colNum++).setCellValue(option.getOptionId());
+                    row.createCell(colNum++).setCellValue(option.getOptionText() != null ? option.getOptionText() : "");
+                    row.createCell(colNum++).setCellValue(option.getOptionDescription() != null ? option.getOptionDescription() : "");
+                    row.createCell(colNum++).setCellValue(option.isCorrect() ? "Yes" : "No");
+                    row.createCell(colNum++).setCellValue(option.getIsGame() != null && option.getIsGame() ? "Yes" : "No");
+
+                    // Add game ID if option is linked to a game
+                    if (option.getIsGame() != null && option.getIsGame() && option.getGame() != null) {
+                        row.createCell(colNum++).setCellValue(option.getGame().getGameId());
+                    } else {
+                        row.createCell(colNum++).setCellValue("");
+                    }
+
+                    // Fill in measured quality type scores for this option
+                    // Initialize all MQT columns with empty values first
+                    for (int i = 0; i < allMeasuredQualityTypes.size(); i++) {
+                        row.createCell(colNum + i).setCellValue("");
+                    }
+
+                    // Now fill in the actual scores for this option
+                    List<OptionScoreBasedOnMEasuredQualityTypes> scores = option.getOptionScores();
+                    if (scores != null && !scores.isEmpty()) {
+                        for (OptionScoreBasedOnMEasuredQualityTypes score : scores) {
+                            if (score.getMeasuredQualityType() != null) {
+                                Long mqtId = score.getMeasuredQualityType().getMeasuredQualityTypeId();
+                                Integer columnIndex = mqtColumnMap.get(mqtId);
+
+                                // Set the score value in the appropriate column
+                                if (columnIndex != null) {
+                                    Cell scoreCell = row.getCell(columnIndex);
+                                    if (scoreCell == null) {
+                                        scoreCell = row.createCell(columnIndex);
+                                    }
+                                    scoreCell.setCellValue(score.getScore() != null ? score.getScore() : 0);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Auto-size all columns for better readability
+        for (int i = 0; i < colNum; i++) {
+            sheet.autoSizeColumn(i);
+        }
+
+        // Write the workbook to a byte array output stream
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        workbook.write(outputStream);
+        workbook.close();
+
+        // Convert output stream to byte array
+        byte[] excelBytes = outputStream.toByteArray();
+
+        // Set HTTP headers for file download
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        headers.setContentDispositionFormData("attachment", "assessment_questions_" + System.currentTimeMillis() + ".xlsx");
+
+        logger.info("Excel export completed successfully with {} questions", questions.size());
+
+        // Return the Excel file as a downloadable response
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(excelBytes);
+    }
 
 }
