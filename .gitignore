@@ -11,6 +11,9 @@ yarn.lock
 
 **/target/
 
+# Project Documentation
+CLAUDE.md
+
 # Environment variables
 .env
 .env.local
