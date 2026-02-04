@@ -6,6 +6,7 @@ import * as Yup from "yup";
 import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
 import { CreateQuestionData, ReadMeasuredQualityTypes } from "../API/Question_APIs";
 import { MQT } from "./MeasuredQualityTypesAsOptionComponent"; // Adjust the import based on your file structure
+import { ListGamesData } from "../../Games/components/API/GAME_APIs";
 
 const validationSchema = Yup.object().shape({
   questionText: Yup.string().required("Question text is required"),
@@ -22,6 +23,16 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const [optionMeasuredQualities, setOptionMeasuredQualities] = useState<any>({});
   const [useMQTAsOptions, setUseMQTAsOptions] = React.useState(false);
   const navigate = useNavigate();
+
+  // NEW: State for tracking option type (text vs image) per option index
+  const [optionTypes, setOptionTypes] = useState<{ [key: number]: 'text' | 'image' }>({});
+  // NEW: State for storing Base64 image data per option index
+  const [optionImages, setOptionImages] = useState<{ [key: number]: string }>({});
+
+  // NEW: Game as option states
+  const [useGameAsOption, setUseGameAsOption] = useState(false);
+  const [games, setGames] = useState<any[]>([]);
+  const [selectedGameId, setSelectedGameId] = useState<string>("");
 
   const initialValues = {
     questionText: "",
@@ -77,12 +88,63 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const removeOption = (index: number) => {
     setFormikValues((prev: any) => {
       const newOptions = prev.questionOptions.filter((_: any, i: number) => i !== index);
-      // Remove measured qualities for this option
-      const newMeasured = { ...optionMeasuredQualities };
-      delete newMeasured[index];
-      setOptionMeasuredQualities(newMeasured);
+      
+      // Shift keys for optionMeasuredQualities
+      setOptionMeasuredQualities((prevMQ: any) => {
+        const newMQ: any = {};
+        Object.keys(prevMQ).forEach(key => {
+          const k = Number(key);
+          if (k < index) newMQ[k] = prevMQ[k];
+          else if (k > index) newMQ[k - 1] = prevMQ[k];
+        });
+        return newMQ;
+      });
+
+      // Shift keys for optionTypes
+      setOptionTypes((prevTypes: any) => {
+        const newTypes: any = {};
+        Object.keys(prevTypes).forEach(key => {
+          const k = Number(key);
+          if (k < index) newTypes[k] = prevTypes[k];
+          else if (k > index) newTypes[k - 1] = prevTypes[k];
+        });
+        return newTypes;
+      });
+
+      // Shift keys for optionImages
+      setOptionImages((prevImages: any) => {
+        const newImages: any = {};
+        Object.keys(prevImages).forEach(key => {
+          const k = Number(key);
+          if (k < index) newImages[k] = prevImages[k];
+          else if (k > index) newImages[k - 1] = prevImages[k];
+        });
+        return newImages;
+      });
+
       return { ...prev, questionOptions: newOptions };
     });
+  };
+
+  // NEW: Toggle option type between text and image
+  const toggleOptionType = (index: number) => {
+    setOptionTypes(prev => ({
+      ...prev,
+      [index]: prev[index] === 'image' ? 'text' : 'image'
+    }));
+  };
+
+  // NEW: Handle image file selection and convert to Base64
+  const handleImageSelect = (index: number, file: File | null) => {
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setOptionImages(prev => ({ ...prev, [index]: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setOptionImages(prev => { const n = {...prev}; delete n[index]; return n; });
+    }
   };
 
   // Update option text
@@ -93,8 +155,23 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
       if (typeof newOptions[index] === 'string') {
         newOptions[index] = value;
       } else {
-        // If it's an object (MQT), update the optionText property
+        // If it's an object (MQT or has description), update the optionText property
         newOptions[index] = { ...newOptions[index], optionText: value };
+      }
+      return { ...prev, questionOptions: newOptions };
+    });
+  };
+
+  // NEW: Update option description
+  const updateOptionDescription = (index: number, value: string) => {
+    setFormikValues((prev: any) => {
+      const newOptions = [...prev.questionOptions];
+      const current = newOptions[index];
+      if (typeof current === 'string') {
+         // Convert string to object
+         newOptions[index] = { optionText: current, optionDescription: value };
+      } else {
+         newOptions[index] = { ...current, optionDescription: value };
       }
       return { ...prev, questionOptions: newOptions };
     });
@@ -130,8 +207,33 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
     fetchMQT();
   }, []);
 
+  // NEW: Fetch games on mount
   useEffect(() => {
-    if (!useMQTAsOptions) {
+    const fetchGames = async () => {
+      try {
+        const response = await ListGamesData();
+        setGames(response.data);
+      } catch (error) {
+        setGames([]);
+      }
+    };
+    fetchGames();
+  }, []);
+
+  // Reset form when useGameAsOption changes
+  useEffect(() => {
+    if (useGameAsOption) {
+      // When switching to game mode, reset options and other states
+      setFormikValues(v => ({ ...v, questionOptions: [] }));
+      setOptionMeasuredQualities({});
+      setUseMQTAsOptions(false);
+    } else {
+      setSelectedGameId("");
+    }
+  }, [useGameAsOption]);
+
+  useEffect(() => {
+    if (!useMQTAsOptions && !useGameAsOption) {
       setFormikValues(v => ({
         ...v,
         questionOptions: [""], // or your preferred default
@@ -153,31 +255,56 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
             e.preventDefault();
             setLoading(true);
             try {
+              console.log("Submitting form. optionMeasuredQualities state:", optionMeasuredQualities);
               // Build options array with optionScores
-              const options = formikValues.questionOptions.map((option: any, index: number) => {
-                // Handle both string options (manual) and object options (MQT)
-                const optionText = typeof option === 'string' ? option : option.optionText;
-                const isCorrect = typeof option === 'string' ? false : (option.correct || false);
-                
-                // Build optionScores for this option
-                const optionScores: any[] = [];
-                if (optionMeasuredQualities[index]) {
-                  Object.entries(optionMeasuredQualities[index]).forEach(([typeId, val]: any) => {
-                    if (val.checked) {
-                      optionScores.push({
-                        score: val.score,
-                        question_option: {}, // leave empty as per your payload
-                        measuredQualityType: { measuredQualityTypeId: Number(typeId) }
-                      });
-                    }
-                  });
-                }
-                return {
-                  optionText,
-                  optionScores,
-                  correct: isCorrect
-                };
-              });
+              let options: any[] = [];
+              
+              if (useGameAsOption && selectedGameId) {
+                // Game as option mode - single option with game reference
+                options = [{
+                  optionText: null,
+                  optionImageBase64: null,
+                  optionScores: [],
+                  correct: false,
+                  isGame: true,
+                  game: { gameId: Number(selectedGameId) }
+                }];
+              } else {
+                // Regular options mode
+                options = formikValues.questionOptions.map((option: any, index: number) => {
+                  // Check if this option is in image mode
+                  const isImageMode = optionTypes[index] === 'image';
+                  
+                  // Handle both string options (manual) and object options (MQT)
+                  const optionText = isImageMode ? null : (typeof option === 'string' ? option : option.optionText);
+                  const optionImageBase64 = isImageMode ? (optionImages[index] || null) : null;
+                  const isCorrect = typeof option === 'string' ? false : (option.correct || false);
+                  const optionDescription = typeof option === 'string' ? null : (option.optionDescription || null);
+                  
+                  // Build optionScores for this option
+                  const optionScores: any[] = [];
+                  if (optionMeasuredQualities[index]) {
+                    Object.entries(optionMeasuredQualities[index]).forEach(([typeId, val]: any) => {
+                      if (val.checked) {
+                        optionScores.push({
+                          score: val.score,
+                          question_option: {}, // leave empty as per your payload
+                          measuredQualityType: { measuredQualityTypeId: Number(typeId) }
+                        });
+                      }
+                    });
+                  }
+                  return {
+                    optionText,
+                    optionImageBase64,
+                    optionScores,
+                    correct: isCorrect,
+                    isGame: false,
+                    game: null,
+                    optionDescription
+                  };
+                });
+              }
 
               // Compose payload
               const payload = {
@@ -193,10 +320,14 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
               await CreateQuestionData(payload);
               setFormikValues(initialValues);
               setOptionMeasuredQualities({});
+              setOptionTypes({});
+              setOptionImages({});
+              setSelectedGameId("");
+              setUseGameAsOption(false);
               navigate("/assessment-questions");
             } catch (error) {
               console.error("Error creating question:", error);
-              window.location.replace("/error");
+              // window.location.replace("/error");
             } finally {
               setLoading(false);
             }
@@ -236,6 +367,9 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
               >
                 <option value="">Select Question Type</option>
                 <option value="multiple-choice">Multiple Choice</option>
+                <option value="single-choice">Single Choice</option>
+                <option value="ranking">Ranking</option>
+
               </select>
             </div>
             <div className="fv-row mb-7">
@@ -262,7 +396,38 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
             </div>
             <div className="fv-row mb-7">
               <label className="required fs-6 fw-bold mb-2">Options:</label>
-              {useMQTAsOptions ? (
+              
+              {/* Game as Option Mode */}
+              {useGameAsOption ? (
+                <div className="p-3 border rounded bg-light">
+                  <div className="d-flex align-items-center mb-2">
+                    <span className="me-2 fw-bold">🎮 Select Game:</span>
+                  </div>
+                  <select
+                    className={clsx(
+                      "form-control form-control-lg form-control-solid",
+                      {
+                        "is-invalid text-danger": !selectedGameId,
+                        "is-valid": !!selectedGameId,
+                      }
+                    )}
+                    value={selectedGameId}
+                    onChange={(e) => setSelectedGameId(e.target.value)}
+                  >
+                    <option value="">Select a Game</option>
+                    {games.map((game) => (
+                      <option key={game.gameId} value={game.gameId}>
+                        {game.gameName} (Code: {game.gameCode})
+                      </option>
+                    ))}
+                  </select>
+                  {selectedGameId && (
+                    <div className="mt-2 text-success">
+                      ✅ Game selected. This question will launch the selected game as an option.
+                    </div>
+                  )}
+                </div>
+              ) : useMQTAsOptions ? (
                 <MQT
                   mqt={mqt}
                   formikValues={formikValues}
@@ -271,84 +436,147 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
               ) : (
                 formikValues.questionOptions.map((option: any, index: number) => {
                   const optionText = typeof option === 'string' ? option : option.optionText;
+                  const isImageMode = optionTypes[index] === 'image';
                   return (
-                  <div key={index} className="d-flex align-items-center gap-2 mb-2">
-                    <input
-                      type="text"
-                      placeholder={`Enter option ${index + 1}`}
-                      value={optionText}
-                      onChange={e => updateOption(index, e.target.value)}
-                      className={clsx(
-                        "form-control form-control-lg form-control-solid w-50",
-                        {
-                          "is-invalid text-danger": !optionText,
-                          "is-valid": !!optionText,
-                        }
-                      )}
-                    />
-                    <Dropdown>
-                      <Dropdown.Toggle
-                        variant="secondary"
-                        id={`dropdown-option-${index}`}
-                        size="sm"
-                      >
-                        Measured Quality Types
-                      </Dropdown.Toggle>
-                      <Dropdown.Menu style={{ minWidth: 250 }}>
-                        <Dropdown.Header>Measured Quality Types</Dropdown.Header>
-                        <div style={{ maxHeight: 250, overflowY: "auto", padding: 8 }}>
-                          {mqt.map((type: any, i: number) => (
-                            <>
-                              <div key={type.measuredQualityTypeId} className="d-flex align-items-center mb-2">
-                                <input
-                                  type="checkbox"
-                                  checked={!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked}
-                                  onChange={() => handleQualityToggle(index, type.measuredQualityTypeId)}
-                                  className="form-check-input me-2"
-                                  id={`option-${index}-type-${type.measuredQualityTypeId}`}
-                                />
-                                <label htmlFor={`option-${index}-type-${type.measuredQualityTypeId}`} className="me-2 mb-0">
-                                  {type.measuredQualityTypeName}
-                                </label>
-                                {!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked && (
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    value={optionMeasuredQualities[index][type.measuredQualityTypeId]?.score ?? 0}
-                                    onChange={e =>
-                                      handleQualityScoreChange(index, type.measuredQualityTypeId, Number(e.target.value))
-                                    }
-                                    placeholder="Score"
-                                    className="form-control form-control-sm ms-2"
-                                    style={{ width: 70 }}
-                                  />
-                                )}
-                              </div>
-                              {i < mqt.length - 1 && <hr style={{ margin: '4px 0' }} />}
-                            </>
-                          ))}
+                  <div key={index} className="mb-3 p-3 border rounded bg-light">
+                    {/* Toggle Switch for Text/Image */}
+                    <div className="d-flex align-items-center mb-2">
+                      <span className="me-2 fw-bold">Option {index + 1}:</span>
+                      <div className="form-check form-switch ms-auto">
+                        <input
+                          className="form-check-input"
+                          type="checkbox"
+                          role="switch"
+                          id={`option-type-switch-${index}`}
+                          checked={isImageMode}
+                          onChange={() => toggleOptionType(index)}
+                        />
+                        <label className="form-check-label" htmlFor={`option-type-switch-${index}`}>
+                          {isImageMode ? '📷 Image' : '📝 Text'}
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="d-flex align-items-start gap-2">
+                      {/* Conditionally render Text Input OR Image Upload */}
+                      {isImageMode ? (
+                        <div className="flex-grow-1">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleImageSelect(index, e.target.files?.[0] || null)}
+                            className="form-control form-control-sm mb-2"
+                          />
+                          {optionImages[index] && (
+                            <div className="position-relative d-inline-block">
+                              <img 
+                                src={optionImages[index]} 
+                                alt={`Option ${index + 1}`}
+                                style={{ maxWidth: 150, maxHeight: 100, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }}
+                              />
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-danger position-absolute"
+                                style={{ top: -8, right: -8, padding: '2px 8px', fontSize: 12 }}
+                                onClick={() => handleImageSelect(index, null)}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      </Dropdown.Menu>
-                    </Dropdown>
-                    {formikValues.questionOptions.length > 1 && (
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-danger ms-2"
-                        onClick={() => removeOption(index)}
-                      >
-                        -
-                      </button>
-                    )}
-                    {index === formikValues.questionOptions.length - 1 && (
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-primary ms-2"
-                        onClick={addOption}
-                      >
-                        +
-                      </button>
-                    )}
+                      ) : (
+                        <input
+                          type="text"
+                          placeholder={`Enter option ${index + 1}`}
+                          value={optionText}
+                          onChange={e => updateOption(index, e.target.value)}
+                          className={clsx(
+                            "form-control form-control-lg form-control-solid flex-grow-1",
+                            {
+                              "is-invalid text-danger": !optionText,
+                              "is-valid": !!optionText,
+                            }
+                          )}
+                        />
+                      )}
+                      
+                      {/* <Dropdown>
+                        <Dropdown.Toggle
+                          variant="secondary"
+                          id={`dropdown-option-${index}`}
+                          size="sm"
+                        >
+                          MQT
+                        </Dropdown.Toggle>
+                        <Dropdown.Menu style={{ minWidth: 250 }}>
+                          <Dropdown.Header>Measured Quality Types</Dropdown.Header>
+                          <div style={{ maxHeight: 250, overflowY: "auto", padding: 8 }}>
+                            {mqt.map((type: any, i: number) => (
+                              <>
+                                <div key={type.measuredQualityTypeId} className="d-flex align-items-center mb-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked}
+                                    onChange={() => handleQualityToggle(index, type.measuredQualityTypeId)}
+                                    className="form-check-input me-2"
+                                    id={`option-${index}-type-${type.measuredQualityTypeId}`}
+                                  />
+                                  <label htmlFor={`option-${index}-type-${type.measuredQualityTypeId}`} className="me-2 mb-0">
+                                    {type.measuredQualityTypeName}
+                                  </label>
+                                  {!!optionMeasuredQualities[index]?.[type.measuredQualityTypeId]?.checked && (
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={100}
+                                      value={optionMeasuredQualities[index][type.measuredQualityTypeId]?.score ?? 0}
+                                      onChange={e =>
+                                        handleQualityScoreChange(index, type.measuredQualityTypeId, Number(e.target.value))
+                                      }
+                                      placeholder="Score"
+                                      className="form-control form-control-sm ms-2"
+                                      style={{ width: 70 }}
+                                    />
+                                  )}
+                                </div>
+                                {i < mqt.length - 1 && <hr style={{ margin: '4px 0' }} />}
+                              </>
+                            ))}
+                          </div>
+                        </Dropdown.Menu>
+                      </Dropdown> */}
+                      {formikValues.questionOptions.length > 1 && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-danger"
+                          onClick={() => removeOption(index)}
+                        >
+                          -
+                        </button>
+                      )}
+                      {index === formikValues.questionOptions.length - 1 && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-primary"
+                          onClick={addOption}
+                        >
+                          +
+                        </button>
+                      )}
+                    </div>
+
+                    {/* NEW: Option Description Field */}
+                    <div className="mt-2">
+                       <label className="fs-7 fw-semibold mb-1 text-muted">Option Description:</label>
+                       <textarea
+                         className="form-control form-control-sm"
+                         rows={2}
+                         placeholder="Enter description for this option (optional)"
+                         value={(typeof option === 'string' ? '' : option.optionDescription) || ''}
+                         onChange={(e) => updateOptionDescription(index, e.target.value)}
+                       />
+                    </div>
                   </div>
                   );
                 })
@@ -372,15 +600,32 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                 style={{ width: 200 }}
               />
             </div>
-            <div className="mb-4">
+            <div className="mb-4 d-flex gap-4">
               <label>
                 <input
                   type="checkbox"
                   checked={useMQTAsOptions}
-                  onChange={() => setUseMQTAsOptions(v => !v)}
+                  onChange={() => {
+                    setUseMQTAsOptions(v => !v);
+                    if (!useMQTAsOptions) setUseGameAsOption(false);
+                  }}
                   className="me-2"
+                  disabled={useGameAsOption}
                 />
                 Use Measured Quality Types as Options
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={useGameAsOption}
+                  onChange={() => {
+                    setUseGameAsOption(v => !v);
+                    if (!useGameAsOption) setUseMQTAsOptions(false);
+                  }}
+                  className="me-2"
+                  disabled={useMQTAsOptions}
+                />
+                🎮 Use Game as Option
               </label>
             </div>
           </div>

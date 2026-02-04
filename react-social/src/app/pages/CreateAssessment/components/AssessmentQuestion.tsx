@@ -4,7 +4,7 @@ import { IconContext } from "react-icons";
 import { MdQuestionAnswer } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
-import { ReadQuestionsData } from "../../AssesmentQuestions/API/Question_APIs";
+import { ReadQuestionsData, ReadQuestionsDataList } from "../../AssesmentQuestions/API/Question_APIs";
 import { QuestionTable } from "../../AssesmentQuestions/components";
 import QuestionCreateModal from "../../AssesmentQuestions/components/QuestionCreateModal"; // Import modal
 
@@ -19,7 +19,8 @@ const AssessmentQuestionsPage = () => {
   const fetchQuestions = async () => {
     setLoading(true);
     try {
-      const response = await ReadQuestionsData();
+      alert("Fetching Questions List");
+      const response = await ReadQuestionsDataList();
       setQuestionsData(response.data);
     } catch (error) {
       console.error("Failed to fetch questions:", error);

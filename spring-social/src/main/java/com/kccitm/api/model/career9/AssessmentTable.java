@@ -1,7 +1,5 @@
 package com.kccitm.api.model.career9;
 
-import java.sql.Date;
-
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
@@ -11,7 +9,8 @@ import javax.persistence.JoinColumn;
 import javax.persistence.OneToOne;
 import javax.persistence.Table;
 
-import com.kccitm.api.model.InstituteDetail;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.kccitm.api.model.career9.Questionaire.Questionnaire;
 
 // import org.springframework.boot.context.properties.bind.DefaultValue;
 
@@ -20,14 +19,16 @@ import com.kccitm.api.model.InstituteDetail;
 @Entity
 @Table(name = "assessment_table")
 public class AssessmentTable implements java.io.Serializable {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "assessment_id")
     private Long id;
 
+    @JsonProperty("AssessmentName")
     private String AssessmentName;
 
-    @Column(columnDefinition = "boolean default false")
+    @Column(name = "is_active")
     private Boolean isActive;
 
     private Boolean modeofAssessment;
@@ -36,50 +37,75 @@ public class AssessmentTable implements java.io.Serializable {
 
     private String endDate;
 
-    
-
-    @OneToOne
-    @JoinColumn(name = "institute_code")
-    private InstituteDetail institute;
-    
-    @OneToOne
-    @JoinColumn(name = "tool_id")
-    private Tool tool;
+    @OneToOne(cascade = javax.persistence.CascadeType.ALL)
+    @JoinColumn(name = "questionnaire_id")
+    private Questionnaire questionnaire;
 
     public Long getId() {
         return id;
     }
+
     public void setId(Long id) {
         this.id = id;
     }
+
+    public AssessmentTable(Long id, String AssessmentName, String starDate, String endDate, Boolean isActive) {
+        this.id = id;
+        this.AssessmentName = AssessmentName;
+        this.starDate = starDate;
+        this.endDate = endDate;
+        this.isActive = isActive;
+    }
+
+    public AssessmentTable() {
+    }
+
     public String getAssessmentName() {
         return AssessmentName;
     }
-    public void setAssessmentName(String assessmentName) {
-        this.AssessmentName = assessmentName;
+
+    public void setAssessmentName(String AssessmentName) {
+        this.AssessmentName = AssessmentName;
     }
+
     public Boolean getIsActive() {
         return isActive;
     }
+
     public void setIsActive(Boolean isActive) {
         this.isActive = isActive;
     }
+
     public Boolean getModeofAssessment() {
         return modeofAssessment;
     }
+
     public void setModeofAssessment(Boolean modeofAssessment) {
         this.modeofAssessment = modeofAssessment;
     }
+
     public String getStarDate() {
         return starDate;
     }
+
     public void setStarDate(String starDate) {
         this.starDate = starDate;
     }
+
     public String getEndDate() {
         return endDate;
     }
+
     public void setEndDate(String endDate) {
         this.endDate = endDate;
     }
+
+    public Questionnaire getQuestionnaire() {
+        return questionnaire;
+    }
+
+    public void setQuestionnaire(Questionnaire questionnaire) {
+        this.questionnaire = questionnaire;
+    }
+
 }

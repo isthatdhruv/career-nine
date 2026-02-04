@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -159,8 +158,8 @@ public class StudentService {
   }
 
   public Student setBatchBranchCourse(Student stu) {
-    InstituteBatch ses = batchRepository.getById(stu.getBatch_id());
-    stu.setBatchData(ses);
+    // InstituteBatch ses = batchRepository.getById(stu.getBatch_id());
+    // stu.setBatchData(ses);
     InstituteBranch brn = branchRepository.getById(stu.getBranch_id());
     stu.setBranchData(brn);
     InstituteCourse ice = instituteCourseRepository.getById(stu.getCourse());

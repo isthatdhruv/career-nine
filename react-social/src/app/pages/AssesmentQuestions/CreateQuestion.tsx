@@ -4,7 +4,7 @@ import { IconContext } from "react-icons";
 import { MdQuestionAnswer } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { ReadQuestionSectionData } from "../QuestionSections/API/Question_Section_APIs";
-import { ReadQuestionsData } from "./API/Question_APIs";
+import { ReadQuestionsData, ReadQuestionsDataList } from "./API/Question_APIs";
 import { QuestionTable } from "./components";
 
 const AssessmentQuestionsPage = () => {
@@ -18,7 +18,7 @@ const AssessmentQuestionsPage = () => {
   const fetchQuestions = async () => {
     setLoading(true);
     try {
-      const response = await ReadQuestionsData();
+      const response = await ReadQuestionsDataList();
       setQuestionsData(response.data);
     } catch (error) {
       console.error("Failed to fetch questions:", error);

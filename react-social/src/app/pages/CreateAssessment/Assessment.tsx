@@ -3,64 +3,68 @@ import { Button } from "react-bootstrap";
 import { IconContext } from "react-icons";
 import { MdQuestionAnswer } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
-import { ReadAssessmentData } from "./API/Create_Assessment_APIs";
+import { ReadAssessmentList } from "./API/Create_Assessment_APIs";
 import { AssessmentTable } from "./components";
-import AssessmentCreateModal from "./components/AssessmentCreateModal";
+import AssessmentCreateModal from "./components/assessment/AssessmentCreateModal";
 
 const AssessmentPage = () => {
   const [assessmentData, setAssessmentData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [sections, setSections] = useState<any[]>([]); 
+  const [isDataLoading, setIsDataLoading] = useState(true);
+  const [sections, setSections] = useState<any[]>([]);
   const [pageLoading, setPageLoading] = useState(["false"]);
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const fetchQuestions = async () => {
-    setLoading(true);
-    try {
-      const response = await ReadAssessmentData();
-      setAssessmentData(response.data);
-    } catch (error) {
-      console.error("Failed to fetch assessments:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Initial load
   useEffect(() => {
-      const fetchSections = async () => {
-        setLoading(true);
+    const fetchData = async () => {
+      setIsDataLoading(true);
+      try {
+        const response = await ReadAssessmentList();
+        console.log("Fetched assessment data:", response.data);
+        setAssessmentData(response.data || []);
+      } catch (error) {
+        console.error("Error fetching assessments:", error);
+        setAssessmentData([]);
+      } finally {
+        setIsDataLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  // Refresh when pageLoading is set to true
+  useEffect(() => {
+    if (pageLoading[0] === "true") {
+      const fetchData = async () => {
+        setIsDataLoading(true);
         try {
-          const response = await ReadAssessmentData();
-          setSections(response.data);
+          const response = await ReadAssessmentList();
+          console.log("Refreshed assessment data:", response.data);
+          setAssessmentData(response.data || []);
         } catch (error) {
-          console.error("Error fetching sections:", error);
+          console.error("Error refreshing assessments:", error);
         } finally {
-          setLoading(false);
+          setIsDataLoading(false);
+          setPageLoading(["false"]);
         }
       };
-      fetchSections();
-    }, []);
-
-  useEffect(() => {
-    fetchQuestions();
-    
-    if (pageLoading[0] === "true") {
-      setPageLoading(["false"]);
+      fetchData();
     }
-  }, [pageLoading[0]]); 
+  }, [pageLoading]);
 
 
   return (
     <div className="card">
-      {loading && (
+      {(loading || isDataLoading) && (
         <span className="indicator-progress m-5" style={{ display: "block" }}>
           Please wait...{" "}
           <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
         </span>
       )}
 
-      {!loading && (
+      {!loading && !isDataLoading && (
         <div className="card-header border-0 pt-6">
           <div className="card-title">
             <h1>Assessments</h1>
@@ -70,7 +74,7 @@ const AssessmentPage = () => {
             <div className="d-flex justify-content-end">
               <Button
                 variant="primary"
-                onClick={() => setShowCreateModal(true)}
+                onClick={() => navigate("/assessments/create")}
               >
                 <IconContext.Provider
                   value={{ style: { paddingBottom: "4px" } }}
@@ -85,7 +89,7 @@ const AssessmentPage = () => {
         </div>
       )}
 
-      {!loading && (
+      {!loading && !isDataLoading && (
         <div className="card-body pt-5">
           <AssessmentTable
             data={assessmentData}

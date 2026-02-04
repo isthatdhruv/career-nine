@@ -35,7 +35,7 @@ public class AssessmentQuestions implements Serializable {
     private int maxOptionsAllowed;
 
     // 1 Question to Many Options
-    @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "question", cascade = CascadeType.ALL)
     @JsonManagedReference
     private List<AssessmentQuestionOptions> options;
 
@@ -48,9 +48,19 @@ public class AssessmentQuestions implements Serializable {
     private QuestionSection section;
 
     // Link Question -> Language
-    @OneToMany(mappedBy = "assessmentQuestion", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "assessmentQuestion", cascade = CascadeType.ALL)
     @JsonIgnoreProperties("assessmentQuestion")
     private List<LanguageQuestion> languageQuestions;
+
+    // Constructor for projection
+    public AssessmentQuestions(Long questionId, String questionText, String questionType) {
+        this.questionId = questionId;
+        this.questionText = questionText;
+        this.questionType = questionType;
+    }
+
+    public AssessmentQuestions() {
+    }
 
     // --- getters and setters ---
     public int getmaxOptionsAllowed() {

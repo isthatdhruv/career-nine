@@ -1,16 +1,27 @@
 package com.kccitm.api.controller.career9;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import com.kccitm.api.repository.Career9.AssessmentTableRepository;
-// import com.kccitm.api.entity.career9.AssessmentTable;
-
-import com.kccitm.api.model.career9.AssessmentTable;
-
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.kccitm.api.model.career9.AssessmentTable;
+import com.kccitm.api.model.career9.StudentAssessmentMapping;
+import com.kccitm.api.model.career9.Questionaire.Questionnaire;
+import com.kccitm.api.repository.StudentAssessmentMappingRepository;
+import com.kccitm.api.repository.Career9.AssessmentTableRepository;
+import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireRepository;
 
 @RestController
 @RequestMapping("/assessments")
@@ -18,36 +29,162 @@ public class AssessmentTableController {
 
     @Autowired
     private AssessmentTableRepository assessmentTableRepository;
-    
+
+    @Autowired
+    private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
+
+    @Autowired
+    private QuestionnaireRepository questionnaireRepository;
+
     @GetMapping("/getAll")
+    // @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public ResponseEntity<List<AssessmentTable>> getAllAssessments() {
         List<AssessmentTable> assessments = assessmentTableRepository.findAll();
         return ResponseEntity.ok(assessments);
     }
-    
-    @GetMapping("/{id}")
-    public ResponseEntity<AssessmentTable> getAssessmentById(@PathVariable Long id) {
-        Optional<AssessmentTable> assessment = assessmentTableRepository.findById(id);
-        return assessment.map(ResponseEntity::ok)
-                        .orElse(ResponseEntity.notFound().build());
+
+    @GetMapping("/get/list")
+    public List<AssessmentTable> getAllAssessment() {
+        // return assessmentTableRepository.findAssessmentList();
+        return assessmentTableRepository.findAll();
     }
-    
+
+    @GetMapping("/{id}")
+    public ResponseEntity<HashMap<String, Object>> getAssessmentById(@PathVariable Long id) {
+        Optional<AssessmentTable> assessment = assessmentTableRepository.findById(id);
+        HashMap<String, Object> response = new HashMap<>();
+        if (assessment.isPresent()) {
+            response.put("isActive", assessment.get().getIsActive());
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{assessmentId}/student/{userStudentId}")
+    public ResponseEntity<HashMap<String, Object>> getAssessmentStatusForStudent(
+            @PathVariable Long assessmentId, @PathVariable Long userStudentId) {
+        Optional<AssessmentTable> assessment = assessmentTableRepository.findById(assessmentId);
+        Optional<StudentAssessmentMapping> studentAssessmentMapping = studentAssessmentMappingRepository
+                .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+        HashMap<String, Object> response = new HashMap<>();
+
+        if (assessment.isPresent()) {
+            response.put("isActive", assessment.get().getIsActive());
+        } else {
+            response.put("isActive", false);
+        }
+
+        if (studentAssessmentMapping.isPresent()) {
+            response.put("studentStatus", studentAssessmentMapping.get().getStatus());
+        } else {
+            response.put("studentStatus", null);
+        }
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/student/{userStudentId}")
+    public ResponseEntity<List<HashMap<String, Object>>> getAssessmentsForStudent(
+            @PathVariable Long userStudentId) {
+        // Get all assessment mappings for this student
+        List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
+                .findByUserStudentUserStudentId(userStudentId);
+
+        java.util.ArrayList<HashMap<String, Object>> result = new java.util.ArrayList<>();
+
+        for (StudentAssessmentMapping mapping : mappings) {
+            HashMap<String, Object> assessmentInfo = new HashMap<>();
+            assessmentInfo.put("assessmentId", mapping.getAssessmentId());
+            assessmentInfo.put("status", mapping.getStatus());
+
+            // Get assessment name
+            Optional<AssessmentTable> assessment = assessmentTableRepository.findById(mapping.getAssessmentId());
+            if (assessment.isPresent()) {
+                assessmentInfo.put("assessmentName", assessment.get().getAssessmentName());
+            } else {
+                assessmentInfo.put("assessmentName", "Unknown Assessment");
+            }
+
+            result.add(assessmentInfo);
+        }
+
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/getby/{id}")
+    public List<Questionnaire> getQuestionnaireById(@PathVariable Long id) {
+
+        Long questionnaireId = assessmentTableRepository.findById(id).get().getQuestionnaire().getQuestionnaireId();
+
+        return questionnaireRepository.findAllByQuestionnaireId(questionnaireId);
+    }
+
+    @GetMapping("/getById/{id}")
+    public ResponseEntity<AssessmentTable> getAssessmentDetailsById(@PathVariable Long id) {
+        Optional<AssessmentTable> assessment = assessmentTableRepository.findById(id);
+        return assessment.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     @PostMapping("/create")
-    public ResponseEntity<AssessmentTable> createAssessment(@RequestBody AssessmentTable assessment) {
+    public ResponseEntity<AssessmentTable> createAssessment(@RequestBody java.util.Map<String, Object> requestBody) {
+        AssessmentTable assessment = new AssessmentTable();
+
+        // Set basic fields from request body
+        if (requestBody.get("AssessmentName") != null) {
+            assessment.setAssessmentName((String) requestBody.get("AssessmentName"));
+        }
+        if (requestBody.get("starDate") != null) {
+            assessment.setStarDate((String) requestBody.get("starDate"));
+        }
+        if (requestBody.get("endDate") != null) {
+            assessment.setEndDate((String) requestBody.get("endDate"));
+        }
+        if (requestBody.get("isActive") != null) {
+            assessment.setIsActive((Boolean) requestBody.get("isActive"));
+        }
+        if (requestBody.get("modeofAssessment") != null) {
+            assessment.setModeofAssessment((Boolean) requestBody.get("modeofAssessment"));
+        }
+
+        // Handle questionnaire - fetch existing entity by ID
+        if (requestBody.get("questionnaire") != null) {
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> questionnaireData = (java.util.Map<String, Object>) requestBody
+                    .get("questionnaire");
+            Long questionnaireId = null;
+
+            // Check for questionnaireId field
+            if (questionnaireData.get("questionnaireId") != null) {
+                questionnaireId = ((Number) questionnaireData.get("questionnaireId")).longValue();
+            } else if (questionnaireData.get("id") != null) {
+                questionnaireId = ((Number) questionnaireData.get("id")).longValue();
+            }
+
+            if (questionnaireId != null) {
+                Optional<Questionnaire> existingQuestionnaire = questionnaireRepository.findById(questionnaireId);
+                if (existingQuestionnaire.isPresent()) {
+                    assessment.setQuestionnaire(existingQuestionnaire.get());
+                } else {
+                    return ResponseEntity.badRequest().build();
+                }
+            }
+        }
+
         AssessmentTable savedAssessment = assessmentTableRepository.save(assessment);
         return ResponseEntity.ok(savedAssessment);
     }
-    
-    @PutMapping("/{id}")
-    public ResponseEntity<AssessmentTable> updateAssessment(@PathVariable Long id, @RequestBody AssessmentTable assessment) {
+
+    @PutMapping("/update/{id}")
+    public ResponseEntity<AssessmentTable> updateAssessment(@PathVariable Long id,
+            @RequestBody AssessmentTable assessment) {
         if (!assessmentTableRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
         assessment.setId(id);
+        assessment.setAssessmentName(assessment.getAssessmentName());
         AssessmentTable updatedAssessment = assessmentTableRepository.save(assessment);
         return ResponseEntity.ok(updatedAssessment);
     }
-    
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteAssessment(@PathVariable Long id) {
         if (!assessmentTableRepository.existsById(id)) {
@@ -56,20 +193,49 @@ public class AssessmentTableController {
         assessmentTableRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }
-    
-    // Get assessment by institute
-    @GetMapping("/by-institute/{instituteId}")
-    public ResponseEntity<AssessmentTable> getAssessmentByInstitute(@PathVariable Long instituteId) {
-        Optional<AssessmentTable> assessment = assessmentTableRepository.findByInstituteId(instituteId);
-        return assessment.map(ResponseEntity::ok)
-                        .orElse(ResponseEntity.notFound().build());
+
+    @GetMapping("/get/list-ids")
+    public HashMap<Long, String> getAllAssessmentIds() {
+        HashMap<Long, String> assessmentIdandName = new HashMap<>();
+        assessmentTableRepository.findAll()
+                .forEach(assessment -> assessmentIdandName.put(assessment.getId(), assessment.getAssessmentName()));
+        return assessmentIdandName;
     }
-    
-    // Get assessment by tool
-    @GetMapping("/by-tool/{toolId}")
-    public ResponseEntity<AssessmentTable> getAssessmentByTool(@PathVariable Long toolId) {
-        Optional<AssessmentTable> assessment = assessmentTableRepository.findByToolId(toolId);
-        return assessment.map(ResponseEntity::ok)
-                        .orElse(ResponseEntity.notFound().build());
+
+    @PostMapping("/startAssessment")
+    public ResponseEntity<HashMap<String, Object>> startAssessment(
+            @RequestBody java.util.Map<String, Long> request) {
+        Long userStudentId = request.get("userStudentId");
+        Long assessmentId = request.get("assessmentId");
+
+        HashMap<String, Object> response = new HashMap<>();
+
+        if (userStudentId == null || assessmentId == null) {
+            response.put("success", false);
+            response.put("error", "userStudentId and assessmentId are required");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        Optional<StudentAssessmentMapping> mappingOpt = studentAssessmentMappingRepository
+                .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+
+        if (mappingOpt.isEmpty()) {
+            response.put("success", false);
+            response.put("error", "No assessment mapping found");
+            return ResponseEntity.status(404).body(response);
+        }
+
+        StudentAssessmentMapping mapping = mappingOpt.get();
+
+        // Only update if not completed
+        if (!"completed".equals(mapping.getStatus())) {
+            mapping.setStatus("ongoing");
+            studentAssessmentMappingRepository.save(mapping);
+        }
+
+        response.put("success", true);
+        response.put("status", mapping.getStatus());
+        return ResponseEntity.ok(response);
     }
+
 }

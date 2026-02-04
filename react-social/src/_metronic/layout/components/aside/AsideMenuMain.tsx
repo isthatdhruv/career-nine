@@ -15,18 +15,24 @@ export function AsideMenuMain() {
         fontIcon="bi-app-indicator"
       />
 
-    
-      <AsideMenuItem
+      <div className="menu-item">
+        <div className="menu-content pt-8 pb-2">
+          <span className="menu-section text-muted text-uppercase fs-8 ls-1">
+            Institute
+          </span>
+        </div>
+      </div>
+
+      <AsideMenuItemWithSub
+        to=""
+        title="Institute Management"
+        fontIcon="bi-app-indicator"
+        icon="/media/icons/duotune/communication/com006.svg"
+      >
+        <AsideMenuItem
         to="/college"
         icon="/media/icons/duotune/general/gen001.svg"
         title="Institute"
-        fontIcon="bi-app-indicator"
-      />
-
-      <AsideMenuItem
-        to="/questionare/create"
-        icon="/media/icons/duotune/general/gen044.svg"
-        title="Create and View Questionare"
         fontIcon="bi-app-indicator"
       />
 
@@ -38,18 +44,86 @@ export function AsideMenuMain() {
       />
 
       <AsideMenuItem
+        to="/group-student"
+        icon="/media/icons/duotune/general/gen044.svg"
+        title="Group Student Information"
+        fontIcon="bi-app-indicator"
+      /> 
+      <AsideMenuItem
+        to="/board"
+        icon="/media/icons/duotune/finance/fin001.svg"
+        title="Board"
+        fontIcon="bi-app-indicator"
+      />
+      <AsideMenuItem
+        to="/upload-excel"
+        icon="/media/icons/duotune/general/gen044.svg"
+        title="Add Students in Bulk"
+        fontIcon="bi-app-indicator"
+      />
+      <AsideMenuItem
+        to="/studentlist"
+        title="Student's List & Profile"
+        fontIcon="bi-app-indicator"
+        icon="/media/icons/duotune/communication/com006.svg"
+      ></AsideMenuItem>
+      
+        </AsideMenuItemWithSub>
+
+      <div className="menu-item">
+        <div className="menu-content pt-8 pb-2">
+          <span className="menu-section text-muted text-uppercase fs-8 ls-1">
+            QUESTIONNAIRE
+          </span>
+        </div>
+      </div>
+
+       <AsideMenuItemWithSub
+        to=""
+        title="Questionnaire Management"
+        fontIcon="bi-app-indicator"
+        icon="/media/icons/duotune/communication/com006.svg"
+      >
+        <AsideMenuItem
+        to="/questionare/create"
+        icon="/media/icons/duotune/general/gen044.svg"
+        title="Create and View Questionare"
+        fontIcon="bi-app-indicator"
+      />
+      <AsideMenuItem
+        to="/questionaire/List"
+        icon="/media/icons/duotune/general/gen044.svg"
+        title="Questionare List"
+        fontIcon="bi-app-indicator"
+      />
+      <AsideMenuItem
         to="/tools"
         icon="/media/icons/duotune/general/gen044.svg"
         title="Tools"
         fontIcon="bi-app-indicator"
       />
       <AsideMenuItem
-        to="/list"
+        to="/game-list"
         icon="/media/icons/duotune/general/gen044.svg"
-        title="List"
+        title="Game List"
         fontIcon="bi-app-indicator"
       />
+        </AsideMenuItemWithSub>
+      
+      <div className="menu-item">
+        <div className="menu-content pt-8 pb-2">
+          <span className="menu-section text-muted text-uppercase fs-8 ls-1">
+            QUALITIES
+          </span>
+        </div>
+      </div>
 
+      <AsideMenuItemWithSub
+        to=""
+        title="Qualities"
+        fontIcon="bi-app-indicator"
+        icon="/media/icons/duotune/communication/com006.svg"
+      > 
       <AsideMenuItem
         to="/measured-qualities"
         icon="/media/icons/duotune/general/gen044.svg```"
@@ -63,42 +137,21 @@ export function AsideMenuMain() {
         title="Measured Quality Types"
         fontIcon="bi-app-indicator"
       />
+      </AsideMenuItemWithSub> */
 
-      <AsideMenuItem
-        to="/career"
+      {/* <AsideMenuItem
+        to="/list"
         icon="/media/icons/duotune/general/gen044.svg"
-        title="Career"
+        title="List"
         fontIcon="bi-app-indicator"
-      />
+      /> */}
 
-      <AsideMenuItem
-        to="/upload-excel"
-        icon="/media/icons/duotune/general/gen044.svg"
-        title="Upload Excel File"
-        fontIcon="bi-app-indicator"
-      />
-
-      <AsideMenuItem
-        to="/board"
-        icon="/media/icons/duotune/finance/fin001.svg"
-        title="Board"
-        fontIcon="bi-app-indicator"
-      />
-
-      <AsideMenuItem
+      {/* <AsideMenuItem
         to="/section"
         icon="/media/icons/duotune/finance/fin001.svg"
         title="Section"
         fontIcon="bi-app-indicator"
-      />
-
-      <div className="menu-item">
-        <div className="menu-content pt-8 pb-2">
-          <span className="menu-section text-muted text-uppercase fs-8 ls-1">
-            Counsellor
-          </span>
-        </div>
-      </div>
+      /> */}
 
       <div className="menu-item">
         <div className="menu-content pt-8 pb-2">
@@ -211,12 +264,6 @@ export function AsideMenuMain() {
         />
       </AsideMenuItemWithSub> */
 
-      <AsideMenuItem
-        to="/studentlist"
-        title="Student's List & Profile"
-        fontIcon="bi-app-indicator"
-        icon="/media/icons/duotune/communication/com006.svg"
-      ></AsideMenuItem>
       {/* <AsideMenuItem
         to="/compiler"
         icon="/media/icons/duotune/coding/cod003.svg"
@@ -278,7 +325,14 @@ export function AsideMenuMain() {
           title="Role - User"
           hasBullet={true}
         />
-      </AsideMenuItemWithSub>
+      </AsideMenuItemWithSub> */
+
+      <AsideMenuItem
+        to="/career"
+        icon="/media/icons/duotune/general/gen044.svg"
+        title="Career"
+        fontIcon="bi-app-indicator"
+      />
     </>
   );
 }

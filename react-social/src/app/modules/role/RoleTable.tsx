@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button, Form } from "react-bootstrap-v5";
 import { AiFillDelete, AiOutlineCheck } from "react-icons/ai";
 import * as Yup from "yup";
-import { deleteRoleData, upsertRoleData } from "./components/core/Role_APIs";
+import { DeleteRoleData, upsertRoleData } from "./components/core/Role_APIs";
 
 type role = {
   id?: any;
@@ -136,7 +136,7 @@ const RoleTable = (props: { data: role }) => {
                   disabled={false}
                   onClick={() => {
                     setLoadingRole(true);
-                    deleteRoleData(props.data.id).then(() => {
+                    DeleteRoleData(props.data.id).then(() => {
                       window.location.reload();
                     });
                   }}

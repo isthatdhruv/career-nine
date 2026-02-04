@@ -34,9 +34,16 @@ const MeasuredQualityTypesTable = (props: {
     const loadExistingSelections = async () => {
       const newSelections: { [key: number]: any } = {};
       for (const type of props.data) {
-        // Use the correct property for the selected quality ID
-        newSelections[type.measuredQualityTypeId] =
-          type.measuredQuality?.measuredQualityId || type.fk_measured_qualities || '';
+        // Try to robustly extract the linked measured quality ID
+        let linkedId = '';
+        if (type.measuredQuality && typeof type.measuredQuality === 'object') {
+          linkedId = type.measuredQuality.measuredQualityId || '';
+        } else if (type.measuredQualityId) {
+          linkedId = type.measuredQualityId;
+        } else if (type.fk_measured_qualities) {
+          linkedId = type.fk_measured_qualities;
+        }
+        newSelections[type.measuredQualityTypeId] = linkedId;
       }
       setSelectedQualityByType(newSelections);
     };

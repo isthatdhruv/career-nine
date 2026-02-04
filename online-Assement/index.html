@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Take Assessment</title>
+  <style>
+    :root{--accent:#0b74de;--green:#078a17;--red:#d12b2b}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0;background:#f6f8fb;color:#111}
+    .wrap{max-width:900px;margin:1.5rem auto;padding:1rem}
+    header{display:flex;align-items:center;gap:1rem}
+    h1{font-size:1.1rem;margin:0}
+    .card{background:#fff;padding:1rem;border-radius:8px;border:1px solid #e6eefc;margin-top:1rem}
+    .row{display:flex;gap:0.75rem;flex-wrap:wrap}
+    label{display:block;font-size:.9rem;margin:.25rem 0}
+    select,input[type="text"]{padding:.5rem;border:1px solid #cddbe8;border-radius:6px;width:100%}
+    .section{margin-top:1rem;padding:.75rem;border-radius:6px;border:1px dashed #e0e6ef}
+    .q{margin-top:.75rem}
+    .options{margin-left:0.5rem}
+    button{background:var(--accent);color:#fff;border:0;padding:.5rem .75rem;border-radius:6px;cursor:pointer}
+    .muted{color:#666;font-size:.9rem}
+    .hint{font-size:.85rem;color:#666;margin-top:.5rem}
+    .controls{display:flex;gap:.5rem;margin-top:1rem}
+    .progress{margin-top:.5rem;font-size:.9rem;color:#444}
+    .badge{display:inline-block;padding:.25rem .5rem;border-radius:6px;color:#fff;font-size:.8rem}
+    .badge.green{background:var(--green)}
+    .badge.red{background:var(--red)}
+    .section-list{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.5rem}
+    .section-item{padding:.5rem .75rem;border-radius:6px;border:1px solid #dfe9f6;background:#fff;cursor:pointer}
+    .section-item.active{outline:2px solid var(--accent)}
+    small.error{color:#a00}
+    @media (max-width:640px){.row{flex-direction:column}}
+  </style>
+</head>
+<body>
+  <main class="wrap" id="app">
+    <header>
+      <div style="width:44px;height:44px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700">Q</div>
+      <div>
+        <h1>Assessment — take now</h1>
+        <div class="muted">Answers saved locally until submit.</div>
+      </div>
+    </header>
+
+    <div class="card" id="setup">
+      <div class="row">
+        <div style="flex:1 1 220px">
+          <label for="studentName">Your name</label>
+          <input id="studentName" type="text" placeholder="Enter name" />
+        </div>
+        <div style="width:180px">
+          <label for="langSelect">Language (initial)</label>
+          <select id="langSelect"></select>
+        </div>
+        <div style="width:140px">
+          <label class="muted">&nbsp;</label>
+          <div><button id="beginBtn">Begin</button></div>
+        </div>
+      </div>
+      <div class="hint" id="setupHint">Loading assessment…</div>
+    </div>
+
+    <div id="instructionsCard" class="card" style="display:none">
+      <h3>Instructions</h3>
+      <div id="allInstructions"></div>
+      <div class="hint">Select a section to start. Completed sections are green, incomplete are red.</div>
+      <div class="section-list" id="sectionList"></div>
+    </div>
+
+    <div id="assessment" style="display:none">
+      <div id="meta" class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <strong id="assessTitle"></strong>
+            <div id="assessTool" class="muted"></div>
+            <div id="assessInstr" class="hint"></div>
+          </div>
+          <div>
+            <div class="progress" id="progress">0 / 0</div>
+            <div class="muted" id="timeInfo"></div>
+          </div>
+        </div>
+      </div>
+
+      <form id="assessForm"></form>
+
+      <div class="controls">
+        <button id="saveBtn" type="button">Save Progress</button>
+        <button id="submitBtn" type="button">Submit</button>
+        <div id="message" class="muted" style="margin-left:0.5rem"></div>
+      </div>
+    </div>
+  </main>
+
+  <script src="analytics.js"></script>
+  <script>
+    // load assessment.json
+    let assessment = null;
+    let studentKey = null;
+    let currentSection = null;
+    let currentQuestionIndex = 0;
+
+    const langSelect = document.getElementById('langSelect');
+    const beginBtn = document.getElementById('beginBtn');
+    const studentName = document.getElementById('studentName');
+    const setupHint = document.getElementById('setupHint');
+    const instructionsCard = document.getElementById('instructionsCard');
+    const allInstructions = document.getElementById('allInstructions');
+    const sectionList = document.getElementById('sectionList');
+
+    const assessTitle = document.getElementById('assessTitle');
+    const assessTool = document.getElementById('assessTool');
+    const assessInstr = document.getElementById('assessInstr');
+    const assessmentDiv = document.getElementById('assessment');
+    const form = document.getElementById('assessForm');
+    const progressEl = document.getElementById('progress');
+    const saveBtn = document.getElementById('saveBtn');
+    const submitBtn = document.getElementById('submitBtn');
+    const message = document.getElementById('message');
+
+    async function loadAssessment() {
+      try {
+        const res = await fetch('./assessment.json');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        assessment = data[0];
+        studentKey = 'assessment_answers_' + assessment.questionnaireId;
+        initLangs();
+        setupHint.textContent = 'Enter your name and click Begin';
+      } catch (e) {
+        setupHint.textContent = 'Failed to load assessment.json';
+        beginBtn.disabled = true;
+      }
+    }
+
+    function initLangs() {
+      langSelect.innerHTML = '';
+      (assessment.languages || []).forEach(l => {
+        const opt = document.createElement('option');
+        opt.value = l.language.languageId;
+        opt.textContent = l.language.languageName;
+        langSelect.appendChild(opt);
+      });
+      if (langSelect.options.length) langSelect.value = langSelect.options[0].value;
+    }
+
+    function showAllInstructions() {
+      allInstructions.innerHTML = '';
+      (assessment.languages || []).forEach(l => {
+        const el = document.createElement('div');
+        el.innerHTML = '<strong>' + (l.language.languageName || 'Language') + ':</strong> ' + (l.instructions || '');
+        allInstructions.appendChild(el);
+      });
+      // build sections list with completion status
+      renderSectionList();
+      instructionsCard.style.display = 'block';
+    }
+
+    function renderSectionList() {
+      sectionList.innerHTML = '';
+      const saved = JSON.parse(localStorage.getItem(studentKey) || 'null');
+      (assessment.sections || []).sort((a,b)=>Number(a.order)-Number(b.order)).forEach(sec => {
+        const completed = isSectionCompleted(sec, saved);
+        const btn = document.createElement('div');
+        btn.className = 'section-item';
+        btn.dataset.id = sec.section.sectionId;
+        btn.innerHTML = `<div style="display:flex;gap:.5rem;align-items:center">
+                          <div>${sec.section.sectionName}</div>
+                          <div class="badge ${completed ? 'green' : 'red'}">${completed ? 'Completed' : 'Incomplete'}</div>
+                         </div>`;
+        btn.addEventListener('click', () => {
+          // mark selected
+          document.querySelectorAll('.section-item').forEach(i=>i.classList.remove('active'));
+          btn.classList.add('active');
+          selectSection(sec);
+        });
+        sectionList.appendChild(btn);
+      });
+    }
+
+    function isSectionCompleted(section, saved) {
+      if (!saved || !saved.answers) return false;
+      const qIds = (section.questions || []).map(q=>q.question.questionId);
+      if (qIds.length === 0) return false;
+      const answeredQuestionIds = saved.answers.map(a=>a.questionId);
+      return qIds.every(qid => answeredQuestionIds.includes(qid) && (saved.answers.find(a=>a.questionId===qid).answers.length>0));
+    }
+
+    function selectSection(sec) {
+      currentSection = sec;
+      // show assessment area for this section only
+      assessTitle.textContent = assessment.name || 'Untitled';
+      assessTool.textContent = assessment.tool?.name ? 'Tool: ' + assessment.tool.name : '';
+      // show section-specific instruction for selected language, if present
+      const selLang = Number(langSelect.value);
+      const inst = (sec.instruction || []).find(i => i.language?.languageId === selLang);
+      assessInstr.textContent = inst ? inst.instructionText : '';
+      // render questions of section, show the next unanswered question only
+      renderSectionQuestions(sec);
+      assessmentDiv.style.display = 'block';
+      document.getElementById('instructionsCard').scrollIntoView({behavior:'smooth'});
+    }
+
+    function renderSectionQuestions(sec) {
+      form.innerHTML = '';
+      const questions = (sec.questions || []).sort((a,b)=>Number(a.order)-Number(b.order));
+      // find first unanswered index
+      const saved = JSON.parse(localStorage.getItem(studentKey) || 'null');
+      const answeredIds = saved ? saved.answers.map(a=>a.questionId) : [];
+      let firstUnansweredIndex = questions.findIndex(qLink => !answeredIds.includes(qLink.question.questionId));
+      if (firstUnansweredIndex === -1) firstUnansweredIndex = 0; // all answered -> start at first
+      currentQuestionIndex = firstUnansweredIndex;
+      showQuestionAtIndex(questions, currentQuestionIndex);
+      updateProgressForSection(sec, saved);
+    }
+
+    function showQuestionAtIndex(questions, idx) {
+      form.innerHTML = '';
+      const qLink = questions[idx];
+      if (!qLink) return;
+      const q = qLink.question;
+      const qtitle = (q.languageQuestions && q.languageQuestions.find(lq=>lq.language?.languageId===Number(langSelect.value))?.questionText) || q.questionText || 'Question';
+      const qnum = document.createElement('div'); qnum.innerHTML = '<strong>Q:</strong> ' + qtitle;
+      const qEl = document.createElement('div'); qEl.className = 'q';
+      qEl.appendChild(qnum);
+      const opts = document.createElement('div'); opts.className='options';
+      const max = Number(q.maxOptionsAllowed) || 0;
+      const isMultiple = q.questionType === 'multiple-choice' || max !== 1;
+      (q.options || []).forEach(opt => {
+        const id = 'q' + q.questionId + '_o' + opt.optionId;
+        const wrapper = document.createElement('div');
+        const input = document.createElement('input');
+        input.type = isMultiple ? 'checkbox' : 'radio';
+        input.name = 'q_' + q.questionId;
+        input.value = opt.optionId;
+        input.id = id;
+        const label = document.createElement('label');
+        label.htmlFor = id;
+        label.style.marginLeft = '6px';
+        label.textContent = opt.optionText;
+        wrapper.appendChild(input);
+        wrapper.appendChild(label);
+        opts.appendChild(wrapper);
+      });
+      if (max > 0) {
+        const hint = document.createElement('div'); hint.className='muted'; hint.textContent = 'Select up to ' + max + ' option(s).';
+        qEl.appendChild(hint);
+      }
+      qEl.appendChild(opts);
+
+      // controls
+      const ctrl = document.createElement('div'); ctrl.style.marginTop = '.75rem';
+      const prevBtn = document.createElement('button');
+      prevBtn.type = 'button';
+      prevBtn.style.marginLeft = '0.5rem';
+      prevBtn.textContent = 'Prev';
+      // Only show Prev when there is a previous question
+      if (idx > 0) ctrl.appendChild(prevBtn);
+
+      if (idx < questions.length - 1) {
+        // Not the last question -> show Next
+        const nextBtn = document.createElement('button');
+        nextBtn.type = 'button';
+        nextBtn.textContent = 'Next';
+        ctrl.appendChild(nextBtn);
+
+        nextBtn.addEventListener('click', () => {
+          // save answer for this question
+          const selected = Array.from(form.querySelectorAll('input[name="q_' + q.questionId + '"]:checked')).map(i => Number(i.value));
+          saveAnswer(q.questionId, selected);
+          // end analytics
+          if (window.MouseTracker) window.MouseTracker.endQuestion(q.questionId);
+          // move next
+          currentQuestionIndex = idx + 1;
+          showQuestionAtIndex(questions, currentQuestionIndex);
+          updateProgressForSection(currentSection, JSON.parse(localStorage.getItem(studentKey) || 'null'));
+        });
+      } else {
+        // Last question -> show Finish Section (submit section)
+        const finishBtn = document.createElement('button');
+        finishBtn.type = 'button';
+        finishBtn.style.marginLeft = '0.5rem';
+        finishBtn.textContent = 'Finish Section';
+        ctrl.appendChild(finishBtn);
+
+        finishBtn.addEventListener('click', () => {
+          const selected = Array.from(form.querySelectorAll('input[name="q_' + q.questionId + '"]:checked')).map(i => Number(i.value));
+          saveAnswer(q.questionId, selected);
+          if (window.MouseTracker) window.MouseTracker.endQuestion(q.questionId);
+          // mark section completed visually by re-rendering list and show message
+          renderSectionList();
+          message.textContent = 'Section completed';
+          setTimeout(() => { message.textContent = ''; }, 1500);
+          // optionally hide section-specific UI or go back to instructions
+          assessmentDiv.style.display = 'none';
+          document.getElementById('instructionsCard').scrollIntoView({ behavior: 'smooth' });
+        });
+      }
+
+      // Prev handler (only meaningful when appended)
+      prevBtn.addEventListener('click', () => {
+        if (idx > 0) {
+          // save current before moving back
+          const selected = Array.from(form.querySelectorAll('input[name="q_' + q.questionId + '"]:checked')).map(i => Number(i.value));
+          saveAnswer(q.questionId, selected);
+          if (window.MouseTracker) window.MouseTracker.endQuestion(q.questionId);
+          currentQuestionIndex = idx - 1;
+          showQuestionAtIndex(questions, currentQuestionIndex);
+          updateProgressForSection(currentSection, JSON.parse(localStorage.getItem(studentKey) || 'null'));
+        }
+      });
+      qEl.appendChild(ctrl);
+      form.appendChild(qEl);
+
+      // restore existing answers for this question
+      const saved = JSON.parse(localStorage.getItem(studentKey) || 'null');
+      if (saved && saved.answers) {
+        const qans = (saved.answers.find(a=>a.questionId === q.questionId) || {}).answers || [];
+        qans.forEach(val => {
+          const inp = form.querySelector('input[value="'+val+'"]');
+          if (inp) inp.checked = true;
+        });
+      }
+
+      // start analytics for this question
+      if (window.MouseTracker) window.MouseTracker.startQuestion(q.questionId);
+    }
+
+    function updateProgressForSection(sec, saved) {
+      const total = (sec.questions || []).length;
+      const answered = (saved && saved.answers) ? (sec.questions || []).filter(sq=>saved.answers.some(a=>a.questionId===sq.question.questionId && a.answers.length>0)).length : 0;
+      progressEl.textContent = answered + ' / ' + total;
+    }
+
+    function saveAnswer(qid, selectedArray) {
+      const saved = JSON.parse(localStorage.getItem(studentKey) || 'null') || { questionnaireId: assessment.questionnaireId, student: studentName.value || null, language: Number(langSelect.value), savedAt: new Date().toISOString(), answers: [] };
+      // update student name on save
+      saved.student = studentName.value || saved.student;
+      saved.language = Number(langSelect.value);
+      saved.savedAt = new Date().toISOString();
+      // update answers array
+      const idx = saved.answers.findIndex(a=>a.questionId===qid);
+      if (idx === -1) {
+        saved.answers.push({ questionId: qid, answers: selectedArray });
+      } else {
+        saved.answers[idx].answers = selectedArray;
+      }
+      localStorage.setItem(studentKey, JSON.stringify(saved));
+      message.textContent = 'Saved';
+      setTimeout(()=>message.textContent='',900);
+      // update section list
+      renderSectionList();
+    }
+
+    function collectAnswers() {
+      return JSON.parse(localStorage.getItem(studentKey) || 'null');
+    }
+
+    function submitAssessment() {
+      const data = collectAnswers();
+      if (!data || !data.answers || data.answers.length === 0) { message.textContent='Please answer at least one question'; return; }
+      data.submittedAt = new Date().toISOString();
+      localStorage.setItem('submission_' + assessment.questionnaireId, JSON.stringify(data));
+      // also store analytics log
+      if (window.MouseTracker) localStorage.setItem('analytics_' + assessment.questionnaireId, JSON.stringify(window.MouseTracker.getLog()));
+      message.textContent = 'Submitted and saved locally';
+      setTimeout(()=>message.textContent='',1500);
+    }
+
+    beginBtn.addEventListener('click', () => {
+      if (!studentName.value.trim()) { setupHint.textContent='Please enter your name'; return; }
+      showAllInstructions();
+      // optionally show the assessment top area
+      assessTitle.textContent = assessment.name || 'Untitled';
+      assessTool.textContent = assessment.tool?.name ? 'Tool: ' + assessment.tool.name : '';
+    });
+
+    saveBtn.addEventListener('click', () => {
+      // nothing extra — saved when moving questions — but snapshot student details
+      const saved = JSON.parse(localStorage.getItem(studentKey) || 'null') || {};
+      saved.student = studentName.value || saved.student;
+      saved.savedAt = new Date().toISOString();
+      localStorage.setItem(studentKey, JSON.stringify(saved));
+      message.textContent = 'Progress snapshot saved';
+      setTimeout(()=>message.textContent='',1000);
+    });
+
+    submitBtn.addEventListener('click', submitAssessment);
+
+    // start
+    loadAssessment();
+  </script>
+</body>
+</html>

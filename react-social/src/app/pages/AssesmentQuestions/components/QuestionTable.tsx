@@ -23,6 +23,7 @@ const QuestionTable = (props: {
   const navigate = useNavigate();
   const [selectedMeasuredQualityTypesByQuestion, setSelectedMeasuredQualityTypesByQuestion] = useState<{ [key: number]: any[] }>({});
   const [measuredQualityTypes, setMeasuredQualityTypes] = useState<any[]>([]);
+  const [searchText, setSearchText] = useState("");
 
   // ✅ State for modal
   const [showLanguageModal, setShowLanguageModal] = useState(false);
@@ -42,84 +43,51 @@ const QuestionTable = (props: {
   }, []);
 
   // Load existing selections when component mounts
-  useEffect(() => {
-    const loadExistingSelections = async () => {
-      const newSelections: {[key: number]: any[]} = {};
+  // useEffect(() => {
+  //   const loadExistingSelections = async () => {
+  //     const newSelections: {[key: number]: any[]} = {};
       
-      for (const question of props.data) {
-        try {
-          const response = await GetMeasuredQualityTypesForQuestion(question.id);
-          newSelections[question.id] = response.data.map((type: any) => type.measuredQualityTypeId);
-        } catch (error) {
-          if ((error as any)?.response?.status === 404) {
-            console.log(`Question ${question.id} not found, skipping...`);
-          } else {
-            console.error(`Error loading quality types for question ${question.id}:`, error);
-          }
-          newSelections[question.id] = [];
-        }
-      }
-      
-      setSelectedMeasuredQualityTypesByQuestion(newSelections);
-    };
-    
-    if (props.data && props.data.length > 0) {
-      loadExistingSelections();
-    } else {
-      setSelectedMeasuredQualityTypesByQuestion({});
-    }
-  }, [props.data]);
-
-  // Handle measured quality type selection changes with real-time API calls
-  // const handleMeasuredQualityTypeSelectionChange = async (questionId: number, newValue: any[]) => {
-  //   const currentValue = selectedMeasuredQualityTypesByQuestion[questionId] || [];
-    
-  //   // Find newly selected types
-  //   const newlySelected = newValue.filter(typeId => !currentValue.includes(typeId));
-    
-  //   // Find deselected types
-  //   const deselected = currentValue.filter(typeId => !newValue.includes(typeId));
-    
-  //   try {
-  //     // Assign new types
-  //     for (const typeId of newlySelected) {
-  //       await AssignMeasuredQualityTypeToQuestion(typeId, questionId);
-  //       console.log(`MeasuredQualityType ${typeId} assigned to Question ${questionId}`);
+  //     for (const question of props.data) {
+  //       try {
+  //         const response = await GetMeasuredQualityTypesForQuestion(question.id);
+  //         newSelections[question.id] = response.data.map((type: any) => type.measuredQualityTypeId);
+  //       } catch (error) {
+  //         if ((error as any)?.response?.status === 404) {
+  //           console.log(`Question ${question.id} not found, skipping...`);
+  //         } else {
+  //           console.error(`Error loading quality types for question ${question.id}:`, error);
+  //         }
+  //         newSelections[question.id] = [];
+  //       }
   //     }
       
-  //     // Remove deselected types
-  //     for (const typeId of deselected) {
-  //       await RemoveMeasuredQualityTypeFromQuestion(typeId, questionId);
-  //       console.log(`MeasuredQualityType ${typeId} removed from Question ${questionId}`);
-  //     }
-      
-  //     // Update state only after successful API calls
-  //     setSelectedMeasuredQualityTypesByQuestion(prev => ({
-  //       ...prev,
-  //       [questionId]: newValue
-  //     }));
-      
-  //   } catch (error) {
-  //     console.error('Error updating MeasuredQualityType assignments:', error);
-  //     alert('Failed to update MeasuredQualityType assignments. Please try again.');
-      
-  //     // Revert to previous state on error
-  //     setSelectedMeasuredQualityTypesByQuestion(prev => ({
-  //       ...prev,
-  //       [questionId]: currentValue
-  //     }));
+  //     setSelectedMeasuredQualityTypesByQuestion(newSelections);
+  //   };
+    
+  //   if (props.data && props.data.length > 0) {
+  //     loadExistingSelections();
+  //   } else {
+  //     setSelectedMeasuredQualityTypesByQuestion({});
   //   }
-  // };
+  // }, [props.data]);
+
+
+  const filteredData = props.data.filter((item: any) =>
+    (item.questionText ?? "")
+      .toString()
+      .toLowerCase()
+      .includes(searchText.trim().toLowerCase())
+  );
 
   const datatable = {
     columns: [
-      { label: "Question Text", field: "questionText", width: 300 },
-      { label: "Question Type", field: "questionType", sort: "asc", width: 150 },
-      { label: "Section", field: "sectionType", sort: "asc", width: 150 },
+      { label: "Question Text", field: "questionText", width: 300 , sort: "asc",},
+      { label: "Question Type", field: "questionType", width: 150 },
+      // { label: "Section", field: "sectionType", sort: "asc", width: 150 },
       { label: "Actions", field: "actions", sort: "disabled", width: 200 },
     ],
 
-    rows: props.data.map((data: any) => ({
+    rows: filteredData.map((data: any) => ({
       questionText: <div>{data.questionText}</div>,
       questionType: <div>{data.questionType}</div>,
       sectionType: (
@@ -182,13 +150,25 @@ const QuestionTable = (props: {
   
   return (
     <>
+      <div className="d-flex justify-content-end mb-2">
+        <input
+          type="search"
+          className="form-control"
+          placeholder="Search question text..."
+          value={searchText}
+          onChange={(event) => setSearchText(event.target.value)}
+          style={{ maxWidth: "360px" }}
+        />
+      </div>
       <MDBDataTableV5
         hover
         scrollY
         maxHeight="160vh"
-        entriesOptions={[5, 20, 25]}
-        entries={25}
+        entriesOptions={[100, 150, 200, 500]}
+        entries={100}
         pagesAmount={4}
+        searchTop={false}
+        searchBottom={false}
         data={datatable}
       />
 

@@ -13,9 +13,9 @@ public interface InstituteBranchRepository extends JpaRepository<InstituteBranch
 
     public List<InstituteBranch> findByBranchName(String branchName);
 
-    public List<InstituteBranch> findByBranchId(int branchId);
+    public List<InstituteBranch> findByBranchId(Integer branchId);
 
-    public List<InstituteBranch> findByCourseId(int courseId);
+    public List<InstituteBranch> findByCourseId(Integer courseId);
 
     // public List<InstituteBranch> findCourseByBranchId(int branchId);
 

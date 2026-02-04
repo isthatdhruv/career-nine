@@ -24,17 +24,16 @@ services:
       - career_shared_net
 
     #   api-mysql:
-
-  # api:
-  #   build:
-  #     context: ./spring-social
-  #     dockerfile: dockerfile
-  #   ports:
-  #     - 8080:8080
-  #   command: ["java","-jar","/usr/local/lib/demo.jar"]  
-       # restart: always
-    # networks:
-    #   api-mysql:
+  api:
+    build:
+      context: ./spring-social
+      dockerfile: dockerfile
+    ports:
+      - 8080:8080
+    command: ["java","-jar","/usr/local/lib/demo.jar"]
+    restart: always
+    networks:
+      - career_shared_net
 
 
   # front-end:
