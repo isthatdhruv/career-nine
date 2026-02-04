@@ -95,6 +95,62 @@ const QuestionTable = (props: {
     }
   };
 
+  /**
+   * Handle Excel import upload
+   *
+   * This function triggers file selection and uploads the Excel file for import.
+   * The backend will process the file and:
+   * - Update existing questions (if Question ID is present)
+   * - Create new questions (if Question ID is absent)
+   *
+   * The function shows a summary of results (success/failed counts)
+   * and refreshes the page to display updated data.
+   *
+   * @param event File input change event
+   */
+  const handleImportFromExcel = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type to ensure it's an Excel file
+    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      alert('Please select a valid Excel file (.xlsx or .xls)');
+      return;
+    }
+
+    try {
+      // Show loading state while processing
+      props.setPageLoading(["true"]);
+
+      // Call the import API and get results
+      const result = await ImportQuestionsFromExcel(file);
+
+      // Show results to user in an alert
+      if (result.failed === 0) {
+        // All imports successful
+        alert(`Import successful! ${result.success} questions imported.`);
+      } else {
+        // Some imports failed - show detailed error messages
+        alert(
+          `Import completed with some errors:\n` +
+          `Success: ${result.success}\n` +
+          `Failed: ${result.failed}\n\n` +
+          `Errors:\n${result.errors.join('\n')}`
+        );
+      }
+
+      // Refresh the page to show new/updated questions
+      props.setPageLoading(["true"]);
+    } catch (error) {
+      console.error('Error importing Excel file:', error);
+      alert('Failed to import Excel file. Please check the file format and try again.');
+    } finally {
+      // Clear the file input so the same file can be uploaded again if needed
+      event.target.value = '';
+      props.setPageLoading([]);
+    }
+  };
+
   const filteredData = props.data.filter((item: any) =>
     (item.questionText ?? "")
       .toString()
@@ -173,7 +229,7 @@ const QuestionTable = (props: {
   
   return (
     <>
-      {/* Header section with search and download button */}
+      {/* Header section with search, download, and upload buttons */}
       <div className="d-flex justify-content-end mb-2 gap-2">
         {/* Download Excel button - exports all questions with their details */}
         <button
@@ -184,6 +240,23 @@ const QuestionTable = (props: {
           <FaFileDownload size={18} className="me-2" />
           Download Excel
         </button>
+
+        {/* Upload Excel button - imports questions from Excel file */}
+        {/* Using label with hidden input for better UX */}
+        <label
+          className="btn btn-primary d-flex align-items-center mb-0"
+          style={{ cursor: 'pointer' }}
+          title="Upload Excel file to import/update questions"
+        >
+          <FaFileDownload size={18} className="me-2" style={{ transform: 'rotate(180deg)' }} />
+          Upload Excel
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleImportFromExcel}
+            style={{ display: 'none' }}
+          />
+        </label>
 
         {/* Search input for filtering questions */}
         <input

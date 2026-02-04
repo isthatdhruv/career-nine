@@ -7,13 +7,16 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.FillPatternType;
 import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.IndexedColors;
@@ -34,7 +37,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -142,57 +147,93 @@ public class AssessmentQuestionController {
         return assementQustionObject.getId() != null ? assementQustionObject : null;
     }
 
+    /**
+     * Update an existing assessment question
+     *
+     * This endpoint updates an existing question and all its related data.
+     * It handles the complete replacement of options and their scores.
+     *
+     * Key behaviors:
+     * - Finds existing question by ID (throws exception if not found)
+     * - Updates question fields (text, type, section, maxOptionsAllowed)
+     * - Clears all existing options (CASCADE deletes their scores automatically)
+     * - Adds new/updated options from the request
+     * - Wires up all relationships (question->option->score->measuredQualityType)
+     * - Refreshes cache after successful update
+     *
+     * @param id The ID of the question to update
+     * @param assessmentQuestions The updated question data
+     * @return The saved question with all relationships
+     */
     @PutMapping("/update/{id}")
-    // public AssessmentQuestions updateAssessmentQuestion(@PathVariable Long id,
-    //         @RequestBody AssessmentQuestions assessmentQuestions) {
-    //     AssessmentQuestions existingQuestion = assessmentQuestionRepository.findById(id)
-    //             .orElseThrow(() -> new RuntimeException("Question not found with ID: " + id));
+    public AssessmentQuestions updateAssessmentQuestion(@PathVariable Long id,
+            @RequestBody AssessmentQuestions assessmentQuestions) {
 
-    //     existingQuestion.setQuestionText(assessmentQuestions.getQuestionText());
-    //     existingQuestion.setQuestionType(assessmentQuestions.getQuestionType());
+        // Step 1: Find existing question (throws exception if not found)
+        AssessmentQuestions existingQuestion = assessmentQuestionRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Question not found with ID: " + id));
 
-    //     if (assessmentQuestions.getSection() != null && assessmentQuestions.getSection().getSectionId() != null) {
-    //         QuestionSection section = questionSectionRepository
-    //                 .findById(assessmentQuestions.getSection().getSectionId()).orElse(null);
-    //         if (section != null) {
-    //             existingQuestion.setSection(section);
-    //         }
-    //     }
+        // Step 2: Update basic question fields
+        existingQuestion.setQuestionText(assessmentQuestions.getQuestionText());
+        existingQuestion.setQuestionType(assessmentQuestions.getQuestionType());
+        existingQuestion.setmaxAllowedOptions(assessmentQuestions.getmaxOptionsAllowed());
 
-    //     if (assessmentQuestions.getOptions() != null && !assessmentQuestions.getOptions().isEmpty()) {
-    //         if (existingQuestion.getOptions() != null) {
-    //             existingQuestion.getOptions().clear();
-    //         }
+        // Step 3: Update section relationship (validate section exists first)
+        if (assessmentQuestions.getSection() != null && assessmentQuestions.getSection().getSectionId() != null) {
+            QuestionSection section = questionSectionRepository
+                    .findById(assessmentQuestions.getSection().getSectionId()).orElse(null);
+            if (section != null) {
+                existingQuestion.setSection(section);
+            }
+        }
 
-    //         for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
-    //             option.setQuestion(existingQuestion);
-    //             // Also wire up MQT scores inside options for updates
-    //             if (option.getOptionScores() != null) {
-    //                 for (OptionScoreBasedOnMEasuredQualityTypes score : option.getOptionScores()) {
-    //                     score.setQuestion_option(option);
-    //                     if (score.getMeasuredQualityType() != null
-    //                             && score.getMeasuredQualityType().getMeasuredQualityTypeId() != null) {
-    //                         score.setMeasuredQualityType(new MeasuredQualityTypes(
-    //                                 score.getMeasuredQualityType().getMeasuredQualityTypeId()));
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         existingQuestion.setOptions(assessmentQuestions.getOptions());
-    //     }
+        // Step 4: Replace options - this is critical for handling option deletions
+        if (assessmentQuestions.getOptions() != null && !assessmentQuestions.getOptions().isEmpty()) {
+            // Clear all existing options first
+            // This triggers CASCADE delete for associated scores automatically
+            if (existingQuestion.getOptions() != null) {
+                existingQuestion.getOptions().clear();
+            }
 
-    //     AssessmentQuestions saved = assessmentQuestionRepository.save(existingQuestion);
+            // Add new/updated options from the request
+            for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
+                // Wire the back-reference from option to question
+                option.setQuestion(existingQuestion);
 
-    //     // refresh cache after update
-    //     try {
-    //         List<AssessmentQuestions> refreshed = fetchAndTransformFromDb();
-    //         writeCache(refreshed);
-    //     } catch (Exception e) {
-    //         logger.warn("Failed to refresh assessment questions cache after update", e);
-    //     }
+                // Wire up measured quality type scores for each option
+                if (option.getOptionScores() != null) {
+                    for (OptionScoreBasedOnMEasuredQualityTypes score : option.getOptionScores()) {
+                        // Set the back-reference from score to option
+                        score.setQuestion_option(option);
 
-    //     return saved;
-    // }
+                        // Important: Use ID-only reference for MeasuredQualityType
+                        // This prevents lazy loading issues and keeps the reference minimal
+                        if (score.getMeasuredQualityType() != null
+                                && score.getMeasuredQualityType().getMeasuredQualityTypeId() != null) {
+                            score.setMeasuredQualityType(new MeasuredQualityTypes(
+                                    score.getMeasuredQualityType().getMeasuredQualityTypeId()));
+                        }
+                    }
+                }
+            }
+
+            // Set the new options list on the existing question
+            existingQuestion.setOptions(assessmentQuestions.getOptions());
+        }
+
+        // Step 5: Save the updated question (cascade saves options and scores)
+        AssessmentQuestions saved = assessmentQuestionRepository.save(existingQuestion);
+
+        // Step 6: Refresh cache after update to keep it in sync
+        try {
+            List<AssessmentQuestions> refreshed = fetchAndTransformFromDb();
+            writeCache(refreshed);
+        } catch (Exception e) {
+            logger.warn("Failed to refresh assessment questions cache after update", e);
+        }
+
+        return saved;
+    }
 
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<String> deleteAssessmentQuestion(@PathVariable Long id) {
@@ -407,6 +448,326 @@ public class AssessmentQuestionController {
         return ResponseEntity.ok()
                 .headers(headers)
                 .body(excelBytes);
+    }
+
+    /**
+     * Import assessment questions from Excel file
+     *
+     * This endpoint handles bulk import of assessment questions from an Excel file.
+     * It intelligently handles both creating new questions and updating existing ones
+     * based on the presence of Question IDs in the Excel file.
+     *
+     * Import logic:
+     * - If Question ID is present in Excel → Update existing question
+     * - If Question ID is null/empty → Create new question
+     * - Options are completely replaced (old options are deleted via cascade)
+     * - Each question is processed independently (failures don't stop other imports)
+     *
+     * Excel format must match the export format with columns:
+     * Question ID, Question Text, Type, Section ID, Max Options, Option ID,
+     * Option Text, Description, Is Correct, Is Game, Game ID, MQT columns...
+     *
+     * @param file Excel file (.xlsx format) containing questions to import
+     * @return Import result with success/failure counts and error messages
+     * @throws Exception if file reading or parsing fails
+     */
+    @PostMapping("/import-excel")
+    public ResponseEntity<Map<String, Object>> importQuestionsFromExcel(
+            @RequestParam("file") MultipartFile file) throws Exception {
+
+        logger.info("Starting Excel import for assessment questions");
+
+        // Validation: Check if file is empty
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", "File is empty"));
+        }
+
+        // Parse Excel file using Apache POI
+        Workbook workbook = new XSSFWorkbook(file.getInputStream());
+        Sheet sheet = workbook.getSheetAt(0);
+
+        // Step 1: Build column index map from header row
+        // This maps column names to their index positions
+        Row headerRow = sheet.getRow(0);
+        Map<String, Integer> columnIndexMap = new HashMap<>();
+
+        for (int i = 0; i < headerRow.getLastCellNum(); i++) {
+            Cell cell = headerRow.getCell(i);
+            if (cell != null) {
+                columnIndexMap.put(cell.getStringCellValue(), i);
+            }
+        }
+
+        // Step 2: Get all MeasuredQualityTypes for dynamic column mapping
+        // The Excel has dynamic columns like "MQT: Analytical Thinking"
+        List<MeasuredQualityTypes> allMQTs = measuredQualityTypesRepository.findAll();
+        Map<String, Long> mqtNameToIdMap = allMQTs.stream()
+            .collect(Collectors.toMap(
+                mqt -> "MQT: " + mqt.getMeasuredQualityTypeName(),
+                MeasuredQualityTypes::getMeasuredQualityTypeId
+            ));
+
+        // Step 3: Group rows by Question ID
+        // Questions with same ID belong together (one row per option)
+        Map<Long, List<Row>> questionRowsMap = new LinkedHashMap<>();
+        List<Row> newQuestionRows = new ArrayList<>();
+
+        for (int rowIdx = 1; rowIdx <= sheet.getLastRowNum(); rowIdx++) {
+            Row row = sheet.getRow(rowIdx);
+            if (row == null) continue;
+
+            // Get Question ID cell to determine if this is create or update
+            Cell questionIdCell = row.getCell(columnIndexMap.get("Question ID"));
+
+            if (questionIdCell == null || questionIdCell.getCellType() == CellType.BLANK) {
+                // New question (no ID) → will be created
+                newQuestionRows.add(row);
+            } else {
+                // Existing question (has ID) → will be updated
+                Long questionId = (long) questionIdCell.getNumericCellValue();
+                questionRowsMap.computeIfAbsent(questionId, k -> new ArrayList<>()).add(row);
+            }
+        }
+
+        workbook.close();
+
+        // Step 4: Process imports and track results
+        int successCount = 0;
+        int failedCount = 0;
+        List<String> errors = new ArrayList<>();
+
+        // Process existing questions (updates)
+        for (Map.Entry<Long, List<Row>> entry : questionRowsMap.entrySet()) {
+            try {
+                // Parse question data from Excel rows
+                AssessmentQuestions question = parseQuestionFromRows(
+                    entry.getValue(),
+                    columnIndexMap,
+                    mqtNameToIdMap
+                );
+                question.setQuestionId(entry.getKey());
+
+                // Call update endpoint logic to save changes
+                updateAssessmentQuestion(entry.getKey(), question);
+                successCount++;
+            } catch (Exception e) {
+                failedCount++;
+                errors.add("Question ID " + entry.getKey() + ": " + e.getMessage());
+                logger.error("Failed to import question " + entry.getKey(), e);
+            }
+        }
+
+        // Process new questions (creates)
+        if (!newQuestionRows.isEmpty()) {
+            List<Row> currentQuestionRows = new ArrayList<>();
+            String currentQuestionText = null;
+
+            // Group rows by question text (since no ID to group by)
+            for (Row row : newQuestionRows) {
+                String questionText = getCellValueAsString(
+                    row.getCell(columnIndexMap.get("Question Text"))
+                );
+
+                // When question text changes, process the previous question
+                if (currentQuestionText != null && !currentQuestionText.equals(questionText)) {
+                    // Process previous question
+                    try {
+                        AssessmentQuestions question = parseQuestionFromRows(
+                            currentQuestionRows,
+                            columnIndexMap,
+                            mqtNameToIdMap
+                        );
+                        createAssessmentQuestion(question);
+                        successCount++;
+                    } catch (Exception e) {
+                        failedCount++;
+                        errors.add("New question '" + currentQuestionText + "': " + e.getMessage());
+                    }
+                    currentQuestionRows.clear();
+                }
+
+                currentQuestionText = questionText;
+                currentQuestionRows.add(row);
+            }
+
+            // Process the last question in the list
+            if (!currentQuestionRows.isEmpty()) {
+                try {
+                    AssessmentQuestions question = parseQuestionFromRows(
+                        currentQuestionRows,
+                        columnIndexMap,
+                        mqtNameToIdMap
+                    );
+                    createAssessmentQuestion(question);
+                    successCount++;
+                } catch (Exception e) {
+                    failedCount++;
+                    errors.add("New question '" + currentQuestionText + "': " + e.getMessage());
+                }
+            }
+        }
+
+        // Step 5: Refresh cache after import to sync with database
+        try {
+            List<AssessmentQuestions> refreshed = fetchAndTransformFromDb();
+            writeCache(refreshed);
+        } catch (Exception e) {
+            logger.warn("Failed to refresh cache after import", e);
+        }
+
+        logger.info("Excel import completed: {} success, {} failed", successCount, failedCount);
+
+        // Step 6: Return result summary to frontend
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", successCount);
+        result.put("failed", failedCount);
+        result.put("errors", errors);
+
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Helper method: Parse AssessmentQuestions object from Excel rows
+     *
+     * Multiple rows can belong to the same question (one row per option).
+     * This method parses all rows for a single question and constructs
+     * the complete question object with all options and their scores.
+     *
+     * @param rows All Excel rows belonging to this question
+     * @param colMap Column name to index mapping
+     * @param mqtMap MeasuredQualityType name to ID mapping
+     * @return Parsed AssessmentQuestions object with all relationships
+     */
+    private AssessmentQuestions parseQuestionFromRows(
+            List<Row> rows,
+            Map<String, Integer> colMap,
+            Map<String, Long> mqtMap) {
+
+        if (rows.isEmpty()) {
+            throw new IllegalArgumentException("No rows provided for parsing");
+        }
+
+        // First row contains question details (same across all rows for this question)
+        Row firstRow = rows.get(0);
+
+        // Create and populate question object
+        AssessmentQuestions question = new AssessmentQuestions();
+        question.setQuestionText(getCellValueAsString(firstRow.getCell(colMap.get("Question Text"))));
+        question.setQuestionType(getCellValueAsString(firstRow.getCell(colMap.get("Question Type"))));
+
+        // Parse Max Options Allowed
+        Cell maxOptionsCell = firstRow.getCell(colMap.get("Max Options Allowed"));
+        if (maxOptionsCell != null && maxOptionsCell.getCellType() != CellType.BLANK) {
+            question.setmaxAllowedOptions((int) maxOptionsCell.getNumericCellValue());
+        }
+
+        // Parse Section - must exist in database
+        Cell sectionIdCell = firstRow.getCell(colMap.get("Section ID"));
+        if (sectionIdCell != null && sectionIdCell.getCellType() != CellType.BLANK) {
+            Long sectionId = (long) sectionIdCell.getNumericCellValue();
+            QuestionSection section = questionSectionRepository.findById(sectionId)
+                .orElseThrow(() -> new RuntimeException("Section not found: " + sectionId));
+            question.setSection(section);
+        }
+
+        // Parse options - one option per row
+        List<AssessmentQuestionOptions> options = new ArrayList<>();
+
+        for (Row row : rows) {
+            // Check if this row has option data
+            Cell optionTextCell = row.getCell(colMap.get("Option Text"));
+            if (optionTextCell == null || optionTextCell.getCellType() == CellType.BLANK) {
+                continue;  // Skip rows without option data
+            }
+
+            // Create and populate option object
+            AssessmentQuestionOptions option = new AssessmentQuestionOptions();
+
+            // Option ID (for updates - will be null for new options)
+            Cell optionIdCell = row.getCell(colMap.get("Option ID"));
+            if (optionIdCell != null && optionIdCell.getCellType() != CellType.BLANK) {
+                option.setOptionId((long) optionIdCell.getNumericCellValue());
+            }
+
+            option.setOptionText(getCellValueAsString(optionTextCell));
+            option.setOptionDescription(getCellValueAsString(row.getCell(colMap.get("Option Description"))));
+
+            // Parse Is Correct (accepts "Yes", "yes", "True", "true")
+            String isCorrect = getCellValueAsString(row.getCell(colMap.get("Is Correct")));
+            option.setCorrect("Yes".equalsIgnoreCase(isCorrect) || "true".equalsIgnoreCase(isCorrect));
+
+            // Parse Is Game
+            String isGame = getCellValueAsString(row.getCell(colMap.get("Is Game")));
+            option.setIsGame("Yes".equalsIgnoreCase(isGame) || "true".equalsIgnoreCase(isGame));
+
+            // Parse Game ID if option is linked to a game
+            if (option.getIsGame() != null && option.getIsGame()) {
+                Cell gameIdCell = row.getCell(colMap.get("Game ID"));
+                if (gameIdCell != null && gameIdCell.getCellType() != CellType.BLANK) {
+                    Long gameId = (long) gameIdCell.getNumericCellValue();
+                    GameTable game = new GameTable();
+                    game.setGameId(gameId);
+                    option.setGame(game);
+                }
+            }
+
+            // Parse MQT scores from dynamic columns
+            List<OptionScoreBasedOnMEasuredQualityTypes> scores = new ArrayList<>();
+
+            for (Map.Entry<String, Long> mqtEntry : mqtMap.entrySet()) {
+                Integer colIdx = colMap.get(mqtEntry.getKey());
+                if (colIdx == null) continue;
+
+                Cell scoreCell = row.getCell(colIdx);
+                if (scoreCell != null && scoreCell.getCellType() != CellType.BLANK) {
+                    // Create score object
+                    OptionScoreBasedOnMEasuredQualityTypes score =
+                        new OptionScoreBasedOnMEasuredQualityTypes();
+
+                    score.setScore((int) scoreCell.getNumericCellValue());
+                    score.setQuestion_option(option);
+                    score.setMeasuredQualityType(new MeasuredQualityTypes(mqtEntry.getValue()));
+
+                    scores.add(score);
+                }
+            }
+
+            // Wire up relationships
+            option.setOptionScores(scores);
+            option.setQuestion(question);
+            options.add(option);
+        }
+
+        question.setOptions(options);
+        return question;
+    }
+
+    /**
+     * Helper method: Safely extract cell value as string
+     *
+     * Handles different cell types (STRING, NUMERIC, BOOLEAN, BLANK)
+     * and converts them to string representation.
+     *
+     * @param cell The Excel cell to read
+     * @return String value of the cell, or empty string if null/blank
+     */
+    private String getCellValueAsString(Cell cell) {
+        if (cell == null) return "";
+
+        switch (cell.getCellType()) {
+            case STRING:
+                return cell.getStringCellValue();
+            case NUMERIC:
+                // Convert numeric to long to avoid decimal points for IDs
+                return String.valueOf((long) cell.getNumericCellValue());
+            case BOOLEAN:
+                return String.valueOf(cell.getBooleanCellValue());
+            case BLANK:
+                return "";
+            default:
+                return "";
+        }
     }
 
 }

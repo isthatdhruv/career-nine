@@ -141,3 +141,48 @@ export async function ExportQuestionsToExcel() {
     throw error; // Re-throw so calling component can handle it
   }
 }
+
+/**
+ * Import assessment questions from Excel file
+ *
+ * This function handles multipart file upload and processes the Excel file on the backend.
+ * The backend will automatically:
+ * - Update existing questions (if Question ID is present in the Excel)
+ * - Create new questions (if Question ID is absent/empty)
+ * - Replace all options for existing questions (deleted options are removed)
+ *
+ * The Excel file must be in the same format as the exported file,
+ * with columns for Question ID, Question Text, Type, Section, Options, MQT scores, etc.
+ *
+ * @param file The Excel file to import (should be .xlsx or .xls format)
+ * @returns Promise with import result containing:
+ *   - success: Number of successfully imported questions
+ *   - failed: Number of failed imports
+ *   - errors: Array of error messages for failed imports
+ */
+export async function ImportQuestionsFromExcel(file: File) {
+  try {
+    // Create FormData for multipart file upload
+    // This is necessary for binary file transfer
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // API endpoint for Excel import
+    const importExcelUrl = `${API_URL}/assessment-questions/import-excel`;
+
+    // Upload file with multipart/form-data content type
+    // The backend expects a MultipartFile parameter
+    const response = await axios.post(importExcelUrl, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    // Return the result object from backend
+    // Expected format: { success: number, failed: number, errors: string[] }
+    return response.data;
+  } catch (error) {
+    console.error('Error importing Excel file:', error);
+    throw error; // Re-throw so calling component can handle it
+  }
+}
