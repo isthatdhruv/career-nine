@@ -2,14 +2,14 @@ package com.kccitm.api.model.userDefinedModel;
 
 public class MeasuredQualityList {
     String NameMeasuredQuealityType;
-    Integer OptionScore; 
+    Integer OptionScore;
     String NameMeasuredQuality;
 
-        public MeasuredQualityList() {
+    public MeasuredQualityList() {
     }
 
-    public MeasuredQualityList(String NameMeasuredQuealityType, Integer OptionScore , String NameMeasuredQuality) {
-         this.NameMeasuredQuality = NameMeasuredQuality;
+    public MeasuredQualityList(String NameMeasuredQuealityType, Integer OptionScore, String NameMeasuredQuality) {
+        this.NameMeasuredQuality = NameMeasuredQuality;
         this.NameMeasuredQuealityType = NameMeasuredQuealityType;
         this.OptionScore = OptionScore;
 
@@ -38,6 +38,5 @@ public class MeasuredQualityList {
     public void setOptionScore(Integer OptionScore) {
         this.OptionScore = OptionScore;
     }
-
 
 }

@@ -10,7 +10,8 @@ public class QuestionOptionID {
     public QuestionOptionID() {
     }
 
-    public QuestionOptionID(Long QuestionairQuestionId, Long OptiononId , ArrayList<MeasuredQualityList> measuredQualityList) {
+    public QuestionOptionID(Long QuestionairQuestionId, Long OptiononId,
+            ArrayList<MeasuredQualityList> measuredQualityList) {
         this.QuestionairQuestionId = QuestionairQuestionId;
         this.OptiononId = OptiononId;
         this.measuredQualityList = measuredQualityList;
@@ -39,6 +40,5 @@ public class QuestionOptionID {
     public void setQuestionairQuestionId(Long questionairQuestionId) {
         QuestionairQuestionId = questionairQuestionId;
     }
-
 
 }

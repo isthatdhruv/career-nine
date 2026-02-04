@@ -33,7 +33,7 @@ import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
 
 @RestController
-@RequestMapping("/student-info") 
+@RequestMapping("/student-info")
 public class StudentInfoController {
     @Autowired
     private UserRepository userRepository;
@@ -61,38 +61,37 @@ public class StudentInfoController {
     public ExcelOptionData getStudentAnswersWithDetails(
             @RequestParam Long userStudentId,
             @RequestParam Long assessmentId) {
-        
-        var assessmentAnswers = assessmentAnswerRepository.findByUserStudentIdAndAssessmentIdWithDetails(userStudentId, assessmentId);
-        
+
+        var assessmentAnswers = assessmentAnswerRepository.findByUserStudentIdAndAssessmentIdWithDetails(userStudentId,
+                assessmentId);
+
         // Transform AssessmentAnswer entities to QuestionOptionID DTOs
         ArrayList<QuestionOptionID> questionOptionList = assessmentAnswers.stream()
-            .map(aa -> {
-                // Create measured quality list from option scores
-                ArrayList<MeasuredQualityList> measuredList = new ArrayList<>();
-                if (aa.getOption() != null && aa.getOption().getOptionScores() != null) {
-                    measuredList = aa.getOption().getOptionScores().stream()
-                        .map(os -> new MeasuredQualityList(
-                            os.getMeasuredQualityType().getMeasuredQualityTypeName(),
-                            os.getScore(),
-                            os.getMeasuredQualityType().getMeasuredQuality() != null 
-                                ? os.getMeasuredQualityType().getMeasuredQuality().getMeasuredQualityName() 
-                                : null
-                        ))
-                        .collect(Collectors.toCollection(ArrayList::new));
-                }
-                
-                return new QuestionOptionID(
-                    aa.getQuestionnaireQuestion().getQuestionnaireQuestionId(),
-                    aa.getOption().getOptionId(),
-                    measuredList
-                );
-            })
-            .collect(Collectors.toCollection(ArrayList::new));
-        
+                .map(aa -> {
+                    // Create measured quality list from option scores
+                    ArrayList<MeasuredQualityList> measuredList = new ArrayList<>();
+                    if (aa.getOption() != null && aa.getOption().getOptionScores() != null) {
+                        measuredList = aa.getOption().getOptionScores().stream()
+                                .map(os -> new MeasuredQualityList(
+                                        os.getMeasuredQualityType().getMeasuredQualityTypeName(),
+                                        os.getScore(),
+                                        os.getMeasuredQualityType().getMeasuredQuality() != null
+                                                ? os.getMeasuredQualityType().getMeasuredQuality()
+                                                        .getMeasuredQualityName()
+                                                : null))
+                                .collect(Collectors.toCollection(ArrayList::new));
+                    }
+
+                    return new QuestionOptionID(
+                            aa.getQuestionnaireQuestion().getQuestionnaireQuestionId(),
+                            aa.getOption().getOptionId(),
+                            measuredList);
+                })
+                .collect(Collectors.toCollection(ArrayList::new));
+
         return new ExcelOptionData(
-            userStudentRepository.getNameByUserID(userStudentId),
-            questionOptionList
-        );
+                userStudentRepository.getNameByUserID(userStudentId),
+                questionOptionList);
     }
 
     @PostMapping("/add")
@@ -107,9 +106,10 @@ public class StudentInfoController {
             UserStudent userStudentSAVED = userStudentRepository.save(userStudent);
 
             // Use assessment ID from request, default to 11 if not provided
-            
-            // if (studentInfo.getAssesment_id() != null && !studentInfo.getAssesment_id().isEmpty()) {
-               var assessmentId = Long.parseLong(studentInfo.getAssesment_id());
+
+            // if (studentInfo.getAssesment_id() != null &&
+            // !studentInfo.getAssesment_id().isEmpty()) {
+            var assessmentId = Long.parseLong(studentInfo.getAssesment_id());
             // }
 
             StudentAssessmentMapping studentAssessmentMapping = studentAssessmentMappingRepository.save(
@@ -132,14 +132,14 @@ public class StudentInfoController {
     public synchronized List<StudentAssessmentMapping> bulkAlotAssessment(
             @RequestBody List<java.util.Map<String, Long>> assignments) {
         List<StudentAssessmentMapping> savedMappings = new java.util.ArrayList<>();
-        
+
         // Deduplicate assignments in the request itself
         java.util.Set<String> processedKeys = new java.util.HashSet<>();
-        
+
         for (java.util.Map<String, Long> assignment : assignments) {
             Long userStudentId = assignment.get("userStudentId");
             Long assessmentId = assignment.get("assessmentId");
-            
+
             if (userStudentId != null && assessmentId != null) {
                 // Check for duplicates within the same request
                 String key = userStudentId + "-" + assessmentId;
@@ -147,7 +147,7 @@ public class StudentInfoController {
                     continue; // Skip duplicate in same request
                 }
                 processedKeys.add(key);
-                
+
                 // Check if mapping already exists in database
                 java.util.Optional<StudentAssessmentMapping> existingMapping = studentAssessmentMappingRepository
                         .findFirstByUserStudentUserStudentIdAndAssessmentId(
