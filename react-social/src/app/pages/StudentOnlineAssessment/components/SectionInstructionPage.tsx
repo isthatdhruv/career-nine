@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAssessment } from "../../StudentLogin/AssessmentContext";
+import { usePreventReload } from "../../StudentLogin/usePreventReload";
 
 type Language = {
   languageId: number;
@@ -17,6 +18,7 @@ const SectionInstructionPage: React.FC = () => {
   const { sectionId } = useParams();
   const navigate = useNavigate();
   const { assessmentData } = useAssessment();
+  usePreventReload();
 
   const [instructions, setInstructions] = useState<Instruction[] | null>(null);
 

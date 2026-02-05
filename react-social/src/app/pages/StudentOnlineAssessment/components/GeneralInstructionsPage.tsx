@@ -1,8 +1,10 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { usePreventReload } from "../../StudentLogin/usePreventReload";
 
 const GeneralInstructionsPage: React.FC = () => {
   const navigate = useNavigate();
+  usePreventReload();
 
   return (
     <div

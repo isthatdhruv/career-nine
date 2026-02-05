@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAssessment } from "../../StudentLogin/AssessmentContext";
+import { usePreventReload } from "../../StudentLogin/usePreventReload";
 import axios from "axios";
 
 type Section = {
@@ -13,6 +14,7 @@ const SelectSectionPage: React.FC = () => {
   const [sections, setSections] = useState<Section[]>([]);
   const navigate = useNavigate();
   const { assessmentData, loading } = useAssessment();
+  usePreventReload();
 
   useEffect(() => {
     const checkStudentStatus = async () => {
@@ -76,13 +78,9 @@ const SelectSectionPage: React.FC = () => {
         alignItems: "center",
         justifyContent: "center",
         minHeight: "100vh",
-        width: "100vw",
         background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        position: "fixed",
-        top: 0,
-        left: 0,
         padding: "2rem 1rem",
-        overflow: "auto",
+        overflowY: "auto",
       }}
     >
       <div

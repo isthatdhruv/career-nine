@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAssessment } from "./AssessmentContext";
+import { usePreventReload } from "./usePreventReload";
 
 type Assessment = {
   assessmentId: number;
@@ -15,6 +16,7 @@ export default function AllottedAssessmentPage() {
   const [showOngoingModal, setShowOngoingModal] = useState(false);
   const navigate = useNavigate();
   const { fetchAssessmentData } = useAssessment();
+  usePreventReload();
 
   useEffect(() => {
     const storedAssessments = localStorage.getItem('allottedAssessments');
@@ -42,10 +44,10 @@ export default function AllottedAssessmentPage() {
     }
 
     // Check if ongoing - show styled modal to contact administrator
-    if (assessment.studentStatus === 'ongoing') {
-      setShowOngoingModal(true);
-      return;
-    }
+    // if (assessment.studentStatus === 'ongoing') {
+    //   setShowOngoingModal(true);
+    //   return;
+    // }
 
     // Check if active
     if (!assessment.isActive) {

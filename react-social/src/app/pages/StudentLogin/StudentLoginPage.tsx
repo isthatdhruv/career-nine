@@ -1,11 +1,17 @@
 import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { usePreventReload } from './usePreventReload';
 
 const StudentLoginPage: React.FC = () => {
+  const navigate = useNavigate();
   const [userId, setUserId] = useState('');
   const [dob, setDob] = useState('');
   const [errors, setErrors] = useState({ userId: '', dob: '' });
   const [touched, setTouched] = useState({ userId: false, dob: false });
   const dateInputRef = useRef<HTMLInputElement>(null);
+
+  // Prevent page reload when user has started entering data
+  usePreventReload(userId.length > 0 || dob.length > 0);
 
   const validateUserId = (id: string): string => {
     if (!id) {
@@ -131,8 +137,8 @@ const StudentLoginPage: React.FC = () => {
           console.log('Login successful:', data);
           localStorage.setItem('userStudentId', data.userStudentId);
           localStorage.setItem('allottedAssessments', JSON.stringify(data.assessments));
-          // Navigate to the next page
-          window.location.href = '/demographics';
+          // Navigate to the next page (SPA navigation, no page reload)
+          navigate('/demographics');
         } else {
           console.error('Login failed:', response.statusText);
           alert('Invalid credentials. Please try again.');

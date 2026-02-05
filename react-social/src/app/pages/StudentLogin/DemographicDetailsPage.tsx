@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { usePreventReload } from "./usePreventReload";
 
 type DemographicData = {
   name: string;
@@ -22,6 +23,7 @@ type ValidationErrors = {
 
 const DemographicDetailsPage: React.FC = () => {
   const navigate = useNavigate();
+  usePreventReload();
   const [formData, setFormData] = useState<DemographicData>({
     name: "",
     gender: "",
