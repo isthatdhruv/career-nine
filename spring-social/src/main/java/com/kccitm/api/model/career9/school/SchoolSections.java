@@ -28,6 +28,10 @@ public class SchoolSections implements Serializable {
     @JoinColumn(name = "school_classes_id", nullable = false)
     private SchoolClasses schoolClasses;
 
+    public SchoolClasses getSchoolClasses() {
+        return schoolClasses;
+    }
+
     public void setSchoolClass(SchoolClasses schoolClasses) {
         this.schoolClasses = schoolClasses;
     }

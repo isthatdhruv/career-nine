@@ -14,6 +14,8 @@ import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 @Entity
 @Table(name = "school_classes")
 public class SchoolClasses implements Serializable {
@@ -30,8 +32,13 @@ public class SchoolClasses implements Serializable {
     private List<SchoolSections> schoolSections;
 
     @ManyToOne
+    @JsonIgnore
     @JoinColumn(name = "school_session_id", nullable = false)
     private SchoolSession schoolSession;
+
+    public SchoolSession getSchoolSession() {
+        return schoolSession;
+    }
 
     public void setSchoolSession(SchoolSession schoolSession) {
         this.schoolSession = schoolSession;

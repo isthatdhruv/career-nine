@@ -194,6 +194,21 @@ export function AsideMenuMain() {
       />
       </AsideMenuItemWithSub>
 
+      <div className="menu-item">
+        <div className="menu-content pt-8 pb-2">
+          <span className="menu-section text-muted text-uppercase fs-8 ls-1">
+            Reports
+          </span>
+        </div>
+      </div>
+
+      <AsideMenuItem
+        to="/reports"
+        icon="/media/icons/duotune/files/fil003.svg"
+        title="Reports & Exports"
+        fontIcon="bi-file-earmark-bar-graph"
+      />
+
       {/* <AsideMenuItem
         to="/student/university/result-list"
         icon="/media/icons/duotune/communication/com014.svg"

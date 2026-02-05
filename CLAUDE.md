@@ -243,6 +243,24 @@ All career9 controllers are located in `controller/career9/` package.
 - `GET /export-excel` - Export all questions to Excel (with MQT scores)
 - `POST /import-excel` - Import questions from Excel (bulk create/update)
 
+**NEW: Bulk Upload Feature (Frontend)**
+- **Component**: `QuestionBulkUploadModal.tsx` - Modal for bulk question upload with preview/edit
+- **Excel Format**: One row per question with up to 6 options
+- **Features**:
+  - Upload Excel file → Parse questions → Preview in modal
+  - Navigate through questions with Next/Previous buttons
+  - Edit questions, options, and MQT scores before submission
+  - Submit all questions to backend (uses `/create` endpoint per question)
+  - Download blank template with sample data
+- **Excel Columns**:
+  - Question Text, Question Type, Section ID, Max Options Allowed
+  - Option 1-6: Text, Description, Is Correct, MQTs (format: "MQTName:Score,MQTName:Score")
+- **Limitations**: Images not supported, max 6 options in Excel (can add more in modal)
+- **Files**:
+  - `/react-social/src/app/pages/AssesmentQuestions/components/QuestionBulkUploadModal.tsx`
+  - `/react-social/src/app/pages/AssesmentQuestions/components/QuestionTable.tsx` (integration)
+  - `/BULK_UPLOAD_INSTRUCTIONS.md` (user documentation)
+
 **AssessmentQuestionOptionsController** (`/assessment-question-options`)
 - `GET /getAll` - Get all options
 - `GET /get/{id}` - Get option by ID

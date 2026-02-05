@@ -62,6 +62,7 @@ import DemographicDetailsPage from "../pages/StudentLogin/DemographicDetailsPage
 import ThankYouPage from "../pages/StudentOnlineAssessment/components/ThankYouPage";
 import GeneralInstructionsPage from "../pages/StudentOnlineAssessment/components/GeneralInstructionsPage";
 import InstituteDashboard from "../pages/dashboard/InstituteDashboard";
+import ReportsPage from "../pages/Reports/ReportsPage";
 
 const PrivateRoutes = () => {
   const StudentsData = lazy(
@@ -801,6 +802,14 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <RoleUser />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/reports"
+          element={
+            <SuspensedView>
+              <ReportsPage />
             </SuspensedView>
           }
         />

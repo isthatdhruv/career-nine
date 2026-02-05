@@ -15,11 +15,13 @@ import {
   ImportQuestionsFromExcel
 } from "../API/Question_APIs";
 import QuestionLanguageModal from "./QuestionLanguageModal";  // ✅ import modal
+import QuestionBulkUploadModal from "./QuestionBulkUploadModal"; // Import bulk upload modal
+import * as XLSX from "xlsx"; // For template generation
 
 const QuestionTable = (props: {
   data: any;
   sections: any[];
-  
+
   setPageLoading: any;
 }) => {
   const navigate = useNavigate();
@@ -27,9 +29,10 @@ const QuestionTable = (props: {
   const [measuredQualityTypes, setMeasuredQualityTypes] = useState<any[]>([]);
   const [searchText, setSearchText] = useState("");
 
-  // ✅ State for modal
+  // ✅ State for modals
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [activeQuestionId, setActiveQuestionId] = useState<number | null>(null);
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false); // Bulk upload modal state
 
   // Fetch measured quality types
   useEffect(() => {
@@ -97,59 +100,63 @@ const QuestionTable = (props: {
   };
 
   /**
-   * Handle Excel import upload
+   * Generate and download an Excel template for bulk question upload
    *
-   * This function triggers file selection and uploads the Excel file for import.
-   * The backend will process the file and:
-   * - Update existing questions (if Question ID is present)
-   * - Create new questions (if Question ID is absent)
-   *
-   * The function shows a summary of results (success/failed counts)
-   * and refreshes the page to display updated data.
-   *
-   * @param event File input change event
+   * This creates a blank Excel file with:
+   * - Proper column headers
+   * - One sample question row
+   * - Instructions for filling the template
    */
-  const handleImportFromExcel = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleDownloadTemplate = () => {
+    // Create sample data with instructions
+    const templateData = [
+      {
+        "Question Text": "What is 2+2?",
+        "Question Type": "single-choice",
+        "Section ID": props.sections[0]?.sectionId || 1,
+        "Max Options Allowed": 1,
+        "Option 1 Text": "4",
+        "Option 1 Description": "Correct answer",
+        "Option 1 Is Correct": "Yes",
+        "Option 1 MQTs": "Analytical:10,Problem Solving:8",
+        "Option 2 Text": "5",
+        "Option 2 Description": "Wrong answer",
+        "Option 2 Is Correct": "No",
+        "Option 2 MQTs": "Analytical:2",
+        "Option 3 Text": "",
+        "Option 3 Description": "",
+        "Option 3 Is Correct": "",
+        "Option 3 MQTs": "",
+        "Option 4 Text": "",
+        "Option 4 Description": "",
+        "Option 4 Is Correct": "",
+        "Option 4 MQTs": "",
+        "Option 5 Text": "",
+        "Option 5 Description": "",
+        "Option 5 Is Correct": "",
+        "Option 5 MQTs": "",
+        "Option 6 Text": "",
+        "Option 6 Description": "",
+        "Option 6 Is Correct": "",
+        "Option 6 MQTs": "",
+      },
+    ];
 
-    // Validate file type to ensure it's an Excel file
-    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
-      alert('Please select a valid Excel file (.xlsx or .xls)');
-      return;
-    }
+    // Create workbook and worksheet
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Questions Template");
 
-    try {
-      // Show loading state while processing
-      props.setPageLoading(["true"]);
+    // Auto-size columns
+    const maxWidth = 50;
+    const colWidths = Object.keys(templateData[0]).map((key) => ({
+      wch: Math.min(key.length + 2, maxWidth),
+    }));
+    worksheet["!cols"] = colWidths;
 
-      // Call the import API and get results
-      const result = await ImportQuestionsFromExcel(file);
-
-      // Show results to user in an alert
-      if (result.failed === 0) {
-        // All imports successful
-        alert(`Import successful! ${result.success} questions imported.`);
-      } else {
-        // Some imports failed - show detailed error messages
-        alert(
-          `Import completed with some errors:\n` +
-          `Success: ${result.success}\n` +
-          `Failed: ${result.failed}\n\n` +
-          `Errors:\n${result.errors.join('\n')}`
-        );
-      }
-
-      // Refresh the page to show new/updated questions
-      props.setPageLoading(["true"]);
-    } catch (error) {
-      console.error('Error importing Excel file:', error);
-      alert('Failed to import Excel file. Please check the file format and try again.');
-    } finally {
-      // Clear the file input so the same file can be uploaded again if needed
-      event.target.value = '';
-      props.setPageLoading([]);
-    }
+    // Generate file and trigger download
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
+    XLSX.writeFile(workbook, `questions_template_${timestamp}.xlsx`);
   };
 
   const filteredData = props.data.filter((item: any) =>
@@ -242,22 +249,25 @@ const QuestionTable = (props: {
           Download Excel
         </button>
 
-        {/* Upload Excel button - imports questions from Excel file */}
-        {/* Using label with hidden input for better UX */}
-        <label
-          className="btn btn-primary d-flex align-items-center mb-0"
-          style={{ cursor: 'pointer' }}
-          title="Upload Excel file to import/update questions"
+        {/* Download Template button - downloads blank template for bulk upload */}
+        <button
+          onClick={handleDownloadTemplate}
+          className="btn btn-info d-flex align-items-center"
+          title="Download a blank template to fill with your questions"
+        >
+          <FaFileDownload size={18} className="me-2" />
+          Download Template
+        </button>
+
+        {/* Upload Excel button - opens modal for bulk question upload */}
+        <button
+          onClick={() => setShowBulkUploadModal(true)}
+          className="btn btn-primary d-flex align-items-center"
+          title="Upload Excel file to import questions (with preview)"
         >
           <FaFileDownload size={18} className="me-2" style={{ transform: 'rotate(180deg)' }} />
           Upload Excel
-          <input
-            type="file"
-            accept=".xlsx,.xls"
-            onChange={handleImportFromExcel}
-            style={{ display: 'none' }}
-          />
-        </label>
+        </button>
 
         {/* Search input for filtering questions */}
         <input
@@ -281,12 +291,19 @@ const QuestionTable = (props: {
         data={datatable}
       />
 
-      {/* ✅ Modal */}
+      {/* ✅ Modals */}
       <QuestionLanguageModal
         show={showLanguageModal}
         onHide={() => setShowLanguageModal(false)}
         setPageLoading={props.setPageLoading}
         questionId={activeQuestionId}   // passing question ID
+      />
+
+      <QuestionBulkUploadModal
+        show={showBulkUploadModal}
+        onHide={() => setShowBulkUploadModal(false)}
+        onUploadComplete={() => props.setPageLoading(["true"])}
+        sections={props.sections}
       />
     </>
   );

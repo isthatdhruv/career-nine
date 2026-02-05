@@ -1,13 +1,29 @@
 package com.kccitm.api.controller;
 
+import java.io.ByteArrayOutputStream;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,6 +34,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.User;
+import com.kccitm.api.model.career9.AssessmentRawScore;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
@@ -412,6 +429,247 @@ public class StudentInfoController {
             e.printStackTrace();
             Map<String, String> error = new HashMap<>();
             error.put("error", "Failed to reset assessment: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
+
+    @GetMapping("/getStudentScores")
+    public ResponseEntity<?> getStudentScores(
+            @RequestParam Long userStudentId,
+            @RequestParam Long assessmentId) {
+        try {
+            // Find the student assessment mapping
+            Optional<StudentAssessmentMapping> mappingOpt = studentAssessmentMappingRepository
+                    .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+
+            if (mappingOpt.isEmpty()) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "No assessment mapping found for this student and assessment");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+            }
+
+            StudentAssessmentMapping mapping = mappingOpt.get();
+
+            // Get raw scores for this mapping
+            List<AssessmentRawScore> rawScores = assessmentRawScoreRepository
+                    .findByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId());
+
+            // Get student info
+            UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
+            StudentInfo studentInfo = userStudent != null ? userStudent.getStudentInfo() : null;
+
+            // Build response
+            Map<String, Object> response = new HashMap<>();
+
+            // Student details
+            Map<String, Object> studentDetails = new HashMap<>();
+            if (studentInfo != null) {
+                studentDetails.put("name", studentInfo.getName());
+                studentDetails.put("rollNumber", studentInfo.getSchoolRollNumber());
+                studentDetails.put("studentClass", studentInfo.getStudentClass());
+                studentDetails.put("dob", studentInfo.getStudentDob());
+            }
+            response.put("student", studentDetails);
+
+            // Scores list
+            List<Map<String, Object>> scoresList = rawScores.stream().map(score -> {
+                Map<String, Object> scoreMap = new HashMap<>();
+                if (score.getMeasuredQualityType() != null) {
+                    scoreMap.put("measuredQualityTypeName", score.getMeasuredQualityType().getMeasuredQualityTypeName());
+                    scoreMap.put("measuredQualityTypeDisplayName",
+                            score.getMeasuredQualityType().getMeasuredQualityTypeDisplayName() != null
+                                    ? score.getMeasuredQualityType().getMeasuredQualityTypeDisplayName()
+                                    : score.getMeasuredQualityType().getMeasuredQualityTypeName());
+                }
+                if (score.getMeasuredQuality() != null) {
+                    scoreMap.put("measuredQualityName", score.getMeasuredQuality().getMeasuredQualityName());
+                }
+                scoreMap.put("rawScore", score.getRawScore());
+                return scoreMap;
+            }).collect(Collectors.toList());
+
+            response.put("scores", scoresList);
+            response.put("status", mapping.getStatus());
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            System.err.println("Error fetching student scores: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Failed to fetch student scores: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
+
+    @GetMapping("/exportScoresByInstitute/{instituteId}")
+    public ResponseEntity<?> exportScoresByInstitute(
+            @PathVariable("instituteId") Integer instituteId,
+            @RequestParam Long assessmentId) {
+        try {
+            // Get all UserStudents for this institute
+            List<UserStudent> userStudents = userStudentRepository.findByInstituteInstituteCode(instituteId);
+
+            if (userStudents.isEmpty()) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "No students found for this institute");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+            }
+
+            // Collect all student assessment mappings for the given assessment
+            List<Long> mappingIds = new ArrayList<>();
+            Map<Long, StudentAssessmentMapping> mappingByUserStudentId = new HashMap<>();
+
+            for (UserStudent us : userStudents) {
+                Optional<StudentAssessmentMapping> mappingOpt = studentAssessmentMappingRepository
+                        .findFirstByUserStudentUserStudentIdAndAssessmentId(us.getUserStudentId(), assessmentId);
+                if (mappingOpt.isPresent()) {
+                    StudentAssessmentMapping mapping = mappingOpt.get();
+                    mappingIds.add(mapping.getStudentAssessmentId());
+                    mappingByUserStudentId.put(us.getUserStudentId(), mapping);
+                }
+            }
+
+            // Get all raw scores for these mappings in one query
+            List<AssessmentRawScore> allScores = mappingIds.isEmpty()
+                    ? new ArrayList<>()
+                    : assessmentRawScoreRepository.findByStudentAssessmentMappingStudentAssessmentIdIn(mappingIds);
+
+            // Collect all unique MQT names (in order)
+            Set<String> mqtNamesSet = new LinkedHashSet<>();
+            Map<Long, Map<String, Integer>> scoresByMappingId = new HashMap<>();
+
+            for (AssessmentRawScore score : allScores) {
+                Long mappingId = score.getStudentAssessmentMapping().getStudentAssessmentId();
+                String mqtName = score.getMeasuredQualityType().getMeasuredQualityTypeDisplayName() != null
+                        ? score.getMeasuredQualityType().getMeasuredQualityTypeDisplayName()
+                        : score.getMeasuredQualityType().getMeasuredQualityTypeName();
+
+                mqtNamesSet.add(mqtName);
+
+                scoresByMappingId.computeIfAbsent(mappingId, k -> new HashMap<>())
+                        .put(mqtName, score.getRawScore());
+            }
+
+            List<String> mqtNames = new ArrayList<>(mqtNamesSet);
+
+            // Create Excel workbook
+            Workbook workbook = new XSSFWorkbook();
+            Sheet sheet = workbook.createSheet("Student Scores");
+
+            // Create header style
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
+
+            // Create header row
+            Row headerRow = sheet.createRow(0);
+            String[] fixedHeaders = {"Name", "Roll Number", "Class", "DOB"};
+            int colIndex = 0;
+
+            for (String header : fixedHeaders) {
+                Cell cell = headerRow.createCell(colIndex++);
+                cell.setCellValue(header);
+                cell.setCellStyle(headerStyle);
+            }
+
+            for (String mqtName : mqtNames) {
+                Cell cell = headerRow.createCell(colIndex++);
+                cell.setCellValue(mqtName);
+                cell.setCellStyle(headerStyle);
+            }
+
+            // Create data rows
+            int rowIndex = 1;
+            for (UserStudent us : userStudents) {
+                StudentInfo si = us.getStudentInfo();
+                StudentAssessmentMapping mapping = mappingByUserStudentId.get(us.getUserStudentId());
+
+                Row row = sheet.createRow(rowIndex++);
+                colIndex = 0;
+
+                // Fixed columns
+                row.createCell(colIndex++).setCellValue(si != null && si.getName() != null ? si.getName() : "");
+                row.createCell(colIndex++).setCellValue(si != null && si.getSchoolRollNumber() != null ? si.getSchoolRollNumber() : "");
+                row.createCell(colIndex++).setCellValue(si != null && si.getStudentClass() != null ? si.getStudentClass().toString() : "");
+
+                // Format DOB as string
+                String dobStr = "";
+                if (si != null && si.getStudentDob() != null) {
+                    SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
+                    dobStr = sdf.format(si.getStudentDob());
+                }
+                row.createCell(colIndex++).setCellValue(dobStr);
+
+                // MQT score columns
+                Map<String, Integer> studentScores = mapping != null
+                        ? scoresByMappingId.getOrDefault(mapping.getStudentAssessmentId(), new HashMap<>())
+                        : new HashMap<>();
+
+                for (String mqtName : mqtNames) {
+                    Integer score = studentScores.get(mqtName);
+                    if (score != null) {
+                        row.createCell(colIndex++).setCellValue(score);
+                    } else {
+                        row.createCell(colIndex++).setCellValue("");
+                    }
+                }
+            }
+
+            // Auto-size columns
+            for (int i = 0; i < fixedHeaders.length + mqtNames.size(); i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            // Write to byte array
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            workbook.write(outputStream);
+            workbook.close();
+
+            byte[] excelBytes = outputStream.toByteArray();
+
+            // Return as downloadable file
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            headers.setContentDispositionFormData("attachment", "student_scores_" + instituteId + "_" + assessmentId + ".xlsx");
+            headers.setContentLength(excelBytes.length);
+
+            return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
+
+        } catch (Exception e) {
+            System.err.println("Error exporting scores: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Failed to export scores: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
+
+    @PostMapping("/bulkRemoveAssessment")
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<?> bulkRemoveAssessment(@RequestBody List<Map<String, Long>> removals) {
+        try {
+            int removedCount = 0;
+            for (Map<String, Long> removal : removals) {
+                Long userStudentId = removal.get("userStudentId");
+                Long assessmentId = removal.get("assessmentId");
+
+                if (userStudentId != null && assessmentId != null) {
+                    studentAssessmentMappingRepository.deleteByUserStudentUserStudentIdAndAssessmentId(
+                            userStudentId, assessmentId);
+                    removedCount++;
+                }
+            }
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("removedCount", removedCount);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            System.err.println("Error removing assessments: " + e.getMessage());
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Failed to remove assessments: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
         }
     }

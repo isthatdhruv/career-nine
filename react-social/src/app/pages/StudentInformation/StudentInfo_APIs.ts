@@ -127,3 +127,37 @@ export function resetAssessment(userStudentId: number, assessmentId: number) {
         assessmentId
     });
 }
+
+// Student Scores APIs
+export interface StudentScoreDetail {
+    measuredQualityTypeName: string;
+    measuredQualityTypeDisplayName: string;
+    measuredQualityName?: string;
+    rawScore: number;
+}
+
+export interface StudentScoresResponse {
+    student: {
+        name: string;
+        rollNumber: string;
+        studentClass: number | null;
+        dob: string;
+    };
+    scores: StudentScoreDetail[];
+    status: string;
+}
+
+// Get individual student scores
+export function getStudentScores(userStudentId: number, assessmentId: number) {
+    return axios.get<StudentScoresResponse>(`${STUDENT_INFO_BASE}/getStudentScores`, {
+        params: { userStudentId, assessmentId }
+    });
+}
+
+// Bulk export scores by institute - returns Excel blob
+export function exportScoresByInstitute(instituteId: number, assessmentId: number) {
+    return axios.get(`${STUDENT_INFO_BASE}/exportScoresByInstitute/${instituteId}`, {
+        params: { assessmentId },
+        responseType: 'blob'
+    });
+}
