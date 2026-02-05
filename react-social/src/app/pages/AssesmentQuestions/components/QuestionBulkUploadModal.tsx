@@ -140,7 +140,10 @@ const QuestionBulkUploadModal: React.FC<QuestionBulkUploadModalProps> = ({
     const questions: ParsedQuestion[] = [];
 
     rows.forEach((row: any) => {
-      const questionText = row["Question Text"]?.trim();
+      const rawQuestionText = row["Question Text"];
+      const questionText = rawQuestionText != null && rawQuestionText !== ""
+        ? String(rawQuestionText).trim()
+        : null;
       if (!questionText) return; // Skip empty rows
 
       // Extract options from Option 1 Text, Option 2 Text, etc. columns
@@ -150,23 +153,27 @@ const QuestionBulkUploadModal: React.FC<QuestionBulkUploadModalProps> = ({
       for (let i = 1; i <= 6; i++) {
         const optionTextCol = `Option ${i} Text`;
         const optionDescCol = `Option ${i} Description`;
-        const optionCorrectCol = `Option ${i} Is Correct`;
         const optionMqtCol = `Option ${i} MQTs`;
 
-        const optionText = row[optionTextCol]?.trim();
+        const rawOptionText = row[optionTextCol];
+        // Auto-convert numbers to string (Excel may store numeric option text as numbers)
+        const optionText = rawOptionText != null && rawOptionText !== ""
+          ? String(rawOptionText).trim()
+          : null;
 
         // Stop if no more options
         if (!optionText) break;
 
         // Parse MQT scores from string format
-        const mqtScores = parseMqtScoresFromString(row[optionMqtCol], mqt);
+        const mqtScores = parseMqtScoresFromString(
+          row[optionMqtCol] != null ? String(row[optionMqtCol]) : undefined,
+          mqt
+        );
 
         options.push({
           optionText,
-          optionDescription: row[optionDescCol]?.trim() || "",
-          correct:
-            String(row[optionCorrectCol]).toLowerCase() === "yes" ||
-            row[optionCorrectCol] === true,
+          optionDescription: row[optionDescCol] != null ? String(row[optionDescCol]).trim() : "",
+          correct: false,
           isGame: false,
           gameId: undefined,
           mqtScores,

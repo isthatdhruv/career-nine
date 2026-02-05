@@ -51,6 +51,7 @@ const SectionInstructionPage: React.FC = () => {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          colorScheme: "light",
         }}
       >
         <div className="text-center">
@@ -72,6 +73,7 @@ const SectionInstructionPage: React.FC = () => {
         alignItems: "center",
         justifyContent: "center",
         padding: "2rem 1rem",
+        colorScheme: "light",
       }}
     >
       <div
@@ -81,9 +83,11 @@ const SectionInstructionPage: React.FC = () => {
           maxWidth: "98%",
           borderRadius: "24px",
           border: "none",
+          background: "#ffffff",
+          colorScheme: "light",
         }}
       >
-        <div className="card-body p-5">
+        <div className="card-body p-5" style={{ background: "#ffffff", color: "#2d3748", borderRadius: "24px" }}>
           {/* Header Icon */}
           <div
             style={{

@@ -163,7 +163,8 @@ const StudentLoginPage: React.FC = () => {
       position: 'fixed',
       top: 0,
       left: 0,
-      overflow: 'auto'
+      overflow: 'auto',
+      colorScheme: 'light',
     }}>
       <div
         className="card shadow-lg"
@@ -172,28 +173,25 @@ const StudentLoginPage: React.FC = () => {
           maxWidth: '95%',
           borderRadius: '20px',
           border: 'none',
+          background: '#ffffff',
+          colorScheme: 'light',
         }}
       >
-        <div className="card-body p-5">
+        <div className="card-body p-5" style={{ borderRadius: '20px', background: '#ffffff', color: '#2d3748' }}>
           {/* Logo/Icon */}
           <div
             style={{
-              width: "80px",
+              width: "220px",
               height: "80px",
-              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-              borderRadius: "50%",
+              background: "white",
+              borderRadius: "10%",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               margin: "0 auto 1.5rem",
-              boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)",
             }}
           >
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
-              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-              <polyline points="10 17 15 12 10 7" />
-              <line x1="15" y1="12" x2="3" y2="12" />
-            </svg>
+            <img src="/media/logos/kcc.jpg" alt="KCC Logo" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: "10%", padding: "8px" }} />
           </div>
 
           <h2
@@ -262,6 +260,8 @@ const StudentLoginPage: React.FC = () => {
                     borderRadius: '10px',
                     border: `2px solid ${touched.userId && errors.userId ? '#e53e3e' : '#e2e8f0'}`,
                     transition: 'all 0.2s ease',
+                    backgroundColor: '#ffffff',
+                    color: '#2d3748',
                   }}
                   onFocus={(e) => {
                     if (!errors.userId) {
@@ -333,6 +333,8 @@ const StudentLoginPage: React.FC = () => {
                       border: `2px solid ${touched.dob && errors.dob ? '#e53e3e' : '#e2e8f0'}`,
                       borderRight: 'none',
                       transition: 'all 0.2s ease',
+                      backgroundColor: '#ffffff',
+                      color: '#2d3748',
                     }}
                     onFocus={(e) => {
                       if (!errors.dob) {

@@ -315,9 +315,6 @@ public class AssessmentQuestionController {
         // Fetch all questions with their complete data (options, sections, scores)
         List<AssessmentQuestions> questions = fetchAndTransformFromDb();
 
-        // Fetch all measured quality types to create dynamic columns
-        List<MeasuredQualityTypes> allMeasuredQualityTypes = measuredQualityTypesRepository.findAll();
-
         // Create a new Excel workbook and sheet
         Workbook workbook = new XSSFWorkbook();
         Sheet sheet = workbook.createSheet("Assessment Questions");
@@ -335,24 +332,24 @@ public class AssessmentQuestionController {
         headerStyle.setBorderRight(BorderStyle.THIN);
         headerStyle.setBorderLeft(BorderStyle.THIN);
 
+        // Determine max number of options across all questions (minimum 6 to match template)
+        int maxOptions = 6;
+        for (AssessmentQuestions q : questions) {
+            if (q.getOptions() != null && q.getOptions().size() > maxOptions) {
+                maxOptions = q.getOptions().size();
+            }
+        }
+
         // Create header row with all column titles
         Row headerRow = sheet.createRow(0);
         int colNum = 0;
 
-        // Define base columns (question and option information)
+        // Define base columns (matching upload template format)
         String[] baseHeaders = {
-            "Question ID",
             "Question Text",
             "Question Type",
             "Section ID",
-            "Section Name",
-            "Max Options Allowed",
-            "Option ID",
-            "Option Text",
-            "Option Description",
-            "Is Correct",
-            "Is Game",
-            "Game ID"
+            "Max Options Allowed"
         };
 
         // Add base headers to the sheet
@@ -362,111 +359,74 @@ public class AssessmentQuestionController {
             cell.setCellStyle(headerStyle);
         }
 
-        // Create a map to store measured quality type column indices
-        // This map helps us know which column corresponds to which quality type
-        Map<Long, Integer> mqtColumnMap = new HashMap<>();
+        // Add option headers: Option N Text, Option N Description, Option N MQTs
+        for (int i = 1; i <= maxOptions; i++) {
+            Cell textCell = headerRow.createCell(colNum++);
+            textCell.setCellValue("Option " + i + " Text");
+            textCell.setCellStyle(headerStyle);
 
-        // Add dynamic columns for each measured quality type
-        // Each quality type gets its own column for scores
-        for (MeasuredQualityTypes mqt : allMeasuredQualityTypes) {
-            Cell cell = headerRow.createCell(colNum);
-            cell.setCellValue("MQT: " + mqt.getMeasuredQualityTypeName());
-            cell.setCellStyle(headerStyle);
+            Cell descCell = headerRow.createCell(colNum++);
+            descCell.setCellValue("Option " + i + " Description");
+            descCell.setCellStyle(headerStyle);
 
-            // Store the column index for this quality type
-            mqtColumnMap.put(mqt.getMeasuredQualityTypeId(), colNum);
-            colNum++;
+            Cell mqtCell = headerRow.createCell(colNum++);
+            mqtCell.setCellValue("Option " + i + " MQTs");
+            mqtCell.setCellStyle(headerStyle);
         }
 
-        // Populate data rows
+        // Populate data rows - one row per question (horizontal format)
         int rowNum = 1;
 
-        // Iterate through all questions
         for (AssessmentQuestions question : questions) {
-            // Get question's section information
+            Row row = sheet.createRow(rowNum++);
+            colNum = 0;
+
+            // Question details
+            row.createCell(colNum++).setCellValue(question.getQuestionText() != null ? question.getQuestionText() : "");
+            row.createCell(colNum++).setCellValue(question.getQuestionType() != null ? question.getQuestionType() : "");
+
             QuestionSection section = question.getSection();
-            String sectionId = section != null ? section.getSectionId().toString() : "";
-            String sectionName = section != null ? section.getSectionName() : "";
+            row.createCell(colNum++).setCellValue(section != null ? section.getSectionId().toString() : "");
+            row.createCell(colNum++).setCellValue(question.getmaxOptionsAllowed());
 
-            // Get all options for this question
+            // Options spread horizontally
             List<AssessmentQuestionOptions> options = question.getOptions();
+            for (int i = 0; i < maxOptions; i++) {
+                if (options != null && i < options.size()) {
+                    AssessmentQuestionOptions opt = options.get(i);
 
-            // If question has no options, still create one row to show the question
-            if (options == null || options.isEmpty()) {
-                Row row = sheet.createRow(rowNum++);
-                colNum = 0;
+                    // Option Text
+                    row.createCell(colNum++).setCellValue(opt.getOptionText() != null ? opt.getOptionText() : "");
 
-                // Fill in question details
-                row.createCell(colNum++).setCellValue(question.getQuestionId());
-                row.createCell(colNum++).setCellValue(question.getQuestionText() != null ? question.getQuestionText() : "");
-                row.createCell(colNum++).setCellValue(question.getQuestionType() != null ? question.getQuestionType() : "");
-                row.createCell(colNum++).setCellValue(sectionId);
-                row.createCell(colNum++).setCellValue(sectionName);
-                row.createCell(colNum++).setCellValue(question.getmaxOptionsAllowed());
+                    // Option Description
+                    row.createCell(colNum++).setCellValue(opt.getOptionDescription() != null ? opt.getOptionDescription() : "");
 
-                // Leave option columns empty
-                for (int i = 0; i < 6; i++) {
-                    row.createCell(colNum++).setCellValue("");
-                }
-            } else {
-                // Create a row for each option of the question
-                for (AssessmentQuestionOptions option : options) {
-                    Row row = sheet.createRow(rowNum++);
-                    colNum = 0;
-
-                    // Fill in question details (repeated for each option row)
-                    row.createCell(colNum++).setCellValue(question.getQuestionId());
-                    row.createCell(colNum++).setCellValue(question.getQuestionText() != null ? question.getQuestionText() : "");
-                    row.createCell(colNum++).setCellValue(question.getQuestionType() != null ? question.getQuestionType() : "");
-                    row.createCell(colNum++).setCellValue(sectionId);
-                    row.createCell(colNum++).setCellValue(sectionName);
-                    row.createCell(colNum++).setCellValue(question.getmaxOptionsAllowed());
-
-                    // Fill in option details
-                    row.createCell(colNum++).setCellValue(option.getOptionId());
-                    row.createCell(colNum++).setCellValue(option.getOptionText() != null ? option.getOptionText() : "");
-                    row.createCell(colNum++).setCellValue(option.getOptionDescription() != null ? option.getOptionDescription() : "");
-                    row.createCell(colNum++).setCellValue(option.isCorrect() ? "Yes" : "No");
-                    row.createCell(colNum++).setCellValue(option.getIsGame() != null && option.getIsGame() ? "Yes" : "No");
-
-                    // Add game ID if option is linked to a game
-                    if (option.getIsGame() != null && option.getIsGame() && option.getGame() != null) {
-                        row.createCell(colNum++).setCellValue(option.getGame().getGameId());
-                    } else {
-                        row.createCell(colNum++).setCellValue("");
-                    }
-
-                    // Fill in measured quality type scores for this option
-                    // Initialize all MQT columns with empty values first
-                    for (int i = 0; i < allMeasuredQualityTypes.size(); i++) {
-                        row.createCell(colNum + i).setCellValue("");
-                    }
-
-                    // Now fill in the actual scores for this option
-                    List<OptionScoreBasedOnMEasuredQualityTypes> scores = option.getOptionScores();
+                    // MQT scores as "MQTName:Score,MQTName:Score"
+                    StringBuilder mqtStr = new StringBuilder();
+                    List<OptionScoreBasedOnMEasuredQualityTypes> scores = opt.getOptionScores();
                     if (scores != null && !scores.isEmpty()) {
-                        for (OptionScoreBasedOnMEasuredQualityTypes score : scores) {
+                        for (int j = 0; j < scores.size(); j++) {
+                            OptionScoreBasedOnMEasuredQualityTypes score = scores.get(j);
                             if (score.getMeasuredQualityType() != null) {
-                                Long mqtId = score.getMeasuredQualityType().getMeasuredQualityTypeId();
-                                Integer columnIndex = mqtColumnMap.get(mqtId);
-
-                                // Set the score value in the appropriate column
-                                if (columnIndex != null) {
-                                    Cell scoreCell = row.getCell(columnIndex);
-                                    if (scoreCell == null) {
-                                        scoreCell = row.createCell(columnIndex);
-                                    }
-                                    scoreCell.setCellValue(score.getScore() != null ? score.getScore() : 0);
-                                }
+                                if (mqtStr.length() > 0) mqtStr.append(",");
+                                mqtStr.append(score.getMeasuredQualityType().getMeasuredQualityTypeName())
+                                      .append(":")
+                                      .append(score.getScore() != null ? score.getScore() : 0);
                             }
                         }
                     }
+                    row.createCell(colNum++).setCellValue(mqtStr.toString());
+                } else {
+                    // Empty option columns
+                    row.createCell(colNum++).setCellValue("");
+                    row.createCell(colNum++).setCellValue("");
+                    row.createCell(colNum++).setCellValue("");
                 }
             }
         }
 
         // Auto-size all columns for better readability
-        for (int i = 0; i < colNum; i++) {
+        for (int i = 0; i < headerRow.getLastCellNum(); i++) {
             sheet.autoSizeColumn(i);
         }
 
@@ -529,7 +489,6 @@ public class AssessmentQuestionController {
         Sheet sheet = workbook.getSheetAt(0);
 
         // Step 1: Build column index map from header row
-        // This maps column names to their index positions
         Row headerRow = sheet.getRow(0);
         Map<String, Integer> columnIndexMap = new HashMap<>();
 
@@ -540,114 +499,133 @@ public class AssessmentQuestionController {
             }
         }
 
-        // Step 2: Get all MeasuredQualityTypes for dynamic column mapping
-        // The Excel has dynamic columns like "MQT: Analytical Thinking"
+        // Step 2: Get all MeasuredQualityTypes for MQT name resolution
         List<MeasuredQualityTypes> allMQTs = measuredQualityTypesRepository.findAll();
         Map<String, Long> mqtNameToIdMap = allMQTs.stream()
             .collect(Collectors.toMap(
-                mqt -> "MQT: " + mqt.getMeasuredQualityTypeName(),
+                mqt -> mqt.getMeasuredQualityTypeName().toLowerCase(),
                 MeasuredQualityTypes::getMeasuredQualityTypeId
             ));
 
-        // Step 3: Group rows by Question ID
-        // Questions with same ID belong together (one row per option)
-        Map<Long, List<Row>> questionRowsMap = new LinkedHashMap<>();
-        List<Row> newQuestionRows = new ArrayList<>();
+        // Step 3: Determine how many option columns exist
+        int maxOptions = 0;
+        for (int i = 1; i <= 20; i++) {
+            if (columnIndexMap.containsKey("Option " + i + " Text")) {
+                maxOptions = i;
+            } else {
+                break;
+            }
+        }
+
+        // Step 4: Process each row as a complete question (horizontal format)
+        int successCount = 0;
+        int failedCount = 0;
+        List<String> errors = new ArrayList<>();
 
         for (int rowIdx = 1; rowIdx <= sheet.getLastRowNum(); rowIdx++) {
             Row row = sheet.getRow(rowIdx);
             if (row == null) continue;
 
-            // Get Question ID cell to determine if this is create or update
-            Cell questionIdCell = row.getCell(columnIndexMap.get("Question ID"));
+            Integer qtIdx = columnIndexMap.get("Question Text");
+            if (qtIdx == null) continue;
 
-            if (questionIdCell == null || questionIdCell.getCellType() == CellType.BLANK) {
-                // New question (no ID) → will be created
-                newQuestionRows.add(row);
-            } else {
-                // Existing question (has ID) → will be updated
-                Long questionId = (long) questionIdCell.getNumericCellValue();
-                questionRowsMap.computeIfAbsent(questionId, k -> new ArrayList<>()).add(row);
+            String questionText = getCellValueAsString(row.getCell(qtIdx));
+            if (questionText == null || questionText.trim().isEmpty()) continue;
+
+            try {
+                AssessmentQuestions question = new AssessmentQuestions();
+                question.setQuestionText(questionText);
+
+                Integer qtypeIdx = columnIndexMap.get("Question Type");
+                if (qtypeIdx != null) {
+                    question.setQuestionType(getCellValueAsString(row.getCell(qtypeIdx)));
+                }
+
+                // Max Options Allowed
+                Integer maxOptsIdx = columnIndexMap.get("Max Options Allowed");
+                if (maxOptsIdx != null) {
+                    Cell maxOptsCell = row.getCell(maxOptsIdx);
+                    if (maxOptsCell != null && maxOptsCell.getCellType() != CellType.BLANK) {
+                        question.setmaxAllowedOptions((int) maxOptsCell.getNumericCellValue());
+                    }
+                }
+
+                // Section
+                Integer sectionIdx = columnIndexMap.get("Section ID");
+                if (sectionIdx != null) {
+                    Cell sectionCell = row.getCell(sectionIdx);
+                    if (sectionCell != null && sectionCell.getCellType() != CellType.BLANK) {
+                        Long sectionId = Long.parseLong(getCellValueAsString(sectionCell));
+                        QuestionSection section = questionSectionRepository.findById(sectionId)
+                            .orElseThrow(() -> new RuntimeException("Section not found: " + sectionId));
+                        question.setSection(section);
+                    }
+                }
+
+                // Parse options from horizontal columns (Option N Text, Option N Description, Option N MQTs)
+                List<AssessmentQuestionOptions> options = new ArrayList<>();
+                for (int i = 1; i <= maxOptions; i++) {
+                    Integer optTextIdx = columnIndexMap.get("Option " + i + " Text");
+                    if (optTextIdx == null) break;
+
+                    String optText = getCellValueAsString(row.getCell(optTextIdx));
+                    if (optText == null || optText.trim().isEmpty()) continue;
+
+                    AssessmentQuestionOptions option = new AssessmentQuestionOptions();
+                    option.setOptionText(optText);
+
+                    // Option Description
+                    Integer optDescIdx = columnIndexMap.get("Option " + i + " Description");
+                    if (optDescIdx != null) {
+                        option.setOptionDescription(getCellValueAsString(row.getCell(optDescIdx)));
+                    }
+
+                    option.setCorrect(false);
+                    option.setIsGame(false);
+
+                    // Parse MQT scores from "MQTName:Score,MQTName:Score" format
+                    Integer optMqtIdx = columnIndexMap.get("Option " + i + " MQTs");
+                    List<OptionScoreBasedOnMEasuredQualityTypes> scores = new ArrayList<>();
+                    if (optMqtIdx != null) {
+                        String mqtString = getCellValueAsString(row.getCell(optMqtIdx));
+                        if (mqtString != null && !mqtString.trim().isEmpty()) {
+                            String[] pairs = mqtString.split(",");
+                            for (String pair : pairs) {
+                                String[] parts = pair.split(":");
+                                if (parts.length == 2) {
+                                    String mqtName = parts[0].trim().toLowerCase();
+                                    Long mqtId = mqtNameToIdMap.get(mqtName);
+                                    if (mqtId != null) {
+                                        OptionScoreBasedOnMEasuredQualityTypes score =
+                                            new OptionScoreBasedOnMEasuredQualityTypes();
+                                        score.setScore((int) Double.parseDouble(parts[1].trim()));
+                                        score.setQuestion_option(option);
+                                        score.setMeasuredQualityType(new MeasuredQualityTypes(mqtId));
+                                        scores.add(score);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    option.setOptionScores(scores);
+                    option.setQuestion(question);
+                    options.add(option);
+                }
+
+                question.setOptions(options);
+
+                // Create the question
+                createAssessmentQuestion(question);
+                successCount++;
+            } catch (Exception e) {
+                failedCount++;
+                errors.add("Row " + rowIdx + " '" + questionText.substring(0, Math.min(50, questionText.length())) + "': " + e.getMessage());
+                logger.error("Failed to import row " + rowIdx, e);
             }
         }
 
         workbook.close();
-
-        // Step 4: Process imports and track results
-        int successCount = 0;
-        int failedCount = 0;
-        List<String> errors = new ArrayList<>();
-
-        // Process existing questions (updates)
-        for (Map.Entry<Long, List<Row>> entry : questionRowsMap.entrySet()) {
-            try {
-                // Parse question data from Excel rows
-                AssessmentQuestions question = parseQuestionFromRows(
-                    entry.getValue(),
-                    columnIndexMap,
-                    mqtNameToIdMap
-                );
-                question.setQuestionId(entry.getKey());
-
-                // Call update endpoint logic to save changes
-                updateAssessmentQuestion(entry.getKey(), question);
-                successCount++;
-            } catch (Exception e) {
-                failedCount++;
-                errors.add("Question ID " + entry.getKey() + ": " + e.getMessage());
-                logger.error("Failed to import question " + entry.getKey(), e);
-            }
-        }
-
-        // Process new questions (creates)
-        if (!newQuestionRows.isEmpty()) {
-            List<Row> currentQuestionRows = new ArrayList<>();
-            String currentQuestionText = null;
-
-            // Group rows by question text (since no ID to group by)
-            for (Row row : newQuestionRows) {
-                String questionText = getCellValueAsString(
-                    row.getCell(columnIndexMap.get("Question Text"))
-                );
-
-                // When question text changes, process the previous question
-                if (currentQuestionText != null && !currentQuestionText.equals(questionText)) {
-                    // Process previous question
-                    try {
-                        AssessmentQuestions question = parseQuestionFromRows(
-                            currentQuestionRows,
-                            columnIndexMap,
-                            mqtNameToIdMap
-                        );
-                        createAssessmentQuestion(question);
-                        successCount++;
-                    } catch (Exception e) {
-                        failedCount++;
-                        errors.add("New question '" + currentQuestionText + "': " + e.getMessage());
-                    }
-                    currentQuestionRows.clear();
-                }
-
-                currentQuestionText = questionText;
-                currentQuestionRows.add(row);
-            }
-
-            // Process the last question in the list
-            if (!currentQuestionRows.isEmpty()) {
-                try {
-                    AssessmentQuestions question = parseQuestionFromRows(
-                        currentQuestionRows,
-                        columnIndexMap,
-                        mqtNameToIdMap
-                    );
-                    createAssessmentQuestion(question);
-                    successCount++;
-                } catch (Exception e) {
-                    failedCount++;
-                    errors.add("New question '" + currentQuestionText + "': " + e.getMessage());
-                }
-            }
-        }
 
         // Step 5: Refresh cache after import to sync with database
         try {
@@ -666,122 +644,6 @@ public class AssessmentQuestionController {
         result.put("errors", errors);
 
         return ResponseEntity.ok(result);
-    }
-
-    /**
-     * Helper method: Parse AssessmentQuestions object from Excel rows
-     *
-     * Multiple rows can belong to the same question (one row per option).
-     * This method parses all rows for a single question and constructs
-     * the complete question object with all options and their scores.
-     *
-     * @param rows All Excel rows belonging to this question
-     * @param colMap Column name to index mapping
-     * @param mqtMap MeasuredQualityType name to ID mapping
-     * @return Parsed AssessmentQuestions object with all relationships
-     */
-    private AssessmentQuestions parseQuestionFromRows(
-            List<Row> rows,
-            Map<String, Integer> colMap,
-            Map<String, Long> mqtMap) {
-
-        if (rows.isEmpty()) {
-            throw new IllegalArgumentException("No rows provided for parsing");
-        }
-
-        // First row contains question details (same across all rows for this question)
-        Row firstRow = rows.get(0);
-
-        // Create and populate question object
-        AssessmentQuestions question = new AssessmentQuestions();
-        question.setQuestionText(getCellValueAsString(firstRow.getCell(colMap.get("Question Text"))));
-        question.setQuestionType(getCellValueAsString(firstRow.getCell(colMap.get("Question Type"))));
-
-        // Parse Max Options Allowed
-        Cell maxOptionsCell = firstRow.getCell(colMap.get("Max Options Allowed"));
-        if (maxOptionsCell != null && maxOptionsCell.getCellType() != CellType.BLANK) {
-            question.setmaxAllowedOptions((int) maxOptionsCell.getNumericCellValue());
-        }
-
-        // Parse Section - must exist in database
-        Cell sectionIdCell = firstRow.getCell(colMap.get("Section ID"));
-        if (sectionIdCell != null && sectionIdCell.getCellType() != CellType.BLANK) {
-            Long sectionId = (long) sectionIdCell.getNumericCellValue();
-            QuestionSection section = questionSectionRepository.findById(sectionId)
-                .orElseThrow(() -> new RuntimeException("Section not found: " + sectionId));
-            question.setSection(section);
-        }
-
-        // Parse options - one option per row
-        List<AssessmentQuestionOptions> options = new ArrayList<>();
-
-        for (Row row : rows) {
-            // Check if this row has option data
-            Cell optionTextCell = row.getCell(colMap.get("Option Text"));
-            if (optionTextCell == null || optionTextCell.getCellType() == CellType.BLANK) {
-                continue;  // Skip rows without option data
-            }
-
-            // Create and populate option object
-            AssessmentQuestionOptions option = new AssessmentQuestionOptions();
-
-            // Option ID (for updates - will be null for new options)
-            Cell optionIdCell = row.getCell(colMap.get("Option ID"));
-            if (optionIdCell != null && optionIdCell.getCellType() != CellType.BLANK) {
-                option.setOptionId((long) optionIdCell.getNumericCellValue());
-            }
-
-            option.setOptionText(getCellValueAsString(optionTextCell));
-            option.setOptionDescription(getCellValueAsString(row.getCell(colMap.get("Option Description"))));
-
-            // Parse Is Correct (accepts "Yes", "yes", "True", "true")
-            String isCorrect = getCellValueAsString(row.getCell(colMap.get("Is Correct")));
-            option.setCorrect("Yes".equalsIgnoreCase(isCorrect) || "true".equalsIgnoreCase(isCorrect));
-
-            // Parse Is Game
-            String isGame = getCellValueAsString(row.getCell(colMap.get("Is Game")));
-            option.setIsGame("Yes".equalsIgnoreCase(isGame) || "true".equalsIgnoreCase(isGame));
-
-            // Parse Game ID if option is linked to a game
-            if (option.getIsGame() != null && option.getIsGame()) {
-                Cell gameIdCell = row.getCell(colMap.get("Game ID"));
-                if (gameIdCell != null && gameIdCell.getCellType() != CellType.BLANK) {
-                    Long gameId = (long) gameIdCell.getNumericCellValue();
-                    GameTable game = new GameTable();
-                    game.setGameId(gameId);
-                    option.setGame(game);
-                }
-            }
-
-            // Parse MQT scores from dynamic columns
-            List<OptionScoreBasedOnMEasuredQualityTypes> scores = new ArrayList<>();
-
-            for (Map.Entry<String, Long> mqtEntry : mqtMap.entrySet()) {
-                Integer colIdx = colMap.get(mqtEntry.getKey());
-                if (colIdx == null) continue;
-
-                Cell scoreCell = row.getCell(colIdx);
-                if (scoreCell != null && scoreCell.getCellType() != CellType.BLANK) {
-                    // Create score object
-                    OptionScoreBasedOnMEasuredQualityTypes score =
-                        new OptionScoreBasedOnMEasuredQualityTypes();
-
-                    score.setScore((int) scoreCell.getNumericCellValue());
-                    score.setQuestion_option(option);
-                    score.setMeasuredQualityType(new MeasuredQualityTypes(mqtEntry.getValue()));
-
-                    scores.add(score);
-                }
-            }
-
-            // Wire up relationships
-            option.setOptionScores(scores);
-            option.setQuestion(question);
-            options.add(option);
-        }
-
-        question.setOptions(options);
-        return question;
     }
 
     /**

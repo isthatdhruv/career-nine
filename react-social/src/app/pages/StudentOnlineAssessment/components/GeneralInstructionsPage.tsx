@@ -15,6 +15,7 @@ const GeneralInstructionsPage: React.FC = () => {
         alignItems: "center",
         justifyContent: "center",
         padding: "2rem 1rem",
+        colorScheme: "light",
       }}
     >
       <div
@@ -24,9 +25,11 @@ const GeneralInstructionsPage: React.FC = () => {
           maxWidth: "98%",
           borderRadius: "24px",
           border: "none",
+          background: "#ffffff",
+          colorScheme: "light",
         }}
       >
-        <div className="card-body p-5">
+        <div className="card-body p-5" style={{ background: "#ffffff", color: "#2d3748", borderRadius: "24px" }}>
           {/* Header Icon */}
           <div
             style={{

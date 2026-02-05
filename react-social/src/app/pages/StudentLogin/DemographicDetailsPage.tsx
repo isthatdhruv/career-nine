@@ -259,6 +259,7 @@ const DemographicDetailsPage: React.FC = () => {
         alignItems: "center",
         justifyContent: "center",
         padding: "2rem 1rem",
+        colorScheme: "light",
       }}
     >
       {isLoading ? (
@@ -276,9 +277,11 @@ const DemographicDetailsPage: React.FC = () => {
           maxWidth: "650px",
           borderRadius: "20px",
           border: "none",
+          background: "#ffffff",
+          colorScheme: "light",
         }}
       >
-        <div className="card-body p-5">
+        <div className="card-body p-5" style={{ background: "#ffffff", color: "#2d3748", borderRadius: "20px" }}>
           {/* Header */}
           <div className="text-center mb-4">
             <div
@@ -347,6 +350,8 @@ const DemographicDetailsPage: React.FC = () => {
                     padding: "0.75rem",
                     border: `2px solid ${errors.name && touched.name ? "#e53e3e" : "#e2e8f0"}`,
                     fontSize: "0.95rem",
+                    backgroundColor: "#ffffff",
+                    color: "#2d3748",
                   }}
                 />
                 {errors.name && touched.name && (
@@ -452,6 +457,8 @@ const DemographicDetailsPage: React.FC = () => {
                     padding: "0.75rem",
                     border: `2px solid ${errors.grade && touched.grade ? "#e53e3e" : "#e2e8f0"}`,
                     fontSize: "0.95rem",
+                    backgroundColor: "#ffffff",
+                    color: "#2d3748",
                   }}
                 >
                   <option value="">Select grade</option>
@@ -481,6 +488,8 @@ const DemographicDetailsPage: React.FC = () => {
                     padding: "0.75rem",
                     border: `2px solid ${errors.schoolBoard && touched.schoolBoard ? "#e53e3e" : "#e2e8f0"}`,
                     fontSize: "0.95rem",
+                    backgroundColor: "#ffffff",
+                    color: "#2d3748",
                   }}
                 >
                   <option value="">Select school board</option>
@@ -528,6 +537,8 @@ const DemographicDetailsPage: React.FC = () => {
                     padding: "0.75rem",
                     border: `2px solid ${errors.siblings && touched.siblings ? "#e53e3e" : "#e2e8f0"}`,
                     fontSize: "0.95rem",
+                    backgroundColor: "#ffffff",
+                    color: "#2d3748",
                   }}
                 >
                   <option value="">Select option</option>
@@ -558,6 +569,8 @@ const DemographicDetailsPage: React.FC = () => {
                     padding: "0.75rem",
                     border: `2px solid ${errors.livingWith && touched.livingWith ? "#e53e3e" : "#e2e8f0"}`,
                     fontSize: "0.95rem",
+                    backgroundColor: "#ffffff",
+                    color: "#2d3748",
                   }}
                 >
                   <option value="">Select option</option>

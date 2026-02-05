@@ -65,6 +65,14 @@ const SectionQuestionPage: React.FC = () => {
   const [currentSection, setCurrentSection] = useState<any>(null);
   const [showWarning, setShowWarning] = useState<boolean>(false);
 
+  // Track which sections have already shown their instructions (only show once)
+  const [seenSectionInstructions, setSeenSectionInstructions] = useState<Set<string>>(() => {
+    const stored = localStorage.getItem('assessmentSeenSectionInstructions');
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  });
+  const [showSectionInstruction, setShowSectionInstruction] = useState<boolean>(false);
+  const [sectionInstructionTexts, setSectionInstructionTexts] = useState<Array<{text: string; language: string}>>([]);
+
   // Game-related state
   const [isGameActive, setIsGameActive] = useState<boolean>(false);
   const [activeGameCode, setActiveGameCode] = useState<number | null>(null);
@@ -170,6 +178,39 @@ const SectionQuestionPage: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('assessmentCompletedGames', JSON.stringify(completedGames));
   }, [completedGames]);
+
+  // Save seen section instructions to localStorage
+  useEffect(() => {
+    localStorage.setItem('assessmentSeenSectionInstructions', JSON.stringify(Array.from(seenSectionInstructions)));
+  }, [seenSectionInstructions]);
+
+  // Show section instruction popup when entering a new section (only once per section)
+  useEffect(() => {
+    if (!sectionId || !questionnaire) return;
+
+    // Already seen this section's instructions
+    if (seenSectionInstructions.has(sectionId)) return;
+
+    const section = questionnaire.sections.find(
+      (sec: any) => String(sec.section.sectionId) === String(sectionId)
+    );
+
+    if (section?.instruction && section.instruction.length > 0) {
+      const texts = section.instruction.map((inst: any) => ({
+        text: inst.instructionText,
+        language: inst.language?.languageName || "English",
+      }));
+      setSectionInstructionTexts(texts);
+      setShowSectionInstruction(true);
+    }
+
+    // Mark as seen regardless of whether instructions exist
+    setSeenSectionInstructions((prev) => {
+      const next = new Set(prev);
+      next.add(sectionId);
+      return next;
+    });
+  }, [sectionId, questionnaire]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -709,12 +750,78 @@ const SectionQuestionPage: React.FC = () => {
   }
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", colorScheme: "light" }}>
+      {/* Section Instruction Popup */}
+      {showSectionInstruction && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+          }}
+          onClick={() => setShowSectionInstruction(false)}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: "12px",
+              padding: "28px 32px",
+              maxWidth: "600px",
+              width: "90%",
+              maxHeight: "80vh",
+              overflowY: "auto",
+              color: "#2d3748",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h5 style={{ fontWeight: 700, marginBottom: "16px", color: "#2d3748" }}>
+              Section Instructions
+            </h5>
+            {sectionInstructionTexts.map((item, idx) => (
+              <div key={idx} style={{ marginBottom: idx < sectionInstructionTexts.length - 1 ? "16px" : 0 }}>
+                {sectionInstructionTexts.length > 1 && (
+                  <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#667eea", marginBottom: "6px" }}>
+                    {item.language}
+                  </div>
+                )}
+                <p style={{ whiteSpace: "pre-line", lineHeight: 1.7, margin: 0, fontSize: "1rem", color: "#4a5568" }}>
+                  {item.text}
+                </p>
+              </div>
+            ))}
+            <div style={{ textAlign: "right", marginTop: "20px" }}>
+              <button
+                onClick={() => setShowSectionInstruction(false)}
+                style={{
+                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "8px",
+                  padding: "8px 28px",
+                  fontWeight: 600,
+                  fontSize: "0.95rem",
+                  cursor: "pointer",
+                }}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* LEFT SIDEBAR */}
       <div
         style={{
           width: 280,
-          background: "rgba(255,255,255,0.98)",
+          background: "#ffffff",
           borderRight: "none",
           display: "flex",
           flexDirection: "column",
@@ -723,49 +830,62 @@ const SectionQuestionPage: React.FC = () => {
           top: 0,
           boxShadow: "4px 0 30px rgba(0,0,0,0.1)",
           borderRadius: "0 24px 24px 0",
+          colorScheme: "light",
+          color: "#2d3748",
         }}
       >
-        {/* Color Legend - Moved to Top with logo clearance */}
+        {/* Logo + Legend */}
         <div
           style={{
             borderBottom: "2px solid #e2e8f0",
-            padding: "20px 20px 20px 20px",
+            padding: "16px 20px",
             background: "linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%)",
           }}
         >
+          {/* KCC Logo */}
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: "12px" }}>
+            <img
+              src="/media/logos/kcc.jpg"
+              alt="KCC Logo"
+              style={{
+                height: "48px",
+                objectFit: "contain",
+              }}
+            />
+          </div>
           <h6 style={{
-            fontSize: "0.95rem",
+            fontSize: "0.85rem",
             fontWeight: 700,
             color: "#2d3748",
-            marginBottom: "16px",
+            marginBottom: "10px",
             display: "flex",
             alignItems: "center",
             gap: "8px"
           }}>
             <span style={{
               width: "6px",
-              height: "20px",
+              height: "18px",
               background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
               borderRadius: "3px"
             }} />
             Legend
           </h6>
-          <div className="d-flex flex-column gap-2">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 12px" }}>
             <div className="d-flex align-items-center gap-2">
-              <div style={{ width: 16, height: 16, borderRadius: "50%", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", flexShrink: 0, boxShadow: "0 2px 6px rgba(102, 126, 234, 0.4)" }} />
-              <span style={{ fontSize: "0.85rem", color: "#4a5568", fontWeight: 500 }}>Answered</span>
+              <div style={{ width: 14, height: 14, borderRadius: "50%", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", flexShrink: 0, boxShadow: "0 2px 6px rgba(102, 126, 234, 0.4)" }} />
+              <span style={{ fontSize: "0.8rem", color: "#4a5568", fontWeight: 500 }}>Answered</span>
             </div>
             <div className="d-flex align-items-center gap-2">
-              <div style={{ width: 16, height: 16, borderRadius: "50%", background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)", flexShrink: 0, boxShadow: "0 2px 6px rgba(251, 191, 36, 0.4)" }} />
-              <span style={{ fontSize: "0.85rem", color: "#4a5568", fontWeight: 500 }}>Saved for Later</span>
+              <div style={{ width: 14, height: 14, borderRadius: "50%", background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)", flexShrink: 0, boxShadow: "0 2px 6px rgba(251, 191, 36, 0.4)" }} />
+              <span style={{ fontSize: "0.8rem", color: "#4a5568", fontWeight: 500 }}>Saved</span>
             </div>
             <div className="d-flex align-items-center gap-2">
-              <div style={{ width: 16, height: 16, borderRadius: "50%", background: "linear-gradient(135deg, #f87171 0%, #dc2626 100%)", flexShrink: 0, boxShadow: "0 2px 6px rgba(248, 113, 113, 0.4)" }} />
-              <span style={{ fontSize: "0.85rem", color: "#4a5568", fontWeight: 500 }}>Skipped</span>
+              <div style={{ width: 14, height: 14, borderRadius: "50%", background: "linear-gradient(135deg, #f87171 0%, #dc2626 100%)", flexShrink: 0, boxShadow: "0 2px 6px rgba(248, 113, 113, 0.4)" }} />
+              <span style={{ fontSize: "0.8rem", color: "#4a5568", fontWeight: 500 }}>Skipped</span>
             </div>
             <div className="d-flex align-items-center gap-2">
-              <div style={{ width: 16, height: 16, borderRadius: "50%", background: "#d1d5db", flexShrink: 0, border: "2px solid #9ca3af" }} />
-              <span style={{ fontSize: "0.85rem", color: "#4a5568", fontWeight: 500 }}>Not Visited</span>
+              <div style={{ width: 14, height: 14, borderRadius: "50%", background: "#d1d5db", flexShrink: 0, border: "2px solid #9ca3af" }} />
+              <span style={{ fontSize: "0.8rem", color: "#4a5568", fontWeight: 500 }}>Not Visited</span>
             </div>
           </div>
         </div>
@@ -867,7 +987,9 @@ const SectionQuestionPage: React.FC = () => {
             borderRadius: "24px",
             border: "none",
             boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
-            background: "white"
+            background: "#ffffff",
+            colorScheme: "light",
+            color: "#2d3748"
           }}
         >
           <div className="card-body p-5">
@@ -1203,7 +1325,7 @@ const SectionQuestionPage: React.FC = () => {
               >
                 ← Back
               </button>
-              <div className="d-flex gap-3">
+              <div className="d-flex gap-3 align-items-center">
                 {selectedOptions.length === 0 && (
                   <button
                     onClick={saveForLaterFn}
@@ -1223,25 +1345,7 @@ const SectionQuestionPage: React.FC = () => {
                     Save for Later
                   </button>
                 )}
-                {isLastQuestionOfLastSection() ? (
-                  <button
-                    onClick={handleSubmitAssessment}
-                    style={{
-                      background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "12px",
-                      padding: "12px 32px",
-                      fontWeight: 700,
-                      fontSize: "1rem",
-                      cursor: "pointer",
-                      boxShadow: "0 4px 15px rgba(34, 197, 94, 0.4)",
-                      transition: "all 0.2s ease",
-                    }}
-                  >
-                    ✓ SUBMIT ASSESSMENT
-                  </button>
-                ) : (
+                {!isLastQuestionOfLastSection() && (
                   <button
                     onClick={goNext}
                     style={{
@@ -1260,6 +1364,26 @@ const SectionQuestionPage: React.FC = () => {
                     {currentIndex === questions.length - 1
                       ? "NEXT SECTION →"
                       : "NEXT →"}
+                  </button>
+                )}
+                {(isLastQuestionOfLastSection() || areAllQuestionsAnswered()) && (
+                  <button
+                    onClick={handleSubmitAssessment}
+                    style={{
+                      background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "12px",
+                      padding: "12px 32px",
+                      fontWeight: 700,
+                      fontSize: "1rem",
+                      cursor: "pointer",
+                      boxShadow: "0 4px 15px rgba(34, 197, 94, 0.4)",
+                      transition: "all 0.2s ease",
+                      marginLeft: "auto",
+                    }}
+                  >
+                    ✓ SUBMIT ASSESSMENT
                   </button>
                 )}
               </div>

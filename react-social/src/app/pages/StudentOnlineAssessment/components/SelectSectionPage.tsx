@@ -81,6 +81,7 @@ const SelectSectionPage: React.FC = () => {
         background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
         padding: "2rem 1rem",
         overflowY: "auto",
+        colorScheme: "light",
       }}
     >
       <div
@@ -90,9 +91,11 @@ const SelectSectionPage: React.FC = () => {
           maxWidth: "95%",
           borderRadius: "24px",
           border: "none",
+          background: "#ffffff",
+          colorScheme: "light",
         }}
       >
-        <div className="card-body p-5">
+        <div className="card-body p-5" style={{ background: "#ffffff", color: "#2d3748", borderRadius: "24px" }}>
           {/* Header Icon */}
           <div
             style={{

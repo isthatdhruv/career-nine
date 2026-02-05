@@ -33,6 +33,8 @@ const QuestionTable = (props: {
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [activeQuestionId, setActiveQuestionId] = useState<number | null>(null);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false); // Bulk upload modal state
+  const [exporting, setExporting] = useState(false); // Export loading state
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false); // Template download loading state
 
   // Fetch measured quality types
   useEffect(() => {
@@ -84,18 +86,15 @@ const QuestionTable = (props: {
    */
   const handleExportToExcel = async () => {
     try {
-      // Show loading state (optional)
-      props.setPageLoading(["true"]);
+      setExporting(true);
 
       // Call the API to get the Excel file
       await ExportQuestionsToExcel();
-
-      // Hide loading state
-      props.setPageLoading([]);
     } catch (error) {
       console.error("Error exporting questions to Excel:", error);
       alert("Failed to export questions. Please try again.");
-      props.setPageLoading([]);
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -108,6 +107,8 @@ const QuestionTable = (props: {
    * - Instructions for filling the template
    */
   const handleDownloadTemplate = () => {
+    setDownloadingTemplate(true);
+    try {
     // Create sample data with instructions
     const templateData = [
       {
@@ -117,27 +118,21 @@ const QuestionTable = (props: {
         "Max Options Allowed": 1,
         "Option 1 Text": "4",
         "Option 1 Description": "Correct answer",
-        "Option 1 Is Correct": "Yes",
         "Option 1 MQTs": "Analytical:10,Problem Solving:8",
         "Option 2 Text": "5",
         "Option 2 Description": "Wrong answer",
-        "Option 2 Is Correct": "No",
         "Option 2 MQTs": "Analytical:2",
         "Option 3 Text": "",
         "Option 3 Description": "",
-        "Option 3 Is Correct": "",
         "Option 3 MQTs": "",
         "Option 4 Text": "",
         "Option 4 Description": "",
-        "Option 4 Is Correct": "",
         "Option 4 MQTs": "",
         "Option 5 Text": "",
         "Option 5 Description": "",
-        "Option 5 Is Correct": "",
         "Option 5 MQTs": "",
         "Option 6 Text": "",
         "Option 6 Description": "",
-        "Option 6 Is Correct": "",
         "Option 6 MQTs": "",
       },
     ];
@@ -157,6 +152,9 @@ const QuestionTable = (props: {
     // Generate file and trigger download
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
     XLSX.writeFile(workbook, `questions_template_${timestamp}.xlsx`);
+    } finally {
+      setDownloadingTemplate(false);
+    }
   };
 
   const filteredData = props.data.filter((item: any) =>
@@ -244,9 +242,14 @@ const QuestionTable = (props: {
           onClick={handleExportToExcel}
           className="btn btn-success d-flex align-items-center"
           title="Download all questions in Excel format"
+          disabled={exporting}
         >
-          <FaFileDownload size={18} className="me-2" />
-          Download Excel
+          {exporting ? (
+            <span className="spinner-border spinner-border-sm me-2" role="status" />
+          ) : (
+            <FaFileDownload size={18} className="me-2" />
+          )}
+          {exporting ? "Downloading..." : "Download Excel"}
         </button>
 
         {/* Download Template button - downloads blank template for bulk upload */}
@@ -254,9 +257,14 @@ const QuestionTable = (props: {
           onClick={handleDownloadTemplate}
           className="btn btn-info d-flex align-items-center"
           title="Download a blank template to fill with your questions"
+          disabled={downloadingTemplate}
         >
-          <FaFileDownload size={18} className="me-2" />
-          Download Template
+          {downloadingTemplate ? (
+            <span className="spinner-border spinner-border-sm me-2" role="status" />
+          ) : (
+            <FaFileDownload size={18} className="me-2" />
+          )}
+          {downloadingTemplate ? "Downloading..." : "Download Template"}
         </button>
 
         {/* Upload Excel button - opens modal for bulk question upload */}
