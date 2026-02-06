@@ -302,6 +302,23 @@ export function AsideMenuMain() {
       </div>
       <AsideMenuItemWithSub
         to=""
+        title="Dashboards"
+        fontIcon="bi-speedometer2"
+        icon="/media/icons/duotune/general/gen019.svg"
+      >
+        <AsideMenuItem
+          to="/teacher/class-dashboard"
+          title="Class Teacher Dashboard"
+          hasBullet={true}
+        />
+        <AsideMenuItem
+          to="/principal/dashboard"
+          title="Principal Dashboard"
+          hasBullet={true}
+        />
+      </AsideMenuItemWithSub>
+      <AsideMenuItemWithSub
+        to=""
         title="Teachers Registration"
         fontIcon="bi-app-indicator"
         icon="/media/icons/duotune/communication/com006.svg"
@@ -315,7 +332,7 @@ export function AsideMenuMain() {
           to="/faculty/registration-form"
           title="Registration Form"
           hasBullet={true}
-        /> 
+        />
       </AsideMenuItemWithSub>
 
 

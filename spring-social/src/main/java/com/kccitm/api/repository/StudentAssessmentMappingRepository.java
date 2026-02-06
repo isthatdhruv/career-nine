@@ -19,6 +19,8 @@ public interface StudentAssessmentMappingRepository extends JpaRepository<Studen
 
     Optional<StudentAssessmentMapping> findByAssessmentId(Long assessmentId);
 
+    List<StudentAssessmentMapping> findAllByAssessmentId(Long assessmentId);
+
     void deleteByUserStudentUserStudentIdAndAssessmentId(Long userStudentId, Long assessmentId);
 
 }
