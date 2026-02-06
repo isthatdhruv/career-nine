@@ -135,6 +135,8 @@ const StudentLoginPage: React.FC = () => {
         if (response.ok) {
           const data = await response.json();
           console.log('Login successful:', data);
+          // Clear all existing local storage before setting new login data
+          localStorage.clear();
           localStorage.setItem('userStudentId', data.userStudentId);
           localStorage.setItem('allottedAssessments', JSON.stringify(data.assessments));
           // Navigate to the next page (SPA navigation, no page reload)

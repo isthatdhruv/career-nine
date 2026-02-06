@@ -14,9 +14,20 @@ export default function AllottedAssessmentPage() {
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [showOngoingModal, setShowOngoingModal] = useState(false);
+  const [showMobileWarning, setShowMobileWarning] = useState(false);
   const navigate = useNavigate();
   const { fetchAssessmentData } = useAssessment();
   usePreventReload();
+
+  // Device detection function
+  const isMobileOrTablet = () => {
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isMobile = /iphone|ipod|android|blackberry|windows phone|webos/.test(userAgent);
+    const isTablet = /ipad|android(?!.*mobile)|tablet|kindle|silk/.test(userAgent);
+    const isSmallScreen = window.innerWidth <= 1024; // Consider screens <= 1024px as non-desktop
+
+    return isMobile || isTablet || isSmallScreen;
+  };
 
   useEffect(() => {
     const storedAssessments = localStorage.getItem('allottedAssessments');
@@ -52,6 +63,12 @@ export default function AllottedAssessmentPage() {
     // Check if active
     if (!assessment.isActive) {
       alert("This assessment is not currently active.");
+      return;
+    }
+
+    // Check if device is mobile/tablet/iPad - prevent assessment on non-desktop devices
+    if (isMobileOrTablet()) {
+      setShowMobileWarning(true);
       return;
     }
 
@@ -523,6 +540,136 @@ export default function AllottedAssessmentPage() {
               }}
             >
               Got it
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Device Warning Modal */}
+      {showMobileWarning && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+          }}
+          onClick={() => setShowMobileWarning(false)}
+        >
+          <div
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '24px',
+              padding: '2.5rem',
+              maxWidth: '480px',
+              width: '90%',
+              textAlign: 'center',
+              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)',
+              animation: 'fadeIn 0.3s ease',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Device Warning Icon */}
+            <div
+              style={{
+                width: '90px',
+                height: '90px',
+                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 1.5rem',
+                boxShadow: '0 8px 24px rgba(239, 68, 68, 0.5)',
+              }}
+            >
+              <svg width="45" height="45" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                <line x1="12" y1="18" x2="12.01" y2="18" />
+                <path d="M8 6h8M8 10h8M8 14h5" stroke="white" strokeWidth="1.5" />
+              </svg>
+            </div>
+
+            {/* Title */}
+            <h3
+              style={{
+                fontSize: '1.65rem',
+                fontWeight: '800',
+                color: '#1f2937',
+                marginBottom: '1rem',
+                lineHeight: '1.2',
+              }}
+            >
+              Desktop Required
+            </h3>
+
+            {/* Message */}
+            <p
+              style={{
+                color: '#4b5563',
+                fontSize: '1.05rem',
+                lineHeight: '1.7',
+                marginBottom: '1.25rem',
+              }}
+            >
+              This assessment <strong>cannot be completed</strong> on a mobile device, tablet, or iPad.
+            </p>
+
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                borderRadius: '16px',
+                padding: '1.25rem',
+                marginBottom: '2rem',
+                border: '2px solid #fbbf24',
+              }}
+            >
+              <p
+                style={{
+                  color: '#92400e',
+                  fontSize: '0.95rem',
+                  fontWeight: '600',
+                  lineHeight: '1.6',
+                  margin: 0,
+                }}
+              >
+                🖥️ Please open this assessment on a <strong>Desktop or Laptop computer</strong> to continue.
+              </p>
+            </div>
+
+            {/* Close Button */}
+            <button
+              onClick={() => setShowMobileWarning(false)}
+              style={{
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                border: 'none',
+                padding: '1rem 3rem',
+                borderRadius: '14px',
+                fontSize: '1.05rem',
+                fontWeight: '700',
+                cursor: 'pointer',
+                boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+                transition: 'all 0.3s ease',
+                width: '100%',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.6)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.4)';
+              }}
+            >
+              I Understand
             </button>
           </div>
         </div>

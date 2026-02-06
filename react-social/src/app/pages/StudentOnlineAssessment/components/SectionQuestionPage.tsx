@@ -1092,9 +1092,15 @@ const SectionQuestionPage: React.FC = () => {
                     Please rank <strong>{question.question.maxOptionsAllowed}</strong> option(s) in order of preference (1 = most important).
                   </>
                 ) : (
-                  <>
-                    You can select up to <strong>{question.question.maxOptionsAllowed}</strong> option(s).
-                  </>
+                  question.question.maxOptionsAllowed === 0 ? (
+                    <>
+                      
+                    </>
+                  ) : (
+                    <>
+                      You can select up to <strong>{question.question.maxOptionsAllowed}</strong> option(s).
+                    </>
+                  )
                 )}
               </small>
             </div>

@@ -19,8 +19,8 @@ type Pattern = {
 
 const patterns: Pattern[] = [
   {
-    id: 2,
-    name: "Pattern C",
+    id: 0,
+    name: "Pattern A",
     tileTypes: {
       1: "t-pipe", 2: "bend", 3: "bend", 4: "straight",
       5: "straight", 6: "bend", 7: "straight", 8: "bend",
@@ -46,10 +46,10 @@ const patterns: Pattern[] = [
     ],
   },
   {
-    id: 0,
-    name: "Pattern A",
+    id: 2,
+    name: "Pattern C",
     tileTypes: {
-      1: "t-pipe", 2: "bend", 3: "straight", 4: "bend",
+      1: "bend", 2: "bend", 3: "straight", 4: "bend",
       5: "straight", 6: "bend", 7: "t-pipe", 8: "straight",
       9: "bend", 10: "straight", 11: "bend", 12: "straight",
       13: "bend", 14: "straight", 15: "straight", 16: "bend",

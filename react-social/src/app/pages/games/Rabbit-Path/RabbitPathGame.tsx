@@ -142,6 +142,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
   const [bufferActivated, setBufferActivated] = useState(false);
   const [history, setHistory] = useState<RoundResult[]>([]);
   const [stonesState] = useState<StonePos[]>(STONES);
+  const [trialSequence, setTrialSequence] = useState<number[]>([]); // Store trial sequence for retry
 
   // Rabbit State
   const [rabbitPos, setRabbitPos] = useState({ x: HOME_POS.xPct, y: HOME_POS.yPct });
@@ -160,6 +161,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
   const timers = useRef<number[]>([]);
   const gameContainerRef = useRef<HTMLDivElement>(null);
   const startRoundRef = useRef<(nextRoundIndex: number) => void>(() => {});
+  const retryRef = useRef<() => void>(() => {});
 
   // Loading state for images
   const [imagesLoaded, setImagesLoaded] = useState(false);
@@ -251,7 +253,8 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
 
   const evaluateAndAdvance = useCallback((input: number[], seq: number[]) => {
     const correct = input.length === seq.length && input.every((v, i) => v === seq[i]);
-    setLastResult(correct ? "correct" : "wrong");
+    // Don't show feedback overlay anymore
+    // setLastResult(correct ? "correct" : "wrong");
 
     if (correct) {
       if (!isTrial) setScore(s => s + 1);
@@ -270,18 +273,18 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
     }
 
     clearTimers();
-    
+
     if (isTrial && !correct) {
-      // Retry same trial round with a new sequence after showing feedback
+      // Retry same trial round with THE SAME SEQUENCE (don't generate new one)
       timers.current.push(window.setTimeout(() => {
-        // Restart the same trial round (trialRound stays the same)
-        startRoundRef.current(trialRound);
-      }, 1500));
+        retryRef.current();
+      }, 500));
     } else {
-      timers.current.push(window.setTimeout(() => handleNextRound(), correct ? 1000 : 700));
+      timers.current.push(window.setTimeout(() => handleNextRound(), correct ? 500 : 500));
     }
-    
-    setPhase("feedback");
+
+    // Skip feedback phase, go directly to next round
+    // setPhase("feedback");
   }, [isTrial, round, trialRound, moveRabbitTo, clearTimers, handleNextRound]);
 
   const finishAfterBuffer = useCallback(() => {
@@ -317,6 +320,50 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
     });
   }, [bufferActivated, clearTimers, evaluateAndAdvance, finishAfterBuffer]);
 
+  const retryWithSameSequence = useCallback(() => {
+    clearTimers();
+    setLastResult(null);
+    setPlayerInput([]);
+    inputRef.current = [];
+    setBufferActivated(false);
+    moveRabbitTo(0);
+
+    // Use the stored trial sequence instead of generating a new one
+    const seq = trialSequence;
+    setSequence(seq);
+    sequenceRef.current = seq;
+
+    setPhase("show");
+    setPhaseMsLeft(ROUND_SHOW_MS);
+
+    const stepMs = Math.floor(ROUND_SHOW_MS / (seq.length + 2));
+
+    timers.current.push(window.setTimeout(() => moveRabbitTo(0), 100));
+
+    seq.forEach((stoneId, idx) => {
+      timers.current.push(window.setTimeout(() => {
+        setActiveStone(stoneId);
+        moveRabbitTo(stoneId);
+      }, (idx + 1) * stepMs));
+    });
+
+    timers.current.push(window.setTimeout(() => {
+      setActiveStone(null);
+      moveRabbitTo(11);
+    }, (seq.length + 1) * stepMs));
+
+    timers.current.push(window.setTimeout(() => {
+      setPhase("input");
+      setPhaseMsLeft(ROUND_INPUT_MS);
+      setActiveStone(null);
+      moveRabbitTo(0);
+    }, ROUND_SHOW_MS));
+
+    timers.current.push(window.setTimeout(() => {
+      finishInputAndScore();
+    }, ROUND_SHOW_MS + ROUND_INPUT_MS));
+  }, [clearTimers, moveRabbitTo, trialSequence, finishInputAndScore]);
+
   const startRound = useCallback((nextRoundIndex: number) => {
     clearTimers();
     setLastResult(null);
@@ -328,6 +375,11 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
     const seq = generateClass4Sequence(stonesState, nextRoundIndex, historyRef.current, isTrial);
     setSequence(seq);
     sequenceRef.current = seq;
+
+    // Store sequence for trial mode retries
+    if (isTrial) {
+      setTrialSequence(seq);
+    }
 
     setPhase("show");
     setPhaseMsLeft(ROUND_SHOW_MS);
@@ -366,10 +418,14 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
     }
   }, [clearTimers, moveRabbitTo, stonesState, isTrial, finishInputAndScore]);
 
-  // Keep ref in sync with latest startRound function
+  // Keep refs in sync with latest functions
   useEffect(() => {
     startRoundRef.current = startRound;
   }, [startRound]);
+
+  useEffect(() => {
+    retryRef.current = retryWithSameSequence;
+  }, [retryWithSameSequence]);
 
   const onStoneClick = useCallback((stoneId: number) => {
     if (phase !== "input") return;
@@ -429,6 +485,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
       setGameMsLeft(GAME_MAX_TIME_MS);
       setHistory([]);
       historyRef.current = [];
+      setTrialSequence([]);
     }
   }, [phase, isTrial, clearTimers, moveRabbitTo]);
 
@@ -979,30 +1036,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
                 </div>
               )}
 
-              {/* Feedback overlay */}
-              {phase === "feedback" && (
-                <div style={{
-                  position: 'absolute',
-                  inset: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  pointerEvents: 'none',
-                }}>
-                  <div style={{
-                    padding: '20px 40px',
-                    borderRadius: '20px',
-                    background: lastResult === 'correct' 
-                      ? 'rgba(22, 163, 74, 0.95)' 
-                      : 'rgba(220, 38, 38, 0.95)',
-                    border: lastResult === 'correct'
-                      ? '3px solid rgba(74, 222, 128, 0.6)'
-                      : '3px solid rgba(248, 113, 113, 0.6)',
-                  }}>
-                    <span style={{ fontSize: '48px' }}>{lastResult === 'correct' ? '✅' : '❌'}</span>
-                  </div>
-                </div>
-              )}
+              {/* Feedback overlay - REMOVED as per requirement */}
 
               {/* Done overlay */}
               {phase === "done" && (
