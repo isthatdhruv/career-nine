@@ -33,6 +33,9 @@ import com.kccitm.api.repository.Career9.OptionScoreBasedOnMeasuredQualityTypesR
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
+import com.kccitm.api.model.userDefinedModel.StudentDashboardResponse;
+import com.kccitm.api.model.userDefinedModel.StudentDashboardResponse.*;
+import com.kccitm.api.model.career9.MeasuredQualities;
 
 @RestController
 @RequestMapping("/assessment-answer")
@@ -173,6 +176,218 @@ public class AssessmentAnswerController {
 
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Comprehensive endpoint to fetch all assessment data for a student dashboard
+     *
+     * Returns:
+     * - Student basic information
+     * - All assessments taken by the student
+     * - All answers with selected options and their MQT scores
+     * - Aggregated raw scores by MQT for each assessment
+     *
+     * Request body should contain:
+     * {
+     *   "userStudentId": 123
+     * }
+     *
+     * @param requestData - JSON containing userStudentId
+     * @return StudentDashboardResponse with complete assessment data
+     */
+    @PostMapping(value = "/dashboard", headers = "Accept=application/json")
+    public ResponseEntity<?> getStudentDashboard(@RequestBody Map<String, Object> requestData) {
+        try {
+            // 1. Extract and validate userStudentId from request body
+            if (!requestData.containsKey("userStudentId")) {
+                return ResponseEntity.status(400).body(Map.of(
+                    "error", "Missing required field",
+                    "message", "userStudentId is required in request body"
+                ));
+            }
+
+            Long userStudentId = ((Number) requestData.get("userStudentId")).longValue();
+
+            // 2. Fetch and validate student
+            UserStudent userStudent = userStudentRepository.findById(userStudentId)
+                    .orElseThrow(() -> new RuntimeException("UserStudent not found with ID: " + userStudentId));
+
+            // 3. Build student basic info
+            StudentBasicInfo studentInfo = new StudentBasicInfo();
+            studentInfo.setUserStudentId(userStudent.getUserStudentId());
+            studentInfo.setUserId(userStudent.getUserId());
+
+            if (userStudent.getInstitute() != null) {
+                studentInfo.setInstituteName(userStudent.getInstitute().getInstituteName());
+                studentInfo.setInstituteCode(userStudent.getInstitute().getInstituteCode());
+            }
+
+            // 4. Fetch all assessments for this student
+            List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
+                    .findByUserStudentUserStudentId(userStudentId);
+
+            List<AssessmentData> assessmentDataList = new ArrayList<>();
+
+            // 5. Process each assessment
+            for (StudentAssessmentMapping mapping : mappings) {
+                AssessmentData assessmentData = new AssessmentData();
+
+                // 5.1 Set assessment basic info
+                Long assessmentId = mapping.getAssessmentId();
+                AssessmentTable assessment = assessmentTableRepository.findById(assessmentId).orElse(null);
+
+                if (assessment == null) {
+                    continue; // Skip if assessment not found
+                }
+
+                assessmentData.setAssessmentId(assessmentId);
+                assessmentData.setAssessmentName(assessment.getAssessmentName());
+                assessmentData.setStatus(mapping.getStatus());
+                assessmentData.setIsActive(assessment.getIsActive());
+                assessmentData.setStartDate(assessment.getStarDate());
+                assessmentData.setEndDate(assessment.getEndDate());
+                assessmentData.setStudentAssessmentMappingId(mapping.getStudentAssessmentId());
+
+                // 5.2 Fetch all answers for this assessment using optimized query
+                ArrayList<AssessmentAnswer> answers = assessmentAnswerRepository
+                        .findByUserStudentIdAndAssessmentIdWithDetails(userStudentId, assessmentId);
+
+                List<AnswerDetail> answerDetails = new ArrayList<>();
+
+                for (AssessmentAnswer answer : answers) {
+                    AnswerDetail answerDetail = new AnswerDetail();
+                    answerDetail.setAssessmentAnswerId(answer.getAssessmentAnswerId());
+
+                    if (answer.getQuestionnaireQuestion() != null) {
+                        answerDetail.setQuestionnaireQuestionId(
+                                answer.getQuestionnaireQuestion().getQuestionnaireQuestionId());
+                    }
+
+                    answerDetail.setRankOrder(answer.getRankOrder());
+
+                    // 5.3 Build option data with MQT scores
+                    if (answer.getOption() != null) {
+                        AssessmentQuestionOptions option = answer.getOption();
+                        OptionData optionData = new OptionData();
+                        optionData.setOptionId(option.getOptionId());
+                        optionData.setOptionText(option.getOptionText());
+                        optionData.setOptionDescription(option.getOptionDescription());
+                        optionData.setIsCorrect(option.isCorrect());
+
+                        // 5.4 Fetch MQT scores for this option
+                        List<OptionScoreBasedOnMEasuredQualityTypes> optionScores = option.getOptionScores();
+                        List<MQTScore> mqtScores = new ArrayList<>();
+
+                        if (optionScores != null) {
+                            for (OptionScoreBasedOnMEasuredQualityTypes optionScore : optionScores) {
+                                MQTScore mqtScore = new MQTScore();
+                                mqtScore.setScoreId(optionScore.getScoreId());
+                                mqtScore.setScore(optionScore.getScore());
+
+                                // Build MQT data
+                                if (optionScore.getMeasuredQualityType() != null) {
+                                    MeasuredQualityTypes mqt = optionScore.getMeasuredQualityType();
+                                    MQTData mqtData = new MQTData();
+                                    mqtData.setMeasuredQualityTypeId(mqt.getMeasuredQualityTypeId());
+                                    mqtData.setName(mqt.getMeasuredQualityTypeName());
+                                    mqtData.setDescription(mqt.getMeasuredQualityTypeDescription());
+                                    mqtData.setDisplayName(mqt.getMeasuredQualityTypeDisplayName());
+
+                                    // Build MQ data (parent quality)
+                                    if (mqt.getMeasuredQuality() != null) {
+                                        MeasuredQualities mq = mqt.getMeasuredQuality();
+                                        MQData mqData = new MQData();
+                                        mqData.setMeasuredQualityId(mq.getMeasuredQualityId());
+                                        mqData.setName(mq.getMeasuredQualityName());
+                                        mqData.setDescription(mq.getMeasuredQualityDescription());
+                                        mqData.setDisplayName(mq.getQualityDisplayName());
+
+                                        mqtData.setMeasuredQuality(mqData);
+                                    }
+
+                                    mqtScore.setMeasuredQualityType(mqtData);
+                                }
+
+                                mqtScores.add(mqtScore);
+                            }
+                        }
+
+                        optionData.setMqtScores(mqtScores);
+                        answerDetail.setSelectedOption(optionData);
+                    }
+
+                    answerDetails.add(answerDetail);
+                }
+
+                assessmentData.setAnswers(answerDetails);
+
+                // 5.5 Fetch raw scores for this assessment
+                List<AssessmentRawScore> rawScores = assessmentRawScoreRepository
+                        .findByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId());
+
+                List<RawScoreData> rawScoreDataList = new ArrayList<>();
+
+                for (AssessmentRawScore rawScore : rawScores) {
+                    RawScoreData rawScoreData = new RawScoreData();
+                    rawScoreData.setAssessmentRawScoreId(rawScore.getAssessmentRawScoreId());
+                    rawScoreData.setRawScore(rawScore.getRawScore());
+
+                    // Build MQT data for raw score
+                    if (rawScore.getMeasuredQualityType() != null) {
+                        MeasuredQualityTypes mqt = rawScore.getMeasuredQualityType();
+                        MQTData mqtData = new MQTData();
+                        mqtData.setMeasuredQualityTypeId(mqt.getMeasuredQualityTypeId());
+                        mqtData.setName(mqt.getMeasuredQualityTypeName());
+                        mqtData.setDescription(mqt.getMeasuredQualityTypeDescription());
+                        mqtData.setDisplayName(mqt.getMeasuredQualityTypeDisplayName());
+
+                        // Build MQ data
+                        if (mqt.getMeasuredQuality() != null) {
+                            MeasuredQualities mq = mqt.getMeasuredQuality();
+                            MQData mqData = new MQData();
+                            mqData.setMeasuredQualityId(mq.getMeasuredQualityId());
+                            mqData.setName(mq.getMeasuredQualityName());
+                            mqData.setDescription(mq.getMeasuredQualityDescription());
+                            mqData.setDisplayName(mq.getQualityDisplayName());
+
+                            mqtData.setMeasuredQuality(mqData);
+                        }
+
+                        rawScoreData.setMeasuredQualityType(mqtData);
+                    }
+
+                    // Build MQ data for raw score (direct reference)
+                    if (rawScore.getMeasuredQuality() != null) {
+                        MeasuredQualities mq = rawScore.getMeasuredQuality();
+                        MQData mqData = new MQData();
+                        mqData.setMeasuredQualityId(mq.getMeasuredQualityId());
+                        mqData.setName(mq.getMeasuredQualityName());
+                        mqData.setDescription(mq.getMeasuredQualityDescription());
+                        mqData.setDisplayName(mq.getQualityDisplayName());
+
+                        rawScoreData.setMeasuredQuality(mqData);
+                    }
+
+                    rawScoreDataList.add(rawScoreData);
+                }
+
+                assessmentData.setRawScores(rawScoreDataList);
+                assessmentDataList.add(assessmentData);
+            }
+
+            // 6. Build and return final response
+            StudentDashboardResponse response = new StudentDashboardResponse();
+            response.setStudentInfo(studentInfo);
+            response.setAssessments(assessmentDataList);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of(
+                "error", "Failed to fetch student dashboard data",
+                "message", e.getMessage()
+            ));
         }
     }
 }
