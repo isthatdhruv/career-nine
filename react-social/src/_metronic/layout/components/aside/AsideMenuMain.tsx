@@ -207,7 +207,7 @@ export function AsideMenuMain() {
         icon="/media/icons/duotune/files/fil003.svg"
         title="Reports & Exports"
         fontIcon="bi-file-earmark-bar-graph"
-      />
+      /> */
 
       {/* <AsideMenuItem
         to="/student/university/result-list"
@@ -255,6 +255,14 @@ export function AsideMenuMain() {
         title="Group"
         fontIcon="bi-app-indicator"
       /> */}
+
+      <div className="menu-item">
+        <div className="menu-content pt-8 pb-2">
+          <span className="menu-section text-muted text-uppercase fs-8 ls-1">
+            STUDENT
+          </span>
+        </div>
+      </div>
 
       <AsideMenuItemWithSub
         to=""

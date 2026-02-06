@@ -216,17 +216,17 @@ public class StudentController {
   public Student getStudentById(@PathVariable("id") int studentId) {
     Student student = studentRepository.findById(studentId);
     // student.setBranchData(branchRepository.findById(Integer.parseInt(student.getBranch())).get());
-    student.setGenderData(genderRepository.findById(student.getGender()).get());
-    student.setCategoryData(
-        categoryRepository.findById(student.getCategory()).get());
-    student.setCheck(checkRegistrationFeildRepository.findById(studentId));
-    if (student.getCheck() == null) {
-      student.setCheck(new CheckRegistrationFeild(studentId));
-    }
-    student.setCourseData(
-        courseRepository.findById(student.getCourse()).isEmpty()
-            ? null
-            : courseRepository.findById(student.getCourse()).get());
+    // // student.setGenderData(genderRepository.findById(student.getGender()).get());
+    // student.setCategoryData(
+    //     categoryRepository.findById(student.getCategory()).get());
+    // student.setCheck(checkRegistrationFeildRepository.findById(studentId));
+    // if (student.getCheck() == null) {
+    //   student.setCheck(new CheckRegistrationFeild(studentId));
+    // }
+    // student.setCourseData(
+    //     courseRepository.findById(student.getCourse()).isEmpty()
+    //         ? null
+    //         : courseRepository.findById(student.getCourse()).get());
     // student.setBranchData(
     //     instituteBranchRepository.findById(student.getBranch_id()));
     // student.setBatchData(
