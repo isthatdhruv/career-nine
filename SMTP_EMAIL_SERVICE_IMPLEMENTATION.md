@@ -116,27 +116,216 @@ smtpEmailService.sendEmail(request);
 
 ## Gmail Setup Requirements
 
-### Before Running the Application:
+### Step 1: Generate Gmail App Password
 
-1. **Enable 2-Step Verification** on your Google Account
-   - Go to: Google Account → Security → 2-Step Verification
+Since you're using `notifications@career-9.net` (or any Gmail account), you need to generate a Gmail App Password:
 
-2. **Generate App Password**
-   - Navigate to: Google Account → Security → 2-Step Verification → App Passwords
-   - Select "Mail" and "Other (Custom name)"
-   - Copy the 16-character password (remove spaces)
+#### Detailed Steps:
 
-3. **Set Environment Variables**
-   ```bash
-   export SMTP_USERNAME="your-email@gmail.com"
-   export SMTP_PASSWORD="your-16-char-app-password"
-   ```
+1. **Go to Google Account Security**
+   - Visit: https://myaccount.google.com/security
+   - Sign in with your `notifications@career-9.net` account
 
-4. **Start the Application**
-   ```bash
-   cd spring-social
-   mvn spring-boot:run
-   ```
+2. **Enable 2-Step Verification** (if not already enabled)
+   - Click on "2-Step Verification"
+   - Follow the setup process (verify phone number, etc.)
+
+3. **Generate App Password**
+   - Go back to Security settings
+   - Click "2-Step Verification"
+   - Scroll down to "App passwords"
+   - Click "App passwords"
+
+4. **Create New App Password**
+   - Select app: **Mail**
+   - Select device: **Other (Custom name)**
+   - Enter name: `Career-9 SMTP`
+   - Click **Generate**
+
+5. **Copy the 16-Character Password**
+   - Google will show a 16-character password (e.g., `abcd efgh ijkl mnop`)
+   - Copy it **without spaces**: `abcdefghijklmnop`
+   - This is your `SMTP_PASSWORD`
+
+6. **Save It Securely**
+   - You won't be able to see it again
+   - Store it in a password manager or secure location
+
+### Step 2: Configure SMTP Credentials
+
+You have several options to set your SMTP username and password:
+
+#### Option 1: Environment Variables (Recommended for Production)
+
+**On Linux/Mac:**
+```bash
+# Add to your ~/.bashrc or ~/.zshrc for permanent setup
+export SMTP_USERNAME="notifications@career-9.net"
+export SMTP_PASSWORD="your-app-password-here"
+
+# Apply changes
+source ~/.bashrc  # or source ~/.zshrc
+
+# Then run your application
+cd spring-social
+mvn spring-boot:run
+```
+
+**Or set temporarily for current session:**
+```bash
+export SMTP_USERNAME="notifications@career-9.net"
+export SMTP_PASSWORD="abcdefghijklmnop"
+cd spring-social
+mvn spring-boot:run
+```
+
+**On Windows (Command Prompt):**
+```cmd
+set SMTP_USERNAME=notifications@career-9.net
+set SMTP_PASSWORD=abcdefghijklmnop
+
+cd spring-social
+mvn spring-boot:run
+```
+
+**On Windows (PowerShell):**
+```powershell
+$env:SMTP_USERNAME="notifications@career-9.net"
+$env:SMTP_PASSWORD="abcdefghijklmnop"
+
+cd spring-social
+mvn spring-boot:run
+```
+
+#### Option 2: Pass as Command Line Arguments
+
+```bash
+cd spring-social
+mvn spring-boot:run -Dspring-boot.run.arguments="--SMTP_USERNAME=notifications@career-9.net --SMTP_PASSWORD=abcdefghijklmnop"
+```
+
+#### Option 3: IDE Configuration
+
+**IntelliJ IDEA:**
+1. Go to **Run → Edit Configurations**
+2. Select your Spring Boot application
+3. In **Environment Variables** section, click the folder icon
+4. Click **+** to add variables:
+   - Name: `SMTP_USERNAME`, Value: `notifications@career-9.net`
+   - Name: `SMTP_PASSWORD`, Value: `your-app-password-here`
+5. Click **OK** and run the application
+
+**Eclipse/STS:**
+1. Right-click your project → **Run As → Run Configurations**
+2. Select **Environment** tab
+3. Click **New** to add each variable:
+   - Name: `SMTP_USERNAME`, Value: `notifications@career-9.net`
+   - Name: `SMTP_PASSWORD`, Value: `your-app-password-here`
+4. Click **Apply** then **Run**
+
+**VS Code:**
+1. Create or edit `.vscode/launch.json`
+2. Add environment variables to your configuration:
+```json
+{
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Spring Boot App",
+      "request": "launch",
+      "mainClass": "com.kccitm.api.ApiApplication",
+      "env": {
+        "SMTP_USERNAME": "notifications@career-9.net",
+        "SMTP_PASSWORD": "your-app-password-here"
+      }
+    }
+  ]
+}
+```
+
+#### Option 4: Docker/Docker Compose
+
+**Edit your docker-compose.yml:**
+```yaml
+services:
+  api:
+    image: your-api-image
+    environment:
+      - SMTP_USERNAME=notifications@career-9.net
+      - SMTP_PASSWORD=your-app-password-here
+    # ... other configurations
+```
+
+**Or use an .env file (more secure):**
+
+Create `.env` file in your docker-compose directory:
+```bash
+# .env file
+SMTP_USERNAME=notifications@career-9.net
+SMTP_PASSWORD=abcdefghijklmnop
+```
+
+Then reference in docker-compose.yml:
+```yaml
+services:
+  api:
+    env_file:
+      - .env
+```
+
+**Important:** Add `.env` to your `.gitignore` to prevent committing credentials!
+
+#### Option 5: System Environment Variables (Permanent)
+
+**Linux/Mac:**
+```bash
+# Edit system profile
+sudo nano /etc/environment
+
+# Add these lines:
+SMTP_USERNAME="notifications@career-9.net"
+SMTP_PASSWORD="your-app-password-here"
+
+# Save and reboot or re-login
+```
+
+**Windows:**
+1. Search for "Environment Variables" in Windows Search
+2. Click "Edit the system environment variables"
+3. Click "Environment Variables" button
+4. Under "System variables" or "User variables", click "New"
+5. Add:
+   - Variable name: `SMTP_USERNAME`
+   - Variable value: `notifications@career-9.net`
+6. Repeat for `SMTP_PASSWORD`
+7. Click OK and restart your terminal/IDE
+
+### Step 3: Verify Configuration
+
+**Check if variables are set:**
+```bash
+# Linux/Mac
+echo $SMTP_USERNAME
+echo $SMTP_PASSWORD  # Won't show value for security
+
+# Windows CMD
+echo %SMTP_USERNAME%
+echo %SMTP_PASSWORD%
+
+# Windows PowerShell
+echo $env:SMTP_USERNAME
+echo $env:SMTP_PASSWORD
+```
+
+**Start the application:**
+```bash
+cd spring-social
+mvn spring-boot:run
+```
+
+**Look for these in the logs:**
+- `Creating JavaMailSender bean` - Configuration loaded
+- No errors related to mail configuration
 
 ## Security Features
 
@@ -144,6 +333,186 @@ smtpEmailService.sendEmail(request);
 ✅ **Gmail App Passwords** - Uses app-specific passwords, not account password
 ✅ **No Credential Logging** - Sensitive data never logged
 ✅ **Environment-Specific Config** - Dev has fallback defaults, staging/prod require explicit env vars
+
+### ⚠️ Important Security Notes
+
+1. **Never Commit Credentials to Git**
+   - Always use environment variables
+   - Add `.env` files to `.gitignore`
+   - Never hardcode passwords in `application.yml`
+
+2. **Use App Passwords, Not Account Passwords**
+   - App passwords are more secure
+   - Can be revoked individually
+   - Doesn't expose your main account password
+
+3. **Protect Your App Password**
+   - Store in password manager
+   - Don't share via email or chat
+   - Regenerate if compromised
+
+4. **Environment-Specific Configuration**
+   - **Dev profile:** Has fallback default (`notifications@career-9.net`) for convenience
+   - **Staging/Production:** Requires explicit environment variables (no defaults)
+
+5. **For Production Deployment**
+   - Use Google Workspace account for higher limits
+   - Configure SPF/DKIM records for your domain
+   - Monitor email sending rates
+   - Set up email logging/monitoring
+
+## Quick Testing Guide
+
+### Test 1: Create a Test Controller
+
+Create this controller to verify the email service works:
+
+```java
+package com.kccitm.api.controller;
+
+import com.kccitm.api.service.SmtpEmailService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/test-email")
+public class EmailTestController {
+
+    @Autowired
+    private SmtpEmailService smtpEmailService;
+
+    @GetMapping("/simple")
+    public ResponseEntity<String> sendSimpleTest(@RequestParam String to) {
+        try {
+            smtpEmailService.sendSimpleEmail(
+                to,
+                "Test Email from Career-9",
+                "This is a test email from the Career-9 SMTP service. If you receive this, the email service is working correctly!"
+            );
+            return ResponseEntity.ok("Simple email sent successfully to: " + to);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                .body("Failed to send email: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/html")
+    public ResponseEntity<String> sendHtmlTest(@RequestParam String to) {
+        try {
+            String htmlContent = """
+                <html>
+                <body>
+                    <h1 style="color: #007bff;">Career-9 SMTP Service</h1>
+                    <p>This is a <strong>test HTML email</strong>.</p>
+                    <p>If you can see this formatted message, HTML emails are working!</p>
+                    <hr>
+                    <p style="color: #6c757d; font-size: 12px;">Sent from Career-9 Email Service</p>
+                </body>
+                </html>
+                """;
+
+            smtpEmailService.sendHtmlEmail(to, "HTML Test Email", htmlContent);
+            return ResponseEntity.ok("HTML email sent successfully to: " + to);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                .body("Failed to send email: " + e.getMessage());
+        }
+    }
+}
+```
+
+### Test 2: Send Test Emails
+
+**Start your application:**
+```bash
+cd spring-social
+mvn spring-boot:run
+```
+
+**Send a simple test email:**
+```bash
+curl "http://localhost:8091/test-email/simple?to=your-email@example.com"
+```
+
+**Send an HTML test email:**
+```bash
+curl "http://localhost:8091/test-email/html?to=your-email@example.com"
+```
+
+**Or test via browser:**
+- http://localhost:8091/test-email/simple?to=your-email@example.com
+- http://localhost:8091/test-email/html?to=your-email@example.com
+
+### Test 3: Check Application Logs
+
+Look for these log entries:
+
+**Success logs:**
+```
+INFO  c.k.a.service.SmtpEmailServiceImpl - Sending simple email to: your-email@example.com with subject: Test Email from Career-9
+INFO  c.k.a.service.SmtpEmailServiceImpl - Simple email sent successfully to: your-email@example.com
+```
+
+**Error logs (if credentials are wrong):**
+```
+ERROR c.k.a.service.SmtpEmailServiceImpl - Failed to send simple email to: your-email@example.com. Error: Authentication failed
+```
+
+### Test 4: Verify Email Delivery
+
+1. Check your inbox for test emails
+2. Check spam/junk folder if not in inbox
+3. Verify sender shows as `notifications@career-9.net`
+4. Verify HTML formatting works correctly
+
+## Troubleshooting
+
+### Issue: "Authentication failed" error
+
+**Solution:**
+- Verify SMTP_USERNAME is correct
+- Verify SMTP_PASSWORD is the 16-character app password (no spaces)
+- Ensure 2-Step Verification is enabled on Google Account
+- Regenerate app password if needed
+
+### Issue: "Connection timeout" error
+
+**Solution:**
+- Check internet connection
+- Verify firewall allows outbound connections on port 587
+- Check if your network blocks SMTP
+
+### Issue: Environment variables not loaded
+
+**Solution:**
+```bash
+# Verify variables are set
+echo $SMTP_USERNAME
+echo $SMTP_PASSWORD
+
+# If not set, export them again
+export SMTP_USERNAME="notifications@career-9.net"
+export SMTP_PASSWORD="your-app-password"
+
+# Then restart application
+```
+
+### Issue: Emails going to spam
+
+**Solution:**
+- Configure SPF records for your domain
+- Set up DKIM signing
+- Use Google Workspace instead of free Gmail
+- Avoid spam trigger words in subject/body
+
+### Issue: Rate limit exceeded
+
+**Solution:**
+- Gmail free account: 500 emails/day limit
+- Google Workspace: 2,000 emails/day limit
+- Implement rate limiting in your application
+- Consider using email queue for bulk sending
 
 ## Key Features
 

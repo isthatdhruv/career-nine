@@ -32,6 +32,8 @@ services:
       - 8080:8080
     command: ["java","-jar","/usr/local/lib/demo.jar"]
     restart: always
+    env_file:
+      - .env
     networks:
       - career_shared_net
 

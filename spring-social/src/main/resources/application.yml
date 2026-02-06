@@ -30,7 +30,7 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: ${SMTP_USERNAME:kccproject75@gmail.com}
+    username: ${SMTP_USERNAME:notifications@career-9.net}
     password: ${SMTP_PASSWORD:}
     properties:
       mail:
@@ -127,8 +127,8 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: ${SMTP_USERNAME}
-    password: ${SMTP_PASSWORD}
+    username: ${SMTP_USERNAME:notifications@career-9.net}
+    password: ${SMTP_PASSWORD:}
     properties:
       mail:
         smtp:
