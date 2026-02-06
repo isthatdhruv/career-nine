@@ -64,6 +64,8 @@ import GeneralInstructionsPage from "../pages/StudentOnlineAssessment/components
 import InstituteDashboard from "../pages/dashboard/InstituteDashboard";
 import ReportsPage from "../pages/Reports/ReportsPage";
 import StudentDashboard from "../pages/StudentDashboard/StudentDashboard";
+import ClassTeacherDashboard from "../pages/ClassTeacherDashboard/ClassTeacherDashboard";
+import PrincipalDashboard from "../pages/PrincipalDashboard/PrincipalDashboard";
 
 const PrivateRoutes = () => {
   const StudentsData = lazy(
@@ -358,6 +360,30 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <FacultyRegistrationDetails />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/faculty/registration-form"
+          element={
+            <SuspensedView>
+              <FacultyRegistrationForm />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/teacher/class-dashboard"
+          element={
+            <SuspensedView>
+              <ClassTeacherDashboard />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/principal/dashboard"
+          element={
+            <SuspensedView>
+              <PrincipalDashboard />
             </SuspensedView>
           }
         />
