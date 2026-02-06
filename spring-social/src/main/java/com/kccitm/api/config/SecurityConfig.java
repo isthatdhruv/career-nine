@@ -133,8 +133,8 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                         "/**/*.js")
                 .permitAll()
                 .antMatchers("/user/*/*","/user/*","/assessment-section-instructions/**", "/language-question/create-with-options",
-                        "/**/**/**", "/**/**/**/**",
-                        "/languages/**",
+                        "/**/**/**", "/**/**/**/**","/dashboard/game-results/*",
+                        "/languages/**","/game-results/*",
                         "/question-sections/**", "/language-supported/*", "/contact-person/**",
                         "/assessment-questions/*/*", "/assessment-questions/*", "/assessments/*", "/api/**",
                         "/api/**/**", "/api/**/**/**", "/api/assessment-questions/**",

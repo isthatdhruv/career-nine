@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 import { ReadCollegeData } from "../College/API/College_APIs";
 import {
   getStudentsWithMappingByInstituteId,
@@ -33,6 +34,7 @@ type StudentAssessmentInfo = {
 };
 
 export default function GroupStudentPage() {
+  const navigate = useNavigate();
   const [institutes, setInstitutes] = useState<any[]>([]);
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
   const [students, setStudents] = useState<Student[]>([]);
@@ -875,6 +877,16 @@ export default function GroupStudentPage() {
                         >
                           Assessments
                         </th>
+                        <th
+                          style={{
+                            padding: "16px 24px",
+                            fontWeight: 600,
+                            color: "#1a1a2e",
+                            borderBottom: "2px solid #e0e0e0",
+                          }}
+                        >
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1084,6 +1096,31 @@ export default function GroupStudentPage() {
                                 );
                               })}
                             </select>
+                          </td>
+                          <td
+                            style={{
+                              padding: "16px 24px",
+                              borderBottom: "1px solid #f0f0f0",
+                            }}
+                          >
+                            <button
+                              className="btn btn-sm d-flex align-items-center gap-1"
+                              onClick={() => navigate(`/student-dashboard/${student.userStudentId}`)}
+                              style={{
+                                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                                color: "#fff",
+                                border: "none",
+                                padding: "8px 16px",
+                                borderRadius: "8px",
+                                fontWeight: 600,
+                                fontSize: "0.85rem",
+                                transition: "all 0.2s",
+                                boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
+                              }}
+                            >
+                              <i className="bi bi-speedometer2"></i>
+                              Dashboard
+                            </button>
                           </td>
                         </tr>
                       ))}

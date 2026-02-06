@@ -63,6 +63,7 @@ import ThankYouPage from "../pages/StudentOnlineAssessment/components/ThankYouPa
 import GeneralInstructionsPage from "../pages/StudentOnlineAssessment/components/GeneralInstructionsPage";
 import InstituteDashboard from "../pages/dashboard/InstituteDashboard";
 import ReportsPage from "../pages/Reports/ReportsPage";
+import StudentDashboard from "../pages/StudentDashboard/StudentDashboard";
 
 const PrivateRoutes = () => {
   const StudentsData = lazy(
@@ -293,6 +294,12 @@ const PrivateRoutes = () => {
         <Route path="/group-student" element={
           <SuspensedView>
             <GroupStudentPage />
+          </SuspensedView>
+        } />
+
+        <Route path="/student-dashboard/:studentId" element={
+          <SuspensedView>
+            <StudentDashboard />
           </SuspensedView>
         } />
 
