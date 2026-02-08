@@ -184,6 +184,7 @@ public class QuestionnaireController {
                     existing.setIsFree(questionnaire.getIsFree());
                     existing.setTool(questionnaire.getTool());
                     existing.setDisplay(questionnaire.getDisplay());
+                    existing.setType(questionnaire.getType());
 
                     // Update languages using the new helper method
                     updateLanguages(existing, questionnaire.getLanguages());

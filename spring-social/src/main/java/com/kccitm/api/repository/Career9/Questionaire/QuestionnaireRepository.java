@@ -17,6 +17,6 @@ public interface QuestionnaireRepository extends JpaRepository<Questionnaire, Lo
     @Query("SELECT q FROM Questionnaire q WHERE q.id = :questionnaireId")
     List<Questionnaire> findAllByQuestionnaireId(@Param("questionnaireId") Long questionnaireId);
 
-    @Query("SELECT new com.kccitm.api.model.career9.Questionaire.Questionnaire(q.questionnaireId,q.name,q.modeId) FROM Questionnaire q")
-List<Questionnaire> findQuestionnaireList();
+    @Query("SELECT new com.kccitm.api.model.career9.Questionaire.Questionnaire(q.questionnaireId, q.name, q.modeId, q.type, q.isFree) FROM Questionnaire q")
+    List<Questionnaire> findQuestionnaireList();
 }

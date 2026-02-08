@@ -93,11 +93,17 @@ public class Questionnaire implements Serializable {
 
     public Questionnaire(Long questionnaireId, String name, Integer modeId) {
         this.questionnaireId = questionnaireId;
-
         this.modeId = modeId;
-
         this.name = name;
+    }
 
+    // Constructor for list projection with type and isFree
+    public Questionnaire(Long questionnaireId, String name, Integer modeId, Boolean type, Boolean isFree) {
+        this.questionnaireId = questionnaireId;
+        this.name = name;
+        this.modeId = modeId;
+        this.type = type;
+        this.isFree = isFree;
     }
 
     public Questionnaire(Long questionnaireId) {

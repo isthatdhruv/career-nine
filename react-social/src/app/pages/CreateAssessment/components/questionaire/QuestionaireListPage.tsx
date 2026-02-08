@@ -31,7 +31,12 @@ const QuestionaireListPage: React.FC = () => {
         width: 100,
       },
       {
-        label: "Type",
+        label: "Category",
+        field: "type",
+        width: 120,
+      },
+      {
+        label: "Pricing",
         field: "isFree",
         width: 100,
       },
@@ -62,7 +67,8 @@ const QuestionaireListPage: React.FC = () => {
         id: item.questionnaireId,
         name: item.name || "-",
         tool: item.tool?.toolName || "-",
-        modeId: item.modeId==0?"Online":"Offline",
+        modeId: item.modeId === 0 ? "Online" : "Offline",
+        type: item.type === true ? "Bet Assessment" : "General",
         isFree: item.isFree === true ? "Free" : "Paid",
         price: item.price || 0,
         actions: (

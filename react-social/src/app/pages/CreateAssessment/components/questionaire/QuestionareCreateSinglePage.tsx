@@ -10,7 +10,7 @@ import * as XLSX from "xlsx";
 import { ReadCollegeData } from "../../../College/API/College_APIs";
 import { ReadQuestionSectionData } from "../../../QuestionSections/API/Question_Section_APIs";
 import { ReadToolData } from "../../../Tool/API/Tool_APIs";
-import { ReadQuestionsData } from "../../../AssesmentQuestions/API/Question_APIs";
+import { ReadQuestionsDataList, ReadQuestionByIdData } from "../../../AssesmentQuestions/API/Question_APIs";
 import { CreateAssessmentData } from "../../API/Create_Assessment_APIs";
 import { ReadLanguageData } from "../../API/Create_Assessment_APIs";
 
@@ -39,10 +39,13 @@ const validationSchema = Yup.object().shape({
       otherwise: (schema) => schema.notRequired(),
     }),
   languages: Yup.array().min(1, "At least one language must be selected"),
-  
+
+  // Questionnaire type (General or Bet Assessment)
+  questionnaireType: Yup.string().required("Questionnaire type is required"),
+
   // Tool selection
   toolId: Yup.string().required("Tool is required"),
-  
+
   // Section selection
   sectionIds: Yup.array().min(1, "At least one section must be selected"),
 });
@@ -56,7 +59,9 @@ const QuestionareCreateSinglePage: React.FC = () => {
   const [colleges, setColleges] = useState<any[]>([]);
   const [sections, setSections] = useState<any[]>([]);
   const [tools, setTools] = useState<any[]>([]);
-  const [questions, setQuestions] = useState<any[]>([]);
+  const [questions, setQuestions] = useState<any[]>([]); // Lightweight: id + text only
+  const [questionsFullData, setQuestionsFullData] = useState<any[]>([]); // Full data for preview
+  const [loadingPreviewData, setLoadingPreviewData] = useState(false);
   const [languages, setLanguages] = useState<any[]>([]);
   
   // Loading states for individual data types
@@ -127,6 +132,7 @@ const QuestionareCreateSinglePage: React.FC = () => {
     sectionInstructions: {} as { [sectionId: string]: { [language: string]: string } },
     price: 0,
     isFree: "true",
+    questionnaireType: "false", // false = General, true = Bet Assessment
     toolId: "",
     languages: ["English"] as string[], // English selected by default
     sectionIds: [] as string[],
@@ -194,12 +200,30 @@ const QuestionareCreateSinglePage: React.FC = () => {
   const fetchQuestions = async () => {
     try {
       setLoadingStates(prev => ({ ...prev, questions: true }));
-      const response = await ReadQuestionsData();
+      // Use lightweight endpoint - only fetches id and text, not options/scores
+      const response = await ReadQuestionsDataList();
       setQuestions(response.data || []);
     } catch (error) {
       console.error("Error fetching questions:", error);
     } finally {
       setLoadingStates(prev => ({ ...prev, questions: false }));
+    }
+  };
+
+  // Fetch full question data for preview (only selected questions)
+  const fetchQuestionsFullData = async (questionIds: string[]) => {
+    if (questionIds.length === 0) return;
+
+    setLoadingPreviewData(true);
+    try {
+      const promises = questionIds.map(id => ReadQuestionByIdData(id));
+      const responses = await Promise.all(promises);
+      const fullData = responses.map(res => res.data).filter(Boolean);
+      setQuestionsFullData(fullData);
+    } catch (error) {
+      console.error("Error fetching full question data:", error);
+    } finally {
+      setLoadingPreviewData(false);
     }
   };
 
@@ -353,35 +377,24 @@ const QuestionareCreateSinglePage: React.FC = () => {
         const sectionQuestionsOrderMap = values.sectionQuestionsOrder?.[sectionId] || {};
         
         const questionsPayload = sectionQuestionIds.map((qId: string, index: number) => {
-          const questionObj = questions.find((q: any) => 
+          const questionObj = questions.find((q: any) =>
             String(q.questionId || q.id) === String(qId)
           );
-          
-          // Build the full question object with options
-          const questionData = questionObj ? {
-            questionId: questionObj.questionId || questionObj.id,
-            questionText: questionObj.questionText || "",
-            questionType: questionObj.questionType || "multiple-choice",
-            flag: questionObj.flag ?? false,
-            maxOptionsAllowed: questionObj.maxOptionsAllowed || 0,
-            options: (questionObj.options || []).map((opt: any) => ({
-              optionId: opt.optionId || null,
-              optionText: opt.optionText || "",
-              optionScores: opt.optionScores || [],
-              correct: opt.correct ?? false
-            })),
-            section: sectionData,
-            languageQuestions: questionObj.languageQuestions || [],
-            id: questionObj.questionId || questionObj.id
-          } : { questionId: Number(qId) };
+
+          // Build lightweight question reference - backend has full data
+          // Only send questionId; backend will look up full question details
+          const questionData = {
+            questionId: Number(qId),
+            questionText: questionObj?.questionText || "",
+            section: sectionData
+          };
 
           // Calculate header components
           const safeSectionName = (sectionData.sectionName || "").replace(/\s+/g, '_');
-          const isMQT = questionData.flag === true; // Assuming flag=true means MQT
-          // Use index + 1 as the sequence number for this question within the section
-          const sequence = index + 1; 
-          
-          const header = isMQT 
+          const isMQT = questionObj?.flag === true; // flag from lightweight data if available
+          const sequence = index + 1;
+
+          const header = isMQT
             ? `${safeSectionName}_MQT_${sequence}`
             : `${safeSectionName}_${sequence}`;
 
@@ -444,6 +457,7 @@ const QuestionareCreateSinglePage: React.FC = () => {
         modeId: questionareData?.mode === 'offline' ? 1 : 0,
         price: Number(values.price) || 0,
         isFree: values.isFree === "true",
+        type: values.questionnaireType === "true", // false = General, true = Bet Assessment
         name: values.name || questionareData?.name || '',
         display: null,
         sections: sectionsPayload,
@@ -603,7 +617,7 @@ const QuestionareCreateSinglePage: React.FC = () => {
                     </div>
                     <div className="card-body">
                       <div className="row">
-                        <div className="col-12">
+                        <div className="col-md-6">
                           <div className="fv-row mb-7">
                             <label className="required fs-6 fw-bold mb-2">Questionare Name</label>
                             <Field
@@ -624,6 +638,38 @@ const QuestionareCreateSinglePage: React.FC = () => {
                               <div className="fv-plugins-message-container">
                                 <div className="fv-help-block text-danger">
                                   <span role="alert">{String(errors.name)}</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="col-md-6">
+                          {/* Questionnaire Type (General / Bet Assessment) */}
+                          <div className="fv-row mb-7">
+                            <label className="required fs-6 fw-bold mb-2">
+                              Questionnaire Category:
+                            </label>
+                            <Field
+                              as="select"
+                              name="questionnaireType"
+                              className={clsx(
+                                "form-control form-control-lg form-control-solid",
+                                {
+                                  "is-invalid text-danger": touched.questionnaireType && errors.questionnaireType,
+                                },
+                                {
+                                  "is-valid": touched.questionnaireType && !errors.questionnaireType,
+                                }
+                              )}
+                            >
+                              <option value="">Select Category</option>
+                              <option value="false">General</option>
+                              <option value="true">Bet Assessment</option>
+                            </Field>
+                            {touched.questionnaireType && errors.questionnaireType && (
+                              <div className="fv-plugins-message-container">
+                                <div className="fv-help-block text-danger">
+                                  <span role="alert">{String(errors.questionnaireType)}</span>
                                 </div>
                               </div>
                             )}
@@ -1162,7 +1208,12 @@ const QuestionareCreateSinglePage: React.FC = () => {
                         <button
                           type="button"
                           className="btn btn-info btn-lg me-3"
-                          onClick={() => setShowPreviewModal(true)}
+                          onClick={() => {
+                            // Collect all selected question IDs across sections
+                            const allQuestionIds = Object.values(values.sectionQuestions || {}).flat();
+                            fetchQuestionsFullData(allQuestionIds);
+                            setShowPreviewModal(true);
+                          }}
                           disabled={!Array.isArray(values.sectionIds) || values.sectionIds.length === 0}
                         >
                           <i className="fas fa-eye me-2"></i>
@@ -1202,13 +1253,18 @@ const QuestionareCreateSinglePage: React.FC = () => {
                     <div className="mb-4 p-3 bg-light rounded">
                       <h5 className="text-primary mb-1">{values.name || questionareData?.name}</h5>
                       <small className="text-muted">
-                        Mode: {(questionareData?.mode || "").toUpperCase()} | 
+                        Mode: {(questionareData?.mode || "").toUpperCase()} |
                         {questionareData && (colleges.find(c => c.instituteCode === questionareData.collegeId || c.id === questionareData.collegeId)?.instituteName || questionareData.collegeId)}
                       </small>
                     </div>
                   )}
-                  
-                  {values.sectionIds && values.sectionIds.length > 0 ? (
+
+                  {loadingPreviewData ? (
+                    <div className="text-center py-5">
+                      <Spinner animation="border" variant="primary" />
+                      <p className="text-muted mt-3">Loading question details...</p>
+                    </div>
+                  ) : values.sectionIds && values.sectionIds.length > 0 ? (
                     values.sectionIds.map((sectionId) => {
                       const section = sections.find((s) => String(s.sectionId) === String(sectionId));
                       const questionIds = values.sectionQuestions[sectionId] || [];
@@ -1226,7 +1282,8 @@ const QuestionareCreateSinglePage: React.FC = () => {
                           {sortedQuestionIds.length > 0 ? (
                             <ul className="list-group list-group-flush">
                               {sortedQuestionIds.map((questionId, index) => {
-                                const question = questions.find((q) => String(q.questionId) === String(questionId));
+                                // Use full data for preview (includes options)
+                                const question = questionsFullData.find((q) => String(q.questionId || q.id) === String(questionId));
                                 return (
                                   <li key={questionId} className="list-group-item px-0">
                                     <p className="fw-bold mb-2">{index + 1}. {question ? question.questionText : `Question not found`}</p>
