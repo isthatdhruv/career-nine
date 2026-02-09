@@ -98,7 +98,7 @@
 }
 
 .header-logo:hover {
-  transform: scale(1.05);
+  transform: none;
 }
 
 .header-text {
@@ -188,7 +188,6 @@
 
 .tab-button:hover {
   color: #667eea;
-  transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
 }
 
@@ -292,7 +291,7 @@
 }
 
 .info-card:hover {
-  transform: translateY(-4px) scale(1.03);
+  transform: none;
 }
 
 .info-icon {
@@ -302,7 +301,7 @@
 }
 
 .info-card:hover .info-icon {
-  transform: scale(1.1) rotate(5deg);
+  transform: none;
   animation: iconPulse 1s ease-in-out infinite;
 }
 
@@ -473,7 +472,7 @@
 }
 
 .metric-card:hover {
-  transform: translateY(-8px) scale(1.02);
+  transform: none;
   box-shadow:
     0 16px 48px rgba(0, 0, 0, 0.15),
     0 8px 16px rgba(102, 126, 234, 0.2);
@@ -493,7 +492,7 @@
 }
 
 .metric-card:hover .metric-icon {
-  transform: scale(1.1) rotate(-5deg);
+  transform: none;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
 }
 
@@ -749,7 +748,7 @@
 }
 
 .student-item:hover .student-rank {
-  transform: scale(1.1) rotate(5deg);
+  transform: none;
   box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
 }
 
@@ -835,7 +834,6 @@
 
 .table tbody tr:hover {
   background: linear-gradient(90deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
-  transform: scale(1.01);
 }
 
 .table tbody td {
@@ -860,7 +858,7 @@
 }
 
 .badge:hover {
-  transform: scale(1.05);
+  transform: none;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 

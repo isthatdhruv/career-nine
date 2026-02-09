@@ -59,7 +59,11 @@ export interface TopDomain {
 export interface SocialInsightData {
   score: number;
   category: string;
+  awarenessLevel: string;
+  categoryTitle: string;
   interpretation: string;
+  detailedInterpretation: string;
+  traits?: string[];
   topDomains?: TopDomain[];
   growthAreas?: TopDomain[];
 }
@@ -112,6 +116,76 @@ export interface DashboardData {
   cognitive: CognitiveData;
   social: SocialData;
   selfManagement: SelfManagementData;
+}
+
+// ========== RAW DASHBOARD API RESPONSE TYPES ==========
+
+export interface DashboardApiMQData {
+  measuredQualityId: number;
+  name: string;
+  description: string;
+  displayName: string;
+}
+
+export interface DashboardApiMQTData {
+  measuredQualityTypeId: number;
+  name: string;
+  description: string;
+  displayName: string;
+  measuredQuality: DashboardApiMQData;
+}
+
+export interface DashboardApiMQTScore {
+  scoreId: number;
+  score: number;
+  measuredQualityType: DashboardApiMQTData;
+}
+
+export interface DashboardApiOptionData {
+  optionId: number;
+  optionText: string | null;
+  optionDescription: string | null;
+  isCorrect: boolean;
+  mqtScores: DashboardApiMQTScore[];
+}
+
+export interface DashboardApiAnswerDetail {
+  assessmentAnswerId: number;
+  questionnaireQuestionId: number;
+  rankOrder: number | null;
+  selectedOption: DashboardApiOptionData;
+}
+
+export interface DashboardApiRawScoreData {
+  assessmentRawScoreId: number;
+  rawScore: number;
+  measuredQualityType: DashboardApiMQTData;
+  measuredQuality: DashboardApiMQData;
+}
+
+export interface DashboardApiAssessmentData {
+  assessmentId: number;
+  assessmentName: string;
+  status: string;
+  isActive: boolean;
+  startDate: string;
+  endDate: string;
+  studentAssessmentMappingId: number;
+  questionnaireType: boolean | null;
+  answers: DashboardApiAnswerDetail[];
+  rawScores: DashboardApiRawScoreData[];
+}
+
+export interface DashboardApiStudentInfo {
+  userStudentId: number;
+  userId: number;
+  instituteName: string;
+  instituteCode: number;
+}
+
+export interface DashboardApiResponse {
+  studentInfo: DashboardApiStudentInfo;
+  assessments: DashboardApiAssessmentData[];
 }
 
 // ========== HELPER FUNCTIONS ==========
@@ -293,25 +367,57 @@ function getCognitiveFlexibilityInterpretation(style: string): { interpretation:
 }
 
 /**
- * Get social insight category
+ * Get comprehensive social insight data based on score.
+ * Score ranges: 0-6 (Low), 7-12 (Moderate), 13-18 (High)
  */
-function getSocialInsightCategory(score: number): string {
-  if (score >= 13) return "High Awareness - Mind Reader";
-  if (score >= 7) return "Moderate Awareness - Social Detective";
-  return "Low Awareness - Literal Thinker";
-}
-
-/**
- * Get social insight interpretation
- */
-function getSocialInsightInterpretation(category: string): string {
-  const interpretations: Record<string, string> = {
-    "High Awareness - Mind Reader": "You possess advanced socio-cognitive maturity. You excel at 'mentalizing'—tracking multiple layers of thought simultaneously. You can distinguish between a speaker's literal words and their strategic goal, allowing you to navigate complex social hierarchies with high emotional intelligence.",
-    "Moderate Awareness - Social Detective": "You show healthy, age-appropriate development of social intuition. You can accurately navigate most everyday social challenges. You understand that mistakes are different from being mean, and can tell when a friend is being sarcastic to vent frustration.",
-    "Low Awareness - Literal Thinker": "You process social information in a concrete and literal manner. In the Indian social context—where politeness and 'saving face' often lead to indirect communication—you may find it difficult to identify 'white lies' or subtle sarcasm. This is a common developmental stage where you're still building the 'mental muscles' needed to decouple a person's words from their actual intent."
-  };
-
-  return interpretations[category] || interpretations["Moderate Awareness - Social Detective"];
+function getSocialInsightFullData(score: number): {
+  category: string;
+  awarenessLevel: string;
+  categoryTitle: string;
+  interpretation: string;
+  detailedInterpretation: string;
+  traits: string[];
+} {
+  if (score >= 13) {
+    return {
+      category: "Mind-Reading",
+      awarenessLevel: "High Awareness",
+      categoryTitle: "The Mind Reader",
+      interpretation: "Your child possesses advanced socio-cognitive maturity, tracking multiple layers of thought simultaneously and navigating complex social hierarchies with high emotional intelligence.",
+      detailedInterpretation: "This score reflects advanced socio-cognitive maturity. These children excel at \"mentalizing\"\u2014tracking multiple layers of thought simultaneously. They are particularly adept at recognizing Indirect Speech Acts, an essential skill in Indian culture where respect for elders often involves responding to subtle hints. They can distinguish between a speaker\u2019s literal words and their strategic goal, allowing them to navigate complex social hierarchies and peer groups with high emotional intelligence. This level of maturity often leads to strong leadership potential and deep, empathetic connections with others.",
+      traits: [
+        "Mind-Reading: tracks layers of thoughts easily",
+        "Hint-Expert: understands subtle commands and hints",
+        "Strategic: can see through \"double bluffs\" and tricks",
+      ],
+    };
+  } else if (score >= 7) {
+    return {
+      category: "Clue-Spotter",
+      awarenessLevel: "Moderate Awareness",
+      categoryTitle: "The Social Detective",
+      interpretation: "Your child shows healthy, age-appropriate development of social intuition and can accurately navigate most everyday social challenges.",
+      detailedInterpretation: "Children in this range show healthy, age-appropriate development of social intuition. They have moved past basic perspective-taking and can accurately navigate most everyday social challenges. They understand that a teacher calling them by the wrong name is an accident and can tell when a friend is being sarcastic to vent frustration. While they are competent \"Social Detectives,\" they are still refining the higher-level logic required to understand complex deceptions or \"double-layered\" thoughts (thinking about what someone else thinks they are thinking).",
+      traits: [
+        "Clue-Spotter: usually tells when a friend is being funny",
+        "Intent-Reader: knows mistakes are different from being mean",
+        "Developing: may find complex bluffs tricky",
+      ],
+    };
+  } else {
+    return {
+      category: "Fact-Focused",
+      awarenessLevel: "Low Awareness",
+      categoryTitle: "The Literal Thinker",
+      interpretation: "Your child processes social information in a concrete and literal manner. This is a common developmental stage where they are building the skills needed to decouple a person\u2019s words from their actual intent.",
+      detailedInterpretation: "Participants in this range process social information in a concrete and literal manner. In the Indian social context\u2014where politeness and \"saving face\" often lead to indirect communication\u2014these children may find it difficult to identify \"white lies\" or subtle sarcasm. They primarily rely on literal definitions and may assume that if a person says something factually incorrect, they are simply \"wrong\" or \"lying.\" This is a common developmental stage where the child is still building the \"mental muscles\" needed to decouple a person\u2019s words from their actual intent.",
+      traits: [
+        "Fact-Focused: listens to exactly what is said",
+        "Direct: prefers clear instructions over hints",
+        "Intent: finds \"white lies\" or sarcasm confusing",
+      ],
+    };
+  }
 }
 
 /**
@@ -355,7 +461,310 @@ export async function getStudentAssessments(studentId: number): Promise<any[]> {
 }
 
 /**
- * Fetch complete dashboard data for a student
+ * Fetch all assessment data from the single dashboard endpoint.
+ * Returns the complete raw response with all assessments, answers, and raw scores.
+ */
+export async function fetchAllDashboardData(studentId: number): Promise<DashboardApiResponse | null> {
+  try {
+    const response = await axios.post(
+      `${API_BASE_URL}/assessment-answer/dashboard`,
+      { userStudentId: studentId },
+      { headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' } }
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch dashboard data from single endpoint:", error);
+    return null;
+  }
+}
+
+// ========== SELF-MANAGEMENT HELPERS ==========
+
+/**
+ * Determine self-management level from raw score
+ */
+function getSelfManagementLevel(rawScore: number, maxScore: number): string {
+  const percentage = (rawScore / maxScore) * 100;
+  if (percentage >= 70) return "High";
+  if (percentage >= 40) return "Moderate";
+  return "Low";
+}
+
+/**
+ * Get self-management interpretation for a given dimension and level
+ */
+function getSelfManagementInterpretation(level: string, dimension: string): string {
+  const interpretations: Record<string, Record<string, string>> = {
+    selfEfficacy: {
+      High: "Your child has a 'can-do' attitude, seeing mistakes as a natural part of learning and staying determined even when a task gets tough.",
+      Moderate: "Your child shows reasonable confidence in their abilities but may sometimes doubt themselves when facing unfamiliar or challenging tasks.",
+      Low: "Your child may struggle with confidence in their abilities. They might need encouragement and support to tackle new challenges.",
+    },
+    emotionalRegulation: {
+      High: "Your child handles daily emotions well and can stay calm during high-pressure moments, demonstrating excellent emotional control.",
+      Moderate: "Your child handles daily emotions well but may struggle to stay calm during high-pressure moments, like a big school test or a lost game.",
+      Low: "Your child may find it challenging to manage strong emotions. They might benefit from learning coping strategies for stressful situations.",
+    },
+    selfRegulation: {
+      High: "Your child shows excellent impulse control and can follow rules well, staying focused even in exciting environments.",
+      Moderate: "Your child shows reasonable self-control but sometimes may act impulsively or have difficulty staying focused when distracted.",
+      Low: "Your child may find it hard to control impulses and stay focused. Structured routines and clear expectations could help.",
+    },
+  };
+  return interpretations[dimension]?.[level] || "Assessment data is being processed.";
+}
+
+// ========== VALUE PHRASE/MEANING LOOKUPS ==========
+
+const VALUE_PHRASES: Record<string, string> = {
+  Honesty: "Telling the truth even if it's a bit scary",
+  Kindness: "Helping others and being kind to everyone",
+  Patience: "Waiting calmly for my turn",
+  Curiosity: "Asking 'Why?' and wanting to learn more",
+  Respect: "Treating everyone with dignity",
+  Courage: "Being brave even when scared",
+  Gratitude: "Being thankful for what I have",
+  Fairness: "Making sure everyone gets equal treatment",
+  Responsibility: "Taking care of my duties",
+  Perseverance: "Keeping going even when things get tough",
+};
+
+const VALUE_RANK_MEANINGS: Record<number, string> = {
+  1: "This is your core identity - the 'WHY' behind your biggest choices",
+  2: "This is your style of action - the 'HOW' you interact with the world",
+  3: "This is your safety net - the value you lean on when things get tough",
+};
+
+// MeasuredQuality ID constants (from database)
+const MQ_ID_VALUES = 7;
+const MQ_ID_ENVIRONMENTAL_AWARENESS = 8;
+
+// MeasuredQualityType ID constants
+const MQT_ID_SOCIAL_INSIGHT = 36;
+const MQT_ID_SELF_EFFICACY = 48;
+const MQT_ID_EMOTION_REGULATION = 49;
+const MQT_ID_SELF_MANAGEMENT = 52;
+
+// Max question counts per subscale (for level calculation)
+const MAX_SELF_EFFICACY = 10;
+const MAX_EMOTION_REGULATION = 8;
+const MAX_SELF_REGULATION = 10;
+
+/**
+ * Process a single bet-assessment's raw data into the DashboardData shape.
+ * Computes all metrics client-side from answers and rawScores.
+ */
+export function processBetAssessmentData(
+  assessmentData: DashboardApiAssessmentData,
+  studentId: number
+): DashboardData {
+  const { answers, rawScores } = assessmentData;
+
+  // --- ENVIRONMENTAL AWARENESS (from answers for friendly/unfriendly breakdown) ---
+  let friendlyChoices = 0;
+  let unfriendlyChoices = 0;
+
+  answers.forEach((answer) => {
+    if (answer.selectedOption?.mqtScores) {
+      answer.selectedOption.mqtScores.forEach((mqtScore) => {
+        if (
+          mqtScore.measuredQualityType?.measuredQuality?.measuredQualityId ===
+          MQ_ID_ENVIRONMENTAL_AWARENESS
+        ) {
+          if (mqtScore.score > 0) friendlyChoices++;
+          else if (mqtScore.score < 0) unfriendlyChoices++;
+        }
+      });
+    }
+  });
+
+  const envNetScore = friendlyChoices - unfriendlyChoices;
+  const envResult = getEnvironmentalCategory(envNetScore);
+  const environmentalAwareness: EnvironmentalAwarenessData = {
+    netScore: envNetScore,
+    category: envResult.category,
+    icon: envResult.icon,
+    friendlyChoices,
+    unfriendlyChoices,
+    interpretation: envResult.interpretation,
+  };
+
+  // --- VALUES (from answers with rankOrder) ---
+  const valuesMap: Map<string, { name: string; rank: number; optionText: string }> = new Map();
+
+  answers.forEach((answer) => {
+    if (answer.rankOrder != null && answer.selectedOption?.mqtScores) {
+      answer.selectedOption.mqtScores.forEach((mqtScore) => {
+        if (
+          mqtScore.measuredQualityType?.measuredQuality?.measuredQualityId ===
+          MQ_ID_VALUES
+        ) {
+          const valueName = mqtScore.measuredQualityType.name;
+          // Keep the entry with the best (lowest) rank for each value
+          if (!valuesMap.has(valueName) || answer.rankOrder! < valuesMap.get(valueName)!.rank) {
+            valuesMap.set(valueName, {
+              name: valueName,
+              rank: answer.rankOrder!,
+              optionText: answer.selectedOption.optionText || "",
+            });
+          }
+        }
+      });
+    }
+  });
+
+  const valuesData: ValueData[] = Array.from(valuesMap.values())
+    .sort((a, b) => a.rank - b.rank)
+    .map((v) => ({
+      name: v.name,
+      phrase: VALUE_PHRASES[v.name] || v.optionText,
+      meaning: VALUE_RANK_MEANINGS[v.rank] || `Rank ${v.rank} value in your personal hierarchy`,
+      rank: v.rank,
+    }));
+
+  // --- SOCIAL INSIGHT (from rawScores) ---
+  const socialInsightRawScore = rawScores.find(
+    (rs) => rs.measuredQualityType?.measuredQualityTypeId === MQT_ID_SOCIAL_INSIGHT
+  );
+  const socialInsightTotalScore = socialInsightRawScore?.rawScore || 0;
+
+  const siResult = getSocialInsightFullData(socialInsightTotalScore);
+
+  const socialInsightData: SocialInsightData = {
+    score: socialInsightTotalScore,
+    category: siResult.category,
+    awarenessLevel: siResult.awarenessLevel,
+    categoryTitle: siResult.categoryTitle,
+    interpretation: siResult.interpretation,
+    detailedInterpretation: siResult.detailedInterpretation,
+    traits: siResult.traits,
+    topDomains: [],
+    growthAreas: [],
+  };
+
+  // --- SELF MANAGEMENT (from rawScores) ---
+  const selfEfficacyRaw = rawScores.find(
+    (rs) => rs.measuredQualityType?.measuredQualityTypeId === MQT_ID_SELF_EFFICACY
+  );
+  const emotionRegRaw = rawScores.find(
+    (rs) => rs.measuredQualityType?.measuredQualityTypeId === MQT_ID_EMOTION_REGULATION
+  );
+  const selfMgmtRaw = rawScores.find(
+    (rs) => rs.measuredQualityType?.measuredQualityTypeId === MQT_ID_SELF_MANAGEMENT
+  );
+
+  const selfEfficacyLevel = selfEfficacyRaw
+    ? getSelfManagementLevel(selfEfficacyRaw.rawScore, MAX_SELF_EFFICACY)
+    : "Moderate";
+  const emotionRegLevel = emotionRegRaw
+    ? getSelfManagementLevel(emotionRegRaw.rawScore, MAX_EMOTION_REGULATION)
+    : "Moderate";
+  const selfRegLevel = selfMgmtRaw
+    ? getSelfManagementLevel(selfMgmtRaw.rawScore, MAX_SELF_REGULATION)
+    : "Moderate";
+
+  const selfManagementData: SelfManagementData = {
+    selfEfficacy: selfEfficacyRaw
+      ? {
+          level: selfEfficacyLevel,
+          interpretation: getSelfManagementInterpretation(selfEfficacyLevel, "selfEfficacy"),
+        }
+      : undefined,
+    emotionalRegulation: emotionRegRaw
+      ? {
+          level: emotionRegLevel,
+          interpretation: getSelfManagementInterpretation(emotionRegLevel, "emotionalRegulation"),
+        }
+      : undefined,
+    selfRegulation: selfMgmtRaw
+      ? {
+          level: selfRegLevel,
+          interpretation: getSelfManagementInterpretation(selfRegLevel, "selfRegulation"),
+        }
+      : undefined,
+  };
+
+  // --- BUILD FINAL DASHBOARD DATA ---
+  return {
+    student: {
+      userStudentId: studentId,
+      name: "Student",
+      assessmentDate: assessmentData.startDate || new Date().toLocaleDateString(),
+    },
+    cognitive: {
+      // Cognitive data comes from games, not questionnaire answers
+    },
+    social: {
+      socialInsight: socialInsightTotalScore > 0 ? socialInsightData : undefined,
+      values: valuesData.length > 0 ? valuesData : undefined,
+      environmentalAwareness:
+        friendlyChoices > 0 || unfriendlyChoices > 0 ? environmentalAwareness : undefined,
+    },
+    selfManagement: selfManagementData,
+  };
+}
+
+/**
+ * Process dashboard data from cached API response for a specific assessment.
+ * Returns the computed DashboardData and whether it's a bet-assessment.
+ */
+export async function getDashboardDataFromCache(
+  studentId: number,
+  cachedResponse: DashboardApiResponse,
+  assessmentId: number
+): Promise<{ data: DashboardData; isBetAssessment: boolean }> {
+  const assessmentData = cachedResponse.assessments.find(
+    (a) => a.assessmentId === assessmentId
+  );
+
+  if (!assessmentData) {
+    throw new Error(`Assessment ${assessmentId} not found in cached data`);
+  }
+
+  const isBetAssessment = assessmentData.questionnaireType === true;
+
+  let dashboardData: DashboardData;
+
+  if (isBetAssessment) {
+    dashboardData = processBetAssessmentData(assessmentData, studentId);
+  } else {
+    // General type - return minimal data with empty sections
+    dashboardData = {
+      student: {
+        userStudentId: studentId,
+        name: "Student",
+        assessmentDate: new Date().toLocaleDateString(),
+      },
+      cognitive: {},
+      social: {},
+      selfManagement: {},
+    };
+  }
+
+  // Enrich student info from demographics endpoint
+  try {
+    const studentResponse = await axios.get(
+      `${API_BASE_URL}/student-info/getDemographics/${studentId}`
+    );
+    const studentData = studentResponse.data;
+    dashboardData.student = {
+      ...dashboardData.student,
+      name: studentData.name || "Student",
+      grade: studentData.studentClass?.toString() || "N/A",
+      schoolBoard: studentData.schoolBoard || "N/A",
+      familyType: studentData.family || "N/A",
+      siblingsCount: studentData.sibling || 0,
+    };
+  } catch (error) {
+    console.warn("Failed to fetch student demographics:", error);
+  }
+
+  return { data: dashboardData, isBetAssessment };
+}
+
+/**
+ * @deprecated Use getDashboardDataFromCache() instead.
+ * Fetch complete dashboard data for a student (old 3-endpoint approach)
  * @param studentId - Student ID
  * @param assessmentId - Optional assessment ID to filter by specific assessment
  */
@@ -538,12 +947,13 @@ export async function getDashboardData(studentId: number, assessmentId?: number 
     if (socialRaw.socialInsight) {
       const score = socialRaw.socialInsight.totalScore || 0;
       const category = getSocialInsightCategory(score);
-      const interpretation = getSocialInsightInterpretation(category);
+      const { interpretation, traits } = getSocialInsightInterpretation(category);
 
       socialInsightData = {
         score,
         category,
         interpretation,
+        traits,
         topDomains: socialRaw.socialInsight.topDomains || [],
         growthAreas: socialRaw.socialInsight.growthAreas || [],
       };
@@ -621,6 +1031,82 @@ export async function getDashboardData(studentId: number, assessmentId?: number 
     console.error("Error fetching dashboard data:", error);
     throw error;
   }
+}
+
+// ========== EXCEL EXPORT ==========
+
+/**
+ * Export a bet-assessment's scores to Excel.
+ * Headers are fully dynamic — derived from Measured Qualities and their Quality Types
+ * found in the assessment's rawScores. Cells contain the raw score values.
+ *
+ * Column layout: userStudentId | Name | Class | [MQ - MQT columns from rawScores...]
+ * MQTs are grouped by their parent MQ (sorted by MQ ID, then MQT ID within each group).
+ * If an MQ has a single MQT with the same name, the column header is just the MQ name.
+ */
+export function exportBetAssessmentToExcel(
+  assessmentData: DashboardApiAssessmentData,
+  studentInfo: StudentInfo
+): void {
+  const XLSX = require("xlsx");
+
+  const { rawScores } = assessmentData;
+
+  // Group rawScores by Measured Quality
+  const mqGroups: Map<
+    number,
+    { mqName: string; types: { mqtName: string; score: number; mqtId: number }[] }
+  > = new Map();
+
+  rawScores.forEach((rs) => {
+    const mqId = rs.measuredQuality?.measuredQualityId ?? 0;
+    const mqName = rs.measuredQuality?.displayName || rs.measuredQuality?.name || "Unknown";
+    const mqtName =
+      rs.measuredQualityType?.displayName || rs.measuredQualityType?.name || "Unknown";
+    const mqtId = rs.measuredQualityType?.measuredQualityTypeId ?? 0;
+
+    if (!mqGroups.has(mqId)) {
+      mqGroups.set(mqId, { mqName, types: [] });
+    }
+    mqGroups.get(mqId)!.types.push({ mqtName, score: rs.rawScore, mqtId });
+  });
+
+  // Sort: MQ groups by MQ ID, MQTs within each group by MQT ID
+  const sortedGroups = Array.from(mqGroups.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([, group]) => ({
+      ...group,
+      types: group.types.sort((a, b) => a.mqtId - b.mqtId),
+    }));
+
+  // Build the row object dynamically
+  const row: Record<string, string | number> = {
+    userStudentId: studentInfo.userStudentId,
+    Name: studentInfo.name || "Student",
+    Class: studentInfo.grade || "N/A",
+  };
+
+  sortedGroups.forEach((group) => {
+    // Individual MQT columns
+    group.types.forEach((type) => {
+      const colName =
+        group.types.length === 1 && type.mqtName === group.mqName
+          ? group.mqName
+          : `${group.mqName} - ${type.mqtName}`;
+      row[colName] = type.score;
+    });
+
+    // MQ total — sum of all MQT scores in this group
+    const total = group.types.reduce((sum, t) => sum + t.score, 0);
+    row[`${group.mqName} Total`] = total;
+  });
+
+  const ws = XLSX.utils.json_to_sheet([row]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+
+  const fileName = `BET_Assessment_${studentInfo.name || "Student"}_${assessmentData.assessmentId}.xlsx`;
+  XLSX.writeFile(wb, fileName);
 }
 
 /**

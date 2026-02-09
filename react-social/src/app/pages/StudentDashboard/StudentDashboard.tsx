@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getDashboardData, getStudentAssessments, DashboardData } from "./API/Dashboard_APIs";
+import { fetchAllDashboardData, getDashboardDataFromCache, getStudentAssessments, exportBetAssessmentToExcel, DashboardData, DashboardApiResponse } from "./API/Dashboard_APIs";
 import "./StudentDashboard.css";
 import {
   RadarChart,
@@ -32,6 +32,8 @@ const StudentDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeView, setActiveView] = useState<"overview" | "cognitive" | "social" | "self-management">("overview");
+  const [cachedApiResponse, setCachedApiResponse] = useState<DashboardApiResponse | null>(null);
+  const [isBetAssessment, setIsBetAssessment] = useState<boolean>(true);
 
   useEffect(() => {
     if (studentId) {
@@ -39,21 +41,28 @@ const StudentDashboard: React.FC = () => {
     }
   }, [studentId]);
 
-  // Re-fetch dashboard data when selectedAssessmentId changes
+  // Re-process dashboard data when selectedAssessmentId or cached data changes
   useEffect(() => {
-    if (studentId && selectedAssessmentId !== null) {
+    if (studentId && selectedAssessmentId !== null && cachedApiResponse) {
       fetchDashboardData();
     }
-  }, [studentId, selectedAssessmentId]);
+  }, [studentId, selectedAssessmentId, cachedApiResponse]);
 
   const fetchDashboardData = async () => {
+    if (!cachedApiResponse || selectedAssessmentId === null) return;
+
     setLoading(true);
     try {
-      const data = await getDashboardData(Number(studentId), selectedAssessmentId);
-      setDashboardData(data);
+      const result = await getDashboardDataFromCache(
+        Number(studentId),
+        cachedApiResponse,
+        selectedAssessmentId
+      );
+      setDashboardData(result.data);
+      setIsBetAssessment(result.isBetAssessment);
       setError("");
     } catch (err: any) {
-      console.error("Error fetching dashboard data:", err);
+      console.error("Error processing dashboard data:", err);
       setError("Failed to load dashboard data. Please try again.");
     } finally {
       setLoading(false);
@@ -64,6 +73,13 @@ const StudentDashboard: React.FC = () => {
     try {
       const assessmentsData = await getStudentAssessments(Number(studentId));
       setAssessments(assessmentsData);
+
+      // Fetch all assessment data from single endpoint
+      const allData = await fetchAllDashboardData(Number(studentId));
+      if (allData) {
+        setCachedApiResponse(allData);
+      }
+
       // Set first assessment as default if not already selected
       if (assessmentsData.length > 0 && !selectedAssessmentId) {
         setSelectedAssessmentId(assessmentsData[0].assessmentId);
@@ -76,6 +92,15 @@ const StudentDashboard: React.FC = () => {
   const handleDownloadReport = () => {
     // Navigate to report view
     navigate(`/student-dashboard/${studentId}/report`);
+  };
+
+  const handleViewResults = () => {
+    if (!cachedApiResponse || selectedAssessmentId === null || !dashboardData) return;
+    const assessmentData = cachedApiResponse.assessments.find(
+      (a) => a.assessmentId === selectedAssessmentId
+    );
+    if (!assessmentData) return;
+    exportBetAssessmentToExcel(assessmentData, dashboardData.student);
   };
 
   if (loading) {
@@ -117,9 +142,9 @@ const StudentDashboard: React.FC = () => {
       <div className="dashboard-header-modern">
         <div className="header-content">
           <div className="header-left">
-            <img src="/media/logos/kcc.jpg" alt="Career-9" className="header-logo" />
+            <img src="/media/logos/kcc.jpg" alt="Career-9" className="header-logo bg-white px-5 py-2" />
             <div className="header-text">
-              <h1 className="dashboard-title">Student Insight Dashboard</h1>
+              <h1 className="dashboard-title text-white">Student Insight Dashboard</h1>
               <p className="dashboard-subtitle">Comprehensive performance and development tracking</p>
             </div>
           </div>
@@ -132,6 +157,12 @@ const StudentDashboard: React.FC = () => {
               <i className="bi bi-file-earmark-text me-2"></i>
               View Report
             </button>
+            {isBetAssessment && dashboardData && (
+              <button className="btn btn-success" onClick={handleViewResults}>
+                <i className="bi bi-file-earmark-spreadsheet me-2"></i>
+                View Results
+              </button>
+            )}
           </div>
         </div>
 
@@ -163,7 +194,7 @@ const StudentDashboard: React.FC = () => {
             onClick={() => setActiveView("self-management")}
           >
             <i className="bi bi-person-check me-2"></i>
-            Self-Management
+            Self Management
           </button>
         </div>
       </div>
@@ -210,8 +241,19 @@ const StudentDashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* General Assessment Placeholder */}
+      {!isBetAssessment && (
+        <div className="dashboard-content">
+          <div className="alert alert-info" style={{ margin: '2rem', padding: '2rem', textAlign: 'center' }}>
+            <i className="bi bi-info-circle me-2" style={{ fontSize: '1.5rem' }}></i>
+            <h4>General Assessment Dashboard</h4>
+            <p>Dashboard visualization for general assessments is coming soon.</p>
+          </div>
+        </div>
+      )}
+
       {/* OVERVIEW VIEW */}
-      {activeView === "overview" && (
+      {isBetAssessment && activeView === "overview" && (
         <div className="dashboard-content">
          
           {/* Overview Charts Grid */}
@@ -264,6 +306,44 @@ const StudentDashboard: React.FC = () => {
                       <Tooltip formatter={(value: any) => `${Number(value).toFixed(1)}%`} />
                     </RadarChart>
                   </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {/* Social Insight Card */}
+            {social.socialInsight && (
+              <div className="dashboard-card">
+                <div className="card-header">
+                  <h3 className="card-title">
+                    <i className="bi bi-lightbulb me-2"></i>
+                    Social Insight
+                  </h3>
+                  <button className="btn-link" onClick={() => setActiveView("social")}>
+                    View Details <i className="bi bi-arrow-right"></i>
+                  </button>
+                </div>
+                <div className="card-body">
+                  <div className="text-center mb-3">
+                    <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#1e40af' }}>
+                      {social.socialInsight.score}/18
+                    </div>
+                    <span className={`badge category-badge ${social.socialInsight.category.toLowerCase().replace(/ /g, '-')}`}>
+                      {social.socialInsight.category}
+                    </span>
+                  </div>
+                  <div className="progress-bar-container" style={{ marginBottom: '1rem' }}>
+                    <div
+                      className="progress-bar-fill"
+                      style={{ width: `${(social.socialInsight.score / 18) * 100}%` }}
+                    ></div>
+                  </div>
+                  {social.socialInsight.traits && (
+                    <ul style={{ paddingLeft: '1.25rem', margin: 0 }}>
+                      {social.socialInsight.traits.map((trait, idx) => (
+                        <li key={idx} style={{ fontSize: '0.85rem', color: '#374151', marginBottom: '0.25rem' }}>{trait}</li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
             )}
@@ -420,7 +500,7 @@ const StudentDashboard: React.FC = () => {
       )}
 
       {/* COGNITIVE DEVELOPMENT VIEW */}
-      {activeView === "cognitive" && (
+      {isBetAssessment && activeView === "cognitive" && (
         <div className="dashboard-content">
           <div className="view-header">
             <h2 className="view-title">
@@ -592,7 +672,7 @@ const StudentDashboard: React.FC = () => {
       )}
 
       {/* SOCIAL DEVELOPMENT VIEW */}
-      {activeView === "social" && (
+      {isBetAssessment && activeView === "social" && (
         <div className="dashboard-content">
           <div className="view-header">
             <h2 className="view-title">
@@ -643,9 +723,19 @@ const StudentDashboard: React.FC = () => {
                 </p>
               </div>
               <div className="interpretation">
-                <strong>Your Child is: "{social.socialInsight.category}"</strong>
+                <strong>Your Child is a "{social.socialInsight.category}"</strong>
                 <p>{social.socialInsight.interpretation}</p>
               </div>
+              {social.socialInsight.traits && social.socialInsight.traits.length > 0 && (
+                <div className="traits-section">
+                  <strong>Your child:</strong>
+                  <ul>
+                    {social.socialInsight.traits.map((trait, idx) => (
+                      <li key={idx}>{trait}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {social.socialInsight.topDomains && social.socialInsight.topDomains.length > 0 && (
                 <>
                   <div className="superpowers-section">
@@ -827,7 +917,7 @@ const StudentDashboard: React.FC = () => {
       )}
 
       {/* SELF-MANAGEMENT VIEW */}
-      {activeView === "self-management" && (
+      {isBetAssessment && activeView === "self-management" && (
         <div className="dashboard-content">
           <div className="view-header">
             <h2 className="view-title">

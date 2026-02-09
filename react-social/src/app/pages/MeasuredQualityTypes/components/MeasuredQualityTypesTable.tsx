@@ -33,16 +33,20 @@ const MeasuredQualityTypesTable = (props: {
   useEffect(() => {
     const loadExistingSelections = async () => {
       const newSelections: { [key: number]: any } = {};
+
+      // Debug: Log the actual data structure
+      console.log('MeasuredQualityTypes data:', props.data);
+
       for (const type of props.data) {
-        // Try to robustly extract the linked measured quality ID
+        // Extract the linked measured quality ID from the measuredQuality object
         let linkedId = '';
         if (type.measuredQuality && typeof type.measuredQuality === 'object') {
-          linkedId = type.measuredQuality.measuredQualityId || '';
-        } else if (type.measuredQualityId) {
-          linkedId = type.measuredQualityId;
-        } else if (type.fk_measured_qualities) {
-          linkedId = type.fk_measured_qualities;
+          console.log('Found measuredQuality for type:', type.measuredQualityTypeId, type.measuredQuality);
+          // Try both camelCase (from Jackson serialization) and snake_case
+          linkedId = type.measuredQuality.measuredQualityId ||
+                     type.measuredQuality.measured_quality_id || '';
         }
+        console.log(`Type ${type.measuredQualityTypeId} -> Quality ${linkedId}`);
         newSelections[type.measuredQualityTypeId] = linkedId;
       }
       setSelectedQualityByType(newSelections);

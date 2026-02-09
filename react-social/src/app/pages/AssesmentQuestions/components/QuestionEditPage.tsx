@@ -707,114 +707,109 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                 </div>
               ) : (
                 <>
-                  <div className="table-responsive">
-                    <table className="table table-row-bordered">
-                      <thead>
-                        <tr className="fw-bold fs-6 text-gray-800">
-                          <th style={{ minWidth: "80px" }}>Sequence</th>
-                          <th>Option Text & Description</th>
-                          <th style={{ minWidth: "200px" }}>Measured Quality Types</th>
-                          <th style={{ minWidth: "100px" }}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {formik.values.options
-                          .sort((a, b) => a.sequence - b.sequence)
-                          .map((option, index) => (
-                            <tr key={index}>
-                              <td>
-                                <select
-                                  className="form-select form-select-sm"
-                                  value={option.sequence}
-                                  onChange={(e) => updateOptionSequence(index, parseInt(e.target.value))}
-                                >
-                                  {generateSequenceOptions(formik.values.options.length).map(seq => (
-                                    <option key={seq} value={seq}>{seq}</option>
-                                  ))}
-                                </select>
-                              </td>
-                              <td>
-                                {/* Toggle Switch for Text/Image */}
-                                <div className="d-flex align-items-center mb-2">
-                                  <div className="form-check form-switch">
-                                    <input
-                                      className="form-check-input"
-                                      type="checkbox"
-                                      role="switch"
-                                      id={`edit-option-type-${index}`}
-                                      checked={optionTypes[index] === 'image'}
-                                      onChange={() => toggleOptionType(index)}
-                                    />
-                                    <label className="form-check-label small" htmlFor={`edit-option-type-${index}`}>
-                                      {optionTypes[index] === 'image' ? '📷' : '📝'}
-                                    </label>
-                                  </div>
-                                </div>
+                  {formik.values.options
+                    .sort((a, b) => a.sequence - b.sequence)
+                    .map((option, index) => (
+                      <div key={index} className="mb-3 p-3 border rounded bg-light" style={{ position: 'relative', zIndex: formik.values.options.length - index }}>
+                        <div className="row g-3">
+                          {/* Sequence Column */}
+                          <div className="col-auto">
+                            <label className="form-label small fw-bold">Sequence</label>
+                            <select
+                              className="form-select form-select-sm"
+                              value={option.sequence}
+                              onChange={(e) => updateOptionSequence(index, parseInt(e.target.value))}
+                              style={{ width: '80px' }}
+                            >
+                              {generateSequenceOptions(formik.values.options.length).map(seq => (
+                                <option key={seq} value={seq}>{seq}</option>
+                              ))}
+                            </select>
+                          </div>
 
-                                {optionTypes[index] === 'image' ? (
-                                  <div>
-                                    <input
-                                      type="file"
-                                      accept="image/*"
-                                      onChange={(e) => handleImageSelect(index, e.target.files?.[0] || null)}
-                                      className="form-control form-control-sm mb-2"
-                                    />
-                                    {optionImages[index] && (
-                                      <div className="position-relative d-inline-block">
-                                        <img
-                                          src={optionImages[index]}
-                                          alt={`Option ${option.sequence}`}
-                                          style={{ maxWidth: 100, maxHeight: 60, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }}
-                                        />
-                                        <button
-                                          type="button"
-                                          className="btn btn-sm btn-danger position-absolute"
-                                          style={{ top: -6, right: -6, padding: '1px 5px', fontSize: 10 }}
-                                          onClick={() => handleImageSelect(index, null)}
-                                        >
-                                          ×
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <>
-                                    <div className="mb-2">
-                                      <input
-                                        type="text"
-                                        placeholder={`Enter option ${option.sequence}`}
-                                        value={option.optionText}
-                                        onChange={e => updateOption(option.sequence, e.target.value)}
-                                        className={clsx(
-                                          "form-control form-control-sm",
-                                          {
-                                            "is-invalid text-danger": !option.optionText,
-                                            "is-valid": !!option.optionText,
-                                          }
-                                        )}
-                                      />
-                                    </div>
-                                    <textarea
-                                      placeholder={`Description (optional)`}
-                                      value={option.optionDescription}
-                                      onChange={e => {
-    const currentOptions = [...formik.values.options];
-    const optionIndex = currentOptions.findIndex(opt => opt.sequence === option.sequence);
-    console.log("Updating description for option index:", optionIndex, "with value:", e.target.value);
-    if (optionIndex !== -1) {
-          console.log("Before update:", currentOptions[optionIndex]);
+                          {/* Option Text & Description Column */}
+                          <div className="col">
+                            {/* Toggle Switch for Text/Image */}
+                            <div className="d-flex align-items-center mb-2">
+                              <div className="form-check form-switch">
+                                <input
+                                  className="form-check-input"
+                                  type="checkbox"
+                                  role="switch"
+                                  id={`edit-option-type-${index}`}
+                                  checked={optionTypes[index] === 'image'}
+                                  onChange={() => toggleOptionType(index)}
+                                />
+                                <label className="form-check-label small" htmlFor={`edit-option-type-${index}`}>
+                                  {optionTypes[index] === 'image' ? '📷' : '📝'}
+                                </label>
+                              </div>
+                            </div>
 
-      currentOptions[optionIndex].optionDescription = e.target.value;
-      formik.setFieldValue("options", currentOptions);
-    }}}
-                                      className="form-control form-control-sm"
-                                      rows={2}
-                                      style={{ resize: "vertical" }}
+                            {optionTypes[index] === 'image' ? (
+                              <div>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => handleImageSelect(index, e.target.files?.[0] || null)}
+                                  className="form-control form-control-sm mb-2"
+                                />
+                                {optionImages[index] && (
+                                  <div className="position-relative d-inline-block">
+                                    <img
+                                      src={optionImages[index]}
+                                      alt={`Option ${option.sequence}`}
+                                      style={{ maxWidth: 100, maxHeight: 60, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }}
                                     />
-                                  </>
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-danger position-absolute"
+                                      style={{ top: -6, right: -6, padding: '1px 5px', fontSize: 10 }}
+                                      onClick={() => handleImageSelect(index, null)}
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
                                 )}
-                              </td>
-                              <td>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="mb-2">
+                                  <input
+                                    type="text"
+                                    placeholder={`Enter option ${option.sequence}`}
+                                    value={option.optionText}
+                                    onChange={e => updateOption(option.sequence, e.target.value)}
+                                    className={clsx(
+                                      "form-control form-control-sm",
+                                      {
+                                        "is-invalid text-danger": !option.optionText,
+                                        "is-valid": !!option.optionText,
+                                      }
+                                    )}
+                                  />
+                                </div>
+                                <textarea
+                                  placeholder={`Description (optional)`}
+                                  value={option.optionDescription}
+                                  onChange={e => {
+                                    const currentOptions = [...formik.values.options];
+                                    const optionIndex = currentOptions.findIndex(opt => opt.sequence === option.sequence);
+                                    if (optionIndex !== -1) {
+                                      currentOptions[optionIndex].optionDescription = e.target.value;
+                                      formik.setFieldValue("options", currentOptions);
+                                    }
+                                  }}
+                                  className="form-control form-control-sm"
+                                  rows={2}
+                                  style={{ resize: "vertical" }}
+                                />
+                              </>
+                            )}
+                          </div>
+
+                          {/* Measured Quality Types Column */}
+                          <div className="col-auto" style={{ minWidth: '200px' }}>
                                 <Dropdown autoClose="outside">
                                   <Dropdown.Toggle
                                     variant="secondary"
@@ -823,7 +818,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                                   >
                                     Quality Types
                                   </Dropdown.Toggle>
-                                  <Dropdown.Menu style={{ minWidth: 300 }}>
+                                  <Dropdown.Menu style={{ minWidth: 300, zIndex: 9999 }} popperConfig={{ strategy: 'fixed' }} renderOnMount>
                                     <Dropdown.Header>Measured Quality Types</Dropdown.Header>
 
                                     {/* Search Bar */}
@@ -894,66 +889,69 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                                       )}
                                     </div>
                                   </Dropdown.Menu>
-                                </Dropdown>
+                            </Dropdown>
 
-                                {/* Display Selected Measured Qualities */}
-                                {optionMeasuredQualities[index] && Object.keys(optionMeasuredQualities[index]).length > 0 && (
-                                  <div className="mt-2">
-                                    <div className="small text-muted mb-1">Selected Qualities:</div>
-                                    <div className="d-flex flex-wrap gap-1">
-                                      {Object.entries(optionMeasuredQualities[index])
-                                        .filter(([_, value]) => value.checked)
-                                        .map(([typeId, value]) => {
-                                          const qualityType = mqt.find(q => q.measuredQualityTypeId === Number(typeId));
-                                          return qualityType ? (
-                                            <div
-                                              key={typeId}
-                                              className="badge bg-primary d-flex align-items-center gap-1"
-                                              style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem' }}
-                                            >
-                                              <span>{qualityType.measuredQualityTypeName}</span>
-                                              <span className="badge bg-light text-dark ms-1">{value.score}</span>
-                                              <button
-                                                type="button"
-                                                className="btn-close btn-close-white"
-                                                style={{ fontSize: '0.5rem', padding: 0, width: '0.6rem', height: '0.6rem' }}
-                                                onClick={() => handleQualityToggle(index, Number(typeId))}
-                                                aria-label="Remove"
-                                              />
-                                            </div>
-                                          ) : null;
-                                        })}
-                                    </div>
-                                  </div>
-                                )}
-                              </td>
-                              <td>
-                                <div className="d-flex gap-1">
-                                  {formik.values.options.length > 1 && (
-                                    <button
-                                      type="button"
-                                      className="btn btn-sm btn-danger"
-                                      onClick={() => removeOption(index)}
-                                    >
-                                      <i className="fas fa-trash"></i>
-                                    </button>
-                                  )}
-                                  {index === formik.values.options.length - 1 && (
-                                    <button
-                                      type="button"
-                                      className="btn btn-sm btn-primary"
-                                      onClick={addOption}
-                                    >
-                                      <i className="fas fa-plus"></i>
-                                    </button>
-                                  )}
+                            {/* Display Selected Measured Qualities */}
+                            {optionMeasuredQualities[index] && Object.keys(optionMeasuredQualities[index]).length > 0 && (
+                              <div className="mt-2">
+                                <div className="small text-muted mb-1">Selected:</div>
+                                <div className="d-flex flex-wrap gap-1">
+                                  {Object.entries(optionMeasuredQualities[index])
+                                    .filter(([_, value]) => value.checked)
+                                    .map(([typeId, value]) => {
+                                      const qualityType = mqt.find(q => q.measuredQualityTypeId === Number(typeId));
+                                      return qualityType ? (
+                                        <div
+                                          key={typeId}
+                                          className="badge bg-primary d-flex align-items-center gap-1"
+                                          style={{ fontSize: '0.75rem', padding: '0.35rem 0.5rem' }}
+                                        >
+                                          <span>{qualityType.measuredQualityTypeName}</span>
+                                          <span className="badge bg-light text-dark ms-1">{value.score}</span>
+                                          <button
+                                            type="button"
+                                            className="btn-close btn-close-white"
+                                            style={{ fontSize: '0.5rem', padding: 0, width: '0.6rem', height: '0.6rem' }}
+                                            onClick={() => handleQualityToggle(index, Number(typeId))}
+                                            aria-label="Remove"
+                                          />
+                                        </div>
+                                      ) : null;
+                                    })}
                                 </div>
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Actions Column */}
+                          <div className="col-auto">
+                            <label className="form-label small fw-bold invisible">Actions</label>
+                            <div className="d-flex gap-1">
+                              {formik.values.options.length > 1 && (
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-danger"
+                                  onClick={() => removeOption(index)}
+                                  title="Remove option"
+                                >
+                                  <i className="fas fa-trash"></i>
+                                </button>
+                              )}
+                              {index === formik.values.options.length - 1 && (
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-primary"
+                                  onClick={addOption}
+                                  title="Add option"
+                                >
+                                  <i className="fas fa-plus"></i>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
 
                   {typeof formik.errors.options === "string" && (
                     <div className="fv-plugins-message-container">

@@ -249,6 +249,11 @@ public class AssessmentAnswerController {
                 assessmentData.setEndDate(assessment.getEndDate());
                 assessmentData.setStudentAssessmentMappingId(mapping.getStudentAssessmentId());
 
+                // 5.1.1 Set questionnaire type (true = bet-assessment, false/null = general)
+                if (assessment.getQuestionnaire() != null) {
+                    assessmentData.setQuestionnaireType(assessment.getQuestionnaire().getType());
+                }
+
                 // 5.2 Fetch all answers for this assessment using optimized query
                 ArrayList<AssessmentAnswer> answers = assessmentAnswerRepository
                         .findByUserStudentIdAndAssessmentIdWithDetails(userStudentId, assessmentId);

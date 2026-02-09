@@ -114,6 +114,11 @@ public class StudentInfoController {
     @PostMapping("/add")
     public StudentAssessmentMapping addStudentInfo(@RequestBody StudentInfo studentInfo) {
         try {
+            System.out.println("[DEBUG addStudentInfo] Received: name=" + studentInfo.getName()
+                + ", rollNo=" + studentInfo.getSchoolRollNumber()
+                + ", assesment_id=" + studentInfo.getAssesment_id()
+                + ", instituteId=" + studentInfo.getInstituteId());
+
             User user = userRepository.save(new User((int) (Math.random() * 1000),
                     studentInfo.getStudentDob()));
             studentInfo.setUser(user);
@@ -122,18 +127,24 @@ public class StudentInfoController {
                     instituteDetailRepository.getById(instituteId));
             UserStudent userStudentSAVED = userStudentRepository.save(userStudent);
 
-            // Use assessment ID from request, default to 11 if not provided
-
-            // if (studentInfo.getAssesment_id() != null &&
-            // !studentInfo.getAssesment_id().isEmpty()) {
             var assessmentId = Long.parseLong(studentInfo.getAssesment_id());
-            // }
+
+            System.out.println("[DEBUG addStudentInfo] Creating mapping: userStudentId="
+                + userStudentSAVED.getUserStudentId() + ", assessmentId=" + assessmentId);
 
             StudentAssessmentMapping studentAssessmentMapping = studentAssessmentMappingRepository.save(
                     new StudentAssessmentMapping(userStudentSAVED.getUserStudentId(), assessmentId));
+
+            // Verify: count all mappings for this userStudent
+            long mappingCount = studentAssessmentMappingRepository
+                    .findByUserStudentUserStudentId(userStudentSAVED.getUserStudentId()).size();
+            System.out.println("[DEBUG addStudentInfo] Total mappings for userStudentId="
+                + userStudentSAVED.getUserStudentId() + ": " + mappingCount);
+
             return studentAssessmentMapping;
         } catch (Exception e) {
-            System.out.println(e);
+            System.out.println("[DEBUG addStudentInfo] ERROR: " + e.getMessage());
+            e.printStackTrace();
             return null;
         }
     }

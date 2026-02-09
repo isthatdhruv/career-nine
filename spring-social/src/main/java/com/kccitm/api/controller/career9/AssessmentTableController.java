@@ -100,8 +100,15 @@ public class AssessmentTableController {
             Optional<AssessmentTable> assessment = assessmentTableRepository.findById(mapping.getAssessmentId());
             if (assessment.isPresent()) {
                 assessmentInfo.put("assessmentName", assessment.get().getAssessmentName());
+                // Add questionnaire type (true = bet-assessment, false/null = general)
+                if (assessment.get().getQuestionnaire() != null) {
+                    assessmentInfo.put("questionnaireType", assessment.get().getQuestionnaire().getType());
+                } else {
+                    assessmentInfo.put("questionnaireType", null);
+                }
             } else {
                 assessmentInfo.put("assessmentName", "Unknown Assessment");
+                assessmentInfo.put("questionnaireType", null);
             }
 
             result.add(assessmentInfo);

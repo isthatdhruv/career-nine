@@ -94,7 +94,7 @@
 }
 
 .info-card:hover {
-  transform: scale(1.02);
+  transform: none;
 }
 
 .info-icon {
@@ -141,7 +141,7 @@
 }
 
 .metric-card:hover {
-  transform: translateY(-4px);
+  transform: none;
 }
 
 .metric-icon {

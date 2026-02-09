@@ -93,6 +93,7 @@ public class StudentDashboardResponse {
         private Long studentAssessmentMappingId;
         private List<AnswerDetail> answers;
         private List<RawScoreData> rawScores;
+        private Boolean questionnaireType;
 
         public AssessmentData() {
         }
@@ -168,6 +169,14 @@ public class StudentDashboardResponse {
 
         public void setRawScores(List<RawScoreData> rawScores) {
             this.rawScores = rawScores;
+        }
+
+        public Boolean getQuestionnaireType() {
+            return questionnaireType;
+        }
+
+        public void setQuestionnaireType(Boolean questionnaireType) {
+            this.questionnaireType = questionnaireType;
         }
     }
 

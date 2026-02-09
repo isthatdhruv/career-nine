@@ -950,12 +950,6 @@ const SectionQuestionPage: React.FC = () => {
                       transition: "all 0.2s ease",
                       boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
                     }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = "scale(1.1)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "scale(1)";
-                    }}
                   >
                     {i + 1}
                   </div>

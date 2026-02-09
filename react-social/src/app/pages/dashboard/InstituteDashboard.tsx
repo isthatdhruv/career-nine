@@ -937,9 +937,7 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
                 <div
                   className={`card shadow-sm h-100 ${isClickable ? 'cursor-pointer' : ''}`}
                   onClick={isClickable ? () => setActiveModal(modalType) : undefined}
-                  style={isClickable ? { cursor: 'pointer', transition: 'transform 0.2s' } : undefined}
-                  onMouseEnter={isClickable ? (e) => (e.currentTarget.style.transform = 'scale(1.02)') : undefined}
-                  onMouseLeave={isClickable ? (e) => (e.currentTarget.style.transform = 'scale(1)') : undefined}
+                  style={isClickable ? { cursor: 'pointer' } : undefined}
                 >
                   <div className="card-body py-4 d-flex flex-column gap-3">
                     <div className="d-flex align-items-center justify-content-between">

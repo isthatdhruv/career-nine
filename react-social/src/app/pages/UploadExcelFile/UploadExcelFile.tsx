@@ -192,7 +192,11 @@ export default function UploadExcelFile() {
     let successCount = 0;
     let skippedCount = 0;
 
-    const uploadPromises = rawExcelData.map(async (row) => {
+    console.log("[DEBUG Upload] Starting upload. selectedAssessment:", selectedAssessment,
+      "selectedInstitute:", selectedInstitute,
+      "totalRows:", rawExcelData.length);
+
+    const uploadPromises = rawExcelData.map(async (row, index) => {
       const obj = { ...DEFAULT_SCHEMA_OBJECT };
       if (selectedInstitute) {
         obj.instituteId = Number(selectedInstitute);
@@ -224,8 +228,11 @@ export default function UploadExcelFile() {
         return;
       }
 
+      console.log(`[DEBUG Upload] Row ${index}: sending payload:`, JSON.stringify(obj));
+
       try {
-        await addStudentInfo(obj as StudentInfo);
+        const response = await addStudentInfo(obj as StudentInfo);
+        console.log(`[DEBUG Upload] Row ${index}: response:`, response.data);
         successCount++;
       } catch (error) {
         console.error("Failed to upload info for row", row, error);
@@ -234,6 +241,7 @@ export default function UploadExcelFile() {
     });
 
     await Promise.all(uploadPromises);
+    console.log("[DEBUG Upload] Done. success:", successCount, "skipped:", skippedCount);
     setUploadResult({ success: successCount, skipped: skippedCount });
     setUploading(false);
   };

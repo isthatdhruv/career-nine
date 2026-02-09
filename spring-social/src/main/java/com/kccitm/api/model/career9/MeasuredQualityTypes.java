@@ -16,6 +16,7 @@ import javax.persistence.OneToMany;
 import javax.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
 @Table(name = "measured_quality_types")
@@ -36,7 +37,7 @@ public class MeasuredQualityTypes implements Serializable {
     // Many-to-One relationship with MeasuredQualities
     @ManyToOne
     @JoinColumn(name = "fk_measured_qualities")
-    @JsonIgnore
+    @JsonIgnoreProperties({"qualityTypes", "tools"})
     private MeasuredQualities measuredQuality;
 
     @ManyToMany
