@@ -122,6 +122,8 @@ npm run format
 - `staging.env` - Staging environment variables
 - `production.env` - Production environment variables
 
+**IMPORTANT:** Do NOT run TypeScript compilation checks (`npm run build`, `tsc`, etc.) or test the build process unless explicitly asked by the user. Focus on code changes only.
+
 ### Docker Deployment
 
 ```bash
@@ -600,3 +602,4 @@ export function getEntityById(id: number) {
 - **Port mismatch:** Dev runs on 8091, Docker runs on 8080
 - **Google credentials required:** Backend won't fully start without `google.json` and Firebase config
 - **Profile matters:** Always specify correct Spring profile (dev/staging/production)
+- **TypeScript compilation:** Do NOT run `npm run build`, `tsc`, or test TypeScript compilation unless explicitly asked by the user

@@ -46,6 +46,10 @@
   margin: 0;
   color: #ffffff;
   letter-spacing: -0.02em;
+  background: none;
+  -webkit-background-clip: unset;
+  -webkit-text-fill-color: #ffffff;
+  background-clip: unset;
 }
 
 .dashboard-subtitle {
@@ -99,6 +103,7 @@
   padding: 0 2rem;
   gap: 0.25rem;
   overflow-x: auto;
+  border-radius: 0px 0px 0px 0px;
   border-bottom: 1px solid #e2e8f0;
 }
 
@@ -1045,6 +1050,290 @@
   padding: 0.875rem;
   border-radius: 6px;
   border-left: 3px solid #eab308;
+}
+
+/* ========== SOCIAL INSIGHT SCORE RANGE ========== */
+.si-score-range {
+  margin-top: 1rem;
+}
+
+.si-range-bar {
+  display: flex;
+  height: 28px;
+  border-radius: 14px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid #e2e8f0;
+}
+
+.si-range-zone {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: white;
+  letter-spacing: 0.3px;
+}
+
+.si-zone-low {
+  background: #fbbf24;
+}
+
+.si-zone-moderate {
+  background: #3b82f6;
+}
+
+.si-zone-high {
+  background: #10b981;
+}
+
+.si-range-marker {
+  position: absolute;
+  top: -4px;
+  width: 4px;
+  height: 36px;
+  background: #0f172a;
+  border-radius: 2px;
+  transform: translateX(-50%);
+  box-shadow: 0 0 0 2px white, 0 0 6px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+}
+
+.si-range-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.4rem;
+  padding: 0 0.25rem;
+}
+
+.si-range-labels span {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #64748b;
+  text-align: center;
+  flex: 1;
+}
+
+/* ========== SOCIAL INSIGHT DETAILED INTERPRETATION ========== */
+.si-detailed-interpretation {
+  background: #f0f9ff;
+  border-left: 3px solid #0ea5e9;
+  padding: 1rem;
+  border-radius: 6px;
+  margin-bottom: 0.875rem;
+}
+
+.si-detailed-interpretation strong {
+  display: block;
+  color: #0c4a6e;
+  font-size: 0.95rem;
+  margin-bottom: 0.375rem;
+}
+
+.si-detailed-interpretation p {
+  margin: 0;
+  color: #374151;
+  line-height: 1.7;
+  font-size: 0.925rem;
+}
+
+/* ========== SELF-MANAGEMENT PROGRESS LINE CHECKPOINTS ========== */
+.sm-progress-line {
+  margin-bottom: 1.5rem;
+}
+
+.sm-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.sm-progress-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.sm-progress-score {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.sm-checkpoint-track {
+  display: flex;
+  align-items: center;
+  position: relative;
+  padding: 0 1.5rem;
+}
+
+.sm-checkpoint-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 2;
+  flex: 0 0 auto;
+}
+
+.sm-checkpoint-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid #cbd5e1;
+  background: white;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sm-checkpoint-dot.passed {
+  border-color: transparent;
+  background: #94a3b8;
+}
+
+.sm-checkpoint-dot.passed.low {
+  background: #f87171;
+}
+
+.sm-checkpoint-dot.passed.moderate {
+  background: #fbbf24;
+}
+
+.sm-checkpoint-dot.passed.high {
+  background: #10b981;
+}
+
+.sm-checkpoint-dot.active {
+  width: 36px;
+  height: 36px;
+  border: 3px solid transparent;
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.08);
+}
+
+.sm-checkpoint-dot.active.low {
+  background: #f87171;
+  box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.25);
+}
+
+.sm-checkpoint-dot.active.moderate {
+  background: #fbbf24;
+  box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.25);
+}
+
+.sm-checkpoint-dot.active.high {
+  background: #10b981;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.25);
+}
+
+.sm-checkpoint-dot.future {
+  border-color: #cbd5e1;
+  background: white;
+}
+
+.sm-checkpoint-dot .dot-icon {
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 900;
+}
+
+.sm-checkpoint-dot.future .dot-icon {
+  color: #cbd5e1;
+}
+
+.sm-checkpoint-label {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+  text-align: center;
+}
+
+.sm-checkpoint-label.active {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.sm-checkpoint-range {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-align: center;
+  margin-top: 0.15rem;
+}
+
+.sm-connector {
+  flex: 1;
+  height: 4px;
+  background: #e2e8f0;
+  z-index: 1;
+}
+
+.sm-connector.filled {
+  background: #94a3b8;
+}
+
+.sm-connector.filled.low {
+  background: #f87171;
+}
+
+.sm-connector.filled.moderate {
+  background: #fbbf24;
+}
+
+.sm-connector.filled.high {
+  background: #10b981;
+}
+
+/* Compact version for overview card */
+.sm-progress-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 0.5rem 0;
+}
+
+.sm-progress-compact .sm-progress-line {
+  margin-bottom: 0;
+}
+
+.sm-progress-compact .sm-checkpoint-dot {
+  width: 20px;
+  height: 20px;
+  border-width: 2px;
+}
+
+.sm-progress-compact .sm-checkpoint-dot.active {
+  width: 24px;
+  height: 24px;
+}
+
+.sm-progress-compact .sm-checkpoint-track {
+  padding: 0 0.75rem;
+}
+
+.sm-progress-compact .sm-connector {
+  height: 3px;
+}
+
+.sm-progress-compact .sm-checkpoint-label {
+  font-size: 0.65rem;
+  margin-top: 0.3rem;
+}
+
+.sm-progress-compact .sm-checkpoint-range {
+  display: none;
+}
+
+.sm-progress-compact .sm-progress-header {
+  margin-bottom: 0.5rem;
+}
+
+.sm-progress-compact .sm-progress-title {
+  font-size: 0.85rem;
 }
 
 /* ========== CHART STYLES ========== */

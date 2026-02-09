@@ -327,9 +327,14 @@ const StudentDashboard: React.FC = () => {
                     <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#1e40af' }}>
                       {social.socialInsight.score}/18
                     </div>
-                    <span className={`badge category-badge ${social.socialInsight.category.toLowerCase().replace(/ /g, '-')}`}>
-                      {social.socialInsight.category}
-                    </span>
+                    <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <span className={`badge category-badge ${social.socialInsight.awarenessLevel.toLowerCase().replace(/ /g, '-')}`}>
+                        {social.socialInsight.awarenessLevel}
+                      </span>
+                      <span className={`badge category-badge ${social.socialInsight.category.toLowerCase().replace(/ /g, '-')}`}>
+                        {social.socialInsight.categoryTitle}
+                      </span>
+                    </div>
                   </div>
                   <div className="progress-bar-container" style={{ marginBottom: '1rem' }}>
                     <div
@@ -337,6 +342,9 @@ const StudentDashboard: React.FC = () => {
                       style={{ width: `${(social.socialInsight.score / 18) * 100}%` }}
                     ></div>
                   </div>
+                  <p style={{ fontSize: '0.85rem', color: '#374151', marginBottom: '0.75rem', lineHeight: 1.5 }}>
+                    {social.socialInsight.interpretation}
+                  </p>
                   {social.socialInsight.traits && (
                     <ul style={{ paddingLeft: '1.25rem', margin: 0 }}>
                       {social.socialInsight.traits.map((trait, idx) => (
@@ -385,7 +393,7 @@ const StudentDashboard: React.FC = () => {
               </div>
             )}
 
-            {/* Self-Management Chart */}
+            {/* Self-Management Summary */}
             {(selfManagement.selfEfficacy || selfManagement.emotionalRegulation || selfManagement.selfRegulation) && (
               <div className="dashboard-card">
                 <div className="card-header">
@@ -398,45 +406,110 @@ const StudentDashboard: React.FC = () => {
                   </button>
                 </div>
                 <div className="card-body">
-                  <ResponsiveContainer width="100%" height={300}>
-                    <RadialBarChart
-                      cx="50%"
-                      cy="50%"
-                      innerRadius="20%"
-                      outerRadius="90%"
-                      barSize={25}
-                      data={[
-                        {
-                          name: 'Self-Efficacy',
-                          value: selfManagement.selfEfficacy
-                            ? selfManagement.selfEfficacy.level === 'High' ? 85 : selfManagement.selfEfficacy.level === 'Moderate' ? 60 : 35
-                            : 0,
-                          fill: '#3b82f6',
-                        },
-                        {
-                          name: 'Emotional Regulation',
-                          value: selfManagement.emotionalRegulation
-                            ? selfManagement.emotionalRegulation.level === 'High' ? 85 : selfManagement.emotionalRegulation.level === 'Moderate' ? 60 : 35
-                            : 0,
-                          fill: '#10b981',
-                        },
-                        {
-                          name: 'Self-Regulation',
-                          value: selfManagement.selfRegulation
-                            ? selfManagement.selfRegulation.level === 'High' ? 85 : selfManagement.selfRegulation.level === 'Moderate' ? 60 : 35
-                            : 0,
-                          fill: '#f59e0b',
-                        },
-                      ]}
-                    >
-                      <PolarGrid gridType="circle" />
-                      {/* @ts-ignore */}
-                      <PolarAngleAxis type="category" dataKey="name" tick={{ fontSize: 11 }} />
-                      <RadialBar background dataKey="value" cornerRadius={10} />
-                      <Tooltip formatter={(value: any) => [`${value}%`, 'Level']} />
-                      <Legend iconSize={10} layout="horizontal" verticalAlign="bottom" />
-                    </RadialBarChart>
-                  </ResponsiveContainer>
+                  <div className="sm-progress-compact">
+                    {selfManagement.selfRegulation && (() => {
+                      const level = selfManagement.selfRegulation.level;
+                      const levelIdx = level === 'Low' ? 0 : level === 'Moderate' ? 1 : 2;
+                      return (
+                        <div className="sm-progress-line">
+                          <div className="sm-progress-header">
+                            <span className="sm-progress-title">Self Management</span>
+                            <span className="sm-progress-score">{selfManagement.selfRegulation.rawScore}/{selfManagement.selfRegulation.maxScore}</span>
+                          </div>
+                          <div className="sm-checkpoint-track">
+                            <div className="sm-checkpoint-node">
+                              <div className={`sm-checkpoint-dot ${levelIdx === 0 ? 'active low' : levelIdx > 0 ? 'passed low' : 'future'}`}>
+                                <span className="dot-icon">{levelIdx >= 0 ? '✓' : ''}</span>
+                              </div>
+                              <div className={`sm-checkpoint-label ${levelIdx === 0 ? 'active' : ''}`}>Low</div>
+                            </div>
+                            <div className={`sm-connector ${levelIdx >= 1 ? 'filled moderate' : ''}`}></div>
+                            <div className="sm-checkpoint-node">
+                              <div className={`sm-checkpoint-dot ${levelIdx === 1 ? 'active moderate' : levelIdx > 1 ? 'passed moderate' : 'future'}`}>
+                                <span className="dot-icon">{levelIdx >= 1 ? '✓' : ''}</span>
+                              </div>
+                              <div className={`sm-checkpoint-label ${levelIdx === 1 ? 'active' : ''}`}>Moderate</div>
+                            </div>
+                            <div className={`sm-connector ${levelIdx >= 2 ? 'filled high' : ''}`}></div>
+                            <div className="sm-checkpoint-node">
+                              <div className={`sm-checkpoint-dot ${levelIdx === 2 ? 'active high' : 'future'}`}>
+                                <span className="dot-icon">{levelIdx >= 2 ? '✓' : ''}</span>
+                              </div>
+                              <div className={`sm-checkpoint-label ${levelIdx === 2 ? 'active' : ''}`}>High</div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    {selfManagement.emotionalRegulation && (() => {
+                      const level = selfManagement.emotionalRegulation.level;
+                      const levelIdx = level === 'Low' ? 0 : level === 'Moderate' ? 1 : 2;
+                      return (
+                        <div className="sm-progress-line">
+                          <div className="sm-progress-header">
+                            <span className="sm-progress-title">Emotion Regulation</span>
+                            <span className="sm-progress-score">{selfManagement.emotionalRegulation.rawScore}/{selfManagement.emotionalRegulation.maxScore}</span>
+                          </div>
+                          <div className="sm-checkpoint-track">
+                            <div className="sm-checkpoint-node">
+                              <div className={`sm-checkpoint-dot ${levelIdx === 0 ? 'active low' : levelIdx > 0 ? 'passed low' : 'future'}`}>
+                                <span className="dot-icon">{levelIdx >= 0 ? '✓' : ''}</span>
+                              </div>
+                              <div className={`sm-checkpoint-label ${levelIdx === 0 ? 'active' : ''}`}>Low</div>
+                            </div>
+                            <div className={`sm-connector ${levelIdx >= 1 ? 'filled moderate' : ''}`}></div>
+                            <div className="sm-checkpoint-node">
+                              <div className={`sm-checkpoint-dot ${levelIdx === 1 ? 'active moderate' : levelIdx > 1 ? 'passed moderate' : 'future'}`}>
+                                <span className="dot-icon">{levelIdx >= 1 ? '✓' : ''}</span>
+                              </div>
+                              <div className={`sm-checkpoint-label ${levelIdx === 1 ? 'active' : ''}`}>Moderate</div>
+                            </div>
+                            <div className={`sm-connector ${levelIdx >= 2 ? 'filled high' : ''}`}></div>
+                            <div className="sm-checkpoint-node">
+                              <div className={`sm-checkpoint-dot ${levelIdx === 2 ? 'active high' : 'future'}`}>
+                                <span className="dot-icon">{levelIdx >= 2 ? '✓' : ''}</span>
+                              </div>
+                              <div className={`sm-checkpoint-label ${levelIdx === 2 ? 'active' : ''}`}>High</div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    {selfManagement.selfEfficacy && (() => {
+                      const level = selfManagement.selfEfficacy.level;
+                      const levelIdx = level === 'Low' ? 0 : level === 'Moderate' ? 1 : 2;
+                      return (
+                        <div className="sm-progress-line">
+                          <div className="sm-progress-header">
+                            <span className="sm-progress-title">Self-Efficacy</span>
+                            <span className="sm-progress-score">{selfManagement.selfEfficacy.rawScore}/{selfManagement.selfEfficacy.maxScore}</span>
+                          </div>
+                          <div className="sm-checkpoint-track">
+                            <div className="sm-checkpoint-node">
+                              <div className={`sm-checkpoint-dot ${levelIdx === 0 ? 'active low' : levelIdx > 0 ? 'passed low' : 'future'}`}>
+                                <span className="dot-icon">{levelIdx >= 0 ? '✓' : ''}</span>
+                              </div>
+                              <div className={`sm-checkpoint-label ${levelIdx === 0 ? 'active' : ''}`}>Low</div>
+                            </div>
+                            <div className={`sm-connector ${levelIdx >= 1 ? 'filled moderate' : ''}`}></div>
+                            <div className="sm-checkpoint-node">
+                              <div className={`sm-checkpoint-dot ${levelIdx === 1 ? 'active moderate' : levelIdx > 1 ? 'passed moderate' : 'future'}`}>
+                                <span className="dot-icon">{levelIdx >= 1 ? '✓' : ''}</span>
+                              </div>
+                              <div className={`sm-checkpoint-label ${levelIdx === 1 ? 'active' : ''}`}>Moderate</div>
+                            </div>
+                            <div className={`sm-connector ${levelIdx >= 2 ? 'filled high' : ''}`}></div>
+                            <div className="sm-checkpoint-node">
+                              <div className={`sm-checkpoint-dot ${levelIdx === 2 ? 'active high' : 'future'}`}>
+                                <span className="dot-icon">{levelIdx >= 2 ? '✓' : ''}</span>
+                              </div>
+                              <div className={`sm-checkpoint-label ${levelIdx === 2 ? 'active' : ''}`}>High</div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </div>
               </div>
             )}
@@ -489,7 +562,7 @@ const StudentDashboard: React.FC = () => {
                       {social.environmentalAwareness.icon} {social.environmentalAwareness.category}
                     </span>
                     <p className="mt-2 mb-0" style={{ fontSize: '0.85rem', color: '#6c757d' }}>
-                      Net Score: {social.environmentalAwareness.netScore > 0 ? '+' : ''}{social.environmentalAwareness.netScore}/+4
+                      Net Score: {social.environmentalAwareness.netScore > 0 ? '+' : ''}{social.environmentalAwareness.netScore}/4
                     </p>
                   </div>
                 </div>
@@ -700,32 +773,54 @@ const StudentDashboard: React.FC = () => {
                 <i className="bi bi-lightbulb-fill me-2"></i>
                 Social Insight
               </h3>
-              <span className={`badge category-badge ${social.socialInsight.category.toLowerCase().replace(' ', '-')}`}>
-                {social.socialInsight.category}
-              </span>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <span className={`badge category-badge ${social.socialInsight.awarenessLevel.toLowerCase().replace(/ /g, '-')}`}>
+                  {social.socialInsight.awarenessLevel}
+                </span>
+                <span className={`badge category-badge ${social.socialInsight.category.toLowerCase().replace(/ /g, '-')}`}>
+                  {social.socialInsight.categoryTitle}
+                </span>
+              </div>
             </div>
             <div className="result-body">
+              {/* Score Display with Range Indicator */}
               <div className="score-display">
-                <div className="score-label">Score:</div>
+                <div className="score-label">Social Insight Score</div>
                 <div className="score-value">{social.socialInsight.score}/18</div>
-                <div className="progress-bar-container">
-                  <div
-                    className="progress-bar-fill"
-                    style={{width: `${(social.socialInsight.score / 18) * 100}%`}}
-                  ></div>
+                <div className="si-score-range">
+                  <div className="si-range-bar">
+                    <div className="si-range-zone si-zone-low">0-6</div>
+                    <div className="si-range-zone si-zone-moderate">7-12</div>
+                    <div className="si-range-zone si-zone-high">13-18</div>
+                    <div
+                      className="si-range-marker"
+                      style={{ left: `${(social.socialInsight.score / 18) * 100}%` }}
+                    ></div>
+                  </div>
+                  <div className="si-range-labels">
+                    <span>Literal Thinker</span>
+                    <span>Social Detective</span>
+                    <span>Mind Reader</span>
+                  </div>
                 </div>
               </div>
+
+              {/* Cultural Context */}
               <div className="cultural-context">
                 <strong>Cultural Context:</strong>
                 <p>
-                  In our Indian cultural context, social "politeness" often involves indirect speech.
+                  In our cultural context, social "politeness" often involves indirect speech.
                   We use these results to help your child navigate these subtle social rules with confidence.
                 </p>
               </div>
+
+              {/* Category Title and Short Interpretation */}
               <div className="interpretation">
-                <strong>Your Child is a "{social.socialInsight.category}"</strong>
+                <strong>Your Child is "{social.socialInsight.categoryTitle}" ({social.socialInsight.awarenessLevel})</strong>
                 <p>{social.socialInsight.interpretation}</p>
               </div>
+
+              {/* Traits - Student-facing bullet points */}
               {social.socialInsight.traits && social.socialInsight.traits.length > 0 && (
                 <div className="traits-section">
                   <strong>Your child:</strong>
@@ -736,10 +831,17 @@ const StudentDashboard: React.FC = () => {
                   </ul>
                 </div>
               )}
+
+              {/* Detailed Professional Interpretation */}
+              <div className="si-detailed-interpretation">
+                <strong>Detailed Interpretation:</strong>
+                <p>{social.socialInsight.detailedInterpretation}</p>
+              </div>
+
               {social.socialInsight.topDomains && social.socialInsight.topDomains.length > 0 && (
                 <>
                   <div className="superpowers-section">
-                    <strong>✨ Superpowers:</strong>
+                    <strong>Superpowers:</strong>
                     <ul>
                       {social.socialInsight.topDomains.map((domain, idx) => (
                         <li key={idx}>{domain.name}: You scored {domain.score}/2 on these questions</li>
@@ -791,9 +893,7 @@ const StudentDashboard: React.FC = () => {
             </div>
             <div className="result-body">
               <p className="values-intro">
-                Your top values show what kind of person you want to be. As primary motivators,
-                supporting these values nurtures your child's confidence, emotional growth, and
-                ability to build empathetic connections.
+                Your child's top choices form an Internal Compass of <strong>{social.values[0]?.name}</strong>, <strong>{social.values[1]?.name}</strong>, and <strong>{social.values[2]?.name}</strong>. As primary motivators, supporting these specific values nurtures your child's confidence, emotional growth, and ability to build empathetic connections.
               </p>
               <div className="values-list">
                 {social.values.map((value, idx) => (
@@ -862,7 +962,7 @@ const StudentDashboard: React.FC = () => {
             <div className="result-body">
               <div className="score-display">
                 <div className="score-label">Net Score:</div>
-                <div className="score-value">{social.environmentalAwareness.netScore}/+4</div>
+                <div className="score-value">{social.environmentalAwareness.netScore}/4</div>
                 <div className="progress-bar-container environmental">
                   <div className="progress-markers">
                     <span>-4</span>
@@ -937,134 +1037,303 @@ const StudentDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Self-Management Overview Chart - only show if at least one metric exists */}
+        {/* Self-Management Overview - Progress Lines with Checkpoints */}
         {(selfManagement.selfEfficacy || selfManagement.emotionalRegulation || selfManagement.selfRegulation) && (
         <div className="chart-container">
           <h3 className="chart-title">Self-Management Skills Overview</h3>
-          <ResponsiveContainer width="100%" height={350}>
-            <RadialBarChart
-              cx="50%"
-              cy="50%"
-              innerRadius="10%"
-              outerRadius="90%"
-              barSize={30}
-              data={[
-                {
-                  name: 'Self-Efficacy',
-                  value: selfManagement.selfEfficacy
-                    ? selfManagement.selfEfficacy.level === 'High'
-                      ? 85
-                      : selfManagement.selfEfficacy.level === 'Moderate'
-                      ? 60
-                      : 35
-                    : 0,
-                  fill: '#3b82f6',
-                },
-                {
-                  name: 'Emotional Regulation',
-                  value: selfManagement.emotionalRegulation
-                    ? selfManagement.emotionalRegulation.level === 'High'
-                      ? 85
-                      : selfManagement.emotionalRegulation.level === 'Moderate'
-                      ? 60
-                      : 35
-                    : 0,
-                  fill: '#10b981',
-                },
-                {
-                  name: 'Self-Regulation',
-                  value: selfManagement.selfRegulation
-                    ? selfManagement.selfRegulation.level === 'High'
-                      ? 85
-                      : selfManagement.selfRegulation.level === 'Moderate'
-                      ? 60
-                      : 35
-                    : 0,
-                  fill: '#f59e0b',
-                },
-              ]}
-            >
-              <PolarGrid gridType="circle" />
-              {/* @ts-ignore */}
-              <PolarAngleAxis type="category" dataKey="name" tick={{ fontSize: 13, fontWeight: 600 }} />
-              <RadialBar
-                background
-                dataKey="value"
-                cornerRadius={10}
-                label={{ position: 'insideStart', fill: '#fff', fontSize: 14, fontWeight: 'bold' }}
-              />
-              <Tooltip formatter={(value: any) => [`${value}%`, 'Level']} />
-              <Legend
-                iconSize={10}
-                layout="horizontal"
-                verticalAlign="bottom"
-                align="center"
-                wrapperStyle={{ paddingTop: '20px' }}
-              />
-            </RadialBarChart>
-          </ResponsiveContainer>
+
+          {selfManagement.selfRegulation && (() => {
+            const level = selfManagement.selfRegulation.level;
+            const levelIdx = level === 'Low' ? 0 : level === 'Moderate' ? 1 : 2;
+            return (
+              <div className="sm-progress-line">
+                <div className="sm-progress-header">
+                  <span className="sm-progress-title">Self Management</span>
+                  <span className="sm-progress-score">{selfManagement.selfRegulation.rawScore}/{selfManagement.selfRegulation.maxScore}</span>
+                </div>
+                <div className="sm-checkpoint-track">
+                  <div className={`sm-checkpoint-node`}>
+                    <div className={`sm-checkpoint-dot ${levelIdx === 0 ? 'active low' : levelIdx > 0 ? 'passed low' : 'future'}`}>
+                      <span className="dot-icon">{levelIdx >= 0 ? '✓' : ''}</span>
+                    </div>
+                    <div className={`sm-checkpoint-label ${levelIdx === 0 ? 'active' : ''}`}>Low</div>
+                    <div className="sm-checkpoint-range">9-11</div>
+                  </div>
+                  <div className={`sm-connector ${levelIdx >= 1 ? 'filled moderate' : ''}`}></div>
+                  <div className={`sm-checkpoint-node`}>
+                    <div className={`sm-checkpoint-dot ${levelIdx === 1 ? 'active moderate' : levelIdx > 1 ? 'passed moderate' : 'future'}`}>
+                      <span className="dot-icon">{levelIdx >= 1 ? '✓' : ''}</span>
+                    </div>
+                    <div className={`sm-checkpoint-label ${levelIdx === 1 ? 'active' : ''}`}>Moderate</div>
+                    <div className="sm-checkpoint-range">12-15</div>
+                  </div>
+                  <div className={`sm-connector ${levelIdx >= 2 ? 'filled high' : ''}`}></div>
+                  <div className={`sm-checkpoint-node`}>
+                    <div className={`sm-checkpoint-dot ${levelIdx === 2 ? 'active high' : 'future'}`}>
+                      <span className="dot-icon">{levelIdx >= 2 ? '✓' : ''}</span>
+                    </div>
+                    <div className={`sm-checkpoint-label ${levelIdx === 2 ? 'active' : ''}`}>High</div>
+                    <div className="sm-checkpoint-range">16-18</div>
+                  </div>
+                </div>
+                <div className="interpretation" style={{ marginTop: '0.75rem' }}>
+                  <p>{selfManagement.selfRegulation.interpretation}</p>
+                </div>
+              </div>
+            );
+          })()}
+
+          {selfManagement.emotionalRegulation && (() => {
+            const level = selfManagement.emotionalRegulation.level;
+            const levelIdx = level === 'Low' ? 0 : level === 'Moderate' ? 1 : 2;
+            return (
+              <div className="sm-progress-line">
+                <div className="sm-progress-header">
+                  <span className="sm-progress-title">Emotion Regulation</span>
+                  <span className="sm-progress-score">{selfManagement.emotionalRegulation.rawScore}/{selfManagement.emotionalRegulation.maxScore}</span>
+                </div>
+                <div className="sm-checkpoint-track">
+                  <div className={`sm-checkpoint-node`}>
+                    <div className={`sm-checkpoint-dot ${levelIdx === 0 ? 'active low' : levelIdx > 0 ? 'passed low' : 'future'}`}>
+                      <span className="dot-icon">{levelIdx >= 0 ? '✓' : ''}</span>
+                    </div>
+                    <div className={`sm-checkpoint-label ${levelIdx === 0 ? 'active' : ''}`}>Low</div>
+                    <div className="sm-checkpoint-range">7-9</div>
+                  </div>
+                  <div className={`sm-connector ${levelIdx >= 1 ? 'filled moderate' : ''}`}></div>
+                  <div className={`sm-checkpoint-node`}>
+                    <div className={`sm-checkpoint-dot ${levelIdx === 1 ? 'active moderate' : levelIdx > 1 ? 'passed moderate' : 'future'}`}>
+                      <span className="dot-icon">{levelIdx >= 1 ? '✓' : ''}</span>
+                    </div>
+                    <div className={`sm-checkpoint-label ${levelIdx === 1 ? 'active' : ''}`}>Moderate</div>
+                    <div className="sm-checkpoint-range">10-12</div>
+                  </div>
+                  <div className={`sm-connector ${levelIdx >= 2 ? 'filled high' : ''}`}></div>
+                  <div className={`sm-checkpoint-node`}>
+                    <div className={`sm-checkpoint-dot ${levelIdx === 2 ? 'active high' : 'future'}`}>
+                      <span className="dot-icon">{levelIdx >= 2 ? '✓' : ''}</span>
+                    </div>
+                    <div className={`sm-checkpoint-label ${levelIdx === 2 ? 'active' : ''}`}>High</div>
+                    <div className="sm-checkpoint-range">13-14</div>
+                  </div>
+                </div>
+                <div className="interpretation" style={{ marginTop: '0.75rem' }}>
+                  <p>{selfManagement.emotionalRegulation.interpretation}</p>
+                </div>
+              </div>
+            );
+          })()}
+
+          {selfManagement.selfEfficacy && (() => {
+            const level = selfManagement.selfEfficacy.level;
+            const levelIdx = level === 'Low' ? 0 : level === 'Moderate' ? 1 : 2;
+            return (
+              <div className="sm-progress-line">
+                <div className="sm-progress-header">
+                  <span className="sm-progress-title">Self-Efficacy</span>
+                  <span className="sm-progress-score">{selfManagement.selfEfficacy.rawScore}/{selfManagement.selfEfficacy.maxScore}</span>
+                </div>
+                <div className="sm-checkpoint-track">
+                  <div className={`sm-checkpoint-node`}>
+                    <div className={`sm-checkpoint-dot ${levelIdx === 0 ? 'active low' : levelIdx > 0 ? 'passed low' : 'future'}`}>
+                      <span className="dot-icon">{levelIdx >= 0 ? '✓' : ''}</span>
+                    </div>
+                    <div className={`sm-checkpoint-label ${levelIdx === 0 ? 'active' : ''}`}>Low</div>
+                    <div className="sm-checkpoint-range">11-14</div>
+                  </div>
+                  <div className={`sm-connector ${levelIdx >= 1 ? 'filled moderate' : ''}`}></div>
+                  <div className={`sm-checkpoint-node`}>
+                    <div className={`sm-checkpoint-dot ${levelIdx === 1 ? 'active moderate' : levelIdx > 1 ? 'passed moderate' : 'future'}`}>
+                      <span className="dot-icon">{levelIdx >= 1 ? '✓' : ''}</span>
+                    </div>
+                    <div className={`sm-checkpoint-label ${levelIdx === 1 ? 'active' : ''}`}>Moderate</div>
+                    <div className="sm-checkpoint-range">15-18</div>
+                  </div>
+                  <div className={`sm-connector ${levelIdx >= 2 ? 'filled high' : ''}`}></div>
+                  <div className={`sm-checkpoint-node`}>
+                    <div className={`sm-checkpoint-dot ${levelIdx === 2 ? 'active high' : 'future'}`}>
+                      <span className="dot-icon">{levelIdx >= 2 ? '✓' : ''}</span>
+                    </div>
+                    <div className={`sm-checkpoint-label ${levelIdx === 2 ? 'active' : ''}`}>High</div>
+                    <div className="sm-checkpoint-range">19-22</div>
+                  </div>
+                </div>
+                <div className="interpretation" style={{ marginTop: '0.75rem' }}>
+                  <p>{selfManagement.selfEfficacy.interpretation}</p>
+                </div>
+              </div>
+            );
+          })()}
         </div>
         )}
 
-        {/* Self-Efficacy */}
-        {selfManagement.selfEfficacy && (
-          <div className="result-card">
-            <div className="result-header">
-              <h3 className="result-title">
-                <i className="bi bi-shield-check me-2"></i>
-                Self-Efficacy
-              </h3>
-              <span className={`badge category-badge ${selfManagement.selfEfficacy.level.toLowerCase().replace(' ', '-')}`}>
-                {selfManagement.selfEfficacy.level}
-              </span>
-            </div>
-            <div className="result-body">
-              <div className="interpretation">
-                <p>{selfManagement.selfEfficacy.interpretation}</p>
+        {/* Self-Efficacy Card */}
+        {selfManagement.selfEfficacy && (() => {
+          const level = selfManagement.selfEfficacy.level;
+          const levelIdx = level === 'Low' ? 0 : level === 'Moderate' ? 1 : 2;
+          return (
+            <div className="result-card">
+              <div className="result-header">
+                <h3 className="result-title">
+                  <i className="bi bi-shield-check me-2"></i>
+                  Self-Efficacy
+                </h3>
+                <span className={`badge category-badge ${level.toLowerCase()}`}>
+                  {level}
+                </span>
+              </div>
+              <div className="result-body">
+                <div className="score-display">
+                  <div className="score-label">Self-Efficacy Score</div>
+                  <div className="score-value">
+                    {selfManagement.selfEfficacy.rawScore}/{selfManagement.selfEfficacy.maxScore}
+                  </div>
+                </div>
+                {/* <div className="sm-checkpoint-track" style={{ margin: '1rem 0' }}>
+                  <div className="sm-checkpoint-node">
+                    <div className={`sm-checkpoint-dot ${levelIdx === 0 ? 'active low' : levelIdx > 0 ? 'passed low' : 'future'}`}>
+                      <span className="dot-icon">{levelIdx >= 0 ? '✓' : ''}</span>
+                    </div>
+                    <div className={`sm-checkpoint-label ${levelIdx === 0 ? 'active' : ''}`}>Low</div>
+                    <div className="sm-checkpoint-range">11-14</div>
+                  </div>
+                  <div className={`sm-connector ${levelIdx >= 1 ? 'filled moderate' : ''}`}></div>
+                  <div className="sm-checkpoint-node">
+                    <div className={`sm-checkpoint-dot ${levelIdx === 1 ? 'active moderate' : levelIdx > 1 ? 'passed moderate' : 'future'}`}>
+                      <span className="dot-icon">{levelIdx >= 1 ? '✓' : ''}</span>
+                    </div>
+                    <div className={`sm-checkpoint-label ${levelIdx === 1 ? 'active' : ''}`}>Moderate</div>
+                    <div className="sm-checkpoint-range">15-18</div>
+                  </div>
+                  <div className={`sm-connector ${levelIdx >= 2 ? 'filled high' : ''}`}></div>
+                  <div className="sm-checkpoint-node">
+                    <div className={`sm-checkpoint-dot ${levelIdx === 2 ? 'active high' : 'future'}`}>
+                      <span className="dot-icon">{levelIdx >= 2 ? '✓' : ''}</span>
+                    </div>
+                    <div className={`sm-checkpoint-label ${levelIdx === 2 ? 'active' : ''}`}>High</div>
+                    <div className="sm-checkpoint-range">19-22</div>
+                  </div>
+                </div> */}
+                <div className="interpretation">
+                  <strong>Interpretation:</strong>
+                  <p>{selfManagement.selfEfficacy.interpretation}</p>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
-        {/* Emotional Regulation */}
-        {selfManagement.emotionalRegulation && (
-          <div className="result-card">
-            <div className="result-header">
-              <h3 className="result-title">
-                <i className="bi bi-heart-fill me-2"></i>
-                Emotional Regulation
-              </h3>
-              <span className={`badge category-badge ${selfManagement.emotionalRegulation.level.toLowerCase().replace(' ', '-')}`}>
-                {selfManagement.emotionalRegulation.level}
-              </span>
-            </div>
-            <div className="result-body">
-              <div className="interpretation">
-                <p>{selfManagement.emotionalRegulation.interpretation}</p>
+        {/* Emotional Regulation Card */}
+        {selfManagement.emotionalRegulation && (() => {
+          const level = selfManagement.emotionalRegulation.level;
+          const levelIdx = level === 'Low' ? 0 : level === 'Moderate' ? 1 : 2;
+          return (
+            <div className="result-card">
+              <div className="result-header">
+                <h3 className="result-title">
+                  <i className="bi bi-heart-fill me-2"></i>
+                  Emotional Regulation
+                </h3>
+                <span className={`badge category-badge ${level.toLowerCase()}`}>
+                  {level}
+                </span>
+              </div>
+              <div className="result-body">
+                <div className="score-display">
+                  <div className="score-label">Emotion Regulation Score</div>
+                  <div className="score-value">
+                    {selfManagement.emotionalRegulation.rawScore}/{selfManagement.emotionalRegulation.maxScore}
+                  </div>
+                </div>
+                {/* <div className="sm-checkpoint-track" style={{ margin: '1rem 0' }}>
+                  <div className="sm-checkpoint-node">
+                    <div className={`sm-checkpoint-dot ${levelIdx === 0 ? 'active low' : levelIdx > 0 ? 'passed low' : 'future'}`}>
+                      <span className="dot-icon">{levelIdx >= 0 ? '✓' : ''}</span>
+                    </div>
+                    <div className={`sm-checkpoint-label ${levelIdx === 0 ? 'active' : ''}`}>Low</div>
+                    <div className="sm-checkpoint-range">7-9</div>
+                  </div>
+                  <div className={`sm-connector ${levelIdx >= 1 ? 'filled moderate' : ''}`}></div>
+                  <div className="sm-checkpoint-node">
+                    <div className={`sm-checkpoint-dot ${levelIdx === 1 ? 'active moderate' : levelIdx > 1 ? 'passed moderate' : 'future'}`}>
+                      <span className="dot-icon">{levelIdx >= 1 ? '✓' : ''}</span>
+                    </div>
+                    <div className={`sm-checkpoint-label ${levelIdx === 1 ? 'active' : ''}`}>Moderate</div>
+                    <div className="sm-checkpoint-range">10-12</div>
+                  </div>
+                  <div className={`sm-connector ${levelIdx >= 2 ? 'filled high' : ''}`}></div>
+                  <div className="sm-checkpoint-node">
+                    <div className={`sm-checkpoint-dot ${levelIdx === 2 ? 'active high' : 'future'}`}>
+                      <span className="dot-icon">{levelIdx >= 2 ? '✓' : ''}</span>
+                    </div>
+                    <div className={`sm-checkpoint-label ${levelIdx === 2 ? 'active' : ''}`}>High</div>
+                    <div className="sm-checkpoint-range">13-14</div>
+                  </div>
+                </div> */}
+                <div className="interpretation">
+                  <strong>Interpretation:</strong>
+                  <p>{selfManagement.emotionalRegulation.interpretation}</p>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
-        {/* Self-Regulation */}
-        {selfManagement.selfRegulation && (
-          <div className="result-card">
-            <div className="result-header">
-              <h3 className="result-title">
-                <i className="bi bi-check2-circle me-2"></i>
-                Self-Regulation
-              </h3>
-              <span className={`badge category-badge ${selfManagement.selfRegulation.level.toLowerCase().replace(' ', '-')}`}>
-                {selfManagement.selfRegulation.level}
-              </span>
-            </div>
-            <div className="result-body">
-              <div className="interpretation">
-                <p>{selfManagement.selfRegulation.interpretation}</p>
+        {/* Self-Regulation Card */}
+        {selfManagement.selfRegulation && (() => {
+          const level = selfManagement.selfRegulation.level;
+          const levelIdx = level === 'Low' ? 0 : level === 'Moderate' ? 1 : 2;
+          return (
+            <div className="result-card">
+              <div className="result-header">
+                <h3 className="result-title">
+                  <i className="bi bi-check2-circle me-2"></i>
+                  Self Regulation
+                </h3>
+                <span className={`badge category-badge ${level.toLowerCase()}`}>
+                  {level}
+                </span>
+              </div>
+              <div className="result-body">
+                <div className="score-display">
+                  <div className="score-label">Self-Regulation Score</div>
+                  <div className="score-value">
+                    {selfManagement.selfRegulation.rawScore}/{selfManagement.selfRegulation.maxScore}
+                  </div>
+                </div>
+                {/* <div className="sm-checkpoint-track" style={{ margin: '1rem 0' }}>
+                  <div className="sm-checkpoint-node">
+                    <div className={`sm-checkpoint-dot ${levelIdx === 0 ? 'active low' : levelIdx > 0 ? 'passed low' : 'future'}`}>
+                      <span className="dot-icon">{levelIdx >= 0 ? '✓' : ''}</span>
+                    </div>
+                    <div className={`sm-checkpoint-label ${levelIdx === 0 ? 'active' : ''}`}>Low</div>
+                    <div className="sm-checkpoint-range">9-11</div>
+                  </div>
+                  <div className={`sm-connector ${levelIdx >= 1 ? 'filled moderate' : ''}`}></div>
+                  <div className="sm-checkpoint-node">
+                    <div className={`sm-checkpoint-dot ${levelIdx === 1 ? 'active moderate' : levelIdx > 1 ? 'passed moderate' : 'future'}`}>
+                      <span className="dot-icon">{levelIdx >= 1 ? '✓' : ''}</span>
+                    </div>
+                    <div className={`sm-checkpoint-label ${levelIdx === 1 ? 'active' : ''}`}>Moderate</div>
+                    <div className="sm-checkpoint-range">12-15</div>
+                  </div>
+                  <div className={`sm-connector ${levelIdx >= 2 ? 'filled high' : ''}`}></div>
+                  <div className="sm-checkpoint-node">
+                    <div className={`sm-checkpoint-dot ${levelIdx === 2 ? 'active high' : 'future'}`}>
+                      <span className="dot-icon">{levelIdx >= 2 ? '✓' : ''}</span>
+                    </div>
+                    <div className={`sm-checkpoint-label ${levelIdx === 2 ? 'active' : ''}`}>High</div>
+                    <div className="sm-checkpoint-range">16-18</div>
+                  </div>
+                </div> */}
+                <div className="interpretation">
+                  <strong>Interpretation:</strong>
+                  <p>{selfManagement.selfRegulation.interpretation}</p>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
         </div>
       )}
     </div>

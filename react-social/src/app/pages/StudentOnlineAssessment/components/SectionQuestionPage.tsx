@@ -236,6 +236,17 @@ const SectionQuestionPage: React.FC = () => {
 
   const selectedOptions = answers[sectionId!]?.[qId] || [];
 
+  // Filter languages to only those that have actual translations for the current question
+  // Prevents English text from being repeated side-by-side when translations are missing
+  const availableLanguages = languages.filter((lang) => {
+    // English/default (id 100) is always available via questionText
+    if (lang.language.languageId === 100) return true;
+    // For other languages, check if a translation actually exists for this question
+    return question.question.languageQuestions?.some(
+      (lq) => lq.language.languageId === lang.language.languageId
+    );
+  });
+
   // Check if this is the last question of the last section
   const isLastSection = () => {
     if (!questionnaire) return false;
@@ -1041,16 +1052,16 @@ const SectionQuestionPage: React.FC = () => {
               </div>
             )}
 
-            {languages.length > 0 ? (
+            {availableLanguages.length > 0 ? (
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: languages.length > 1 ? "1fr 1px 1fr" : "1fr",
+                  gridTemplateColumns: availableLanguages.length > 1 ? "1fr 1px 1fr" : "1fr",
                   gap: 20,
                   marginBottom: 30,
                 }}
               >
-                {languages.map((lang, index) => (
+                {availableLanguages.map((lang, index) => (
                   <React.Fragment key={lang.language.languageId}>
                     <div>
                       <h6 className="fw-bold mb-3">
@@ -1068,7 +1079,7 @@ const SectionQuestionPage: React.FC = () => {
                         {getQuestionText(lang.language.languageId)}
                       </div>
                     </div>
-                    {index === 0 && languages.length > 1 && (
+                    {index === 0 && availableLanguages.length > 1 && (
                       <div style={{ width: 1, backgroundColor: "#dee2e6" }} />
                     )}
                   </React.Fragment>
@@ -1111,27 +1122,28 @@ const SectionQuestionPage: React.FC = () => {
                     return (
                       <div
                         key={opt.optionId}
-                        className="border rounded p-4 mb-3 bg-gradient-to-r from-purple-50 to-pink-50"
+                        className="rounded p-4 mb-3"
+                        style={{ border: "1px solid #dee2e6", background: "#faf5ff" }}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <div className="font-bold text-purple-900 mb-2" style={{ fontSize: "1.1rem", color: "#2d3748" }}>
                               🎮 Game: {opt.game.gameName}
                             </div>
-                            {languages.length > 0 ? (
+                            {availableLanguages.length > 0 ? (
                               <div
                                 style={{
                                   display: "grid",
-                                  gridTemplateColumns: languages.length > 1 ? "1fr 1px 1fr" : "1fr",
+                                  gridTemplateColumns: availableLanguages.length > 1 ? "1fr 1px 1fr" : "1fr",
                                   gap: 15,
                                 }}
                               >
-                                {languages.map((lang, index) => (
+                                {availableLanguages.map((lang, index) => (
                                   <React.Fragment key={lang.language.languageId}>
                                     <div style={{ fontSize: "1.2rem", lineHeight: "1.6", color: "#2d3748" }}>
                                       {getOptionText(opt, lang.language.languageId)}
                                     </div>
-                                    {index === 0 && languages.length > 1 && (
+                                    {index === 0 && availableLanguages.length > 1 && (
                                       <div style={{ width: 1, backgroundColor: "#dee2e6" }} />
                                     )}
                                   </React.Fragment>
@@ -1176,8 +1188,8 @@ const SectionQuestionPage: React.FC = () => {
                     return (
                       <div
                         key={opt.optionId}
-                        className={`border rounded p-3 d-block mb-2 ${currentRank ? "bg-light" : ""}`}
-                        style={{ display: "flex", alignItems: "center", gap: "15px" }}
+                        className="rounded p-3 d-block mb-2"
+                        style={{ display: "flex", alignItems: "center", gap: "15px", background: currentRank ? "#f8f9fa" : "#fff", border: "1px solid #dee2e6" }}
                       >
                         <div style={{ minWidth: "120px" }}>
                           <select
@@ -1187,7 +1199,7 @@ const SectionQuestionPage: React.FC = () => {
                               const value = e.target.value;
                               handleRankChange(opt.optionId, value ? parseInt(value) : null);
                             }}
-                            style={{ width: "110px", fontSize: "1rem", fontWeight: 600, color: "#2d3748" }}
+                            style={{ width: "110px", fontSize: "1rem", fontWeight: 600, color: "#2d3748", background: "#fff", borderColor: "#dee2e6" }}
                           >
                             <option value="">Rank</option>
                             {currentRank && !availableRanks.includes(currentRank) ? (
@@ -1203,20 +1215,20 @@ const SectionQuestionPage: React.FC = () => {
                         <div style={{ flex: 1 }}>
                           {hasOptionImage(opt) ? (
                             renderOptionContent(opt)
-                          ) : languages.length > 0 ? (
+                          ) : availableLanguages.length > 0 ? (
                             <div
                               style={{
                                 display: "grid",
-                                gridTemplateColumns: languages.length > 1 ? "1fr 1px 1fr" : "1fr",
+                                gridTemplateColumns: availableLanguages.length > 1 ? "1fr 1px 1fr" : "1fr",
                                 gap: 15,
                               }}
                             >
-                              {languages.map((lang, index) => (
+                              {availableLanguages.map((lang, index) => (
                                 <React.Fragment key={lang.language.languageId}>
                                   <div style={{ fontSize: "1.2rem", lineHeight: "1.6", color: "#2d3748" }}>
                                     {getOptionText(opt, lang.language.languageId)}
                                   </div>
-                                  {index === 0 && languages.length > 1 && (
+                                  {index === 0 && availableLanguages.length > 1 && (
                                     <div style={{ width: 1, backgroundColor: "#dee2e6" }} />
                                   )}
                                 </React.Fragment>
@@ -1234,9 +1246,8 @@ const SectionQuestionPage: React.FC = () => {
                   return (
                     <label
                       key={opt.optionId}
-                      className={`border rounded p-3 d-block mb-2 ${selectedOptions.includes(opt.optionId) ? "bg-light" : ""
-                        }`}
-                      style={{ cursor: "pointer" }}
+                      className="rounded p-3 d-block mb-2"
+                      style={{ cursor: "pointer", background: selectedOptions.includes(opt.optionId) ? "#f8f9fa" : "#fff", border: "1px solid #dee2e6" }}
                     >
                       <div className="d-flex align-items-start">
                         <input
@@ -1254,21 +1265,21 @@ const SectionQuestionPage: React.FC = () => {
                           <div style={{ flex: 1 }}>
                             {renderOptionContent(opt)}
                           </div>
-                        ) : languages.length > 0 ? (
+                        ) : availableLanguages.length > 0 ? (
                           <div
                             style={{
                               display: "grid",
-                              gridTemplateColumns: languages.length > 1 ? "1fr 1px 1fr" : "1fr",
+                              gridTemplateColumns: availableLanguages.length > 1 ? "1fr 1px 1fr" : "1fr",
                               gap: 15,
                               flex: 1,
                             }}
                           >
-                            {languages.map((lang, index) => (
+                            {availableLanguages.map((lang, index) => (
                               <React.Fragment key={lang.language.languageId}>
                                 <div style={{ fontSize: "1.2rem", lineHeight: "1.6", color: "#2d3748" }}>
                                   {getOptionText(opt, lang.language.languageId)}
                                 </div>
-                                {index === 0 && languages.length > 1 && (
+                                {index === 0 && availableLanguages.length > 1 && (
                                   <div style={{ width: 1, backgroundColor: "#dee2e6" }} />
                                 )}
                               </React.Fragment>

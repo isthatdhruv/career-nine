@@ -91,16 +91,25 @@ export interface SocialData {
 }
 
 export interface SelfEfficacyData {
+  rawScore: number;
+  minScore: number;
+  maxScore: number;
   level: string;
   interpretation: string;
 }
 
 export interface EmotionalRegulationData {
+  rawScore: number;
+  minScore: number;
+  maxScore: number;
   level: string;
   interpretation: string;
 }
 
 export interface SelfRegulationData {
+  rawScore: number;
+  minScore: number;
+  maxScore: number;
   level: string;
   interpretation: string;
 }
@@ -424,23 +433,23 @@ function getSocialInsightFullData(score: number): {
  * Get environmental awareness category
  */
 function getEnvironmentalCategory(netScore: number): { category: string; icon: string; interpretation: string } {
-  if (netScore >= 4) {
+  if (netScore >= 2) {
     return {
       category: "Mighty Tree",
       icon: "🌳",
-      interpretation: "You are a true Earth Guardian! You consistently look past the 'shiny' stuff to choose what is best for the planet."
+      interpretation: "Your child consistently looks past the \"shiny\" stuff to choose what is best for the planet."
     };
   } else if (netScore >= 0) {
     return {
       category: "Growing Sapling",
       icon: "🌿",
-      interpretation: "You are a great observer! You are balancing convenience with caring for the planet in your daily life."
+      interpretation: "Your child is balancing convenience with caring for the planet in your daily life."
     };
   } else {
     return {
       category: "Seedling Starter",
       icon: "🌱",
-      interpretation: "You currently prefer things that are quick and easy—try swapping one 'convenient' choice for a 'green' one this week!"
+      interpretation: "Your child currently prefers things that are quick and easy—try swapping one \"convenient\" choice for a \"green\" one this week!"
     };
   }
 }
@@ -481,37 +490,81 @@ export async function fetchAllDashboardData(studentId: number): Promise<Dashboar
 // ========== SELF-MANAGEMENT HELPERS ==========
 
 /**
- * Determine self-management level from raw score
+ * Get self-efficacy data based on raw score.
+ * Score range: 11-22. Low: 11-14, Moderate: 15-18, High: 19-22.
  */
-function getSelfManagementLevel(rawScore: number, maxScore: number): string {
-  const percentage = (rawScore / maxScore) * 100;
-  if (percentage >= 70) return "High";
-  if (percentage >= 40) return "Moderate";
-  return "Low";
+function getSelfEfficacyFullData(score: number): { level: string; interpretation: string } {
+  if (score >= 19) {
+    return {
+      level: "High",
+      interpretation:
+        "Your child has a \u201ccan-do\u201d attitude, seeing mistakes as a natural part of learning and staying determined even when a task gets tough.",
+    };
+  } else if (score >= 15) {
+    return {
+      level: "Moderate",
+      interpretation:
+        "Your child feels confident with things they already know but might need a little extra encouragement to try something brand new or difficult.",
+    };
+  } else {
+    return {
+      level: "Low",
+      interpretation:
+        "Your child often doubts their abilities and may want to give up quickly because they worry they aren\u2019t \u201cnaturally good\u201d at a task.",
+    };
+  }
 }
 
 /**
- * Get self-management interpretation for a given dimension and level
+ * Get emotion regulation data based on raw score.
+ * Score range: 7-14. Low: 7-9, Moderate: 10-12, High: 13-14.
  */
-function getSelfManagementInterpretation(level: string, dimension: string): string {
-  const interpretations: Record<string, Record<string, string>> = {
-    selfEfficacy: {
-      High: "Your child has a 'can-do' attitude, seeing mistakes as a natural part of learning and staying determined even when a task gets tough.",
-      Moderate: "Your child shows reasonable confidence in their abilities but may sometimes doubt themselves when facing unfamiliar or challenging tasks.",
-      Low: "Your child may struggle with confidence in their abilities. They might need encouragement and support to tackle new challenges.",
-    },
-    emotionalRegulation: {
-      High: "Your child handles daily emotions well and can stay calm during high-pressure moments, demonstrating excellent emotional control.",
-      Moderate: "Your child handles daily emotions well but may struggle to stay calm during high-pressure moments, like a big school test or a lost game.",
-      Low: "Your child may find it challenging to manage strong emotions. They might benefit from learning coping strategies for stressful situations.",
-    },
-    selfRegulation: {
-      High: "Your child shows excellent impulse control and can follow rules well, staying focused even in exciting environments.",
-      Moderate: "Your child shows reasonable self-control but sometimes may act impulsively or have difficulty staying focused when distracted.",
-      Low: "Your child may find it hard to control impulses and stay focused. Structured routines and clear expectations could help.",
-    },
-  };
-  return interpretations[dimension]?.[level] || "Assessment data is being processed.";
+function getEmotionRegulationFullData(score: number): { level: string; interpretation: string } {
+  if (score >= 13) {
+    return {
+      level: "High",
+      interpretation:
+        "Your child is very aware of their emotions, knows how to cheer themselves up when sad, and shows a kind understanding of why friends might be upset.",
+    };
+  } else if (score >= 10) {
+    return {
+      level: "Moderate",
+      interpretation:
+        "Your child handles daily emotions well but may struggle to stay calm during high-pressure moments, like a big school test or a lost game.",
+    };
+  } else {
+    return {
+      level: "Low",
+      interpretation:
+        "Your child often feels overwhelmed by \u201cbig\u201d feelings like anger or worry and may find it hard to explain exactly why they are upset.",
+    };
+  }
+}
+
+/**
+ * Get self-regulation data based on raw score.
+ * Score range: 9-18. Low: 9-11, Moderate: 12-15, High: 16-18.
+ */
+function getSelfRegulationFullData(score: number): { level: string; interpretation: string } {
+  if (score >= 16) {
+    return {
+      level: "High",
+      interpretation:
+        "Your child shows great independence, staying focused on their work even if it\u2019s a bit boring and waiting patiently for their turn.",
+    };
+  } else if (score >= 12) {
+    return {
+      level: "Moderate",
+      interpretation:
+        "Your child generally follows rules well but can get distracted or impulsive when they are very excited or in a noisy environment.",
+    };
+  } else {
+    return {
+      level: "Low",
+      interpretation:
+        "Your child finds it difficult to manage impulses or stay quiet when asked, often needing an adult\u2019s help to stay organized and finish tasks.",
+    };
+  }
 }
 
 // ========== VALUE PHRASE/MEANING LOOKUPS ==========
@@ -545,10 +598,13 @@ const MQT_ID_SELF_EFFICACY = 48;
 const MQT_ID_EMOTION_REGULATION = 49;
 const MQT_ID_SELF_MANAGEMENT = 52;
 
-// Max question counts per subscale (for level calculation)
-const MAX_SELF_EFFICACY = 10;
-const MAX_EMOTION_REGULATION = 8;
-const MAX_SELF_REGULATION = 10;
+// Self Management score ranges (from interpretation guidelines)
+const MIN_SELF_EFFICACY = 11;
+const MAX_SELF_EFFICACY = 22;
+const MIN_EMOTION_REGULATION = 7;
+const MAX_EMOTION_REGULATION = 14;
+const MIN_SELF_REGULATION = 9;
+const MAX_SELF_REGULATION = 18;
 
 /**
  * Process a single bet-assessment's raw data into the DashboardData shape.
@@ -653,34 +709,42 @@ export function processBetAssessmentData(
     (rs) => rs.measuredQualityType?.measuredQualityTypeId === MQT_ID_SELF_MANAGEMENT
   );
 
-  const selfEfficacyLevel = selfEfficacyRaw
-    ? getSelfManagementLevel(selfEfficacyRaw.rawScore, MAX_SELF_EFFICACY)
-    : "Moderate";
-  const emotionRegLevel = emotionRegRaw
-    ? getSelfManagementLevel(emotionRegRaw.rawScore, MAX_EMOTION_REGULATION)
-    : "Moderate";
-  const selfRegLevel = selfMgmtRaw
-    ? getSelfManagementLevel(selfMgmtRaw.rawScore, MAX_SELF_REGULATION)
-    : "Moderate";
-
   const selfManagementData: SelfManagementData = {
     selfEfficacy: selfEfficacyRaw
-      ? {
-          level: selfEfficacyLevel,
-          interpretation: getSelfManagementInterpretation(selfEfficacyLevel, "selfEfficacy"),
-        }
+      ? (() => {
+          const seData = getSelfEfficacyFullData(selfEfficacyRaw.rawScore);
+          return {
+            rawScore: selfEfficacyRaw.rawScore,
+            minScore: MIN_SELF_EFFICACY,
+            maxScore: MAX_SELF_EFFICACY,
+            level: seData.level,
+            interpretation: seData.interpretation,
+          };
+        })()
       : undefined,
     emotionalRegulation: emotionRegRaw
-      ? {
-          level: emotionRegLevel,
-          interpretation: getSelfManagementInterpretation(emotionRegLevel, "emotionalRegulation"),
-        }
+      ? (() => {
+          const erData = getEmotionRegulationFullData(emotionRegRaw.rawScore);
+          return {
+            rawScore: emotionRegRaw.rawScore,
+            minScore: MIN_EMOTION_REGULATION,
+            maxScore: MAX_EMOTION_REGULATION,
+            level: erData.level,
+            interpretation: erData.interpretation,
+          };
+        })()
       : undefined,
     selfRegulation: selfMgmtRaw
-      ? {
-          level: selfRegLevel,
-          interpretation: getSelfManagementInterpretation(selfRegLevel, "selfRegulation"),
-        }
+      ? (() => {
+          const srData = getSelfRegulationFullData(selfMgmtRaw.rawScore);
+          return {
+            rawScore: selfMgmtRaw.rawScore,
+            minScore: MIN_SELF_REGULATION,
+            maxScore: MAX_SELF_REGULATION,
+            level: srData.level,
+            interpretation: srData.interpretation,
+          };
+        })()
       : undefined,
   };
 
@@ -946,14 +1010,16 @@ export async function getDashboardData(studentId: number, assessmentId?: number 
     let socialInsightData: SocialInsightData | undefined;
     if (socialRaw.socialInsight) {
       const score = socialRaw.socialInsight.totalScore || 0;
-      const category = getSocialInsightCategory(score);
-      const { interpretation, traits } = getSocialInsightInterpretation(category);
+      const siFullData = getSocialInsightFullData(score);
 
       socialInsightData = {
         score,
-        category,
-        interpretation,
-        traits,
+        category: siFullData.category,
+        awarenessLevel: siFullData.awarenessLevel,
+        categoryTitle: siFullData.categoryTitle,
+        interpretation: siFullData.interpretation,
+        detailedInterpretation: siFullData.detailedInterpretation,
+        traits: siFullData.traits,
         topDomains: socialRaw.socialInsight.topDomains || [],
         growthAreas: socialRaw.socialInsight.growthAreas || [],
       };
@@ -990,19 +1056,28 @@ export async function getDashboardData(studentId: number, assessmentId?: number 
       // Use demo data if API fails or no data available
       selfManagementRaw = {
         selfEfficacy: {
+          rawScore: 19,
+          minScore: 11,
+          maxScore: 22,
           level: "High",
           interpretation:
-            "Your child has a 'can-do' attitude, seeing mistakes as a natural part of learning and staying determined even when a task gets tough.",
+            "Your child has a \u201ccan-do\u201d attitude, seeing mistakes as a natural part of learning and staying determined even when a task gets tough.",
         },
         emotionalRegulation: {
+          rawScore: 11,
+          minScore: 7,
+          maxScore: 14,
           level: "Moderate",
           interpretation:
             "Your child handles daily emotions well but may struggle to stay calm during high-pressure moments, like a big school test or a lost game.",
         },
         selfRegulation: {
+          rawScore: 16,
+          minScore: 9,
+          maxScore: 18,
           level: "High",
           interpretation:
-            "Your child shows excellent impulse control and can follow rules well, staying focused even in exciting environments.",
+            "Your child shows great independence, staying focused on their work even if it\u2019s a bit boring and waiting patiently for their turn.",
         },
       };
     }
