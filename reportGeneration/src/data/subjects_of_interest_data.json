@@ -1,0 +1,100 @@
+{
+  "subjects_of_interest": {
+    "agriculture": {
+      "title": {
+        "english": "Agriculture",
+        "hindi": "कृषि"
+      }
+    },
+    "art": {
+      "title": {
+        "english": "Art",
+        "hindi": "कला"
+      }
+    },
+    "cultural_studies": {
+      "title": {
+        "english": "Cultural Studies",
+        "hindi": "सांस्कृतिक अध्ययन"
+      }
+    },
+    "english": {
+      "title": {
+        "english": "English",
+        "hindi": "अंग्रेज़ी"
+      }
+    },
+    "home_and_consumer_science": {
+      "title": {
+        "english": "Home and Consumer Science",
+        "hindi": "गृह और उपभोक्ता विज्ञान"
+      }
+    },
+    "finance": {
+      "title": {
+        "english": "Finance",
+        "hindi": "वित्त"
+      }
+    },
+    "health": {
+      "title": {
+        "english": "Health",
+        "hindi": "स्वास्थ्य"
+      }
+    },
+    "languages": {
+      "title": {
+        "english": "Languages",
+        "hindi": "भाषाएँ"
+      }
+    },
+    "management": {
+      "title": {
+        "english": "Management",
+        "hindi": "प्रबंधन"
+      }
+    },
+    "mathematics": {
+      "title": {
+        "english": "Mathematics",
+        "hindi": "गणित"
+      }
+    },
+    "music": {
+      "title": {
+        "english": "Music",
+        "hindi": "संगीत"
+      }
+    },
+    "science": {
+      "title": {
+        "english": "Science",
+        "hindi": "विज्ञान"
+      }
+    },
+    "vocational_studies": {
+      "title": {
+        "english": "Vocational studies",
+        "hindi": "व्यावसायिक अध्ययन"
+      }
+    },
+    "social_sciences": {
+      "title": {
+        "english": "Social Sciences",
+        "hindi": "सामाजिक विज्ञान"
+      }
+    },
+    "technology": {
+      "title": {
+        "english": "Technology",
+        "hindi": "प्रौद्योगिकी"
+      }
+    },
+    "sport": {
+      "title": {
+        "english": "Sport",
+        "hindi": "खेल"
+      }
+    }
+  }
+}
