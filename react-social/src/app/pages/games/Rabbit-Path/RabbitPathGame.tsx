@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"
 
 // Asset Paths
 const SCENE_SRC = "/game-scenes/2nd/game-scene-2nd.png";
-const RABBIT_SRC = "/game-scenes/2nd/rabbit-nobg.png";
+const RABBIT_FORWARD_SRC = "/game-scenes/2nd/rabbit-nobg-old.png";
+const RABBIT_REVERSE_SRC = "/game-scenes/2nd/rabbit-nobg.png";
 
 // How to play video path - place video at: public/assets/game/rabbit-path-tutorial.mp4
 const HOW_TO_PLAY_VIDEO_PATH = "/assets/game/rabbit-path-tutorial.mp4";
@@ -15,6 +16,7 @@ type StonePos = {
   yPct: number;
   rPct: number;
   rabbitScale?: number;
+  rabbitYOffset?: number;
 };
 
 type RoundResult = {
@@ -32,18 +34,18 @@ interface RabbitPathGameProps {
 }
 
 const STONES: StonePos[] = [
-  { id: 0, xPct: 21.4, yPct: 81.3, rPct: 4, rabbitScale: 3.5 },
-  { id: 1, xPct: 47.1, yPct: 77.3, rPct: 4.8, rabbitScale: 2.1 },
-  { id: 2, xPct: 36.2, yPct: 70.9, rPct: 4, rabbitScale: 2.1 },
-  { id: 3, xPct: 53.3, yPct: 68, rPct: 4.4, rabbitScale: 2 },
-  { id: 4, xPct: 43.9, yPct: 59.8, rPct: 4, rabbitScale: 1.8 },
-  { id: 5, xPct: 69, yPct: 62.8, rPct: 3.5, rabbitScale: 1.4 },
-  { id: 6, xPct: 58.5, yPct: 55.3, rPct: 3.9, rabbitScale: 1.5 },
-  { id: 7, xPct: 76.3, yPct: 56, rPct: 3.1, rabbitScale: 1.5 },
-  { id: 8, xPct: 67.8, yPct: 50.6, rPct: 3.1, rabbitScale: 1.5 },
-  { id: 9, xPct: 82.5, yPct: 51, rPct: 2.3, rabbitScale: 0.9 },
-  { id: 10, xPct: 74.7, yPct: 49, rPct: 2, rabbitScale: 1 },
-  { id: 11, xPct: 81.6, yPct: 40.5, rPct: 4, rabbitScale: 0 }
+  { id: 0, xPct: 21.4, yPct: 81.3, rPct: 4, rabbitScale: 3, rabbitYOffset: -5 },
+  { id: 1, xPct: 50.1, yPct: 79.2, rPct: 4.8, rabbitScale: 2.6, rabbitYOffset: -11 },
+  { id: 2, xPct: 39.1, yPct: 70.2, rPct: 4, rabbitScale: 2.3, rabbitYOffset: -10 },
+  { id: 3, xPct: 56.8, yPct: 68, rPct: 4.4, rabbitScale: 2.2, rabbitYOffset: -9 },
+  { id: 4, xPct: 47, yPct: 60.3, rPct: 4, rabbitScale: 2, rabbitYOffset: -8 },
+  { id: 5, xPct: 72.4, yPct: 62.8, rPct: 3.5, rabbitScale: 1.6, rabbitYOffset: -6.5 },
+  { id: 6, xPct: 61.3, yPct: 56.1, rPct: 3.2, rabbitScale: 1.4, rabbitYOffset: -5.5 },
+  { id: 7, xPct: 80, yPct: 55.9, rPct: 3.1, rabbitScale: 1.4, rabbitYOffset: -6.5 },
+  { id: 8, xPct: 70.9, yPct: 51.6, rPct: 2.4, rabbitScale: 1.2, rabbitYOffset: -5.5 },
+  { id: 9, xPct: 86.7, yPct: 50.9, rPct: 2.3, rabbitScale: 1.1, rabbitYOffset: -5.5 },
+  { id: 10, xPct: 78, yPct: 49.5, rPct: 2, rabbitScale: 1.1, rabbitYOffset: -5 },
+  { id: 11, xPct: 76.3, yPct: 41.6, rPct: 4, rabbitScale: 1, rabbitYOffset: -1.5 }
 ];
 
 const ROUND_SHOW_MS = 10_000;
@@ -141,7 +143,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
   const [activeStone, setActiveStone] = useState<number | null>(null);
   const [bufferActivated, setBufferActivated] = useState(false);
   const [history, setHistory] = useState<RoundResult[]>([]);
-  const [stonesState] = useState<StonePos[]>(STONES);
+  const [stonesState, setStonesState] = useState<StonePos[]>(STONES);
   const [trialSequence, setTrialSequence] = useState<number[]>([]); // Store trial sequence for retry
 
   // Rabbit State
@@ -163,12 +165,31 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
   const startRoundRef = useRef<(nextRoundIndex: number) => void>(() => {});
   const retryRef = useRef<() => void>(() => {});
 
+  // Position Editor (localhost only)
+  const isLocalhost = typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const [showEditor, setShowEditor] = useState(false);
+  const [selectedStoneId, setSelectedStoneId] = useState<number | null>(null);
+  const [draggingStoneId, setDraggingStoneId] = useState<number | null>(null);
+  const sceneRef = useRef<HTMLDivElement>(null);
+
+  const updateStone = useCallback((stoneId: number, updates: Partial<StonePos>) => {
+    setStonesState(prev => prev.map(s => s.id === stoneId ? { ...s, ...updates } : s));
+  }, []);
+
+  const copyConfig = useCallback(() => {
+    const config = stonesState.map(s =>
+      `  { id: ${s.id}, xPct: ${s.xPct}, yPct: ${s.yPct}, rPct: ${s.rPct}, rabbitScale: ${s.rabbitScale ?? 1}, rabbitYOffset: ${s.rabbitYOffset ?? -5} }`
+    ).join(',\n');
+    navigator.clipboard.writeText(`const STONES: StonePos[] = [\n${config}\n];`);
+  }, [stonesState]);
+
   // Loading state for images
   const [imagesLoaded, setImagesLoaded] = useState(false);
 
   // Preload images
   useEffect(() => {
-    const imageUrls = [SCENE_SRC, RABBIT_SRC];
+    const imageUrls = [SCENE_SRC, RABBIT_FORWARD_SRC, RABBIT_REVERSE_SRC];
     let loadedCount = 0;
     
     imageUrls.forEach(src => {
@@ -198,7 +219,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
     if (stoneId === 0 || stoneId === null) {
       const startStone = stonesState.find(s => s.id === 0);
       if (startStone) {
-        setRabbitPos({ x: startStone.xPct, y: startStone.yPct - 5 });
+        setRabbitPos({ x: startStone.xPct, y: startStone.yPct + (startStone.rabbitYOffset ?? -5) });
         setRabbitScale(startStone.rabbitScale ?? 1.2);
       } else {
         setRabbitPos({ x: HOME_POS.xPct, y: HOME_POS.yPct });
@@ -207,11 +228,11 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
       setRabbitVisible(true);
       return;
     }
-    
+
     if (stoneId === 11) {
       const endStone = stonesState.find(s => s.id === 11);
       if (endStone) {
-        setRabbitPos({ x: endStone.xPct, y: endStone.yPct - 5 });
+        setRabbitPos({ x: endStone.xPct, y: endStone.yPct + (endStone.rabbitYOffset ?? -5) });
         setRabbitScale(endStone.rabbitScale ?? 0);
         setRabbitVisible(true);
       }
@@ -220,7 +241,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
 
     const stone = stonesState.find(s => s.id === stoneId);
     if (stone) {
-      setRabbitPos({ x: stone.xPct, y: stone.yPct - 5 });
+      setRabbitPos({ x: stone.xPct, y: stone.yPct + (stone.rabbitYOffset ?? -5) });
       setRabbitScale(stone.rabbitScale ?? 1);
       setRabbitVisible(true);
     }
@@ -252,13 +273,14 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
   }, [isTrial, trialRound, round]);
 
   const evaluateAndAdvance = useCallback((input: number[], seq: number[]) => {
-    const correct = input.length === seq.length && input.every((v, i) => v === seq[i]);
+    const reversedSeq = [...seq].reverse();
+    const correct = input.length === reversedSeq.length && input.every((v, i) => v === reversedSeq[i]);
     // Don't show feedback overlay anymore
     // setLastResult(correct ? "correct" : "wrong");
 
     if (correct) {
       if (!isTrial) setScore(s => s + 1);
-      moveRabbitTo(11);
+      moveRabbitTo(0); // Rabbit goes back home after correct reverse trace
     }
 
     if (!isTrial) {
@@ -307,7 +329,8 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
         return "paused";
       }
 
-      const isPartialCorrect = input.length > 0 && input.every((v, i) => v === seq[i]);
+      const reversedSeq = [...seq].reverse();
+      const isPartialCorrect = input.length > 0 && input.every((v, i) => v === reversedSeq[i]);
       if (isPartialCorrect && !bufferActivated) {
         setBufferActivated(true);
         setPhaseMsLeft(BUFFER_MS);
@@ -356,7 +379,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
       setPhase("input");
       setPhaseMsLeft(ROUND_INPUT_MS);
       setActiveStone(null);
-      moveRabbitTo(0);
+      moveRabbitTo(11); // Start at end - student traces backwards
     }, ROUND_SHOW_MS));
 
     timers.current.push(window.setTimeout(() => {
@@ -404,7 +427,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
       setPhase("input");
       setPhaseMsLeft(ROUND_INPUT_MS);
       setActiveStone(null);
-      moveRabbitTo(0);
+      moveRabbitTo(11); // Start at end - student traces backwards
     }, ROUND_SHOW_MS));
 
     timers.current.push(window.setTimeout(() => {
@@ -428,6 +451,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
   }, [retryWithSameSequence]);
 
   const onStoneClick = useCallback((stoneId: number) => {
+    if (showEditor) return;
     if (phase !== "input") return;
     if (stoneId === 0 || stoneId === 11) return;
 
@@ -438,17 +462,18 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
 
     const idx = nextInput.length - 1;
     const seq = sequenceRef.current;
+    const reversedSeq = [...seq].reverse();
 
-    if (stoneId !== seq[idx]) {
+    if (stoneId !== reversedSeq[idx]) {
       evaluateAndAdvance(nextInput, seq);
     } else {
-      if (nextInput.length === seq.length) {
+      if (nextInput.length === reversedSeq.length) {
         setTimeout(() => {
           evaluateAndAdvance(nextInput, seq);
         }, 500);
       }
     }
-  }, [phase, moveRabbitTo, evaluateAndAdvance]);
+  }, [phase, showEditor, moveRabbitTo, evaluateAndAdvance]);
 
   const handleContinueGame = useCallback(() => {
     setPhase("ready");
@@ -489,15 +514,22 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
     }
   }, [phase, isTrial, clearTimers, moveRabbitTo]);
 
+  // Pause game when editor is open
+  useEffect(() => {
+    if (showEditor) clearTimers();
+  }, [showEditor, clearTimers]);
+
   // Phase countdown
   useEffect(() => {
+    if (showEditor) return;
     if (phase !== "show" && phase !== "input") return;
     const tick = window.setInterval(() => setPhaseMsLeft(ms => Math.max(0, ms - 100)), 100);
     return () => window.clearInterval(tick);
-  }, [phase]);
+  }, [phase, showEditor]);
 
   // Global game timer
   useEffect(() => {
+    if (showEditor) return;
     if (phase === "ready" || phase === "done" || phase === "trial_done" || isTrial) return;
     const interval = window.setInterval(() => {
       setGameMsLeft(prev => {
@@ -509,7 +541,14 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
       });
     }, 100);
     return () => window.clearInterval(interval);
-  }, [phase, isTrial]);
+  }, [phase, isTrial, showEditor]);
+
+  // Re-apply rabbit position when stone data changes in editor
+  useEffect(() => {
+    if (showEditor && selectedStoneId !== null) {
+      moveRabbitTo(selectedStoneId);
+    }
+  }, [showEditor, selectedStoneId, stonesState, moveRabbitTo]);
 
   // Save results on done
   useEffect(() => {
@@ -534,10 +573,34 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
     return () => clearTimers();
   }, [clearTimers]);
 
+  // Drag handler for position editor
+  useEffect(() => {
+    if (draggingStoneId === null || !sceneRef.current) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = sceneRef.current!.getBoundingClientRect();
+      const xPct = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+      const yPct = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+      updateStone(draggingStoneId, {
+        xPct: Math.round(xPct * 10) / 10,
+        yPct: Math.round(yPct * 10) / 10,
+      });
+    };
+
+    const handleMouseUp = () => setDraggingStoneId(null);
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [draggingStoneId, updateStone]);
+
   const phaseLabel = useMemo(() => {
     if (phase === "ready") return "Ready";
     if (phase === "show") return "Watch carefully";
-    if (phase === "input") return "Your turn";
+    if (phase === "input") return "Trace backwards!";
     if (phase === "feedback") return lastResult === "correct" ? "Correct!" : "Oops!";
     if (phase === "done") return "Finished";
     return "";
@@ -660,7 +723,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
             border: '1px solid rgba(59, 130, 246, 0.3)' 
           }}>
             <p style={{ color: '#93c5fd', fontSize: '13px' }}>
-              🐰 Watch the rabbit hop on stones, then repeat the sequence!<br />
+              🐰 Watch the rabbit hop on stones, then trace the path backwards!<br />
               <span style={{ color: 'rgba(147, 197, 253, 0.8)' }}>After the video: <strong>2 practice rounds</strong> → <strong>{TOTAL_ROUNDS} main rounds</strong></span>
             </p>
           </div>
@@ -888,12 +951,14 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
             borderRadius: '14px',
           }}>
             {/* Game Scene Container */}
-            <div style={{
+            <div
+              ref={sceneRef}
+              style={{
               position: 'relative',
               width: '100%',
               aspectRatio: '16/9',
               borderRadius: '10px',
-              overflow: 'hidden',
+              overflow: showEditor ? 'visible' : 'hidden',
               boxShadow: 'inset 0 4px 20px rgba(0,0,0,0.5)',
             }}>
               {/* Background Scene */}
@@ -926,7 +991,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
                 }}
               >
                 <img
-                  src={RABBIT_SRC}
+                  src={phase === "input" ? RABBIT_REVERSE_SRC : RABBIT_FORWARD_SRC}
                   alt="Rabbit"
                   style={{
                     width: '100%',
@@ -943,6 +1008,8 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
                 const isActive = activeStone === s.id && phase === "show";
                 const isClickable = phase === "input" && s.id !== 0 && s.id !== 11;
                 const wasClicked = playerInput.includes(s.id);
+                const editorActive = showEditor && isLocalhost;
+                const isSelected = editorActive && selectedStoneId === s.id;
 
                 return (
                   <div
@@ -957,26 +1024,47 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
                     }}
                   >
                     <button
-                      onClick={() => isClickable && onStoneClick(s.id)}
+                      onClick={() => {
+                        if (editorActive) {
+                          setSelectedStoneId(s.id);
+                          moveRabbitTo(s.id);
+                        } else if (isClickable) {
+                          onStoneClick(s.id);
+                        }
+                      }}
+                      onMouseDown={(e) => {
+                        if (editorActive) {
+                          e.preventDefault();
+                          setSelectedStoneId(s.id);
+                          setDraggingStoneId(s.id);
+                        }
+                      }}
                       style={{
                         width: '100%',
                         height: '100%',
                         borderRadius: '50%',
-                        border: 'none',
-                        transition: 'transform 0.15s, box-shadow 0.15s',
-                        cursor: isClickable ? 'pointer' : 'default',
-                        transform: isClickable ? 'scale(1)' : 'scale(1)',
-                        boxShadow: isActive
+                        border: isSelected ? '3px solid #f59e0b' : 'none',
+                        transition: draggingStoneId === s.id ? 'none' : 'transform 0.15s, box-shadow 0.15s',
+                        cursor: editorActive ? (draggingStoneId === s.id ? 'grabbing' : 'grab') : isClickable ? 'pointer' : 'default',
+                        boxShadow: isSelected
+                          ? '0 0 0 4px rgba(245, 158, 11, 0.6), 0 0 15px rgba(245, 158, 11, 0.4)'
+                          : isActive
                           ? '0 0 0 4px rgba(255,255,255,0.4), 0 0 12px rgba(255,255,255,0.6)'
                           : wasClicked && phase !== 'show'
                           ? '0 0 0 4px rgba(255,255,255,0.3)'
+                          : editorActive
+                          ? '0 0 0 2px rgba(245, 158, 11, 0.3)'
                           : 'none',
-                        background: isActive
+                        background: isSelected
+                          ? 'rgba(245, 158, 11, 0.3)'
+                          : isActive
                           ? 'rgba(255,255,255,0.25)'
+                          : editorActive
+                          ? 'rgba(245, 158, 11, 0.1)'
                           : 'transparent',
                       }}
                       onMouseEnter={(e) => {
-                        if (isClickable) {
+                        if (isClickable && !editorActive) {
                           (e.target as HTMLButtonElement).style.transform = 'scale(1.1)';
                         }
                       }}
@@ -985,6 +1073,25 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
                       }}
                       aria-label={`Stone ${s.id}`}
                     />
+                    {/* Stone ID label (editor mode) */}
+                    {editorActive && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '-20px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        background: isSelected ? '#f59e0b' : 'rgba(0,0,0,0.85)',
+                        color: isSelected ? '#000' : '#fff',
+                        fontSize: '10px',
+                        fontWeight: 700,
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        pointerEvents: 'none',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {s.id}{s.id === 0 ? ' Start' : s.id === 11 ? ' End' : ''}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -1013,7 +1120,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
                       Rabbit's Path
                     </h2>
                     <p style={{ color: 'rgba(147, 197, 253, 0.8)', fontSize: '14px', marginTop: '8px' }}>
-                      Watch the rabbit jump on stones, then repeat the same sequence!
+                      Watch the rabbit jump on stones, then trace the path backwards!
                     </p>
                     <button
                       onClick={handleGameControl}
@@ -1241,6 +1348,160 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
             </div>
           </div>
         </div>
+      )}
+
+      {/* Position Editor - localhost only */}
+      {isLocalhost && (
+        <>
+          {/* Editor Toggle */}
+          <button
+            onClick={() => setShowEditor(prev => !prev)}
+            style={{
+              position: 'fixed',
+              bottom: '20px',
+              right: '20px',
+              zIndex: 200,
+              background: showEditor ? '#f59e0b' : 'rgba(30, 58, 95, 0.9)',
+              color: showEditor ? '#000' : '#f59e0b',
+              padding: '10px 16px',
+              borderRadius: '12px',
+              border: '2px solid #f59e0b',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: 700,
+              boxShadow: '0 4px 15px rgba(0,0,0,0.4)',
+            }}
+          >
+            {showEditor ? 'Close Editor' : 'Position Editor'}
+          </button>
+
+          {/* Editor Panel */}
+          {showEditor && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '320px',
+              height: '100vh',
+              zIndex: 200,
+              background: 'rgba(15, 23, 42, 0.97)',
+              borderRight: '2px solid rgba(245, 158, 11, 0.4)',
+              overflowY: 'auto',
+              padding: '16px',
+              fontFamily: 'monospace',
+              color: '#e2e8f0',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h3 style={{ color: '#f59e0b', fontSize: '16px', fontWeight: 800, margin: 0 }}>
+                  Stone Editor
+                </h3>
+                <button
+                  onClick={copyConfig}
+                  style={{
+                    background: '#22c55e',
+                    color: '#000',
+                    border: 'none',
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                  }}
+                >
+                  Copy Config
+                </button>
+              </div>
+
+              <p style={{ color: '#94a3b8', fontSize: '10px', marginBottom: '12px' }}>
+                Click a stone to select. Drag stones on the scene to reposition. X=horizontal Y=vertical R=hitbox radius S=rabbit scale O=rabbit Y offset
+              </p>
+
+              {/* Stone List */}
+              {stonesState.map(s => (
+                <div
+                  key={s.id}
+                  onClick={() => { setSelectedStoneId(s.id); moveRabbitTo(s.id); }}
+                  style={{
+                    padding: '8px 10px',
+                    marginBottom: '4px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    background: selectedStoneId === s.id ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255,255,255,0.03)',
+                    border: selectedStoneId === s.id ? '1px solid rgba(245, 158, 11, 0.5)' : '1px solid transparent',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: selectedStoneId === s.id ? '8px' : 0 }}>
+                    <span style={{ color: '#f59e0b', fontWeight: 700 }}>
+                      Stone {s.id} {s.id === 0 ? '(Start)' : s.id === 11 ? '(End)' : ''}
+                    </span>
+                    <span style={{ color: '#94a3b8', fontSize: '10px' }}>
+                      ({s.xPct}, {s.yPct}) r:{s.rPct} s:{s.rabbitScale ?? 1} o:{s.rabbitYOffset ?? -5}
+                    </span>
+                  </div>
+
+                  {/* Expanded controls for selected stone */}
+                  {selectedStoneId === s.id && (
+                    <div onClick={e => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {([
+                        { label: 'X', key: 'xPct' as const, min: 0, max: 100, step: 0.1, def: 0 },
+                        { label: 'Y', key: 'yPct' as const, min: 0, max: 100, step: 0.1, def: 0 },
+                        { label: 'R', key: 'rPct' as const, min: 0.5, max: 10, step: 0.1, def: 4 },
+                        { label: 'S', key: 'rabbitScale' as const, min: 0, max: 5, step: 0.1, def: 1 },
+                        { label: 'O', key: 'rabbitYOffset' as const, min: -20, max: 10, step: 0.5, def: -5 },
+                      ]).map(ctrl => (
+                        <div key={ctrl.label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <label style={{ width: '16px', fontSize: '10px', color: '#94a3b8', fontWeight: 700 }}>{ctrl.label}</label>
+                          <input
+                            type="range"
+                            min={ctrl.min}
+                            max={ctrl.max}
+                            step={ctrl.step}
+                            value={s[ctrl.key] ?? ctrl.def}
+                            onChange={e => updateStone(s.id, { [ctrl.key]: parseFloat(e.target.value) })}
+                            style={{ flex: 1, accentColor: '#f59e0b' }}
+                          />
+                          <input
+                            type="number"
+                            value={s[ctrl.key] ?? ctrl.def}
+                            step={ctrl.step}
+                            onChange={e => updateStone(s.id, { [ctrl.key]: parseFloat(e.target.value) || 0 })}
+                            style={{
+                              width: '55px',
+                              background: '#1e293b',
+                              color: '#e2e8f0',
+                              border: '1px solid #334155',
+                              borderRadius: '4px',
+                              padding: '2px 4px',
+                              fontSize: '11px',
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              <button
+                onClick={() => setStonesState([...STONES])}
+                style={{
+                  marginTop: '12px',
+                  width: '100%',
+                  background: '#991b1b',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '8px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                }}
+              >
+                Reset to Defaults
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
