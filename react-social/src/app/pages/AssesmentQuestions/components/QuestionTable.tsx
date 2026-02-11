@@ -136,13 +136,65 @@ const QuestionTable = (props: {
         "Option 6 MQTs": "",
       },
     ];
-
-    // Create workbook and worksheet
+    // Create workbook and worksheets
     const worksheet = XLSX.utils.json_to_sheet(templateData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Questions Template");
 
-    // Auto-size columns
+    // Build Legend sheet using aoa (array of arrays) for full layout control
+    const legendData: any[][] = [];
+
+    // --- Sections table ---
+    legendData.push(["Section ID", "Section Name", "Section Description"]);
+    if (props.sections && props.sections.length > 0) {
+      props.sections.forEach((s: any) => {
+        legendData.push([s.sectionId, s.sectionName || "", s.sectionDescription || ""]);
+      });
+    } else {
+      legendData.push(["No sections available", "", ""]);
+    }
+
+    // 2-row gap
+    legendData.push([]);
+    legendData.push([]);
+
+    // --- Question Types table ---
+    const questionTypesStartRow = legendData.length;
+    legendData.push(["Question Type", "Question Keyword"]);
+    legendData.push(["Single Choice", "single-choice"]);
+    legendData.push(["Multiple Choice", "multiple-choice"]);
+    legendData.push(["Ranking", "ranking"]);
+
+    const legendSheet = XLSX.utils.aoa_to_sheet(legendData);
+
+    // Bold header styling for both table headers
+    const boldStyle = { font: { bold: true } };
+    const sectionHeaders = ["A1", "B1", "C1"];
+    const qTypeHeaders = [
+      `A${questionTypesStartRow + 1}`,
+      `B${questionTypesStartRow + 1}`,
+    ];
+    [...sectionHeaders, ...qTypeHeaders].forEach((ref) => {
+      if (legendSheet[ref]) {
+        legendSheet[ref].s = boldStyle;
+      }
+    });
+
+    // Column widths for Legend sheet
+    legendSheet["!cols"] = [
+      { wch: 14 }, // Section ID / Question Type
+      { wch: 30 }, // Section Name / Question Keyword
+      { wch: 40 }, // Section Description
+    ];
+
+    // AutoFilter on sections table (gives table-like header appearance)
+    legendSheet["!autofilter"] = {
+      ref: `A1:C${(props.sections?.length || 1) + 1}`,
+    };
+
+    XLSX.utils.book_append_sheet(workbook, legendSheet, "Legend");
+
+    // Auto-size columns for Questions Template sheet
     const maxWidth = 50;
     const colWidths = Object.keys(templateData[0]).map((key) => ({
       wch: Math.min(key.length + 2, maxWidth),
