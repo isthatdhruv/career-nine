@@ -1,4 +1,4 @@
-import { FC, lazy, Suspense, useState } from "react";
+import { FC, lazy, Suspense } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import TopBarProgress from "react-topbar-progress-indicator";
 import { getCSSVariableValue } from "../../_metronic/assets/ts/_utils";
@@ -69,6 +69,58 @@ import ClassTeacherDashboard from "../pages/ClassTeacherDashboard/ClassTeacherDa
 import PrincipalDashboard from "../pages/PrincipalDashboard/PrincipalDashboard";
 import { Error401 } from "../modules/errors/components/Error401";
 import _ from "lodash";
+
+// Paths that every logged-in user can access without role check
+const ALWAYS_ALLOWED = [
+  "/dashboard",
+  "/auth",
+  "/login",
+  "/student-login",
+  "/studentAssessment",
+  "/allotted-assessment",
+  "/general-instructions",
+  "/demographics",
+  "/login/reset-password",
+];
+
+const AuthorizedLayout = () => {
+  const { currentUser } = useAuth();
+  const location = useLocation();
+
+  const isAlwaysAllowed = ALWAYS_ALLOWED.some(
+    (p) => location.pathname === p || location.pathname.startsWith(p + "/")
+  );
+
+  if (!isAlwaysAllowed) {
+    const authorityUrls: string[] = currentUser?.authorityUrls ?? [];
+    console.log("User's authority URLs:", authorityUrls);
+
+    const isAuthorized = authorityUrls.some((pattern) => {
+      // If pattern contains *, convert to regex
+      if (pattern.includes("*")) {
+        // Escape regex special chars except *, then replace * with .*
+        const regexStr =
+          "^" +
+          pattern
+            .replace(/([.+?^${}()|[\]\\])/g, "\\$1")
+            .replace(/\*/g, ".*") +
+          "$";
+        return new RegExp(regexStr).test(location.pathname);
+      }
+      // Exact match or sub-route match
+      return (
+        location.pathname === pattern ||
+        location.pathname.startsWith(pattern + "/")
+      );
+    });
+
+    if (!isAuthorized) {
+      return <Error401 />;
+    }
+  }
+
+  return <MasterLayout />;
+};
 
 const PrivateRoutes = () => {
   const StudentsData = lazy(
@@ -155,21 +207,6 @@ const PrivateRoutes = () => {
   // const UniversityAllResultDashboard = lazy(
   //   () => import("../pages/UniversityResult/UniversityAllResultDashboard")
   // );
-  const [autorized, setAutorized] = useState(false);
-  const { currentUser } = useAuth();
-  console.log("Current User:", currentUser);
-  // const roles = currentUser?.authorityUrls;
-  var location = useLocation();
-  // console.log(_.includes(currentUser!.authorityUrls!, location.pathname));
-  // console.log(currentUser!.authorityUrls!, location.pathname)
-  // const regex = new RegExp(currentUser!.authorityUrls![0], "i"); // 'i' flag for case-insensitive matching
-
-  // if (!regex.test(location.pathname)) {
-  //   if (location.pathname != "/dashboard") return <Error401></Error401>;
-  // }
-  if (!autorized) { console.log("Arreb aur Somya are sole mates") }
-  // console.log(roles);
-  // const Pdf = lazy(() => import("../pages/newRegistrationUpload/StudentService"));
   return (
     <Routes>
       <Route path="/studentAssessment" element={<SelectSectionPage />} />
@@ -223,7 +260,7 @@ const PrivateRoutes = () => {
       />
 
       <Route path="/login" element={<LoginPage />} />
-      <Route element={<MasterLayout />}>
+      <Route element={<AuthorizedLayout />}>
         <Route path="auth/*" element={<Navigate to="/dashboard" />} />
         <Route path="dashboard" element={<DashboardAdminPage />} />
 
