@@ -1,15 +1,23 @@
 package com.kccitm.api.controller;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.HashMap;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -20,20 +28,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-/**
- * REST endpoint to trigger the reportGeneration module's main() method.
- *
- * Behavior and assumptions:
- * - The code will search upward from the current working directory for a folder named
- *   "reportGeneration" (the module in this repo). If not found the endpoint fails.
- * - It will run `mvn -f <reportGeneration/pom.xml> -DskipTests package` to ensure the
- *   jar is built, then run the jar's main class via `java -cp <jar> com.demo.App`.
- * - Accepts an optional JSON body { "excelPath": "/abs/or/rel/path.xlsx" } to pass to
- *   the report generator; otherwise the report generator will use its default.
- */
 @RestController
 @RequestMapping("/api/reportgen")
 public class ReportGenerationController {
+
+    private static final int SCRIPT_TIMEOUT_MINUTES = 5;
 
     @PostMapping(value = "/run", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Object> runReport(@RequestBody(required = false) Map<String, String> body) {
@@ -42,144 +41,182 @@ public class ReportGenerationController {
             excelPath = body.get("excelPath");
         }
 
-        try {
-            Path rgDir = findReportGenerationDir();
-            if (rgDir == null) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(Map.of("error", "reportGeneration module directory not found"));
-            }
-
-            return executeReport(rgDir, excelPath);
-
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "interrupted"));
-        } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "io error", "message", e.getMessage()));
+        if (excelPath == null || excelPath.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "excelPath is required in request body"));
         }
+
+        Path excelFile = Paths.get(excelPath);
+        if (!Files.exists(excelFile)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Excel file not found: " + excelPath));
+        }
+
+        return executePipeline(excelFile);
     }
 
-    @PostMapping(value = "/run/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(value = "/run/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Object> uploadAndRun(@RequestParam("file") MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "no file uploaded"));
+            return ResponseEntity.badRequest().body(Map.of("error", "No file uploaded"));
         }
 
-        Path temp = null;
-        try {
-            Path rgDir = findReportGenerationDir();
-            if (rgDir == null) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(Map.of("error", "reportGeneration module directory not found"));
-            }
+        Path rgDir = findReportGenerationDir();
+        if (rgDir == null) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "reportGeneration directory not found"));
+        }
 
-            // create a temp file and copy contents
-            String fname = file.getOriginalFilename() != null ? file.getOriginalFilename() : "upload.xlsx";
-            temp = Files.createTempFile("reportgen-upload-", "-" + fname);
-            try (java.io.InputStream in = file.getInputStream()) {
-                Files.copy(in, temp, StandardCopyOption.REPLACE_EXISTING);
-            }
+        // Save uploaded file to the scripts directory
+        Path scriptsDir = rgDir.resolve("src").resolve("files");
+        String fname = file.getOriginalFilename() != null ? file.getOriginalFilename() : "upload.xlsx";
+        Path uploadedFile = scriptsDir.resolve(fname);
 
-            return executeReport(rgDir, temp.toAbsolutePath().toString());
+        try (java.io.InputStream in = file.getInputStream()) {
+            Files.copy(in, uploadedFile, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "io error", "message", e.getMessage()));
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "interrupted"));
-        } finally {
-            if (temp != null) {
-                try { Files.deleteIfExists(temp); } catch (IOException ignored) {}
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to save uploaded file: " + e.getMessage()));
+        }
+
+        return executePipeline(uploadedFile);
+    }
+
+    private ResponseEntity<Object> executePipeline(Path excelFile) {
+        Path rgDir = findReportGenerationDir();
+        if (rgDir == null) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "reportGeneration directory not found"));
+        }
+
+        Path scriptsDir = rgDir.resolve("src").resolve("files");
+        String pythonCmd = findPythonCommand(rgDir);
+
+        if (pythonCmd == null) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Python executable not found (checked venv and system)"));
+        }
+
+        // Pipeline scripts in order
+        List<String[]> pipeline = Arrays.asList(
+            new String[]{pythonCmd, "00_data_normalizer.py", excelFile.toAbsolutePath().toString()},
+            new String[]{pythonCmd, "00_eligibility_check.py", "input.xlsx"},
+            new String[]{pythonCmd, "01_core_analysis.py"},
+            new String[]{pythonCmd, "02_career_pathway_analysis.py"},
+            new String[]{pythonCmd, "03_career_matching.py"},
+            new String[]{pythonCmd, "04_ai_summaries.py", "--resume", "--batch-size=10"},
+            new String[]{pythonCmd, "05_data_enrichment.py"},
+            new String[]{pythonCmd, "06_generate_reports.py"}
+        );
+
+        StringBuilder fullLog = new StringBuilder();
+
+        for (String[] cmd : pipeline) {
+            String scriptName = cmd[1];
+            fullLog.append("\n--- Running: ").append(scriptName).append(" ---\n");
+
+            try {
+                ProcessBuilder pb = new ProcessBuilder(cmd);
+                pb.directory(scriptsDir.toFile());
+                pb.redirectErrorStream(true);
+
+                Process process = pb.start();
+                StringBuilder scriptOutput = new StringBuilder();
+
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        scriptOutput.append(line).append('\n');
+                    }
+                }
+
+                boolean finished = process.waitFor(SCRIPT_TIMEOUT_MINUTES, TimeUnit.MINUTES);
+                if (!finished) {
+                    process.destroyForcibly();
+                    fullLog.append(scriptOutput);
+                    fullLog.append("TIMEOUT: Script exceeded ").append(SCRIPT_TIMEOUT_MINUTES).append(" minutes\n");
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body(Map.of("error", "Script timed out: " + scriptName, "log", fullLog.toString()));
+                }
+
+                fullLog.append(scriptOutput);
+
+                int exitCode = process.exitValue();
+                if (exitCode != 0) {
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body(Map.of("error", "Script failed: " + scriptName,
+                                         "exitCode", exitCode,
+                                         "log", fullLog.toString()));
+                }
+
+            } catch (IOException | InterruptedException e) {
+                if (e instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                }
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(Map.of("error", "Error running " + scriptName + ": " + e.getMessage(),
+                                     "log", fullLog.toString()));
             }
+        }
+
+        // Pipeline complete — collect generated reports into ZIP
+        Path reportsDir = scriptsDir.resolve("Reports").resolve("english");
+        if (!Files.exists(reportsDir) || !Files.isDirectory(reportsDir)) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Reports directory not found after pipeline",
+                                 "log", fullLog.toString()));
+        }
+
+        try {
+            byte[] zipBytes = createZipFromDirectory(reportsDir);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            headers.setContentDispositionFormData("attachment", "career9_reports.zip");
+            headers.setContentLength(zipBytes.length);
+
+            return new ResponseEntity<>(zipBytes, headers, HttpStatus.OK);
+
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to create ZIP: " + e.getMessage(),
+                                 "log", fullLog.toString()));
         }
     }
 
-    private ResponseEntity<Object> executeReport(Path rgDir, String excelPath) throws IOException, InterruptedException {
-        // 1) Build the module (skip tests)
-        String mvnCmd = findExecutable("mvn");
-        if (mvnCmd == null) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "mvn executable not found on PATH"));
+    private byte[] createZipFromDirectory(Path directory) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (ZipOutputStream zos = new ZipOutputStream(baos)) {
+            addDirectoryToZip(zos, directory, directory);
         }
+        return baos.toByteArray();
+    }
 
-        ProcessBuilder mvnPb = new ProcessBuilder(mvnCmd, "-f", rgDir.resolve("pom.xml").toString(), "-DskipTests", "package");
-        mvnPb.directory(rgDir.toFile());
-        mvnPb.redirectErrorStream(true);
+    private void addDirectoryToZip(ZipOutputStream zos, Path fileOrDir, Path baseDir) throws IOException {
+        File[] files = fileOrDir.toFile().listFiles();
+        if (files == null) return;
 
-        StringBuilder output = new StringBuilder();
-
-        Process mvn = mvnPb.start();
-        try (BufferedReader r = new BufferedReader(new InputStreamReader(mvn.getInputStream()))) {
-            String line;
-            while ((line = r.readLine()) != null) {
-                output.append(line).append('\n');
+        for (File file : files) {
+            String entryName = baseDir.relativize(file.toPath()).toString();
+            if (file.isDirectory()) {
+                zos.putNextEntry(new ZipEntry(entryName + "/"));
+                zos.closeEntry();
+                addDirectoryToZip(zos, file.toPath(), baseDir);
+            } else {
+                zos.putNextEntry(new ZipEntry(entryName));
+                try (FileInputStream fis = new FileInputStream(file)) {
+                    byte[] buffer = new byte[8192];
+                    int len;
+                    while ((len = fis.read(buffer)) > 0) {
+                        zos.write(buffer, 0, len);
+                    }
+                }
+                zos.closeEntry();
             }
         }
-        int mvnExit = mvn.waitFor();
-        if (mvnExit != 0) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "maven build failed", "mvnExit", mvnExit, "log", output.toString()));
-        }
-
-        // 2) Locate the jar in target
-        Path targetDir = rgDir.resolve("target");
-        if (!Files.exists(targetDir) || !Files.isDirectory(targetDir)) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "target directory not found after build"));
-        }
-
-        // Expect artifact jython-demo-1.0-SNAPSHOT.jar (as per pom)
-        Path jar = targetDir.resolve("jython-demo-1.0-SNAPSHOT.jar");
-        if (!Files.exists(jar)) {
-            // fallback: pick the first jar in target
-            try (var s = Files.list(targetDir)) {
-                jar = s.filter(p -> p.toString().endsWith(".jar")).findFirst().orElse(null);
-            }
-        }
-
-        if (jar == null || !Files.exists(jar)) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "no jar found in target after build"));
-        }
-
-        // 3) Find java executable
-        String javaCmd = findExecutable("java");
-        if (javaCmd == null) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "java executable not found on PATH"));
-        }
-
-        // Build java command
-        ProcessBuilder javaPb;
-        if (excelPath != null && !excelPath.isBlank()) {
-            javaPb = new ProcessBuilder(javaCmd, "-cp", jar.toAbsolutePath().toString(), "com.demo.App", excelPath);
-        } else {
-            javaPb = new ProcessBuilder(javaCmd, "-cp", jar.toAbsolutePath().toString(), "com.demo.App");
-        }
-        javaPb.directory(rgDir.toFile());
-        javaPb.redirectErrorStream(true);
-
-        Process javaProc = javaPb.start();
-        StringBuilder runLog = new StringBuilder();
-        try (BufferedReader r = new BufferedReader(new InputStreamReader(javaProc.getInputStream()))) {
-            String line;
-            while ((line = r.readLine()) != null) {
-                runLog.append(line).append('\n');
-            }
-        }
-        int runExit = javaProc.waitFor();
-        Map<String, Object> resp = new HashMap<>();
-        resp.put("buildLog", output.toString());
-        resp.put("runLog", runLog.toString());
-        resp.put("runExit", runExit);
-
-        HttpStatus status = runExit == 0 ? HttpStatus.OK : HttpStatus.INTERNAL_SERVER_ERROR;
-        return ResponseEntity.status(status).body(resp);
     }
 
     private Path findReportGenerationDir() {
-        // Walk up from current working dir to find a directory named "reportGeneration"
         Path cur = Paths.get(System.getProperty("user.dir")).toAbsolutePath();
-        for (int i = 0; i < 8; i++) { // limit depth to avoid infinite loops
+        for (int i = 0; i < 8; i++) {
             Path candidate = cur.resolve("reportGeneration");
             if (Files.exists(candidate) && Files.isDirectory(candidate)) {
                 return candidate;
@@ -190,22 +227,26 @@ public class ReportGenerationController {
         return null;
     }
 
-    private String findExecutable(String name) {
-        // Check common candidates and PATH
-        try {
-            ProcessBuilder pb = new ProcessBuilder("which", name);
-            pb.redirectErrorStream(true);
-            Process p = pb.start();
-            int exit = p.waitFor();
-            if (exit == 0) {
-                try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
-                    String line = r.readLine();
-                    if (line != null && !line.isBlank()) return line.trim();
-                }
-            }
-        } catch (IOException | InterruptedException ignored) {
+    private String findPythonCommand(Path rgDir) {
+        // 1. Prefer the project's venv Python
+        Path venvPython = rgDir.resolve(".venv").resolve("bin").resolve("python");
+        if (Files.exists(venvPython) && Files.isExecutable(venvPython)) {
+            return venvPython.toAbsolutePath().toString();
         }
-        // fallback to name itself (let OS resolve via PATH)
-        return name;
+
+        // 2. Fallback to system python3 / python
+        for (String cmd : Arrays.asList("python3", "python")) {
+            try {
+                ProcessBuilder pb = new ProcessBuilder(cmd, "--version");
+                pb.redirectErrorStream(true);
+                Process p = pb.start();
+                boolean finished = p.waitFor(3, TimeUnit.SECONDS);
+                if (finished && p.exitValue() == 0) {
+                    return cmd;
+                }
+            } catch (IOException | InterruptedException ignored) {
+            }
+        }
+        return null;
     }
 }
