@@ -5,6 +5,7 @@ import java.net.URI;
 import javax.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -42,10 +43,22 @@ public class AuthController {
     private PasswordEncoder passwordEncoder;
 
     @Autowired
+    private com.kccitm.api.service.SmtpEmailService smtpEmailService;
+
+    @Autowired
     private TokenProvider tokenProvider;
 
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
+        User user = userRepository.findByEmail(loginRequest.getEmail());
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiResponse(false, "Invalid email or password."));
+        }
+        if (user.getIsActive() == null || !user.getIsActive()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiResponse(false, "Your registration is under Process"));
+        }
 
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
@@ -63,24 +76,49 @@ public class AuthController {
         if (userRepository.existsByEmail(signUpRequest.getEmail())) {
             throw new BadRequestException("Email address already in use.");
         }
+        if (signUpRequest.getPhone() == null || signUpRequest.getPhone().trim().isEmpty()) {
+            throw new BadRequestException("Phone number is required.");
+        }
+        if (userRepository.existsByPhone(signUpRequest.getPhone())) {
+            throw new BadRequestException("Phone number already in use.");
+        }
+        if (signUpRequest.getAcceptTerms() == null || !signUpRequest.getAcceptTerms()) {
+            throw new BadRequestException("You must accept the terms and conditions.");
+        }
 
-        // Creating user's account
-        User user = new User();
-        user.setName(signUpRequest.getName());
-        user.setEmail(signUpRequest.getEmail());
-        user.setPassword(signUpRequest.getPassword());
-        user.setProvider(AuthProvider.local);
+    // Creating user's account
+    User user = new User();
+    // set name from firstname+lastname if available otherwise use provided name
+    String fullName = (signUpRequest.getFirstname() != null && !signUpRequest.getFirstname().isBlank())
+        ? signUpRequest.getFirstname() + " " + signUpRequest.getLastname()
+        : "";
+    user.setName(signUpRequest.getFirstname() + " " + signUpRequest.getLastname());
+    user.setEmail(signUpRequest.getEmail());
+    user.setPhone(signUpRequest.getPhone());
+    user.setOrganisation(signUpRequest.getOrganisation());
+    user.setDesignation(signUpRequest.getDesignation());
+    user.setAcceptTerms(signUpRequest.getAcceptTerms());
+    user.setProvider(AuthProvider.local);
 
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
+    user.setPassword(passwordEncoder.encode(signUpRequest.getPassword()));
 
-        User result = userRepository.save(user);
+    User result = userRepository.save(user);
 
         URI location = ServletUriComponentsBuilder
                 .fromCurrentContextPath().path("/user/me")
                 .buildAndExpand(result.getId()).toUri();
 
-        return ResponseEntity.created(location)
-                .body(new ApiResponse(true, "User registered successfully@"));
+    // Send welcome email asynchronously (fire-and-forget)
+    try {
+        String subject = "Welcome to Career-9";
+        String body = "Hello " + fullName + ",\n\nThank you for registering.We will get back to you soon.\n\nRegards,\nCareer-9 Team";
+        smtpEmailService.sendSimpleEmail(result.getEmail(), subject, body);
+    } catch (Exception e) {
+        // log and continue - do not fail registration because of email
+    }
+
+    return ResponseEntity.created(location)
+        .body(new ApiResponse(true, "User registered successfully"));
     }
 
 }

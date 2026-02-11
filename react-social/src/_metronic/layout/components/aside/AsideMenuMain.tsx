@@ -156,6 +156,29 @@ export function AsideMenuMain() {
       <div className="menu-item">
         <div className="menu-content pt-8 pb-2">
           <span className="menu-section text-muted text-uppercase fs-8 ls-1">
+            Registration
+          </span>
+        </div>
+      </div>
+          <AsideMenuItemWithSub
+        to=""
+        title="User Registration"
+        fontIcon="bi-app-indicator"
+        icon="/media/icons/duotune/communication/com006.svg"
+      >
+        <AsideMenuItem
+        to="/user-registrations"
+        icon="/media/icons/duotune/general/gen044.svg"
+        title="User Registration"
+        fontIcon="bi-app-indicator"
+        />
+      </AsideMenuItemWithSub>
+        
+        
+
+      <div className="menu-item">
+        <div className="menu-content pt-8 pb-2">
+          <span className="menu-section text-muted text-uppercase fs-8 ls-1">
             Assessment Section
           </span>
         </div>

@@ -8,8 +8,12 @@ import javax.validation.constraints.NotBlank;
  */
 
 public class SignUpRequest {
+
     @NotBlank
-    private String name;
+    private String firstname;
+
+    @NotBlank
+    private String lastname;
 
     @NotBlank
     @Email
@@ -18,13 +22,18 @@ public class SignUpRequest {
     @NotBlank
     private String password;
 
-    public String getName() {
-        return name;
-    }
+    @NotBlank
+    private String phone;
 
-    public void setName(String name) {
-        this.name = name;
-    }
+    @NotBlank
+    private String organisation;
+
+    @NotBlank
+    private String designation;
+
+    private Boolean acceptTerms = Boolean.FALSE;
+
+
 
     public String getEmail() {
         return email;
@@ -40,5 +49,53 @@ public class SignUpRequest {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public String getFirstname() {
+        return firstname;
+    }
+
+    public void setFirstname(String firstname) {
+        this.firstname = firstname;
+    }
+
+    public String getLastname() {
+        return lastname;
+    }
+
+    public void setLastname(String lastname) {
+        this.lastname = lastname;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public String getOrganisation() {
+        return organisation;
+    }
+
+    public void setOrganisation(String organisation) {
+        this.organisation = organisation;
+    }
+
+    public String getDesignation() {
+        return designation;
+    }
+
+    public void setDesignation(String designation) {
+        this.designation = designation;
+    }
+
+    public Boolean getAcceptTerms() {
+        return acceptTerms;
+    }
+
+    public void setAcceptTerms(Boolean acceptTerms) {
+        this.acceptTerms = acceptTerms;
     }
 }

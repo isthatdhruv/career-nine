@@ -48,7 +48,10 @@ public class User implements Serializable {
 
     @Column(nullable = true)
     private String name;
-    
+
+    @Column(name="isActive", nullable = true, columnDefinition = "boolean default false")
+    private Boolean isActive = false;
+
     @OneToOne
     @JoinColumn(name = "student_info_id", referencedColumnName = "id", nullable = true)
     private StudentInfo studentInfo;
@@ -56,6 +59,18 @@ public class User implements Serializable {
     @Email
     @Column(nullable = true)
     private String email;
+
+    @Column(name = "phone")
+    private String phone;
+
+    @Column(name = "organisation")
+    private String organisation;
+
+    @Column(name = "designation")
+    private String designation;
+
+    @Column(name = "accept_terms")
+    private Boolean acceptTerms = false;
 
     @Column(nullable = true)
     @JsonFormat(pattern = "dd-MM-yyyy")
@@ -122,6 +137,14 @@ public class User implements Serializable {
 
     }
 
+    public Boolean getIsActive() {
+        return isActive;
+    }
+
+    public void setIsActive(Boolean isActive) {
+        this.isActive = isActive;
+    }
+    
     public Boolean getDisplay() {
         return display;
     }
@@ -144,6 +167,38 @@ public class User implements Serializable {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public String getOrganisation() {
+        return organisation;
+    }
+
+    public void setOrganisation(String organisation) {
+        this.organisation = organisation;
+    }
+
+    public String getDesignation() {
+        return designation;
+    }
+
+    public void setDesignation(String designation) {
+        this.designation = designation;
+    }
+
+    public Boolean getAcceptTerms() {
+        return acceptTerms;
+    }
+
+    public void setAcceptTerms(Boolean acceptTerms) {
+        this.acceptTerms = acceptTerms;
     }
 
     public Date getDobDate() {
@@ -227,7 +282,7 @@ public class User implements Serializable {
     }
 
     public List<GrantedAuthority> getRole() {
-        List<GrantedAuthority> role = new ArrayList<GrantedAuthority>();
+        List<GrantedAuthority> role = new ArrayList<>();
         if (this.userRoleGroupMappings != null)
             this.userRoleGroupMappings.stream()
                     .forEach((arg0) -> arg0.getRoleGroup().getRoleRoleGroupMappings().stream()

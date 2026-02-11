@@ -12,7 +12,7 @@ import { getCSSVariableValue } from "../../_metronic/assets/ts/_utils";
 import { WithChildren } from "../../_metronic/helpers";
 import { AuthRedirectPage } from "../../app/pages/authRedirectPage";
 import { App } from "../App";
-import { Logout, useAuth } from "../modules/auth";
+import { AuthPage, Logout, useAuth } from "../modules/auth";
 import { ErrorsPage } from "../modules/errors/ErrorsPage";
 import FacultyRegistrationForm from "../pages/FacultyRegistration/FacultyRegistrationForm";
 import StudentDetailPage from "../pages/StudentRegistration/StudentRegistrationForm";
@@ -162,12 +162,12 @@ const AppRoutes: FC = () => {
 
         <Route path="roles/logout" element={<Logout />} />
 
-        <>
+        {/* <>
             <Route path="/*" element={<PrivateRoutes />} />
             <Route index element={<Navigate to="/dashboard" />} />
-          </>
+          </> */}
 
-        {/* {currentUser ? (
+        {currentUser ? (
           <>
             <Route path="/*" element={<PrivateRoutes />} />
             <Route index element={<Navigate to="/dashboard" />} />
@@ -178,7 +178,7 @@ const AppRoutes: FC = () => {
             <Route path="*" element={<Navigate to="/auth" />} />
           </>
         )
-        } */}
+        }
 
         {/* {currentUser ? (
           roles && roles!.lastIndexOf("/temp-student") === -1 ?
