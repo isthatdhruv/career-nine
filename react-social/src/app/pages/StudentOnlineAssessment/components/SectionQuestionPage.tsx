@@ -404,24 +404,14 @@ const SectionQuestionPage: React.FC = () => {
       return { ...prev, [sectionId!]: s };
     });
 
-    // Auto-advance to next question after a short delay (to let user see their selection)
+    // Auto-advance to next unanswered question after a short delay (to let user see their selection)
     if (willAutoAdvance) {
       setTimeout(() => {
-        if (currentIndex < questions.length - 1) {
-          const newIndex = currentIndex + 1;
-          setCurrentIndex(newIndex);
-          navigate(`/studentAssessment/sections/${sectionId}/questions/${newIndex}`);
-        } else {
-          // Last question of section - check for next section
-          const idx = questionnaire.sections.findIndex(
-            (s: any) => String(s.section.sectionId) === String(sectionId)
-          );
-          const next = questionnaire.sections[idx + 1];
-          if (next) {
-            navigate(`/studentAssessment/sections/${next.section.sectionId}/questions/0`);
-          }
-          // If it's the last section, stay on the question (user needs to submit)
+        const nextUnanswered = findNextUnansweredQuestion(sectionId!, currentIndex, qId);
+        if (nextUnanswered) {
+          navigate(`/studentAssessment/sections/${nextUnanswered.sectionId}/questions/${nextUnanswered.questionIndex}`);
         }
+        // If all questions answered, stay on current question (user can submit)
       }, 400); // 400ms delay so user can see their selection
     }
   };
@@ -469,24 +459,14 @@ const SectionQuestionPage: React.FC = () => {
       });
     }
 
-    // Auto-advance to next question after a short delay
+    // Auto-advance to next unanswered question after a short delay
     if (willAutoAdvance) {
       setTimeout(() => {
-        if (currentIndex < questions.length - 1) {
-          const newIndex = currentIndex + 1;
-          setCurrentIndex(newIndex);
-          navigate(`/studentAssessment/sections/${sectionId}/questions/${newIndex}`);
-        } else {
-          // Last question of section - check for next section
-          const idx = questionnaire.sections.findIndex(
-            (s: any) => String(s.section.sectionId) === String(sectionId)
-          );
-          const next = questionnaire.sections[idx + 1];
-          if (next) {
-            navigate(`/studentAssessment/sections/${next.section.sectionId}/questions/0`);
-          }
-          // If it's the last section, stay on the question (user needs to submit)
+        const nextUnanswered = findNextUnansweredQuestion(sectionId!, currentIndex, qId);
+        if (nextUnanswered) {
+          navigate(`/studentAssessment/sections/${nextUnanswered.sectionId}/questions/${nextUnanswered.questionIndex}`);
         }
+        // If all questions answered, stay on current question (user can submit)
       }, 400); // 400ms delay so user can see their selection
     }
   };
@@ -512,47 +492,47 @@ const SectionQuestionPage: React.FC = () => {
   };
 
   const saveForLaterFn = () => {
+    // Mark as saved for later
     setSavedForLater((prev) => {
       const s = new Set(prev[sectionId!] || []);
       s.add(qId);
       return { ...prev, [sectionId!]: s };
     });
 
-    // Only go to next if not on the last question of last section
-    // Otherwise stay on current question (user can use navigation to move)
-    if (currentIndex < questions.length - 1) {
-      // Not the last question of current section - go to next question
-      const newIndex = currentIndex + 1;
-      setCurrentIndex(newIndex);
+    // Clear any existing answers so the question reverts to "saved" (yellow) state
+    setAnswers((prev) => {
+      const sec = prev[sectionId!] || {};
+      const { [qId]: _, ...rest } = sec;
+      return { ...prev, [sectionId!]: rest };
+    });
+    setRankingAnswers((prev) => {
+      const sec = prev[sectionId!] || {};
+      const { [qId]: _, ...rest } = sec;
+      return { ...prev, [sectionId!]: rest };
+    });
+
+    // Navigate to the next unanswered question, skipping already-answered ones
+    // Exclude the current question since we just saved it (it's not answered)
+    const nextUnanswered = findNextUnansweredQuestion(sectionId!, currentIndex, qId);
+    if (nextUnanswered) {
       navigate(
-        `/studentAssessment/sections/${sectionId}/questions/${newIndex}`
+        `/studentAssessment/sections/${nextUnanswered.sectionId}/questions/${nextUnanswered.questionIndex}`
       );
-    } else {
-      // Last question of current section - check if there's a next section
-      const idx = questionnaire.sections.findIndex(
-        (s: any) => String(s.section.sectionId) === String(sectionId)
-      );
-      const next = questionnaire.sections[idx + 1];
-      if (next) {
-        // Go to next section
-        navigate(
-          `/studentAssessment/sections/${next.section.sectionId}/questions/0`
-        );
-      }
-      // If no next section, just stay on current question (don't go to completed)
     }
+    // If no unanswered questions remain, stay on current question
   };
 
   const goNext = () => {
     if (selectedOptions.length === 0) markSkipped();
 
-    if (currentIndex < questions.length - 1) {
-      const newIndex = currentIndex + 1;
-      setCurrentIndex(newIndex);
+    // Jump to the next unanswered question, skipping already-answered ones
+    const nextUnanswered = findNextUnansweredQuestion(sectionId!, currentIndex);
+    if (nextUnanswered) {
       navigate(
-        `/studentAssessment/sections/${sectionId}/questions/${newIndex}`
+        `/studentAssessment/sections/${nextUnanswered.sectionId}/questions/${nextUnanswered.questionIndex}`
       );
     } else {
+      // All questions answered — go to next section or completed page
       goToNextSection();
     }
   };
@@ -616,12 +596,20 @@ const SectionQuestionPage: React.FC = () => {
         alert("Failed to submit assessment. Please try again.");
       }
     } else {
-      // Show warning message
+      // Show popup asking user to mark all answers
       setShowWarning(true);
-      // Hide warning after 5 seconds
-      setTimeout(() => {
-        setShowWarning(false);
-      }, 5000);
+    }
+  };
+
+  // Navigate to the first unanswered question from the very beginning
+  const goToFirstUnanswered = () => {
+    if (!questionnaire) return;
+    const firstSectionId = String(questionnaire.sections[0].section.sectionId);
+    // Pass -1 so it starts checking from index 0 of the first section
+    const firstUnanswered = findNextUnansweredQuestion(firstSectionId, -1);
+    if (firstUnanswered) {
+      setShowWarning(false);
+      navigate(`/studentAssessment/sections/${firstUnanswered.sectionId}/questions/${firstUnanswered.questionIndex}`);
     }
   };
 
@@ -636,6 +624,77 @@ const SectionQuestionPage: React.FC = () => {
     // Check skipped
     if (skipped[secId]?.has(questionId)) return "linear-gradient(135deg, #f87171 0%, #dc2626 100%)";
     return "#d1d5db";
+  };
+
+  // Find the next unanswered question starting after the current position
+  // Skips over already-answered questions so auto-advance lands on unanswered ones
+  const findNextUnansweredQuestion = (
+    fromSectionId: string,
+    fromQuestionIndex: number,
+    excludeQuestionId?: number
+  ): { sectionId: string; questionIndex: number } | null => {
+    if (!questionnaire) return null;
+    const sections = questionnaire.sections;
+    const startSectionIdx = sections.findIndex(
+      (s: any) => String(s.section.sectionId) === fromSectionId
+    );
+    if (startSectionIdx === -1) return null;
+
+    for (let sIdx = startSectionIdx; sIdx < sections.length; sIdx++) {
+      const sec = sections[sIdx];
+      const secId = String(sec.section.sectionId);
+      const startQ = sIdx === startSectionIdx ? fromQuestionIndex + 1 : 0;
+
+      for (let qIdx = startQ; qIdx < sec.questions.length; qIdx++) {
+        const q = sec.questions[qIdx];
+        const questionId = q.questionnaireQuestionId;
+
+        // Skip the question we just answered (state may be stale in closure)
+        if (excludeQuestionId && questionId === excludeQuestionId) continue;
+
+        const isRanking = q.question.questionType === "ranking";
+        let isAnswered = false;
+        if (isRanking) {
+          const rankings = rankingAnswers[secId]?.[questionId] || {};
+          isAnswered = Object.keys(rankings).length > 0;
+        } else {
+          isAnswered = (answers[secId]?.[questionId]?.length || 0) > 0;
+        }
+
+        if (!isAnswered) {
+          return { sectionId: secId, questionIndex: qIdx };
+        }
+      }
+    }
+
+    // Wrap around: search from beginning up to the starting point
+    for (let sIdx = 0; sIdx <= startSectionIdx; sIdx++) {
+      const sec = sections[sIdx];
+      const secId = String(sec.section.sectionId);
+      const endQ = sIdx === startSectionIdx ? fromQuestionIndex : sec.questions.length;
+
+      for (let qIdx = 0; qIdx < endQ; qIdx++) {
+        const q = sec.questions[qIdx];
+        const questionId = q.questionnaireQuestionId;
+
+        if (excludeQuestionId && questionId === excludeQuestionId) continue;
+
+        const isRanking = q.question.questionType === "ranking";
+        let isAnswered = false;
+        if (isRanking) {
+          const rankings = rankingAnswers[secId]?.[questionId] || {};
+          isAnswered = Object.keys(rankings).length > 0;
+        } else {
+          isAnswered = (answers[secId]?.[questionId]?.length || 0) > 0;
+        }
+
+        if (!isAnswered) {
+          return { sectionId: secId, questionIndex: qIdx };
+        }
+      }
+    }
+
+    return null; // All questions are answered
   };
 
   const getQuestionText = (languageId: number): string => {
@@ -1035,20 +1094,91 @@ const SectionQuestionPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Warning Message */}
+            {/* Submit Warning Popup */}
             {showWarning && (
               <div
-                className="alert alert-warning alert-dismissible fade show"
-                role="alert"
-                style={{ marginBottom: "20px" }}
+                style={{
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: "rgba(0, 0, 0, 0.5)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 9999,
+                }}
+                onClick={() => setShowWarning(false)}
               >
-                <strong>⚠️ Warning!</strong> Please answer all questions before submitting the assessment. Some questions are still Saved for Later, Skipped, or Not Visited.
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => setShowWarning(false)}
-                  aria-label="Close"
-                ></button>
+                <div
+                  style={{
+                    background: "#fff",
+                    borderRadius: "16px",
+                    padding: "32px 36px",
+                    maxWidth: "440px",
+                    width: "90%",
+                    textAlign: "center",
+                    boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+                    color: "#2d3748",
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div
+                    style={{
+                      width: "60px",
+                      height: "60px",
+                      borderRadius: "50%",
+                      background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      margin: "0 auto 16px",
+                      fontSize: "1.8rem",
+                    }}
+                  >
+                    ⚠️
+                  </div>
+                  <h5 style={{ fontWeight: 700, marginBottom: "12px", color: "#1a202c", fontSize: "1.2rem" }}>
+                    Mark all answers before saving
+                  </h5>
+                  <p style={{ color: "#6b7280", fontSize: "0.95rem", lineHeight: 1.6, marginBottom: "24px" }}>
+                    Some questions are still unanswered, saved for later, or skipped. Please answer all questions before submitting.
+                  </p>
+                  <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+                    <button
+                      onClick={() => setShowWarning(false)}
+                      style={{
+                        background: "#e2e8f0",
+                        color: "#4a5568",
+                        border: "none",
+                        borderRadius: "10px",
+                        padding: "10px 24px",
+                        fontWeight: 600,
+                        fontSize: "0.95rem",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Close
+                    </button>
+                    <button
+                      onClick={goToFirstUnanswered}
+                      style={{
+                        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: "10px",
+                        padding: "10px 24px",
+                        fontWeight: 600,
+                        fontSize: "0.95rem",
+                        cursor: "pointer",
+                        boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)",
+                      }}
+                    >
+                      Continue →
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -1337,25 +1467,23 @@ const SectionQuestionPage: React.FC = () => {
                 ← Back
               </button>
               <div className="d-flex gap-3 align-items-center">
-                {selectedOptions.length === 0 && (
-                  <button
-                    onClick={saveForLaterFn}
-                    style={{
-                      background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
-                      color: "#78350f",
-                      border: "none",
-                      borderRadius: "12px",
-                      padding: "12px 24px",
-                      fontWeight: 600,
-                      fontSize: "0.95rem",
-                      cursor: "pointer",
-                      boxShadow: "0 4px 15px rgba(251, 191, 36, 0.4)",
-                      transition: "all 0.2s ease",
-                    }}
-                  >
-                    Save for Later
-                  </button>
-                )}
+                <button
+                  onClick={saveForLaterFn}
+                  style={{
+                    background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
+                    color: "#78350f",
+                    border: "none",
+                    borderRadius: "12px",
+                    padding: "12px 24px",
+                    fontWeight: 600,
+                    fontSize: "0.95rem",
+                    cursor: "pointer",
+                    boxShadow: "0 4px 15px rgba(251, 191, 36, 0.4)",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  Save for Later
+                </button>
                 {!isLastQuestionOfLastSection() && (
                   <button
                     onClick={goNext}
