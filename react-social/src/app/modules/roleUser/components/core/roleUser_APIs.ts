@@ -31,6 +31,10 @@ export function readUserData() {
   return axios.get(ReadUser);
 }
 
+export function readRegisteredUserData() {
+  return axios.get(`${API_URL}/user/registered-users`);
+}
+
 export function readUserDatabyId(id: any) {
   return axios.post<crudApiModal>(ReadUserbyId + id);
 }

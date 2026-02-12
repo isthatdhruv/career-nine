@@ -189,12 +189,12 @@ const CollegeTable = (props: {
                 Actions
               </Dropdown.Toggle>
 
-              <Dropdown.Menu 
-                style={{ 
-                  maxHeight: 'unset', 
-                  overflow: 'visible',
-                  minWidth: '150px'
+              <Dropdown.Menu
+                style={{
+                  minWidth: '150px',
+                  zIndex: 1050,
                 }}
+                popperConfig={{ strategy: 'fixed' }}
                 renderOnMount
               >
                 {/* Add Course */}

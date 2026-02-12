@@ -8,7 +8,7 @@ import * as Yup from "yup";
 import { RoleUserTable } from "./RoleUserTable1";
 import {
   readRoleGroupData,
-  readUserData,
+  readRegisteredUserData,
   upsertRoleGroupUserData
 } from "./components/core/roleUser_APIs";
 
@@ -39,7 +39,7 @@ const RoleUserPage = () => {
         setOptions(roles);
 
         try {
-          readUserData().then((data) => {
+          readRegisteredUserData().then((data) => {
             var users = data.data.map((data: any) => {
               return { label: data.name, value: data.id };
             });

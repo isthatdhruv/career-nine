@@ -1,0 +1,164 @@
+{
+  "ability": {
+    "speed_and_accuracy": {
+      "title": {
+        "english": "Speed and accuracy",
+        "hindi": "गति और सटीकता"
+      },
+      "recommendations": {
+        "6-8": {
+          "english": "Math Races: Solve math problems like multiplication or division as quickly as possible within a set time.\nTyping Fun: Use typing tools to measure and improve your typing speed and accuracy.\nReflex Challenge: Play reaction games like catching a ball on-screen or responding to a flashing light.\nQuick Fix: Spot and correct spelling and grammatical mistakes in a short paragraph.",
+          "hindi": "गणित दौड़: दिए गए समय में जल्दी से गणित के सवाल जैसे गुणा या भाग को हल करें।\nटाइपिंग मज़ा: टाइपिंग टूल का इस्तेमाल करके अपनी टाइपिंग की गति और सहीता को मापें और बेहतर बनाएं।\nरिफ्लेक्स चैलेंज: प्रतिक्रिया खेल खेलें, जैसे स्क्रीन पर गेंद पकड़ना या चमकती हुई लाइट का जवाब देना।\nतेज सुधार: एक छोटे से पैराग्राफ में गलत वर्तनी और व्याकरण की गलतियों को ढूंढें और ठीक करें।"
+        },
+        "9-12": {
+          "english": "Timed Problem Sets: Solve algebra or calculus problems within a 10-minute window.\nTyping Challenges: Improve your typing speed to 60 WPM with 99% accuracy.\nQuick Reflex Apps: Use apps like Brain Trainer to enhance cognitive speed.\nProofread Sprint: Edit articles or essays with grammatical errors quickly and accurately.\nFlash Math: Solve quick math problems using flashcards or apps.",
+          "hindi": "अपनी गति और कौशल बढ़ाने के लिए इन गतिविधियों का अभ्यास करें:\nतय समय में जल्दी से जल्दी गुणा या भाग जैसी गणित की समस्याएं हल करें।\nटाइपिंग टूल का इस्तेमाल करके अपनी टाइपिंग की तेजी और सहीता को मापें और सुधारें।\nरिएक्शन गेम खेलें, जैसे स्क्रीन पर गेंद पकड़ना या झलकती हुई लाइट का जवाब देना।\nएक छोटे से पैराग्राफ में मौजूद वर्तनी और व्याकरण की गलतियों को ढूंढ़ें और सही करें।"
+        }
+      }
+    },
+    "computational": {
+      "title": {
+        "english": "Computational",
+        "hindi": "गणनात्मक"
+      },
+      "recommendations": {
+        "6-8": {
+          "english": "Puzzle Time: Solve Sudoku or simple logic puzzles within a time limit.\nSnack Budget: Plan a budget for a class party with a fixed amount. Calculate how much you can spend on snacks, drinks, and decorations.\nDaily Math Quizzes: Solve a set of 5 math problems every day and aim to improve your time and accuracy each week.\nShortcut Hunt: Learn one new math trick each week (e.g., quick ways to multiply or divide) and practice using it in math problems.",
+          "hindi": "पज़ल टाइम: सुडोकू या आसान लॉजिक पहेलियाँ निर्धारित समय में हल करें।\nनाश्ते का बजट: एक क्लास पार्टी के लिए तय रकम के भीतर बजट बनाएं। सोचें कि आप नाश्ते, पेय और सजावट पर कितना खर्च कर सकते हैं।\nदैनिक गणित क्विज़: हर दिन 5 गणित के सवाल हल करें और हर हफ्ते अपने समय और सटीकता में सुधार लाने का प्रयास करें।\nशॉर्टकट खोजें: हर हफ्ते एक नई गणित की ट्रिक सीखें (जैसे जल्दी गुणा या भाग करने के तरीके) और उन्हें गणित के सवालों में अभ्यास करें।"
+        },
+        "9-12": {
+          "english": "Budget Proposal: Create a detailed budget for a school event or trip.\nCompetitive Sudoku: Engage in Sudoku puzzles or interschool logic contests.\nAdvanced Math Research: Present shortcuts and strategies for complex math topics.\nData Crunching: Analyze school-related data using Excel or Google Sheets.\nFinancial Literacy: Explore concepts like investments and savings with real-world problems.",
+          "hindi": "सूडोकू या आसान लॉजिक पहेलियों को तय समय सीमा के अंदर हल करें।\nक्लास पार्टी के लिए बजट बनाएं, जिसमें तय रकम हो। सोचें कि आप कितने पैसे स्नैक्स, ड्रिंक्स और सजावट पर खर्च कर सकते हैं।\nहर दिन 5 गणित के सवाल हल करें और हर हफ्ते अपनी तेज़ी और सही जवाब देने की क्षमता को बेहतर बनाने का प्रयास करें।\nहर हफ्ते एक नई गणित की ट्रिक सीखें, जैसे जल्दी गुणा या भाग करने के आसान तरीके, और इन ट्रिक्स का अभ्यास करके अपने गणित के सवाल हल करने में इस्तेमाल करें।"
+        }
+      }
+    },
+    "creativity": {
+      "title": {
+        "english": "Creativity",
+        "hindi": "रचनात्मकता"
+      },
+      "recommendations": {
+        "6-8": {
+          "english": "Creative Art Journals: Maintain a journal to draw, paint, or sketch ideas inspired by daily experiences or nature.\nImprov Games: Play fun improvisational games where students act out different scenarios to boost creativity and confidence.\nMini Invention Challenge: Create small inventions using household items like a wind-powered car or a homemade musical instrument.\nColor Outside the Lines: Experiment with abstract painting or doodling to explore personal artistic styles.\nStory Puzzle: Write a short story where each student adds a sentence, creating a collaborative and unpredictable narrative.",
+          "hindi": "क्रिएटिव आर्ट जर्नल्स: एक जर्नल रखें जिसमें आप रोज़ की जिंदगी या प्रकृति से प्रेरित आइडियाज को ड्रॉ, पेंट या स्केच कर सकते हैं। इससे आपकी कल्पना और रचनात्मकता बढ़ेगी।\nइम्प्रोव गेम्स: मजेदार improvisation गेम्स खेलें, जिसमें बच्चे अलग-अलग परिदृश्यों का अभिनय करते हैं। यह खेल उनकी क्रिएटिविटी और आत्मविश्वास दोनों को बढ़ाता है।\nमिनी इनवेंशन चैलेंज: घर में मौजूद चीज़ों का इस्तेमाल करके छोटी-छोटी नई चीजें बनाएं, जैसे हवा से चलने वाली कार या अपने ही बनाए हुए संगीत वाद्ययंत्र। इससे नवाचार की प्रेरणा मिलती है।\nकलर आउटसाइड द लाइन: अब्स्ट्रैक्ट पेंटिंग या डूडलिंग की कोशिश करें, ताकि आप अपने व्यक्तिगत आर्टिस्टिक स्टाइल को खोज सकें। यह अभ्यास आपके रचनात्मक सोच को खोलता है।\nस्टोरी पजल: एक छोटी कहानी लिखें जिसमें हर बच्चे एक वाक्य जोड़ता है। इससे मिलकर बनाई गई यह कहानी अनपेक्षित और दिलचस्प बनती है, और मिलजुल कर काम करने का अनुभव भी होता है।"
+        },
+        "9-12": {
+          "english": "Art Portfolio: Develop a personal portfolio in any medium like painting or digital art.\nDrama Workshop: Write, direct, or perform plays in a theatre workshop.\nInnovation Challenge: Design and present prototypes to solve common school-related problems.\nStorytelling Sessions: Create and perform original skits in groups.\nBrainstorm Sessions: Generate 50 creative uses for everyday objects like paperclips.",
+          "hindi": "रोज़ाना की ज़िंदगी या प्रकृति से मिली प्रेरणा से चित्र बनाने, रंगीन पेंटिंग करने या स्केच बनाने के लिए एक डायरी रखिए।\nमज़ेदार improvisation गेम खेलिए, जिसमें बच्चे अलग-अलग परिस्थितियों का अभिनय करते हैं, इससे उनकी रचनात्मकता और आत्मविश्वास बढ़ता है।\nघर में मौजूद चीज़ों का इस्तेमाल कर छोटे-छोटे आविष्कार बनाइए, जैसे हवा से चलने वाली कार या खुद का बनाया हुआ संगीत वाद्ययंत्र।\nअसामान्य रंगीन चित्रकारी या doodling (डूडलिंग) का अभ्यास कीजिए ताकि बच्चे अपनी खास कला शैली खोज सकें।\nएक छोटी कहानी लिखिए, जिसमें हर बच्चे एक वाक्य जोड़ता जाए, इस तरह से मिलकर एक अनोखी और मजेदार कहानी बनती है।"
+        }
+      }
+    },
+    "communication": {
+      "title": {
+        "english": "Communication",
+        "hindi": "संचार"
+      },
+      "recommendations": {
+        "6-8": {
+          "english": "Speak Up Sessions: Practice public speaking by giving short talks on a topic of interest for 2 minutes.\nStory Creators: Write short stories or comic strips individually or collaboratively.\nBook Explorers: Read a short story or article and summarize it in your own words during class discussions.\nMini Debates: Debate fun topics like \"Cats vs. Dogs\" or \"Ice Cream vs. Chocolate Cake\" to improve reasoning skills.\nWord Builders: Play vocabulary-building games like Scrabble or Boggle to enhance language skills.",
+          "hindi": "बोलने का अभ्यास सत्र: किसी रुचिकर विषय पर 2 मिनट का छोटा भाषण देकर सार्वजनिक बोलने का अभ्यास करें।\nकहानी बनाने वाले: अपने आप या दोस्तों के साथ मिलकर छोटी कहानियाँ या कॉमिक स्ट्रिप्स बनाएं।\nकिताब खोजकर्ता: एक छोटी कहानी या लेख पढ़ें और कक्षा में चर्चा के दौरान उसे अपने शब्दों में संक्षेप में समझाएँ।\nमिनी बहस: मजेदार विषयों पर बहस करें, जैसे \"बिल्लियाँ बनाम कुत्ते\" या \"आइसक्रीम बनाम चॉकलेट केक,\" ताकि आपकी सोचने-समझने की क्षमता बढ़े।\nशब्द निर्माता: स्क्रैबल या बोगल जैसे शब्दावली बनाने वाले खेल खेलें, ताकि आपकी भाषा कौशल मजबूत हो।"
+        },
+        "9-12": {
+          "english": "Debate on Current Affairs: Discuss the impact of technology on education.\nEssay Writing: Participate in essay contests on themes like My Vision for India's Future.\nBook Clubs: Read and discuss novels or plays focusing on themes and character analysis.\nCreative Blogging: Start a blog on a favorite topic with weekly updates.\nSpoken Word Poetry: Write and perform spoken-word pieces to express personal views creatively.",
+          "hindi": "अपनी बात कहने का अभ्यास करें और किसी दिलचस्प विषय पर 2 मिनट तक छोटे-छोटे भाषण दें।\nछोटे-छोटे कहानियां या कॉमिक स्ट्रिप्स खुद मिलकर या दोस्तों के साथ मिलकर बनाएं।\nकक्षा में किसी छोटी कहानी या लेख को पढ़ें और उसे अपने शब्दों में समझाकर बताएं।\nमज़ेदार विषयों पर बहस करें, जैसे \"बिल्लियाँ बनाम कुत्ते\" या \"आइसक्रीम बनाम चॉकलेट केक,\" ताकि आप सोचने और समझदारी बढ़ा सकें।\nशब्दावली बढ़ाने के खेल खेलें जैसे स्क्रैबल या बोगल, ताकि आपकी भाषा मजबूत हो सके।"
+        }
+      }
+    },
+    "technical": {
+      "title": {
+        "english": "Technical",
+        "hindi": "तकनीकी"
+      },
+      "recommendations": {
+        "6-8": {
+          "english": "Build a Bridge: Use popsicle sticks and glue to create a mini bridge and test how much weight it can hold.\nBasic Coding: Learn the basics of block-based programming with platforms like Scratch.\nTinker Time: Disassemble an old toy (with supervision) to understand how it works and try to put it back together.\nDIY Pulley: Build a simple pulley system to understand how mechanical systems work.\nTech Detective: Identify components in a computer or tablet and learn their functions.",
+          "hindi": "इकट्ठा करें एक पुल: पॉप्सिकल स्टिक्स और ग्लू का इस्तेमाल करके एक छोटे से पुल का निर्माण करें और देखें कि वह कितना वजन सह सकता है।\nमूल कोडिंग सीखें: Scratch जैसे प्लेटफॉर्म का उपयोग करके ब्लॉक आधारित प्रोग्रामिंग के आधार सीखें।\nमजेदार टिंकर टाइम: एक पुरानी खिलौना को (सुपरविजन के साथ) खोलें ताकि यह समझ सकें कि वह कैसे काम करता है और फिर उसे फिर से जोड़ने की कोशिश करें।\nडिज़ाइन करें एक पुली सिस्टम: एक आसान पुली सिस्टम बनाएं ताकि आप जान सकें कि मेकेनिकल सिस्टम कैसे काम करते हैं।\nटेक डिटेक्टिव बनें: कंप्यूटर या टैबलेट के अंदर मौजूद कंपोनेंट्स को पहचानें और उनके कार्यों को समझें।"
+        },
+        "9-12": {
+          "english": "Robotics Club: Build and program robots for interschool competitions.\nDIY Solar Projects: Create solar-powered gadgets like fans or lamps.\nWeb Development: Learn HTML and CSS to create and maintain websites.\nGadget Fixing: Repair and repurpose old electronic gadgets in organized sessions.\nCoding Challenges: Participate in coding competitions or hackathons.",
+          "hindi": "पॉप्सिकल स्टिक्स और गोंद का इस्तेमाल करके एक छोटी सी पुलिया बनाएं और देखें कि वह कितनी वजन सह सकती है।\nब्लॉक-बेस्ड प्रोग्रामिंग के बेसिक्स सीखें, जैसे कि Scratch जैसी प्लेटफॉर्म का इस्तेमाल।\nएक पुराना खिलौना (वयस्क की निगरानी में) तोड़ें और समझने की कोशिश करें कि वह कैसे काम करता है, फिर उसे फिर से जोड़ने का प्रयास करें।\nएक सादा पुली सिस्टम बनाएं ताकि आप समझ सकें कि यांत्रिक प्रणालियां कैसे काम करती हैं।\nकंप्यूटर या टैबलेट में मौजूद अलग-अलग हिस्सों की पहचान करें और उनके काम करने के तरीके को जानें।"
+        }
+      }
+    },
+    "decision_making_problem_solving": {
+      "title": {
+        "english": "Decision making & problem solving",
+        "hindi": "निर्णय लेना और समस्या का समाधान"
+      },
+      "recommendations": {
+        "6-8": {
+          "english": "Pros and Cons Poster: Make a colorful poster listing the pros and cons of choosing a specific hobby or project.\nScenario Role-Play: Act out scenarios like organizing a class event to practice decision-making under different conditions.\nMind Mapping Puzzles: Use a mind map to find solutions to a \"lost treasure\" or a mystery problem.\nGroup Challenge: Work together to build the tallest structure using paper and tape, learning to make team decisions.\nProblem-Solving Maze: Create and solve mazes that require logical thinking to find the best route.",
+          "hindi": "फायदे और नुकसान का पोस्टर: एक रंगीन पोस्टर बनाएं जिसमें किसी खास शौक या प्रोजेक्ट को चुनने के फायदे और नुकसान दोनों को दिखाया जाए।\nस्थिति भूमिका-निभाना: ऐसी कल्पना करें जैसे आप किसी क्लास इवेंट का आयोजन कर रहे हैं, और विभिन्न परिस्थितियों में सही निर्णय लेने का अभ्यास करें।\nमाइंड मैपिंग पहेलियाँ: एक माइंड मैप का इस्तेमाल कर के \"खोया हुआ खजाना\" या किसी रहस्यमय समस्या का हल खोजें।\nसमूह चुनौती: मिलकर कागज़ और टेप का इस्तेमाल कर सबसे ऊंची इमारत बनाने का प्रयास करें, जिससे टीम में निर्णय लेने की क्षमता बढ़े।\nसमस्या हल करने की भूलभुलैया: ऐसी भूलभुलैया बनाएं और हल करें जिसमें सही रास्ता खोजने के लिए तर्क और सोच का इस्तेमाल करना पड़े।"
+        },
+        "9-12": {
+          "english": "Debate Pros and Cons: Engage in debates on critical issues like renewable energy.\nRole-Playing Scenarios: Role-play crisis management and decision-making in hypothetical situations.\nDetailed Mind Maps: Develop decision trees to tackle real-life challenges like event planning.\nCollaborative Problem Solving: Brainstorm in groups to address school-related issues.\nSimulation Games: Play strategy games to enhance logical and analytical thinking.",
+          "hindi": "आइए, एक रंगीन पोस्टर बनाएं जिसमें किसी खास शौक या प्रोजेक्ट के फायदे और नुकसान दोनों को दिखाया जाए।\nआप एक ऐसा नाटक भी कर सकते हैं, जिसमें आप एक क्लास इवेंट का आयोजन करते हैं, ताकि आप अलग-अलग परिस्थितियों में फैसले लेना सीख सकें।\nएक माइंड मैप का इस्तेमाल करके आप \"खोया हुआ खज़ाना\" या किसी रहस्यमय समस्या का हल खोज सकते हैं।\nमिलकर काम करें और कागज़ और टेप का इस्तेमाल कर सबसे ऊंचा टावर बनाएं, ताकि टीम में निर्णय लेने की प्रक्रिया समझ में आए।\nऔर अंत में, पहेलियों वाले मैज़ बनाएं और हल करें, जिससे आप तर्क और सोच का इस्तेमाल कर बेहतर रास्ता खोज सकें।"
+        }
+      }
+    },
+    "finger_dexterity": {
+      "title": {
+        "english": "Finger dexterity",
+        "hindi": "उंगली की निपुणता"
+      },
+      "recommendations": {
+        "6-8": {
+          "english": "Origami Club: Create simple designs like paper cranes or frogs to practice folding techniques.\nClay Creations: Mold basic shapes like animals or objects using modeling clay.\nDIY Bead Bracelets: String beads of different sizes to make colorful jewelry.\nLego Challenges: Build small Lego structures, focusing on detailed parts.\nDrawing with Precision: Practice shading and outlining in art projects to improve control.",
+          "hindi": "ऑरीगामी क्लब: कागज़ के क्रेन या मेंढ़क जैसे आसान डिज़ाइन बनाएं ताकि आप फोल्डिंग तकनीकें सीख सकें।\nक्ले क्रिएशंस: मॉडलिंग क्ले का इस्तेमाल करके जानवरों या वस्तुओं जैसी बुनियादी आकृतियों को बनाएं।\nडायरी बीड ब्रेसलेट्स: अलग-अलग आकार के मोती लेकर रंगीन कंगन बनाएं।\nलेगो चुनौतियां: छोटे लेगो स्ट्रक्चर बनाएं, खासतौर पर उन हिस्सों पर ध्यान दें जो ज्यादा डिटेल्ड होते हैं।\nचित्रकारी में निपुणता: आर्ट प्रोजेक्ट्स में शेडिंग और आउटलाइन बनाने का अभ्यास करें ताकि आपका नियंत्रण बेहतर हो सके।"
+        },
+        "9-12": {
+          "english": "Intricate Origami: Create complex origami designs.\nKnitting Projects: Knit wearable items like scarves.\nModel Assembly: Build detailed models of cars or airplanes.\nCalligraphy Classes: Practice decorative writing to improve hand control.\nClay Sculpting: Sculpt detailed miniatures from clay or polymer.",
+          "hindi": "कागज़ के क्रेन या मेंढक जैसे आसान डिज़ाइन बनाएं ताकि फोल्डिंग की तकनीक अच्छी हो सके। मिट्टी का इस्तेमाल करके जानवर या चीज़ जैसी बेसिक आकृतियों को आकार दें। अलग-अलग आकार के मोती लेकर रंगीन गहने बनाएं। छोटे-छोटे लेगो के स्ट्रक्चर बनाएं और खास ध्यान दें कि हर हिस्से में डिटेल अच्छी तरह से दिखाई दे। कला के प्रोजेक्ट्स में शेडिंग और आउटलाइनिंग का अभ्यास करें ताकि नियंत्रण बेहतर हो सके।"
+        }
+      }
+    },
+    "form_perception": {
+      "title": {
+        "english": "Form perception",
+        "hindi": "रूप पहचानने की क्षमता"
+      },
+      "recommendations": {
+        "6-8": {
+          "english": "Puzzle Competition: Complete a jigsaw puzzle of up to 300 pieces within a time limit.\nColor by Numbers: Use color-by-number worksheets to recognize patterns and follow visual guides.\nTangram Shapes: Solve tangram puzzles to form specific designs using geometric pieces.\nSpot It! Game: Play card games like Spot It! to quickly identify matching symbols.\nNature Sketching: Draw leaves, flowers, or objects, paying attention to fine details.",
+          "hindi": "पज़ल प्रतियोगिता: तय समय में 300 टुकड़ों का जिगसॉ पज़ल पूरा करें।\nरंग-बाय नंबर: नंबर के हिसाब से रंग भरने वाले वर्कशीट का इस्तेमाल करके पैटर्न पहचानें और विज़ुअल गाइड को फॉलो करें।\nटैंग्राम आकृतियां: टैंग्राम के टुकड़ों से खास डिजाइनों को बनाने के लिए हल करें।\nस्पॉट इट! खेल: कार्ड गेम जैसे स्पॉट इट! खेलें ताकि जल्दी से मिलते-जुलते चिन्हों को आसानी से पहचान सकें।\nप्रकृति की स्केचिंग: पत्तियां, फूल या किसी भी वस्तु को ड्राइंग करें, और बारीकियों का ध्यान रखें।"
+        },
+        "9-12": {
+          "english": "Complex Puzzles: Solve jigsaw puzzles with 500+ pieces.\nArchitectural Sketching: Draw buildings with focus on perspective and detail.\n3D Visualization: Use software like Minecraft to visualize and create structures.\nObservation Exercises: Recall specific visual details from short videos.\nPhotography Projects: Take photos highlighting patterns, symmetry, and contrasting shapes.",
+          "hindi": "1. 300 टुकड़ों का पज़ल पूरे समय सीमा में मिलाकर पूरा करें।\n2. रंग-बाय नंबर वर्कशीट का इस्तेमाल करके पैटर्न पहचानें और तस्वीरों के निर्देशों का पालन करें।\n3. टंग्राम पज़ल हल करके खास डिज़ाइनों को बनाएं, जिसमें ज्यामितीय टुकड़ों का इस्तेमाल होता है।\n4. स्पॉट इट! जैसे कार्ड गेम खेलें ताकि आप जल्दी से मिलते-जुलते चिन्हों को पहचान सकें।\n5. पत्तियां, फूल या कोई भी वस्तु बनाएं और उनके छोटे-छोटे विवरणों पर ध्यान दें।"
+        }
+      }
+    },
+    "logical_reasoning": {
+      "title": {
+        "english": "Logical reasoning",
+        "hindi": "तार्किक सोच"
+      },
+      "recommendations": {
+        "6-8": {
+          "english": "Chess Practice: Join a chess club or play online chess to improve strategy and logical thinking.\nPuzzle Time: Solve beginner-level logic puzzles like Sudoku, crosswords, or grid-based reasoning problems.\nFun Riddles: Work on brain teasers and riddles as a group activity to practice thinking critically and creatively.\nBeginner Coding: Use block-based programming tools like Scratch to design simple animations or games.\nLogic Challenges: Participate in \"What's the Pattern?\" games where you find the rule behind a sequence of shapes or numbers.",
+          "hindi": "शतरंज का अभ्यास: शतरंज क्लब में शामिल हों या ऑनलाइन शतरंज खेलें ताकि आप अपनी रणनीति और तार्किक सोच बेहतर बना सकें।\nपहेली का समय: शुरुआत स्तर की लॉजिक पहेलियाँ जैसे सudoku, क्रॉसवर्ड या ग्रिड आधारित सोच के सवाल हल करें।\nमज़ेदार पहेलियाँ: दिमागी कसरत और पहेलियों में समूह के रूप में भाग लें ताकि आप अपनी सोच को अधिक क्रिएटिव और आलोचनात्मक बना सकें।\nशुरुआती कोडिंग: Scratch जैसी ब्लॉक आधारित प्रोग्रामिंग टूल का इस्तेमाल करें ताकि आप आसान एनिमेशन या गेम बना सकें।\nतार्किक चुनौतियाँ: \"यह पैटर्न क्या है?\" जैसे खेल खेलें जिसमें आप किसी श्रृंखला या नंबरों के पीछे का नियम ढूंढते हैं।"
+        },
+        "9-12": {
+          "english": "Chess Strategies: Study and practice advanced chess strategies.\nLogic Puzzles: Solve puzzles like cryptograms and Kakuro.\nCoding Projects: Tackle beginner Python programming challenges.\nCase Study Reviews: Analyze case studies to find logical solutions.\nDebate Logical Fallacies: Identify and discuss logical fallacies in debates.",
+          "hindi": "शतरंज क्लब में शामिल हों या ऑनलाइन शतरंज खेलें ताकि आपकी रणनीति और तार्किक सोच बेहतर हो सके।\nआसान स्तर के लॉजिक पहेलियों जैसे सudoku, क्रॉसवर्ड या ग्रिड आधारित सोचने वाली समस्याओं को हल करें।\nबुद्धिमानी और रचनात्मकता का अभ्यास करने के लिए समूह में Brain Teasers और पहेलियों को हल करें।\nScratch जैसे ब्लॉक-बेस्ड प्रोग्रामिंग टूल का इस्तेमाल करके आसान एनिमेशन या खेल बनाएं।\n\"क्या है पैटर्न?\" जैसे खेलों में भाग लें, जिसमें आपको किसी सीक्वेंस में छिपे नियम को ढूंढना होता है।"
+        }
+      }
+    },
+    "motor_movement": {
+      "title": {
+        "english": "Motor movement",
+        "hindi": "शारीरिक गति"
+      },
+      "recommendations": {
+        "6-8": {
+          "english": "Outdoor Games: Play team sports like dodgeball or cricket to improve coordination and teamwork.\nBasic Yoga: Learn simple yoga poses like the Tree Pose and Warrior Pose to enhance balance and flexibility.\nDance Moves: Participate in a freestyle dance session to improve rhythm and coordination.\nObstacle Course: Build and complete a backyard obstacle course to practice agility and motor control.\nSkipping Challenges: Use a jump rope to set personal skipping records for endurance and speed.",
+          "hindi": "बाहरी खेल: टीम के साथ खेलें जैसे डॉजबॉल या क्रिकेट ताकि आपकी तालमेल और टीमवर्क बेहतर हो सके।\nमूल योग: सरल योगासन जैसे पेड़ की मुद्रा और योद्धा की मुद्रा सीखें, इससे आपका संतुलन और लचीलापन बढ़ेगा।\nनृत्य के कदम: फ्रीस्टाइल डांस में भाग लें, ताकि आपका ताल और तालमेल मजबूत हो सके।\nबाधाओं का रास्ता: अपने घर के पीछे एक बाधा कोर्स बनाएं और उसे पूरा करें, इससे आपकी फुर्ती और मोटर नियंत्रण सुधरेगा।\nस्किपिंग चुनौतियां: जंप रोप का इस्तेमाल करें और अपनी व्यक्तिगत स्किपिंग रिकॉर्ड बनाएं, यह आपकी सहनशक्ति और तेज़ी को बढ़ाएगा।"
+        },
+        "9-12": {
+          "english": "Sports Practice: Join and practice regularly with a school sports team.\nAdvanced Yoga: Participate in yoga sessions with challenging poses.\nDance Routines: Learn and perform choreographed dance routines.\nStrength Training: Perform bodyweight exercises to build strength.\nSwimming Techniques: Improve stroke techniques and endurance through lap swimming.",
+          "hindi": "टीम स्पोर्ट्स जैसे डॉजबॉल या क्रिकेट खेलें ताकि आपकी मेलजोल और टीमवर्क मजबूत हो सके।\nसाधारण योग आसनों जैसे पेड़ मुद्रा और योद्धा मुद्रा सीखें ताकि संतुलन और लचीलापन बढ़े।\nफ्रीस्टाइल नृत्य में भाग लेकर ताल और तालमेल सुधारें।\nअपने घर के पिछवाड़े में एक बाधा दौड़ बनाएं और पूरी करें ताकि फुर्ती और शरीर पर नियंत्रण बढ़े।\nजंप रोप का इस्तेमाल करें और अपनी खुद की स्किपिंग रिकॉर्ड बनाएं ताकि सहनशक्ति और तेज़ी बढ़ सके।"
+        }
+      }
+    }
+  }
+}

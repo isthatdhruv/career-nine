@@ -79,20 +79,7 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      height: '100vh',
-      width: '100vw',
-      margin: 0,
-      padding: 0,
-      overflow: 'hidden',
-      backgroundColor: '#f8f9fa',
-      position: 'fixed',
-      top: 0,
-      left: 0
-    }}>
+    <div >
       <div className="card shadow-sm" style={{ width: '500px', maxWidth: '90%' }}>
         <div className="card-body p-5">
           <h2 className="text-center mb-4" style={{ fontSize: '2rem', fontWeight: '600' }}>Login</h2>

@@ -12,12 +12,16 @@ import javax.persistence.FetchType;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.JoinTable;
+import javax.persistence.ManyToMany;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 import javax.persistence.Transient;
 import javax.validation.constraints.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.kccitm.api.model.BoardName;
 import com.kccitm.api.model.ContactPerson;
 import com.kccitm.api.model.InstituteCourse;
 
@@ -67,6 +71,15 @@ public class InstituteDetail implements Serializable {
 
     @OneToMany(mappedBy = "institute", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private List<SchoolSession> schoolSession;
+
+    // Many-to-Many: Boards
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "institute_board_mapping",
+        joinColumns = @JoinColumn(name = "institute_code"),
+        inverseJoinColumns = @JoinColumn(name = "board_id")
+    )
+    private Set<BoardName> boards = new HashSet<>();
 
     public Integer getInstituteCode() {
         return instituteCode;
@@ -193,6 +206,14 @@ public class InstituteDetail implements Serializable {
 
     public void setSchoolSession(List<SchoolSession> schoolSession) {
         this.schoolSession = schoolSession;
+    }
+
+    public Set<BoardName> getBoards() {
+        return boards;
+    }
+
+    public void setBoards(Set<BoardName> boards) {
+        this.boards = boards;
     }
 
     // public Integer getId() {

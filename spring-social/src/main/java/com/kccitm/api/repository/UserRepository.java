@@ -7,15 +7,20 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import com.kccitm.api.model.AuthProvider;
 import com.kccitm.api.model.User;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
+    List<User> findByProviderNot(AuthProvider provider);
+
     User findByEmail(String email);
 
     // Optional<User> findByT(String email);
     Boolean existsByEmail(String email);
+
+    Boolean existsByPhone(String phone);
 
     public List<User> findByDisplay(Boolean display);
 

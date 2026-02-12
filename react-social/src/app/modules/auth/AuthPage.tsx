@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { Outlet, Route, Routes } from "react-router-dom";
 import { toAbsoluteUrl } from "../../../_metronic/helpers";
 import { ForgotPassword } from "./components/ForgotPassword";
-import { Login } from "./components/Login";
+import Login from "./components/Login";
 import { Registration } from "./components/Registration";
 
 const AuthLayout = () => {
@@ -26,14 +26,14 @@ const AuthLayout = () => {
       {/* begin::Content */}
       <div className="d-flex flex-center flex-column flex-column-fluid p-10 pb-lg-20">
         {/* begin::Logo */}
-        <a href="#" className="mb-12">
+        {/* <a href="#" className="mb-12">
           <img
             alt="Logo"
             src={toAbsoluteUrl("/media/logos/kcc.jpg")}
             style={{ borderRadius: "8px" }}
-            className="h-120px"
+            // className="h-120px"
           />
-        </a>
+        </a> */}
         {/* end::Logo */}
         {/* begin::Wrapper */}
         <div className="w-lg-500px bg-body rounded shadow-sm p-10 p-lg-15 mx-auto">

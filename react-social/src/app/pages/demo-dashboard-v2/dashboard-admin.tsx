@@ -6,6 +6,7 @@ import { PageTitle } from "../../../_metronic/layout/core";
 import { getCSSVariableValue } from "../../../_metronic/assets/ts/_utils";
 import { toAbsoluteUrl } from "../../../_metronic/helpers";
 import { useThemeMode } from "../../../_metronic/partials/layout/theme-mode/ThemeModeProvider";
+import { useAuth } from "../../modules/auth/core/Auth";
 
 type DashboardRole = "principal" | "teacher" | "student";
 
@@ -523,6 +524,7 @@ const cssColor = (variable: string, fallback: string) =>
 
 const DashboardAdminContent: FC = () => {
   const { mode } = useThemeMode();
+  const { logout } = useAuth();
   const [role, setRole] = useState<DashboardRole>("principal");
   const [now, setNow] = useState(new Date());
   const data = dashboards[role];
@@ -749,6 +751,12 @@ const DashboardAdminContent: FC = () => {
                   Student
                 </button>
               </div>
+              <button
+                className="btn btn-sm btn-light-danger"
+                onClick={logout}
+              >
+                Logout
+              </button>
             </div>
           </div>
         </div>
