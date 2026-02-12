@@ -175,6 +175,13 @@
   align-items: center;
 }
 
+.section-description {
+  color: #718096;
+  font-size: 0.95rem;
+  margin-bottom: 1rem;
+  line-height: 1.6;
+}
+
 .chart-container {
   background: white;
   padding: 2rem;
@@ -215,7 +222,7 @@
   letter-spacing: 0.5px;
   margin-bottom: 0.5rem;
   opacity: 0.9;
-  color:white;
+  color: white;
 }
 
 .stat-value {
@@ -281,6 +288,494 @@
   font-weight: 600;
 }
 
+/* ==================== NEW STYLES ==================== */
+
+/* Two-Column Grid */
+.two-column-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+/* Custom Legend */
+.chart-legend-custom {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4a5568;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Interpretation Box */
+.interpretation-box {
+  background: linear-gradient(135deg, #eef2ff 0%, #f0f4ff 100%);
+  border-left: 4px solid #667eea;
+  padding: 1.25rem 1.5rem;
+  border-radius: 0 12px 12px 0;
+  margin: 1.5rem 0;
+  color: #374151;
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+.interpretation-box i {
+  color: #667eea;
+}
+
+/* Interpretation Cards Grid (Personality) */
+.interpretation-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.interpretation-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border-left: 4px solid #e2e8f0;
+  transition: transform 0.2s ease;
+}
+
+.interpretation-card.trend-rising {
+  border-left-color: #10b981;
+}
+
+.interpretation-card.trend-declining {
+  border-left-color: #ef4444;
+}
+
+.interpretation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.interpretation-header strong {
+  font-size: 1.05rem;
+  color: #1a202c;
+}
+
+.trend-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.trend-up {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.trend-down {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.interpretation-text {
+  color: #6b7280;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Insight Cards (Integrated Potential) */
+.insight-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.insight-card {
+  background: white;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.insight-icon {
+  width: 50px;
+  height: 50px;
+  min-width: 50px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+}
+
+.insight-card strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #1a202c;
+  font-size: 0.95rem;
+}
+
+.insight-card p {
+  color: #6b7280;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* CCI Definitions */
+.cci-definitions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.cci-def-item {
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  font-weight: 500;
+}
+
+.cci-perfect {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.cci-high {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.cci-moderate {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.cci-none {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+/* Support Badges */
+.support-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.support-high {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.support-medium {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.support-low {
+  background: #d1fae5;
+  color: #059669;
+}
+
+/* Support Row Highlighting */
+.support-row-high {
+  background: #fff5f5 !important;
+}
+
+.support-row-high:hover {
+  background: #fee2e2 !important;
+}
+
+.support-row-medium {
+  background: #fffdf5 !important;
+}
+
+.support-row-medium:hover {
+  background: #fef9e7 !important;
+}
+
+/* Summary Cards (Recommendations) */
+.summary-card {
+  padding: 1.5rem;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.summary-card h4 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+}
+
+.summary-card ul {
+  padding-left: 1.25rem;
+  margin: 0;
+}
+
+.summary-card li {
+  padding: 0.4rem 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #4a5568;
+}
+
+.strengths-card {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.strengths-card h4 {
+  color: #065f46;
+}
+
+.gaps-card {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.gaps-card h4 {
+  color: #991b1b;
+}
+
+/* Intervention Cards */
+.intervention-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.intervention-header {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1a202c;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+}
+
+.intervention-stat {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1a202c;
+  margin-bottom: 0.25rem;
+}
+
+.intervention-label {
+  font-size: 0.8rem;
+  color: #718096;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.progress-bar-custom {
+  width: 100%;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.intervention-areas {
+  font-size: 0.8rem;
+  color: #718096;
+  font-weight: 500;
+}
+
+/* Recommendations Grid */
+.recommendations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.recommendation-card {
+  background: white;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  border: 1px solid #e2e8f0;
+  transition: border-color 0.3s ease;
+}
+
+.recommendation-card:hover {
+  border-color: #667eea;
+}
+
+.rec-number {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.recommendation-card strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #1a202c;
+  font-size: 1rem;
+}
+
+.recommendation-card p {
+  color: #6b7280;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Final Note */
+.final-note {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 1.5rem 2rem;
+  border-radius: 16px;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  text-align: center;
+}
+
+.final-note i {
+  font-size: 1.2rem;
+}
+
+/* Three-Column Grid (Pie Charts per Navigator) */
+.three-column-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+/* Assessment Summary Grid */
+.assessment-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.summary-stat-card {
+  background: linear-gradient(135deg, #f0f4ff 0%, #eef2ff 100%);
+  border: 1px solid #c7d2fe;
+  border-radius: 16px;
+  padding: 1.5rem;
+  text-align: center;
+  transition: transform 0.2s ease;
+}
+
+.summary-stat-card:hover {
+  transform: translateY(-2px);
+}
+
+.summary-stat-card i {
+  font-size: 1.75rem;
+  color: #667eea;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.summary-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a202c;
+  margin-bottom: 0.25rem;
+}
+
+.summary-stat-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #718096;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Mini Chart Title (used inside three-column-grid) */
+.mini-chart-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1a202c;
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+/* Challenges-Solutions-Outcomes Table */
+.challenges-table td {
+  vertical-align: top;
+  line-height: 1.7;
+  font-size: 0.85rem;
+}
+
+.challenge-cell {
+  color: #991b1b;
+  background: #fff5f5;
+}
+
+.solution-cell {
+  color: #065f46;
+  background: #f0fdf4;
+}
+
+.outcome-cell {
+  color: #1e40af;
+  background: #eff6ff;
+}
+
+/* ==================== RESPONSIVE ==================== */
+
 @media (max-width: 768px) {
   .principal-dashboard {
     padding: 1rem;
@@ -315,5 +810,33 @@
 
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .two-column-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .three-column-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .assessment-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .interpretation-cards-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .insight-cards-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cci-definitions {
+    grid-template-columns: 1fr;
+  }
+
+  .recommendations-grid {
+    grid-template-columns: 1fr;
   }
 }
