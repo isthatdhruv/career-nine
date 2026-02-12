@@ -1,13 +1,13 @@
 import clsx from "clsx";
 import { useFormik } from "formik";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dropdown } from "react-bootstrap";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
 import { ReadQuestionSectionData, ReadQuestionSectionDataList } from "../../QuestionSections/API/Question_Section_APIs";
-import { CreateQuestionData, ReadMeasuredQualityTypes, ReadQuestionByIdData } from "../API/Question_APIs";
+import { CreateQuestionData, UpdateQuestionData, ReadMeasuredQualityTypes, ReadQuestionByIdData } from "../API/Question_APIs";
 import { ListGamesData } from "../../Games/components/API/GAME_APIs";
 
 const validationSchema = Yup.object().shape({
@@ -33,7 +33,7 @@ interface Option {
 }
 
 const QuestionEditPage = (props?: { setPageLoading?: any }) => {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [sections, setSections] = useState<any[]>([]);
   const [mqt, setMqt] = useState<any[]>([]);
   const [questionData, setQuestionData] = useState<any>({
@@ -60,14 +60,19 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
   // Search state for each option's measured quality dropdown
   const [qualitySearchTerms, setQualitySearchTerms] = useState<{ [key: number]: string }>({});
 
-  // Always call this hook at the top level, not conditionally
-  useEffect(() => {
-    if (questionData.options && questionData.options.length > 0) {
+  // Track whether formik has been initialized with real data — disable reinitialize after that
+  const dataLoadedRef = useRef(false);
+
+  // Helper to initialize derived state from question options data
+  const initializeDerivedState = (data: any) => {
+    if (data.options && data.options.length > 0) {
       const qualities: Record<number, Record<number, { checked: boolean, score: number }>> = {};
       const types: { [key: number]: 'text' | 'image' } = {};
       const images: { [key: number]: string } = {};
+      let foundGame = false;
+      let foundGameId = "";
 
-      questionData.options.forEach((option: any, idx: number) => {
+      data.options.forEach((option: any, idx: number) => {
         // Load measured quality scores
         if (option.optionScores && Array.isArray(option.optionScores)) {
           qualities[idx] = {};
@@ -84,7 +89,6 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
         // Load existing images - check if optionImageBase64 exists
         if (option.optionImageBase64) {
           types[idx] = 'image';
-          // If it's already a data URL, use as is; otherwise prepend the data URL prefix
           images[idx] = option.optionImageBase64.startsWith('data:')
             ? option.optionImageBase64
             : `data:image/png;base64,${option.optionImageBase64}`;
@@ -94,16 +98,20 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
 
         // Check if this is a game option
         if (option.isGame && option.game) {
-          setUseGameAsOption(true);
-          setSelectedGameId(String(option.game.gameId));
+          foundGame = true;
+          foundGameId = String(option.game.gameId);
         }
       });
 
       setOptionMeasuredQualities(qualities);
       setOptionTypes(types);
       setOptionImages(images);
+      if (foundGame) {
+        setUseGameAsOption(true);
+        setSelectedGameId(foundGameId);
+      }
     }
-  }, [questionData]);
+  };
 
   // Generate sequence options for dropdown
   const generateSequenceOptions = (maxSequence: number) => {
@@ -216,6 +224,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const locationStateRef = useRef(location.state);
   const { id } = useParams<{ id: string }>();
 
   // Fetch all data when component mounts
@@ -245,7 +254,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
             // console.log("Processed data with section:", questionDataResult.section);
           } catch (error) {
             console.error("Error fetching question:", error);
-            const locationData = (location.state as any)?.data;
+            const locationData = (locationStateRef.current as any)?.data;
             if (locationData) {
               questionDataResult = {
                 ...locationData,
@@ -261,7 +270,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
             }
           }
         } else {
-          const locationData = (location.state as any)?.data;
+          const locationData = (locationStateRef.current as any)?.data;
           if (locationData) {
             questionDataResult = {
               ...locationData,
@@ -276,7 +285,10 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
             };
           }
         }
-        if (questionDataResult) setQuestionData(questionDataResult);
+        if (questionDataResult) {
+          setQuestionData(questionDataResult);
+          initializeDerivedState(questionDataResult);
+        }
 
         // Fetch sections
         let sectionsResult: any[] = [];
@@ -311,17 +323,21 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
         }
         setGames(gamesResult);
       } finally {
+        // Mark data as loaded so enableReinitialize gets disabled
+        // after formik picks up the real initialValues
+        dataLoadedRef.current = true;
         setLoading(false);
       }
     };
 
     fetchAllData();
-  }, [id, location.state]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
 
   // ✅ Keep using useFormik but with enhanced initial values
   const formik = useFormik({
-    enableReinitialize: true,
+    enableReinitialize: !dataLoadedRef.current,
     initialValues: {
       id: questionData.id || id,
       questionId: questionData.questionId || questionData.id || id,
@@ -375,21 +391,23 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
           }];
         } else {
           // Build options array with optionScores from optionMeasuredQualities
-          options = sortedOptions.map((option: any, idx: number) => {
-            // Check if this option is in image mode
-            const isImageMode = optionTypes[idx] === 'image';
+          options = sortedOptions.map((option: any) => {
+            // Find the original form index to look up qualities, types, and images
+            const originalIdx = values.options.indexOf(option);
 
-            const qualities = optionMeasuredQualities[idx] || {};
+            // Check if this option is in image mode
+            const isImageMode = optionTypes[originalIdx] === 'image';
+
+            const qualities = optionMeasuredQualities[originalIdx] || {};
             const optionScores = Object.entries(qualities)
               .filter(([_, v]) => v && v.checked)
               .map(([typeId, v]) => ({
                 score: v.score,
-                question_option: option.optionId ? { optionId: option.optionId } : {},
                 measuredQualityType: { measuredQualityTypeId: Number(typeId) },
               }));
             return {
               optionText: isImageMode ? null : option.optionText,
-              optionImageBase64: isImageMode ? (optionImages[idx] || null) : null,
+              optionImageBase64: isImageMode ? (optionImages[originalIdx] || null) : null,
               optionDescription: option.optionDescription || "",
               optionScores,
               correct: option.correct ?? false,
@@ -412,7 +430,12 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
         };
 
         console.log("Submitting payload:", payload);
-        await CreateQuestionData(payload);
+        const questionId = values.questionId || values.id;
+        if (questionId) {
+          await UpdateQuestionData(questionId, payload);
+        } else {
+          await CreateQuestionData(payload);
+        }
         navigate("/assessment-questions");
 
         if (props?.setPageLoading) {
@@ -707,7 +730,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                 </div>
               ) : (
                 <>
-                  {formik.values.options
+                  {[...formik.values.options]
                     .sort((a, b) => a.sequence - b.sequence)
                     .map((option, index) => (
                       <div key={index} className="mb-3 p-3 border rounded bg-light" style={{ position: 'relative', zIndex: formik.values.options.length - index }}>

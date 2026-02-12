@@ -101,7 +101,7 @@ public class AssessmentQuestionController {
     }
 
     private List<AssessmentQuestions> fetchAndTransformFromDb() {
-        List<AssessmentQuestions> assementQuestionsObject = assessmentQuestionRepository.findAll();
+        List<AssessmentQuestions> assementQuestionsObject = assessmentQuestionRepository.findByIsDeletedFalseOrIsDeletedIsNull();
         // assementQuestionsObject.iterator().forEachRemaining(assmentQuestion -> {
         //     assmentQuestion.getOptions().iterator().forEachRemaining(option -> {
         //         option.getOptionScores().iterator().forEachRemaining(score -> {
@@ -217,7 +217,7 @@ public class AssessmentQuestionController {
         // Step 2: Update basic question fields
         existingQuestion.setQuestionText(assessmentQuestions.getQuestionText());
         existingQuestion.setQuestionType(assessmentQuestions.getQuestionType());
-        existingQuestion.setmaxAllowedOptions(assessmentQuestions.getmaxOptionsAllowed());
+        existingQuestion.setMaxOptionsAllowed(assessmentQuestions.getMaxOptionsAllowed());
 
         // Step 3: Update section relationship (validate section exists first)
         if (assessmentQuestions.getSection() != null && assessmentQuestions.getSection().getSectionId() != null) {
@@ -228,27 +228,22 @@ public class AssessmentQuestionController {
             }
         }
 
-        // Step 4: Replace options - this is critical for handling option deletions
-        if (assessmentQuestions.getOptions() != null && !assessmentQuestions.getOptions().isEmpty()) {
-            // Clear all existing options first
-            // This triggers CASCADE delete for associated scores automatically
-            if (existingQuestion.getOptions() != null) {
-                existingQuestion.getOptions().clear();
-            }
+        // Step 4: Replace options - clear existing and add new ones
+        // IMPORTANT: With orphanRemoval=true, we must modify the existing collection
+        // in place (clear + addAll), never replace the reference with setOptions()
+        if (existingQuestion.getOptions() != null) {
+            existingQuestion.getOptions().clear();
+        }
 
-            // Add new/updated options from the request
+        if (assessmentQuestions.getOptions() != null && !assessmentQuestions.getOptions().isEmpty()) {
+            // Wire up new options and their scores
             for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
-                // Wire the back-reference from option to question
                 option.setQuestion(existingQuestion);
 
-                // Wire up measured quality type scores for each option
                 if (option.getOptionScores() != null) {
                     for (OptionScoreBasedOnMEasuredQualityTypes score : option.getOptionScores()) {
-                        // Set the back-reference from score to option
                         score.setQuestion_option(option);
 
-                        // Important: Use ID-only reference for MeasuredQualityType
-                        // This prevents lazy loading issues and keeps the reference minimal
                         if (score.getMeasuredQualityType() != null
                                 && score.getMeasuredQualityType().getMeasuredQualityTypeId() != null) {
                             score.setMeasuredQualityType(new MeasuredQualityTypes(
@@ -258,8 +253,8 @@ public class AssessmentQuestionController {
                 }
             }
 
-            // Set the new options list on the existing question
-            existingQuestion.setOptions(assessmentQuestions.getOptions());
+            // Add all new options to the existing (now empty) collection
+            existingQuestion.getOptions().addAll(assessmentQuestions.getOptions());
         }
 
         // Step 5: Save the updated question (cascade saves options and scores)
@@ -278,9 +273,16 @@ public class AssessmentQuestionController {
 
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<String> deleteAssessmentQuestion(@PathVariable Long id) {
-        assessmentQuestionRepository.deleteById(id);
+        // Soft delete: set isDeleted flag instead of removing from database
+        AssessmentQuestions question = assessmentQuestionRepository.findById(id)
+                .orElse(null);
+        if (question == null) {
+            return ResponseEntity.notFound().build();
+        }
+        question.setIsDeleted(true);
+        assessmentQuestionRepository.save(question);
 
-        // refresh cache after delete
+        // refresh cache after soft delete
         try {
             List<AssessmentQuestions> refreshed = fetchAndTransformFromDb();
             writeCache(refreshed);
@@ -288,7 +290,40 @@ public class AssessmentQuestionController {
             logger.warn("Failed to refresh assessment questions cache after delete", e);
         }
 
-        return ResponseEntity.ok("AssessmentQuestion and all related options/relationships deleted successfully.");
+        return ResponseEntity.ok("AssessmentQuestion soft-deleted successfully.");
+    }
+
+    @GetMapping("/deleted")
+    public List<AssessmentQuestions> getDeletedQuestions() {
+        return assessmentQuestionRepository.findByIsDeletedTrue();
+    }
+
+    @PutMapping("/restore/{id}")
+    public ResponseEntity<String> restoreAssessmentQuestion(@PathVariable Long id) {
+        AssessmentQuestions question = assessmentQuestionRepository.findById(id)
+                .orElse(null);
+        if (question == null) {
+            return ResponseEntity.notFound().build();
+        }
+        question.setIsDeleted(false);
+        assessmentQuestionRepository.save(question);
+
+        // refresh cache after restore
+        try {
+            List<AssessmentQuestions> refreshed = fetchAndTransformFromDb();
+            writeCache(refreshed);
+        } catch (Exception e) {
+            logger.warn("Failed to refresh assessment questions cache after restore", e);
+        }
+
+        return ResponseEntity.ok("AssessmentQuestion restored successfully.");
+    }
+
+    @DeleteMapping("/permanent-delete/{id}")
+    public ResponseEntity<String> permanentlyDeleteAssessmentQuestion(@PathVariable Long id) {
+        assessmentQuestionRepository.deleteById(id);
+
+        return ResponseEntity.ok("AssessmentQuestion permanently deleted.");
     }
 
     // Many-to-Many relationship management endpoints for MeasuredQualityTypes
@@ -387,7 +422,7 @@ public class AssessmentQuestionController {
 
             QuestionSection section = question.getSection();
             row.createCell(colNum++).setCellValue(section != null ? section.getSectionId().toString() : "");
-            row.createCell(colNum++).setCellValue(question.getmaxOptionsAllowed());
+            row.createCell(colNum++).setCellValue(question.getMaxOptionsAllowed());
 
             // Options spread horizontally
             List<AssessmentQuestionOptions> options = question.getOptions();
@@ -546,7 +581,7 @@ public class AssessmentQuestionController {
                 if (maxOptsIdx != null) {
                     Cell maxOptsCell = row.getCell(maxOptsIdx);
                     if (maxOptsCell != null && maxOptsCell.getCellType() != CellType.BLANK) {
-                        question.setmaxAllowedOptions((int) maxOptsCell.getNumericCellValue());
+                        question.setMaxOptionsAllowed((int) maxOptsCell.getNumericCellValue());
                     }
                 }
 

@@ -1,7 +1,7 @@
 import { MDBDataTableV5 } from "mdbreact";
 import { useEffect, useState } from "react";
 import { AiFillEdit } from "react-icons/ai";
-import { FaLightbulb, FaFileDownload } from "react-icons/fa"; // Added download icon
+import { FaLightbulb, FaFileDownload } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
@@ -15,7 +15,7 @@ import {
   ImportQuestionsFromExcel
 } from "../API/Question_APIs";
 import QuestionLanguageModal from "./QuestionLanguageModal";  // ✅ import modal
-import QuestionBulkUploadModal from "./QuestionBulkUploadModal"; // Import bulk upload modal
+import QuestionBulkUploadModal from "./QuestionBulkUploadModal";
 import * as XLSX from "xlsx"; // For template generation
 
 const QuestionTable = (props: {
@@ -28,12 +28,14 @@ const QuestionTable = (props: {
   const [selectedMeasuredQualityTypesByQuestion, setSelectedMeasuredQualityTypesByQuestion] = useState<{ [key: number]: any[] }>({});
   const [measuredQualityTypes, setMeasuredQualityTypes] = useState<any[]>([]);
   const [searchText, setSearchText] = useState("");
-  const [selectedSection, setSelectedSection] = useState<string>("");
+  const [selectedSection, setSelectedSection] = useState<string>(
+    () => sessionStorage.getItem("questionTableSectionFilter") || ""
+  );
 
   // ✅ State for modals
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [activeQuestionId, setActiveQuestionId] = useState<number | null>(null);
-  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false); // Bulk upload modal state
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const [exporting, setExporting] = useState(false); // Export loading state
   const [downloadingTemplate, setDownloadingTemplate] = useState(false); // Template download loading state
 
@@ -340,7 +342,10 @@ const QuestionTable = (props: {
         <select
           className="form-select"
           value={selectedSection}
-          onChange={(e) => setSelectedSection(e.target.value)}
+          onChange={(e) => {
+            setSelectedSection(e.target.value);
+            sessionStorage.setItem("questionTableSectionFilter", e.target.value);
+          }}
           style={{ maxWidth: "200px" }}
         >
           <option value="">All Sections</option>
@@ -387,6 +392,7 @@ const QuestionTable = (props: {
         onUploadComplete={() => props.setPageLoading(["true"])}
         sections={props.sections}
       />
+
     </>
   );
 };

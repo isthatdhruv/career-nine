@@ -34,14 +34,15 @@ public class AssessmentQuestionOptions implements Serializable {
 
     private boolean isCorrect;
 
+    @Column(columnDefinition = "TEXT")
     private String optionDescription;
 
-    @ManyToOne(cascade = CascadeType.ALL)
+    @ManyToOne
     @JoinColumn(name = "fk_assessment_questions")
     @JsonBackReference
     private AssessmentQuestions question;
 
-    @OneToMany(mappedBy = "question_option", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "question_option", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OptionScoreBasedOnMEasuredQualityTypes> optionScores;
 
     @Lob

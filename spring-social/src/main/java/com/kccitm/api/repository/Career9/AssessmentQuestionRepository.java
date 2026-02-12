@@ -12,7 +12,11 @@ import com.kccitm.api.model.career9.AssessmentQuestions;
 @Repository
 public interface AssessmentQuestionRepository extends JpaRepository<AssessmentQuestions, Long> {
 
-    @Query("SELECT new com.kccitm.api.model.career9.AssessmentQuestions(a.questionId, a.questionText, a.questionType, a.section) FROM AssessmentQuestions a")
+    @Query("SELECT new com.kccitm.api.model.career9.AssessmentQuestions(a.questionId, a.questionText, a.questionType, a.section) FROM AssessmentQuestions a WHERE a.isDeleted = false OR a.isDeleted IS NULL")
     List<AssessmentQuestions> findAllQuestionsProjection();
-    
+
+    List<AssessmentQuestions> findByIsDeletedFalseOrIsDeletedIsNull();
+
+    List<AssessmentQuestions> findByIsDeletedTrue();
+
 }
