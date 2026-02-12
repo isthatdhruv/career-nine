@@ -209,31 +209,7 @@ const PrivateRoutes = () => {
   // );
   return (
     <Routes>
-      <Route path="/studentAssessment" element={<SelectSectionPage />} />
-      <Route
-        path="/studentAssessment/sections/:sectionId"
-        element={<SectionInstructionPage />}
-      />
-      <Route
-        path="/studentAssessment/sections/:sectionId/questions/:questionIndex"
-        element={<SectionQuestionPage />}
-      />
-      <Route
-        path="/allotted-assessment"
-        element={<AllottedAssessmentPage />}
-      />
-      <Route
-        path="/general-instructions"
-        element={<GeneralInstructionsPage />}
-      />
-      <Route
-        path="/demographics"
-        element={<DemographicDetailsPage />}
-      />
-      <Route
-        path="/studentAssessment/completed"
-        element={<ThankYouPage />}
-      />
+      
       <Route
         path="/login/reset-password/enter-email"
         element={
@@ -250,14 +226,7 @@ const PrivateRoutes = () => {
           </SuspensedView>
         }
       />
-      <Route
-        path="/student-login"
-        element={
-          <SuspensedView>
-            <StudentLoginPage />
-          </SuspensedView>
-        }
-      />
+      
 
       <Route path="/login" element={<LoginPage />} />
       <Route element={<AuthorizedLayout />}>
