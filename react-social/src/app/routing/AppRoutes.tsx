@@ -22,6 +22,14 @@ import { PrivateRoutes } from "./PrivateRoutes";
 // import CompilerPageEdit from "../pages/Compiler/compilerEdit";
 import {SchoolDashboardPage} from "../pages/dashboard/SchoolDashboardPage";
 import QuestionaireListPage from "../pages/CreateAssessment/components/questionaire/QuestionaireListPage";
+import StudentLoginPage from "../pages/StudentLogin/StudentLoginPage";
+import DemographicDetailsPage from "../pages/StudentLogin/DemographicDetailsPage";
+import AllottedAssessmentPage from "../pages/StudentLogin/AllottedAssessmentPage";
+import SectionInstructionPage from "../pages/StudentOnlineAssessment/components/SectionInstructionPage";
+import SectionQuestionPage from "../pages/StudentOnlineAssessment/components/SectionQuestionPage";
+import GeneralInstructionsPage from "../pages/StudentOnlineAssessment/components/GeneralInstructionsPage";
+
+import SelectSectionPage from "../pages/StudentOnlineAssessment/components/SelectSectionPage";
 
 const StudentRegistrationForm = lazy(
   () => import("../pages/StudentRegistration/StudentRegistrationForm")
@@ -81,6 +89,39 @@ const AppRoutes: FC = () => {
           </SuspensedView>
         }
       />
+      <Route path="/studentAssessment" element={<SelectSectionPage />} />
+            <Route
+              path="/studentAssessment/sections/:sectionId"
+              element={<SectionInstructionPage />}
+            />
+            <Route
+              path="/studentAssessment/sections/:sectionId/questions/:questionIndex"
+              element={<SectionQuestionPage />}
+            />
+            <Route
+              path="/allotted-assessment"
+              element={<AllottedAssessmentPage />}
+            />
+            <Route
+              path="/general-instructions"
+              element={<GeneralInstructionsPage />}
+            />
+            <Route
+              path="/demographics"
+              element={<DemographicDetailsPage />}
+            />
+            <Route
+              path="/studentAssessment/completed"
+              element={<ThankYouPage />}
+            />
+      <Route
+              path="/student-login"
+              element={
+                <SuspensedView>
+                  <StudentLoginPage />
+                </SuspensedView>
+              }
+            />
       {/* <Route path="/questionaire/List" element={
         <SuspensedView>
           <QuestionaireListPage />

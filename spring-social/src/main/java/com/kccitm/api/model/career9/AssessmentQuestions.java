@@ -59,6 +59,14 @@ public class AssessmentQuestions implements Serializable {
         this.questionType = questionType;
     }
 
+    // Constructor for projection with section
+    public AssessmentQuestions(Long questionId, String questionText, String questionType, QuestionSection section) {
+        this.questionId = questionId;
+        this.questionText = questionText;
+        this.questionType = questionType;
+        this.section = section;
+    }
+
     public AssessmentQuestions() {
     }
 

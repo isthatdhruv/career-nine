@@ -82,9 +82,9 @@ public class AuthController {
         if (userRepository.existsByPhone(signUpRequest.getPhone())) {
             throw new BadRequestException("Phone number already in use.");
         }
-        if (signUpRequest.getAcceptTerms() == null || !signUpRequest.getAcceptTerms()) {
-            throw new BadRequestException("You must accept the terms and conditions.");
-        }
+        // if (signUpRequest.getAcceptTerms() == null || !signUpRequest.getAcceptTerms()) {
+        //     throw new BadRequestException("You must accept the terms and conditions.");
+        // }
 
     // Creating user's account
     User user = new User();

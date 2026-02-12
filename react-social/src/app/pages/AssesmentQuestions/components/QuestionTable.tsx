@@ -28,6 +28,7 @@ const QuestionTable = (props: {
   const [selectedMeasuredQualityTypesByQuestion, setSelectedMeasuredQualityTypesByQuestion] = useState<{ [key: number]: any[] }>({});
   const [measuredQualityTypes, setMeasuredQualityTypes] = useState<any[]>([]);
   const [searchText, setSearchText] = useState("");
+  const [selectedSection, setSelectedSection] = useState<string>("");
 
   // ✅ State for modals
   const [showLanguageModal, setShowLanguageModal] = useState(false);
@@ -136,13 +137,65 @@ const QuestionTable = (props: {
         "Option 6 MQTs": "",
       },
     ];
-
-    // Create workbook and worksheet
+    // Create workbook and worksheets
     const worksheet = XLSX.utils.json_to_sheet(templateData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Questions Template");
 
-    // Auto-size columns
+    // Build Legend sheet using aoa (array of arrays) for full layout control
+    const legendData: any[][] = [];
+
+    // --- Sections table ---
+    legendData.push(["Section ID", "Section Name", "Section Description"]);
+    if (props.sections && props.sections.length > 0) {
+      props.sections.forEach((s: any) => {
+        legendData.push([s.sectionId, s.sectionName || "", s.sectionDescription || ""]);
+      });
+    } else {
+      legendData.push(["No sections available", "", ""]);
+    }
+
+    // 2-row gap
+    legendData.push([]);
+    legendData.push([]);
+
+    // --- Question Types table ---
+    const questionTypesStartRow = legendData.length;
+    legendData.push(["Question Type", "Question Keyword"]);
+    legendData.push(["Single Choice", "single-choice"]);
+    legendData.push(["Multiple Choice", "multiple-choice"]);
+    legendData.push(["Ranking", "ranking"]);
+
+    const legendSheet = XLSX.utils.aoa_to_sheet(legendData);
+
+    // Bold header styling for both table headers
+    const boldStyle = { font: { bold: true } };
+    const sectionHeaders = ["A1", "B1", "C1"];
+    const qTypeHeaders = [
+      `A${questionTypesStartRow + 1}`,
+      `B${questionTypesStartRow + 1}`,
+    ];
+    [...sectionHeaders, ...qTypeHeaders].forEach((ref) => {
+      if (legendSheet[ref]) {
+        legendSheet[ref].s = boldStyle;
+      }
+    });
+
+    // Column widths for Legend sheet
+    legendSheet["!cols"] = [
+      { wch: 14 }, // Section ID / Question Type
+      { wch: 30 }, // Section Name / Question Keyword
+      { wch: 40 }, // Section Description
+    ];
+
+    // AutoFilter on sections table (gives table-like header appearance)
+    legendSheet["!autofilter"] = {
+      ref: `A1:C${(props.sections?.length || 1) + 1}`,
+    };
+
+    XLSX.utils.book_append_sheet(workbook, legendSheet, "Legend");
+
+    // Auto-size columns for Questions Template sheet
     const maxWidth = 50;
     const colWidths = Object.keys(templateData[0]).map((key) => ({
       wch: Math.min(key.length + 2, maxWidth),
@@ -157,27 +210,33 @@ const QuestionTable = (props: {
     }
   };
 
-  const filteredData = props.data.filter((item: any) =>
-    (item.questionText ?? "")
+  const filteredData = props.data.filter((item: any) => {
+    const matchesText = (item.questionText ?? "")
       .toString()
       .toLowerCase()
-      .includes(searchText.trim().toLowerCase())
-  );
+      .includes(searchText.trim().toLowerCase());
+    const itemSectionId = item.section?.sectionId ?? item.sectionId;
+    const matchesSection = !selectedSection || String(itemSectionId) === selectedSection;
+    return matchesText && matchesSection;
+  });
 
   const datatable = {
     columns: [
+      { label: "#", field: "serialNo", width: 50, sort: "disabled" },
       { label: "Question Text", field: "questionText", width: 300 , sort: "asc",},
       { label: "Question Type", field: "questionType", width: 150 },
+      { label: "Section", field: "sectionType", width: 150 },
       // { label: "Section", field: "sectionType", sort: "asc", width: 150 },
       { label: "Actions", field: "actions", sort: "disabled", width: 200 },
     ],
 
-    rows: filteredData.map((data: any) => ({
+    rows: filteredData.map((data: any, index: number) => ({
+      serialNo: <div>{index + 1}</div>,
       questionText: <div>{data.questionText}</div>,
       questionType: <div>{data.questionType}</div>,
       sectionType: (
         <div>
-          {props.sections.find(section => section.sectionId === data.sectionId)?.sectionName ?? "Unknown"}
+          {props.sections.find(section => section.sectionId === (data.section?.sectionId ?? data.sectionId))?.sectionName ?? "Unknown"}
         </div>
       ),
       actions: (
@@ -276,6 +335,21 @@ const QuestionTable = (props: {
           <FaFileDownload size={18} className="me-2" style={{ transform: 'rotate(180deg)' }} />
           Upload Excel
         </button>
+
+        {/* Section filter dropdown */}
+        <select
+          className="form-select"
+          value={selectedSection}
+          onChange={(e) => setSelectedSection(e.target.value)}
+          style={{ maxWidth: "200px" }}
+        >
+          <option value="">All Sections</option>
+          {props.sections.map((section: any) => (
+            <option key={section.sectionId} value={String(section.sectionId)}>
+              {section.sectionName}
+            </option>
+          ))}
+        </select>
 
         {/* Search input for filtering questions */}
         <input

@@ -12,7 +12,7 @@ import com.kccitm.api.model.career9.AssessmentQuestions;
 @Repository
 public interface AssessmentQuestionRepository extends JpaRepository<AssessmentQuestions, Long> {
 
-    @Query("SELECT new com.kccitm.api.model.career9.AssessmentQuestions(a.questionId, a.questionText, a.questionType) FROM AssessmentQuestions a")
+    @Query("SELECT new com.kccitm.api.model.career9.AssessmentQuestions(a.questionId, a.questionText, a.questionType, a.section) FROM AssessmentQuestions a")
     List<AssessmentQuestions> findAllQuestionsProjection();
     
 }
