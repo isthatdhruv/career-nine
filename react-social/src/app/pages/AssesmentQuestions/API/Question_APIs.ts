@@ -7,6 +7,9 @@ const readQuestionById = `${API_URL}/assessment-questions/get/`;
 const createQuestion = `${API_URL}/assessment-questions/create`;
 const updateQuestion = `${API_URL}/assessment-questions/update`;
 const deleteQuestion = `${API_URL}/assessment-questions/delete/`;
+const deletedQuestions = `${API_URL}/assessment-questions/deleted`;
+const restoreQuestion = `${API_URL}/assessment-questions/restore`;
+const permanentDeleteQuestion = `${API_URL}/assessment-questions/permanent-delete`;
 const readMeasuredQualityTypes = `${API_URL}/measured-quality-types/getAll`;
 const updateOptionScore = `${API_URL}/option-scores/create`;
 
@@ -62,27 +65,23 @@ export function CreateQuestionData(values: any) {
 }
 
 export function UpdateQuestionData(id: any, values: any) {
-  // Transform the data to match backend expectations
-  const requestData = {
-    ...values,
-    section: values.sectionId ? { sectionId: values.sectionId } : null,
-    options: values.questionOptions 
-      ? values.questionOptions
-          .filter((option: string) => option.trim() !== '') // Remove empty options
-          .map((option: string, index: number) => ({
-            optionText: option,
-            isCorrect: index === 0 // For now, make first option correct by default
-          }))
-      : []
-  };
-  delete requestData.sectionId; // Remove the flat sectionId
-  delete requestData.questionOptions; // Remove the original field
-  console.log("Sending update to backend:", requestData);
-  return axios.put(`${updateQuestion}/${id}`, requestData);
+  return axios.put(`${updateQuestion}/${id}`, values);
 }
 
 export function DeleteQuestionData(id: any) {
   return axios.delete(deleteQuestion + id);
+}
+
+export function GetDeletedQuestions() {
+  return axios.get(deletedQuestions);
+}
+
+export function RestoreQuestion(id: any) {
+  return axios.put(`${restoreQuestion}/${id}`);
+}
+
+export function PermanentDeleteQuestion(id: any) {
+  return axios.delete(`${permanentDeleteQuestion}/${id}`);
 }
 
 /**
