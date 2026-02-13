@@ -11,7 +11,6 @@ import com.kccitm.api.service.EmailService;
 
 
 @RestController
-
 public class EmailController {
 @Autowired
 EmailService emailService;

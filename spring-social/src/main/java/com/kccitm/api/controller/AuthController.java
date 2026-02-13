@@ -27,11 +27,13 @@ import com.kccitm.api.payload.LoginRequest;
 import com.kccitm.api.payload.SignUpRequest;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.security.TokenProvider;
-
+import com.kccitm.api.service.SmtpEmailService;
 @RestController
 @RequestMapping("/auth")
 
 public class AuthController {
+    @Autowired
+    private SmtpEmailService smtpEmailService;
 
     @Autowired
     private AuthenticationManager authenticationManager;
@@ -42,9 +44,7 @@ public class AuthController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    @Autowired
-    private com.kccitm.api.service.SmtpEmailService smtpEmailService;
-
+    
     @Autowired
     private TokenProvider tokenProvider;
 
@@ -73,6 +73,7 @@ public class AuthController {
 
     @PostMapping("/signup")
     public ResponseEntity<?> registerUser(@Valid @RequestBody SignUpRequest signUpRequest) {
+        
         if (userRepository.existsByEmail(signUpRequest.getEmail())) {
             throw new BadRequestException("Email address already in use.");
         }
@@ -80,7 +81,7 @@ public class AuthController {
             throw new BadRequestException("Phone number is required.");
         }
         if (userRepository.existsByPhone(signUpRequest.getPhone())) {
-            throw new BadRequestException("Phone number already in use.");
+            throw new BadRequestException("Phone nusmber already in use.");
         }
         // if (signUpRequest.getAcceptTerms() == null || !signUpRequest.getAcceptTerms()) {
         //     throw new BadRequestException("You must accept the terms and conditions.");
@@ -111,8 +112,8 @@ public class AuthController {
     // Send welcome email asynchronously (fire-and-forget)
     try {
         String subject = "Welcome to Career-9";
-        String body = "Hello " + fullName + ",\n\nThank you for registering.We will get back to you soon.\n\nRegards,\nCareer-9 Team";
-        smtpEmailService.sendSimpleEmail(result.getEmail(), subject, body);
+        String body = "Hello " + fullName + ",\n\nThank you for registering.\nYour account is under review.We will get back to you soon.\n\nRegards,\nCareer-9 Team";
+        smtpEmailService.sendSimpleEmail(user.getEmail(), subject, body);
     } catch (Exception e) {
         // log and continue - do not fail registration because of email
     }
@@ -120,5 +121,6 @@ public class AuthController {
     return ResponseEntity.created(location)
         .body(new ApiResponse(true, "User registered successfully"));
     }
-
+    // return ResponseEntity.ok(new ApiResponse(true, "User registered successfully"));
+    // }
 }

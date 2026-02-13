@@ -33,9 +33,13 @@ import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.security.CurrentUser;
 import com.kccitm.api.security.UserPrincipal;
+import com.kccitm.api.service.SmtpEmailService;
 
 @RestController
 public class UserController {
+
+    @Autowired
+    private SmtpEmailService smtpEmailService;
 
     @Autowired
     private UserRepository userRepository;
@@ -168,15 +172,24 @@ public class UserController {
 
     @PostMapping(value = "user/toggle-active/{id}")
     public ResponseEntity<?> toggleUserActive(@PathVariable("id") Long userId) {
+
         Optional<User> optionalUser = userRepository.findById(userId);
         if (!optionalUser.isPresent()) {
             return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
-                .body(new ApiResponse(false, "User not found"));
+                    .body(new ApiResponse(false, "User not found"));
         }
         User user = optionalUser.get();
         boolean newStatus = !(user.getIsActive() != null && user.getIsActive());
         user.setIsActive(newStatus);
-        userRepository.save(user);
+
+        try {
+            userRepository.save(user);
+            String subject = "Congratulations! Account Activated";
+            // Send email notification
+            smtpEmailService.sendSimpleEmail(user.getEmail(), subject,
+                    "Your Dashboard account has been activated.\nYou can login at https://dashboard.career-9.com using your registered email and password.\n\nBest regards,\nCareer-9 Team");
+        } catch (Exception e) {
+        }
         return ResponseEntity.ok(new ApiResponse(true, newStatus ? "User activated" : "User deactivated"));
     }
 
@@ -185,23 +198,29 @@ public class UserController {
         Optional<User> optionalUser = userRepository.findById(userId);
         if (!optionalUser.isPresent()) {
             return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
-                .body(new ApiResponse(false, "User not found"));
+                    .body(new ApiResponse(false, "User not found"));
         }
         User user = optionalUser.get();
 
-        if (body.containsKey("name")) user.setName((String) body.get("name"));
-        if (body.containsKey("email")) user.setEmail((String) body.get("email"));
-        if (body.containsKey("phone")) user.setPhone((String) body.get("phone"));
-        if (body.containsKey("organisation")) user.setOrganisation((String) body.get("organisation"));
-        if (body.containsKey("designation")) user.setDesignation((String) body.get("designation"));
-        if (body.containsKey("isActive")) user.setIsActive((Boolean) body.get("isActive"));
+        if (body.containsKey("name"))
+            user.setName((String) body.get("name"));
+        if (body.containsKey("email"))
+            user.setEmail((String) body.get("email"));
+        if (body.containsKey("phone"))
+            user.setPhone((String) body.get("phone"));
+        if (body.containsKey("organisation"))
+            user.setOrganisation((String) body.get("organisation"));
+        if (body.containsKey("designation"))
+            user.setDesignation((String) body.get("designation"));
+        if (body.containsKey("isActive"))
+            user.setIsActive((Boolean) body.get("isActive"));
         if (body.containsKey("dob") && body.get("dob") != null) {
             try {
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
                 user.setDobDate(sdf.parse((String) body.get("dob")));
             } catch (Exception e) {
                 return ResponseEntity.status(org.springframework.http.HttpStatus.BAD_REQUEST)
-                    .body(new ApiResponse(false, "Invalid date format. Use yyyy-MM-dd"));
+                        .body(new ApiResponse(false, "Invalid date format. Use yyyy-MM-dd"));
             }
         }
 
