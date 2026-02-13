@@ -26,7 +26,7 @@ const Login = () => {
       password: "",
     },
     validationSchema: Yup.object({
-      email: Yup.string().email("Invalid email address").required("Required"),
+      email: Yup.string().email("Invalid email address").required("Email is required"),
       password: Yup.string().required("Password is required"),
     }),
     onSubmit: async (values, { setStatus, setSubmitting }) => {
@@ -68,7 +68,8 @@ const Login = () => {
 
       {formik.status && (
         <div className='mb-lg-15 alert alert-danger'>
-          <div className='alert-text font-weight-bold'>{formik.status}</div>
+          
+          <div className='alert-text font-weight-bold'>{formik.status=="Unauthorized" ? "Invalid email or password" : formik.status}</div>
         </div>
       )}
 
@@ -89,7 +90,10 @@ const Login = () => {
         />
         {formik.touched.email && formik.errors.email && (
           <div className='fv-plugins-message-container'>
-            <span role='alert'>{formik.errors.email}</span>
+            <div className='fv-help-block'>
+              <span role='alert'>{formik.errors.email}</span>
+            </div>
+          
           </div>
         )}
       </div>
@@ -118,6 +122,8 @@ const Login = () => {
             {'is-invalid': formik.touched.password && formik.errors.password},
             {'is-valid': formik.touched.password && !formik.errors.password}
           )}
+          name='password'
+          placeholder='Password'
         />
         {formik.touched.password && formik.errors.password && (
           <div className='fv-plugins-message-container'>
