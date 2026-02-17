@@ -1,6 +1,7 @@
 import { FC, useEffect, useState } from "react";
 import axios from "axios";
 import UsersRegistrationEditModal from "./UsersRegistrationEditModal";
+import UserCollegeMappingModal from "./UserCollegeMappingModal";
 import { useNavigate } from "react-router-dom";
 
 const API_URL = process.env.REACT_APP_API_URL;
@@ -25,6 +26,8 @@ const UserRegistration: FC = () => {
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
+  const [showMappingModal, setShowMappingModal] = useState(false);
+  const [selectedMappingUser, setSelectedMappingUser] = useState<UserRow | null>(null);
 
   const fetchUsers = async () => {
     try {
@@ -207,6 +210,17 @@ const UserRegistration: FC = () => {
                               <i className="bi bi-pencil-square me-1"></i>
                               Edit
                             </button>
+                            <button
+                              className="btn btn-sm btn-info fw-bold"
+                              onClick={() => {
+                                setSelectedMappingUser(user);
+                                setShowMappingModal(true);
+                              }}
+                              title="Map to college"
+                            >
+                              <i className="bi bi-building me-1"></i>
+                              Map to College
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -224,6 +238,15 @@ const UserRegistration: FC = () => {
         onClose={handleCloseModal}
         user={selectedUser}
         onSave={fetchUsers}
+      />
+
+      <UserCollegeMappingModal
+        show={showMappingModal}
+        onHide={() => {
+          setShowMappingModal(false);
+          setSelectedMappingUser(null);
+        }}
+        user={selectedMappingUser}
       />
     </>
   );
