@@ -4,7 +4,7 @@ import { I18nProvider } from "../_metronic/i18n/i18nProvider";
 import { MasterInit } from "../_metronic/layout/MasterInit";
 import { LayoutProvider, LayoutSplashScreen } from "../_metronic/layout/core";
 import { AuthInit } from "./modules/auth";
-import { DataProvider } from "./pages/games/Data-Context/DataContext";
+import { DataProvider } from "./pages/Games/Data-Context/DataContext";
 
 const App = () => {
   return (

@@ -2,6 +2,7 @@ package com.kccitm.api.controller;
 
 import java.net.URI;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +29,7 @@ import com.kccitm.api.payload.SignUpRequest;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.service.SmtpEmailService;
+import com.kccitm.api.service.UserActivityLogService;
 @RestController
 @RequestMapping("/auth")
 
@@ -44,12 +46,15 @@ public class AuthController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    
     @Autowired
     private TokenProvider tokenProvider;
 
+    @Autowired
+    private UserActivityLogService userActivityLogService;
+
     @PostMapping("/login")
-    public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest,
+            HttpServletRequest request) {
         User user = userRepository.findByEmail(loginRequest.getEmail());
         if (user == null) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -66,6 +71,19 @@ public class AuthController {
                         loginRequest.getPassword()));
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        // Async login activity logging - wrapped in try-catch so login is never affected
+        try {
+            String ipAddress = UserActivityLogService.getClientIp(request);
+            String userAgent = request.getHeader("User-Agent");
+            String userName = user.getName() != null ? user.getName() : "";
+            String organisation = user.getOrganisation() != null ? user.getOrganisation() : "";
+
+            userActivityLogService.logLogin(user.getId(), userName, user.getEmail(),
+                    organisation, ipAddress, userAgent);
+        } catch (Exception e) {
+            // Silently fail - never block login due to logging
+        }
 
         String token = tokenProvider.createToken(authentication);
         return ResponseEntity.ok(new AuthResponse(token));
