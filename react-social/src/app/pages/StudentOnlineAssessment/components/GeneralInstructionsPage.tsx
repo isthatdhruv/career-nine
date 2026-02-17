@@ -1,10 +1,70 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAssessment } from "../../StudentLogin/AssessmentContext";
 import { usePreventReload } from "../../StudentLogin/usePreventReload";
+
+const isNA = (text: string | null | undefined): boolean => {
+  if (!text) return false;
+  const trimmed = text.trim().toUpperCase();
+  return trimmed === 'NA' || trimmed === 'N/A';
+};
+
+type Language = {
+  languageId: number;
+  languageName: string;
+};
+
+type QuestionnaireLanguage = {
+  id: number;
+  language: Language;
+  instructions: string;
+};
 
 const GeneralInstructionsPage: React.FC = () => {
   const navigate = useNavigate();
+  const { assessmentData, loading } = useAssessment();
   usePreventReload();
+
+  // Extract general instructions from questionnaire languages, excluding NA
+  const questionnaire = assessmentData?.[0];
+  const languageInstructions: QuestionnaireLanguage[] = questionnaire?.languages?.filter(
+    (lang: QuestionnaireLanguage) => lang.instructions && lang.instructions.trim() && !isNA(lang.instructions)
+  ) || [];
+
+  // Auto-skip if all instructions are NA or empty
+  useEffect(() => {
+    if (!loading && questionnaire) {
+      const validInstructions = questionnaire.languages?.filter(
+        (lang: any) => lang.instructions && lang.instructions.trim() && !isNA(lang.instructions)
+      ) || [];
+
+      if (validInstructions.length === 0) {
+        navigate("/studentAssessment", { replace: true });
+      }
+    }
+  }, [loading, questionnaire, navigate]);
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          colorScheme: "light",
+        }}
+      >
+        <div className="text-center">
+          <div className="spinner-border text-light" role="status" style={{ width: "3rem", height: "3rem" }}>
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="mt-3 text-white fw-semibold">Loading instructions...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -21,7 +81,7 @@ const GeneralInstructionsPage: React.FC = () => {
       <div
         className="card shadow-lg"
         style={{
-          width: "800px",
+          width: languageInstructions.length > 1 ? "1000px" : "800px",
           maxWidth: "98%",
           borderRadius: "24px",
           border: "none",
@@ -44,7 +104,18 @@ const GeneralInstructionsPage: React.FC = () => {
               boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)",
             }}
           >
-            <span style={{ fontSize: "3.5rem" }}>🚀</span>
+            <svg
+              width="50"
+              height="50"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              strokeWidth="2"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
           </div>
 
           {/* Welcome Message */}
@@ -57,7 +128,7 @@ const GeneralInstructionsPage: React.FC = () => {
               lineHeight: "1.2",
             }}
           >
-            Hi there! Please read the instructions carefully.
+            General Instructions
           </h2>
 
           <p
@@ -68,170 +139,204 @@ const GeneralInstructionsPage: React.FC = () => {
               marginTop: "1rem",
             }}
           >
-            Before we start, here are three things to know:
+            Please read the instructions carefully before proceeding
           </p>
 
-          {/* Instruction Cards */}
+          {/* Instructions from DB */}
+          {languageInstructions.length > 0 ? (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: languageInstructions.length > 1 ? "1fr 1px 1fr" : "1fr",
+                gap: "2rem",
+                marginBottom: "3rem",
+              }}
+            >
+              {languageInstructions.map((lang, index) => (
+                <React.Fragment key={lang.id}>
+                  <div>
+                    {/* Language Badge */}
+                    <div
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        backgroundColor: "#eef2ff",
+                        color: "#667eea",
+                        padding: "0.5rem 1rem",
+                        borderRadius: "50px",
+                        fontSize: "0.9rem",
+                        fontWeight: "600",
+                        marginBottom: "1rem",
+                        border: "2px solid #667eea30",
+                      }}
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="2" y1="12" x2="22" y2="12" />
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                      </svg>
+                      {lang.language.languageName}
+                    </div>
+
+                    {/* Instruction Box */}
+                    <div
+                      style={{
+                        backgroundColor: "#f7fafc",
+                        border: "2px solid #e2e8f0",
+                        borderRadius: "16px",
+                        padding: "2rem",
+                        minHeight: "200px",
+                        whiteSpace: "pre-line",
+                        fontSize: "1.05rem",
+                        lineHeight: "1.8",
+                        color: "#2d3748",
+                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.04)",
+                      }}
+                    >
+                      {lang.instructions}
+                    </div>
+                  </div>
+
+                  {/* Divider only between columns */}
+                  {index === 0 && languageInstructions.length > 1 && (
+                    <div
+                      style={{
+                        width: "1px",
+                        backgroundColor: "#e2e8f0",
+                        alignSelf: "stretch",
+                      }}
+                    />
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          ) : (
+            /* Fallback when no instructions exist in DB */
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "1.5rem",
+                marginBottom: "3rem",
+              }}
+            >
+              {[
+                {
+                  icon: "\u{1F4DD}",
+                  text: 'This is <strong style="color: #667eea">NOT a school exam</strong>. You won\'t get a "grade" like A or B.',
+                },
+                {
+                  icon: "\u{1F4AD}",
+                  text: 'There are <strong style="color: #667eea">no wrong answers</strong>. We just want to see how you think and how you feel.',
+                },
+                {
+                  icon: "\u{2728}",
+                  text: 'Just <strong style="color: #667eea">be yourself</strong>! Some parts are games and some parts are questions. Take your time and have fun!',
+                },
+              ].map((item, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    background: "linear-gradient(135deg, #667eea10 0%, #764ba210 100%)",
+                    border: "2px solid #667eea30",
+                    borderRadius: "16px",
+                    padding: "1.5rem",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "1.25rem",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "50px",
+                      height: "50px",
+                      minWidth: "50px",
+                      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                      borderRadius: "12px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.75rem",
+                      boxShadow: "0 4px 12px rgba(102, 126, 234, 0.3)",
+                    }}
+                  >
+                    {item.icon}
+                  </div>
+                  <div style={{ flex: 1, paddingTop: "0.25rem" }}>
+                    <p
+                      style={{
+                        margin: 0,
+                        color: "#2d3748",
+                        fontSize: "1.5rem",
+                        lineHeight: "1.7",
+                        fontWeight: "500",
+                      }}
+                      dangerouslySetInnerHTML={{ __html: item.text }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Info Box */}
           <div
             style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "1.5rem",
-              marginBottom: "3rem",
-            }}
-          >
-            {/* Instruction 1 */}
-            <div
-              style={{
-                background: "linear-gradient(135deg, #667eea10 0%, #764ba210 100%)",
-                border: "2px solid #667eea30",
-                borderRadius: "16px",
-                padding: "1.5rem",
-                display: "flex",
-                alignItems: "flex-start",
-                gap: "1.25rem",
-              }}
-            >
-              <div
-                style={{
-                  width: "50px",
-                  height: "50px",
-                  minWidth: "50px",
-                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                  borderRadius: "12px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "1.75rem",
-                  boxShadow: "0 4px 12px rgba(102, 126, 234, 0.3)",
-                }}
-              >
-                📝
-              </div>
-              <div style={{ flex: 1, paddingTop: "0.25rem" }}>
-                <p
-                  style={{
-                    margin: 0,
-                    color: "#2d3748",
-                    fontSize: "1.50rem",
-                    lineHeight: "1.7",
-                    fontWeight: "500",
-                  }}
-                >
-                  This is <strong style={{ color: "#667eea" }}>NOT a school exam</strong>. You won't get a "grade" like A or B.
-                </p>
-              </div>
-            </div>
-
-            {/* Instruction 2 */}
-            <div
-              style={{
-                background: "linear-gradient(135deg, #667eea10 0%, #764ba210 100%)",
-                border: "2px solid #667eea30",
-                borderRadius: "16px",
-                padding: "1.5rem",
-                display: "flex",
-                alignItems: "flex-start",
-                gap: "1.25rem",
-              }}
-            >
-              <div
-                style={{
-                  width: "50px",
-                  height: "50px",
-                  minWidth: "50px",
-                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                  borderRadius: "12px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "1.75rem",
-                  boxShadow: "0 4px 12px rgba(102, 126, 234, 0.3)",
-                }}
-              >
-                💭
-              </div>
-              <div style={{ flex: 1, paddingTop: "0.25rem" }}>
-                <p
-                  style={{
-                    margin: 0,
-                    color: "#2d3748",
-                    fontSize: "1.5rem",
-                    lineHeight: "1.7",
-                    fontWeight: "500",
-                  }}
-                >
-                  There are <strong style={{ color: "#667eea" }}>no wrong answers</strong>. We just want to see how you think and how you feel.
-                </p>
-              </div>
-            </div>
-
-            {/* Instruction 3 */}
-            <div
-              style={{
-                background: "linear-gradient(135deg, #667eea10 0%, #764ba210 100%)",
-                border: "2px solid #667eea30",
-                borderRadius: "16px",
-                padding: "1.5rem",
-                display: "flex",
-                alignItems: "flex-start",
-                gap: "1.25rem",
-              }}
-            >
-              <div
-                style={{
-                  width: "50px",
-                  height: "50px",
-                  minWidth: "50px",
-                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                  borderRadius: "12px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "1.75rem",
-                  boxShadow: "0 4px 12px rgba(102, 126, 234, 0.3)",
-                }}
-              >
-                ✨
-              </div>
-              <div style={{ flex: 1, paddingTop: "0.25rem" }}>
-                <p
-                  style={{
-                    margin: 0,
-                    color: "#2d3748",
-                    fontSize: "1.5rem",
-                    lineHeight: "1.7",
-                    fontWeight: "500",
-                  }}
-                >
-                  Just <strong style={{ color: "#667eea" }}>be yourself</strong>! Some parts are games and some parts are questions. Take your time and have fun!
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Encouragement Box */}
-          <div
-            style={{
-              background: "linear-gradient(135deg, #10b98110 0%, #059669 10 100%)",
-              border: "2px solid #10b98130",
+              background: "linear-gradient(135deg, #667eea10 0%, #764ba210 100%)",
+              border: "2px solid #667eea30",
               borderRadius: "16px",
-              padding: "1.5rem",
-              marginBottom: "3rem",
-              textAlign: "center",
+              padding: "1.25rem 1.5rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "1rem",
+              marginBottom: "2.5rem",
             }}
           >
-            <p
+            <div
               style={{
-                margin: 0,
-                color: "#2d3748",
-                fontSize: "1.05rem",
-                fontWeight: "500",
+                width: "40px",
+                height: "40px",
+                minWidth: "40px",
+                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
-              <span style={{ fontSize: "1.5rem", marginRight: "0.5rem" }}>🎉</span>
-              You're all set! Let's begin this exciting journey together.
-            </p>
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="2.5"
+              >
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+            </div>
+            <div>
+              <p
+                style={{
+                  margin: 0,
+                  color: "#4a5568",
+                  fontSize: "0.95rem",
+                  fontWeight: "500",
+                }}
+              >
+                <strong style={{ color: "#2d3748" }}>Ready to begin?</strong> Make sure you've
+                read and understood all the instructions before starting.
+              </p>
+            </div>
           </div>
 
           {/* Start Button */}

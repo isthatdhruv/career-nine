@@ -14,11 +14,11 @@ server:
 spring:
   profiles: dev
   datasource:
-    # url: jdbc:mysql://localhost:3306/kareer-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
-    url: jdbc:mysql://192.168.10.73:3306/kiraya-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3306/live-db?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    # url: jdbc:mysql://192.168.10.73:3306/kiraya-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     username: root
-    password: Career-qCsfeuECc3MW
-    # password: MyStrongPass@123
+    # password: Career-qCsfeuECc3MW
+    password: MyStrongPass@123
   jpa:
     show-sql: true
     hibernate:
@@ -31,7 +31,7 @@ spring:
     host: smtp.gmail.com
     port: 587
     username: ${SMTP_USERNAME:notifications@career-9.net}
-    password: ${SMTP_PASSWORD:ntck wmgi benh lhql}
+    password: ${SMTP_PASSWORD:}
     properties:
       mail:
         smtp:
@@ -39,9 +39,9 @@ spring:
           starttls:
             enable: true
             required: true
-          connectiontimeout: 10000
-          timeout: 10000
-          writetimeout: 10000
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
   security:
     oauth2:
       client:

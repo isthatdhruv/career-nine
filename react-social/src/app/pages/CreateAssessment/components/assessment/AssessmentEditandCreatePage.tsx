@@ -7,17 +7,14 @@ import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
 import { ReadAssessmentByIdData, UpdateAssessmentData, CreateAssessmentData } from "../../API/Create_Assessment_APIs";
 import { ReadQuestionaireData } from "../../API/Create_Questionaire_APIs";
-import { Dropdown, Form } from "react-bootstrap";
-import { data } from "jquery";
 
 const validationSchema = Yup.object().shape({
   AssessmentName: Yup.string().required("Assessment name is required"),
 });
 
-
 const AssessmentEditPage = (props?: {
   setPageLoading?: any;
-  data?: any; // Accept data as prop if passed
+  data?: any;
 }) => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -27,9 +24,6 @@ const AssessmentEditPage = (props?: {
   const [questionnaires, setQuestionnaires] = useState<any[]>([]);
   const [selectedQuestionnaireId, setSelectedQuestionnaireId] = useState<number | null>(null);
 
-  // Prefer data from props, then location.state, then fallback to empty
-
-  // Helper to normalize assessment data (always use 'AssessmentName' in state)
   function normalizeAssessmentData(data: any) {
     if (!data) return {
       id: "",
@@ -38,6 +32,7 @@ const AssessmentEditPage = (props?: {
       endDate: "",
       isActive: false,
       modeofAssessment: false,
+      showTimer: true,
       questionnaires: [
         {
           questionnaireId: 0,
@@ -57,7 +52,6 @@ const AssessmentEditPage = (props?: {
 
   const [assessmentData, setAssessmentData] = useState<any>(initialAssessmentData);
 
-  // Fetch questionnaires when component mounts
   useEffect(() => {
     const fetchQuestionnaires = async () => {
       try {
@@ -70,10 +64,8 @@ const AssessmentEditPage = (props?: {
     fetchQuestionnaires();
   }, []);
 
-  // Set assessment data from props/location.state if present, else fetch from API
   useEffect(() => {
     let didSet = false;
-    // Prefer props.data
     if (props?.data) {
       const norm = normalizeAssessmentData(props.data);
       setAssessmentData(norm);
@@ -89,7 +81,6 @@ const AssessmentEditPage = (props?: {
       }
       didSet = true;
     }
-    // Only fetch from API if not already set
     if (!didSet && id) {
       const fetchData = async () => {
         try {
@@ -99,6 +90,11 @@ const AssessmentEditPage = (props?: {
           setAssessmentData(norm);
           if (norm.questionnaire?.questionnaireId) {
             setSelectedQuestionnaireId(norm.questionnaire.questionnaireId);
+          }
+          if (norm.customDemographicFields) {
+            try {
+              setCustomFields(JSON.parse(norm.customDemographicFields));
+            } catch (e) { /* ignore parse errors */ }
           }
         } catch (error) {
           console.error("Error fetching assessment:", error);
@@ -119,32 +115,30 @@ const AssessmentEditPage = (props?: {
       endDate: assessmentData.endDate || "",
       isActive: assessmentData.isActive || false,
       modeofAssessment: assessmentData.modeofAssessment || false,
+      showTimer: assessmentData.showTimer !== false,
       questionnaires: assessmentData.questionnaires?.map((q: any) => q.questionnaireId) || [],
     },
     validationSchema: validationSchema,
     onSubmit: async (values) => {
       setLoading(true);
       try {
-        // Always send 'AssessmentName' in payload
         const payload: any = {
           AssessmentName: values.AssessmentName,
           starDate: values.startDate,
           endDate: values.endDate,
           isActive: values.isActive,
           modeofAssessment: values.modeofAssessment,
+          showTimer: values.showTimer,
         };
 
-        // Add questionnaire if selected (use questionnaireId to match backend model)
         if (selectedQuestionnaireId) {
           payload.questionnaire = { questionnaireId: selectedQuestionnaireId };
         }
 
         let response;
         if (isEditMode && values.id) {
-          // Update existing assessment
           response = await UpdateAssessmentData(values.id, payload);
         } else {
-          // Create new assessment
           response = await CreateAssessmentData(payload);
         }
 
@@ -218,10 +212,7 @@ const AssessmentEditPage = (props?: {
               )}
             </div>
 
-            {/* Assessment Price Type */}
-
-
-            {/* Options Management Section */}
+            {/* Assessment Settings */}
             <div className="card mb-7">
               <h3 className="card-title">Assessment Settings</h3>
               <div className="card-body">
@@ -255,7 +246,7 @@ const AssessmentEditPage = (props?: {
                     Is Active
                   </label>
                 </div>
-                <div className="form-check form-switch">
+                <div className="form-check form-switch mb-3">
                   <input
                     className="form-check-input"
                     type="checkbox"
@@ -269,8 +260,24 @@ const AssessmentEditPage = (props?: {
                     Mode of Assessment (Online)
                   </label>
                 </div>
+                <div className="form-check form-switch">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    id="showTimer"
+                    checked={formik.values.showTimer}
+                    onChange={() =>
+                      formik.setFieldValue("showTimer", !formik.values.showTimer)
+                    }
+                  />
+                  <label className="form-check-label" htmlFor="showTimer">
+                    Show Timer to Students
+                  </label>
+                </div>
               </div>
             </div>
+
+            {/* Select Questionnaire */}
             <div className="card mb-7">
               <h3 className="card-title">Select Questionnaire</h3>
               <div className="card-body">
@@ -313,7 +320,7 @@ const AssessmentEditPage = (props?: {
                       );
                     })}
                   </div>
-                )} 
+                )}
               </div>
             </div>
 

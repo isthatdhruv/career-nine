@@ -30,6 +30,8 @@ import SectionQuestionPage from "../pages/StudentOnlineAssessment/components/Sec
 import GeneralInstructionsPage from "../pages/StudentOnlineAssessment/components/GeneralInstructionsPage";
 
 import SelectSectionPage from "../pages/StudentOnlineAssessment/components/SelectSectionPage";
+import PrincipalDashboard from "../pages/PrincipalDashboard/PrincipalDashboard";
+import { MasterLayout } from "../../_metronic/layout/MasterLayout";
 
 const StudentRegistrationForm = lazy(
   () => import("../pages/StudentRegistration/StudentRegistrationForm")
@@ -73,6 +75,16 @@ const AppRoutes: FC = () => {
             </SuspensedView>
           }
         />
+        <Route element={<MasterLayout />}>
+          <Route
+            path="/principal/dashboard"
+            element={
+              <SuspensedView>
+                <PrincipalDashboard />
+              </SuspensedView>
+            }
+          />
+        </Route>
         <Route
         path="/student/registration-form"
         element={

@@ -61,7 +61,7 @@ const DemographicDetailsPage: React.FC = () => {
           gender: data.gender || "",
           grade: data.studentClass ? `${data.studentClass}${data.studentClass === 3 ? 'rd' : data.studentClass === 4 || data.studentClass === 5 ? 'th' : ''} Grade` : "",
           schoolBoard: data.schoolBoard || "",
-          siblings: data.sibling !== null && data.sibling !== undefined 
+          siblings: data.sibling !== null && data.sibling !== undefined
             ? (data.sibling >= 3 ? "3 or more" : String(data.sibling))
             : "",
           livingWith: data.family || "",
@@ -179,7 +179,7 @@ const DemographicDetailsPage: React.FC = () => {
     setIsSubmitting(true);
 
     // Check if data has changed from original
-    const hasChanges = !originalData || 
+    const hasChanges = !originalData ||
       formData.name !== originalData.name ||
       formData.gender !== originalData.gender ||
       formData.grade !== originalData.grade ||

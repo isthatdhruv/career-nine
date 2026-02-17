@@ -41,6 +41,11 @@ public class AssessmentTable implements java.io.Serializable {
     @JoinColumn(name = "questionnaire_id")
     private Questionnaire questionnaire;
 
+    // Timer visibility flag
+    @Column(name = "show_timer", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    private Boolean showTimer = true;
+
+
     public Long getId() {
         return id;
     }
@@ -106,6 +111,14 @@ public class AssessmentTable implements java.io.Serializable {
 
     public void setQuestionnaire(Questionnaire questionnaire) {
         this.questionnaire = questionnaire;
+    }
+
+    public Boolean getShowTimer() {
+        return showTimer;
+    }
+
+    public void setShowTimer(Boolean showTimer) {
+        this.showTimer = showTimer;
     }
 
 }

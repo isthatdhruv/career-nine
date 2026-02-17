@@ -66,7 +66,6 @@ import InstituteDashboard from "../pages/dashboard/InstituteDashboard";
 import ReportsPage from "../pages/Reports/ReportsPage";
 import StudentDashboard from "../pages/StudentDashboard/StudentDashboard";
 import ClassTeacherDashboard from "../pages/ClassTeacherDashboard/ClassTeacherDashboard";
-import PrincipalDashboard from "../pages/PrincipalDashboard/PrincipalDashboard";
 import { Error401 } from "../modules/errors/components/Error401";
 import _ from "lodash";
 
@@ -389,14 +388,7 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-        <Route
-          path="/principal/dashboard"
-          element={
-            <SuspensedView>
-              <PrincipalDashboard />
-            </SuspensedView>
-          }
-        />
+        
         <Route
           path="/registrar/verification/faculty"
           element={

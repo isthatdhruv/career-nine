@@ -14,6 +14,12 @@ type Instruction = {
   language: Language;
 };
 
+const isNA = (text: string | null | undefined): boolean => {
+  if (!text) return false;
+  const trimmed = text.trim().toUpperCase();
+  return trimmed === 'NA' || trimmed === 'N/A';
+};
+
 const SectionInstructionPage: React.FC = () => {
   const { sectionId } = useParams();
   const navigate = useNavigate();
@@ -26,7 +32,6 @@ const SectionInstructionPage: React.FC = () => {
     if (assessmentData && assessmentData[0]) {
       const questionnaire = assessmentData[0];
 
-      // 🔍 Find section by sectionId
       const section = questionnaire.sections.find(
         (sec: any) => String(sec.section.sectionId) === String(sectionId)
       );
@@ -37,7 +42,18 @@ const SectionInstructionPage: React.FC = () => {
         return;
       }
 
-      setInstructions(section.instruction);
+      // Filter out NA instructions
+      const nonNAInstructions = section.instruction.filter(
+        (inst: any) => inst.instructionText && !isNA(inst.instructionText)
+      );
+
+      if (nonNAInstructions.length === 0) {
+        // All instructions are NA - skip directly to questions
+        navigate(`/studentAssessment/sections/${sectionId}/questions/0`, { replace: true });
+        return;
+      }
+
+      setInstructions(nonNAInstructions);
     }
   }, [sectionId, assessmentData, navigate]);
 

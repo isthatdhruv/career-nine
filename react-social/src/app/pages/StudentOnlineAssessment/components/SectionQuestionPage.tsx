@@ -13,6 +13,7 @@ type GameTable = {
 type Option = {
   optionId: number;
   optionText: string;
+  optionDescription?: string;
   optionImageBase64?: string | null;
   languageOptions?: LanguageOption[];
   isGame?: boolean;
@@ -55,7 +56,8 @@ type QuestionnaireLanguage = {
 const SectionQuestionPage: React.FC = () => {
   const { sectionId, questionIndex } = useParams();
   const navigate = useNavigate();
-  const { assessmentData } = useAssessment();
+  const { assessmentData, assessmentConfig } = useAssessment();
+  const showTimer = assessmentConfig?.showTimer !== false;
   usePreventReload();
 
   const [questionnaire, setQuestionnaire] = useState<any>(null);
@@ -196,12 +198,21 @@ const SectionQuestionPage: React.FC = () => {
     );
 
     if (section?.instruction && section.instruction.length > 0) {
-      const texts = section.instruction.map((inst: any) => ({
-        text: inst.instructionText,
-        language: inst.language?.languageName || "English",
-      }));
-      setSectionInstructionTexts(texts);
-      setShowSectionInstruction(true);
+      const isNAText = (text: string | null | undefined): boolean => {
+        if (!text) return false;
+        const trimmed = text.trim().toUpperCase();
+        return trimmed === 'NA' || trimmed === 'N/A';
+      };
+      const texts = section.instruction
+        .filter((inst: any) => inst.instructionText && !isNAText(inst.instructionText))
+        .map((inst: any) => ({
+          text: inst.instructionText,
+          language: inst.language?.languageName || "English",
+        }));
+      if (texts.length > 0) {
+        setSectionInstructionTexts(texts);
+        setShowSectionInstruction(true);
+      }
     }
 
     // Mark as seen regardless of whether instructions exist
@@ -749,6 +760,23 @@ const SectionQuestionPage: React.FC = () => {
     return languageId !== undefined ? getOptionText(option, languageId) : option.optionText;
   };
 
+  // Helper to render option description in light grey
+  const renderOptionDescription = (opt: Option) => {
+    if (!opt.optionDescription) return null;
+    return (
+      <div style={{
+        fontSize: "0.85rem",
+        color: "#9ca3af",
+        marginTop: "4px",
+        lineHeight: "1.4",
+        fontWeight: 400,
+        fontStyle: "italic",
+      }}>
+        {opt.optionDescription}
+      </div>
+    );
+  };
+
   // Game handlers
   const handleLaunchGame = (gameCode: number) => {
     setActiveGameCode(gameCode);
@@ -1079,19 +1107,21 @@ const SectionQuestionPage: React.FC = () => {
               <h6 style={{ color: "#2d3748", fontWeight: 700, marginBottom: 0, fontSize: "1.1rem" }}>
                 Question {currentIndex + 1} of {questions.length}
               </h6>
-              <div
-                style={{
-                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                  padding: "10px 24px",
-                  borderRadius: "30px",
-                  fontWeight: 700,
-                  fontSize: "1rem",
-                  color: "white",
-                  boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)",
-                }}
-              >
-                ⏱️ {formatTime(elapsedTime)}
-              </div>
+              {showTimer && (
+                <div
+                  style={{
+                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                    padding: "10px 24px",
+                    borderRadius: "30px",
+                    fontWeight: 700,
+                    fontSize: "1rem",
+                    color: "white",
+                    boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)",
+                  }}
+                >
+                  ⏱️ {formatTime(elapsedTime)}
+                </div>
+              )}
             </div>
 
             {/* Submit Warning Popup */}
@@ -1391,33 +1421,35 @@ const SectionQuestionPage: React.FC = () => {
                             selectedOptions.length >= question.question.maxOptionsAllowed
                           }
                         />
-                        {hasOptionImage(opt) ? (
-                          <div style={{ flex: 1 }}>
-                            {renderOptionContent(opt)}
-                          </div>
-                        ) : availableLanguages.length > 0 ? (
-                          <div
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns: availableLanguages.length > 1 ? "1fr 1px 1fr" : "1fr",
-                              gap: 15,
-                              flex: 1,
-                            }}
-                          >
-                            {availableLanguages.map((lang, index) => (
-                              <React.Fragment key={lang.language.languageId}>
-                                <div style={{ fontSize: "1.2rem", lineHeight: "1.6", color: "#2d3748" }}>
-                                  {getOptionText(opt, lang.language.languageId)}
-                                </div>
-                                {index === 0 && availableLanguages.length > 1 && (
-                                  <div style={{ width: 1, backgroundColor: "#dee2e6" }} />
-                                )}
-                              </React.Fragment>
-                            ))}
-                          </div>
-                        ) : (
-                          <span style={{ fontSize: "1.2rem", color: "#2d3748" }}>{opt.optionText}</span>
-                        )}
+                        <div style={{ flex: 1 }}>
+                          {hasOptionImage(opt) ? (
+                            <div>
+                              {renderOptionContent(opt)}
+                            </div>
+                          ) : availableLanguages.length > 0 ? (
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: availableLanguages.length > 1 ? "1fr 1px 1fr" : "1fr",
+                                gap: 15,
+                              }}
+                            >
+                              {availableLanguages.map((lang, index) => (
+                                <React.Fragment key={lang.language.languageId}>
+                                  <div style={{ fontSize: "1.2rem", lineHeight: "1.6", color: "#2d3748" }}>
+                                    {getOptionText(opt, lang.language.languageId)}
+                                  </div>
+                                  {index === 0 && availableLanguages.length > 1 && (
+                                    <div style={{ width: 1, backgroundColor: "#dee2e6" }} />
+                                  )}
+                                </React.Fragment>
+                              ))}
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: "1.2rem", color: "#2d3748" }}>{opt.optionText}</span>
+                          )}
+                          {renderOptionDescription(opt)}
+                        </div>
                       </div>
                     </label>
                   );

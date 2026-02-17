@@ -152,6 +152,11 @@ public class AssessmentTableController {
             assessment.setModeofAssessment((Boolean) requestBody.get("modeofAssessment"));
         }
 
+        // Timer visibility flag
+        if (requestBody.get("showTimer") != null) {
+            assessment.setShowTimer((Boolean) requestBody.get("showTimer"));
+        }
+
         // Handle questionnaire - fetch existing entity by ID
         if (requestBody.get("questionnaire") != null) {
             @SuppressWarnings("unchecked")

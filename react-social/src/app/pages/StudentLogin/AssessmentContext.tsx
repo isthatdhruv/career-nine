@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 type AssessmentContextType = {
   assessmentData: any;
+  assessmentConfig: any;
   loading: boolean;
   error: string | null;
   fetchAssessmentData: (assessmentId: string) => Promise<void>;
@@ -12,26 +13,36 @@ const AssessmentContext = createContext<AssessmentContextType | undefined>(undef
 
 export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [assessmentData, setAssessmentData] = useState<any>(null);
+  const [assessmentConfig, setAssessmentConfig] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAssessmentData = async (assessmentId: string) => {
+  const fetchAssessmentData = async (assessmentId: string): Promise<void> => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const API_URL = process.env.REACT_APP_API_URL;
-      const response = await fetch(`${API_URL}/assessments/getby/${assessmentId}`);
-      
-      if (!response.ok) {
+
+      // Fetch both questionnaire data and assessment config in parallel
+      const [questionnaireResponse, configResponse] = await Promise.all([
+        fetch(`${API_URL}/assessments/getby/${assessmentId}`),
+        fetch(`${API_URL}/assessments/getById/${assessmentId}`),
+      ]);
+
+      if (!questionnaireResponse.ok) {
         throw new Error('Failed to fetch assessment data');
       }
-      
-      const data = await response.json();
+
+      const data = await questionnaireResponse.json();
       setAssessmentData(data);
-      
-      // Optionally store in localStorage for persistence
       localStorage.setItem('assessmentData', JSON.stringify(data));
+
+      if (configResponse.ok) {
+        const configData = await configResponse.json();
+        setAssessmentConfig(configData);
+        localStorage.setItem('assessmentConfig', JSON.stringify(configData));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
       console.error('Error fetching assessment data:', err);
@@ -50,10 +61,19 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         console.error('Failed to parse stored assessment data');
       }
     }
+
+    const storedConfig = localStorage.getItem('assessmentConfig');
+    if (storedConfig) {
+      try {
+        setAssessmentConfig(JSON.parse(storedConfig));
+      } catch (e) {
+        console.error('Failed to parse stored assessment config');
+      }
+    }
   }, []);
 
   return (
-    <AssessmentContext.Provider value={{ assessmentData, loading, error, fetchAssessmentData }}>
+    <AssessmentContext.Provider value={{ assessmentData, assessmentConfig, loading, error, fetchAssessmentData }}>
       {children}
     </AssessmentContext.Provider>
   );
