@@ -132,7 +132,38 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                         "/**/*.css",
                         "/**/*.js")
                 .permitAll()
-                .antMatchers("/auth/**", "/oauth2/**","/api/auth/**","/user/**")
+.antMatchers("/user/*/*","/user/*","/assessment-section-instructions/**", "/language-question/create-with-options",
+                        "/**/**/**", "/**/**/**/**","/dashboard/game-results/*",
+                        "/languages/**","/game-results/*",
+                        "/question-sections/**", "/language-supported/*", "/contact-person/**",
+                        "/assessment-questions/*/*", "/assessment-questions/*", "/assessments/*", "/api/**",
+                        "/api/**/**", "/api/**/**/**", "/api/assessment-questions/**",
+                        "/api/question-sections/**", "/api/assessment-questions/*/*", "/api/firebase/*/*",
+                        "/api/firebase/*", "/api/firebase/*", "/actuator/*", "/auth/**", "/oauth2/callback/google/*",
+                        "/oauth2/**", "/user/me", "role/*", "/gender/get", "/api/questionnaire/**",
+                        "/category/*", "/board/*",
+                        "/rolegroup/*", "/user/*", "/instituteDetail/**", "/role/*", "/instituteBranch/getbybranchid/*",
+                        "/instituteBatch/getbyid/*", "/instituteCourse/getbyCollegeId/*",
+                        "/instituteBranch/getbyCourseId/*", "/instituteSession/getbyBatchId/*",
+                        "/section/get", "tools/**", "/tools/**", "measured-qualities/**",
+                        "/measured-qualities/**", "measured-quality-types/**", "/measured-quality-types/**",
+                        "/question-sections/**", "/assesment-questions/**",
+                        "/question-sections/getbyid/*", "/assesment-questions/getbyid/*",
+                        "/question-sections/getbycollegeid/*",
+                        "/assesment-questions/getbycollegeid/*", "/question-sections/getbyinstituteid/*",
+                        "/assesment-questions/getbyinstituteid/*",
+                        "/question-sections/getbybatchid/*", "/assesment-questions/getbybatchid/*",
+                        "/question-sections/getbycourseid/*",
+                        "/section/update", "/generate_pdf", "/codingquestion/save", "/testcase/save",
+                        "/student/update", "/student/getbyid/*", "/student/get", "/student/save-csv", "/userrolegroupmapping/update",
+                        "/util/**", "/util/file-get/getbyname/**", "/util/file-delete/deletebyname/**",
+                        "/google-api/**", "/util/file-delete/delete/**", "/codingquestion/*", "/instituteBatch/*",
+                        "/instituteBranch/*", "/instituteCourse/*", "/instituteDetail/getbyid/*", "/student/putmarks",
+                        "/student/emailChecker", "/email-validation-official",
+                        "/email-validation-official-confermation", "/getmarks/*", "/getmarks", "/coding/*",
+                        "/career/edit/*",
+                        "/google-api/email/get/*", "student/get-check", "instituteBranchBatchMapping/*", "/getmarks",
+                        "/getmarksArray")                
                 .permitAll()
                 .anyRequest()
                 .authenticated()

@@ -31,7 +31,7 @@ spring:
     host: smtp.gmail.com
     port: 587
     username: ${SMTP_USERNAME:notifications@career-9.net}
-    password: ${SMTP_PASSWORD:}
+    password: ${SMTP_PASSWORD:ntck wmgi benh lhql}
     properties:
       mail:
         smtp:
@@ -39,9 +39,9 @@ spring:
           starttls:
             enable: true
             required: true
-          connectiontimeout: 5000
-          timeout: 5000
-          writetimeout: 5000
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
   security:
     oauth2:
       client:
