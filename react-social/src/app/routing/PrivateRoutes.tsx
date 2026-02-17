@@ -63,6 +63,7 @@ import DemographicDetailsPage from "../pages/StudentLogin/DemographicDetailsPage
 import ThankYouPage from "../pages/StudentOnlineAssessment/components/ThankYouPage";
 import GeneralInstructionsPage from "../pages/StudentOnlineAssessment/components/GeneralInstructionsPage";
 import InstituteDashboard from "../pages/dashboard/InstituteDashboard";
+import ActivityLogPage from "../pages/ActivityLog/ActivityLogPage";
 import ReportsPage from "../pages/Reports/ReportsPage";
 import StudentDashboard from "../pages/StudentDashboard/StudentDashboard";
 import ClassTeacherDashboard from "../pages/ClassTeacherDashboard/ClassTeacherDashboard";
@@ -853,6 +854,14 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <ReportsPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/activity-log"
+          element={
+            <SuspensedView>
+              <ActivityLogPage />
             </SuspensedView>
           }
         />

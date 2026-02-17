@@ -10,7 +10,7 @@ import GameTable from "./components/GameTable";
 
 const GamePage = () => {
   const [modalShowCreate, setModalShowCreate] = useState(false);
-  const [GameData, setGameData] = useState([]);
+  const [GameData, setGameData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(["false"]);
   const location = useLocation();

@@ -1,7 +1,7 @@
 import React from "react";
-import { HydroTubeGame } from "../../games/Hydro-Tube/HydroTubeGame";
-import { JungleSpotGame } from "../../games/Jungle-Spot/JungleSpotGame";
-import { RabbitPathGame } from "../../games/Rabbit-Path/RabbitPathGame";
+import { HydroTubeGame } from "../../Games/Hydro-Tube/HydroTubeGame";
+import { JungleSpotGame } from "../../Games/Jungle-Spot/JungleSpotGame";
+import { RabbitPathGame } from "../../Games/Rabbit-Path/RabbitPathGame";
 
 interface GameRendererProps {
   gameCode: number;

@@ -19,8 +19,8 @@
   },
   "include": ["src"],
   "exclude": [
-    "src/app/pages/games/*/page.tsx",
-    "src/app/pages/games/*/grade-*",
-    "src/app/pages/games/Rabbit-Path/Components/RabbitRiverGame.tsx"
+    "src/app/pages/Games/*/page.tsx",
+    "src/app/pages/Games/*/grade-*",
+    "src/app/pages/Games/Rabbit-Path/Components/RabbitRiverGame.tsx"
   ]
 }
