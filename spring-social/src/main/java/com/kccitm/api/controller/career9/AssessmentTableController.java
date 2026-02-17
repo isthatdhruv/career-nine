@@ -206,6 +206,11 @@ public class AssessmentTableController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/get/list-summary")
+    public List<AssessmentTableRepository.AssessmentSummary> getAssessmentSummaryList() {
+        return assessmentTableRepository.findAssessmentSummaryList();
+    }
+
     @GetMapping("/get/list-ids")
     public HashMap<Long, String> getAllAssessmentIds() {
         HashMap<Long, String> assessmentIdandName = new HashMap<>();

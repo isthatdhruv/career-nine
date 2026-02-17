@@ -14,6 +14,7 @@ import CollegeEditModal from "./CollegeEditModal";
 import CollegeInfoModal from "./CollegeInfoModal";
 import CollegeAssignRoleModal from "../components/CollegeAssignRoleModal";
 import CollegeDetailModal from "./CollegeSectionSessionGradeModal";
+import AssessmentMappingModal from "./AssessmentMappingModal";
 
 // Layout reference image (local path)
 const layoutImagePath = "/mnt/data/556d6c4d-1033-4fd7-8d4f-f02d4f436ce2.png";
@@ -75,6 +76,13 @@ const CollegeTable = (props: {
   const [infoRolesModalData, setInfoRolesModalData] = useState<ModalData | undefined>(
     undefined
   );
+
+  const [assessmentMappingModalShow, setAssessmentMappingModalShow] = useState(false);
+  const [assessmentMappingInstitute, setAssessmentMappingInstitute] = useState<{
+    code: number;
+    name: string;
+  }>({ code: 0, name: "" });
+
   const navigate = useNavigate();
   // convert a table row into the modal-compatible partial form shape
   const toModalData = (row: CollegeRow): ModalData => {
@@ -244,6 +252,20 @@ const CollegeTable = (props: {
                   <AiOutlineInfoCircle size={18} className="me-2" />
                   Assign Roles
                 </Dropdown.Item>
+
+                {/* Assessment Mapping */}
+                <Dropdown.Item
+                  onClick={() => {
+                    setAssessmentMappingInstitute({
+                      code: Number(data.instituteCode),
+                      name: data.instituteName || "",
+                    });
+                    setAssessmentMappingModalShow(true);
+                  }}
+                >
+                  <MdSchool size={18} className="me-2" />
+                  Assessment Mapping
+                </Dropdown.Item>
               </Dropdown.Menu>
             </Dropdown>
 
@@ -369,6 +391,14 @@ const CollegeTable = (props: {
         onHide={() => setInfoRolesModalShow(false)}
         data={infoRolesModalData}
         setPageLoading={props.setPageLoading}
+      />
+
+      {/* Assessment Mapping */}
+      <AssessmentMappingModal
+        show={assessmentMappingModalShow}
+        onHide={() => setAssessmentMappingModalShow(false)}
+        instituteCode={assessmentMappingInstitute.code}
+        instituteName={assessmentMappingInstitute.name}
       />
     </>
   );

@@ -33,6 +33,10 @@ import SelectSectionPage from "../pages/StudentOnlineAssessment/components/Selec
 import PrincipalDashboard from "../pages/PrincipalDashboard/PrincipalDashboard";
 import { MasterLayout } from "../../_metronic/layout/MasterLayout";
 
+const AssessmentRegisterPage = lazy(
+  () => import("../pages/AssessmentRegister/AssessmentRegisterPage")
+);
+
 const StudentRegistrationForm = lazy(
   () => import("../pages/StudentRegistration/StudentRegistrationForm")
 );
@@ -131,6 +135,14 @@ const AppRoutes: FC = () => {
               element={
                 <SuspensedView>
                   <StudentLoginPage />
+                </SuspensedView>
+              }
+            />
+      <Route
+              path="/assessment-register/:token"
+              element={
+                <SuspensedView>
+                  <AssessmentRegisterPage />
                 </SuspensedView>
               }
             />
