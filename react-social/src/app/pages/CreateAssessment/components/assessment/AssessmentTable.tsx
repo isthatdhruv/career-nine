@@ -3,7 +3,7 @@ import { AiFillEdit } from "react-icons/ai";
 import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
-import { DeleteAssessmentData } from "../../API/Create_Assessment_APIs";
+import { DeactivateAssessment } from "../../API/Create_Assessment_APIs";
 
 const AssessmentTable = (props: {
   data: any;
@@ -56,14 +56,15 @@ const AssessmentTable = (props: {
             <AiFillEdit size={16} />
           </button>
           <button
-            onClick={async () => { 
+            onClick={async () => {
+              if (!window.confirm(`Are you sure you want to deactivate "${data.AssessmentName || data.assessmentName}"?`)) return;
               props.setLoading(true);
               try {
-                await DeleteAssessmentData(data.id || data.toolId);
+                await DeactivateAssessment(data.id || data.assessmentId, data);
                 props.setPageLoading(["true"]);
               } catch (error) {
-                console.error("Delete failed:", error);
-                alert("Failed to delete assessment. Please try again.");
+                console.error("Deactivate failed:", error);
+                alert("Failed to deactivate assessment. Please try again.");
               } finally {
                 props.setLoading(false);
               }

@@ -46,8 +46,9 @@ export default function StudentsList() {
     setAssessmentsLoading(true);
     getAllAssessments()
       .then(response => {
-        setAssessments(response.data);
-        console.log("Loaded assessments:", response.data); // Debug log
+        const activeOnly = (response.data || []).filter((a: any) => a.isActive !== false);
+        setAssessments(activeOnly);
+        console.log("Loaded assessments:", activeOnly); // Debug log
       })
       .catch(error => {
         console.error("Error fetching assessments:", error);

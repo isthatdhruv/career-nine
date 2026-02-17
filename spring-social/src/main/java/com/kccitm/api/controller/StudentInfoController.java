@@ -75,40 +75,123 @@ public class StudentInfoController {
     }
 
     @GetMapping("/getStudentAnswersWithDetails")
-    public ExcelOptionData getStudentAnswersWithDetails(
+    public List<Map<String, Object>> getStudentAnswersWithDetails(
             @RequestParam Long userStudentId,
             @RequestParam Long assessmentId) {
 
         var assessmentAnswers = assessmentAnswerRepository.findByUserStudentIdAndAssessmentIdWithDetails(userStudentId,
                 assessmentId);
 
-        // Transform AssessmentAnswer entities to QuestionOptionID DTOs
-        ArrayList<QuestionOptionID> questionOptionList = assessmentAnswers.stream()
+        return assessmentAnswers.stream()
                 .map(aa -> {
-                    // Create measured quality list from option scores
-                    ArrayList<MeasuredQualityList> measuredList = new ArrayList<>();
-                    if (aa.getOption() != null && aa.getOption().getOptionScores() != null) {
-                        measuredList = aa.getOption().getOptionScores().stream()
-                                .map(os -> new MeasuredQualityList(
-                                        os.getMeasuredQualityType().getMeasuredQualityTypeName(),
-                                        os.getScore(),
-                                        os.getMeasuredQualityType().getMeasuredQuality() != null
-                                                ? os.getMeasuredQualityType().getMeasuredQuality()
-                                                        .getMeasuredQualityName()
-                                                : null))
-                                .collect(Collectors.toCollection(ArrayList::new));
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("questionId", aa.getQuestionnaireQuestion() != null
+                            ? aa.getQuestionnaireQuestion().getQuestionnaireQuestionId() : null);
+
+                    // Question text
+                    String questionText = "";
+                    if (aa.getQuestionnaireQuestion() != null && aa.getQuestionnaireQuestion().getQuestion() != null) {
+                        questionText = aa.getQuestionnaireQuestion().getQuestion().getQuestionText();
                     }
+                    row.put("questionText", questionText);
 
-                    return new QuestionOptionID(
-                            aa.getQuestionnaireQuestion().getQuestionnaireQuestionId(),
-                            aa.getOption().getOptionId(),
-                            measuredList);
+                    // Option ID and text
+                    row.put("optionId", aa.getOption() != null ? aa.getOption().getOptionId() : null);
+                    row.put("optionText", aa.getOption() != null ? aa.getOption().getOptionText() : "");
+
+                    // Section name (QuestionnaireQuestion -> section -> section -> sectionName)
+                    String sectionName = "";
+                    try {
+                        if (aa.getQuestionnaireQuestion() != null
+                                && aa.getQuestionnaireQuestion().getSection() != null
+                                && aa.getQuestionnaireQuestion().getSection().getSection() != null) {
+                            sectionName = aa.getQuestionnaireQuestion().getSection().getSection().getSectionName();
+                        }
+                    } catch (Exception e) {
+                        sectionName = "";
+                    }
+                    row.put("sectionName", sectionName != null ? sectionName : "");
+
+                    // Excel question header
+                    String excelHeader = "";
+                    if (aa.getQuestionnaireQuestion() != null) {
+                        excelHeader = aa.getQuestionnaireQuestion().getExcelQuestionHeader();
+                    }
+                    row.put("excelQuestionHeader", excelHeader != null ? excelHeader : "");
+
+                    return row;
                 })
-                .collect(Collectors.toCollection(ArrayList::new));
+                .collect(Collectors.toList());
+    }
 
-        return new ExcelOptionData(
-                userStudentRepository.getNameByUserID(userStudentId),
-                questionOptionList);
+    @PostMapping("/getBulkStudentAnswersWithDetails")
+    public List<Map<String, Object>> getBulkStudentAnswersWithDetails(
+            @RequestBody List<Map<String, Long>> studentAssessmentPairs) {
+
+        List<Map<String, Object>> allRows = new ArrayList<>();
+
+        for (Map<String, Long> pair : studentAssessmentPairs) {
+            Long userStudentId = pair.get("userStudentId");
+            Long assessmentId = pair.get("assessmentId");
+            if (userStudentId == null || assessmentId == null) continue;
+
+            String studentName = userStudentRepository.getNameByUserID(userStudentId);
+
+            // Get assessment name
+            String assessmentName = "";
+            try {
+                var assessmentOpt = assessmentTableRepository.findById(assessmentId);
+                if (assessmentOpt.isPresent()) {
+                    assessmentName = assessmentOpt.get().getAssessmentName();
+                }
+            } catch (Exception e) {
+                assessmentName = "";
+            }
+
+            var assessmentAnswers = assessmentAnswerRepository
+                    .findByUserStudentIdAndAssessmentIdWithDetails(userStudentId, assessmentId);
+
+            for (var aa : assessmentAnswers) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("studentName", studentName != null ? studentName : "");
+                row.put("userStudentId", userStudentId);
+                row.put("assessmentName", assessmentName);
+
+                row.put("questionId", aa.getQuestionnaireQuestion() != null
+                        ? aa.getQuestionnaireQuestion().getQuestionnaireQuestionId() : null);
+
+                String questionText = "";
+                if (aa.getQuestionnaireQuestion() != null && aa.getQuestionnaireQuestion().getQuestion() != null) {
+                    questionText = aa.getQuestionnaireQuestion().getQuestion().getQuestionText();
+                }
+                row.put("questionText", questionText);
+
+                row.put("optionId", aa.getOption() != null ? aa.getOption().getOptionId() : null);
+                row.put("optionText", aa.getOption() != null ? aa.getOption().getOptionText() : "");
+
+                String sectionName = "";
+                try {
+                    if (aa.getQuestionnaireQuestion() != null
+                            && aa.getQuestionnaireQuestion().getSection() != null
+                            && aa.getQuestionnaireQuestion().getSection().getSection() != null) {
+                        sectionName = aa.getQuestionnaireQuestion().getSection().getSection().getSectionName();
+                    }
+                } catch (Exception e) {
+                    sectionName = "";
+                }
+                row.put("sectionName", sectionName != null ? sectionName : "");
+
+                String excelHeader = "";
+                if (aa.getQuestionnaireQuestion() != null) {
+                    excelHeader = aa.getQuestionnaireQuestion().getExcelQuestionHeader();
+                }
+                row.put("excelQuestionHeader", excelHeader != null ? excelHeader : "");
+
+                allRows.add(row);
+            }
+        }
+
+        return allRows;
     }
 
     @PostMapping("/add")
@@ -132,14 +215,12 @@ public class StudentInfoController {
             System.out.println("[DEBUG addStudentInfo] Creating mapping: userStudentId="
                 + userStudentSAVED.getUserStudentId() + ", assessmentId=" + assessmentId);
 
-            StudentAssessmentMapping studentAssessmentMapping = studentAssessmentMappingRepository.save(
-                    new StudentAssessmentMapping(userStudentSAVED.getUserStudentId(), assessmentId));
-
-            // Verify: count all mappings for this userStudent
-            long mappingCount = studentAssessmentMappingRepository
-                    .findByUserStudentUserStudentId(userStudentSAVED.getUserStudentId()).size();
-            System.out.println("[DEBUG addStudentInfo] Total mappings for userStudentId="
-                + userStudentSAVED.getUserStudentId() + ": " + mappingCount);
+            // Check if mapping already exists before creating (prevent duplicates)
+            StudentAssessmentMapping studentAssessmentMapping = studentAssessmentMappingRepository
+                    .findFirstByUserStudentUserStudentIdAndAssessmentId(
+                            userStudentSAVED.getUserStudentId(), assessmentId)
+                    .orElseGet(() -> studentAssessmentMappingRepository.save(
+                            new StudentAssessmentMapping(userStudentSAVED.getUserStudentId(), assessmentId)));
 
             return studentAssessmentMapping;
         } catch (Exception e) {
@@ -213,6 +294,7 @@ public class StudentInfoController {
                 studentData.put("email", si.getEmail());
                 studentData.put("instituteId", si.getInstituteId());
                 studentData.put("studentDob", si.getStudentDob());
+                studentData.put("schoolSectionId", si.getSchoolSectionId());
                 studentData.put("username", si.getUser().getUsername());
 
                 // Find UserStudent for this StudentInfo to get userStudentId
@@ -226,16 +308,23 @@ public class StudentInfoController {
                         List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
                                 .findByUserStudentUserStudentId(us.getUserStudentId());
 
-                        // Return all assigned assessment IDs
-                        List<Long> assignedAssessmentIds = new java.util.ArrayList<>();
+                        // Deduplicate mappings by assessmentId (keep the first occurrence)
+                        java.util.Map<Long, StudentAssessmentMapping> uniqueMappings = new java.util.LinkedHashMap<>();
                         for (StudentAssessmentMapping mapping : mappings) {
+                            uniqueMappings.putIfAbsent(mapping.getAssessmentId(), mapping);
+                        }
+                        List<StudentAssessmentMapping> deduplicatedMappings = new java.util.ArrayList<>(uniqueMappings.values());
+
+                        // Return all assigned assessment IDs (deduplicated)
+                        List<Long> assignedAssessmentIds = new java.util.ArrayList<>();
+                        for (StudentAssessmentMapping mapping : deduplicatedMappings) {
                             assignedAssessmentIds.add(mapping.getAssessmentId());
                         }
                         studentData.put("assignedAssessmentIds", assignedAssessmentIds);
 
-                        // Return full assessment details (id, name, status)
+                        // Return full assessment details (id, name, status) - deduplicated
                         List<java.util.Map<String, Object>> assessmentDetails = new java.util.ArrayList<>();
-                        for (StudentAssessmentMapping mapping : mappings) {
+                        for (StudentAssessmentMapping mapping : deduplicatedMappings) {
                             java.util.Map<String, Object> detail = new java.util.HashMap<>();
                             detail.put("assessmentId", mapping.getAssessmentId());
                             detail.put("status", mapping.getStatus());

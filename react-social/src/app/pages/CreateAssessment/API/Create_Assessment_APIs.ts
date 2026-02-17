@@ -37,3 +37,12 @@ export function UpdateAssessmentData(id: any, values: any) {
 export function DeleteAssessmentData(id: any) {
   return axios.delete(deleteAssessment + id);
 }
+
+// Soft-delete: sets isActive to false instead of removing from DB
+export function DeactivateAssessment(id: any, currentData: any) {
+  return axios.put(`${updateAssessment}/${id}`, {
+    ...currentData,
+    id,
+    isActive: false,
+  });
+}

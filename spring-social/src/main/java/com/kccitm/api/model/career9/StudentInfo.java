@@ -51,6 +51,9 @@ public class StudentInfo implements Serializable {
     @Column(name = "institute_id")
     private Integer instituteId;
 
+    @Column(name = "school_section_id")
+    private Integer schoolSectionId;
+
     @Transient
     private String assesment_id;
 
@@ -184,6 +187,14 @@ public class StudentInfo implements Serializable {
 
     public void setStudentClass(Integer studentClass) {
         this.studentClass = studentClass;
+    }
+
+    public Integer getSchoolSectionId() {
+        return schoolSectionId;
+    }
+
+    public void setSchoolSectionId(Integer schoolSectionId) {
+        this.schoolSectionId = schoolSectionId;
     }
 
 }

@@ -101,3 +101,14 @@ export function UpdateSectionData(id: number, values: any) {
 export function DeleteSectionData(id: number) {
   return axios.delete(deleteSectionEndpoint + id);
 }
+
+// ============ RESOLVE OR CREATE ============
+
+export function ResolveOrCreateSection(payload: {
+  instituteCode: number;
+  sessionYear: string;
+  className: string;
+  sectionName: string;
+}) {
+  return axios.post(`${API_URL}/schoolSession/resolve-or-create`, payload);
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Assessment, resetAssessment } from "./StudentInfo_APIs";
+import { getAllAssessments, resetAssessment } from "./StudentInfo_APIs";
 import axios from "axios";
 
 type StudentAssessmentInfo = {
@@ -37,10 +37,29 @@ export default function ResetAssessmentModal({
   const fetchAssessments = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(
-        `${process.env.REACT_APP_API_URL}/assessments/student/${userStudentId}`
+      const [studentRes, allRes] = await Promise.all([
+        axios.get(
+          `${process.env.REACT_APP_API_URL}/assessments/student/${userStudentId}`
+        ),
+        getAllAssessments(),
+      ]);
+      const activeIds = new Set(
+        (allRes.data || [])
+          .filter((a) => a.isActive !== false)
+          .map((a) => a.id)
       );
-      setStudentAssessments(response.data || []);
+      const activeOnly = (studentRes.data || []).filter(
+        (a: StudentAssessmentInfo) => activeIds.has(Number(a.assessmentId))
+      );
+      // Deduplicate by assessmentId
+      const seen = new Set<number>();
+      const deduplicated = activeOnly.filter((a) => {
+        const id = Number(a.assessmentId);
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+      setStudentAssessments(deduplicated);
     } catch (error) {
       console.error("Error fetching student assessments:", error);
       setStudentAssessments([]);

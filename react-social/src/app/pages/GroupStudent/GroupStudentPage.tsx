@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { ReadCollegeData } from "../College/API/College_APIs";
+import { ReadCollegeData, GetSessionsByInstituteCode } from "../College/API/College_APIs";
 import {
   getStudentsWithMappingByInstituteId,
   getAllAssessments,
   bulkAlotAssessment,
   Assessment,
   getStudentAnswersWithDetails,
+  getBulkStudentAnswersWithDetails,
   StudentAnswerDetail,
   resetAssessment,
 } from "../StudentInformation/StudentInfo_APIs";
@@ -23,6 +24,7 @@ type Student = {
   phoneNumber?: string;
   studentDob?: string;
   username?: string;
+  schoolSectionId?: number;
   assessments?: StudentAssessmentInfo[];
   assignedAssessmentIds: number[];
 };
@@ -63,6 +65,37 @@ export default function GroupStudentPage() {
   const [downloadError, setDownloadError] = useState<string>("");
   const [downloading, setDownloading] = useState(false);
   const [showStudentUsernameDownload, setShowStudentUsernameDownload] = useState(false);
+
+  // Bulk download all answers state
+  const [showBulkDownloadModal, setShowBulkDownloadModal] = useState(false);
+  const [bulkDownloadLoading, setBulkDownloadLoading] = useState(false);
+  const [bulkDownloadAnswers, setBulkDownloadAnswers] = useState<any[]>([]);
+  const [bulkDownloadError, setBulkDownloadError] = useState<string>("");
+  const [bulkDownloading, setBulkDownloading] = useState(false);
+
+  // Filter panel state
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [hierarchyData, setHierarchyData] = useState<any[]>([]);
+
+  // Pending filter selections (inside the panel, before "Apply")
+  const [pendingAssessmentIds, setPendingAssessmentIds] = useState<Set<number>>(new Set());
+  const [pendingSessions, setPendingSessions] = useState<Set<string>>(new Set());
+  const [pendingGrades, setPendingGrades] = useState<Set<string>>(new Set());
+  const [pendingSections, setPendingSections] = useState<Set<string>>(new Set());
+  const [pendingStatuses, setPendingStatuses] = useState<Set<string>>(new Set());
+  const [pendingEnabled, setPendingEnabled] = useState<Set<string>>(new Set());
+
+  // Applied filter selections (what actually filters the data)
+  const [appliedAssessmentIds, setAppliedAssessmentIds] = useState<Set<number>>(new Set());
+  const [appliedSessions, setAppliedSessions] = useState<Set<string>>(new Set());
+  const [appliedGrades, setAppliedGrades] = useState<Set<string>>(new Set());
+  const [appliedSections, setAppliedSections] = useState<Set<string>>(new Set());
+  const [appliedStatuses, setAppliedStatuses] = useState<Set<string>>(new Set());
+  const [appliedEnabled, setAppliedEnabled] = useState<Set<string>>(new Set());
+
+  // Which category is selected on the left to show its options on the right
+  const [activeFilterCategory, setActiveFilterCategory] = useState<string>("assessment");
+
   // Reset modal state
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetStudent, setResetStudent] = useState<Student | null>(null);
@@ -128,6 +161,110 @@ export default function GroupStudentPage() {
       .filter((item) => item.questionText || item.optionText || item.sectionName || item.excelQuestionHeader);
   };
 
+  // All available sessions / grades / sections from hierarchy
+  const allSessions = useMemo(() => hierarchyData, [hierarchyData]);
+
+  const allGrades = useMemo(() => {
+    const grades: { id: number; className: string; sessionYear: string }[] = [];
+    const seen = new Set<string>();
+    for (const session of hierarchyData) {
+      for (const cls of session.schoolClasses || []) {
+        if (!seen.has(cls.className)) {
+          seen.add(cls.className);
+          grades.push({ id: cls.id, className: cls.className, sessionYear: session.sessionYear });
+        }
+      }
+    }
+    return grades;
+  }, [hierarchyData]);
+
+  const allSectionsFlat = useMemo(() => {
+    const sections: { id: number; sectionName: string; className: string }[] = [];
+    const seen = new Set<string>();
+    for (const session of hierarchyData) {
+      for (const cls of session.schoolClasses || []) {
+        for (const sec of cls.schoolSections || []) {
+          if (!seen.has(sec.sectionName)) {
+            seen.add(sec.sectionName);
+            sections.push({ id: sec.id, sectionName: sec.sectionName, className: cls.className });
+          }
+        }
+      }
+    }
+    return sections;
+  }, [hierarchyData]);
+
+  // Collect all section IDs that match applied hierarchy filters
+  const filteredSectionIds = useMemo(() => {
+    const hasSession = appliedEnabled.has("session") && appliedSessions.size > 0;
+    const hasGrade = appliedEnabled.has("grade") && appliedGrades.size > 0;
+    const hasSection = appliedEnabled.has("section") && appliedSections.size > 0;
+    if (!hasSession && !hasGrade && !hasSection) return null; // no hierarchy filter
+
+    let sessions = hierarchyData;
+    if (hasSession) {
+      sessions = sessions.filter((s: any) => appliedSessions.has(s.sessionYear));
+    }
+
+    let classes = sessions.flatMap((s: any) => s.schoolClasses || []);
+    if (hasGrade) {
+      classes = classes.filter((c: any) => appliedGrades.has(c.className));
+    }
+
+    const sectionIds = new Set<number>();
+    for (const cls of classes) {
+      let secs = cls.schoolSections || [];
+      if (hasSection) {
+        secs = secs.filter((s: any) => appliedSections.has(s.sectionName));
+      }
+      for (const sec of secs) {
+        sectionIds.add(sec.id);
+      }
+    }
+    return sectionIds;
+  }, [hierarchyData, appliedEnabled, appliedSessions, appliedGrades, appliedSections]);
+
+  // Whether assessment filter is active
+  const hasAssessmentFilter = appliedEnabled.has("assessment") && appliedAssessmentIds.size > 0;
+  // Whether status filter is active
+  const hasStatusFilter = appliedEnabled.has("status") && appliedStatuses.size > 0;
+
+  // Status filter options
+  const statusOptions = [
+    { key: "completed", label: "Completed" },
+    { key: "ongoing", label: "In Progress" },
+    { key: "notstarted", label: "Not Started" },
+  ];
+
+  // Build a short label describing what filters are active
+  const activeFilterLabel = useMemo(() => {
+    const parts: string[] = [];
+    if (hasAssessmentFilter) {
+      const names = assessments
+        .filter(a => appliedAssessmentIds.has(a.id))
+        .map(a => a.assessmentName);
+      parts.push(names.length === 1 ? names[0] : `${names.length} assessments`);
+    }
+    if (appliedEnabled.has("session") && appliedSessions.size > 0) {
+      parts.push(appliedSessions.size === 1 ? Array.from(appliedSessions)[0] : `${appliedSessions.size} sessions`);
+    }
+    if (appliedEnabled.has("grade") && appliedGrades.size > 0) {
+      parts.push(appliedGrades.size === 1 ? Array.from(appliedGrades)[0] : `${appliedGrades.size} grades`);
+    }
+    if (appliedEnabled.has("section") && appliedSections.size > 0) {
+      parts.push(appliedSections.size === 1 ? Array.from(appliedSections)[0] : `${appliedSections.size} sections`);
+    }
+    if (hasStatusFilter) {
+      const labels = statusOptions
+        .filter(so => appliedStatuses.has(so.key))
+        .map(so => so.label);
+      parts.push(labels.length === 1 ? labels[0] : `${labels.length} statuses`);
+    }
+    return parts.join(', ');
+  }, [hasAssessmentFilter, appliedAssessmentIds, appliedEnabled, appliedSessions, appliedGrades, appliedSections, hasStatusFilter, appliedStatuses, assessments]);
+
+  const isFiltered = activeFilterLabel.length > 0;
+
   const handleAssessmentChange = (studentId: number, assessmentId: string) => {
     setStudents((prev) =>
       prev.map((s) =>
@@ -187,6 +324,7 @@ export default function GroupStudentPage() {
             userStudentId: student.userStudentId,
             assessmentName: assessment?.assessmentName || "",
             username: student.username || "",
+            schoolSectionId: student.schoolSectionId ?? undefined,
             assessments: student.assessments || [],
             assignedAssessmentIds: assignedIds,
           };
@@ -240,10 +378,10 @@ export default function GroupStudentPage() {
       // Prepare data for Excel
       const excelData = downloadAnswers.map((answer, index) => ({
         "S.No": index + 1,
-        Section: answer.sectionName || "",
+        "Section Name": answer.sectionName || "",
         "Excel Header": answer.excelQuestionHeader || "",
-        Question: answer.questionText,
-        "Selected Answer": answer.optionText,
+        "Question Text": answer.questionText,
+        "Opted Option Text": answer.optionText,
       }));
 
       // Create worksheet
@@ -251,11 +389,11 @@ export default function GroupStudentPage() {
 
       // Set column widths
       worksheet["!cols"] = [
-        { wch: 8 }, // S.No
-        { wch: 25 }, // Section
+        { wch: 8 },  // S.No
+        { wch: 25 }, // Section Name
         { wch: 30 }, // Excel Header
-        { wch: 60 }, // Question
-        { wch: 30 }, // Selected Answer
+        { wch: 60 }, // Question Text
+        { wch: 35 }, // Opted Option Text
       ];
 
       // Create workbook
@@ -324,6 +462,7 @@ export default function GroupStudentPage() {
             userStudentId: student.userStudentId,
             assessmentName: assessment?.assessmentName || "",
             username: student.username || "",
+            schoolSectionId: student.schoolSectionId ?? undefined,
             assessments: student.assessments || [],
             assignedAssessmentIds: assignedIds,
           };
@@ -362,15 +501,41 @@ export default function GroupStudentPage() {
       })
       .catch((err: any) => console.error("Failed to fetch institutes", err));
 
-    // Fetch assessments
+    // Fetch assessments (only active ones)
     getAllAssessments()
       .then((response) => {
-        setAssessments(response.data);
+        const activeOnly = (response.data || []).filter((a: any) => a.isActive !== false);
+        setAssessments(activeOnly);
       })
       .catch((error) => {
         console.error("Error fetching assessments:", error);
       });
   }, []);
+
+  // Fetch hierarchy data when institute changes
+  useEffect(() => {
+    if (selectedInstitute) {
+      GetSessionsByInstituteCode(selectedInstitute).then((res: any) => {
+        setHierarchyData(res.data || []);
+      }).catch(() => setHierarchyData([]));
+    } else {
+      setHierarchyData([]);
+    }
+    // Reset all filters when institute changes
+    setAppliedEnabled(new Set());
+    setAppliedAssessmentIds(new Set());
+    setAppliedSessions(new Set());
+    setAppliedGrades(new Set());
+    setAppliedSections(new Set());
+    setAppliedStatuses(new Set());
+    setPendingEnabled(new Set());
+    setPendingAssessmentIds(new Set());
+    setPendingSessions(new Set());
+    setPendingGrades(new Set());
+    setPendingSections(new Set());
+    setPendingStatuses(new Set());
+    setShowFilterPanel(false);
+  }, [selectedInstitute]);
 
   useEffect(() => {
     if (selectedInstitute) {
@@ -398,6 +563,7 @@ export default function GroupStudentPage() {
               userStudentId: student.userStudentId,
               assessmentName: assessment?.assessmentName || "",
               username: student.username || "",
+              schoolSectionId: student.schoolSectionId ?? undefined,
               assessments: student.assessments || [],
               assignedAssessmentIds: assignedIds,
             };
@@ -412,13 +578,55 @@ export default function GroupStudentPage() {
     }
   }, [selectedInstitute, assessments]);
 
-  const filteredStudents = students.filter((s) => {
-    return (
-      s.name.toLowerCase().includes(query.toLowerCase()) ||
-      s.schoolRollNumber.toLowerCase().includes(query.toLowerCase()) ||
-      s.userStudentId.toString().includes(query)
-    );
-  });
+  // Set of active assessment IDs — used to hide deactivated assessments everywhere
+  const activeAssessmentIds = new Set(assessments.map((a) => a.id));
+
+  const filteredStudents = useMemo(() => {
+    return students.filter((s) => {
+      // Text search filter
+      const matchesQuery =
+        s.name.toLowerCase().includes(query.toLowerCase()) ||
+        s.schoolRollNumber.toLowerCase().includes(query.toLowerCase()) ||
+        s.userStudentId.toString().includes(query);
+
+      // Session/Grade/Section filter
+      const matchesSection =
+        filteredSectionIds === null ||
+        (s.schoolSectionId != null && filteredSectionIds.has(s.schoolSectionId));
+
+      // Assessment filter: student must have at least one of the selected assessments
+      let matchesAssessment = true;
+      if (hasAssessmentFilter) {
+        const activeStudentAssessments = (s.assessments || []).filter(
+          (a) => activeAssessmentIds.has(Number(a.assessmentId))
+        );
+        matchesAssessment = activeStudentAssessments.some(
+          (a) => appliedAssessmentIds.has(Number(a.assessmentId))
+        );
+      }
+
+      // Status filter: student must have at least one assessment matching the selected statuses
+      let matchesStatus = true;
+      if (hasStatusFilter) {
+        const activeStudentAssessments = (s.assessments || []).filter(
+          (a) => activeAssessmentIds.has(Number(a.assessmentId))
+        );
+        // If assessment filter is also active, only check statuses on those specific assessments
+        const relevantAssessments = hasAssessmentFilter
+          ? activeStudentAssessments.filter((a) => appliedAssessmentIds.has(Number(a.assessmentId)))
+          : activeStudentAssessments;
+
+        if (relevantAssessments.length === 0) {
+          // No assessments at all — matches "notstarted" only
+          matchesStatus = appliedStatuses.has("notstarted");
+        } else {
+          matchesStatus = relevantAssessments.some((a) => appliedStatuses.has(a.status));
+        }
+      }
+
+      return matchesQuery && matchesSection && matchesAssessment && matchesStatus;
+    });
+  }, [students, query, filteredSectionIds, hasAssessmentFilter, appliedAssessmentIds, hasStatusFilter, appliedStatuses, activeAssessmentIds]);
 
   const getSelectedInstituteName = () => {
     const institute = institutes.find(
@@ -479,6 +687,92 @@ export default function GroupStudentPage() {
     }
   };
 
+  const handleBulkDownloadClick = async () => {
+    setShowBulkDownloadModal(true);
+    setBulkDownloadLoading(true);
+    setBulkDownloadError("");
+    setBulkDownloadAnswers([]);
+
+    try {
+      // Build pairs: for each filtered student, include all their active assessments
+      const pairs: { userStudentId: number; assessmentId: number }[] = [];
+      for (const student of filteredStudents) {
+        const activeStudentAssessments = (student.assessments || []).filter(
+          (a) => activeAssessmentIds.has(Number(a.assessmentId))
+        );
+        // Deduplicate by assessmentId
+        const seen = new Set<number>();
+        for (const a of activeStudentAssessments) {
+          const id = Number(a.assessmentId);
+          if (!seen.has(id)) {
+            seen.add(id);
+            pairs.push({ userStudentId: student.userStudentId, assessmentId: id });
+          }
+        }
+      }
+
+      if (pairs.length === 0) {
+        setBulkDownloadAnswers([]);
+        setBulkDownloadLoading(false);
+        return;
+      }
+
+      const response = await getBulkStudentAnswersWithDetails(pairs);
+      setBulkDownloadAnswers(Array.isArray(response.data) ? response.data : []);
+    } catch (err: any) {
+      console.error("Error fetching bulk answers:", err);
+      setBulkDownloadError("Failed to load student answers. Please try again.");
+    } finally {
+      setBulkDownloadLoading(false);
+    }
+  };
+
+  const handleBulkDownloadExcel = () => {
+    if (bulkDownloadAnswers.length === 0) return;
+
+    setBulkDownloading(true);
+    try {
+      const excelData = bulkDownloadAnswers.map((row: any, index: number) => ({
+        "S.No": index + 1,
+        "Student Name": row.studentName || "",
+        "User ID": row.userStudentId || "",
+        "Assessment": row.assessmentName || "",
+        "Section Name": row.sectionName || "",
+        "Excel Header": row.excelQuestionHeader || "",
+        "Question Text": row.questionText || "",
+        "Opted Option Text": row.optionText || "",
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
+      worksheet["!cols"] = [
+        { wch: 8 },  // S.No
+        { wch: 25 }, // Student Name
+        { wch: 10 }, // User ID
+        { wch: 25 }, // Assessment
+        { wch: 20 }, // Section Name
+        { wch: 25 }, // Excel Header
+        { wch: 55 }, // Question Text
+        { wch: 30 }, // Opted Option Text
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "All Student Answers");
+
+      const instituteName = getSelectedInstituteName().replace(/\s+/g, "_");
+      const filename = `${instituteName}_All_Answers_${Date.now()}.xlsx`;
+      XLSX.writeFile(workbook, filename);
+
+      alert("Download successful!");
+      setShowBulkDownloadModal(false);
+      setBulkDownloadAnswers([]);
+    } catch (error) {
+      console.error("Error downloading:", error);
+      alert("Failed to download. Please try again.");
+    } finally {
+      setBulkDownloading(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     if (!dateString) return "";
 
@@ -519,8 +813,18 @@ export default function GroupStudentPage() {
   const handleViewAssessments = (student: Student) => {
     setModalStudent(student);
     setShowAssessmentModal(true);
-    // Use pre-loaded assessments from the student object
-    setStudentAssessments(student.assessments || []);
+    // Filter out deactivated assessments and deduplicate by assessmentId
+    const activeOnly = (student.assessments || []).filter(
+      (a) => activeAssessmentIds.has(Number(a.assessmentId))
+    );
+    const seen = new Set<number>();
+    const deduplicated = activeOnly.filter((a) => {
+      const id = Number(a.assessmentId);
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+    setStudentAssessments(deduplicated);
   };
 
   const getStatusBadge = (status: string) => {
@@ -650,6 +954,537 @@ export default function GroupStudentPage() {
             </div>
           </div>
 
+          {/* Filter Icon + Active Filter Tags */}
+          <div className="d-flex align-items-center gap-3 flex-wrap mb-4">
+            <button
+              className="btn btn-sm d-flex align-items-center gap-2"
+              onClick={() => {
+                if (!showFilterPanel) {
+                  // Sync pending state from applied state when opening
+                  setPendingEnabled(new Set(Array.from(appliedEnabled)));
+                  setPendingAssessmentIds(new Set(Array.from(appliedAssessmentIds)));
+                  setPendingSessions(new Set(Array.from(appliedSessions)));
+                  setPendingGrades(new Set(Array.from(appliedGrades)));
+                  setPendingSections(new Set(Array.from(appliedSections)));
+                  setPendingStatuses(new Set(Array.from(appliedStatuses)));
+                }
+                setShowFilterPanel(!showFilterPanel);
+              }}
+              style={{
+                background: showFilterPanel
+                  ? "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)"
+                  : "rgba(67, 97, 238, 0.1)",
+                color: showFilterPanel ? "#fff" : "#4361ee",
+                border: showFilterPanel ? "none" : "1px solid rgba(67, 97, 238, 0.3)",
+                borderRadius: "10px",
+                padding: "8px 16px",
+                fontWeight: 600,
+                fontSize: "0.9rem",
+              }}
+            >
+              <i className="bi bi-funnel-fill"></i>
+              Filters
+              {isFiltered && (
+                <span
+                  style={{
+                    background: showFilterPanel ? "rgba(255,255,255,0.3)" : "#f1416c",
+                    color: "#fff",
+                    borderRadius: "50%",
+                    width: "20px",
+                    height: "20px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "0.7rem",
+                    fontWeight: 700,
+                    marginLeft: "4px",
+                  }}
+                >
+                  {(hasAssessmentFilter ? 1 : 0)
+                    + (appliedEnabled.has("session") && appliedSessions.size > 0 ? 1 : 0)
+                    + (appliedEnabled.has("grade") && appliedGrades.size > 0 ? 1 : 0)
+                    + (appliedEnabled.has("section") && appliedSections.size > 0 ? 1 : 0)
+                    + (hasStatusFilter ? 1 : 0)}
+                </span>
+              )}
+            </button>
+            {isFiltered && (
+              <>
+                <div className="d-flex flex-wrap gap-2">
+                  {hasAssessmentFilter && assessments.filter(a => appliedAssessmentIds.has(a.id)).map(a => (
+                    <span key={a.id} style={{ background: "rgba(67, 97, 238, 0.1)", color: "#4361ee", padding: "4px 12px", borderRadius: "16px", fontSize: "0.8rem", fontWeight: 600 }}>
+                      {a.assessmentName}
+                    </span>
+                  ))}
+                  {appliedEnabled.has("session") && Array.from(appliedSessions).map(s => (
+                    <span key={s} style={{ background: "rgba(16, 185, 129, 0.1)", color: "#059669", padding: "4px 12px", borderRadius: "16px", fontSize: "0.8rem", fontWeight: 600 }}>
+                      {s}
+                    </span>
+                  ))}
+                  {appliedEnabled.has("grade") && Array.from(appliedGrades).map(g => (
+                    <span key={g} style={{ background: "rgba(245, 158, 11, 0.1)", color: "#d97706", padding: "4px 12px", borderRadius: "16px", fontSize: "0.8rem", fontWeight: 600 }}>
+                      {g}
+                    </span>
+                  ))}
+                  {appliedEnabled.has("section") && Array.from(appliedSections).map(s => (
+                    <span key={s} style={{ background: "rgba(139, 92, 246, 0.1)", color: "#7c3aed", padding: "4px 12px", borderRadius: "16px", fontSize: "0.8rem", fontWeight: 600 }}>
+                      {s}
+                    </span>
+                  ))}
+                  {hasStatusFilter && Array.from(appliedStatuses).map(st => (
+                    <span key={st} style={{
+                      background: st === "completed" ? "rgba(16, 185, 129, 0.1)" : st === "ongoing" ? "rgba(37, 99, 235, 0.1)" : "rgba(245, 158, 11, 0.1)",
+                      color: st === "completed" ? "#059669" : st === "ongoing" ? "#2563eb" : "#d97706",
+                      padding: "4px 12px", borderRadius: "16px", fontSize: "0.8rem", fontWeight: 600
+                    }}>
+                      {st === "notstarted" ? "Not Started" : st === "ongoing" ? "In Progress" : "Completed"}
+                    </span>
+                  ))}
+                </div>
+                <button
+                  className="btn btn-sm d-flex align-items-center gap-1"
+                  onClick={() => {
+                    setAppliedEnabled(new Set());
+                    setAppliedAssessmentIds(new Set());
+                    setAppliedSessions(new Set());
+                    setAppliedGrades(new Set());
+                    setAppliedSections(new Set());
+                    setAppliedStatuses(new Set());
+                    setPendingEnabled(new Set());
+                    setPendingAssessmentIds(new Set());
+                    setPendingSessions(new Set());
+                    setPendingGrades(new Set());
+                    setPendingSections(new Set());
+                    setPendingStatuses(new Set());
+                  }}
+                  style={{
+                    background: "rgba(241, 65, 108, 0.1)",
+                    color: "#f1416c",
+                    border: "1px solid rgba(241, 65, 108, 0.3)",
+                    borderRadius: "8px",
+                    padding: "6px 12px",
+                    fontWeight: 500,
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  <i className="bi bi-x-circle"></i>
+                  Clear All
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Filter Panel (toggleable) */}
+          {showFilterPanel && (
+            <div
+              className="card border-0 shadow-sm mb-4"
+              style={{ borderRadius: "16px", border: "2px solid rgba(67, 97, 238, 0.2)" }}
+            >
+              <div
+                style={{
+                  background: "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
+                  padding: "12px 20px",
+                  borderRadius: "16px 16px 0 0",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <span style={{ color: "#fff", fontWeight: 700, fontSize: "1rem" }}>
+                  <i className="bi bi-sliders me-2"></i>Select Filters
+                </span>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => setShowFilterPanel(false)}
+                  style={{ color: "#fff", background: "rgba(255,255,255,0.2)", border: "none", borderRadius: "8px", padding: "4px 10px" }}
+                >
+                  <i className="bi bi-x fs-5"></i>
+                </button>
+              </div>
+              <div style={{ display: "flex", minHeight: "300px" }}>
+                {/* Left panel — filter categories */}
+                <div style={{ width: "240px", borderRight: "1px solid #e0e0e0", background: "#fafbfc" }}>
+                  {[
+                    { key: "assessment", label: "Assessment", icon: "bi-clipboard-data" },
+                    { key: "session", label: "Session", icon: "bi-calendar3" },
+                    { key: "grade", label: "Grade / Class", icon: "bi-mortarboard" },
+                    { key: "section", label: "Section", icon: "bi-diagram-3" },
+                    { key: "status", label: "Assessment Status", icon: "bi-check2-circle" },
+                  ].map((cat) => (
+                    <div
+                      key={cat.key}
+                      onClick={() => setActiveFilterCategory(cat.key)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        padding: "14px 20px",
+                        cursor: "pointer",
+                        borderBottom: "1px solid #e0e0e0",
+                        background: activeFilterCategory === cat.key ? "rgba(67, 97, 238, 0.08)" : "transparent",
+                        borderLeft: activeFilterCategory === cat.key ? "3px solid #4361ee" : "3px solid transparent",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        className="custom-checkbox"
+                        style={{ width: "18px", height: "18px" }}
+                        checked={pendingEnabled.has(cat.key)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          const next = new Set(Array.from(pendingEnabled));
+                          if (next.has(cat.key)) {
+                            next.delete(cat.key);
+                          } else {
+                            next.add(cat.key);
+                          }
+                          setPendingEnabled(next);
+                          setActiveFilterCategory(cat.key);
+                        }}
+                      />
+                      <i className={`bi ${cat.icon}`} style={{ color: activeFilterCategory === cat.key ? "#4361ee" : "#666", fontSize: "1.1rem" }}></i>
+                      <span style={{ fontWeight: 600, color: activeFilterCategory === cat.key ? "#4361ee" : "#333", fontSize: "0.9rem" }}>
+                        {cat.label}
+                      </span>
+                      {pendingEnabled.has(cat.key) && (
+                        <span
+                          style={{
+                            marginLeft: "auto",
+                            background: "#4361ee",
+                            color: "#fff",
+                            borderRadius: "50%",
+                            width: "22px",
+                            height: "22px",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "0.75rem",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {cat.key === "assessment" ? pendingAssessmentIds.size
+                            : cat.key === "session" ? pendingSessions.size
+                            : cat.key === "grade" ? pendingGrades.size
+                            : cat.key === "section" ? pendingSections.size
+                            : pendingStatuses.size}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Right panel — options for selected category */}
+                <div style={{ flex: 1, padding: "20px" }}>
+                  {!pendingEnabled.has(activeFilterCategory) && (
+                    <div style={{ textAlign: "center", color: "#999", paddingTop: "60px" }}>
+                      <i className="bi bi-check2-square" style={{ fontSize: "2rem", color: "#ccc", display: "block", marginBottom: "12px" }}></i>
+                      Tick the checkbox on the left to enable <strong>{activeFilterCategory}</strong> filter
+                    </div>
+                  )}
+
+                  {/* Assessment options */}
+                  {activeFilterCategory === "assessment" && pendingEnabled.has("assessment") && (
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                        <span style={{ fontWeight: 700, color: "#1a1a2e" }}>Select Assessments</span>
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => {
+                            if (pendingAssessmentIds.size === assessments.length) {
+                              setPendingAssessmentIds(new Set());
+                            } else {
+                              setPendingAssessmentIds(new Set(assessments.map(a => a.id)));
+                            }
+                          }}
+                          style={{ background: "rgba(67, 97, 238, 0.1)", color: "#4361ee", border: "none", borderRadius: "8px", padding: "4px 12px", fontWeight: 600, fontSize: "0.8rem" }}
+                        >
+                          {pendingAssessmentIds.size === assessments.length ? 'Deselect All' : 'Select All'}
+                        </button>
+                      </div>
+                      <div style={{ maxHeight: "220px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "4px" }}>
+                        {assessments.map((a) => (
+                          <label key={a.id} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "8px 12px", borderRadius: "8px", cursor: "pointer", background: pendingAssessmentIds.has(a.id) ? "rgba(67, 97, 238, 0.05)" : "transparent" }}>
+                            <input
+                              type="checkbox"
+                              className="custom-checkbox"
+                              style={{ width: "18px", height: "18px" }}
+                              checked={pendingAssessmentIds.has(a.id)}
+                              onChange={() => {
+                                const next = new Set(Array.from(pendingAssessmentIds));
+                                if (next.has(a.id)) next.delete(a.id); else next.add(a.id);
+                                setPendingAssessmentIds(next);
+                              }}
+                            />
+                            <span style={{ fontWeight: 500, color: "#333" }}>{a.assessmentName}</span>
+                          </label>
+                        ))}
+                        {assessments.length === 0 && (
+                          <div style={{ textAlign: "center", color: "#999", padding: "20px" }}>No assessments available</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Session options */}
+                  {activeFilterCategory === "session" && pendingEnabled.has("session") && (
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                        <span style={{ fontWeight: 700, color: "#1a1a2e" }}>Select Sessions</span>
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => {
+                            if (pendingSessions.size === allSessions.length) {
+                              setPendingSessions(new Set());
+                            } else {
+                              setPendingSessions(new Set(allSessions.map((s: any) => s.sessionYear)));
+                            }
+                          }}
+                          style={{ background: "rgba(67, 97, 238, 0.1)", color: "#4361ee", border: "none", borderRadius: "8px", padding: "4px 12px", fontWeight: 600, fontSize: "0.8rem" }}
+                        >
+                          {pendingSessions.size === allSessions.length ? 'Deselect All' : 'Select All'}
+                        </button>
+                      </div>
+                      <div style={{ maxHeight: "220px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "4px" }}>
+                        {allSessions.map((s: any) => (
+                          <label key={s.id} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "8px 12px", borderRadius: "8px", cursor: "pointer", background: pendingSessions.has(s.sessionYear) ? "rgba(67, 97, 238, 0.05)" : "transparent" }}>
+                            <input
+                              type="checkbox"
+                              className="custom-checkbox"
+                              style={{ width: "18px", height: "18px" }}
+                              checked={pendingSessions.has(s.sessionYear)}
+                              onChange={() => {
+                                const next = new Set(Array.from(pendingSessions));
+                                if (next.has(s.sessionYear)) next.delete(s.sessionYear); else next.add(s.sessionYear);
+                                setPendingSessions(next);
+                              }}
+                            />
+                            <span style={{ fontWeight: 500, color: "#333" }}>{s.sessionYear}</span>
+                          </label>
+                        ))}
+                        {allSessions.length === 0 && (
+                          <div style={{ textAlign: "center", color: "#999", padding: "20px" }}>No sessions available</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Grade options */}
+                  {activeFilterCategory === "grade" && pendingEnabled.has("grade") && (
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                        <span style={{ fontWeight: 700, color: "#1a1a2e" }}>Select Grades</span>
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => {
+                            if (pendingGrades.size === allGrades.length) {
+                              setPendingGrades(new Set());
+                            } else {
+                              setPendingGrades(new Set(allGrades.map(g => g.className)));
+                            }
+                          }}
+                          style={{ background: "rgba(67, 97, 238, 0.1)", color: "#4361ee", border: "none", borderRadius: "8px", padding: "4px 12px", fontWeight: 600, fontSize: "0.8rem" }}
+                        >
+                          {pendingGrades.size === allGrades.length ? 'Deselect All' : 'Select All'}
+                        </button>
+                      </div>
+                      <div style={{ maxHeight: "220px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "4px" }}>
+                        {allGrades.map((g) => (
+                          <label key={g.id} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "8px 12px", borderRadius: "8px", cursor: "pointer", background: pendingGrades.has(g.className) ? "rgba(67, 97, 238, 0.05)" : "transparent" }}>
+                            <input
+                              type="checkbox"
+                              className="custom-checkbox"
+                              style={{ width: "18px", height: "18px" }}
+                              checked={pendingGrades.has(g.className)}
+                              onChange={() => {
+                                const next = new Set(Array.from(pendingGrades));
+                                if (next.has(g.className)) next.delete(g.className); else next.add(g.className);
+                                setPendingGrades(next);
+                              }}
+                            />
+                            <span style={{ fontWeight: 500, color: "#333" }}>{g.className}</span>
+                          </label>
+                        ))}
+                        {allGrades.length === 0 && (
+                          <div style={{ textAlign: "center", color: "#999", padding: "20px" }}>No grades available</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Section options */}
+                  {activeFilterCategory === "section" && pendingEnabled.has("section") && (
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                        <span style={{ fontWeight: 700, color: "#1a1a2e" }}>Select Sections</span>
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => {
+                            if (pendingSections.size === allSectionsFlat.length) {
+                              setPendingSections(new Set());
+                            } else {
+                              setPendingSections(new Set(allSectionsFlat.map(s => s.sectionName)));
+                            }
+                          }}
+                          style={{ background: "rgba(67, 97, 238, 0.1)", color: "#4361ee", border: "none", borderRadius: "8px", padding: "4px 12px", fontWeight: 600, fontSize: "0.8rem" }}
+                        >
+                          {pendingSections.size === allSectionsFlat.length ? 'Deselect All' : 'Select All'}
+                        </button>
+                      </div>
+                      <div style={{ maxHeight: "220px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "4px" }}>
+                        {allSectionsFlat.map((s) => (
+                          <label key={s.id} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "8px 12px", borderRadius: "8px", cursor: "pointer", background: pendingSections.has(s.sectionName) ? "rgba(67, 97, 238, 0.05)" : "transparent" }}>
+                            <input
+                              type="checkbox"
+                              className="custom-checkbox"
+                              style={{ width: "18px", height: "18px" }}
+                              checked={pendingSections.has(s.sectionName)}
+                              onChange={() => {
+                                const next = new Set(Array.from(pendingSections));
+                                if (next.has(s.sectionName)) next.delete(s.sectionName); else next.add(s.sectionName);
+                                setPendingSections(next);
+                              }}
+                            />
+                            <span style={{ fontWeight: 500, color: "#333" }}>{s.sectionName}</span>
+                            <span style={{ color: "#999", fontSize: "0.8rem" }}>({s.className})</span>
+                          </label>
+                        ))}
+                        {allSectionsFlat.length === 0 && (
+                          <div style={{ textAlign: "center", color: "#999", padding: "20px" }}>No sections available</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Status options */}
+                  {activeFilterCategory === "status" && pendingEnabled.has("status") && (
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                        <span style={{ fontWeight: 700, color: "#1a1a2e" }}>Select Assessment Status</span>
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => {
+                            if (pendingStatuses.size === statusOptions.length) {
+                              setPendingStatuses(new Set());
+                            } else {
+                              setPendingStatuses(new Set(statusOptions.map(s => s.key)));
+                            }
+                          }}
+                          style={{ background: "rgba(67, 97, 238, 0.1)", color: "#4361ee", border: "none", borderRadius: "8px", padding: "4px 12px", fontWeight: 600, fontSize: "0.8rem" }}
+                        >
+                          {pendingStatuses.size === statusOptions.length ? 'Deselect All' : 'Select All'}
+                        </button>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                        {statusOptions.map((opt) => {
+                          const statusColors: Record<string, { bg: string; dot: string }> = {
+                            completed: { bg: "rgba(16, 185, 129, 0.08)", dot: "#059669" },
+                            ongoing: { bg: "rgba(37, 99, 235, 0.08)", dot: "#2563eb" },
+                            notstarted: { bg: "rgba(245, 158, 11, 0.08)", dot: "#d97706" },
+                          };
+                          const sc = statusColors[opt.key] || statusColors.notstarted;
+                          return (
+                            <label
+                              key={opt.key}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "12px",
+                                padding: "10px 12px",
+                                borderRadius: "8px",
+                                cursor: "pointer",
+                                background: pendingStatuses.has(opt.key) ? sc.bg : "transparent",
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                className="custom-checkbox"
+                                style={{ width: "18px", height: "18px" }}
+                                checked={pendingStatuses.has(opt.key)}
+                                onChange={() => {
+                                  const next = new Set(Array.from(pendingStatuses));
+                                  if (next.has(opt.key)) next.delete(opt.key); else next.add(opt.key);
+                                  setPendingStatuses(next);
+                                }}
+                              />
+                              <span
+                                style={{
+                                  width: "10px",
+                                  height: "10px",
+                                  borderRadius: "50%",
+                                  background: sc.dot,
+                                  display: "inline-block",
+                                }}
+                              ></span>
+                              <span style={{ fontWeight: 500, color: "#333" }}>{opt.label}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer with Apply / Reset */}
+              <div
+                style={{
+                  borderTop: "1px solid #e0e0e0",
+                  padding: "12px 20px",
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: "12px",
+                  borderRadius: "0 0 16px 16px",
+                }}
+              >
+                <button
+                  className="btn btn-sm"
+                  onClick={() => {
+                    setPendingEnabled(new Set());
+                    setPendingAssessmentIds(new Set());
+                    setPendingSessions(new Set());
+                    setPendingGrades(new Set());
+                    setPendingSections(new Set());
+                    setPendingStatuses(new Set());
+                  }}
+                  style={{
+                    background: "#f5f5f5",
+                    color: "#666",
+                    border: "1px solid #e0e0e0",
+                    borderRadius: "8px",
+                    padding: "6px 20px",
+                    fontWeight: 600,
+                  }}
+                >
+                  Reset
+                </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => {
+                    setAppliedEnabled(new Set(Array.from(pendingEnabled)));
+                    setAppliedAssessmentIds(new Set(Array.from(pendingAssessmentIds)));
+                    setAppliedSessions(new Set(Array.from(pendingSessions)));
+                    setAppliedGrades(new Set(Array.from(pendingGrades)));
+                    setAppliedSections(new Set(Array.from(pendingSections)));
+                    setAppliedStatuses(new Set(Array.from(pendingStatuses)));
+                    setShowFilterPanel(false);
+                  }}
+                  style={{
+                    background: "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "8px",
+                    padding: "6px 20px",
+                    fontWeight: 600,
+                    boxShadow: "0 4px 12px rgba(67, 97, 238, 0.3)",
+                  }}
+                >
+                  <i className="bi bi-check2 me-1"></i>
+                  Apply Filters
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Search Bar */}
           <div
             className="card border-0 shadow-sm mb-4"
@@ -729,6 +1564,29 @@ export default function GroupStudentPage() {
                   >
                     <i className="bi bi-download"></i>
                     Download List
+                  </button>
+                  <button
+                    className="btn d-flex align-items-center gap-2"
+                    onClick={handleBulkDownloadClick}
+                    disabled={filteredStudents.length === 0}
+                    style={{
+                      background: filteredStudents.length > 0
+                        ? "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)"
+                        : "#e0e0e0",
+                      border: "none",
+                      borderRadius: "10px",
+                      padding: "0.6rem 1.2rem",
+                      fontWeight: 600,
+                      color: filteredStudents.length > 0 ? "#fff" : "#9e9e9e",
+                      cursor: filteredStudents.length > 0 ? "pointer" : "not-allowed",
+                      transition: "all 0.3s ease",
+                      boxShadow: filteredStudents.length > 0
+                        ? "0 4px 15px rgba(67, 97, 238, 0.3)"
+                        : "none",
+                    }}
+                  >
+                    <i className="bi bi-file-earmark-spreadsheet"></i>
+                    Download All Answers
                   </button>
                 </div>
               </div>
@@ -992,7 +1850,7 @@ export default function GroupStudentPage() {
                               }}
                             >
                               <i className="bi bi-list-ul"></i>
-                              View ({student.assessments?.length || 0})
+                              View ({new Set((student.assessments || []).filter(a => activeAssessmentIds.has(Number(a.assessmentId))).map(a => Number(a.assessmentId))).size})
                             </button>
                           </td>
                           <td
@@ -1639,7 +2497,7 @@ export default function GroupStudentPage() {
                                   width: "200px",
                                 }}
                               >
-                                Section
+                                Section Name
                               </th>
                               <th
                                 style={{
@@ -1665,10 +2523,10 @@ export default function GroupStudentPage() {
                                   padding: "12px 16px",
                                   fontWeight: 600,
                                   color: "#1a1a2e",
-                                  width: "250px",
+                                  width: "280px",
                                 }}
                               >
-                                Selected Answer
+                                Opted Option Text
                               </th>
                             </tr>
                           </thead>
@@ -1784,6 +2642,441 @@ export default function GroupStudentPage() {
                       <>
                         <i className="bi bi-download me-2"></i>
                         Download Excel
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Bulk Download All Answers Modal */}
+      {showBulkDownloadModal && (
+        <>
+          <div
+            className="modal-backdrop fade show"
+            onClick={() => {
+              if (!bulkDownloading) {
+                setShowBulkDownloadModal(false);
+                setBulkDownloadAnswers([]);
+                setBulkDownloadError("");
+              }
+            }}
+            style={{ zIndex: 10040 }}
+          ></div>
+
+          <div
+            className="modal fade show"
+            style={{
+              display: "block",
+              zIndex: 10050,
+            }}
+            tabIndex={-1}
+            role="dialog"
+          >
+            <div
+              className="modal-dialog modal-dialog-centered modal-xl"
+              role="document"
+            >
+              <div
+                className="modal-content"
+                style={{
+                  borderRadius: "16px",
+                  border: "none",
+                  boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
+                }}
+              >
+                {/* Header */}
+                <div
+                  className="modal-header"
+                  style={{ borderBottom: "2px solid #f0f0f0", padding: "1.5rem" }}
+                >
+                  <h5
+                    className="modal-title"
+                    style={{ color: "#1a1a2e", fontWeight: 700 }}
+                  >
+                    <i
+                      className="bi bi-file-earmark-excel me-2"
+                      style={{ color: "#7209b7" }}
+                    ></i>
+                    All Students Answer Sheet
+                  </h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => {
+                      setShowBulkDownloadModal(false);
+                      setBulkDownloadAnswers([]);
+                      setBulkDownloadError("");
+                    }}
+                    disabled={bulkDownloading}
+                    aria-label="Close"
+                  ></button>
+                </div>
+
+                {/* Body */}
+                <div
+                  className="modal-body"
+                  style={{
+                    padding: "2rem",
+                    maxHeight: "70vh",
+                    overflowY: "auto",
+                  }}
+                >
+                  {/* Summary */}
+                  <div className="mb-4">
+                    <div
+                      className="card border-0"
+                      style={{ background: "#f8f9fa", borderRadius: "12px" }}
+                    >
+                      <div className="card-body p-3">
+                        <div className="row g-3">
+                          <div className="col-md-4">
+                            <div className="d-flex align-items-center gap-2">
+                              <i
+                                className="bi bi-people-fill"
+                                style={{ color: "#7209b7" }}
+                              ></i>
+                              <div>
+                                <small className="text-muted d-block">
+                                  Filtered Students
+                                </small>
+                                <strong
+                                  style={{ color: "#1a1a2e", fontSize: "0.9rem" }}
+                                >
+                                  {filteredStudents.length}
+                                </strong>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="col-md-4">
+                            <div className="d-flex align-items-center gap-2">
+                              <i
+                                className="bi bi-clipboard-check"
+                                style={{ color: "#7209b7" }}
+                              ></i>
+                              <div>
+                                <small className="text-muted d-block">
+                                  Total Answer Rows
+                                </small>
+                                <strong
+                                  style={{ color: "#1a1a2e", fontSize: "0.9rem" }}
+                                >
+                                  {bulkDownloadAnswers.length}
+                                </strong>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="col-md-4">
+                            <div className="d-flex align-items-center gap-2">
+                              <i
+                                className="bi bi-building"
+                                style={{ color: "#7209b7" }}
+                              ></i>
+                              <div>
+                                <small className="text-muted d-block">
+                                  Institute
+                                </small>
+                                <strong
+                                  style={{ color: "#1a1a2e", fontSize: "0.9rem" }}
+                                >
+                                  {getSelectedInstituteName()}
+                                </strong>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Answers Table */}
+                  <div className="mb-3">
+                    <h6
+                      className="mb-3"
+                      style={{ color: "#1a1a2e", fontWeight: 600 }}
+                    >
+                      <i className="bi bi-table me-2"></i>
+                      All Student Answers Preview
+                    </h6>
+
+                    {bulkDownloadLoading ? (
+                      <div className="text-center py-5">
+                        <div className="spinner-border text-primary" role="status">
+                          <span className="visually-hidden">Loading...</span>
+                        </div>
+                        <p className="mt-3 text-muted">
+                          Loading answers for all students... This may take a moment.
+                        </p>
+                      </div>
+                    ) : bulkDownloadError ? (
+                      <div
+                        className="alert alert-danger"
+                        style={{ borderRadius: "10px" }}
+                      >
+                        <i className="bi bi-exclamation-triangle me-2"></i>
+                        {bulkDownloadError}
+                      </div>
+                    ) : bulkDownloadAnswers.length === 0 ? (
+                      <div
+                        className="alert alert-info"
+                        style={{ borderRadius: "10px" }}
+                      >
+                        <i className="bi bi-info-circle me-2"></i>
+                        No answers found for the filtered students.
+                      </div>
+                    ) : (
+                      <div
+                        className="table-responsive"
+                        style={{
+                          borderRadius: "12px",
+                          border: "1px solid #e0e0e0",
+                        }}
+                      >
+                        <table className="table table-hover mb-0">
+                          <thead
+                            style={{
+                              background: "#f8f9fa",
+                              position: "sticky",
+                              top: 0,
+                              zIndex: 1,
+                            }}
+                          >
+                            <tr>
+                              <th
+                                style={{
+                                  padding: "12px 16px",
+                                  fontWeight: 600,
+                                  color: "#1a1a2e",
+                                  width: "60px",
+                                }}
+                              >
+                                S.No
+                              </th>
+                              <th
+                                style={{
+                                  padding: "12px 16px",
+                                  fontWeight: 600,
+                                  color: "#1a1a2e",
+                                  width: "160px",
+                                }}
+                              >
+                                Student Name
+                              </th>
+                              <th
+                                style={{
+                                  padding: "12px 16px",
+                                  fontWeight: 600,
+                                  color: "#1a1a2e",
+                                  width: "80px",
+                                }}
+                              >
+                                User ID
+                              </th>
+                              <th
+                                style={{
+                                  padding: "12px 16px",
+                                  fontWeight: 600,
+                                  color: "#1a1a2e",
+                                  width: "160px",
+                                }}
+                              >
+                                Assessment
+                              </th>
+                              <th
+                                style={{
+                                  padding: "12px 16px",
+                                  fontWeight: 600,
+                                  color: "#1a1a2e",
+                                  width: "150px",
+                                }}
+                              >
+                                Section Name
+                              </th>
+                              <th
+                                style={{
+                                  padding: "12px 16px",
+                                  fontWeight: 600,
+                                  color: "#1a1a2e",
+                                  width: "150px",
+                                }}
+                              >
+                                Excel Header
+                              </th>
+                              <th
+                                style={{
+                                  padding: "12px 16px",
+                                  fontWeight: 600,
+                                  color: "#1a1a2e",
+                                }}
+                              >
+                                Question Text
+                              </th>
+                              <th
+                                style={{
+                                  padding: "12px 16px",
+                                  fontWeight: 600,
+                                  color: "#1a1a2e",
+                                  width: "200px",
+                                }}
+                              >
+                                Opted Option Text
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {bulkDownloadAnswers.slice(0, 100).map((row: any, index: number) => (
+                              <tr key={index}>
+                                <td
+                                  style={{
+                                    padding: "12px 16px",
+                                    verticalAlign: "top",
+                                  }}
+                                >
+                                  <span
+                                    className="badge bg-light text-dark"
+                                    style={{ fontSize: "0.85rem" }}
+                                  >
+                                    {index + 1}
+                                  </span>
+                                </td>
+                                <td
+                                  style={{ padding: "12px 16px", color: "#333", fontWeight: 500 }}
+                                >
+                                  {row.studentName || "N/A"}
+                                </td>
+                                <td
+                                  style={{ padding: "12px 16px", color: "#333" }}
+                                >
+                                  #{row.userStudentId || "N/A"}
+                                </td>
+                                <td
+                                  style={{ padding: "12px 16px", color: "#333" }}
+                                >
+                                  <span
+                                    className="badge"
+                                    style={{
+                                      background: "rgba(114, 9, 183, 0.1)",
+                                      color: "#7209b7",
+                                      padding: "4px 8px",
+                                      borderRadius: "6px",
+                                      fontSize: "0.8rem",
+                                    }}
+                                  >
+                                    {row.assessmentName || "N/A"}
+                                  </span>
+                                </td>
+                                <td
+                                  style={{ padding: "12px 16px", color: "#333" }}
+                                >
+                                  <span
+                                    className="badge bg-light text-dark"
+                                    style={{ fontSize: "0.85rem" }}
+                                  >
+                                    {row.sectionName || "N/A"}
+                                  </span>
+                                </td>
+                                <td
+                                  style={{ padding: "12px 16px", color: "#333" }}
+                                >
+                                  {row.excelQuestionHeader || "N/A"}
+                                </td>
+                                <td
+                                  style={{ padding: "12px 16px", color: "#333" }}
+                                >
+                                  {row.questionText || "N/A"}
+                                </td>
+                                <td style={{ padding: "12px 16px" }}>
+                                  <span
+                                    className="badge"
+                                    style={{
+                                      background: "rgba(67, 97, 238, 0.1)",
+                                      color: "#4361ee",
+                                      padding: "6px 12px",
+                                      borderRadius: "6px",
+                                      fontWeight: 500,
+                                      fontSize: "0.85rem",
+                                    }}
+                                  >
+                                    {row.optionText || "N/A"}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {bulkDownloadAnswers.length > 100 && (
+                          <div
+                            className="text-center py-3"
+                            style={{
+                              background: "#f8f9fa",
+                              borderTop: "1px solid #e0e0e0",
+                              color: "#666",
+                              fontSize: "0.9rem",
+                            }}
+                          >
+                            <i className="bi bi-info-circle me-2"></i>
+                            Showing first 100 of {bulkDownloadAnswers.length} rows. All rows will be included in the Excel download.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div
+                  className="modal-footer"
+                  style={{ borderTop: "2px solid #f0f0f0", padding: "1.5rem" }}
+                >
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary"
+                    onClick={() => {
+                      setShowBulkDownloadModal(false);
+                      setBulkDownloadAnswers([]);
+                      setBulkDownloadError("");
+                    }}
+                    disabled={bulkDownloading}
+                    style={{
+                      borderRadius: "10px",
+                      padding: "0.6rem 1.5rem",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleBulkDownloadExcel}
+                    disabled={
+                      bulkDownloading || bulkDownloadLoading || bulkDownloadAnswers.length === 0
+                    }
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #7209b7 0%, #3a0ca3 100%)",
+                      border: "none",
+                      borderRadius: "10px",
+                      padding: "0.6rem 1.5rem",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {bulkDownloading ? (
+                      <>
+                        <span
+                          className="spinner-border spinner-border-sm me-2"
+                          role="status"
+                          aria-hidden="true"
+                        ></span>
+                        Downloading...
+                      </>
+                    ) : (
+                      <>
+                        <i className="bi bi-download me-2"></i>
+                        Download Excel ({bulkDownloadAnswers.length} rows)
                       </>
                     )}
                   </button>

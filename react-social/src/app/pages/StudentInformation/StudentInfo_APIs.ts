@@ -15,6 +15,7 @@ export interface StudentInfo {
     instituteId?: number;
     assesment_id?: string;
     studentDob?: string;
+    schoolSectionId?: number;
 }
 
 export interface Assessment {
@@ -47,6 +48,7 @@ export interface StudentWithMapping {
     assessmentId?: number;
     studentDob?: string;
     username?: string;
+    schoolSectionId?: number;
     assessments?: AssessmentDetail[];
     assignedAssessmentIds?: number[];
 }
@@ -118,6 +120,11 @@ export function getStudentAnswersWithDetails(userStudentId: number, assessmentId
         console.error("API Error:", error.response?.data || error.message);
         throw error;
     });
+}
+
+// Bulk fetch answers for multiple students and their assessments
+export function getBulkStudentAnswersWithDetails(pairs: { userStudentId: number; assessmentId: number }[]) {
+    return axios.post<any[]>(`${STUDENT_INFO_BASE}/getBulkStudentAnswersWithDetails`, pairs);
 }
 
 // Reset assessment - sets status to 'notstarted' and deletes raw scores

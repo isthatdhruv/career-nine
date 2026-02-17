@@ -12,9 +12,12 @@ export interface SchoolOMRRow {
   Section: string;
   Mobile: string;
   Dob: string;
+  sessionYear?: string;
+  className?: string;
+  sectionName?: string;
   answers: answers[];
   measuredQualityFinalScore: measuredQualityFinalScore[];
-  [key: string]: any; // 🔹 allows dynamic Excel fields
+  [key: string]: any;
 }
 
 export interface answers {

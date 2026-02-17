@@ -49,7 +49,8 @@ const ClassTeacherDashboard: React.FC = () => {
   const fetchAssessments = async () => {
     try {
       const assessmentsData = await getAllAssessments();
-      setAssessments(assessmentsData);
+      const activeOnly = assessmentsData.filter((a: any) => a.isActive !== false);
+      setAssessments(activeOnly);
       // Set first assessment as default if not already selected
       if (assessmentsData.length > 0 && !selectedAssessmentId) {
         setSelectedAssessmentId(assessmentsData[0].assessmentId);

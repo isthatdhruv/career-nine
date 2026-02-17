@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Button, Modal, Alert, Spinner, ProgressBar } from "react-bootstrap";
 import { MDBDataTableV5 } from "mdbreact";
 import * as XLSX from "xlsx";
 import { setData } from "./StudentDataComputationExcel";
 import { SchoolOMRRow } from "./DataStructure";
 import { addStudentInfo, StudentInfo, getAllAssessments, Assessment } from "../StudentInformation/StudentInfo_APIs";
-import { ReadCollegeData } from "../College/API/College_APIs";
+import { ReadCollegeData, GetSessionsByInstituteCode, ResolveOrCreateSection } from "../College/API/College_APIs";
 
 /* ================= MASTER SCHEMA ================= */
 
@@ -16,7 +16,9 @@ const SCHEMA_FIELDS = [
   "email",
   "address",
   "studentDob",
-  "user"
+  "sessionYear",
+  "className",
+  "sectionName"
 ];
 
 /* ================= DEFAULT OBJECT ================= */
@@ -30,7 +32,8 @@ const DEFAULT_SCHEMA_OBJECT: Record<string, any> = {
   studentDob: "",
   user: null,
   instituteId: null,
-  assesment_id: null
+  assesment_id: null,
+  schoolSectionId: null
 };
 
 /* ================= COMPONENT ================= */
@@ -43,6 +46,7 @@ export default function UploadExcelFile() {
   const [columnMap, setColumnMap] = useState<Record<string, string>>({});
   const [showMapping, setShowMapping] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [uploadResult, setUploadResult] = useState<{ success: number; skipped: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -57,6 +61,12 @@ export default function UploadExcelFile() {
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [selectedAssessment, setSelectedAssessment] = useState<number | "">("");
 
+  // Session/Grade/Section hierarchy
+  const [hierarchyData, setHierarchyData] = useState<any[]>([]);
+  const [selectedSession, setSelectedSession] = useState<string>("");
+  const [selectedGrade, setSelectedGrade] = useState<string>("");
+  const [selectedSection, setSelectedSection] = useState<string>("");
+
   useEffect(() => {
     ReadCollegeData()
       .then((res: any) => {
@@ -68,11 +78,48 @@ export default function UploadExcelFile() {
 
     getAllAssessments()
       .then((res) => {
-        setAssessments(res.data);
-        console.log("Fetched Assessments:", res.data);
+        const activeOnly = (res.data || []).filter((a: any) => a.isActive !== false);
+        setAssessments(activeOnly);
+        console.log("Fetched Assessments:", activeOnly);
       })
       .catch((err) => console.error("Failed to fetch assessments", err));
   }, []);
+
+  // Fetch hierarchy when institute changes
+  useEffect(() => {
+    if (selectedInstitute) {
+      GetSessionsByInstituteCode(selectedInstitute)
+        .then((res: any) => {
+          setHierarchyData(res.data || []);
+          setSelectedSession("");
+          setSelectedGrade("");
+          setSelectedSection("");
+        })
+        .catch((err: any) => {
+          console.error("Failed to fetch sessions", err);
+          setHierarchyData([]);
+        });
+    } else {
+      setHierarchyData([]);
+      setSelectedSession("");
+      setSelectedGrade("");
+      setSelectedSection("");
+    }
+  }, [selectedInstitute]);
+
+  // Derived: available grades based on selected session
+  const availableGrades = useMemo(() => {
+    if (!selectedSession) return [];
+    const session = hierarchyData.find((s: any) => s.sessionYear === selectedSession);
+    return session?.schoolClasses || [];
+  }, [hierarchyData, selectedSession]);
+
+  // Derived: available sections based on selected grade
+  const availableSections = useMemo(() => {
+    if (!selectedGrade) return [];
+    const grade = availableGrades.find((c: any) => c.className === selectedGrade);
+    return grade?.schoolSections || [];
+  }, [availableGrades, selectedGrade]);
 
   /* ================= FILE UPLOAD ================= */
 
@@ -97,7 +144,10 @@ export default function UploadExcelFile() {
         const lowerH = h.toLowerCase();
         const match = SCHEMA_FIELDS.find(f => f.toLowerCase() === lowerH ||
           (f === 'schoolRollNumber' && lowerH.includes('roll')) ||
-          (f === 'phoneNumber' && (lowerH.includes('phone') || lowerH.includes('mobile')))
+          (f === 'phoneNumber' && (lowerH.includes('phone') || lowerH.includes('mobile'))) ||
+          (f === 'sessionYear' && (lowerH.includes('session') || lowerH === 'year' || lowerH.includes('academic year'))) ||
+          (f === 'className' && (lowerH.includes('class') || lowerH.includes('grade'))) ||
+          (f === 'sectionName' && lowerH.includes('section'))
         );
         if (match) initialMap[h] = match;
       });
@@ -187,31 +237,77 @@ export default function UploadExcelFile() {
 
   /* ================= SUBMIT ================= */
 
+  // Helper: get effective session/grade/section for a row (Excel overrides dropdown)
+  const getEffectiveHierarchy = (row: any): { sessionYear: string; className: string; sectionName: string } | null => {
+    let sessionYear = "";
+    let className = "";
+    let sectionName = "";
+
+    // Extract from mapped Excel columns
+    Object.entries(columnMap).forEach(([excelCol, schemaField]) => {
+      if (schemaField === "sessionYear" && row[excelCol]) sessionYear = String(row[excelCol]).trim();
+      if (schemaField === "className" && row[excelCol]) className = String(row[excelCol]).trim();
+      if (schemaField === "sectionName" && row[excelCol]) sectionName = String(row[excelCol]).trim();
+    });
+
+    // Fall back to dropdown selections if Excel data is missing
+    if (!sessionYear && selectedSession) sessionYear = selectedSession;
+    if (!className && selectedGrade) className = selectedGrade;
+    if (!sectionName && selectedSection) sectionName = selectedSection;
+
+    // All three must be present to resolve a section
+    if (sessionYear && className && sectionName) {
+      return { sessionYear, className, sectionName };
+    }
+    return null;
+  };
+
   const handleSubmit = async () => {
     setUploading(true);
+    setUploadProgress({ current: 0, total: rawExcelData.length });
     let successCount = 0;
     let skippedCount = 0;
 
-    console.log("[DEBUG Upload] Starting upload. selectedAssessment:", selectedAssessment,
-      "selectedInstitute:", selectedInstitute,
-      "totalRows:", rawExcelData.length);
+    // Phase 1: Pre-resolve all unique section combinations
+    const sectionIdCache = new Map<string, number>();
+    const uniqueCombos = new Set<string>();
 
-    const uploadPromises = rawExcelData.map(async (row, index) => {
-      const obj = { ...DEFAULT_SCHEMA_OBJECT };
-      if (selectedInstitute) {
-        obj.instituteId = Number(selectedInstitute);
+    for (const row of rawExcelData) {
+      const hierarchy = getEffectiveHierarchy(row);
+      if (hierarchy) {
+        const key = `${hierarchy.sessionYear}|${hierarchy.className}|${hierarchy.sectionName}`;
+        uniqueCombos.add(key);
       }
-      if (selectedAssessment) {
-        obj.assesment_id = String(selectedAssessment);
+    }
+
+    // Resolve each unique combo sequentially to avoid race conditions
+    for (const key of Array.from(uniqueCombos)) {
+      const [sessionYear, className, sectionName] = key.split("|");
+      try {
+        const response = await ResolveOrCreateSection({
+          instituteCode: Number(selectedInstitute),
+          sessionYear,
+          className,
+          sectionName,
+        });
+        sectionIdCache.set(key, response.data.id);
+      } catch (error) {
+        console.error(`Failed to resolve section for ${key}:`, error);
       }
+    }
+
+    // Phase 2: Upload students sequentially to prevent duplicate assessment mappings
+    for (let i = 0; i < rawExcelData.length; i++) {
+      const row = rawExcelData[i];
+      const obj: Record<string, any> = { ...DEFAULT_SCHEMA_OBJECT };
+      if (selectedInstitute) obj.instituteId = Number(selectedInstitute);
+      if (selectedAssessment) obj.assesment_id = String(selectedAssessment);
       let isValid = true;
 
       Object.entries(columnMap).forEach(([excelCol, schemaField]) => {
         if (schemaField) {
           const val = row[excelCol];
-
           if (schemaField === "studentDob") {
-            // Skip student if DOB is missing, empty, null, or undefined
             if (!val || val === "" || val === "Null" || val === "null" || val === undefined) {
               isValid = false;
             } else {
@@ -223,26 +319,34 @@ export default function UploadExcelFile() {
         }
       });
 
-      if (!isValid) {
-        skippedCount++;
-        return;
+      if (!isValid) { skippedCount++; setUploadProgress({ current: i + 1, total: rawExcelData.length }); continue; }
+
+      // Resolve section ID from cache
+      const hierarchy = getEffectiveHierarchy(row);
+      if (hierarchy) {
+        const key = `${hierarchy.sessionYear}|${hierarchy.className}|${hierarchy.sectionName}`;
+        const sectionId = sectionIdCache.get(key);
+        if (sectionId) obj.schoolSectionId = sectionId;
       }
 
-      console.log(`[DEBUG Upload] Row ${index}: sending payload:`, JSON.stringify(obj));
+      // Remove transient fields before sending to backend
+      delete obj.sessionYear;
+      delete obj.className;
+      delete obj.sectionName;
 
       try {
-        const response = await addStudentInfo(obj as StudentInfo);
-        console.log(`[DEBUG Upload] Row ${index}: response:`, response.data);
+        await addStudentInfo(obj as StudentInfo);
         successCount++;
       } catch (error) {
         console.error("Failed to upload info for row", row, error);
         skippedCount++;
       }
-    });
 
-    await Promise.all(uploadPromises);
-    console.log("[DEBUG Upload] Done. success:", successCount, "skipped:", skippedCount);
+      setUploadProgress({ current: i + 1, total: rawExcelData.length });
+    }
+
     setUploadResult({ success: successCount, skipped: skippedCount });
+    setUploadProgress(null);
     setUploading(false);
   };
 
@@ -316,6 +420,85 @@ export default function UploadExcelFile() {
           </div>
         </div>
       </div>
+
+      {/* Session/Grade/Section Dropdowns */}
+      {selectedInstitute && (
+        <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px' }}>
+          <div className="card-body p-4">
+            <p className="text-muted mb-3">
+              <i className="bi bi-diagram-3 me-2"></i>
+              Optional: Pre-select session, grade, and section (Excel data overrides these)
+            </p>
+            <div className="d-flex gap-3 flex-wrap">
+              <select
+                className="form-select shadow-sm"
+                style={{
+                  minWidth: '180px',
+                  maxWidth: '220px',
+                  borderRadius: '10px',
+                  border: '2px solid #e0e0e0',
+                  padding: '0.6rem 1rem',
+                  fontWeight: 500,
+                }}
+                value={selectedSession}
+                onChange={(e) => {
+                  setSelectedSession(e.target.value);
+                  setSelectedGrade("");
+                  setSelectedSection("");
+                }}
+              >
+                <option value="">Select Session</option>
+                {hierarchyData.map((s: any) => (
+                  <option key={s.id} value={s.sessionYear}>{s.sessionYear}</option>
+                ))}
+              </select>
+
+              <select
+                className="form-select shadow-sm"
+                style={{
+                  minWidth: '180px',
+                  maxWidth: '220px',
+                  borderRadius: '10px',
+                  border: '2px solid #e0e0e0',
+                  padding: '0.6rem 1rem',
+                  fontWeight: 500,
+                }}
+                value={selectedGrade}
+                onChange={(e) => {
+                  setSelectedGrade(e.target.value);
+                  setSelectedSection("");
+                }}
+                disabled={!selectedSession}
+              >
+                <option value="">Select Grade</option>
+                {availableGrades.map((c: any) => (
+                  <option key={c.id} value={c.className}>{c.className}</option>
+                ))}
+              </select>
+
+              <select
+                className="form-select shadow-sm"
+                style={{
+                  minWidth: '180px',
+                  maxWidth: '220px',
+                  borderRadius: '10px',
+                  border: '2px solid #e0e0e0',
+                  padding: '0.6rem 1rem',
+                  fontWeight: 500,
+                }}
+                value={selectedSection}
+                onChange={(e) => setSelectedSection(e.target.value)}
+                disabled={!selectedGrade}
+              >
+                <option value="">Select Section</option>
+                {availableSections.map((sec: any) => (
+                  <option key={sec.id} value={sec.sectionName}>{sec.sectionName}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Upload Area */}
       <div
@@ -535,34 +718,45 @@ export default function UploadExcelFile() {
                       : "Please select an assessment first"}
                 </span>
               )}
-              <Button
-                size="lg"
-                onClick={handleSubmit}
-                disabled={uploading || !selectedInstitute || !selectedAssessment}
-                style={{
-                  background: uploading
-                    ? '#6c757d'
-                    : 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
-                  border: 'none',
-                  borderRadius: '12px',
-                  padding: '0.8rem 2.5rem',
-                  fontWeight: 600,
-                  boxShadow: uploading ? 'none' : '0 8px 20px rgba(76, 175, 80, 0.3)',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                {uploading ? (
-                  <>
-                    <Spinner animation="border" size="sm" className="me-2" />
-                    Uploading...
-                  </>
-                ) : (
-                  <>
-                    <i className="bi bi-cloud-upload me-2"></i>
-                    Submit {tableData.rows.length} Students
-                  </>
+              <div className="d-flex flex-column align-items-end gap-2">
+                {uploading && uploadProgress && (
+                  <div style={{ width: '250px' }}>
+                    <ProgressBar
+                      now={Math.round((uploadProgress.current / uploadProgress.total) * 100)}
+                      label={`${uploadProgress.current} / ${uploadProgress.total}`}
+                      style={{ height: '22px', borderRadius: '10px' }}
+                    />
+                  </div>
                 )}
-              </Button>
+                <Button
+                  size="lg"
+                  onClick={handleSubmit}
+                  disabled={uploading || !selectedInstitute || !selectedAssessment}
+                  style={{
+                    background: uploading
+                      ? '#6c757d'
+                      : 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '0.8rem 2.5rem',
+                    fontWeight: 600,
+                    boxShadow: uploading ? 'none' : '0 8px 20px rgba(76, 175, 80, 0.3)',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  {uploading ? (
+                    <>
+                      <Spinner animation="border" size="sm" className="me-2" />
+                      Uploading {uploadProgress ? `${uploadProgress.current}/${uploadProgress.total}` : '...'}
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-cloud-upload me-2"></i>
+                      Submit {tableData.rows.length} Students
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

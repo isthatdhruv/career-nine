@@ -1,6 +1,7 @@
 package com.kccitm.api.repository.Career9.School;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -20,4 +21,6 @@ public interface SchoolSessionRepository extends JpaRepository<SchoolSession, In
            "LEFT JOIN FETCH s.schoolClasses " +
            "WHERE s.institute.instituteCode = :instituteCode")
     List<SchoolSession> findByInstituteCodeWithClasses(@Param("instituteCode") Integer instituteCode);
+
+    Optional<SchoolSession> findBySessionYearAndInstitute_InstituteCode(String sessionYear, Integer instituteCode);
 }

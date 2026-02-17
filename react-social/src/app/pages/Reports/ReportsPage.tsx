@@ -31,7 +31,8 @@ const ReportsPage: React.FC = () => {
           : instituteRes.data?.data || [];
         setInstitutes(instituteList);
 
-        setAssessments(assessmentRes.data || []);
+        const activeOnly = (assessmentRes.data || []).filter((a: any) => a.isActive !== false);
+        setAssessments(activeOnly);
       } catch (err) {
         console.error("Error fetching data:", err);
         setError("Failed to load institutes or assessments.");

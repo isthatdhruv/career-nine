@@ -2,6 +2,7 @@ package com.kccitm.api.controller.career9;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,6 +75,50 @@ public class SchoolSessionController {
 
         // Save all sessions with cascaded relationships
         return schoolSessionRepository.saveAll(payload);
+    }
+
+    // ============ RESOLVE OR CREATE ============
+
+    @PostMapping("/resolve-or-create")
+    @Transactional
+    public ResponseEntity<SchoolSections> resolveOrCreateSection(@RequestBody Map<String, Object> payload) {
+        Integer instituteCode = Integer.valueOf(payload.get("instituteCode").toString());
+        String sessionYear = payload.get("sessionYear").toString().trim();
+        String className = payload.get("className").toString().trim();
+        String sectionName = payload.get("sectionName").toString().trim();
+
+        // 1. Resolve or create session
+        SchoolSession session = schoolSessionRepository
+            .findBySessionYearAndInstitute_InstituteCode(sessionYear, instituteCode)
+            .orElseGet(() -> {
+                SchoolSession newSession = new SchoolSession();
+                newSession.setSessionYear(sessionYear);
+                newSession.setInstitute(instituteDetailRepository.findById(instituteCode)
+                    .orElseThrow(() -> new RuntimeException("Institute not found: " + instituteCode)));
+                return schoolSessionRepository.save(newSession);
+            });
+
+        // 2. Resolve or create class
+        SchoolClasses schoolClass = schoolClassesRepository
+            .findByClassNameAndSchoolSession_Id(className, session.getId())
+            .orElseGet(() -> {
+                SchoolClasses newClass = new SchoolClasses();
+                newClass.setClassName(className);
+                newClass.setSchoolSession(session);
+                return schoolClassesRepository.save(newClass);
+            });
+
+        // 3. Resolve or create section
+        SchoolSections section = schoolSectionsRepository
+            .findBySectionNameAndSchoolClasses_Id(sectionName, schoolClass.getId())
+            .orElseGet(() -> {
+                SchoolSections newSection = new SchoolSections();
+                newSection.setSectionName(sectionName);
+                newSection.setSchoolClass(schoolClass);
+                return schoolSectionsRepository.save(newSection);
+            });
+
+        return ResponseEntity.ok(section);
     }
 
     // ============ SESSION CRUD ENDPOINTS ============

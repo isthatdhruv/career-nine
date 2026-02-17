@@ -7,7 +7,8 @@ import { PageTitle } from "../../../_metronic/layout/core";
 import { getCSSVariableValue } from "../../../_metronic/assets/ts/_utils";
 import { toAbsoluteUrl } from "../../../_metronic/helpers";
 import { useThemeMode } from "../../../_metronic/partials/layout/theme-mode/ThemeModeProvider";
-import { getStudentsWithMappingByInstituteId, StudentWithMapping } from "../StudentInformation/StudentInfo_APIs";
+import { getStudentsWithMappingByInstituteId, StudentWithMapping, getAllAssessments, Assessment } from "../StudentInformation/StudentInfo_APIs";
+import { GetSessionsByInstituteCode } from "../College/API/College_APIs";
 
 type DashboardRole = "principal" | "teacher" | "student";
 
@@ -532,8 +533,22 @@ const StudentListModal: FC<{
   onClose: () => void;
   title: string;
   students: StudentWithMapping[];
-}> = ({ show, onClose, title, students }) => {
+  activeAssessmentIds?: Set<number>;
+}> = ({ show, onClose, title, students, activeAssessmentIds }) => {
   if (!show) return null;
+
+  // Filter student assessments to only show active ones, deduplicated
+  const filterAssessments = (assessments: any[] | undefined) => {
+    if (!assessments || !activeAssessmentIds) return assessments || [];
+    const active = assessments.filter((a: any) => activeAssessmentIds.has(Number(a.assessmentId)));
+    const seen = new Set<number>();
+    return active.filter((a: any) => {
+      const id = Number(a.assessmentId);
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  };
 
   return (
     <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={onClose}>
@@ -558,35 +573,38 @@ const StudentListModal: FC<{
                     </tr>
                   </thead>
                   <tbody>
-                    {students.map((student, index) => (
-                      <tr key={student.userStudentId}>
-                        <td className="ps-4">{index + 1}</td>
-                        <td className="fw-semibold text-gray-800">{student.name || 'N/A'}</td>
-                        <td className="text-gray-600">{student.schoolRollNumber || 'N/A'}</td>
-                        <td>
-                          {student.assessments && student.assessments.length > 0 ? (
-                            <div className="d-flex flex-wrap gap-1">
-                              {student.assessments.map((assessment, idx) => (
-                                <span
-                                  key={idx}
-                                  className={`badge ${assessment.status === 'completed'
-                                    ? 'badge-light-success'
-                                    : assessment.status === 'inprogress'
-                                      ? 'badge-light-warning'
-                                      : 'badge-light-secondary'
-                                    }`}
-                                  title={assessment.assessmentName}
-                                >
-                                  {assessment.assessmentName}: {assessment.status}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="badge badge-light-secondary">No assessments</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                    {students.map((student, index) => {
+                      const visibleAssessments = filterAssessments(student.assessments);
+                      return (
+                        <tr key={student.userStudentId}>
+                          <td className="ps-4">{index + 1}</td>
+                          <td className="fw-semibold text-gray-800">{student.name || 'N/A'}</td>
+                          <td className="text-gray-600">{student.schoolRollNumber || 'N/A'}</td>
+                          <td>
+                            {visibleAssessments.length > 0 ? (
+                              <div className="d-flex flex-wrap gap-1">
+                                {visibleAssessments.map((assessment: any, idx: number) => (
+                                  <span
+                                    key={idx}
+                                    className={`badge ${assessment.status === 'completed'
+                                      ? 'badge-light-success'
+                                      : assessment.status === 'inprogress'
+                                        ? 'badge-light-warning'
+                                        : 'badge-light-secondary'
+                                      }`}
+                                    title={assessment.assessmentName}
+                                  >
+                                    {assessment.assessmentName}: {assessment.status}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="badge badge-light-secondary">No assessments</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -605,34 +623,215 @@ const StudentListModal: FC<{
 interface DashboardAdminContentProps {
   students: StudentWithMapping[];
   isLoading: boolean;
+  instituteId?: string;
 }
 
-const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoading }) => {
+const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoading, instituteId }) => {
   const { mode } = useThemeMode();
   const navigate = useNavigate();
   const [role, setRole] = useState<DashboardRole>("principal");
   const [now, setNow] = useState(new Date());
   const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
 
-  // Compute student stats from assessment data
+  // Filter panel state
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [hierarchyData, setHierarchyData] = useState<any[]>([]);
+
+  // Pending filter selections (inside the panel, before "Apply")
+  const [pendingAssessmentIds, setPendingAssessmentIds] = useState<Set<number>>(new Set());
+  const [pendingSessions, setPendingSessions] = useState<Set<string>>(new Set());
+  const [pendingGrades, setPendingGrades] = useState<Set<string>>(new Set());
+  const [pendingSections, setPendingSections] = useState<Set<string>>(new Set());
+  // Which filter categories are enabled (checked on the left)
+  const [pendingEnabled, setPendingEnabled] = useState<Set<string>>(new Set());
+
+  // Applied filter selections (what actually filters the dashboard)
+  const [appliedAssessmentIds, setAppliedAssessmentIds] = useState<Set<number>>(new Set());
+  const [appliedSessions, setAppliedSessions] = useState<Set<string>>(new Set());
+  const [appliedGrades, setAppliedGrades] = useState<Set<string>>(new Set());
+  const [appliedSections, setAppliedSections] = useState<Set<string>>(new Set());
+  const [appliedEnabled, setAppliedEnabled] = useState<Set<string>>(new Set());
+
+  // Which category is selected on the left to show its options on the right
+  const [activeFilterCategory, setActiveFilterCategory] = useState<string>("assessment");
+
+  // Fetch hierarchy data
+  useEffect(() => {
+    if (instituteId) {
+      GetSessionsByInstituteCode(instituteId).then((res: any) => {
+        setHierarchyData(res.data || []);
+      }).catch(() => setHierarchyData([]));
+    }
+  }, [instituteId]);
+
+  // All available sessions / grades / sections from hierarchy
+  const allSessions = useMemo(() => hierarchyData, [hierarchyData]);
+
+  const allGrades = useMemo(() => {
+    const grades: { id: number; className: string; sessionYear: string }[] = [];
+    const seen = new Set<string>();
+    for (const session of hierarchyData) {
+      for (const cls of session.schoolClasses || []) {
+        if (!seen.has(cls.className)) {
+          seen.add(cls.className);
+          grades.push({ id: cls.id, className: cls.className, sessionYear: session.sessionYear });
+        }
+      }
+    }
+    return grades;
+  }, [hierarchyData]);
+
+  const allSectionsFlat = useMemo(() => {
+    const sections: { id: number; sectionName: string; className: string }[] = [];
+    const seen = new Set<string>();
+    for (const session of hierarchyData) {
+      for (const cls of session.schoolClasses || []) {
+        for (const sec of cls.schoolSections || []) {
+          if (!seen.has(sec.sectionName)) {
+            seen.add(sec.sectionName);
+            sections.push({ id: sec.id, sectionName: sec.sectionName, className: cls.className });
+          }
+        }
+      }
+    }
+    return sections;
+  }, [hierarchyData]);
+
+  // Collect all section IDs that match applied hierarchy filters
+  const filteredSectionIds = useMemo(() => {
+    const hasSession = appliedEnabled.has("session") && appliedSessions.size > 0;
+    const hasGrade = appliedEnabled.has("grade") && appliedGrades.size > 0;
+    const hasSection = appliedEnabled.has("section") && appliedSections.size > 0;
+    if (!hasSession && !hasGrade && !hasSection) return null; // no hierarchy filter
+
+    let sessions = hierarchyData;
+    if (hasSession) {
+      sessions = sessions.filter((s: any) => appliedSessions.has(s.sessionYear));
+    }
+
+    let classes = sessions.flatMap((s: any) => s.schoolClasses || []);
+    if (hasGrade) {
+      classes = classes.filter((c: any) => appliedGrades.has(c.className));
+    }
+
+    const sectionIds = new Set<number>();
+    for (const cls of classes) {
+      let secs = cls.schoolSections || [];
+      if (hasSection) {
+        secs = secs.filter((s: any) => appliedSections.has(s.sectionName));
+      }
+      for (const sec of secs) {
+        sectionIds.add(sec.id);
+      }
+    }
+    return sectionIds;
+  }, [hierarchyData, appliedEnabled, appliedSessions, appliedGrades, appliedSections]);
+
+  // Apply session/grade/section filter to students
+  const sectionFilteredStudents = useMemo(() => {
+    if (filteredSectionIds === null) return students;
+    return students.filter(
+      (s) => s.schoolSectionId != null && filteredSectionIds.has(s.schoolSectionId)
+    );
+  }, [students, filteredSectionIds]);
+
+  // Fetch assessments from DB (only active ones)
+  useEffect(() => {
+    getAllAssessments()
+      .then((response) => {
+        const activeOnly = (response.data || []).filter((a: any) => a.isActive !== false);
+        setAssessments(activeOnly);
+      })
+      .catch((error) => {
+        console.error("Error fetching assessments:", error);
+      });
+  }, []);
+
+  // Set of active assessment IDs — used to ignore deactivated assessments
+  const activeAssessmentIds = useMemo(
+    () => new Set(assessments.map((a) => a.id)),
+    [assessments]
+  );
+
+  // Helper: get only active assessments for a student, deduplicated
+  const getActiveAssessments = (student: StudentWithMapping) => {
+    const active = (student.assessments || []).filter((a) =>
+      activeAssessmentIds.has(Number(a.assessmentId))
+    );
+    const seen = new Set<number>();
+    return active.filter((a) => {
+      const id = Number(a.assessmentId);
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  };
+
+  // Whether assessment filter is active
+  const hasAssessmentFilter = appliedEnabled.has("assessment") && appliedAssessmentIds.size > 0;
+
+  // Compute student stats from assessment data, filtered by selected assessments.
+  // Categories are MUTUALLY EXCLUSIVE so Total = Completed + Ongoing + Not Started.
   const studentStats = useMemo(() => {
-    const total = students.length;
+    const baseStudents = sectionFilteredStudents;
 
-    // Not started: students with at least one assessment that has 'notstarted' status
-    const notStarted = students.filter(student =>
-      student.assessments?.some(a => a.status === 'notstarted')
-    );
+    if (hasAssessmentFilter) {
+      // Assessment-specific filter: only students who have any of the selected assessments
+      const relevantStudents = baseStudents.filter(student =>
+        getActiveAssessments(student).some(a => appliedAssessmentIds.has(Number(a.assessmentId)))
+      );
 
-    // Ongoing (In Progress): students with at least one assessment that has 'inprogress' status
-    const ongoing = students.filter(student =>
-      student.assessments?.some(a => a.status === 'inprogress')
-    );
+      const total = relevantStudents.length;
 
-    // Completed: students where ALL assessments have 'completed' status
-    const completed = students.filter(student =>
-      student.assessments && student.assessments.length > 0 &&
-      student.assessments.every(a => a.status === 'completed')
-    );
+      const completed = relevantStudents.filter(student => {
+        const matching = getActiveAssessments(student).filter(a => appliedAssessmentIds.has(Number(a.assessmentId)));
+        return matching.length > 0 && matching.every(a => a.status === 'completed');
+      });
+
+      const ongoing = relevantStudents.filter(student => {
+        const matching = getActiveAssessments(student).filter(a => appliedAssessmentIds.has(Number(a.assessmentId)));
+        return matching.length > 0 &&
+          !matching.every(a => a.status === 'completed') &&
+          !matching.every(a => a.status === 'notstarted');
+      });
+
+      const notStarted = relevantStudents.filter(student => {
+        const matching = getActiveAssessments(student).filter(a => appliedAssessmentIds.has(Number(a.assessmentId)));
+        return matching.length === 0 || matching.every(a => a.status === 'notstarted');
+      });
+
+      return {
+        total,
+        notStartedCount: notStarted.length,
+        ongoingCount: ongoing.length,
+        completedCount: completed.length,
+        notStartedStudents: notStarted,
+        ongoingStudents: ongoing,
+        completedStudents: completed,
+        allStudents: relevantStudents,
+      };
+    }
+
+    // No assessment selected — only consider active assessments for each student.
+    const total = baseStudents.length;
+
+    const completed = baseStudents.filter(student => {
+      const active = getActiveAssessments(student);
+      return active.length > 0 && active.every(a => a.status === 'completed');
+    });
+
+    const notStarted = baseStudents.filter(student => {
+      const active = getActiveAssessments(student);
+      return active.length === 0 || active.every(a => a.status === 'notstarted');
+    });
+
+    const ongoing = baseStudents.filter(student => {
+      const active = getActiveAssessments(student);
+      return active.length > 0 &&
+        !active.every(a => a.status === 'completed') &&
+        !active.every(a => a.status === 'notstarted');
+    });
 
     return {
       total,
@@ -642,9 +841,32 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
       notStartedStudents: notStarted,
       ongoingStudents: ongoing,
       completedStudents: completed,
-      allStudents: students,
+      allStudents: baseStudents,
     };
-  }, [students]);
+  }, [sectionFilteredStudents, hasAssessmentFilter, appliedAssessmentIds, activeAssessmentIds]);
+
+  // Build a short label describing what filters are active
+  const activeFilterLabel = useMemo(() => {
+    const parts: string[] = [];
+    if (hasAssessmentFilter) {
+      const names = assessments
+        .filter(a => appliedAssessmentIds.has(a.id))
+        .map(a => a.assessmentName);
+      parts.push(names.length === 1 ? names[0] : `${names.length} assessments`);
+    }
+    if (appliedEnabled.has("session") && appliedSessions.size > 0) {
+      parts.push(appliedSessions.size === 1 ? Array.from(appliedSessions)[0] : `${appliedSessions.size} sessions`);
+    }
+    if (appliedEnabled.has("grade") && appliedGrades.size > 0) {
+      parts.push(appliedGrades.size === 1 ? Array.from(appliedGrades)[0] : `${appliedGrades.size} grades`);
+    }
+    if (appliedEnabled.has("section") && appliedSections.size > 0) {
+      parts.push(appliedSections.size === 1 ? Array.from(appliedSections)[0] : `${appliedSections.size} sections`);
+    }
+    return parts.join(', ');
+  }, [hasAssessmentFilter, appliedAssessmentIds, appliedEnabled, appliedSessions, appliedGrades, appliedSections, assessments]);
+
+  const isFiltered = activeFilterLabel.length > 0;
 
   // Create a mutable copy of dashboards data with dynamic student count
   const data = useMemo(() => {
@@ -656,36 +878,36 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
       roleData.stats = [...roleData.stats];
       roleData.stats[0] = {
         ...roleData.stats[0],
-        title: "Total students",
+        title: isFiltered ? "Students (Filtered)" : "Total students",
         value: isLoading ? "..." : studentStats.total.toString(),
-        helper: "Across all grades",
+        helper: isFiltered ? activeFilterLabel : "Across all grades",
         tone: "primary",
       };
       roleData.stats[1] = {
         ...roleData.stats[1],
         title: "Ongoing Assessment",
         value: isLoading ? "..." : studentStats.ongoingCount.toString(),
-        helper: "Assessment in progress",
+        helper: isFiltered ? "In progress (filtered)" : "Assessment in progress",
         tone: "warning",
       };
       roleData.stats[2] = {
         ...roleData.stats[2],
         title: "Completed Assessment",
         value: isLoading ? "..." : studentStats.completedCount.toString(),
-        helper: "Finished all assessments",
+        helper: isFiltered ? "Completed (filtered)" : "Finished all assessments",
         tone: "success",
       };
       roleData.stats[3] = {
         ...roleData.stats[3],
         title: "Not Started",
         value: isLoading ? "..." : studentStats.notStartedCount.toString(),
-        helper: "Assessment not started",
+        helper: isFiltered ? "Not started (filtered)" : "Assessment not started",
         tone: "danger",
       };
     }
 
     return roleData;
-  }, [role, isLoading, studentStats]);
+  }, [role, isLoading, studentStats, isFiltered, activeFilterLabel]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30000);
@@ -925,6 +1147,358 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
           </div>
         </div>
 
+        {/* Filter Icon + Active Filter Tags */}
+        {role === "principal" && (
+          <div className="d-flex align-items-center gap-3 flex-wrap">
+            <div style={{ position: 'relative' }}>
+              <button
+                className={`btn btn-sm d-flex align-items-center gap-2 ${showFilterPanel ? 'btn-primary' : 'btn-light-primary'}`}
+                onClick={() => {
+                  if (!showFilterPanel) {
+                    // Sync pending state from applied state when opening
+                    setPendingEnabled(new Set(Array.from(appliedEnabled)));
+                    setPendingAssessmentIds(new Set(Array.from(appliedAssessmentIds)));
+                    setPendingSessions(new Set(Array.from(appliedSessions)));
+                    setPendingGrades(new Set(Array.from(appliedGrades)));
+                    setPendingSections(new Set(Array.from(appliedSections)));
+                  }
+                  setShowFilterPanel(!showFilterPanel);
+                }}
+              >
+                <i className="bi bi-funnel-fill fs-4"></i>
+                Filters
+                {isFiltered && (
+                  <span className="badge badge-circle badge-light-danger ms-1" style={{ fontSize: '10px', width: '18px', height: '18px', lineHeight: '18px' }}>
+                    {(hasAssessmentFilter ? 1 : 0)
+                      + (appliedEnabled.has("session") && appliedSessions.size > 0 ? 1 : 0)
+                      + (appliedEnabled.has("grade") && appliedGrades.size > 0 ? 1 : 0)
+                      + (appliedEnabled.has("section") && appliedSections.size > 0 ? 1 : 0)}
+                  </span>
+                )}
+              </button>
+            </div>
+            {isFiltered && (
+              <>
+                <div className="d-flex flex-wrap gap-2">
+                  {hasAssessmentFilter && assessments.filter(a => appliedAssessmentIds.has(a.id)).map(a => (
+                    <span key={a.id} className="badge badge-light-primary fw-semibold py-2 px-3">{a.assessmentName}</span>
+                  ))}
+                  {appliedEnabled.has("session") && Array.from(appliedSessions).map(s => (
+                    <span key={s} className="badge badge-light-info fw-semibold py-2 px-3">{s}</span>
+                  ))}
+                  {appliedEnabled.has("grade") && Array.from(appliedGrades).map(g => (
+                    <span key={g} className="badge badge-light-success fw-semibold py-2 px-3">{g}</span>
+                  ))}
+                  {appliedEnabled.has("section") && Array.from(appliedSections).map(s => (
+                    <span key={s} className="badge badge-light-warning fw-semibold py-2 px-3">{s}</span>
+                  ))}
+                </div>
+                <button
+                  className="btn btn-sm btn-light-danger d-flex align-items-center gap-1"
+                  onClick={() => {
+                    setAppliedEnabled(new Set());
+                    setAppliedAssessmentIds(new Set());
+                    setAppliedSessions(new Set());
+                    setAppliedGrades(new Set());
+                    setAppliedSections(new Set());
+                    setPendingEnabled(new Set());
+                    setPendingAssessmentIds(new Set());
+                    setPendingSessions(new Set());
+                    setPendingGrades(new Set());
+                    setPendingSections(new Set());
+                  }}
+                >
+                  <i className="bi bi-x-circle"></i>
+                  Clear All
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Filter Panel (toggleable) */}
+        {role === "principal" && showFilterPanel && (
+          <div className="card shadow-sm border border-primary border-opacity-25">
+            <div className="card-header border-0 py-3 px-5 bg-light-primary">
+              <div className="d-flex align-items-center justify-content-between w-100">
+                <span className="fw-bold text-gray-800 fs-6">Select Filters</span>
+                <button className="btn btn-sm btn-icon btn-light" onClick={() => setShowFilterPanel(false)}>
+                  <i className="bi bi-x fs-3"></i>
+                </button>
+              </div>
+            </div>
+            <div className="card-body p-0">
+              <div className="row g-0" style={{ minHeight: '300px' }}>
+                {/* Left panel — filter categories */}
+                <div className="col-12 col-md-4 col-lg-3 border-end">
+                  <div className="d-flex flex-column">
+                    {[
+                      { key: "assessment", label: "Assessment", icon: "bi-clipboard-data" },
+                      { key: "session", label: "Session", icon: "bi-calendar3" },
+                      { key: "grade", label: "Grade / Class", icon: "bi-mortarboard" },
+                      { key: "section", label: "Section", icon: "bi-diagram-3" },
+                    ].map((cat) => (
+                      <div
+                        key={cat.key}
+                        className={`d-flex align-items-center gap-3 px-5 py-4 border-bottom cursor-pointer ${
+                          activeFilterCategory === cat.key ? 'bg-light-primary' : 'bg-hover-light'
+                        }`}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => setActiveFilterCategory(cat.key)}
+                      >
+                        <div className="form-check form-check-custom form-check-sm">
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            checked={pendingEnabled.has(cat.key)}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              const next = new Set(Array.from(pendingEnabled));
+                              if (next.has(cat.key)) {
+                                next.delete(cat.key);
+                              } else {
+                                next.add(cat.key);
+                              }
+                              setPendingEnabled(next);
+                              setActiveFilterCategory(cat.key);
+                            }}
+                          />
+                        </div>
+                        <i className={`bi ${cat.icon} fs-5 ${activeFilterCategory === cat.key ? 'text-primary' : 'text-gray-600'}`}></i>
+                        <span className={`fw-semibold ${activeFilterCategory === cat.key ? 'text-primary' : 'text-gray-700'}`}>
+                          {cat.label}
+                        </span>
+                        {pendingEnabled.has(cat.key) && (
+                          <span className="badge badge-sm badge-circle badge-primary ms-auto">
+                            {cat.key === "assessment" ? pendingAssessmentIds.size
+                              : cat.key === "session" ? pendingSessions.size
+                              : cat.key === "grade" ? pendingGrades.size
+                              : pendingSections.size}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Right panel — options for selected category */}
+                <div className="col-12 col-md-8 col-lg-9">
+                  <div className="p-5">
+                    {!pendingEnabled.has(activeFilterCategory) && (
+                      <div className="text-center text-muted py-10">
+                        <i className="bi bi-check2-square fs-2x text-gray-400 d-block mb-3"></i>
+                        Tick the checkbox on the left to enable <strong>{activeFilterCategory}</strong> filter
+                      </div>
+                    )}
+
+                    {/* Assessment options */}
+                    {activeFilterCategory === "assessment" && pendingEnabled.has("assessment") && (
+                      <div>
+                        <div className="d-flex align-items-center justify-content-between mb-4">
+                          <span className="fw-bold text-gray-800">Select Assessments</span>
+                          <button
+                            className="btn btn-sm btn-light-primary"
+                            onClick={() => {
+                              if (pendingAssessmentIds.size === assessments.length) {
+                                setPendingAssessmentIds(new Set());
+                              } else {
+                                setPendingAssessmentIds(new Set(assessments.map(a => a.id)));
+                              }
+                            }}
+                          >
+                            {pendingAssessmentIds.size === assessments.length ? 'Deselect All' : 'Select All'}
+                          </button>
+                        </div>
+                        <div className="d-flex flex-column gap-2" style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                          {assessments.map((a) => (
+                            <label key={a.id} className="d-flex align-items-center gap-3 px-3 py-2 rounded bg-hover-light cursor-pointer" style={{ cursor: 'pointer' }}>
+                              <div className="form-check form-check-custom form-check-sm">
+                                <input
+                                  className="form-check-input"
+                                  type="checkbox"
+                                  checked={pendingAssessmentIds.has(a.id)}
+                                  onChange={() => {
+                                    const next = new Set(Array.from(pendingAssessmentIds));
+                                    if (next.has(a.id)) next.delete(a.id); else next.add(a.id);
+                                    setPendingAssessmentIds(next);
+                                  }}
+                                />
+                              </div>
+                              <span className="fw-semibold text-gray-700">{a.assessmentName}</span>
+                            </label>
+                          ))}
+                          {assessments.length === 0 && (
+                            <div className="text-muted text-center py-4">No assessments available</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Session options */}
+                    {activeFilterCategory === "session" && pendingEnabled.has("session") && (
+                      <div>
+                        <div className="d-flex align-items-center justify-content-between mb-4">
+                          <span className="fw-bold text-gray-800">Select Sessions</span>
+                          <button
+                            className="btn btn-sm btn-light-primary"
+                            onClick={() => {
+                              if (pendingSessions.size === allSessions.length) {
+                                setPendingSessions(new Set());
+                              } else {
+                                setPendingSessions(new Set(allSessions.map((s: any) => s.sessionYear)));
+                              }
+                            }}
+                          >
+                            {pendingSessions.size === allSessions.length ? 'Deselect All' : 'Select All'}
+                          </button>
+                        </div>
+                        <div className="d-flex flex-column gap-2" style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                          {allSessions.map((s: any) => (
+                            <label key={s.id} className="d-flex align-items-center gap-3 px-3 py-2 rounded bg-hover-light cursor-pointer" style={{ cursor: 'pointer' }}>
+                              <div className="form-check form-check-custom form-check-sm">
+                                <input
+                                  className="form-check-input"
+                                  type="checkbox"
+                                  checked={pendingSessions.has(s.sessionYear)}
+                                  onChange={() => {
+                                    const next = new Set(Array.from(pendingSessions));
+                                    if (next.has(s.sessionYear)) next.delete(s.sessionYear); else next.add(s.sessionYear);
+                                    setPendingSessions(next);
+                                  }}
+                                />
+                              </div>
+                              <span className="fw-semibold text-gray-700">{s.sessionYear}</span>
+                            </label>
+                          ))}
+                          {allSessions.length === 0 && (
+                            <div className="text-muted text-center py-4">No sessions available</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Grade options */}
+                    {activeFilterCategory === "grade" && pendingEnabled.has("grade") && (
+                      <div>
+                        <div className="d-flex align-items-center justify-content-between mb-4">
+                          <span className="fw-bold text-gray-800">Select Grades</span>
+                          <button
+                            className="btn btn-sm btn-light-primary"
+                            onClick={() => {
+                              if (pendingGrades.size === allGrades.length) {
+                                setPendingGrades(new Set());
+                              } else {
+                                setPendingGrades(new Set(allGrades.map(g => g.className)));
+                              }
+                            }}
+                          >
+                            {pendingGrades.size === allGrades.length ? 'Deselect All' : 'Select All'}
+                          </button>
+                        </div>
+                        <div className="d-flex flex-column gap-2" style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                          {allGrades.map((g) => (
+                            <label key={g.id} className="d-flex align-items-center gap-3 px-3 py-2 rounded bg-hover-light cursor-pointer" style={{ cursor: 'pointer' }}>
+                              <div className="form-check form-check-custom form-check-sm">
+                                <input
+                                  className="form-check-input"
+                                  type="checkbox"
+                                  checked={pendingGrades.has(g.className)}
+                                  onChange={() => {
+                                    const next = new Set(Array.from(pendingGrades));
+                                    if (next.has(g.className)) next.delete(g.className); else next.add(g.className);
+                                    setPendingGrades(next);
+                                  }}
+                                />
+                              </div>
+                              <span className="fw-semibold text-gray-700">{g.className}</span>
+                            </label>
+                          ))}
+                          {allGrades.length === 0 && (
+                            <div className="text-muted text-center py-4">No grades available</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Section options */}
+                    {activeFilterCategory === "section" && pendingEnabled.has("section") && (
+                      <div>
+                        <div className="d-flex align-items-center justify-content-between mb-4">
+                          <span className="fw-bold text-gray-800">Select Sections</span>
+                          <button
+                            className="btn btn-sm btn-light-primary"
+                            onClick={() => {
+                              if (pendingSections.size === allSectionsFlat.length) {
+                                setPendingSections(new Set());
+                              } else {
+                                setPendingSections(new Set(allSectionsFlat.map(s => s.sectionName)));
+                              }
+                            }}
+                          >
+                            {pendingSections.size === allSectionsFlat.length ? 'Deselect All' : 'Select All'}
+                          </button>
+                        </div>
+                        <div className="d-flex flex-column gap-2" style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                          {allSectionsFlat.map((s) => (
+                            <label key={s.id} className="d-flex align-items-center gap-3 px-3 py-2 rounded bg-hover-light cursor-pointer" style={{ cursor: 'pointer' }}>
+                              <div className="form-check form-check-custom form-check-sm">
+                                <input
+                                  className="form-check-input"
+                                  type="checkbox"
+                                  checked={pendingSections.has(s.sectionName)}
+                                  onChange={() => {
+                                    const next = new Set(Array.from(pendingSections));
+                                    if (next.has(s.sectionName)) next.delete(s.sectionName); else next.add(s.sectionName);
+                                    setPendingSections(next);
+                                  }}
+                                />
+                              </div>
+                              <span className="fw-semibold text-gray-700">{s.sectionName}</span>
+                              <span className="text-muted fs-8">({s.className})</span>
+                            </label>
+                          ))}
+                          {allSectionsFlat.length === 0 && (
+                            <div className="text-muted text-center py-4">No sections available</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            {/* Footer with Apply / Reset */}
+            <div className="card-footer py-3 px-5 d-flex justify-content-end gap-3">
+              <button
+                className="btn btn-sm btn-light"
+                onClick={() => {
+                  setPendingEnabled(new Set());
+                  setPendingAssessmentIds(new Set());
+                  setPendingSessions(new Set());
+                  setPendingGrades(new Set());
+                  setPendingSections(new Set());
+                }}
+              >
+                Reset
+              </button>
+              <button
+                className="btn btn-sm btn-primary"
+                onClick={() => {
+                  setAppliedEnabled(new Set(Array.from(pendingEnabled)));
+                  setAppliedAssessmentIds(new Set(Array.from(pendingAssessmentIds)));
+                  setAppliedSessions(new Set(Array.from(pendingSessions)));
+                  setAppliedGrades(new Set(Array.from(pendingGrades)));
+                  setAppliedSections(new Set(Array.from(pendingSections)));
+                  setShowFilterPanel(false);
+                }}
+              >
+                <i className="bi bi-check2 me-1"></i>
+                Apply Filters
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="row g-4 row-cols-1 row-cols-md-2 row-cols-xl-4">
           {data.stats.map((stat, index) => {
             // All 4 cards are clickable in principal view
@@ -968,7 +1542,11 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
                         className="btn btn-sm btn-primary mt-2"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleNavigateToStudentList();
+                          if (isFiltered) {
+                            setActiveModal('total');
+                          } else {
+                            handleNavigateToStudentList();
+                          }
                         }}
                       >
                         List of Students
@@ -1156,30 +1734,41 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
       </div>
 
       {/* Student List Modals */}
-      <StudentListModal
-        show={activeModal === 'total'}
-        onClose={() => setActiveModal(null)}
-        title="All Students"
-        students={studentStats.allStudents}
-      />
-      <StudentListModal
-        show={activeModal === 'ongoing'}
-        onClose={() => setActiveModal(null)}
-        title="Students with Ongoing Assessments"
-        students={studentStats.ongoingStudents}
-      />
-      <StudentListModal
-        show={activeModal === 'completed'}
-        onClose={() => setActiveModal(null)}
-        title="Students with Completed Assessments"
-        students={studentStats.completedStudents}
-      />
-      <StudentListModal
-        show={activeModal === 'notstarted'}
-        onClose={() => setActiveModal(null)}
-        title="Students with Not Started Assessments"
-        students={studentStats.notStartedStudents}
-      />
+      {(() => {
+        const suffix = isFiltered ? ` — ${activeFilterLabel}` : '';
+        return (
+          <>
+            <StudentListModal
+              show={activeModal === 'total'}
+              onClose={() => setActiveModal(null)}
+              title={`All Students${suffix}`}
+              students={studentStats.allStudents}
+              activeAssessmentIds={activeAssessmentIds}
+            />
+            <StudentListModal
+              show={activeModal === 'ongoing'}
+              onClose={() => setActiveModal(null)}
+              title={`Students with Ongoing Assessments${suffix}`}
+              students={studentStats.ongoingStudents}
+              activeAssessmentIds={activeAssessmentIds}
+            />
+            <StudentListModal
+              show={activeModal === 'completed'}
+              onClose={() => setActiveModal(null)}
+              title={`Students with Completed Assessments${suffix}`}
+              students={studentStats.completedStudents}
+              activeAssessmentIds={activeAssessmentIds}
+            />
+            <StudentListModal
+              show={activeModal === 'notstarted'}
+              onClose={() => setActiveModal(null)}
+              title={`Students with Not Started Assessments${suffix}`}
+              students={studentStats.notStartedStudents}
+              activeAssessmentIds={activeAssessmentIds}
+            />
+          </>
+        );
+      })()}
     </>
   );
 };
@@ -1219,7 +1808,7 @@ const InstituteDashboard: FC = () => {
       <PageTitle breadcrumbs={[]}>
         {intl.formatMessage({ id: "MENU.DASHBOARD" })}
       </PageTitle>
-      <DashboardAdminContent students={students} isLoading={isLoading} />
+      <DashboardAdminContent students={students} isLoading={isLoading} instituteId={id} />
     </>
   );
 };
