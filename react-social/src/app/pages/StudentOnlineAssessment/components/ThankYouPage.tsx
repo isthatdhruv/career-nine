@@ -33,22 +33,19 @@ const ThankYouPage: React.FC = () => {
                     animation: 'fadeIn 0.8s ease-out',
                 }}
             >
-                <div
+                <img
+                    src="/media/logos/kcc.jpg"
+                    alt="Career-9 Logo"
                     style={{
-                        width: '100px',
-                        height: '100px',
-                        background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
+                        width: '120px',
+                        height: '120px',
+                        objectFit: 'contain',
+                        borderRadius: '12px',
                         margin: '0 auto 30px auto',
-                        boxShadow: '0 8px 25px rgba(34, 197, 94, 0.4)',
+                        display: 'block',
                         animation: 'scaleIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                     }}
-                >
-                    <span style={{ fontSize: '50px', color: 'white' }}>✓</span>
-                </div>
+                />
 
                 <h1
                     style={{

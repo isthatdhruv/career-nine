@@ -17,9 +17,6 @@ const StudentLoginPage: React.FC = () => {
     if (!id) {
       return 'User ID is required';
     }
-    if (id.length < 3) {
-      return 'User ID must be at least 3 characters';
-    }
     return '';
   };
 

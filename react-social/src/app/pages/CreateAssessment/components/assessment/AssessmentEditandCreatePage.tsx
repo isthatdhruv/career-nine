@@ -93,7 +93,7 @@ const AssessmentEditPage = (props?: {
           }
           if (norm.customDemographicFields) {
             try {
-              setCustomFields(JSON.parse(norm.customDemographicFields));
+              // setCustomFields(JSON.parse(norm.customDemographicFields));
             } catch (e) { /* ignore parse errors */ }
           }
         } catch (error) {
