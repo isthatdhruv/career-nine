@@ -104,6 +104,8 @@ app:
       - myiosapp://oauth2/redirect
       - http://192.168.0.204:3000
   mandrill: WXX3fC00pJTZgonjnVvkgQ
+  gmail:
+    sender-email: ${GMAIL_SENDER:notifications@career-9.net}
   firebase:
     project-id: career-9-assessment
     service-account-file: firebase-service-account.json
@@ -199,6 +201,8 @@ app:
       - http://localhost:80/oauth2/redirect
       - myiosapp://oauth2/redirect
   mandrill: WXX3fC00pJTZgonjnVvkgQ
+  gmail:
+    sender-email: ${GMAIL_SENDER:notifications@career-9.net}
 ---
 spring:
   profiles: production
@@ -291,5 +295,7 @@ app:
       - http://localhost:80/oauth2/redirect
       - myiosapp://oauth2/redirect
   mandrill: WXX3fC00pJTZgonjnVvkgQ
+  gmail:
+    sender-email: ${GMAIL_SENDER:notifications@career-9.net}
 
 ---
