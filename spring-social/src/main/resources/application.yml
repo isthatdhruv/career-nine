@@ -105,7 +105,7 @@ app:
       - http://192.168.0.204:3000
   mandrill: WXX3fC00pJTZgonjnVvkgQ
   firebase:
-    project-id: career-library
+    project-id: career-9-assessment
     service-account-file: firebase-service-account.json
 
 ---

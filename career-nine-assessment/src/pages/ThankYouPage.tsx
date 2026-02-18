@@ -8,7 +8,9 @@ const ThankYouPage: React.FC = () => {
         navigate('/student-dashboard');
     };
 
-    
+    const handleExploreCareerLibrary = () => {
+        window.open('https://library.career-9.com', '_blank');
+    };
 
     return (
         <>
@@ -252,8 +254,10 @@ const ThankYouPage: React.FC = () => {
                                 e.currentTarget.style.boxShadow = '0 10px 35px rgba(245, 87, 108, 0.4)';
                             }}
                         >
-                            <a href="library.career-9.com" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-                            <div style={{
+                            <div 
+                            onClick={handleExploreCareerLibrary}
+                            style={{
+                                
                                 width: '50px',
                                 height: '50px',
                                 borderRadius: '12px',
@@ -278,7 +282,6 @@ const ThankYouPage: React.FC = () => {
                             }}>
                                 Explore Career Library
                             </h3>
-                            </a>
                             <p style={{
                                 color: 'rgba(255,255,255,0.85)',
                                 fontSize: '0.85rem',

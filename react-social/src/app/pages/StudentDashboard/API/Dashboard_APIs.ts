@@ -306,11 +306,12 @@ function getAttentionInterpretation(category: string): { interpretation: string;
 }
 
 /**
- * Get working memory category
+ * Get working memory category based on raw score (points out of 12)
+ * High: 10-12 → Multifaceted, Moderate: 6-9 → Sequential, Low: 0-5 → Unitary
  */
-function getWorkingMemoryCategory(levelReached: number): string {
-  if (levelReached >= 5) return "Multifaceted";
-  if (levelReached >= 3) return "Sequential";
+function getWorkingMemoryCategory(rawScore: number): string {
+  if (rawScore >= 10) return "Multifaceted";
+  if (rawScore >= 6) return "Sequential";
   return "Unitary";
 }
 
@@ -452,6 +453,134 @@ function getEnvironmentalCategory(netScore: number): { category: string; icon: s
       interpretation: "Your child currently prefers things that are quick and easy—try swapping one \"convenient\" choice for a \"green\" one this week!"
     };
   }
+}
+
+// ========== GAME RESULTS TYPES ==========
+
+interface RawAnimalReaction {
+  totalTrials?: number;
+  trialMs?: number;
+  target?: string;
+  targetsShown?: number;
+  hits?: number;
+  misses?: number;
+  falsePositives?: number;
+  hitRTsMs?: number[];
+  timestamp?: string;
+}
+
+interface RawRabbitPath {
+  score?: number;
+  totalRounds?: number;
+  roundsPlayed?: number;
+  history?: any[];
+  timestamp?: string;
+}
+
+interface RawHydroTube {
+  patternsCompleted?: number;
+  totalPatterns?: number;
+  aimlessRotations?: number;
+  curiousClicks?: number;
+  tilesCorrect?: number;
+  totalTiles?: number;
+  timeSpentSeconds?: number;
+  timestamp?: string;
+}
+
+interface RawGameResults {
+  userStudentId?: string;
+  animal_reaction?: RawAnimalReaction;
+  rabbit_path?: RawRabbitPath;
+  hydro_tube?: RawHydroTube;
+  lastUpdated?: string;
+}
+
+// ========== GAME RESULTS PROCESSING ==========
+
+/**
+ * Fetch game results from Firebase via backend.
+ * Document ID in Firebase = userStudentId.
+ */
+export async function fetchGameResults(studentId: number): Promise<RawGameResults | null> {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/game-results/get/${studentId}`);
+    return response.data;
+  } catch (error) {
+    console.warn("Failed to fetch game results:", error);
+    return null;
+  }
+}
+
+/**
+ * Process raw Firebase game results into CognitiveData for the dashboard.
+ * Applies d-prime calculation, category classification, and interpretation.
+ */
+export function processGameResults(raw: RawGameResults): CognitiveData {
+  const cognitive: CognitiveData = {};
+
+  // --- ATTENTION (animal_reaction / Jungle Spot game) ---
+  if (raw.animal_reaction) {
+    const ar = raw.animal_reaction;
+    const hits = ar.hits || 0;
+    const totalTargets = ar.targetsShown || 24;
+    const falsePositives = ar.falsePositives || 0;
+    const totalNonTargets = (ar.totalTrials || 120) - totalTargets;
+
+    const dPrime = calculateDPrime(hits, totalTargets, falsePositives, totalNonTargets);
+    const category = getAttentionCategory(dPrime);
+    const { interpretation, actionTip } = getAttentionInterpretation(category);
+
+    cognitive.attention = {
+      dPrimeScore: dPrime,
+      category,
+      hits,
+      misses: ar.misses || 0,
+      falsePositives,
+      interpretation,
+      actionTip,
+    };
+  }
+
+  // --- WORKING MEMORY (rabbit_path / Rabbit's Path game) ---
+  if (raw.rabbit_path) {
+    const rp = raw.rabbit_path;
+    const rawScore = rp.score || 0;
+    // Derive highest difficulty level reached from score
+    const levelReached = rawScore >= 10 ? 3 : rawScore >= 6 ? 2 : 1;
+    const category = getWorkingMemoryCategory(rawScore);
+    const { interpretation, actionTip } = getWorkingMemoryInterpretation(category);
+
+    cognitive.workingMemory = {
+      levelReached,
+      rawScore,
+      category,
+      pathwaysCompleted: rp.roundsPlayed || 0,
+      interpretation,
+      actionTip,
+    };
+  }
+
+  // --- COGNITIVE FLEXIBILITY (hydro_tube / Hydro Tube game) ---
+  if (raw.hydro_tube) {
+    const ht = raw.hydro_tube;
+    const time = ht.timeSpentSeconds || 0;
+    const aimlessClicks = ht.aimlessRotations || 0;
+    const style = getCognitiveFlexibilityStyle(time, aimlessClicks);
+    const { interpretation, actionTip } = getCognitiveFlexibilityInterpretation(style);
+
+    cognitive.cognitiveFlexibility = {
+      style,
+      time,
+      aimlessClicks,
+      puzzlesCompleted: ht.patternsCompleted || 0,
+      curiousClicks: ht.curiousClicks || 0,
+      interpretation,
+      actionTip,
+    };
+  }
+
+  return cognitive;
 }
 
 // ========== API FUNCTIONS ==========
@@ -805,6 +934,16 @@ export async function getDashboardDataFromCache(
     };
   }
 
+  // Fetch cognitive data from Firebase game results
+  try {
+    const gameResults = await fetchGameResults(studentId);
+    if (gameResults) {
+      dashboardData.cognitive = processGameResults(gameResults);
+    }
+  } catch (error) {
+    console.warn("Failed to fetch game results for cognitive data:", error);
+  }
+
   // Enrich student info from demographics endpoint
   try {
     const studentResponse = await axios.get(
@@ -926,12 +1065,13 @@ export async function getDashboardData(studentId: number, assessmentId?: number 
     let workingMemoryData: WorkingMemoryData | undefined;
     if (cognitiveRaw.workingMemory) {
       const { levelReached, pathwaysCompleted, rawScore } = cognitiveRaw.workingMemory;
-      const category = getWorkingMemoryCategory(levelReached || 1);
+      const score = rawScore || 0;
+      const category = getWorkingMemoryCategory(score);
       const { interpretation, actionTip } = getWorkingMemoryInterpretation(category);
 
       workingMemoryData = {
-        levelReached: levelReached || 1,
-        rawScore: rawScore || 0,
+        levelReached: levelReached || (score >= 10 ? 3 : score >= 6 ? 2 : 1),
+        rawScore: score,
         category,
         pathwaysCompleted: pathwaysCompleted || 0,
         interpretation,
@@ -1115,13 +1255,14 @@ export async function getDashboardData(studentId: number, assessmentId?: number 
  * Headers are fully dynamic — derived from Measured Qualities and their Quality Types
  * found in the assessment's rawScores. Cells contain the raw score values.
  *
- * Column layout: userStudentId | Name | Class | [MQ - MQT columns from rawScores...]
+ * Column layout: userStudentId | Name | Class | Cognitive columns | [MQ - MQT columns from rawScores...]
  * MQTs are grouped by their parent MQ (sorted by MQ ID, then MQT ID within each group).
  * If an MQ has a single MQT with the same name, the column header is just the MQ name.
  */
 export function exportBetAssessmentToExcel(
   assessmentData: DashboardApiAssessmentData,
-  studentInfo: StudentInfo
+  studentInfo: StudentInfo,
+  cognitiveData?: CognitiveData
 ): void {
   const XLSX = require("xlsx");
 
@@ -1161,6 +1302,30 @@ export function exportBetAssessmentToExcel(
     Class: studentInfo.grade || "N/A",
   };
 
+  // --- Cognitive data (game results) ---
+  if (cognitiveData?.attention) {
+    const a = cognitiveData.attention;
+    row["Attention - d' Score"] = Number(a.dPrimeScore.toFixed(2));
+    row["Attention - Hits"] = a.hits;
+    row["Attention - Misses"] = a.misses;
+    row["Attention - False Positives"] = a.falsePositives;
+    row["Attention - Category"] = a.category;
+  }
+  if (cognitiveData?.workingMemory) {
+    const wm = cognitiveData.workingMemory;
+    row["Working Memory - Raw Score"] = wm.rawScore;
+    row["Working Memory - Level Reached"] = wm.levelReached;
+    row["Working Memory - Category"] = wm.category;
+  }
+  if (cognitiveData?.cognitiveFlexibility) {
+    const cf = cognitiveData.cognitiveFlexibility;
+    row["Cognitive Flexibility - Time (sec)"] = cf.time;
+    row["Cognitive Flexibility - Aimless Clicks"] = cf.aimlessClicks;
+    row["Cognitive Flexibility - Puzzles Completed"] = cf.puzzlesCompleted;
+    row["Cognitive Flexibility - Style"] = cf.style;
+  }
+
+  // --- Assessment rawScores (MQ/MQT) ---
   sortedGroups.forEach((group) => {
     // Individual MQT columns
     group.types.forEach((type) => {

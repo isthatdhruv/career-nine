@@ -20,7 +20,7 @@ public class FirebaseConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(FirebaseConfig.class);
 
-    @Value("${app.firebase.project-id:career-library}")
+    @Value("${app.firebase.project-id:career-9-assessment}")
     private String projectId;
 
     @Value("${app.firebase.service-account-file:firebase-service-account.json}")
