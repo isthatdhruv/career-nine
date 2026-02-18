@@ -2,6 +2,7 @@ package com.kccitm.api.model;
 
 import java.io.Serializable;
 
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
 import javax.persistence.GeneratedValue;
@@ -34,6 +35,9 @@ public class ContactPerson implements Serializable {
     private String designation;
     private String gender;
     private String type;
+
+    @Column(name = "user_id")
+    private Long userId;
 
     // Many contact persons belong to one institute
     // contact person
@@ -104,6 +108,14 @@ public class ContactPerson implements Serializable {
 
     public void setType(String type) {
         this.type = type;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
     }
 
 }
