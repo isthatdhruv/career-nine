@@ -41,6 +41,7 @@ import com.kccitm.api.repository.Career9.School.SchoolSessionRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
+import com.kccitm.api.service.GmailApiEmailServiceImpl;
 
 @RestController
 @RequestMapping("/assessment-mapping")
@@ -77,6 +78,9 @@ public class AssessmentInstituteMappingController {
 
     @Autowired
     private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
+
+    @Autowired
+    private GmailApiEmailServiceImpl gmailApiEmailService;
 
     // ============ ADMIN ENDPOINTS ============
 
@@ -321,6 +325,11 @@ public class AssessmentInstituteMappingController {
             response.put("username", user.getUsername());
             response.put("dob", dobStr);
 
+            // Send registration email with credentials
+            String assessmentName = assessmentTableRepository.findById(assessmentId)
+                    .map(a -> a.getAssessmentName()).orElse("Assessment");
+            sendRegistrationEmail(email, name, user.getUsername(), dobStr, assessmentName);
+
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
@@ -380,10 +389,50 @@ public class AssessmentInstituteMappingController {
         if (user != null) {
             response.put("username", user.getUsername());
             SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
-            response.put("dob", user.getDobDate() != null ? sdf.format(user.getDobDate()) : "");
+            String dobFormatted = user.getDobDate() != null ? sdf.format(user.getDobDate()) : "";
+            response.put("dob", dobFormatted);
+
+            // Send email for newly assigned assessments (not already registered)
+            if (!"already_registered".equals(response.get("status")) && existingStudentInfo.getEmail() != null) {
+                String assessmentName = assessmentTableRepository.findById(assessmentId)
+                        .map(a -> a.getAssessmentName()).orElse("Assessment");
+                sendRegistrationEmail(existingStudentInfo.getEmail(), existingStudentInfo.getName(),
+                        user.getUsername(), dobFormatted, assessmentName);
+            }
         }
 
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Send registration confirmation email with login credentials.
+     */
+    private void sendRegistrationEmail(String toEmail, String studentName, String username, String dob, String assessmentName) {
+        try {
+            String subject = "Registration Successful - " + assessmentName;
+            String htmlContent = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>"
+                    + "<div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 24px; border-radius: 12px 12px 0 0; color: white;'>"
+                    + "<h2 style='margin: 0;'>Registration Successful!</h2>"
+                    + "</div>"
+                    + "<div style='padding: 24px; background: #ffffff; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 12px 12px;'>"
+                    + "<p>Dear <strong>" + studentName + "</strong>,</p>"
+                    + "<p>You have been successfully registered for <strong>" + assessmentName + "</strong>.</p>"
+                    + "<p>Here are your login credentials:</p>"
+                    + "<div style='background: #f8f9fa; padding: 16px; border-radius: 8px; margin: 16px 0;'>"
+                    + "<p style='margin: 4px 0;'><strong>Username:</strong> <span style='color: #667eea; font-size: 1.1em;'>" + username + "</span></p>"
+                    + "<p style='margin: 4px 0;'><strong>Password:</strong> <span style='color: #667eea; font-size: 1.1em;'>" + dob + "</span> (Your Date of Birth)</p>"
+                    + "</div>"
+                    + "<p style='color: #666; font-size: 0.9em;'>Please save these credentials. You will need them to log in and take the assessment.</p>"
+                    + "<p style='color: #999; font-size: 0.8em; margin-top: 24px;'>This is an automated email. Please do not reply.</p>"
+                    + "</div>"
+                    + "</div>";
+
+            gmailApiEmailService.sendHtmlEmail(toEmail, subject, htmlContent);
+            logger.info("Registration email sent to: {}", toEmail);
+        } catch (Exception e) {
+            logger.error("Failed to send registration email to: {}. Error: {}", toEmail, e.getMessage(), e);
+            // Don't fail registration if email fails
+        }
     }
 
     /**
