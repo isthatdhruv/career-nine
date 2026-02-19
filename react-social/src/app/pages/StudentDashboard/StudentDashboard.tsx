@@ -100,7 +100,7 @@ const StudentDashboard: React.FC = () => {
       (a) => a.assessmentId === selectedAssessmentId
     );
     if (!assessmentData) return;
-    exportBetAssessmentToExcel(assessmentData, dashboardData.student);
+    exportBetAssessmentToExcel(assessmentData, dashboardData.student, dashboardData.cognitive);
   };
 
   if (loading) {

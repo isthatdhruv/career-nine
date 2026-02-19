@@ -1,0 +1,193 @@
+// Assessment + Questionnaire page responsive fixes (Plan 03)
+// All rules are media-guarded — no unguarded overrides.
+
+// ============================================================
+// QuestionTable header toolbar
+// The toolbar is `d-flex justify-content-end gap-2` holding
+// 4 buttons + a select + a search input. On narrow screens
+// they overflow off-screen.  Wrap them and let them fill the
+// available width so each row is usable without scrolling.
+// ============================================================
+@media (max-width: 767.98px) {
+  // Toolbar row: allow wrapping, align-left so items don't
+  // stretch to a full-width single column by accident.
+  .d-flex.justify-content-end.mb-2.gap-2 {
+    flex-wrap: wrap;
+    justify-content: flex-start !important;
+
+    // Every direct child (button, select, input) should not
+    // exceed the viewport minus gutter on very small screens.
+    > * {
+      max-width: 100%;
+    }
+
+    // The section-filter select should not be wider than the
+    // available space on mobile (inline max-width: 200px is
+    // fine on desktop but may still be tight at 375px).
+    > select {
+      flex: 1 1 auto;
+      max-width: none;
+    }
+
+    // Search input — allow it to fill a full row.
+    > input[type="search"] {
+      flex: 1 1 100%;
+      max-width: none;
+    }
+  }
+}
+
+// ============================================================
+// QuestionCreatePage — option builder row
+// Each option is rendered as:
+//   <div class="d-flex align-items-start gap-2">
+//     <input flex-grow-1>  |  <Dropdown MQT>  |  <btn ->  |  <btn +>
+//   </div>
+// On mobile this single flex row will force horizontal scroll.
+// Wrap it so the text input fills the row and action buttons
+// sit below on a second line.
+// ============================================================
+@media (max-width: 575.98px) {
+  // The option builder container that holds the text input
+  // and inline action buttons side-by-side.
+  // We scope tightly: inside .card-body > fv-row > .mb-3.p-3.border.rounded
+  .card-body .fv-row .mb-3.p-3.border.rounded.bg-light {
+    > .d-flex.align-items-start.gap-2 {
+      flex-wrap: wrap;
+
+      // Text input takes a full row
+      > .form-control.flex-grow-1 {
+        flex: 1 1 100%;
+      }
+
+      // Flex-grow-1 wrapper for image upload also takes full row
+      > .flex-grow-1 {
+        flex: 1 1 100%;
+      }
+
+      // Action buttons (Dropdown, remove, add) stay inline together
+      // on the second row.  They are naturally flex children so they
+      // wrap onto a new line after the input above.
+    }
+  }
+
+  // Max Options Allowed input — has inline style={{ width: 200 }}
+  // combined with w-25 class.  On 375px screens 200px is >50%.
+  // Override just for input[type=number] inside card-body fv-row.
+  .card-body .fv-row input[type="number"].form-control {
+    max-width: 100%;
+    width: 100% !important;
+  }
+}
+
+// ============================================================
+// QuestionEditPage — option row Bootstrap grid
+// Row is: <div class="row g-3">
+//   col-auto (Sequence, width 80px select)
+//   col       (text / image)
+//   col-auto  (Quality Types, minWidth 200px — inline style)
+//   col-auto  (Actions)
+// </div>
+//
+// Bootstrap wraps col-auto/col columns on xs, so the layout
+// already stacks.  The only problem is the inline minWidth
+// 200px on the Quality Types column which can force overflow
+// on 375px.  Target the wrapping col-auto with inline style.
+//
+// We cannot remove the inline style via CSS, but we CAN cap
+// the min-width so the column doesn't exceed the viewport.
+// Target: .col-auto that contains the Dropdown component.
+// ============================================================
+@media (max-width: 575.98px) {
+  .card-body .fv-row .mb-3.p-3.border.rounded.bg-light .row.g-3 {
+    // Quality-types column with minWidth 200px — allow it to
+    // shrink below 200px on very small screens.
+    > [style*="min-width"] {
+      min-width: 0 !important;
+      flex: 1 1 100%;
+    }
+
+    // Sequence column (col-auto, w-80px select) — keep narrow
+    > .col-auto:first-child {
+      flex: 0 0 auto;
+    }
+
+    // Make actions column naturally flow
+    > .col-auto:last-child {
+      flex: 0 0 auto;
+    }
+  }
+}
+
+// ============================================================
+// QuestionareCreateSinglePage / QuestionareEditSinglePage
+// card-footer actions row
+// The footer has:
+//   <div class="card-footer d-flex justify-content-between">
+//     <btn Cancel>
+//     <div>
+//       <btn Preview>  <btn Create Questionaire>
+//     </div>
+//   </div>
+// At 375px the inner div with two buttons can overflow.
+// Stack the footer vertically on mobile.
+// ============================================================
+@media (max-width: 575.98px) {
+  // Target the outer footer flex container
+  .card-footer.d-flex.justify-content-between {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+
+    // Inner button group — stack buttons and fill width
+    > div {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+
+      > .btn {
+        width: 100%;
+        margin-right: 0 !important;
+        margin-left: 0 !important;
+      }
+    }
+
+    // Cancel button — fill width
+    > .btn {
+      width: 100%;
+    }
+  }
+}
+
+// ============================================================
+// AssessmentSection + QuestionareCreateSinglePage
+// Section checkbox grid: col-md-6 col-lg-4 stacks at md.
+// No extra CSS needed — Bootstrap handles it.
+//
+// General: ensure no form-control inside card-body overflows
+// on very small screens (covers AssessmentEditandCreatePage
+// and QuestionSectionCreatePage/EditPage which are all single-
+// column forms with no fixed widths, but the Metronic
+// form-control-lg might be wider than the viewport in edge
+// cases when inside nested cards with padding).
+// ============================================================
+@media (max-width: 575.98px) {
+  .card-body .form-control,
+  .card-body .form-select {
+    max-width: 100%;
+  }
+}
+
+// ============================================================
+// MDBDataTableV5 with MUI Select in cells (QuestionTable)
+// The global _tables.scss already provides horizontal scroll
+// via overflow-x: auto on the table wrapper.
+// The MUI Select has sx={{ width: 200 }} inline — it's inside
+// a scrollable wrapper so no extra fix is needed.
+// As a safety net, cap .MuiFormControl-root inside MDB tables.
+// ============================================================
+@media (max-width: 991.98px) {
+  .dataTables_wrapper .MuiFormControl-root {
+    max-width: 200px;
+  }
+}

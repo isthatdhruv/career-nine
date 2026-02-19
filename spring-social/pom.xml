@@ -188,6 +188,12 @@
 			<artifactId>google-api-services-admin-directory</artifactId>
 			<version>directory_v1-rev20211221-1.32.1</version>
 		</dependency>
+		<!-- Gmail API for sending emails via service account -->
+		<dependency>
+			<groupId>com.google.apis</groupId>
+			<artifactId>google-api-services-gmail</artifactId>
+			<version>v1-rev20220404-2.0.0</version>
+		</dependency>
 		<dependency>
 			<groupId>com.cribbstechnologies.clients</groupId>
 			<artifactId>mandrillClient</artifactId>

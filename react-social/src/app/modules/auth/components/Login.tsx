@@ -151,12 +151,12 @@ const Login = () => {
           )}
         </button>
 
-        <a
+        {/* <a
           href={Redirect_URL}
           className="btn btn-flex flex-center btn-light btn-lg w-100 mb-5"
         >
           Login with Google
-        </a>
+        </a> */}
       </div>
       {/* end::Action */}
     </form>
