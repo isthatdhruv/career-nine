@@ -43,12 +43,37 @@
 @media (max-width: 767.98px) {
   .app-content .min-vh-100 {
     padding: 1rem !important;
+    overflow-x: hidden;
+    max-width: 100vw;
   }
 }
 
 @media (max-width: 575.98px) {
   .app-content .min-vh-100 {
     padding: 0.5rem !important;
+  }
+}
+
+// ─── GroupStudentPage / StudentsList: Custom table scroll fix ─────────────────
+// These pages use plain HTML <table> inside <div class="table-responsive">.
+// Bootstrap's .card has overflow:hidden which can clip the scroll indicator.
+// We force the card to constrain to available width and ensure the
+// table-responsive container can scroll the wide table horizontally.
+@media (max-width: 991.98px) {
+  .app-content .min-vh-100 > .card {
+    max-width: 100%;
+    overflow: visible;
+  }
+
+  .app-content .min-vh-100 .card-body .table-responsive {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  // The 9-column table has generous 24px cell padding. Reduce on mobile.
+  .app-content .min-vh-100 .table-responsive .table th,
+  .app-content .min-vh-100 .table-responsive .table td {
+    padding: 8px 12px !important;
   }
 }
 
