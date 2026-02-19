@@ -1,1 +1,105 @@
-// Roles, Faculty, Dashboard, sub-page responsive fixes (Plan 04)
+// Roles, Faculty, Dashboard, and miscellaneous page responsive fixes (Plan 04)
+//
+// ============================================================================
+// PAGE-BY-PAGE RESPONSIVE DECISION LOG
+// ============================================================================
+//
+// DashboardAdminPage (dashboard-admin.tsx):
+//   Uses Bootstrap row-cols-1/row-cols-md-2/row-cols-xl-4 stat cards,
+//   col-12/col-xl-4/col-xl-6/col-xl-8 chart sections, col-12/col-lg-4/col-lg-8
+//   for student scorecard. All Bootstrap responsive grid — no custom CSS needed.
+//
+// InstituteDashboard (InstituteDashboard.tsx):
+//   Identical Bootstrap-responsive structure to DashboardAdminPage. Also uses
+//   col-12/col-md-4/col-md-8 for the filter panel. No custom CSS needed.
+//
+// ReportsPage (ReportsPage.tsx):
+//   Uses col-md-6 Bootstrap grid for institute/assessment selectors, and
+//   table-responsive wrapper for the export format table. No custom CSS needed.
+//
+// Users.tsx (CollegeAssignRolePage):
+//   Has table-responsive wrapper around the metronic-table, plus an inline
+//   <style> block with its own @media (max-width: 768px) rule. Fully handled.
+//   No additional CSS needed.
+//
+// ClassTeacherDashboard and PrincipalDashboard:
+//   Have their own comprehensive responsive CSS per Plan 02/03.
+//   No additional overrides needed here.
+//
+// LNAV-03 (sidebar full-width content):
+//   Metronic KTDrawer JS handles sidebar close on mobile — no custom CSS needed.
+//
+// MeasuredQualitiesCreatePage, MeasuredQualityTypesCreatePage, CareerCreatePage,
+// ToolCreatePage, ToolEditPage:
+//   All use vertical fv-row stacking or single-column Bootstrap containers.
+//   Already responsive — no CSS needed.
+//
+// ============================================================================
+// PAGES NEEDING CSS FIXES
+// ============================================================================
+//
+// 1. Role.tsx / Role_RoleGroup.tsx / RoleUser1.tsx
+//    These share the same Bootstrap .row layout:
+//      .row > .col (input) > .col (input/select) > .col-2 (submit button)
+//    Bootstrap's .col auto-stacks on xs, but .col-2 (width: 16.666%) becomes
+//    too narrow to render the icon-only submit button properly on xs.
+//    Fix: stack all columns to full-width on mobile, restore side-by-side on sm+.
+//
+// 2. FacultyRegistrationForm.tsx
+//    Form uses col-md-4 Bootstrap grid (stacks on mobile automatically), BUT
+//    the submit button wrapper has a hard-coded inline style:
+//      style={{ marginInline: "30vw" }}
+//    This crops the button area to 40vw width on all screen sizes including
+//    very narrow phones. We can't change inline styles via SCSS directly, but
+//    we can select the containing div by its parent context (the form + .mt-10
+//    class combo) and override the margin via !important.
+
+// ============================================================================
+// FIX 1 — Role / Role_RoleGroup / RoleUser — form row stacking on mobile
+// ============================================================================
+// These pages share the same form structure:
+//   <Form class="form fv-plugins-bootstrap5 ... w-100 mt-5 mb-5">
+//     <div class="row">
+//       <div class="col">...</div>
+//       <div class="col">...</div>
+//       <div class="col-2">...</div>
+//     </div>
+//   </Form>
+// On xs screens, Bootstrap's default .col stacking works but .col-2 is only
+// 16.666% wide — too narrow for the icon button. Force all columns full-width
+// on very small screens and give the button reasonable size.
+
+@media (max-width: 575.98px) {
+  // Stack role-form columns on mobile
+  .form.fv-plugins-bootstrap5.fv-plugins-framework.w-100 > .row > .col,
+  .form.fv-plugins-bootstrap5.fv-plugins-framework.w-100 > .row > .col-2 {
+    flex: 0 0 100%;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  // Give submit button row a bit of bottom spacing when stacked
+  .form.fv-plugins-bootstrap5.fv-plugins-framework.w-100 > .row > .col-2 {
+    margin-top: 0.5rem;
+  }
+
+  // Align the icon-button to the left when stacked (it was justify-content-end)
+  .form.fv-plugins-bootstrap5.fv-plugins-framework.w-100 > .row > .col-2 .d-flex.justify-content-end {
+    justify-content: flex-start !important;
+  }
+}
+
+// ============================================================================
+// FIX 2 — FacultyRegistrationForm — submit button area margin on mobile
+// ============================================================================
+// The submit + generate checkbox wrapper has: style={{ marginInline: "30vw" }}
+// This leaves only 40vw width on mobile. Override via parent selectors.
+// Target: .form#form1 > .mt-10.mb-5.d-flex (the submit row div)
+// Since we cannot target inline style, we use the class chain.
+
+@media (max-width: 768px) {
+  form#form1 .mt-10.mb-5.d-flex {
+    margin-inline: 0 !important;
+    justify-content: center;
+  }
+}
