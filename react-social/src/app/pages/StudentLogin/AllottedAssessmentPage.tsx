@@ -78,7 +78,19 @@ export default function AllottedAssessmentPage() {
       // Store the selected assessment ID for use in other pages
       localStorage.setItem('assessmentId', String(assessment.assessmentId));
 
-      // Update status to 'ongoing' on the backend
+      // Check if demographics are configured and need to be completed
+      const statusRes = await fetch(
+        `${process.env.REACT_APP_API_URL}/student-demographics/status/${assessment.assessmentId}/${userStudentId}`
+      );
+      const statusData = await statusRes.json();
+
+      if (statusData.totalFields > 0 && !statusData.completed) {
+        // Demographics required and not yet completed - go to demographics form
+        navigate(`/demographics/${assessment.assessmentId}`);
+        return;
+      }
+
+      // No demographics needed or already completed - proceed to assessment
       await fetch(`${process.env.REACT_APP_API_URL}/assessments/startAssessment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

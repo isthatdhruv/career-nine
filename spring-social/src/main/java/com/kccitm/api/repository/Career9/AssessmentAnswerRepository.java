@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.kccitm.api.model.career9.Questionaire.AssessmentAnswer;
 
@@ -31,6 +32,9 @@ public interface AssessmentAnswerRepository extends JpaRepository<AssessmentAnsw
        ArrayList<AssessmentAnswer> findByUserStudentIdAndAssessmentIdWithDetails(
                      @Param("userStudentId") Long userStudentId,
                      @Param("assessmentId") Long assessmentId);
+
+       @Transactional
+       void deleteByUserStudent_UserStudentIdAndAssessment_Id(Long userStudentId, Long assessmentId);
 
        // @Query("SELECT"+
        // " new
