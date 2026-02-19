@@ -1,0 +1,35 @@
+// XL modals go fullscreen below sm breakpoint (576px).
+// Covers all 5 xl modals: StudentUploadModal, CollegeSectionSessionGradeModal,
+// AssessmentMappingModal, UserCollegeMappingModal, QuestionBulkUploadModal.
+
+@media (max-width: 575.98px) {
+  .modal-dialog.modal-xl {
+    width: 100vw;
+    max-width: none;
+    height: 100%;
+    margin: 0;
+
+    .modal-content {
+      height: 100%;
+      border: 0;
+      border-radius: 0;
+    }
+
+    .modal-body {
+      overflow-y: auto;
+    }
+
+    .modal-header,
+    .modal-footer {
+      border-radius: 0;
+    }
+  }
+}
+
+// All modals: ensure body scrolls on small screens
+@media (max-width: 767.98px) {
+  .modal-body {
+    overflow-y: auto;
+    max-height: calc(100vh - 200px);
+  }
+}
