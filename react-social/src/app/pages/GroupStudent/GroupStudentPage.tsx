@@ -11,6 +11,7 @@ import {
   getBulkStudentAnswersWithDetails,
   StudentAnswerDetail,
   resetAssessment,
+  getAllGameResults,
 } from "../StudentInformation/StudentInfo_APIs";
 import * as XLSX from "xlsx";
 
@@ -72,6 +73,7 @@ export default function GroupStudentPage() {
   const [bulkDownloadAnswers, setBulkDownloadAnswers] = useState<any[]>([]);
   const [bulkDownloadError, setBulkDownloadError] = useState<string>("");
   const [bulkDownloading, setBulkDownloading] = useState(false);
+  const [bulkGameResults, setBulkGameResults] = useState<Map<string, any>>(new Map());
 
   // Filter panel state
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -692,6 +694,7 @@ export default function GroupStudentPage() {
     setBulkDownloadLoading(true);
     setBulkDownloadError("");
     setBulkDownloadAnswers([]);
+    setBulkGameResults(new Map());
 
     try {
       // Build pairs: for each filtered student, include all their active assessments
@@ -717,8 +720,22 @@ export default function GroupStudentPage() {
         return;
       }
 
-      const response = await getBulkStudentAnswersWithDetails(pairs);
-      setBulkDownloadAnswers(Array.isArray(response.data) ? response.data : []);
+      // Fetch answers and game results in parallel
+      const [answersResponse, gameResponse] = await Promise.all([
+        getBulkStudentAnswersWithDetails(pairs),
+        getAllGameResults().catch(() => ({ data: [] })),
+      ]);
+
+      setBulkDownloadAnswers(Array.isArray(answersResponse.data) ? answersResponse.data : []);
+
+      // Index game results by userStudentId for quick lookup
+      const gameMap = new Map<string, any>();
+      const gameList = Array.isArray(gameResponse.data) ? gameResponse.data : [];
+      for (const doc of gameList) {
+        const id = String(doc.userStudentId || doc.id || "");
+        if (id) gameMap.set(id, doc);
+      }
+      setBulkGameResults(gameMap);
     } catch (err: any) {
       console.error("Error fetching bulk answers:", err);
       setBulkDownloadError("Failed to load student answers. Please try again.");
@@ -727,21 +744,120 @@ export default function GroupStudentPage() {
     }
   };
 
+  // Game data column definitions
+  const gameColumns = [
+    "Jungle Spot - Hits",
+    "Jungle Spot - Misses",
+    "Jungle Spot - False Positives",
+    "Jungle Spot - Targets Shown",
+    "Rabbit Path - Score",
+    "Rabbit Path - Total Rounds",
+    "Rabbit Path - Rounds Played",
+    "Hydro Tube - Patterns Completed",
+    "Hydro Tube - Total Patterns",
+    "Hydro Tube - Aimless Rotations",
+    "Hydro Tube - Curious Clicks",
+    "Hydro Tube - Tiles Correct",
+    "Hydro Tube - Total Tiles",
+    "Hydro Tube - Time (sec)",
+  ];
+
+  // Extract game data for a student into a flat record
+  const extractGameData = (gameDoc: any): Record<string, any> => {
+    const data: Record<string, any> = {};
+    if (!gameDoc) return data;
+
+    const ar = gameDoc.animal_reaction;
+    if (ar) {
+      data["Jungle Spot - Hits"] = ar.hits ?? "";
+      data["Jungle Spot - Misses"] = ar.misses ?? "";
+      data["Jungle Spot - False Positives"] = ar.falsePositives ?? "";
+      data["Jungle Spot - Targets Shown"] = ar.targetsShown ?? "";
+    }
+
+    const rp = gameDoc.rabbit_path;
+    if (rp) {
+      data["Rabbit Path - Score"] = rp.score ?? "";
+      data["Rabbit Path - Total Rounds"] = rp.totalRounds ?? "";
+      data["Rabbit Path - Rounds Played"] = rp.roundsPlayed ?? "";
+    }
+
+    const ht = gameDoc.hydro_tube;
+    if (ht) {
+      data["Hydro Tube - Patterns Completed"] = ht.patternsCompleted ?? "";
+      data["Hydro Tube - Total Patterns"] = ht.totalPatterns ?? "";
+      data["Hydro Tube - Aimless Rotations"] = ht.aimlessRotations ?? "";
+      data["Hydro Tube - Curious Clicks"] = ht.curiousClicks ?? "";
+      data["Hydro Tube - Tiles Correct"] = ht.tilesCorrect ?? "";
+      data["Hydro Tube - Total Tiles"] = ht.totalTiles ?? "";
+      data["Hydro Tube - Time (sec)"] = ht.timeSpentSeconds ?? "";
+    }
+
+    return data;
+  };
+
+  // Pivot bulk answers: one row per student+assessment, each question as a column
+  const pivotedBulkData = useMemo(() => {
+    if (bulkDownloadAnswers.length === 0 && bulkGameResults.size === 0) return { rows: [] as any[], questionColumns: [] as string[], hasGameData: false };
+
+    // Collect all unique question column headers in order of first appearance
+    const questionColumnsSet = new Set<string>();
+    for (const row of bulkDownloadAnswers) {
+      const colKey = row.excelQuestionHeader || row.questionText || "";
+      if (colKey) questionColumnsSet.add(colKey);
+    }
+    const questionColumns = Array.from(questionColumnsSet);
+
+    // Group by student + assessment
+    const groupMap = new Map<string, { studentName: string; userStudentId: string; assessmentName: string; answers: Record<string, string>; gameData: Record<string, any> }>();
+    for (const row of bulkDownloadAnswers) {
+      const key = `${row.userStudentId}_${row.assessmentName}`;
+      if (!groupMap.has(key)) {
+        const gameDoc = bulkGameResults.get(String(row.userStudentId));
+        groupMap.set(key, {
+          studentName: row.studentName || "",
+          userStudentId: row.userStudentId || "",
+          assessmentName: row.assessmentName || "",
+          answers: {},
+          gameData: extractGameData(gameDoc),
+        });
+      }
+      const colKey = row.excelQuestionHeader || row.questionText || "";
+      if (colKey) {
+        groupMap.get(key)!.answers[colKey] = row.optionText || "";
+      }
+    }
+
+    const rows = Array.from(groupMap.values());
+    const hasGameData = bulkGameResults.size > 0;
+    return { rows, questionColumns, hasGameData };
+  }, [bulkDownloadAnswers, bulkGameResults]);
+
   const handleBulkDownloadExcel = () => {
     if (bulkDownloadAnswers.length === 0) return;
 
     setBulkDownloading(true);
     try {
-      const excelData = bulkDownloadAnswers.map((row: any, index: number) => ({
-        "S.No": index + 1,
-        "Student Name": row.studentName || "",
-        "User ID": row.userStudentId || "",
-        "Assessment": row.assessmentName || "",
-        "Section Name": row.sectionName || "",
-        "Excel Header": row.excelQuestionHeader || "",
-        "Question Text": row.questionText || "",
-        "Opted Option Text": row.optionText || "",
-      }));
+      const { rows, questionColumns, hasGameData } = pivotedBulkData;
+
+      const excelData = rows.map((row, index) => {
+        const base: Record<string, any> = {
+          "S.No": index + 1,
+          "Student Name": row.studentName,
+          "User ID": row.userStudentId,
+          "Assessment": row.assessmentName,
+        };
+        for (const col of questionColumns) {
+          base[col] = row.answers[col] || "";
+        }
+        // Add game data columns
+        if (hasGameData) {
+          for (const col of gameColumns) {
+            base[col] = row.gameData[col] ?? "";
+          }
+        }
+        return base;
+      });
 
       const worksheet = XLSX.utils.json_to_sheet(excelData);
       worksheet["!cols"] = [
@@ -749,10 +865,8 @@ export default function GroupStudentPage() {
         { wch: 25 }, // Student Name
         { wch: 10 }, // User ID
         { wch: 25 }, // Assessment
-        { wch: 20 }, // Section Name
-        { wch: 25 }, // Excel Header
-        { wch: 55 }, // Question Text
-        { wch: 30 }, // Opted Option Text
+        ...questionColumns.map(() => ({ wch: 20 })),
+        ...(hasGameData ? gameColumns.map(() => ({ wch: 18 })) : []),
       ];
 
       const workbook = XLSX.utils.book_new();
@@ -1596,7 +1710,7 @@ export default function GroupStudentPage() {
           {/* Table Card */}
           <div
             className="card border-0 shadow-sm"
-            style={{ borderRadius: "16px" }}
+            style={{ borderRadius: "16px", overflow: "hidden" }}
           >
             <div className="card-body p-0">
               {loading ? (
@@ -1631,8 +1745,8 @@ export default function GroupStudentPage() {
                   </p>
                 </div>
               ) : (
-                <div className="table-responsive">
-                  <table className="table align-middle mb-0">
+                <div className="table-responsive" style={{ overflowX: "auto" }}>
+                  <table className="table align-middle mb-0" style={{ minWidth: "1400px" }}>
                     <thead>
                       <tr style={{ background: "#f8f9fa" }}>
                         <th
@@ -2733,7 +2847,7 @@ export default function GroupStudentPage() {
                     >
                       <div className="card-body p-3">
                         <div className="row g-3">
-                          <div className="col-md-4">
+                          <div className="col-md-3">
                             <div className="d-flex align-items-center gap-2">
                               <i
                                 className="bi bi-people-fill"
@@ -2751,7 +2865,7 @@ export default function GroupStudentPage() {
                               </div>
                             </div>
                           </div>
-                          <div className="col-md-4">
+                          <div className="col-md-3">
                             <div className="d-flex align-items-center gap-2">
                               <i
                                 className="bi bi-clipboard-check"
@@ -2759,17 +2873,17 @@ export default function GroupStudentPage() {
                               ></i>
                               <div>
                                 <small className="text-muted d-block">
-                                  Total Answer Rows
+                                  Students x Assessments
                                 </small>
                                 <strong
                                   style={{ color: "#1a1a2e", fontSize: "0.9rem" }}
                                 >
-                                  {bulkDownloadAnswers.length}
+                                  {pivotedBulkData.rows.length} rows ({pivotedBulkData.questionColumns.length} questions)
                                 </strong>
                               </div>
                             </div>
                           </div>
-                          <div className="col-md-4">
+                          <div className="col-md-3">
                             <div className="d-flex align-items-center gap-2">
                               <i
                                 className="bi bi-building"
@@ -2783,6 +2897,26 @@ export default function GroupStudentPage() {
                                   style={{ color: "#1a1a2e", fontSize: "0.9rem" }}
                                 >
                                   {getSelectedInstituteName()}
+                                </strong>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="col-md-3">
+                            <div className="d-flex align-items-center gap-2">
+                              <i
+                                className="bi bi-controller"
+                                style={{ color: pivotedBulkData.hasGameData ? "#059669" : "#999" }}
+                              ></i>
+                              <div>
+                                <small className="text-muted d-block">
+                                  Game Data
+                                </small>
+                                <strong
+                                  style={{ color: "#1a1a2e", fontSize: "0.9rem" }}
+                                >
+                                  {pivotedBulkData.hasGameData
+                                    ? `${bulkGameResults.size} students`
+                                    : "Not available"}
                                 </strong>
                               </div>
                             </div>
@@ -2885,49 +3019,37 @@ export default function GroupStudentPage() {
                               >
                                 Assessment
                               </th>
-                              <th
-                                style={{
-                                  padding: "12px 16px",
-                                  fontWeight: 600,
-                                  color: "#1a1a2e",
-                                  width: "150px",
-                                }}
-                              >
-                                Section Name
-                              </th>
-                              <th
-                                style={{
-                                  padding: "12px 16px",
-                                  fontWeight: 600,
-                                  color: "#1a1a2e",
-                                  width: "150px",
-                                }}
-                              >
-                                Excel Header
-                              </th>
-                              <th
-                                style={{
-                                  padding: "12px 16px",
-                                  fontWeight: 600,
-                                  color: "#1a1a2e",
-                                }}
-                              >
-                                Question Text
-                              </th>
-                              <th
-                                style={{
-                                  padding: "12px 16px",
-                                  fontWeight: 600,
-                                  color: "#1a1a2e",
-                                  width: "200px",
-                                }}
-                              >
-                                Opted Option Text
-                              </th>
+                              {pivotedBulkData.questionColumns.slice(0, 5).map((col) => (
+                                <th
+                                  key={col}
+                                  style={{
+                                    padding: "12px 16px",
+                                    fontWeight: 600,
+                                    color: "#1a1a2e",
+                                    minWidth: "150px",
+                                    maxWidth: "200px",
+                                  }}
+                                  title={col}
+                                >
+                                  {col.length > 25 ? col.substring(0, 25) + "..." : col}
+                                </th>
+                              ))}
+                              {pivotedBulkData.questionColumns.length > 5 && (
+                                <th
+                                  style={{
+                                    padding: "12px 16px",
+                                    fontWeight: 600,
+                                    color: "#999",
+                                    fontStyle: "italic",
+                                  }}
+                                >
+                                  +{pivotedBulkData.questionColumns.length - 5} more
+                                </th>
+                              )}
                             </tr>
                           </thead>
                           <tbody>
-                            {bulkDownloadAnswers.slice(0, 100).map((row: any, index: number) => (
+                            {pivotedBulkData.rows.slice(0, 50).map((row, index) => (
                               <tr key={index}>
                                 <td
                                   style={{
@@ -2968,46 +3090,38 @@ export default function GroupStudentPage() {
                                     {row.assessmentName || "N/A"}
                                   </span>
                                 </td>
-                                <td
-                                  style={{ padding: "12px 16px", color: "#333" }}
-                                >
-                                  <span
-                                    className="badge bg-light text-dark"
-                                    style={{ fontSize: "0.85rem" }}
+                                {pivotedBulkData.questionColumns.slice(0, 5).map((col) => (
+                                  <td
+                                    key={col}
+                                    style={{ padding: "12px 16px" }}
                                   >
-                                    {row.sectionName || "N/A"}
-                                  </span>
-                                </td>
-                                <td
-                                  style={{ padding: "12px 16px", color: "#333" }}
-                                >
-                                  {row.excelQuestionHeader || "N/A"}
-                                </td>
-                                <td
-                                  style={{ padding: "12px 16px", color: "#333" }}
-                                >
-                                  {row.questionText || "N/A"}
-                                </td>
-                                <td style={{ padding: "12px 16px" }}>
-                                  <span
-                                    className="badge"
-                                    style={{
-                                      background: "rgba(67, 97, 238, 0.1)",
-                                      color: "#4361ee",
-                                      padding: "6px 12px",
-                                      borderRadius: "6px",
-                                      fontWeight: 500,
-                                      fontSize: "0.85rem",
-                                    }}
-                                  >
-                                    {row.optionText || "N/A"}
-                                  </span>
-                                </td>
+                                    {row.answers[col] ? (
+                                      <span
+                                        className="badge"
+                                        style={{
+                                          background: "rgba(67, 97, 238, 0.1)",
+                                          color: "#4361ee",
+                                          padding: "6px 12px",
+                                          borderRadius: "6px",
+                                          fontWeight: 500,
+                                          fontSize: "0.85rem",
+                                        }}
+                                      >
+                                        {row.answers[col]}
+                                      </span>
+                                    ) : (
+                                      <span className="text-muted" style={{ fontSize: "0.8rem" }}>-</span>
+                                    )}
+                                  </td>
+                                ))}
+                                {pivotedBulkData.questionColumns.length > 5 && (
+                                  <td style={{ padding: "12px 16px", color: "#999", fontSize: "0.8rem" }}>...</td>
+                                )}
                               </tr>
                             ))}
                           </tbody>
                         </table>
-                        {bulkDownloadAnswers.length > 100 && (
+                        {pivotedBulkData.rows.length > 50 && (
                           <div
                             className="text-center py-3"
                             style={{
@@ -3018,7 +3132,7 @@ export default function GroupStudentPage() {
                             }}
                           >
                             <i className="bi bi-info-circle me-2"></i>
-                            Showing first 100 of {bulkDownloadAnswers.length} rows. All rows will be included in the Excel download.
+                            Showing first 50 of {pivotedBulkData.rows.length} rows. All rows will be included in the Excel download.
                           </div>
                         )}
                       </div>
@@ -3053,7 +3167,7 @@ export default function GroupStudentPage() {
                     className="btn btn-primary"
                     onClick={handleBulkDownloadExcel}
                     disabled={
-                      bulkDownloading || bulkDownloadLoading || bulkDownloadAnswers.length === 0
+                      bulkDownloading || bulkDownloadLoading || pivotedBulkData.rows.length === 0
                     }
                     style={{
                       background:
@@ -3076,7 +3190,7 @@ export default function GroupStudentPage() {
                     ) : (
                       <>
                         <i className="bi bi-download me-2"></i>
-                        Download Excel ({bulkDownloadAnswers.length} rows)
+                        Download Excel ({pivotedBulkData.rows.length} students)
                       </>
                     )}
                   </button>

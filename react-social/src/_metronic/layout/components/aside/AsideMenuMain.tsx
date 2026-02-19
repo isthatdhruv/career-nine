@@ -160,7 +160,7 @@ export function AsideMenuMain() {
               <AsideMenuItem
                 to="/questionare/create"
                 icon="/media/icons/duotune/general/gen044.svg"
-                title="Create and View Questionare"
+                title="Create Questionnaire"
                 fontIcon="bi-app-indicator"
               />
             )}
