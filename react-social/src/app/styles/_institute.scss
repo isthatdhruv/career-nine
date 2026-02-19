@@ -1,1 +1,111 @@
 // Institute + Student page responsive fixes (Plan 02)
+// All rules are inside @media (max-width: ...) blocks — never unguarded.
+
+// ─── CollegeTable: Action column wrapping ──────────────────────────────────────
+// CollegeTable renders ~5 interactive elements in the last <td> of each row:
+//   2 icon buttons, 1 Dropdown, 1 Dashboard btn, 1 Upload Students btn.
+// Without wrapping, these extend the row far beyond the viewport on 375px.
+// We allow flex-wrap inside that cell so buttons stack cleanly.
+@media (max-width: 767.98px) {
+  // Target the last cell in every MDB DataTable row
+  .mdb-datatable table td:last-child {
+    white-space: normal;
+  }
+
+  // The action buttons render as sibling elements directly inside the cell.
+  // MDB wraps cell content in a <span> or renders raw JSX — we target the
+  // wrapping element provided by MDB's td and allow children to wrap.
+  .mdb-datatable table td:last-child > span,
+  .mdb-datatable table td:last-child > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+  }
+
+  // Prevent individual buttons from growing too wide — let them be their natural size
+  .mdb-datatable table td:last-child .btn {
+    flex-shrink: 0;
+  }
+
+  // Dropdown container inside action cell — keep inline
+  .mdb-datatable table td:last-child .dropdown {
+    flex-shrink: 0;
+  }
+}
+
+// ─── Container padding reduction ──────────────────────────────────────────────
+// GroupStudentPage, StudentsList, and UploadExcelFile all use:
+//   <div className="min-vh-100" style={{ padding: "2rem" }}>
+// Inline style has high specificity, so we use !important.
+// Scoped to .app-content to avoid touching unrelated .min-vh-100 elements
+// in Metronic layout (sidebar, header, etc.).
+@media (max-width: 767.98px) {
+  .app-content .min-vh-100 {
+    padding: 1rem !important;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .app-content .min-vh-100 {
+    padding: 0.5rem !important;
+  }
+}
+
+// ─── GroupStudentPage: Modal body padding reduction ────────────────────────────
+// Download modals inside GroupStudentPage use style={{ padding: "2rem" }} on
+// modal-body. On narrow mobile screens (375px) this wastes horizontal space.
+// The modal tables inside already have table-responsive wrappers, so this
+// reduces wasted padding only.
+@media (max-width: 575.98px) {
+  .modal-body {
+    padding: 1rem !important;
+  }
+}
+
+// ─── StudentsList: Assessment select min-width override ───────────────────────
+// The "Assessment" column select has minWidth: '200px' inline style.
+// Inside a table-responsive this is fine (the table will scroll), but we
+// can also cap it on larger phones so the select does not force scroll
+// unnecessarily on medium-width phones (>=576px) where cards are wide enough.
+@media (max-width: 575.98px) {
+  // Target the select inside the students table assessment column
+  .app-content .min-vh-100 .table-responsive select {
+    min-width: 150px !important;
+    width: 100% !important;
+  }
+}
+
+// ─── UploadExcelFile: Header dropdowns on small screens ────────────────────────
+// The header has two selects with minWidth: '220px' in a flex-wrap row.
+// flex-wrap is already applied so they wrap, but on very small screens
+// they push past the card edge. Allow them to use full width when stacked.
+@media (max-width: 575.98px) {
+  .app-content .min-vh-100 .card-body .form-select {
+    min-width: unset !important;
+    width: 100% !important;
+  }
+}
+
+// ─── CollegePage: Card header toolbar wrapping ────────────────────────────────
+// CollegePage card-header has d-flex toolbar. On mobile, let buttons wrap.
+@media (max-width: 575.98px) {
+  .card-header .card-toolbar {
+    width: 100%;
+    margin-top: 0.5rem;
+  }
+
+  .card-header .card-title {
+    width: 100%;
+  }
+}
+
+// ─── MUI DataTable responsive base ────────────────────────────────────────────
+// FacultyRegistrationDetails uses MUI DataTable (MuiPaper-root).
+// Ensure its responsive scroll container scrolls horizontally on mobile.
+@media (max-width: 767.98px) {
+  .MuiPaper-root .MUIDataTable-responsiveBase,
+  .MuiPaper-root [class*="MUIDataTable-responsiveBase"] {
+    overflow-x: auto;
+  }
+}
