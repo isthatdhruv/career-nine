@@ -18,7 +18,7 @@ BACKUP_FILE="${BACKUP_DIR}/${DB_NAME}_${DATE}.sql"
 RETENTION_DAYS=30
 
 # Email settings
-EMAIL_TO="dhruv.kccsw@kccitm.edu.in,utkrishtmittal@kccitm.edu.in"
+EMAIL_TO="dhruv.kccsw@kccitm.edu.in"
 EMAIL_SUBJECT="backup - $(date +"%d-%m-%Y")"
 
 mkdir -p "$BACKUP_DIR"

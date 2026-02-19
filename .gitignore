@@ -9,7 +9,7 @@ yarn.lock
 # Production builds
 /.claude
 /.planning
-
+/backups
 **/target/
 
 # Project Documentation
