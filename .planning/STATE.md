@@ -49,6 +49,10 @@ Recent decisions affecting current work:
 - SCSS entry point pre-populated with all 7 imports so Wave 2 plans never touch index.scss
 - Responsive overrides imported after all 3 Metronic SCSS files for correct cascade priority
 - [Phase 07]: Scope .min-vh-100 padding overrides to .app-content to avoid touching Metronic layout elements
+- MUI Select in MDB tables: global horizontal scroll is primary fix; max-width supplement added as belt-and-suspenders
+- Role/RoleGroup/RoleUser forms: .col-2 submit column must be overridden to 100% on xs to avoid too-narrow button
+- FacultyRegistrationForm inline marginInline:30vw: can be overridden via form#form1 class-chain selector with !important
+- Pages using Bootstrap row-cols-*/col-12/col-xl-* are fully responsive without custom CSS (DashboardAdmin, InstituteDashboard, ReportsPage)
 
 ### Roadmap Evolution
 
@@ -68,5 +72,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-19
-Stopped at: Completed 07-02-PLAN.md (Institute + Student responsive CSS). _institute.scss fully populated.
+Stopped at: Completed 07-04-PLAN.md (Qualities, Tools, Career, Roles, Faculty responsive CSS). _qualities.scss and _misc.scss populated.
 Resume file: None
