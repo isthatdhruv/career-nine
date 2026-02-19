@@ -38,7 +38,7 @@ public class GmailApiEmailServiceImpl implements SmtpEmailService {
 
     private static final Logger logger = LoggerFactory.getLogger(GmailApiEmailServiceImpl.class);
 
-    @Value("${app.googleAPIJSON}")
+    @Value("classpath:firebase-service-account.json")
     private Resource serviceAccountResource;
 
     @Value("${app.gmail.sender-email:notifications@career-9.net}")
