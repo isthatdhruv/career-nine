@@ -41,7 +41,7 @@ import com.kccitm.api.repository.Career9.School.SchoolSessionRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
-import com.kccitm.api.service.GmailApiEmailServiceImpl;
+import com.kccitm.api.service.SmtpEmailService;
 
 @RestController
 @RequestMapping("/assessment-mapping")
@@ -80,7 +80,7 @@ public class AssessmentInstituteMappingController {
     private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
 
     @Autowired
-    private GmailApiEmailServiceImpl gmailApiEmailService;
+    private SmtpEmailService gmailApiEmailService;
 
     // ============ ADMIN ENDPOINTS ============
 

@@ -7,10 +7,10 @@
 DB_NAME="career-9"
 DB_USER="root"
 DB_PASS="Career-qCsfeuECc3MW"
-DB_HOST="localhost"
+DB_HOST="127.0.0.1"
 DB_PORT="3306"
 
-BACKUP_DIR="/home/whisky/Projects/career-nine/backups"
+BACKUP_DIR="/root/project/career-nine/backups"
 DATE=$(date +"%Y-%m-%d_%H-%M-%S")
 BACKUP_FILE="${BACKUP_DIR}/${DB_NAME}_${DATE}.sql"
 
@@ -18,7 +18,7 @@ BACKUP_FILE="${BACKUP_DIR}/${DB_NAME}_${DATE}.sql"
 RETENTION_DAYS=30
 
 # Email settings
-EMAIL_TO="dhruv.kccsw@kccitm.edu.in"
+EMAIL_TO="dhruv.kccsw@kccitm.edu.in,utkrishtmittal@kccitm.edu.in"
 EMAIL_SUBJECT="backup - $(date +"%d-%m-%Y")"
 
 mkdir -p "$BACKUP_DIR"
@@ -36,28 +36,29 @@ mysqldump -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASS" \
     > "$BACKUP_FILE" 2>/dev/null
 
 if [ $? -eq 0 ]; then
-    gzip "$BACKUP_FILE"
-    GZIP_FILE="${BACKUP_FILE}.gz"
-    FILESIZE=$(du -h "$GZIP_FILE" | cut -f1)
-    echo "[$(date)] Backup successful: ${GZIP_FILE} (${FILESIZE})"
+    FILESIZE=$(du -h "$BACKUP_FILE" | cut -f1)
+    echo "[$(date)] Backup successful: ${BACKUP_FILE} (${FILESIZE})"
 
-    # Email the backup as attachment
-    echo "Database backup for ${DB_NAME} on $(date +"%d %b %Y %I:%M %p").
+    # Email the backup via Spring Boot Gmail API endpoint
+    EMAIL_BODY="Database backup for ${DB_NAME} on $(date +"%d %b %Y %I:%M %p").
 
-File: $(basename "$GZIP_FILE")
+File: $(basename "$BACKUP_FILE")
 Size: ${FILESIZE}
 
 To restore, run:
-  gunzip $(basename "$GZIP_FILE")
-  mysql -u root -p < $(basename "${GZIP_FILE%.gz}")" | mutt \
-        -s "$EMAIL_SUBJECT" \
-        -a "$GZIP_FILE" \
-        -- "$EMAIL_TO" 2>/dev/null
+  mysql -u root -p < $(basename "$BACKUP_FILE")"
 
-    if [ $? -eq 0 ]; then
+    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+        -X POST "http://127.0.0.1:8080/email/send-with-attachment" \
+        -F "to=${EMAIL_TO}" \
+        -F "subject=${EMAIL_SUBJECT}" \
+        -F "body=${EMAIL_BODY}" \
+        -F "file=@${BACKUP_FILE}")
+
+    if [ "$HTTP_STATUS" = "200" ]; then
         echo "[$(date)] Email sent to ${EMAIL_TO}"
     else
-        echo "[$(date)] WARNING: Email failed. Backup saved locally at ${GZIP_FILE}"
+        echo "[$(date)] WARNING: Email failed (HTTP ${HTTP_STATUS}). Backup saved locally at ${BACKUP_FILE}"
     fi
 else
     echo "[$(date)] Backup FAILED for ${DB_NAME}"
@@ -65,6 +66,6 @@ else
 fi
 
 # Delete backups older than retention period
-find "$BACKUP_DIR" -name "*.sql.gz" -mtime +${RETENTION_DAYS} -delete
+find "$BACKUP_DIR" -name "*.sql" -mtime +${RETENTION_DAYS} -delete
 
 echo "[$(date)] Cleanup done. Backups older than ${RETENTION_DAYS} days removed."
