@@ -293,14 +293,14 @@ export function AsideMenuMain() {
                 fontIcon="bi-app-indicator"
               />
             )}
-            {allowed("/assessment-sections") && (
+            {/* {allowed("/assessment-sections") && (
               <AsideMenuItem
                 to="/assessment-sections"
                 title="Assessment Section List"
                 icon="/media/icons/duotune/general/gen044.svg"
                 fontIcon="bi-app-indicator"
               />
-            )}
+            )} */}
             {allowed("/assessment-questions") && (
               <AsideMenuItem
                 to="/assessment-questions"
