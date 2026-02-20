@@ -30,8 +30,8 @@ yarn-error.log*
 *.njsproj
 *.sln
 *.sw?
-**/build/*
-/build/*
+
+
 .env
 # Package locks (optional - uncomment if you want to ignore them)
 # yarn.lock
