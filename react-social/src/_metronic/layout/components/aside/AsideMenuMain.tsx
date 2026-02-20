@@ -160,7 +160,7 @@ export function AsideMenuMain() {
               <AsideMenuItem
                 to="/questionare/create"
                 icon="/media/icons/duotune/general/gen044.svg"
-                title="Create and View Questionare"
+                title="Create Questionnaire"
                 fontIcon="bi-app-indicator"
               />
             )}
@@ -315,6 +315,20 @@ export function AsideMenuMain() {
                 icon="/media/icons/duotune/general/gen044.svg"
                 title="Assessment Sections"
                 fontIcon="bi-app-indicator"
+              />
+            )}
+            <AsideMenuItem
+              to="/demographic-fields"
+              icon="/media/icons/duotune/general/gen019.svg"
+              title="Demographic Fields"
+              fontIcon="bi-app-indicator"
+            />
+            {allowed("/offline-assessment-upload") && (
+              <AsideMenuItem
+                to="/offline-assessment-upload"
+                icon="/media/icons/duotune/general/gen044.svg"
+                title="Offline Upload"
+                fontIcon="bi-cloud-upload"
               />
             )}
           </AsideMenuItemWithSub>

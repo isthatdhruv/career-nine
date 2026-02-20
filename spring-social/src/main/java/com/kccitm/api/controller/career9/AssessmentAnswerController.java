@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.career9.AssessmentQuestionOptions;
+import com.kccitm.api.model.career9.AssessmentQuestions;
 import com.kccitm.api.model.career9.AssessmentRawScore;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.MeasuredQualityTypes;
@@ -173,6 +174,187 @@ public class AssessmentAnswerController {
             }
 
             return ResponseEntity.ok(Map.of("status", "success", "scoresSaved", finalScores.size()));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        }
+    }
+
+    // ============ OFFLINE ASSESSMENT UPLOAD ENDPOINTS ============
+
+    /**
+     * Returns question-header-to-options mapping for an assessment's questionnaire.
+     * Used by the frontend to build the Excel template and parse uploaded data.
+     */
+    @GetMapping(value = "/offline-mapping/{assessmentId}", headers = "Accept=application/json")
+    public ResponseEntity<?> getOfflineMapping(@PathVariable Long assessmentId) {
+        try {
+            AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
+                    .orElseThrow(() -> new RuntimeException("Assessment not found"));
+
+            if (assessment.getQuestionnaire() == null) {
+                return ResponseEntity.status(400).body("Assessment has no linked questionnaire");
+            }
+
+            Long questionnaireId = assessment.getQuestionnaire().getQuestionnaireId();
+            String questionnaireName = assessment.getQuestionnaire().getName();
+
+            List<QuestionnaireQuestion> qqList = questionnaireQuestionRepository
+                    .findByQuestionnaireIdWithOptions(questionnaireId);
+
+            List<Map<String, Object>> questions = new ArrayList<>();
+            for (QuestionnaireQuestion qq : qqList) {
+                Map<String, Object> qMap = new HashMap<>();
+                qMap.put("questionnaireQuestionId", qq.getQuestionnaireQuestionId());
+                qMap.put("excelQuestionHeader", qq.getExcelQuestionHeader());
+
+                AssessmentQuestions aq = qq.getQuestion();
+                if (aq != null) {
+                    qMap.put("questionText", aq.getQuestionText());
+                    qMap.put("questionType", aq.getQuestionType());
+
+                    // Build options with computed sequence (1-indexed, ordered by optionId)
+                    List<Map<String, Object>> optionsList = new ArrayList<>();
+                    if (aq.getOptions() != null) {
+                        List<AssessmentQuestionOptions> sortedOptions = new ArrayList<>(aq.getOptions());
+                        sortedOptions.sort((a, b) -> Long.compare(a.getOptionId(), b.getOptionId()));
+
+                        int seq = 1;
+                        for (AssessmentQuestionOptions opt : sortedOptions) {
+                            Map<String, Object> oMap = new HashMap<>();
+                            oMap.put("optionId", opt.getOptionId());
+                            oMap.put("sequence", seq++);
+                            oMap.put("optionText", opt.getOptionText());
+                            optionsList.add(oMap);
+                        }
+                    }
+                    qMap.put("options", optionsList);
+                } else {
+                    qMap.put("questionText", null);
+                    qMap.put("questionType", null);
+                    qMap.put("options", new ArrayList<>());
+                }
+
+                questions.add(qMap);
+            }
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("assessmentId", assessmentId);
+            result.put("assessmentName", assessment.getAssessmentName());
+            result.put("questionnaireName", questionnaireName);
+            result.put("questions", questions);
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Bulk submit offline assessment answers for multiple students.
+     * Supports re-upload: deletes old answers before saving new ones.
+     */
+    @Transactional
+    @PostMapping(value = "/bulk-submit", headers = "Accept=application/json")
+    public ResponseEntity<?> bulkSubmitAnswers(@RequestBody Map<String, Object> payload) {
+        try {
+            Long assessmentId = ((Number) payload.get("assessmentId")).longValue();
+
+            AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
+                    .orElseThrow(() -> new RuntimeException("Assessment not found"));
+
+            List<Map<String, Object>> students = (List<Map<String, Object>>) payload.get("students");
+            int successCount = 0;
+            List<Map<String, Object>> errors = new ArrayList<>();
+
+            for (Map<String, Object> studentData : students) {
+                Long userStudentId = ((Number) studentData.get("userStudentId")).longValue();
+
+                try {
+                    UserStudent userStudent = userStudentRepository.findById(userStudentId)
+                            .orElseThrow(() -> new RuntimeException("UserStudent not found: " + userStudentId));
+
+                    // Find or create mapping
+                    StudentAssessmentMapping mapping = studentAssessmentMappingRepository
+                            .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                            .orElseGet(() -> {
+                                StudentAssessmentMapping newMapping = new StudentAssessmentMapping();
+                                newMapping.setUserStudent(userStudent);
+                                newMapping.setAssessmentId(assessmentId);
+                                return studentAssessmentMappingRepository.save(newMapping);
+                            });
+
+                    mapping.setStatus("completed");
+                    studentAssessmentMappingRepository.save(mapping);
+
+                    // Delete old answers for re-upload support
+                    assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(
+                            userStudentId, assessmentId);
+
+                    // Delete old raw scores
+                    assessmentRawScoreRepository
+                            .deleteByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId());
+
+                    // Process answers
+                    List<Map<String, Object>> answers = (List<Map<String, Object>>) studentData.get("answers");
+                    Map<Long, Integer> qualityTypeScores = new HashMap<>();
+                    Map<Long, MeasuredQualityTypes> qualityTypeCache = new HashMap<>();
+
+                    for (Map<String, Object> ansMap : answers) {
+                        Long qId = ((Number) ansMap.get("questionnaireQuestionId")).longValue();
+                        Long oId = ((Number) ansMap.get("optionId")).longValue();
+
+                        QuestionnaireQuestion question = questionnaireQuestionRepository.findById(qId).orElse(null);
+                        AssessmentQuestionOptions option = assessmentQuestionOptionsRepository.findById(oId)
+                                .orElse(null);
+
+                        if (question != null && option != null) {
+                            AssessmentAnswer ans = new AssessmentAnswer();
+                            ans.setUserStudent(userStudent);
+                            ans.setAssessment(assessment);
+                            ans.setQuestionnaireQuestion(question);
+                            ans.setOption(option);
+                            assessmentAnswerRepository.save(ans);
+
+                            // Accumulate scores
+                            List<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository
+                                    .findByOptionId(oId);
+                            for (OptionScoreBasedOnMEasuredQualityTypes s : scores) {
+                                MeasuredQualityTypes type = s.getMeasuredQualityType();
+                                Long typeId = type.getMeasuredQualityTypeId();
+                                qualityTypeScores.merge(typeId, s.getScore(), Integer::sum);
+                                qualityTypeCache.putIfAbsent(typeId, type);
+                            }
+                        }
+                    }
+
+                    // Save raw scores
+                    for (Map.Entry<Long, Integer> entry : qualityTypeScores.entrySet()) {
+                        MeasuredQualityTypes mqt = qualityTypeCache.get(entry.getKey());
+                        AssessmentRawScore ars = new AssessmentRawScore();
+                        ars.setStudentAssessmentMapping(mapping);
+                        ars.setMeasuredQualityType(mqt);
+                        ars.setMeasuredQuality(mqt.getMeasuredQuality());
+                        ars.setRawScore(entry.getValue());
+                        assessmentRawScoreRepository.save(ars);
+                    }
+
+                    successCount++;
+
+                } catch (Exception e) {
+                    Map<String, Object> err = new HashMap<>();
+                    err.put("userStudentId", userStudentId);
+                    err.put("error", e.getMessage());
+                    errors.add(err);
+                }
+            }
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("status", "success");
+            result.put("studentsProcessed", successCount);
+            result.put("errors", errors);
+            return ResponseEntity.ok(result);
 
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Error: " + e.getMessage());

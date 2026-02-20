@@ -135,6 +135,11 @@ export function resetAssessment(userStudentId: number, assessmentId: number) {
     });
 }
 
+// Game Results APIs (Firestore via backend)
+export function getAllGameResults() {
+    return axios.get<any[]>(`${API_URL}/game-results/getAll`);
+}
+
 // Student Scores APIs
 export interface StudentScoreDetail {
     measuredQualityTypeName: string;
