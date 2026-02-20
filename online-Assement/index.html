@@ -62,6 +62,10 @@
     <div class="card" id="setup">
       <div class="row">
         <div style="flex:1 1 220px">
+          <label for="studentName">Your name</label>
+          <input id="studentName" type="text" placeholder="Enter name" />
+        </div>
+        <div style="width:180px">
           <label for="langSelect">Language (initial)</label>
           <select id="langSelect"></select>
         </div>
@@ -128,6 +132,7 @@
 
     const langSelect = document.getElementById('langSelect');
     const beginBtn = document.getElementById('beginBtn');
+    const studentName = document.getElementById('studentName');
     const setupHint = document.getElementById('setupHint');
     const instructionsCard = document.getElementById('instructionsCard');
     const allInstructions = document.getElementById('allInstructions');
@@ -213,7 +218,7 @@
         assessment = data[0];
         studentKey = 'assessment_answers_' + assessment.questionnaireId;
         initLangs();
-        setupHint.textContent = 'Select language and click Begin';
+        setupHint.textContent = 'Enter your name and click Begin';
       } catch (e) {
         setupHint.textContent = 'Failed to load assessment.json';
         beginBtn.disabled = true;
@@ -483,10 +488,11 @@
       });
       localStorage.setItem('demographics_' + (assessment ? assessment.questionnaireId : 'local'), JSON.stringify(demoData));
 
-      // Store student name from demographics (for the assessment answers)
+      // Update student name from demographics if the name field was in the form
       const nameField = demographicFields.find(f => f.fieldName === 'student_name' || f.systemFieldKey === 'name');
-      if (nameField) {
-        localStorage.setItem('studentName', demographicValues[nameField.fieldId] || '');
+      if (nameField && demographicValues[nameField.fieldId]) {
+        localStorage.setItem('studentName', demographicValues[nameField.fieldId]);
+        studentName.value = demographicValues[nameField.fieldId];
       }
 
       return true;
@@ -662,9 +668,8 @@
     }
 
     function saveAnswer(qid, selectedArray) {
-      const studentNameVal = localStorage.getItem('studentName') || null;
-      const saved = JSON.parse(localStorage.getItem(studentKey) || 'null') || { questionnaireId: assessment.questionnaireId, student: studentNameVal, language: Number(langSelect.value), savedAt: new Date().toISOString(), answers: [] };
-      saved.student = studentNameVal || saved.student;
+      const saved = JSON.parse(localStorage.getItem(studentKey) || 'null') || { questionnaireId: assessment.questionnaireId, student: studentName.value || null, language: Number(langSelect.value), savedAt: new Date().toISOString(), answers: [] };
+      saved.student = studentName.value || saved.student;
       saved.language = Number(langSelect.value);
       saved.savedAt = new Date().toISOString();
       const idx = saved.answers.findIndex(a=>a.questionId===qid);
@@ -696,25 +701,31 @@
     // ---- Event Handlers ----
 
     beginBtn.addEventListener('click', async () => {
+      if (!studentName.value.trim()) { setupHint.textContent = 'Please enter your name'; return; }
       if (!assessment) { setupHint.textContent = 'Assessment not loaded yet'; return; }
 
+      // Store student name in localStorage for demographics/answers
+      localStorage.setItem('studentName', studentName.value.trim());
+
       beginBtn.disabled = true;
-      setupHint.textContent = 'Loading demographic form...';
+      setupHint.textContent = 'Loading...';
 
       // Try to load configured demographic fields from backend
       const configuredFields = await loadDemographicFields();
 
-      if (configuredFields) {
-        // Use backend-configured fields
+      if (configuredFields && configuredFields.length > 0) {
+        // Backend has configured fields for this assessment — show demographics step
         renderDemographicsForm(configuredFields);
+        document.getElementById('setup').style.display = 'none';
+        demographicsCard.style.display = 'block';
       } else {
-        // No configured fields — use default demographics
+        // No configured demographics — show default demographics
         renderDemographicsForm(DEFAULT_DEMOGRAPHICS);
+        document.getElementById('setup').style.display = 'none';
+        demographicsCard.style.display = 'block';
       }
 
-      // Hide setup, show demographics
-      document.getElementById('setup').style.display = 'none';
-      demographicsCard.style.display = 'block';
+      beginBtn.disabled = false;
     });
 
     demoContinueBtn.addEventListener('click', async () => {
@@ -736,7 +747,7 @@
 
     saveBtn.addEventListener('click', () => {
       const saved = JSON.parse(localStorage.getItem(studentKey) || 'null') || {};
-      saved.student = localStorage.getItem('studentName') || saved.student;
+      saved.student = studentName.value || saved.student;
       saved.savedAt = new Date().toISOString();
       localStorage.setItem(studentKey, JSON.stringify(saved));
       message.textContent = 'Progress snapshot saved';
