@@ -7,6 +7,7 @@ import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
 import { ReadAssessmentByIdData, UpdateAssessmentData, CreateAssessmentData } from "../../API/Create_Assessment_APIs";
 import { ReadQuestionaireData } from "../../API/Create_Questionaire_APIs";
+import AssessmentDemographicConfig from "./AssessmentDemographicConfig";
 
 const validationSchema = Yup.object().shape({
   AssessmentName: Yup.string().required("Assessment name is required"),
@@ -323,6 +324,11 @@ const AssessmentEditPage = (props?: {
                 )}
               </div>
             </div>
+
+            {/* Demographic Fields Configuration (only in edit mode) */}
+            {isEditMode && id && (
+              <AssessmentDemographicConfig assessmentId={Number(id)} />
+            )}
 
           </div>
 

@@ -24,6 +24,7 @@ import {SchoolDashboardPage} from "../pages/dashboard/SchoolDashboardPage";
 import QuestionaireListPage from "../pages/CreateAssessment/components/questionaire/QuestionaireListPage";
 import StudentLoginPage from "../pages/StudentLogin/StudentLoginPage";
 import DemographicDetailsPage from "../pages/StudentLogin/DemographicDetailsPage";
+import DynamicDemographicForm from "../pages/StudentLogin/DynamicDemographicForm";
 import AllottedAssessmentPage from "../pages/StudentLogin/AllottedAssessmentPage";
 import SectionInstructionPage from "../pages/StudentOnlineAssessment/components/SectionInstructionPage";
 import SectionQuestionPage from "../pages/StudentOnlineAssessment/components/SectionQuestionPage";
@@ -121,6 +122,10 @@ const AppRoutes: FC = () => {
             <Route
               path="/general-instructions"
               element={<GeneralInstructionsPage />}
+            />
+            <Route
+              path="/demographics/:assessmentId"
+              element={<DynamicDemographicForm />}
             />
             <Route
               path="/demographics"

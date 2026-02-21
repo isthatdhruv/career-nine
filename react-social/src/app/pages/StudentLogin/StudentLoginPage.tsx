@@ -138,7 +138,7 @@ const StudentLoginPage: React.FC = () => {
           localStorage.setItem('userStudentId', data.userStudentId);
           localStorage.setItem('allottedAssessments', JSON.stringify(data.assessments));
           // Navigate to the next page (SPA navigation, no page reload)
-          navigate('/demographics');
+          navigate('/allotted-assessment');
         } else {
           console.error('Login failed:', response.statusText);
           alert('Invalid credentials. Please try again.');

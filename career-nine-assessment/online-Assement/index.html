@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Take Assessment</title>
   <style>
-    :root{--accent:#0b74de;--green:#078a17;--red:#d12b2b}
+    :root{--accent:#0b74de;--green:#078a17;--red:#d12b2b;--purple:#667eea;--purple2:#764ba2}
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0;background:#f6f8fb;color:#111}
     .wrap{max-width:900px;margin:1.5rem auto;padding:1rem}
     header{display:flex;align-items:center;gap:1rem}
@@ -13,11 +13,12 @@
     .card{background:#fff;padding:1rem;border-radius:8px;border:1px solid #e6eefc;margin-top:1rem}
     .row{display:flex;gap:0.75rem;flex-wrap:wrap}
     label{display:block;font-size:.9rem;margin:.25rem 0}
-    select,input[type="text"]{padding:.5rem;border:1px solid #cddbe8;border-radius:6px;width:100%}
+    select,input[type="text"],input[type="number"],input[type="date"]{padding:.5rem;border:1px solid #cddbe8;border-radius:6px;width:100%;box-sizing:border-box}
     .section{margin-top:1rem;padding:.75rem;border-radius:6px;border:1px dashed #e0e6ef}
     .q{margin-top:.75rem}
     .options{margin-left:0.5rem}
     button{background:var(--accent);color:#fff;border:0;padding:.5rem .75rem;border-radius:6px;cursor:pointer}
+    button:disabled{opacity:0.6;cursor:not-allowed}
     .muted{color:#666;font-size:.9rem}
     .hint{font-size:.85rem;color:#666;margin-top:.5rem}
     .controls{display:flex;gap:.5rem;margin-top:1rem}
@@ -29,7 +30,23 @@
     .section-item{padding:.5rem .75rem;border-radius:6px;border:1px solid #dfe9f6;background:#fff;cursor:pointer}
     .section-item.active{outline:2px solid var(--accent)}
     small.error{color:#a00}
-    @media (max-width:640px){.row{flex-direction:column}}
+    .demo-field{margin-bottom:1rem}
+    .demo-field label{font-weight:500;color:#4a5568;margin-bottom:.25rem}
+    .demo-field .required{color:#e53e3e}
+    .demo-field .field-error{color:#e53e3e;font-size:.85rem;margin-top:.25rem}
+    .demo-radio-group{display:flex;gap:.5rem;flex-wrap:wrap}
+    .demo-radio-label{padding:.5rem .75rem;border:2px solid #e2e8f0;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:.5rem;transition:all .2s}
+    .demo-radio-label.selected{border-color:var(--purple);background:#eef2ff}
+    .demo-radio-label input{width:18px;height:18px;accent-color:var(--purple)}
+    .demo-checkbox-group{display:flex;flex-wrap:wrap;gap:.5rem}
+    .demo-checkbox-label{padding:.4rem .75rem;border:2px solid #e2e8f0;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:.5rem;transition:all .2s}
+    .demo-checkbox-label.selected{border-color:var(--purple);background:#eef2ff}
+    .demo-checkbox-label input{width:16px;height:16px;accent-color:var(--purple)}
+    .demo-section-title{font-size:1rem;font-weight:600;color:#4a5568;margin-bottom:.75rem;padding-bottom:.5rem;border-bottom:2px solid #e2e8f0}
+    .btn-continue{background:linear-gradient(135deg,var(--purple),var(--purple2));color:#fff;border:0;padding:.75rem 1.5rem;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;width:100%;margin-top:1rem;box-shadow:0 4px 15px rgba(102,126,234,.4)}
+    .btn-continue:hover{box-shadow:0 6px 20px rgba(102,126,234,.5);transform:translateY(-1px)}
+    .btn-continue:disabled{opacity:.6;cursor:not-allowed;transform:none;box-shadow:none}
+    @media (max-width:640px){.row{flex-direction:column}.demo-radio-group{flex-direction:column}}
   </style>
 </head>
 <body>
@@ -58,6 +75,15 @@
         </div>
       </div>
       <div class="hint" id="setupHint">Loading assessment…</div>
+    </div>
+
+    <!-- Demographics Card -->
+    <div id="demographicsCard" class="card" style="display:none">
+      <h3 style="margin-top:0">Demographic Details</h3>
+      <p class="muted" style="margin-top:0">Please provide your information to continue</p>
+      <div id="demographicsForm"></div>
+      <div id="demoError" class="hint" style="color:#e53e3e"></div>
+      <button class="btn-continue" id="demoContinueBtn" type="button">Save and Continue</button>
     </div>
 
     <div id="instructionsCard" class="card" style="display:none">
@@ -99,6 +125,10 @@
     let studentKey = null;
     let currentSection = null;
     let currentQuestionIndex = 0;
+    let demographicFields = [];
+    let demographicValues = {};
+
+    const API_URL = localStorage.getItem('apiUrl') || (window.location.hostname === 'localhost' ? 'http://localhost:8091' : '');
 
     const langSelect = document.getElementById('langSelect');
     const beginBtn = document.getElementById('beginBtn');
@@ -107,6 +137,10 @@
     const instructionsCard = document.getElementById('instructionsCard');
     const allInstructions = document.getElementById('allInstructions');
     const sectionList = document.getElementById('sectionList');
+    const demographicsCard = document.getElementById('demographicsCard');
+    const demographicsForm = document.getElementById('demographicsForm');
+    const demoContinueBtn = document.getElementById('demoContinueBtn');
+    const demoError = document.getElementById('demoError');
 
     const assessTitle = document.getElementById('assessTitle');
     const assessTool = document.getElementById('assessTool');
@@ -117,6 +151,64 @@
     const saveBtn = document.getElementById('saveBtn');
     const submitBtn = document.getElementById('submitBtn');
     const message = document.getElementById('message');
+
+    // Default demographic fields (used when no configured fields exist)
+    const DEFAULT_DEMOGRAPHICS = [
+      {
+        fieldId: -1, fieldName: 'student_name', displayLabel: 'What is your name?',
+        fieldSource: 'SYSTEM', systemFieldKey: 'name', dataType: 'TEXT',
+        validationRegex: '^[a-zA-Z\\s]+$', validationMessage: 'Name should only contain letters and spaces',
+        minValue: 2, maxValue: 100, placeholder: 'Enter your name',
+        isMandatory: true, options: []
+      },
+      {
+        fieldId: -2, fieldName: 'student_gender', displayLabel: 'Are you a boy or a girl?',
+        fieldSource: 'SYSTEM', systemFieldKey: 'gender', dataType: 'SELECT_SINGLE',
+        isMandatory: true, options: [
+          { optionId: 1, optionValue: 'Boy', optionLabel: 'Boy' },
+          { optionId: 2, optionValue: 'Girl', optionLabel: 'Girl' }
+        ]
+      },
+      {
+        fieldId: -3, fieldName: 'student_grade', displayLabel: 'What grade are you in?',
+        fieldSource: 'SYSTEM', systemFieldKey: 'studentClass', dataType: 'SELECT_SINGLE',
+        isMandatory: true, options: [
+          { optionId: 3, optionValue: '3', optionLabel: '3rd Grade' },
+          { optionId: 4, optionValue: '4', optionLabel: '4th Grade' },
+          { optionId: 5, optionValue: '5', optionLabel: '5th Grade' }
+        ]
+      },
+      {
+        fieldId: -4, fieldName: 'school_board', displayLabel: 'Which school board do you study in?',
+        fieldSource: 'SYSTEM', systemFieldKey: 'schoolBoard', dataType: 'SELECT_SINGLE',
+        isMandatory: true, options: [
+          { optionId: 6, optionValue: 'CBSE', optionLabel: 'CBSE' },
+          { optionId: 7, optionValue: 'ICSE', optionLabel: 'ICSE' },
+          { optionId: 8, optionValue: 'State Board', optionLabel: 'State Board' },
+          { optionId: 9, optionValue: 'IB / IGCSE', optionLabel: 'IB / IGCSE' },
+          { optionId: 10, optionValue: "I don't know", optionLabel: "I don't know" }
+        ]
+      },
+      {
+        fieldId: -5, fieldName: 'student_siblings', displayLabel: 'How many brothers and sisters do you have?',
+        fieldSource: 'SYSTEM', systemFieldKey: 'sibling', dataType: 'SELECT_SINGLE',
+        isMandatory: true, options: [
+          { optionId: 11, optionValue: '0', optionLabel: '0 (I am an only child)' },
+          { optionId: 12, optionValue: '1', optionLabel: '1' },
+          { optionId: 13, optionValue: '2', optionLabel: '2' },
+          { optionId: 14, optionValue: '3', optionLabel: '3 or more' }
+        ]
+      },
+      {
+        fieldId: -6, fieldName: 'living_with', displayLabel: 'Who do you live with?',
+        fieldSource: 'SYSTEM', systemFieldKey: 'family', dataType: 'SELECT_SINGLE',
+        isMandatory: true, options: [
+          { optionId: 15, optionValue: 'Small Family', optionLabel: 'Just my parents and siblings (Small Family)' },
+          { optionId: 16, optionValue: 'Big/Joint Family', optionLabel: 'My parents, siblings, grandparents, uncles, or aunts (Big/Joint Family)' },
+          { optionId: 17, optionValue: 'Other', optionLabel: 'Other' }
+        ]
+      }
+    ];
 
     async function loadAssessment() {
       try {
@@ -133,6 +225,25 @@
       }
     }
 
+    async function loadDemographicFields() {
+      const userStudentId = localStorage.getItem('userStudentId');
+      const assessmentId = localStorage.getItem('assessmentId');
+
+      if (!API_URL || !userStudentId || !assessmentId) {
+        return null; // No backend available - use defaults
+      }
+
+      try {
+        const res = await fetch(API_URL + '/student-demographics/fields/' + assessmentId + '/' + userStudentId);
+        if (!res.ok) return null;
+        const fields = await res.json();
+        return fields.length > 0 ? fields : null;
+      } catch (e) {
+        console.warn('Could not load demographic fields from backend:', e);
+        return null;
+      }
+    }
+
     function initLangs() {
       langSelect.innerHTML = '';
       (assessment.languages || []).forEach(l => {
@@ -144,6 +255,251 @@
       if (langSelect.options.length) langSelect.value = langSelect.options[0].value;
     }
 
+    // ---- Demographics rendering ----
+
+    function renderDemographicsForm(fields) {
+      demographicFields = fields;
+      demographicsForm.innerHTML = '';
+      demographicValues = {};
+      demoError.textContent = '';
+
+      fields.forEach(field => {
+        const label = field.customLabel || field.displayLabel;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'demo-field';
+        wrapper.dataset.fieldId = field.fieldId;
+
+        const lbl = document.createElement('label');
+        lbl.textContent = label;
+        if (field.isMandatory) {
+          const req = document.createElement('span');
+          req.className = 'required';
+          req.textContent = ' *';
+          lbl.appendChild(req);
+        }
+        wrapper.appendChild(lbl);
+
+        // Pre-fill value
+        const currentVal = field.currentValue || field.defaultValue || '';
+        demographicValues[field.fieldId] = currentVal;
+
+        switch (field.dataType) {
+          case 'TEXT':
+            renderTextField(wrapper, field, currentVal);
+            break;
+          case 'NUMBER':
+            renderNumberField(wrapper, field, currentVal);
+            break;
+          case 'DATE':
+            renderDateField(wrapper, field, currentVal);
+            break;
+          case 'SELECT_SINGLE':
+            if (field.options && field.options.length <= 4) {
+              renderRadioField(wrapper, field, currentVal);
+            } else {
+              renderDropdownField(wrapper, field, currentVal);
+            }
+            break;
+          case 'SELECT_MULTI':
+            renderCheckboxField(wrapper, field, currentVal);
+            break;
+          default:
+            renderTextField(wrapper, field, currentVal);
+        }
+
+        demographicsForm.appendChild(wrapper);
+      });
+    }
+
+    function renderTextField(wrapper, field, value) {
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = field.placeholder || '';
+      input.value = value;
+      input.addEventListener('input', () => { demographicValues[field.fieldId] = input.value; });
+      wrapper.appendChild(input);
+    }
+
+    function renderNumberField(wrapper, field, value) {
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.placeholder = field.placeholder || '';
+      input.value = value;
+      if (field.minValue != null) input.min = field.minValue;
+      if (field.maxValue != null) input.max = field.maxValue;
+      input.addEventListener('input', () => { demographicValues[field.fieldId] = input.value; });
+      wrapper.appendChild(input);
+    }
+
+    function renderDateField(wrapper, field, value) {
+      const input = document.createElement('input');
+      input.type = 'date';
+      input.value = value;
+      input.addEventListener('input', () => { demographicValues[field.fieldId] = input.value; });
+      wrapper.appendChild(input);
+    }
+
+    function renderRadioField(wrapper, field, value) {
+      const group = document.createElement('div');
+      group.className = 'demo-radio-group';
+      (field.options || []).forEach(opt => {
+        const lbl = document.createElement('label');
+        lbl.className = 'demo-radio-label' + (value === opt.optionValue ? ' selected' : '');
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'demo_' + field.fieldId;
+        radio.value = opt.optionValue;
+        radio.checked = value === opt.optionValue;
+        radio.addEventListener('change', () => {
+          demographicValues[field.fieldId] = opt.optionValue;
+          group.querySelectorAll('.demo-radio-label').forEach(l => l.classList.remove('selected'));
+          lbl.classList.add('selected');
+        });
+        lbl.appendChild(radio);
+        const txt = document.createElement('span');
+        txt.textContent = opt.optionLabel;
+        lbl.appendChild(txt);
+        group.appendChild(lbl);
+      });
+      wrapper.appendChild(group);
+    }
+
+    function renderDropdownField(wrapper, field, value) {
+      const sel = document.createElement('select');
+      const defOpt = document.createElement('option');
+      defOpt.value = '';
+      defOpt.textContent = 'Select an option';
+      sel.appendChild(defOpt);
+      (field.options || []).forEach(opt => {
+        const o = document.createElement('option');
+        o.value = opt.optionValue;
+        o.textContent = opt.optionLabel;
+        if (value === opt.optionValue) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.addEventListener('change', () => { demographicValues[field.fieldId] = sel.value; });
+      wrapper.appendChild(sel);
+    }
+
+    function renderCheckboxField(wrapper, field, value) {
+      const selectedValues = value ? value.split(',') : [];
+      demographicValues[field.fieldId] = selectedValues.join(',');
+      const group = document.createElement('div');
+      group.className = 'demo-checkbox-group';
+      (field.options || []).forEach(opt => {
+        const isChecked = selectedValues.includes(opt.optionValue);
+        const lbl = document.createElement('label');
+        lbl.className = 'demo-checkbox-label' + (isChecked ? ' selected' : '');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = opt.optionValue;
+        cb.checked = isChecked;
+        cb.addEventListener('change', () => {
+          const current = (demographicValues[field.fieldId] || '').split(',').filter(v => v);
+          if (cb.checked) {
+            current.push(opt.optionValue);
+            lbl.classList.add('selected');
+          } else {
+            const idx = current.indexOf(opt.optionValue);
+            if (idx > -1) current.splice(idx, 1);
+            lbl.classList.remove('selected');
+          }
+          demographicValues[field.fieldId] = current.join(',');
+        });
+        lbl.appendChild(cb);
+        const txt = document.createElement('span');
+        txt.textContent = opt.optionLabel;
+        lbl.appendChild(txt);
+        group.appendChild(lbl);
+      });
+      wrapper.appendChild(group);
+    }
+
+    function validateDemographics() {
+      const errors = [];
+      for (const field of demographicFields) {
+        const val = (demographicValues[field.fieldId] || '').trim();
+        const label = field.customLabel || field.displayLabel;
+        if (field.isMandatory && !val) {
+          errors.push(label + ' is required');
+          continue;
+        }
+        if (val && field.dataType === 'TEXT' && field.validationRegex) {
+          try {
+            if (!new RegExp(field.validationRegex).test(val)) {
+              errors.push(field.validationMessage || 'Invalid value for ' + label);
+            }
+          } catch (e) { /* skip invalid regex */ }
+        }
+        if (val && field.dataType === 'TEXT' && field.minValue && val.length < field.minValue) {
+          errors.push(label + ' must be at least ' + field.minValue + ' characters');
+        }
+      }
+      return errors;
+    }
+
+    async function submitDemographics() {
+      const errors = validateDemographics();
+      if (errors.length > 0) {
+        demoError.textContent = errors[0];
+        return false;
+      }
+      demoError.textContent = '';
+
+      const userStudentId = localStorage.getItem('userStudentId');
+      const assessmentId = localStorage.getItem('assessmentId');
+
+      // If backend is available, submit to API
+      if (API_URL && userStudentId && assessmentId) {
+        try {
+          const responses = demographicFields.map(f => ({
+            fieldId: f.fieldId,
+            value: demographicValues[f.fieldId] || ''
+          }));
+
+          const res = await fetch(API_URL + '/student-demographics/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userStudentId: Number(userStudentId),
+              assessmentId: Number(assessmentId),
+              responses: responses
+            })
+          });
+
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            if (errData.validationErrors) {
+              demoError.textContent = errData.validationErrors[0];
+              return false;
+            }
+            demoError.textContent = errData.error || 'Failed to save demographics';
+            return false;
+          }
+        } catch (e) {
+          console.warn('Backend submit failed, saving locally:', e);
+        }
+      }
+
+      // Also save demographics locally (for offline/local use)
+      const demoData = {};
+      demographicFields.forEach(f => {
+        demoData[f.fieldName] = demographicValues[f.fieldId] || '';
+      });
+      localStorage.setItem('demographics_' + (assessment ? assessment.questionnaireId : 'local'), JSON.stringify(demoData));
+
+      // Update student name from demographics if the name field was in the form
+      const nameField = demographicFields.find(f => f.fieldName === 'student_name' || f.systemFieldKey === 'name');
+      if (nameField && demographicValues[nameField.fieldId]) {
+        localStorage.setItem('studentName', demographicValues[nameField.fieldId]);
+        studentName.value = demographicValues[nameField.fieldId];
+      }
+
+      return true;
+    }
+
+    // ---- Assessment flow ----
+
     function showAllInstructions() {
       allInstructions.innerHTML = '';
       (assessment.languages || []).forEach(l => {
@@ -151,7 +507,6 @@
         el.innerHTML = '<strong>' + (l.language.languageName || 'Language') + ':</strong> ' + (l.instructions || '');
         allInstructions.appendChild(el);
       });
-      // build sections list with completion status
       renderSectionList();
       instructionsCard.style.display = 'block';
     }
@@ -169,7 +524,6 @@
                           <div class="badge ${completed ? 'green' : 'red'}">${completed ? 'Completed' : 'Incomplete'}</div>
                          </div>`;
         btn.addEventListener('click', () => {
-          // mark selected
           document.querySelectorAll('.section-item').forEach(i=>i.classList.remove('active'));
           btn.classList.add('active');
           selectSection(sec);
@@ -188,14 +542,11 @@
 
     function selectSection(sec) {
       currentSection = sec;
-      // show assessment area for this section only
       assessTitle.textContent = assessment.name || 'Untitled';
       assessTool.textContent = assessment.tool?.name ? 'Tool: ' + assessment.tool.name : '';
-      // show section-specific instruction for selected language, if present
       const selLang = Number(langSelect.value);
       const inst = (sec.instruction || []).find(i => i.language?.languageId === selLang);
       assessInstr.textContent = inst ? inst.instructionText : '';
-      // render questions of section, show the next unanswered question only
       renderSectionQuestions(sec);
       assessmentDiv.style.display = 'block';
       document.getElementById('instructionsCard').scrollIntoView({behavior:'smooth'});
@@ -204,11 +555,10 @@
     function renderSectionQuestions(sec) {
       form.innerHTML = '';
       const questions = (sec.questions || []).sort((a,b)=>Number(a.order)-Number(b.order));
-      // find first unanswered index
       const saved = JSON.parse(localStorage.getItem(studentKey) || 'null');
       const answeredIds = saved ? saved.answers.map(a=>a.questionId) : [];
       let firstUnansweredIndex = questions.findIndex(qLink => !answeredIds.includes(qLink.question.questionId));
-      if (firstUnansweredIndex === -1) firstUnansweredIndex = 0; // all answered -> start at first
+      if (firstUnansweredIndex === -1) firstUnansweredIndex = 0;
       currentQuestionIndex = firstUnansweredIndex;
       showQuestionAtIndex(questions, currentQuestionIndex);
       updateProgressForSection(sec, saved);
@@ -248,59 +598,46 @@
       }
       qEl.appendChild(opts);
 
-      // controls
       const ctrl = document.createElement('div'); ctrl.style.marginTop = '.75rem';
       const prevBtn = document.createElement('button');
       prevBtn.type = 'button';
       prevBtn.style.marginLeft = '0.5rem';
       prevBtn.textContent = 'Prev';
-      // Only show Prev when there is a previous question
       if (idx > 0) ctrl.appendChild(prevBtn);
 
       if (idx < questions.length - 1) {
-        // Not the last question -> show Next
         const nextBtn = document.createElement('button');
         nextBtn.type = 'button';
         nextBtn.textContent = 'Next';
         ctrl.appendChild(nextBtn);
-
         nextBtn.addEventListener('click', () => {
-          // save answer for this question
           const selected = Array.from(form.querySelectorAll('input[name="q_' + q.questionId + '"]:checked')).map(i => Number(i.value));
           saveAnswer(q.questionId, selected);
-          // end analytics
           if (window.MouseTracker) window.MouseTracker.endQuestion(q.questionId);
-          // move next
           currentQuestionIndex = idx + 1;
           showQuestionAtIndex(questions, currentQuestionIndex);
           updateProgressForSection(currentSection, JSON.parse(localStorage.getItem(studentKey) || 'null'));
         });
       } else {
-        // Last question -> show Finish Section (submit section)
         const finishBtn = document.createElement('button');
         finishBtn.type = 'button';
         finishBtn.style.marginLeft = '0.5rem';
         finishBtn.textContent = 'Finish Section';
         ctrl.appendChild(finishBtn);
-
         finishBtn.addEventListener('click', () => {
           const selected = Array.from(form.querySelectorAll('input[name="q_' + q.questionId + '"]:checked')).map(i => Number(i.value));
           saveAnswer(q.questionId, selected);
           if (window.MouseTracker) window.MouseTracker.endQuestion(q.questionId);
-          // mark section completed visually by re-rendering list and show message
           renderSectionList();
           message.textContent = 'Section completed';
           setTimeout(() => { message.textContent = ''; }, 1500);
-          // optionally hide section-specific UI or go back to instructions
           assessmentDiv.style.display = 'none';
           document.getElementById('instructionsCard').scrollIntoView({ behavior: 'smooth' });
         });
       }
 
-      // Prev handler (only meaningful when appended)
       prevBtn.addEventListener('click', () => {
         if (idx > 0) {
-          // save current before moving back
           const selected = Array.from(form.querySelectorAll('input[name="q_' + q.questionId + '"]:checked')).map(i => Number(i.value));
           saveAnswer(q.questionId, selected);
           if (window.MouseTracker) window.MouseTracker.endQuestion(q.questionId);
@@ -312,7 +649,7 @@
       qEl.appendChild(ctrl);
       form.appendChild(qEl);
 
-      // restore existing answers for this question
+      // restore existing answers
       const saved = JSON.parse(localStorage.getItem(studentKey) || 'null');
       if (saved && saved.answers) {
         const qans = (saved.answers.find(a=>a.questionId === q.questionId) || {}).answers || [];
@@ -321,8 +658,6 @@
           if (inp) inp.checked = true;
         });
       }
-
-      // start analytics for this question
       if (window.MouseTracker) window.MouseTracker.startQuestion(q.questionId);
     }
 
@@ -334,11 +669,9 @@
 
     function saveAnswer(qid, selectedArray) {
       const saved = JSON.parse(localStorage.getItem(studentKey) || 'null') || { questionnaireId: assessment.questionnaireId, student: studentName.value || null, language: Number(langSelect.value), savedAt: new Date().toISOString(), answers: [] };
-      // update student name on save
       saved.student = studentName.value || saved.student;
       saved.language = Number(langSelect.value);
       saved.savedAt = new Date().toISOString();
-      // update answers array
       const idx = saved.answers.findIndex(a=>a.questionId===qid);
       if (idx === -1) {
         saved.answers.push({ questionId: qid, answers: selectedArray });
@@ -348,7 +681,6 @@
       localStorage.setItem(studentKey, JSON.stringify(saved));
       message.textContent = 'Saved';
       setTimeout(()=>message.textContent='',900);
-      // update section list
       renderSectionList();
     }
 
@@ -361,22 +693,59 @@
       if (!data || !data.answers || data.answers.length === 0) { message.textContent='Please answer at least one question'; return; }
       data.submittedAt = new Date().toISOString();
       localStorage.setItem('submission_' + assessment.questionnaireId, JSON.stringify(data));
-      // also store analytics log
       if (window.MouseTracker) localStorage.setItem('analytics_' + assessment.questionnaireId, JSON.stringify(window.MouseTracker.getLog()));
       message.textContent = 'Submitted and saved locally';
       setTimeout(()=>message.textContent='',1500);
     }
 
-    beginBtn.addEventListener('click', () => {
-      if (!studentName.value.trim()) { setupHint.textContent='Please enter your name'; return; }
-      showAllInstructions();
-      // optionally show the assessment top area
-      assessTitle.textContent = assessment.name || 'Untitled';
-      assessTool.textContent = assessment.tool?.name ? 'Tool: ' + assessment.tool.name : '';
+    // ---- Event Handlers ----
+
+    beginBtn.addEventListener('click', async () => {
+      if (!studentName.value.trim()) { setupHint.textContent = 'Please enter your name'; return; }
+      if (!assessment) { setupHint.textContent = 'Assessment not loaded yet'; return; }
+
+      // Store student name in localStorage for demographics/answers
+      localStorage.setItem('studentName', studentName.value.trim());
+
+      beginBtn.disabled = true;
+      setupHint.textContent = 'Loading...';
+
+      // Try to load configured demographic fields from backend
+      const configuredFields = await loadDemographicFields();
+
+      if (configuredFields && configuredFields.length > 0) {
+        // Backend has configured fields for this assessment — show demographics step
+        renderDemographicsForm(configuredFields);
+        document.getElementById('setup').style.display = 'none';
+        demographicsCard.style.display = 'block';
+      } else {
+        // No configured demographics — show default demographics
+        renderDemographicsForm(DEFAULT_DEMOGRAPHICS);
+        document.getElementById('setup').style.display = 'none';
+        demographicsCard.style.display = 'block';
+      }
+
+      beginBtn.disabled = false;
+    });
+
+    demoContinueBtn.addEventListener('click', async () => {
+      demoContinueBtn.disabled = true;
+      demoContinueBtn.textContent = 'Saving...';
+
+      const success = await submitDemographics();
+
+      if (success) {
+        demographicsCard.style.display = 'none';
+        showAllInstructions();
+        assessTitle.textContent = assessment.name || 'Untitled';
+        assessTool.textContent = assessment.tool?.name ? 'Tool: ' + assessment.tool.name : '';
+      }
+
+      demoContinueBtn.disabled = false;
+      demoContinueBtn.textContent = 'Save and Continue';
     });
 
     saveBtn.addEventListener('click', () => {
-      // nothing extra — saved when moving questions — but snapshot student details
       const saved = JSON.parse(localStorage.getItem(studentKey) || 'null') || {};
       saved.student = studentName.value || saved.student;
       saved.savedAt = new Date().toISOString();

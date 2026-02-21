@@ -57,6 +57,9 @@ import GroupStudentPage from "../pages/GroupStudent/GroupStudentPage";
 import StudentLoginPage from "../pages/StudentLogin/StudentLoginPage";
 import AllottedAssessmentPage from "../pages/StudentLogin/AllottedAssessmentPage";
 import GamePage from "../pages/Games/GamePage";
+import DemographicFieldsPage from "../pages/DemographicFields/DemographicFieldsPage";
+import DemographicFieldCreatePage from "../pages/DemographicFields/components/DemographicFieldCreatePage";
+import DemographicFieldEditPage from "../pages/DemographicFields/components/DemographicFieldEditPage";
 // import QuestionareEditSinglePage from "../pages/CreateAssessment/components/questionaire/QuestionareEditSinglePage";
 import DashboardAdminPage from "../pages/demo-dashboard-v2/dashboard-admin";
 import DemographicDetailsPage from "../pages/StudentLogin/DemographicDetailsPage";
@@ -188,6 +191,9 @@ const PrivateRoutes = () => {
   );
   const QuestionEditPage = lazy(
     () => import("../pages/AssesmentQuestions/components/QuestionEditPage")
+  );
+  const OfflineAssessmentUpload = lazy(
+    () => import("../pages/OfflineAssessmentUpload/OfflineAssessmentUploadPage")
   );
   const Board = lazy(() => import("../pages/Board/BoardPage"));
   const Section = lazy(() => import("../pages/Section/SectionPage"));
@@ -577,6 +583,14 @@ const PrivateRoutes = () => {
           }
         />
         <Route
+          path="/offline-assessment-upload"
+          element={
+            <SuspensedView>
+              <OfflineAssessmentUpload />
+            </SuspensedView>
+          }
+        />
+        <Route
           path="/tools"
           element={
             <SuspensedView>
@@ -629,6 +643,30 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <UploadExcelFile />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/demographic-fields"
+          element={
+            <SuspensedView>
+              <DemographicFieldsPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/demographic-fields/create"
+          element={
+            <SuspensedView>
+              <DemographicFieldCreatePage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/demographic-fields/edit/:id"
+          element={
+            <SuspensedView>
+              <DemographicFieldEditPage />
             </SuspensedView>
           }
         />

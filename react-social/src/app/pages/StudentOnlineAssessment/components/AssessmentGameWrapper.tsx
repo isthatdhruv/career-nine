@@ -1,6 +1,6 @@
 import React, { useCallback } from "react";
 import { GameRenderer } from "./GameRenderer";
-import { useGameData } from "../../games/Data-Context/DataContext";
+import { useGameData } from "../../Games/Data-Context/DataContext";
 
 interface AssessmentGameWrapperProps {
   gameCode: number;
