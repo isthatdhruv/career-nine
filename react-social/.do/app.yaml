@@ -1,0 +1,26 @@
+name: career-nine-dashboard
+region: blr
+
+static_sites:
+  - name: dashboard-frontend
+    source_dir: /
+    build_command: npm run build:production
+    output_dir: build
+    environment_slug: node-js
+    envs:
+      - key: REACT_APP_API_URL
+        value: https://api.career-9.com
+        scope: BUILD_TIME
+      - key: REACT_APP_URL
+        value: https://dashboard.career-9.com
+        scope: BUILD_TIME
+      - key: ASSESSMENT_APP_URL
+        value: https://assessment.career-9.com
+        scope: BUILD_TIME
+    routes:
+      - path: /
+    catchall_document: index.html
+
+domains:
+  - domain: dashboard.career-9.com
+    type: PRIMARY
