@@ -37,7 +37,7 @@ public class MeasuredQualityTypes implements Serializable {
     // Many-to-One relationship with MeasuredQualities
     @ManyToOne
     @JoinColumn(name = "fk_measured_qualities")
-    @JsonIgnoreProperties("qualityTypes")
+    @JsonIgnoreProperties({"qualityTypes", "tools"})
     private MeasuredQualities measuredQuality;
 
     @ManyToMany
@@ -50,7 +50,8 @@ public class MeasuredQualityTypes implements Serializable {
     private Set<Career> careers = new HashSet<>();
 
     @OneToMany(mappedBy = "measuredQualityType")
-    @JsonIgnoreProperties({"question_option", "measuredQualityType"})
+    // @JsonIgnoreProperties({"question_option", "measuredQualityType"})
+    @JsonIgnore
     private List<OptionScoreBasedOnMEasuredQualityTypes> optionScores;
 
     // REMOVED: Many-to-many mapping to AssessmentQuestions
@@ -61,6 +62,14 @@ public MeasuredQualityTypes() {
     
     super();
 }
+
+    MeasuredQualityTypes(Long measuredQualityTypeId, String measuredQualityTypeName, String measuredQualityTypeDescription, String measuredQualityTypeDisplayName) {
+        this.measured_quality_type_id = measuredQualityTypeId;
+        this.measured_quality_type_name = measuredQualityTypeName;
+        this.measured_quality_type_description = measuredQualityTypeDescription;    
+        this.measured_quality_type_display_name = measuredQualityTypeDisplayName;
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
     // Getters and Setters
     public List<OptionScoreBasedOnMEasuredQualityTypes> getOptionScores() {
         return optionScores;

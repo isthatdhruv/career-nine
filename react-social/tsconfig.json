@@ -17,5 +17,10 @@
     "jsx": "react-jsx",
     "noImplicitAny": false
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": [
+    "src/app/pages/Games/*/page.tsx",
+    "src/app/pages/Games/*/grade-*",
+    "src/app/pages/Games/Rabbit-Path/Components/RabbitRiverGame.tsx"
+  ]
 }

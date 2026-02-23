@@ -16,7 +16,7 @@ const ThankYouPage = () => {
                 <div className="mb-7">
                   <img
                     alt="Logo"
-                    src="https://www.kccitm.edu.in/images/kcc-logo-new.png"
+                    src="/media/logos/kcc.jpg"
                     className="h-80px"
                   />
                 </div>

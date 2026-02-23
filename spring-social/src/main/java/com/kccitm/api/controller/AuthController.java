@@ -2,9 +2,11 @@ package com.kccitm.api.controller;
 
 import java.net.URI;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -26,11 +28,14 @@ import com.kccitm.api.payload.LoginRequest;
 import com.kccitm.api.payload.SignUpRequest;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.security.TokenProvider;
-
+import com.kccitm.api.service.SmtpEmailService;
+import com.kccitm.api.service.UserActivityLogService;
 @RestController
 @RequestMapping("/auth")
 
 public class AuthController {
+    @Autowired
+    private SmtpEmailService smtpEmailService;
 
     @Autowired
     private AuthenticationManager authenticationManager;
@@ -44,8 +49,21 @@ public class AuthController {
     @Autowired
     private TokenProvider tokenProvider;
 
+    @Autowired
+    private UserActivityLogService userActivityLogService;
+
     @PostMapping("/login")
-    public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest,
+            HttpServletRequest request) {
+        User user = userRepository.findByEmail(loginRequest.getEmail());
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiResponse(false, "Invalid email or password."));
+        }
+        if (user.getIsActive() == null || !user.getIsActive()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiResponse(false, "Your registration is under Process"));
+        }
 
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
@@ -54,33 +72,73 @@ public class AuthController {
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
+        // Async login activity logging - wrapped in try-catch so login is never affected
+        try {
+            String ipAddress = UserActivityLogService.getClientIp(request);
+            String userAgent = request.getHeader("User-Agent");
+            String userName = user.getName() != null ? user.getName() : "";
+            String organisation = user.getOrganisation() != null ? user.getOrganisation() : "";
+
+            userActivityLogService.logLogin(user.getId(), userName, user.getEmail(),
+                    organisation, ipAddress, userAgent);
+        } catch (Exception e) {
+            // Silently fail - never block login due to logging
+        }
+
         String token = tokenProvider.createToken(authentication);
         return ResponseEntity.ok(new AuthResponse(token));
     }
 
     @PostMapping("/signup")
     public ResponseEntity<?> registerUser(@Valid @RequestBody SignUpRequest signUpRequest) {
+        
         if (userRepository.existsByEmail(signUpRequest.getEmail())) {
             throw new BadRequestException("Email address already in use.");
         }
+        if (signUpRequest.getPhone() == null || signUpRequest.getPhone().trim().isEmpty()) {
+            throw new BadRequestException("Phone number is required.");
+        }
+        if (userRepository.existsByPhone(signUpRequest.getPhone())) {
+            throw new BadRequestException("Phone nusmber already in use.");
+        }
+        // if (signUpRequest.getAcceptTerms() == null || !signUpRequest.getAcceptTerms()) {
+        //     throw new BadRequestException("You must accept the terms and conditions.");
+        // }
 
-        // Creating user's account
-        User user = new User();
-        user.setName(signUpRequest.getName());
-        user.setEmail(signUpRequest.getEmail());
-        user.setPassword(signUpRequest.getPassword());
-        user.setProvider(AuthProvider.local);
+    // Creating user's account
+    User user = new User();
+    // set name from firstname+lastname if available otherwise use provided name
+    String fullName = (signUpRequest.getFirstname() != null && !signUpRequest.getFirstname().isBlank())
+        ? signUpRequest.getFirstname() + " " + signUpRequest.getLastname()
+        : "";
+    user.setName(signUpRequest.getFirstname() + " " + signUpRequest.getLastname());
+    user.setEmail(signUpRequest.getEmail());
+    user.setPhone(signUpRequest.getPhone());
+    user.setOrganisation(signUpRequest.getOrganisation());
+    user.setDesignation(signUpRequest.getDesignation());
+    user.setAcceptTerms(signUpRequest.getAcceptTerms());
+    user.setProvider(AuthProvider.local);
 
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
+    user.setPassword(passwordEncoder.encode(signUpRequest.getPassword()));
 
-        User result = userRepository.save(user);
+    User result = userRepository.save(user);
 
         URI location = ServletUriComponentsBuilder
                 .fromCurrentContextPath().path("/user/me")
                 .buildAndExpand(result.getId()).toUri();
 
-        return ResponseEntity.created(location)
-                .body(new ApiResponse(true, "User registered successfully@"));
+    // Send welcome email asynchronously (fire-and-forget)
+    try {
+        String subject = "Welcome to Career-9";
+        String body = "Hello " + fullName + ",\n\nThank you for registering.\nYour account is under review.We will get back to you soon.\n\nRegards,\nCareer-9 Team";
+        smtpEmailService.sendSimpleEmail(user.getEmail(), subject, body);
+    } catch (Exception e) {
+        // log and continue - do not fail registration because of email
     }
 
+    return ResponseEntity.created(location)
+        .body(new ApiResponse(true, "User registered successfully"));
+    }
+    // return ResponseEntity.ok(new ApiResponse(true, "User registered successfully"));
+    // }
 }

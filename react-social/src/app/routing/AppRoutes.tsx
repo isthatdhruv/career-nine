@@ -6,13 +6,13 @@
  */
 
 import { FC, lazy, Suspense } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import TopBarProgress from "react-topbar-progress-indicator";
 import { getCSSVariableValue } from "../../_metronic/assets/ts/_utils";
 import { WithChildren } from "../../_metronic/helpers";
 import { AuthRedirectPage } from "../../app/pages/authRedirectPage";
 import { App } from "../App";
-import { Logout, useAuth } from "../modules/auth";
+import { AuthPage, Logout, useAuth } from "../modules/auth";
 import { ErrorsPage } from "../modules/errors/ErrorsPage";
 import FacultyRegistrationForm from "../pages/FacultyRegistration/FacultyRegistrationForm";
 import StudentDetailPage from "../pages/StudentRegistration/StudentRegistrationForm";
@@ -20,6 +20,23 @@ import { ThankYouPage } from "../pages/StudentRegistration/ThankYou";
 import { UniRollNoUpdate } from "../pages/StudentRegistration/UniRollNoUpdate";
 import { PrivateRoutes } from "./PrivateRoutes";
 // import CompilerPageEdit from "../pages/Compiler/compilerEdit";
+import {SchoolDashboardPage} from "../pages/dashboard/SchoolDashboardPage";
+import QuestionaireListPage from "../pages/CreateAssessment/components/questionaire/QuestionaireListPage";
+import StudentLoginPage from "../pages/StudentLogin/StudentLoginPage";
+import DemographicDetailsPage from "../pages/StudentLogin/DemographicDetailsPage";
+import DynamicDemographicForm from "../pages/StudentLogin/DynamicDemographicForm";
+import AllottedAssessmentPage from "../pages/StudentLogin/AllottedAssessmentPage";
+import SectionInstructionPage from "../pages/StudentOnlineAssessment/components/SectionInstructionPage";
+import SectionQuestionPage from "../pages/StudentOnlineAssessment/components/SectionQuestionPage";
+import GeneralInstructionsPage from "../pages/StudentOnlineAssessment/components/GeneralInstructionsPage";
+
+import SelectSectionPage from "../pages/StudentOnlineAssessment/components/SelectSectionPage";
+import PrincipalDashboard from "../pages/PrincipalDashboard/PrincipalDashboard";
+import { MasterLayout } from "../../_metronic/layout/MasterLayout";
+
+const AssessmentRegisterPage = lazy(
+  () => import("../pages/AssessmentRegister/AssessmentRegisterPage")
+);
 
 const StudentRegistrationForm = lazy(
   () => import("../pages/StudentRegistration/StudentRegistrationForm")
@@ -48,35 +65,126 @@ const AppRoutes: FC = () => {
   const { currentUser } = useAuth();
 
   return (
-    <BrowserRouter basename={PUBLIC_URL}>
-      <Routes>
-        <Route element={<App />}>
-          <Route path="/student-details" element={<StudentDetailPage />} />
-          <Route path="/oauth2/redirect" element={<AuthRedirectPage />} />
-          <Route path="error/*" element={<ErrorsPage />} />
-          
-          {/* <Route path="compiler/compiler-edit" element={<CompilerPageEdit />} /> */}
-          <Route
-            path="/thankyou"
-            element={
-              <SuspensedView>
-                <ThankYouPage />
-              </SuspensedView>
-            }
-          />
-          <Route
-          path="/student/registration-form"
+    <Routes>
+      <Route element={<App />}>
+        <Route path="/student-details" element={<StudentDetailPage />} />
+        <Route path="/oauth2/redirect" element={<AuthRedirectPage />} />
+        <Route path="error/*" element={<ErrorsPage />} />
+        
+        {/* <Route path="compiler/compiler-edit" element={<CompilerPageEdit />} /> */}
+        <Route
+          path="/thankyou"
           element={
             <SuspensedView>
-              <StudentRegistrationForm />
+              <ThankYouPage />
             </SuspensedView>
           }
         />
+        <Route element={<MasterLayout />}>
+          <Route
+            path="/principal/dashboard"
+            element={
+              <SuspensedView>
+                <PrincipalDashboard />
+              </SuspensedView>
+            }
+          />
+        </Route>
         <Route
-          path="/student/registration-existing"
+        path="/student/registration-form"
+        element={
+          <SuspensedView>
+            <StudentRegistrationForm />
+          </SuspensedView>
+        }
+      />
+      <Route
+        path="/student/registration-existing"
+        element={
+          <SuspensedView>
+            <StudentRegistrationFormExisting />
+          </SuspensedView>
+        }
+      />
+      <Route path="/studentAssessment" element={<SelectSectionPage />} />
+            <Route
+              path="/studentAssessment/sections/:sectionId"
+              element={<SectionInstructionPage />}
+            />
+            <Route
+              path="/studentAssessment/sections/:sectionId/questions/:questionIndex"
+              element={<SectionQuestionPage />}
+            />
+            <Route
+              path="/allotted-assessment"
+              element={<AllottedAssessmentPage />}
+            />
+            <Route
+              path="/general-instructions"
+              element={<GeneralInstructionsPage />}
+            />
+            <Route
+              path="/demographics/:assessmentId"
+              element={<DynamicDemographicForm />}
+            />
+            <Route
+              path="/demographics"
+              element={<DemographicDetailsPage />}
+            />
+            <Route
+              path="/studentAssessment/completed"
+              element={<ThankYouPage />}
+            />
+      <Route
+              path="/student-login"
+              element={
+                <SuspensedView>
+                  <StudentLoginPage />
+                </SuspensedView>
+              }
+            />
+      <Route
+              path="/assessment-register/:token"
+              element={
+                <SuspensedView>
+                  <AssessmentRegisterPage />
+                </SuspensedView>
+              }
+            />
+      {/* <Route path="/questionaire/List" element={
+        <SuspensedView>
+          <QuestionaireListPage />
+        </SuspensedView>
+      } /> */}
+      <Route
+        path="/faculty/registration-form"
+        element={
+          <SuspensedView>
+            <FacultyRegistrationForm />
+          </SuspensedView>
+        }
+      />
+      <Route
+        path="/re-fillForm/*"
+        element={
+          <SuspensedView>
+            <ReFillFormPage/>
+          </SuspensedView>
+        }
+      />
+      <Route
+        path="/student/uni-roll-no/update"
+        element={
+          <SuspensedView>
+           <UniRollNoUpdate/>
+          </SuspensedView>
+        }
+      />
+        
+        <Route  path="/student/registration-form"
           element={
             <SuspensedView>
-              <StudentRegistrationFormExisting />
+              <StudentRegistrationForm />
             </SuspensedView>
           }
         />
@@ -92,103 +200,71 @@ const AppRoutes: FC = () => {
           path="/re-fillForm/*"
           element={
             <SuspensedView>
-              <ReFillFormPage/>
+              <ReFillFormPage />
             </SuspensedView>
           }
         />
         <Route
-          path="/student/uni-roll-no/update"
+          path="faculty/re-fillForm/*"
           element={
             <SuspensedView>
-             <UniRollNoUpdate/>
+              <FacultyReFillFormPage />
             </SuspensedView>
           }
         />
-          
-          <Route  path="/student/registration-form"
-            element={
-              <SuspensedView>
-                <StudentRegistrationForm />
-              </SuspensedView>
-            }
-          />
-          <Route
-            path="/faculty/registration-form"
-            element={
-              <SuspensedView>
-                <FacultyRegistrationForm />
-              </SuspensedView>
-            }
-          />
-          <Route
-            path="/re-fillForm/*"
-            element={
-              <SuspensedView>
-                <ReFillFormPage />
-              </SuspensedView>
-            }
-          />
-          <Route
-            path="faculty/re-fillForm/*"
-            element={
-              <SuspensedView>
-                <FacultyReFillFormPage />
-              </SuspensedView>
-            }
-          />
-          <Route
-            path="classroom/*"
-            element={
-              <SuspensedView>
-                <ClassRoomPage/>
-              </SuspensedView>
-            }
-          />
+        <Route
+          path="classroom/*"
+          element={
+            <SuspensedView>
+              <ClassRoomPage/>
+            </SuspensedView>
+          }
+        />
+       
 
-          <Route path="logout" element={<Logout />} />
+        <Route path="logout" element={<Logout />} />
 
-          <Route path="registrar/logout" element={<Logout />} />
+        <Route path="registrar/logout" element={<Logout />} />
 
-          <Route path="student/logout" element={<Logout />} />
+        <Route path="student/logout" element={<Logout />} />
 
-          <Route path="faculty/logout" element={<Logout />} />
+        <Route path="faculty/logout" element={<Logout />} />
 
-          <Route path="roles/logout" element={<Logout />} />
+        <Route path="roles/logout" element={<Logout />} />
 
+        {/* <>
+            <Route path="/*" element={<PrivateRoutes />} />
+            <Route index element={<Navigate to="/dashboard" />} />
+          </> */}
+
+        {currentUser ? (
           <>
-              <Route path="/*" element={<PrivateRoutes />} />
-              <Route index element={<Navigate to="/dashboard" />} />
-            </>
-
-          {/* {currentUser ? (
-            <>
-              <Route path="/*" element={<PrivateRoutes />} />
-              <Route index element={<Navigate to="/dashboard" />} />
-            </>
-          ) : (
-            <>
-              <Route path="auth/*" element={<AuthPage />} />
-              <Route path="*" element={<Navigate to="/auth" />} />
-            </>
-          )
-          } */}
-
-          {/* {currentUser ? (
-            roles && roles!.lastIndexOf("/temp-student") === -1 ?
-              <>
-                <Route path="/*" element={<PrivateRoutes />} />
-                <Route index element={<Navigate to="/dashboard" />} />
-              </>
-              : <>
-                <Route path="auth/*" element={<ErrorsPage />} />
-              </>
-          ) : (<>
-            <Route path="auth/*" element={<AuthPage />} />
+            <Route path="/*" element={<PrivateRoutes />} />
+            <Route index element={<Navigate to="/dashboard" />} />
           </>
-          )} */}
-        </Route>
-      </Routes>
-    </BrowserRouter>
+        ) : (
+          <>
+            <Route path="auth/*" element={<AuthPage />} />
+            <Route path="*" element={<Navigate to="/auth" />} />
+          </>
+        )
+        }
+
+        {/* {currentUser ? (
+          roles && roles!.lastIndexOf("/temp-student") === -1 ?
+            <>
+              <Route path="/*" element={<PrivateRoutes />} />
+              <Route index element={<Navigate to="/dashboard" />} />
+            </>
+            : <>
+              <Route path="auth/*" element={<ErrorsPage />} />
+            </>
+        ) : (<>
+          <Route path="auth/*" element={<AuthPage />} />
+        </>
+        )} */}
+      </Route>
+    </Routes>
   );
 };
 

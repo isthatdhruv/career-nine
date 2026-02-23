@@ -24,6 +24,6 @@ export function upsertRoleData(values: any) {
   });
 }
 
-export function deleteRoleData(id: any) {
-  return axios.get(deleteRole + id);
+export function DeleteRoleData(id: any) {
+  return axios.delete(deleteRole + id);
 }

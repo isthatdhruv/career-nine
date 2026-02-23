@@ -16,7 +16,7 @@ import javax.persistence.ManyToOne;
 import javax.persistence.JoinColumn;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
-
+import com.kccitm.api.model.career9.school.InstituteDetail;
 
 /**
  * The persistent class for the institute_courses database table.
@@ -50,12 +50,7 @@ public class InstituteCourse implements Serializable {
 	@Transient
 	private List<InstituteBranch> instituteBranchs;
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(
-		name = "institute_id", 
-		referencedColumnName = "institute_code",
-		insertable = false,
-		updatable = false
-	)
+	@JoinColumn(name = "institute_id", referencedColumnName = "institute_code", insertable = false, updatable = false)
 	@JsonBackReference("inst-course")
 	private InstituteDetail institute;
 
@@ -128,8 +123,8 @@ public class InstituteCourse implements Serializable {
 	}
 
 	public InstituteDetail getInstitute() {
-    return institute;
-}
+		return institute;
+	}
 
 	public void setInstitute(InstituteDetail institute) {
 		this.institute = institute;

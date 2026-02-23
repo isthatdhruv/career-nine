@@ -3,7 +3,7 @@ spring:
     active: dev
 
 server:
-  port: 8091
+  port: 8080
   # ssl:
   #   enabled: true
   #   key-store: classpath:keystore.p12
@@ -14,10 +14,11 @@ server:
 spring:
   profiles: dev
   datasource:
-    url: jdbc:mysql://localhost:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3306/career-9-latest-dump?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    # url: jdbc:mysql://192.168.10.73:3306/kiraya-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     username: root
     password: Career-qCsfeuECc3MW
-    
+    # password: MyStrongPass@123
   jpa:
     show-sql: true
     hibernate:
@@ -26,6 +27,21 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${SMTP_USERNAME:notifications@career-9.net}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
   security:
     oauth2:
       client:
@@ -71,9 +87,8 @@ app:
     tokenSecret: 04ca023b39512e46d0c2cf4b48d5aac61d34302994c87ed4eff225dcf3b0a218739f3897051a057f9b846a69ea2927a587044164b7bae5e1306219d50b588cb1
     tokenExpirationMsec: 864000000
   cors:
-    allowedOrigins: http://35.227.40.232:3000,http://localhost:3001,http://192.168.1.11:3000,http://35.196.122.199:3000,http://192.168.0.204:3000,http://192.168.0.204:3000,http://localhost:3000,https://localhost:3000,https://localhost:8080,https://192.168.0.204:8080,https://localhost,https://localhost:80,https://staging.student.kccitm.in/,https://student.kccitm.in/,https://erp.aktu.ac.in/,https://leetcode.com,http://192.168.0.204:8443//http://localhost:8080
+    allowedOrigins: http://35.227.40.232:3000,http://localhost:3001,http://192.168.1.11:3000,http://35.196.122.199:3000,http://192.168.0.204:3000,http://192.168.0.204:3000,http://localhost:3000,https://localhost:3000,https://localhost:8080,https://192.168.0.204:8080,https://localhost,https://localhost:80,https://staging.student.kccitm.in/,https://student.kccitm.in/,https://erp.aktu.ac.in/,https://leetcode.com,http://192.168.0.204:8443//,http://localhost:8080
   oauth2:
-  
     # After successfully authenticating with the OAuth2 Provider,
     # we'll be generating an auth token for the user and sending the token to the
     # redirectUri mentioned by the client in the /oauth2/authorize request.
@@ -89,26 +104,43 @@ app:
       - myiosapp://oauth2/redirect
       - http://192.168.0.204:3000
   mandrill: WXX3fC00pJTZgonjnVvkgQ
+  gmail:
+    sender-email: ${GMAIL_SENDER:notifications@career-9.net}
   firebase:
-    project-id: career-library
+    project-id: career-9-assessment
     service-account-file: firebase-service-account.json
 
 ---
 spring:
   profiles: staging
   datasource:
-    url: jdbc:mysql://localhost:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://mysql_db_api:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     username: root
-    password: Career-qCsfeuECc3MW    # password: Google.com1
+    password: Career-qCsfeuECc3MW # password: Google.com1
 
   jpa:
-    show-sql: true
+    show-sql: false
     hibernate:
       naming-strategy: org.hibernate.cfg.EJB3NamingStrategy
       ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${SMTP_USERNAME:notifications@career-9.net}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
   security:
     oauth2:
       client:
@@ -145,15 +177,15 @@ spring:
             tokenUri: https://graph.facebook.com/v3.0/oauth/access_token
             userInfoUri: https://graph.facebook.com/v3.0/me?fields=id,first_name,middle_name,last_name,name,email,verified,is_verified,picture.width(250).height(250)
 app:
-  protocol: http
-  name: staging.student.kccitm.in
+  protocol: https
+  name: api.career-9.com
   googleAPIJSON: classpath:google.json
   fileTempFolder: classpath:temp
   auth:
     tokenSecret: 04ca023b39512e46d0c2cf4b48d5aac61d34302994c87ed4eff225dcf3b0a218739f3897051a057f9b846a69ea2927a587044164b7bae5e1306219d50b588cb1
     tokenExpirationMsec: 864000000
   cors:
-    allowedOrigins: http://localhost:3000,http://localhost:8080,http://localhost,http://localhost:80,https://staging.student.kccitm.in/,https://student.kccitm.in/,https://erp.aktu.ac.in/
+    allowedOrigins: https://dashboard.career-9.com,https://walrus-app-e2a6a.ondigitalocean.app,https://assessment.career-9.com
   oauth2:
     # After successfully authenticating with the OAuth2 Provider,
     # we'll be generating an auth token for the user and sending the token to the
@@ -169,6 +201,8 @@ app:
       - http://localhost:80/oauth2/redirect
       - myiosapp://oauth2/redirect
   mandrill: WXX3fC00pJTZgonjnVvkgQ
+  gmail:
+    sender-email: ${GMAIL_SENDER:notifications@career-9.net}
 ---
 spring:
   profiles: production
@@ -186,6 +220,21 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${SMTP_USERNAME}
+    password: ${SMTP_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
   security:
     oauth2:
       client:
@@ -246,6 +295,7 @@ app:
       - http://localhost:80/oauth2/redirect
       - myiosapp://oauth2/redirect
   mandrill: WXX3fC00pJTZgonjnVvkgQ
+  gmail:
+    sender-email: ${GMAIL_SENDER:notifications@career-9.net}
 
 ---
-

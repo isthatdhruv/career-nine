@@ -31,6 +31,9 @@ public class AssessmentQuestions implements Serializable {
 
     private Boolean flag;
 
+    @Column(name = "is_deleted", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
+    private Boolean isDeleted = false;
+
     @Column(name = "max_options_allowed")
     private int maxOptionsAllowed;
 
@@ -48,15 +51,33 @@ public class AssessmentQuestions implements Serializable {
     private QuestionSection section;
 
     // Link Question -> Language
-    @OneToMany(mappedBy = "assessmentQuestion", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "assessmentQuestion", cascade = CascadeType.ALL)
     @JsonIgnoreProperties("assessmentQuestion")
     private List<LanguageQuestion> languageQuestions;
 
+    // Constructor for projection
+    public AssessmentQuestions(Long questionId, String questionText, String questionType) {
+        this.questionId = questionId;
+        this.questionText = questionText;
+        this.questionType = questionType;
+    }
+
+    // Constructor for projection with section
+    public AssessmentQuestions(Long questionId, String questionText, String questionType, QuestionSection section) {
+        this.questionId = questionId;
+        this.questionText = questionText;
+        this.questionType = questionType;
+        this.section = section;
+    }
+
+    public AssessmentQuestions() {
+    }
+
     // --- getters and setters ---
-    public int getmaxOptionsAllowed() {
+    public int getMaxOptionsAllowed() {
         return maxOptionsAllowed;
     }
-    public void setmaxAllowedOptions(int maxAllowedOptions) {
+    public void setMaxOptionsAllowed(int maxOptionsAllowed) {
         this.maxOptionsAllowed = maxOptionsAllowed;
     }
 
@@ -77,6 +98,13 @@ public class AssessmentQuestions implements Serializable {
     }
     public void setFlag(Boolean flag) {
         this.flag = flag;
+    }
+
+    public Boolean getIsDeleted() {
+        return isDeleted;
+    }
+    public void setIsDeleted(Boolean isDeleted) {
+        this.isDeleted = isDeleted;
     }
     public void setQuestionText(String questionText) {
         this.questionText = questionText;

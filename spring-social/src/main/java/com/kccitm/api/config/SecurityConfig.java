@@ -92,7 +92,10 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 "http://localhost:3000",
                 "http://192.168.3.78:3000",
                 "http://192.168.0.204:3000",
-                "https://192.168.0.204:3000"));
+                "https://192.168.0.204:3000",
+                "https://dashboard.career-9.com",
+                "https://assessment.career-9.com",
+                "https://walrus-app-e2a6a.ondigitalocean.app/"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
@@ -132,10 +135,16 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                         "/**/*.css",
                         "/**/*.js")
                 .permitAll()
-                .antMatchers("/language-supported/*","/contact-person/**","/assessment-questions/*/*","/assessment-questions/*","/assessments/*","/api/**", "/api/**/**", "/api/**/**/**", "/api/assessment-questions/**",
+.antMatchers("/assessment-mapping/public/**",
+                        "/user/*/*","/user/*","/assessment-section-instructions/**", "/language-question/create-with-options",
+                        "/**/**/**", "/**/**/**/**","/dashboard/game-results/*",
+                        "/languages/**","/game-results/*",
+                        "/question-sections/**", "/language-supported/*", "/contact-person/**",
+                        "/assessment-questions/*/*", "/assessment-questions/*", "/assessments/*", "/api/**",
+                        "/api/**/**", "/api/**/**/**", "/api/assessment-questions/**",
                         "/api/question-sections/**", "/api/assessment-questions/*/*", "/api/firebase/*/*",
                         "/api/firebase/*", "/api/firebase/*", "/actuator/*", "/auth/**", "/oauth2/callback/google/*",
-                        "/oauth2/**", "/user/me", "role/*", "/gender/get",
+                        "/oauth2/**", "/user/me", "role/*", "/gender/get", "/api/questionnaire/**",
                         "/category/*", "/board/*",
                         "/rolegroup/*", "/user/*", "/instituteDetail/**", "/role/*", "/instituteBranch/getbybranchid/*",
                         "/instituteBatch/getbyid/*", "/instituteCourse/getbyCollegeId/*",
@@ -150,7 +159,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                         "/question-sections/getbybatchid/*", "/assesment-questions/getbybatchid/*",
                         "/question-sections/getbycourseid/*",
                         "/section/update", "/generate_pdf", "/codingquestion/save", "/testcase/save",
-                        "/student/update", "/student/getbyid/*", "/student/get", "/userrolegroupmapping/update",
+                        "/student/update", "/student/getbyid/*", "/student/get", "/student/save-csv", "/userrolegroupmapping/update",
                         "/util/**", "/util/file-get/getbyname/**", "/util/file-delete/deletebyname/**",
                         "/google-api/**", "/util/file-delete/delete/**", "/codingquestion/*", "/instituteBatch/*",
                         "/instituteBranch/*", "/instituteCourse/*", "/instituteDetail/getbyid/*", "/student/putmarks",
@@ -158,7 +167,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                         "/email-validation-official-confermation", "/getmarks/*", "/getmarks", "/coding/*",
                         "/career/edit/*",
                         "/google-api/email/get/*", "student/get-check", "instituteBranchBatchMapping/*", "/getmarks",
-                        "/getmarksArray")
+                        "/getmarksArray")                
                 .permitAll()
                 .anyRequest()
                 .authenticated()
