@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePreventReload } from '../hooks/usePreventReload';
 import http from '../api/http';
@@ -7,6 +7,14 @@ const StudentLoginPage: React.FC = () => {
   const navigate = useNavigate();
   const [userId, setUserId] = useState('');
   const [dob, setDob] = useState('');
+
+  useEffect(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+    if ('caches' in window) {
+      caches.keys().then(names => names.forEach(name => caches.delete(name)));
+    }
+  }, []);
   const [errors, setErrors] = useState({ userId: '', dob: '' });
   const [touched, setTouched] = useState({ userId: false, dob: false });
   const dateInputRef = useRef<HTMLInputElement>(null);
