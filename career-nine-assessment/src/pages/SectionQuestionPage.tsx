@@ -119,6 +119,13 @@ const SectionQuestionPage: React.FC = () => {
     const stored = localStorage.getItem('assessmentElapsedTime');
     return stored ? parseInt(stored) : 0;
   });
+  // For text-type questions: sectionId -> questionId -> inputIndex -> text value
+  const [textAnswers, setTextAnswers] = useState<Record<string, Record<number, Record<number, string>>>>(() => {
+    const stored = localStorage.getItem('assessmentTextAnswers');
+    return stored ? JSON.parse(stored) : {};
+  });
+  // Track which autocomplete dropdown is open: "questionId-inputIdx" or null
+  const [activeAutocomplete, setActiveAutocomplete] = useState<string | null>(null);
   // Track completed games: gameCode -> boolean
   const [completedGames, setCompletedGames] = useState<Record<number, boolean>>(() => {
     const stored = localStorage.getItem('assessmentCompletedGames');
@@ -180,6 +187,11 @@ const SectionQuestionPage: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('assessmentCompletedGames', JSON.stringify(completedGames));
   }, [completedGames]);
+
+  // Save text answers to localStorage
+  useEffect(() => {
+    localStorage.setItem('assessmentTextAnswers', JSON.stringify(textAnswers));
+  }, [textAnswers]);
 
   // Save seen section instructions to localStorage
   useEffect(() => {
@@ -282,8 +294,12 @@ const SectionQuestionPage: React.FC = () => {
 
         // Check if question is answered
         const isRankingQuestion = q.question.questionType === "ranking";
+        const isTextQuestion = q.question.questionType === "text" || q.question.isMQT === true;
         let isAnswered = false;
-        if (isRankingQuestion) {
+        if (isTextQuestion) {
+          const texts = textAnswers[secId]?.[qId] || {};
+          isAnswered = Object.values(texts).some((t: string) => t.trim().length > 0);
+        } else if (isRankingQuestion) {
           const rankings = rankingAnswers[secId]?.[qId] || {};
           isAnswered = Object.keys(rankings).length > 0;
         } else {
@@ -309,8 +325,36 @@ const SectionQuestionPage: React.FC = () => {
         for (const q of section.questions) {
           const questionnaireQuestionId = q.questionnaireQuestionId;
           const isRankingQuestion = q.question.questionType === "ranking";
+          const isTextQuestion = q.question.questionType === "text" || q.question.isMQT === true;
 
-          if (isRankingQuestion) {
+          if (isTextQuestion) {
+            // Handle text-type questions
+            const texts = textAnswers[secId]?.[questionnaireQuestionId] || {};
+            const questionOptions = q.question.options || [];
+            for (const [, text] of Object.entries(texts)) {
+              const trimmed = (text as string).trim();
+              if (trimmed) {
+                // Check if text exactly matches an option (case-insensitive, ignoring extra spaces)
+                const normalised = trimmed.replace(/\s+/g, ' ').toLowerCase();
+                const matchedOption = questionOptions.find(
+                  (opt: any) => (opt.optionText || '').trim().replace(/\s+/g, ' ').toLowerCase() === normalised
+                );
+                if (matchedOption) {
+                  // Exact match — send optionId directly (scored immediately, no mapping needed)
+                  answersList.push({
+                    questionnaireQuestionId: questionnaireQuestionId,
+                    optionId: matchedOption.optionId
+                  });
+                } else {
+                  // Free-text — send as textResponse (needs admin mapping later)
+                  answersList.push({
+                    questionnaireQuestionId: questionnaireQuestionId,
+                    textResponse: trimmed
+                  });
+                }
+              }
+            }
+          } else if (isRankingQuestion) {
             // Handle ranking questions
             const rankings = rankingAnswers[secId]?.[questionnaireQuestionId] || {};
 
@@ -630,6 +674,9 @@ const SectionQuestionPage: React.FC = () => {
     // Check ranking answers
     const rankingCount = Object.keys(rankingAnswers[secId]?.[questionId] || {}).length;
     if (rankingCount > 0) return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+    // Check text answers
+    const textCount = Object.values(textAnswers[secId]?.[questionId] || {}).filter((t: string) => t.trim()).length;
+    if (textCount > 0) return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
     // Check saved for later
     if (savedForLater[secId]?.has(questionId)) return "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)";
     // Check skipped
@@ -664,8 +711,11 @@ const SectionQuestionPage: React.FC = () => {
         if (excludeQuestionId && questionId === excludeQuestionId) continue;
 
         const isRanking = q.question.questionType === "ranking";
+        const isText = q.question.questionType === "text" || q.question.isMQT === true;
         let isAnswered = false;
-        if (isRanking) {
+        if (isText) {
+          isAnswered = Object.values(textAnswers[secId]?.[questionId] || {}).some((t: string) => t.trim().length > 0);
+        } else if (isRanking) {
           const rankings = rankingAnswers[secId]?.[questionId] || {};
           isAnswered = Object.keys(rankings).length > 0;
         } else {
@@ -691,8 +741,11 @@ const SectionQuestionPage: React.FC = () => {
         if (excludeQuestionId && questionId === excludeQuestionId) continue;
 
         const isRanking = q.question.questionType === "ranking";
+        const isText = q.question.questionType === "text" || q.question.isMQT === true;
         let isAnswered = false;
-        if (isRanking) {
+        if (isText) {
+          isAnswered = Object.values(textAnswers[secId]?.[questionId] || {}).some((t: string) => t.trim().length > 0);
+        } else if (isRanking) {
           const rankings = rankingAnswers[secId]?.[questionId] || {};
           isAnswered = Object.keys(rankings).length > 0;
         } else {
@@ -1252,7 +1305,11 @@ const SectionQuestionPage: React.FC = () => {
             {/* Display maxOptionsAllowed */}
             <div className="text-muted mb-3">
               <small style={{ fontSize: "1.1rem", color: "#4a5568", fontWeight: 500 }}>
-                {question.question.questionType === "ranking" ? (
+                {(question.question.questionType === "text" || question.question.isMQT === true) ? (
+                  <>
+                    Please type your response(s) below. You can enter up to <strong>{question.question.maxOptionsAllowed || 1}</strong> response(s).
+                  </>
+                ) : question.question.questionType === "ranking" ? (
                   <>
                     Please rank <strong>{question.question.maxOptionsAllowed}</strong> option(s) in order of preference (1 = most important).
                   </>
@@ -1274,6 +1331,138 @@ const SectionQuestionPage: React.FC = () => {
               {(() => {
                 const options = question.question.options;
                 const isRankingQuestion = question.question.questionType === "ranking";
+                const isTextQuestion = question.question.questionType === "text" || question.question.isMQT === true;
+
+                // Text-type or isMQT question: render text input boxes with autocomplete
+                if (isTextQuestion) {
+                  const maxInputs = question.question.maxOptionsAllowed || 1;
+                  const currentTexts = textAnswers[sectionId!]?.[qId] || {};
+
+                  // Collect values already used in other text boxes (for deduplication)
+                  const usedValues = new Set(
+                    Object.entries(currentTexts)
+                      .filter(([, v]) => (v as string).trim())
+                      .map(([, v]) => (v as string).trim().toLowerCase())
+                  );
+
+                  const handleTextInput = (inputIdx: number, value: string) => {
+                    setTextAnswers(prev => ({
+                      ...prev,
+                      [sectionId!]: {
+                        ...prev[sectionId!],
+                        [qId]: {
+                          ...(prev[sectionId!]?.[qId] || {}),
+                          [inputIdx]: value
+                        }
+                      }
+                    }));
+                    // Remove from skipped
+                    setSkipped(prev => {
+                      const s = new Set(prev[sectionId!] || []);
+                      s.delete(qId);
+                      return { ...prev, [sectionId!]: s };
+                    });
+                  };
+
+                  const handleSelectSuggestion = (inputIdx: number, value: string) => {
+                    handleTextInput(inputIdx, value);
+                    // Close dropdown by clearing focus state
+                    setActiveAutocomplete(null);
+                  };
+
+                  return (
+                    <div>
+                      {Array.from({ length: maxInputs }, (_, inputIdx) => {
+                        const inputValue = (currentTexts[inputIdx] || '').toLowerCase();
+                        const thisBoxValue = (currentTexts[inputIdx] || '').trim().toLowerCase();
+
+                        // Filter suggestions: existing mapped options always show,
+                        // typed text only filters after 4+ characters
+                        const suggestions = options.filter(opt => {
+                          const optText = opt.optionText?.toLowerCase() || '';
+                          // Exclude if already selected in another box (not this one)
+                          const usedElsewhere = Object.entries(currentTexts)
+                            .some(([idx, v]) => Number(idx) !== inputIdx && (v as string).trim().toLowerCase() === optText);
+                          if (usedElsewhere) return false;
+                          // If less than 4 chars typed, show all mapped options
+                          if (inputValue.length < 4) return true;
+                          // With 4+ chars, filter to matching options only
+                          return optText.includes(inputValue);
+                        });
+
+                        const isDropdownOpen = activeAutocomplete === `${qId}-${inputIdx}` && suggestions.length > 0;
+                        // Don't show dropdown if the current value exactly matches a suggestion
+                        const exactMatch = suggestions.length === 1 && suggestions[0].optionText?.toLowerCase() === thisBoxValue;
+
+                        return (
+                          <div key={inputIdx} className="mb-3" style={{ position: "relative" }}>
+                            <label className="fw-bold mb-1" style={{ fontSize: "1rem", color: "#4a5568" }}>
+                              Response {inputIdx + 1}:
+                            </label>
+                            <input
+                              type="text"
+                              className="form-control form-control-lg"
+                              placeholder="Type your answer..."
+                              value={currentTexts[inputIdx] || ''}
+                              onChange={(e) => {
+                                handleTextInput(inputIdx, e.target.value);
+                                setActiveAutocomplete(`${qId}-${inputIdx}`);
+                              }}
+                              onFocus={() => setActiveAutocomplete(`${qId}-${inputIdx}`)}
+                              onBlur={() => setTimeout(() => setActiveAutocomplete(null), 200)}
+                              autoComplete="off"
+                              style={{ fontSize: "1.1rem", padding: "12px 16px", borderColor: "#dee2e6" }}
+                            />
+                            {isDropdownOpen && !exactMatch && (
+                              <div style={{
+                                position: "absolute",
+                                top: "100%",
+                                left: 0,
+                                right: 0,
+                                zIndex: 1000,
+                                background: "#fff",
+                                border: "1px solid #e2e8f0",
+                                borderTop: "none",
+                                borderRadius: "0 0 8px 8px",
+                                boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                                maxHeight: "240px",
+                                overflowY: "auto",
+                              }}>
+                                {suggestions.map((opt) => {
+                                  const optText = opt.optionText || '';
+                                  const matchIdx = optText.toLowerCase().indexOf(inputValue);
+                                  return (
+                                    <div
+                                      key={opt.optionId}
+                                      onMouseDown={() => handleSelectSuggestion(inputIdx, optText)}
+                                      style={{
+                                        padding: "10px 16px",
+                                        cursor: "pointer",
+                                        fontSize: "1rem",
+                                        borderBottom: "1px solid #f1f5f9",
+                                        transition: "background 0.15s",
+                                      }}
+                                      onMouseEnter={(e) => (e.currentTarget.style.background = "#f7fafc")}
+                                      onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
+                                    >
+                                      {matchIdx >= 0 ? (
+                                        <>
+                                          {optText.slice(0, matchIdx)}
+                                          <strong>{optText.slice(matchIdx, matchIdx + inputValue.length)}</strong>
+                                          {optText.slice(matchIdx + inputValue.length)}
+                                        </>
+                                      ) : optText}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                }
 
                 // Helper function to render a single option (for both layouts)
                 const renderOption = (opt: Option, optIndex: number) => {

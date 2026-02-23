@@ -195,6 +195,9 @@ const PrivateRoutes = () => {
   const OfflineAssessmentUpload = lazy(
     () => import("../pages/OfflineAssessmentUpload/OfflineAssessmentUploadPage")
   );
+  const TextResponseMapping = lazy(
+    () => import("../pages/TextResponseMapping/TextResponseMappingPage")
+  );
   const Board = lazy(() => import("../pages/Board/BoardPage"));
   const Section = lazy(() => import("../pages/Section/SectionPage"));
   const Course = lazy(() => import("../pages/Course/CoursePage"));
@@ -587,6 +590,14 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <OfflineAssessmentUpload />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/text-response-mapping"
+          element={
+            <SuspensedView>
+              <TextResponseMapping />
             </SuspensedView>
           }
         />

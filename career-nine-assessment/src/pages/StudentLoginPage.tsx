@@ -93,7 +93,7 @@ const StudentLoginPage: React.FC = () => {
         localStorage.clear();
         localStorage.setItem('userStudentId', data.userStudentId);
         localStorage.setItem('allottedAssessments', JSON.stringify(data.assessments));
-        navigate('/demographics');
+        navigate('/allotted-assessment');
       } catch (error: any) {
         if (error.response) {
           alert('Invalid credentials. Please try again.');

@@ -631,7 +631,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                 <option value="multiple-choice">Multiple Choice</option>
                 <option value="single-choice">Single Choice</option>
                 <option value="ranking">Ranking</option>
-
+                <option value="text">Text Input</option>
               </select>
               {formik.touched.questionType && formik.errors.questionType && (
                 <div className="fv-plugins-message-container">
@@ -991,7 +991,9 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
 
             {/* Max Options Allowed */}
             <div className="fv-row mb-7">
-              <label className="fs-6 fw-bold mb-2">Max Options Allowed</label>
+              <label className="fs-6 fw-bold mb-2">
+                {formik.values.questionType === "text" ? "Number of Text Input Boxes" : "Max Options Allowed"}
+              </label>
               <input
                 type="number"
                 min={0}
@@ -1000,11 +1002,17 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                 onChange={e =>
                   formik.setFieldValue("maxOptionsAllowed", e.target.value)
                 }
-                placeholder="Max Options Allowed"
+                placeholder={formik.values.questionType === "text" ? "Number of text input boxes" : "Max Options Allowed"}
                 className="form-control form-control-lg form-control-solid"
                 style={{ width: 200 }}
               />
             </div>
+            {formik.values.questionType === "text" && (
+              <div className="alert alert-info mb-7">
+                <strong>Text Input Mode:</strong> Students will type free-text answers instead of selecting options.
+                The options below serve as reference options for autocomplete suggestions and scoring after admin mapping.
+              </div>
+            )}
 
             {/* isMQT Toggle */}
             <div className="fv-row mb-7">
