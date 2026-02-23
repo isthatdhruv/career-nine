@@ -1,5 +1,5 @@
 // CollegeTable.tsx
-import React, { useState } from "react";
+import { useState } from "react";
 import { MDBDataTableV5 } from "mdbreact";
 import { AiFillEdit, AiOutlineInfoCircle } from "react-icons/ai";
 import { Link, useNavigate } from "react-router-dom";
@@ -7,7 +7,7 @@ import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { Button, Dropdown } from "react-bootstrap";
 import { IconContext } from "react-icons";
-import { MdEdit, MdDelete, MdSchool, MdOutlineDashboard, MdUploadFile } from "react-icons/md";
+import { MdEdit, MdDelete, MdSchool, MdOutlineDashboard } from "react-icons/md";
 
 import { DeleteCollegeData } from "../API/College_APIs";
 import CollegeEditModal from "./CollegeEditModal";
@@ -296,23 +296,6 @@ const CollegeTable = (props: {
               <span style={{ marginLeft: 6 }}>Dashboard</span>
             </Button>
 
-            {/* Actual safe handler - call passed in prop */}
-            <Button
-              variant="outline-success"
-              size="sm"
-              className="me-2"
-              onClick={() => props.onUploadClick && props.onUploadClick(data)}
-            >
-              <IconContext.Provider value={{ style: { paddingBottom: "3px" } }}>
-                <MdUploadFile />
-              </IconContext.Provider>
-              <span style={{ marginLeft: 6 }}>Upload Students</span>
-            </Button>
-            {/* Simpler: call prop directly if provided */}
-            <Button
-              hidden
-              onClick={() => {}}
-            />
           </>
         ),
       })) ?? [];
@@ -351,15 +334,27 @@ const CollegeTable = (props: {
 
   return (
     <>
-      <MDBDataTableV5
-        hover
-        scrollY
-        maxHeight="160vh"
-        entriesOptions={[5, 20, 25]}
-        entries={25}
-        pagesAmount={4}
-        data={datatable}
-      />
+      <style>{`
+        .college-table-wrapper table tbody tr {
+          position: relative;
+        }
+        .college-table-wrapper table tbody tr:has(.dropdown-menu.show) {
+          z-index: 10;
+        }
+        .college-table-wrapper .dropdown-menu.show {
+          position: fixed !important;
+          z-index: 1050 !important;
+        }
+      `}</style>
+      <div className="college-table-wrapper" style={{ overflow: 'visible' }}>
+        <MDBDataTableV5
+          hover
+          entriesOptions={[5, 20, 25]}
+          entries={25}
+          pagesAmount={4}
+          data={datatable}
+        />
+      </div>
 
       {/* Edit modal (existing) */}
       <CollegeEditModal
