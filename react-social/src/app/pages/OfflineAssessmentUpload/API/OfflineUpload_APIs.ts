@@ -6,6 +6,8 @@ export function getOfflineMapping(assessmentId: number) {
   return axios.get(`${API_URL}/assessment-answer/offline-mapping/${assessmentId}`);
 }
 
+export { addStudentInfo } from '../../StudentInformation/StudentInfo_APIs';
+
 export function bulkSubmitAnswers(data: {
   assessmentId: number;
   students: {
