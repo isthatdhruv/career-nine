@@ -270,7 +270,7 @@ const CollegeTable = (props: {
             </Dropdown>
 
             {/* Upload students excel for this institute */}
-            <Button
+            {/* <Button
               variant="outline-success"
               size="sm"
               onClick={() => {
@@ -282,8 +282,7 @@ const CollegeTable = (props: {
                 if (typeof ({} as any) === "undefined") {}
               }}
             >
-              {/* fallback when using compiled TypeScript; real handler below */}
-            </Button>
+            </Button> */}
             {/* School Dashboard */}
             <Button
               variant="outline-info"

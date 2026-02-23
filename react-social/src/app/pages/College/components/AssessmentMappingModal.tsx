@@ -156,7 +156,7 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
   };
 
   const getRegistrationUrl = (token: string) => {
-    return `${process.env.ASSESSMENT_APP_URL}/assessment-register/${token}`;
+    return `${process.env.REACT_APP_ASSESSMENT_APP_URL}/assessment-register/${token}`;
   };
 
   const copyToClipboard = (token: string) => {

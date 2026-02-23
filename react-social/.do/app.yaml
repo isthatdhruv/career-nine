@@ -14,7 +14,7 @@ static_sites:
       - key: REACT_APP_URL
         value: https://dashboard.career-9.com
         scope: BUILD_TIME
-      - key: ASSESSMENT_APP_URL
+      - key: REACT_APP_ASSESSMENT_APP_URL
         value: https://assessment.career-9.com
         scope: BUILD_TIME
     routes:
