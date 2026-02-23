@@ -34,6 +34,8 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const [games, setGames] = useState<any[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string>("");
 
+  const [isMQT, setIsMQT] = useState(false);
+
   const initialValues = {
     questionText: "",
     questionType: "",
@@ -311,6 +313,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                 questionText: formikValues.questionText,
                 questionType: formikValues.questionType,
                 maxOptionsAllowed: Number(formikValues.maxOptionsAllowed) || 0,
+                isMQT: isMQT,
                 options,
                 section: { sectionId: Number(formikValues.sectionId) },
                 flag: useMQTAsOptions ? 1 : 0
@@ -631,6 +634,21 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                 className="form-control form-control-lg form-control-solid w-25"
                 style={{ width: 200 }}
               />
+            </div>
+            <div className="fv-row mb-7">
+              <div className="form-check form-switch">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  id="isMQTToggle"
+                  checked={isMQT}
+                  onChange={() => setIsMQT(v => !v)}
+                />
+                <label className="form-check-label fs-6 fw-bold" htmlFor="isMQTToggle">
+                  isMQT
+                </label>
+              </div>
             </div>
             <div className="mb-4 d-flex gap-4">
               <label>

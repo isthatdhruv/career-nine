@@ -344,6 +344,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
       questionText: questionData.questionText || "",
       questionType: questionData.questionType || "",
       maxOptionsAllowed: questionData.maxOptionsAllowed || 0,
+      isMQT: questionData.isMQT ?? false,
       section: questionData.section && typeof questionData.section === "object" && "sectionId" in questionData.section
         ? { sectionId: String(questionData.section.sectionId) }
         : questionData.section
@@ -425,6 +426,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
           questionText: values.questionText,
           questionType: values.questionType,
           maxOptionsAllowed: Number(values.maxOptionsAllowed) || 0,
+          isMQT: values.isMQT,
           options,
           section: { sectionId: values.section.sectionId },
         };
@@ -1002,6 +1004,23 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                 className="form-control form-control-lg form-control-solid"
                 style={{ width: 200 }}
               />
+            </div>
+
+            {/* isMQT Toggle */}
+            <div className="fv-row mb-7">
+              <div className="form-check form-switch">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  id="isMQTToggleEdit"
+                  checked={formik.values.isMQT || false}
+                  onChange={() => formik.setFieldValue("isMQT", !formik.values.isMQT)}
+                />
+                <label className="form-check-label fs-6 fw-bold" htmlFor="isMQTToggleEdit">
+                  isMQT
+                </label>
+              </div>
             </div>
           </div> {/* Close card-body */}
 
