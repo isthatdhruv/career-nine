@@ -31,7 +31,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Navigate to="/student-login" replace />} />
               <Route path="/student-login" element={<StudentLoginPage />} />
-              <Route path="/demographics" element={<DemographicDetailsPage />} />
+              <Route path="/demographics/:assessmentId" element={<DemographicDetailsPage />} />
               <Route path="/allotted-assessment" element={<AllottedAssessmentPage />} />
               <Route path="/general-instructions" element={<GeneralInstructionsPage />} />
               <Route path="/studentAssessment" element={<SelectSectionPage />} />
