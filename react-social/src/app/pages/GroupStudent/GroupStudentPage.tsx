@@ -668,17 +668,28 @@ export default function GroupStudentPage() {
     }
 
     try {
+      // Build section ID → {className, sectionName} lookup
+      const sectionLookup = new Map<number, { className: string; sectionName: string }>();
+      for (const sec of allSectionsFlat) {
+        sectionLookup.set(sec.id, { className: sec.className, sectionName: sec.sectionName });
+      }
+
       // Prepare data for Excel
-      const excelData = filteredStudents.map((student, index) => ({
-        "S.No": index + 1,
-        "Control Number": student.controlNumber ?? "N/A",
-        "Username": student.username && !isNaN(Number(student.username)) ? Number(student.username) : (student.username || "N/A"),
-        "Student Name": student.name,
-        // "Roll Number": student.schoolRollNumber || "N/A",
-        // "Phone Number": student.phoneNumber || "N/A",
-        "Date of Birth": student.studentDob ? formatDate(student.studentDob) : "N/A",
-        "Institute": getSelectedInstituteName(),
-      }));
+      const excelData = filteredStudents.map((student, index) => {
+        const secInfo = student.schoolSectionId ? sectionLookup.get(student.schoolSectionId) : undefined;
+        return {
+          "S.No": index + 1,
+          "Control Number": student.controlNumber ?? "N/A",
+          "Username": student.username && !isNaN(Number(student.username)) ? Number(student.username) : (student.username || "N/A"),
+          "Student Name": student.name,
+          "Class": secInfo?.className || "N/A",
+          "Section": secInfo?.sectionName || "N/A",
+          // "Roll Number": student.schoolRollNumber || "N/A",
+          // "Phone Number": student.phoneNumber || "N/A",
+          "Date of Birth": student.studentDob ? formatDate(student.studentDob) : "N/A",
+          "Institute": getSelectedInstituteName(),
+        };
+      });
 
       // Create worksheet
       const worksheet = XLSX.utils.json_to_sheet(excelData);
@@ -689,6 +700,8 @@ export default function GroupStudentPage() {
         { wch: 18 },  // Control Number
         { wch: 20 },  // Username
         { wch: 30 },  // Student Name
+        { wch: 15 },  // Class
+        { wch: 15 },  // Section
         { wch: 15 },  // Date of Birth
         { wch: 30 },  // Institute
       ];
