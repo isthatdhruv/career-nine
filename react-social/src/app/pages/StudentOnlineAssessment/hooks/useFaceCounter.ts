@@ -1,30 +1,49 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { FaceDetector, FilesetResolver } from '@mediapipe/tasks-vision';
 
-const DETECTION_INTERVAL_MS = 4000; // count faces every 4 seconds
+const DETECTION_INTERVAL_MS = 1000; // count faces every 1 second
 
 interface UseFaceCounterParams {
   videoElement: React.MutableRefObject<HTMLVideoElement | null>;
+  faceCountRef: React.MutableRefObject<number>;
 }
 
-interface UseFaceCounterReturn {
-  faceCount: React.MutableRefObject<number>;
-}
-
-export function useFaceCounter({ videoElement }: UseFaceCounterParams): UseFaceCounterReturn {
-  const faceCountRef = useRef<number>(0);
+export function useFaceCounter({ videoElement, faceCountRef }: UseFaceCounterParams): void {
 
   useEffect(() => {
     let cancelled = false;
     let detector: FaceDetector | null = null;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let independentStream: MediaStream | null = null;
+    let independentVideo: HTMLVideoElement | null = null;
 
     const init = async () => {
       try {
-        const vision = await FilesetResolver.forVisionTasks(
+        // Start camera and MediaPipe loading in parallel for fastest startup
+        const visionPromise = FilesetResolver.forVisionTasks(
           'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
         );
 
+        // Request camera immediately — don't wait for WebGazer
+        // Browser reuses the permission grant, so WebGazer won't prompt again
+        try {
+          independentStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } },
+          });
+          if (cancelled) {
+            independentStream.getTracks().forEach((t) => t.stop());
+            return;
+          }
+          independentVideo = document.createElement('video');
+          independentVideo.srcObject = independentStream;
+          independentVideo.setAttribute('playsinline', '');
+          independentVideo.muted = true;
+          await independentVideo.play();
+        } catch {
+          // Camera denied — will fall back to WebGazer's video when available
+        }
+
+        const vision = await visionPromise;
         if (cancelled) return;
 
         detector = await FaceDetector.createFromOptions(vision, {
@@ -45,7 +64,8 @@ export function useFaceCounter({ videoElement }: UseFaceCounterParams): UseFaceC
         const detect = () => {
           if (cancelled || !detector) return;
 
-          const video = videoElement.current;
+          // Prefer WebGazer's video if available, fall back to independent stream
+          const video = videoElement.current || independentVideo;
           if (video && video.readyState >= 2) {
             try {
               const result = detector.detectForVideo(video, Date.now());
@@ -55,14 +75,23 @@ export function useFaceCounter({ videoElement }: UseFaceCounterParams): UseFaceC
             }
           }
 
+          // Once WebGazer's video is available, stop the independent stream
+          if (videoElement.current && independentStream) {
+            independentStream.getTracks().forEach((t) => t.stop());
+            independentStream = null;
+            if (independentVideo) {
+              independentVideo.srcObject = null;
+              independentVideo = null;
+            }
+          }
+
           timeoutId = setTimeout(detect, DETECTION_INTERVAL_MS);
         };
 
-        // Wait a bit for WebGazer's video to be ready before starting detection
-        timeoutId = setTimeout(detect, 2000);
+        // Start detection as soon as possible
+        detect();
       } catch (err) {
         console.warn('Face counter init failed:', err);
-        // Fall back: face count stays at 0 (non-blocking)
       }
     };
 
@@ -72,14 +101,14 @@ export function useFaceCounter({ videoElement }: UseFaceCounterParams): UseFaceC
       cancelled = true;
       if (timeoutId) clearTimeout(timeoutId);
       if (detector) {
-        try {
-          detector.close();
-        } catch {
-          // Already closed
-        }
+        try { detector.close(); } catch { /* already closed */ }
+      }
+      if (independentStream) {
+        independentStream.getTracks().forEach((t) => t.stop());
+      }
+      if (independentVideo) {
+        independentVideo.srcObject = null;
       }
     };
-  }, [videoElement]);
-
-  return { faceCount: faceCountRef };
+  }, [videoElement, faceCountRef]);
 }

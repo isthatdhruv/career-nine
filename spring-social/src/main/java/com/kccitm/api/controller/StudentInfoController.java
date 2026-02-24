@@ -68,6 +68,8 @@ public class StudentInfoController {
     private AssessmentRawScoreRepository assessmentRawScoreRepository;
     @Autowired
     private com.kccitm.api.repository.Career9.AssessmentTableRepository assessmentTableRepository;
+    @Autowired
+    private com.kccitm.api.repository.Career9.AssessmentProctoringQuestionLogRepository assessmentProctoringQuestionLogRepository;
 
     @GetMapping("/getAll")
     public List<StudentInfo> getAllStudentInfo() {
@@ -516,6 +518,10 @@ public class StudentInfoController {
             // Delete raw scores for this mapping
             assessmentRawScoreRepository.deleteByStudentAssessmentMappingStudentAssessmentId(
                     mapping.getStudentAssessmentId());
+
+            // Delete proctoring data for this student + assessment
+            assessmentProctoringQuestionLogRepository.deleteByUserStudentUserStudentIdAndAssessmentId(
+                    userStudentId, assessmentId);
 
             // Reset status to 'notstarted'
             mapping.setStatus("notstarted");

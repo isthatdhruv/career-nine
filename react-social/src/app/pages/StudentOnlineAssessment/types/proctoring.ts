@@ -53,7 +53,6 @@ export interface PerQuestionData {
   optionsRect: OptionRect[];
   gazePoints: GazePoint[];                // backward-compat gaze data with derived direction
   eyeGazePoints: EyeGazeSnapshot[];      // raw screen coordinate gaze data
-  firstLookedOptionId: number | null;     // first option the gaze entered
   timeSpentMs: number;
   questionStartTime: number;
   questionEndTime: number;

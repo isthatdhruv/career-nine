@@ -5,16 +5,45 @@ import { EyeGazeSnapshot } from '../types/proctoring';
 // WebGazer calls the listener at ~60fps; we only need ~4 samples/sec.
 const SAMPLE_INTERVAL_MS = 250;
 
+interface UseEyeGazeTrackingParams {
+  faceCountRef: React.MutableRefObject<number>;
+}
+
 interface UseEyeGazeTrackingReturn {
   snapshots: React.MutableRefObject<EyeGazeSnapshot[]>;
   videoElement: React.MutableRefObject<HTMLVideoElement | null>;
 }
 
-export function useEyeGazeTracking(): UseEyeGazeTrackingReturn {
+export function useEyeGazeTracking({ faceCountRef }: UseEyeGazeTrackingParams): UseEyeGazeTrackingReturn {
   const snapshotsRef = useRef<EyeGazeSnapshot[]>([]);
   const lastSampleTimeRef = useRef<number>(0);
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
+  const webgazerReadyRef = useRef<boolean>(false);
 
+  // Create face-only snapshots while WebGazer is still initializing.
+  // This ensures questions answered before WebGazer is ready still have face count data.
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      // Stop once WebGazer's gaze listener takes over
+      if (webgazerReadyRef.current) {
+        clearInterval(intervalId);
+        return;
+      }
+
+      const currentFaces = faceCountRef.current;
+      snapshotsRef.current.push({
+        t: Date.now(),
+        x: null,
+        y: null,
+        faceDetected: currentFaces > 0,
+        faceCount: currentFaces,
+      });
+    }, SAMPLE_INTERVAL_MS);
+
+    return () => clearInterval(intervalId);
+  }, [faceCountRef]);
+
+  // Initialize WebGazer for gaze tracking
   useEffect(() => {
     let cancelled = false;
 
@@ -43,21 +72,24 @@ export function useEyeGazeTracking(): UseEyeGazeTrackingReturn {
             if (now - lastSampleTimeRef.current < SAMPLE_INTERVAL_MS) return;
             lastSampleTimeRef.current = now;
 
+            // Use real-time face count from MediaPipe (via shared faceCountRef)
+            const currentFaces = faceCountRef.current;
+
             if (data !== null) {
               snapshotsRef.current.push({
                 t: now,
                 x: Math.round(data.x),
                 y: Math.round(data.y),
                 faceDetected: true,
-                faceCount: 1, // default; overridden by useFaceCounter via usePerQuestionProctoring
+                faceCount: Math.max(1, currentFaces), // at least 1 since WebGazer found a face
               });
             } else {
               snapshotsRef.current.push({
                 t: now,
                 x: null,
                 y: null,
-                faceDetected: false,
-                faceCount: 0,
+                faceDetected: currentFaces > 0, // MediaPipe may still see a face even when WebGazer can't predict gaze
+                faceCount: currentFaces,
               });
             }
           }
@@ -69,6 +101,9 @@ export function useEyeGazeTracking(): UseEyeGazeTrackingReturn {
           webgazer.end();
           return;
         }
+
+        // Mark WebGazer as ready — stops the face-only snapshot interval
+        webgazerReadyRef.current = true;
 
         // Grab the video element WebGazer created so useFaceCounter can reuse it
         const webgazerVideo = document.getElementById('webgazerVideoFeed') as HTMLVideoElement | null;
@@ -98,6 +133,14 @@ export function useEyeGazeTracking(): UseEyeGazeTrackingReturn {
 
     return () => {
       cancelled = true;
+
+      // Immediately stop all camera MediaStream tracks (synchronous, reliable)
+      if (videoElementRef.current && videoElementRef.current.srcObject) {
+        const stream = videoElementRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach((track) => track.stop());
+        videoElementRef.current.srcObject = null;
+      }
+
       import('webgazer').then((mod) => {
         const webgazer = mod.default;
         try {

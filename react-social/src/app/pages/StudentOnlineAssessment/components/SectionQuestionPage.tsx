@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAssessment } from "../../StudentLogin/AssessmentContext";
 import { usePreventReload } from "../../StudentLogin/usePreventReload";
@@ -67,8 +67,10 @@ const SectionQuestionPage: React.FC = () => {
   usePreventReload();
 
   // Proctoring: silent webcam eye-tracking + face counter + mouse click tracking
-  const { snapshots: proctoringSnapshots, videoElement } = useEyeGazeTracking();
-  const { faceCount: faceCountRef } = useFaceCounter({ videoElement });
+  // Shared ref so face count is stamped in real-time on every gaze snapshot
+  const faceCountRef = useRef<number>(0);
+  const { snapshots: proctoringSnapshots, videoElement } = useEyeGazeTracking({ faceCountRef });
+  useFaceCounter({ videoElement, faceCountRef });
   const { clicks: proctoringClicks } = useMouseClickTracker();
 
   const [questionnaire, setQuestionnaire] = useState<any>(null);
@@ -81,7 +83,6 @@ const SectionQuestionPage: React.FC = () => {
     questionnaireQuestionId: currentQuestionId,
     proctoringSnapshots,
     proctoringClicks,
-    faceCountRef,
   });
   const [languages, setLanguages] = useState<QuestionnaireLanguage[]>([]);
   const [currentSection, setCurrentSection] = useState<any>(null);
@@ -644,6 +645,17 @@ const SectionQuestionPage: React.FC = () => {
           localStorage.removeItem('proctoring_per_question');
         } catch (proctoringError) {
           console.error("Proctoring data submission failed (non-blocking):", proctoringError);
+        }
+
+        // Stop the webcam before navigating away
+        try {
+          const webgazerVideo = document.getElementById('webgazerVideoFeed') as HTMLVideoElement | null;
+          if (webgazerVideo && webgazerVideo.srcObject) {
+            (webgazerVideo.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
+            webgazerVideo.srcObject = null;
+          }
+        } catch (e) {
+          // Camera cleanup is best-effort
         }
 
         // Navigate to completion page

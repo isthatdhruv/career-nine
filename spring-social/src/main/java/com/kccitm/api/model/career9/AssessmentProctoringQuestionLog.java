@@ -70,10 +70,6 @@ public class AssessmentProctoringQuestionLog implements Serializable {
     @Column(name = "eye_gaze_points_json", columnDefinition = "LONGTEXT")
     private String eyeGazePointsJson;
 
-    // The option the student's eyes looked at first
-    @Column(name = "first_looked_option_id")
-    private Long firstLookedOptionId;
-
     // Time tracking
     @Column(name = "time_spent_ms")
     private Long timeSpentMs;
@@ -270,14 +266,6 @@ public class AssessmentProctoringQuestionLog implements Serializable {
 
     public void setEyeGazePointsJson(String eyeGazePointsJson) {
         this.eyeGazePointsJson = eyeGazePointsJson;
-    }
-
-    public Long getFirstLookedOptionId() {
-        return firstLookedOptionId;
-    }
-
-    public void setFirstLookedOptionId(Long firstLookedOptionId) {
-        this.firstLookedOptionId = firstLookedOptionId;
     }
 
     public LocalDateTime getCreatedAt() {

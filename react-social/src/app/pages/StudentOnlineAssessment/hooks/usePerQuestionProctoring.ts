@@ -14,7 +14,6 @@ interface UsePerQuestionProctoringParams {
   questionnaireQuestionId: number | null;
   proctoringSnapshots: React.MutableRefObject<EyeGazeSnapshot[]>;
   proctoringClicks: React.MutableRefObject<MouseClickRecord[]>;
-  faceCountRef: React.MutableRefObject<number>;
 }
 
 interface UsePerQuestionProctoringReturn {
@@ -50,36 +49,10 @@ function deriveGazeDirection(
   return 'center';
 }
 
-// Find the first option whose bounding box contains a gaze point
-function computeFirstLookedOption(
-  snapshots: EyeGazeSnapshot[],
-  optionsRect: OptionRect[]
-): number | null {
-  if (optionsRect.length === 0) return null;
-
-  for (const snap of snapshots) {
-    if (snap.x === null || snap.y === null) continue;
-
-    for (const opt of optionsRect) {
-      if (
-        snap.x >= opt.x &&
-        snap.x <= opt.x + opt.width &&
-        snap.y >= opt.y &&
-        snap.y <= opt.y + opt.height
-      ) {
-        return opt.optionId;
-      }
-    }
-  }
-
-  return null; // gaze never entered any option bounding box
-}
-
 export function usePerQuestionProctoring({
   questionnaireQuestionId,
   proctoringSnapshots,
   proctoringClicks,
-  faceCountRef,
 }: UsePerQuestionProctoringParams): UsePerQuestionProctoringReturn {
 
   const perQuestionDataRef = useRef<Map<number, PerQuestionData>>(new Map());
@@ -163,15 +136,10 @@ export function usePerQuestionProctoring({
     const allClicks = proctoringClicks.current;
     const questionClicks = allClicks.slice(clickStartIndexRef.current);
 
-    // Stamp each snapshot with the latest face count from MediaPipe
-    const currentFaceCount = faceCountRef.current;
-    const stampedSnapshots: EyeGazeSnapshot[] = questionSnapshots.map((s) => ({
-      ...s,
-      faceCount: s.faceDetected ? Math.max(s.faceCount, currentFaceCount) : 0,
-    }));
+    // Snapshots already have accurate real-time face counts from useEyeGazeTracking
 
     // Convert to backward-compatible GazePoint format
-    const gazePoints: GazePoint[] = stampedSnapshots.map((s) => ({
+    const gazePoints: GazePoint[] = questionSnapshots.map((s) => ({
       t: s.t,
       x: s.x,
       y: s.y,
@@ -184,10 +152,10 @@ export function usePerQuestionProctoring({
     }));
 
     // Raw eye gaze points
-    const eyeGazePoints: EyeGazeSnapshot[] = [...stampedSnapshots];
+    const eyeGazePoints: EyeGazeSnapshot[] = [...questionSnapshots];
 
     // Face detection stats (from faceCount values)
-    const faceCounts = stampedSnapshots.map((s) => s.faceCount);
+    const faceCounts = questionSnapshots.map((s) => s.faceCount);
     const maxFacesDetected = faceCounts.length > 0 ? Math.max(...faceCounts) : 0;
     const avgFacesDetected = faceCounts.length > 0
       ? faceCounts.reduce((sum, c) => sum + c, 0) / faceCounts.length
@@ -196,7 +164,7 @@ export function usePerQuestionProctoring({
     // Head-away events: gaze is null (no face) or goes off-screen
     let headAwayCount = 0;
     let wasAway = false;
-    for (const s of stampedSnapshots) {
+    for (const s of questionSnapshots) {
       const isAway =
         !s.faceDetected ||
         s.x === null ||
@@ -213,9 +181,6 @@ export function usePerQuestionProctoring({
     const questionRect = capturedQuestionRectRef.current;
     const optionsRect = capturedOptionsRectRef.current;
 
-    // Compute which option the student looked at first
-    const firstLookedOptionId = computeFirstLookedOption(stampedSnapshots, optionsRect);
-
     const data: PerQuestionData = {
       questionnaireQuestionId: qId,
       screenWidth: screenW,
@@ -224,7 +189,6 @@ export function usePerQuestionProctoring({
       optionsRect,
       gazePoints,
       eyeGazePoints,
-      firstLookedOptionId,
       timeSpentMs: now - startTime,
       questionStartTime: startTime,
       questionEndTime: now,
@@ -248,8 +212,6 @@ export function usePerQuestionProctoring({
       data.tabSwitchCount = existing.tabSwitchCount + data.tabSwitchCount;
       data.gazePoints = [...existing.gazePoints, ...data.gazePoints];
       data.eyeGazePoints = [...existing.eyeGazePoints, ...data.eyeGazePoints];
-      // Keep the FIRST firstLookedOptionId (from the initial visit)
-      data.firstLookedOptionId = existing.firstLookedOptionId ?? data.firstLookedOptionId;
       // Recompute avg faces from merged gazePoints
       const allFaces = data.gazePoints.map((g) => g.faceCount);
       data.avgFacesDetected = allFaces.length > 0
@@ -259,7 +221,7 @@ export function usePerQuestionProctoring({
 
     perQuestionDataRef.current.set(qId, data);
     persistData();
-  }, [proctoringSnapshots, proctoringClicks, faceCountRef, capturePositions, persistData]);
+  }, [proctoringSnapshots, proctoringClicks, capturePositions, persistData]);
 
   // Track tab visibility changes
   useEffect(() => {

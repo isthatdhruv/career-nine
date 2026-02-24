@@ -1,5 +1,7 @@
 package com.kccitm.api.controller.career9;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -64,9 +66,6 @@ public class AssessmentProctoringController {
                 return ResponseEntity.badRequest().body("No per-question data provided");
             }
 
-            // Delete old data if re-submitting
-            questionLogRepository.deleteByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
-
             for (Map<String, Object> qData : perQuestionData) {
                 Long qqId = ((Number) qData.get("questionnaireQuestionId")).longValue();
 
@@ -100,11 +99,6 @@ public class AssessmentProctoringController {
                     qLog.setEyeGazePointsJson(objectMapper.writeValueAsString(eyeGazePoints));
                 }
 
-                Object firstLookedOptionId = qData.get("firstLookedOptionId");
-                if (firstLookedOptionId != null) {
-                    qLog.setFirstLookedOptionId(((Number) firstLookedOptionId).longValue());
-                }
-
                 questionLogRepository.save(qLog);
             }
 
@@ -135,5 +129,52 @@ public class AssessmentProctoringController {
         List<AssessmentProctoringQuestionLog> logs = questionLogRepository
                 .findByUserStudentUserStudentIdAndAssessmentId(studentId, assessmentId);
         return ResponseEntity.ok(logs);
+    }
+
+    @PostMapping(value = "/getBulkProctoringData", headers = "Accept=application/json")
+    public ResponseEntity<?> getBulkProctoringData(
+            @RequestBody List<Map<String, Long>> pairs) {
+        try {
+            List<Map<String, Object>> result = new ArrayList<>();
+
+            for (Map<String, Long> pair : pairs) {
+                Long userStudentId = pair.get("userStudentId");
+                Long assessmentId = pair.get("assessmentId");
+                if (userStudentId == null || assessmentId == null) continue;
+
+                List<AssessmentProctoringQuestionLog> logs = questionLogRepository
+                        .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+
+                for (AssessmentProctoringQuestionLog log : logs) {
+                    Map<String, Object> row = new HashMap<>();
+                    row.put("proctoringLogId", log.getProctoringLogId());
+                    row.put("userStudentId", userStudentId);
+                    row.put("studentName", log.getUserStudent() != null && log.getUserStudent().getStudentInfo() != null
+                            ? log.getUserStudent().getStudentInfo().getName() : "");
+                    row.put("assessmentId", assessmentId);
+                    row.put("assessmentName", log.getAssessment() != null ? log.getAssessment().getAssessmentName() : "");
+                    row.put("questionnaireQuestionId", log.getQuestionnaireQuestion() != null
+                            ? log.getQuestionnaireQuestion().getQuestionnaireQuestionId() : null);
+                    row.put("questionText", log.getQuestionnaireQuestion() != null && log.getQuestionnaireQuestion().getQuestion() != null
+                            ? log.getQuestionnaireQuestion().getQuestion().getQuestionText() : "");
+                    row.put("screenWidth", log.getScreenWidth());
+                    row.put("screenHeight", log.getScreenHeight());
+                    row.put("timeSpentMs", log.getTimeSpentMs());
+                    row.put("questionStartTime", log.getQuestionStartTime());
+                    row.put("questionEndTime", log.getQuestionEndTime());
+                    row.put("mouseClickCount", log.getMouseClickCount());
+                    row.put("maxFacesDetected", log.getMaxFacesDetected());
+                    row.put("avgFacesDetected", log.getAvgFacesDetected());
+                    row.put("headAwayCount", log.getHeadAwayCount());
+                    row.put("tabSwitchCount", log.getTabSwitchCount());
+                    row.put("createdAt", log.getCreatedAt() != null ? log.getCreatedAt().toString() : "");
+                    result.add(row);
+                }
+            }
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error fetching bulk proctoring data: " + e.getMessage());
+        }
     }
 }
