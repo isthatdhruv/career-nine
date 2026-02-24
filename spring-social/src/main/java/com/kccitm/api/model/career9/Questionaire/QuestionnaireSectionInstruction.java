@@ -7,6 +7,7 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
+import javax.persistence.Lob;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
@@ -33,7 +34,8 @@ public class QuestionnaireSectionInstruction {
     @JoinColumn(name = "language_id") // explicit join column to avoid auto-generated column name
     private LanguagesSupported language;
 
-    @Column(name = "instruction_text" , columnDefinition = "LONGTEXT")
+    @Lob
+    @Column(name = "instruction_text")
     private String instructionText;
 
     public String getInstructionText() {
