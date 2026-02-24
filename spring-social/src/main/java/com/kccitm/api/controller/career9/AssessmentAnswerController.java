@@ -2,6 +2,7 @@ package com.kccitm.api.controller.career9;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -25,6 +26,8 @@ import com.kccitm.api.model.career9.MeasuredQualityTypes;
 import com.kccitm.api.model.career9.OptionScoreBasedOnMEasuredQualityTypes;
 import com.kccitm.api.model.career9.Questionaire.AssessmentAnswer;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
+import com.kccitm.api.model.career9.Questionaire.QuestionnaireSection;
+import com.kccitm.api.model.career9.QuestionSection;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.repository.AssessmentRawScoreRepository;
@@ -249,10 +252,28 @@ public class AssessmentAnswerController {
                 qMap.put("questionnaireQuestionId", qq.getQuestionnaireQuestionId());
                 qMap.put("excelQuestionHeader", qq.getExcelQuestionHeader());
 
+                // Add section info
+                QuestionnaireSection qs = qq.getSection();
+                if (qs != null) {
+                    qMap.put("questionnaireSectionId", qs.getQuestionnaireSectionId());
+                    qMap.put("sectionOrder", qs.getOrder());
+                    QuestionSection qSection = qs.getSection();
+                    if (qSection != null) {
+                        qMap.put("sectionName", qSection.getSectionName());
+                    } else {
+                        qMap.put("sectionName", null);
+                    }
+                } else {
+                    qMap.put("questionnaireSectionId", null);
+                    qMap.put("sectionOrder", null);
+                    qMap.put("sectionName", null);
+                }
+
                 AssessmentQuestions aq = qq.getQuestion();
                 if (aq != null) {
                     qMap.put("questionText", aq.getQuestionText());
                     qMap.put("questionType", aq.getQuestionType());
+                    qMap.put("isMQT", aq.getIsMQT() != null ? aq.getIsMQT() : false);
 
                     // Build options with computed sequence (1-indexed, ordered by optionId)
                     List<Map<String, Object>> optionsList = new ArrayList<>();
@@ -273,17 +294,46 @@ public class AssessmentAnswerController {
                 } else {
                     qMap.put("questionText", null);
                     qMap.put("questionType", null);
+                    qMap.put("isMQT", false);
                     qMap.put("options", new ArrayList<>());
                 }
 
                 questions.add(qMap);
             }
 
+            // Group questions by section, sorted alphabetically by sectionName
+            Map<Long, Map<String, Object>> sectionMap = new LinkedHashMap<>();
+            for (Map<String, Object> qMap : questions) {
+                Long qsId = (Long) qMap.get("questionnaireSectionId");
+                if (qsId == null) continue;
+                sectionMap.computeIfAbsent(qsId, k -> {
+                    Map<String, Object> s = new LinkedHashMap<>();
+                    s.put("questionnaireSectionId", qsId);
+                    s.put("sectionName", qMap.get("sectionName"));
+                    s.put("sectionOrder", qMap.get("sectionOrder"));
+                    s.put("questions", new ArrayList<Map<String, Object>>());
+                    return s;
+                });
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> sectionQuestions =
+                        (List<Map<String, Object>>) sectionMap.get(qsId).get("questions");
+                sectionQuestions.add(qMap);
+            }
+            List<Map<String, Object>> sections = new ArrayList<>(sectionMap.values());
+            sections.sort((a, b) -> {
+                String nameA = (String) a.get("sectionName");
+                String nameB = (String) b.get("sectionName");
+                if (nameA == null) return 1;
+                if (nameB == null) return -1;
+                return nameA.compareTo(nameB);
+            });
+
             Map<String, Object> result = new HashMap<>();
             result.put("assessmentId", assessmentId);
             result.put("assessmentName", assessment.getAssessmentName());
             result.put("questionnaireName", questionnaireName);
             result.put("questions", questions);
+            result.put("sections", sections);
 
             return ResponseEntity.ok(result);
 
