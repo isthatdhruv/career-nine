@@ -135,7 +135,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                         "/**/*.css",
                         "/**/*.js")
                 .permitAll()
-.antMatchers("/assessment-mapping/public/**",
+.antMatchers("/assessment-mapping/public/**", "/leads/capture",
                         "/user/*/*","/user/*","/assessment-section-instructions/**", "/language-question/create-with-options",
                         "/**/**/**", "/**/**/**/**","/dashboard/game-results/*",
                         "/languages/**","/game-results/*",
