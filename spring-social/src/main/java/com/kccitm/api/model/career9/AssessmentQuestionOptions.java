@@ -34,7 +34,7 @@ public class AssessmentQuestionOptions implements Serializable {
 
     private boolean isCorrect;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "LONGTEXT")
     private String optionDescription;
 
     @ManyToOne

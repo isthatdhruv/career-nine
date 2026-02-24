@@ -33,7 +33,7 @@ public class QuestionnaireSectionInstruction {
     @JoinColumn(name = "language_id") // explicit join column to avoid auto-generated column name
     private LanguagesSupported language;
 
-    @Column(name = "instruction_text" , columnDefinition = "TEXT")
+    @Column(name = "instruction_text" , columnDefinition = "LONGTEXT")
     private String instructionText;
 
     public String getInstructionText() {

@@ -28,7 +28,7 @@ public class QuestionnaireLanguage {
     @JoinColumn(name = "languageId")
     private LanguagesSupported language;
 
-    @Column(name = "instructions" , columnDefinition = "TEXT")
+    @Column(name = "instructions" , columnDefinition = "LONGTEXT")
     private String instructions;
 
 
