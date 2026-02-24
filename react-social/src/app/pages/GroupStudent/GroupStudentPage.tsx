@@ -12,6 +12,8 @@ import {
   StudentAnswerDetail,
   resetAssessment,
   getAllGameResults,
+  getDemographicFieldsForStudent,
+  getBulkDemographicData,
 } from "../StudentInformation/StudentInfo_APIs";
 import * as XLSX from "xlsx";
 
@@ -75,6 +77,7 @@ export default function GroupStudentPage() {
   const [bulkDownloadError, setBulkDownloadError] = useState<string>("");
   const [bulkDownloading, setBulkDownloading] = useState(false);
   const [bulkGameResults, setBulkGameResults] = useState<Map<string, any>>(new Map());
+  const [bulkDemographicData, setBulkDemographicData] = useState<any[]>([]);
 
   // Filter panel state
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -106,6 +109,14 @@ export default function GroupStudentPage() {
   const [resetAssessmentName, setResetAssessmentName] = useState<string>("");
   const [resetting, setResetting] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  // Demographics modal state
+  const [showDemographicsModal, setShowDemographicsModal] = useState(false);
+  const [demographicsStudent, setDemographicsStudent] = useState<Student | null>(null);
+  const [demographicsAssessmentId, setDemographicsAssessmentId] = useState<number | null>(null);
+  const [demographicsAssessmentName, setDemographicsAssessmentName] = useState<string>("");
+  const [demographicsData, setDemographicsData] = useState<any[]>([]);
+  const [demographicsLoading, setDemographicsLoading] = useState(false);
 
   const normalizeAnswers = (data: any): StudentAnswerDetail[] => {
     const rawList = Array.isArray(data)
@@ -693,14 +704,21 @@ export default function GroupStudentPage() {
   };
 
   const handleBulkDownloadClick = async () => {
+    // Require assessment filter to be selected
+    if (!appliedEnabled.has("assessment") || appliedAssessmentIds.size === 0) {
+      alert("Please select at least one assessment in the filter before downloading.");
+      return;
+    }
+
     setShowBulkDownloadModal(true);
     setBulkDownloadLoading(true);
     setBulkDownloadError("");
     setBulkDownloadAnswers([]);
     setBulkGameResults(new Map());
+    setBulkDemographicData([]);
 
     try {
-      // Build pairs: for each filtered student, include all their active assessments
+      // Build pairs: for each filtered student, include only selected assessments
       const pairs: { userStudentId: number; assessmentId: number }[] = [];
       for (const student of filteredStudents) {
         const activeStudentAssessments = (student.assessments || []).filter(
@@ -723,10 +741,11 @@ export default function GroupStudentPage() {
         return;
       }
 
-      // Fetch answers and game results in parallel
-      const [answersResponse, gameResponse] = await Promise.all([
+      // Fetch answers, game results, and demographic data in parallel
+      const [answersResponse, gameResponse, demoResponse] = await Promise.all([
         getBulkStudentAnswersWithDetails(pairs),
         getAllGameResults().catch(() => ({ data: [] })),
+        getBulkDemographicData(pairs).catch(() => ({ data: [] })),
       ]);
 
       setBulkDownloadAnswers(Array.isArray(answersResponse.data) ? answersResponse.data : []);
@@ -739,6 +758,7 @@ export default function GroupStudentPage() {
         if (id) gameMap.set(id, doc);
       }
       setBulkGameResults(gameMap);
+      setBulkDemographicData(Array.isArray(demoResponse.data) ? demoResponse.data : []);
     } catch (err: any) {
       console.error("Error fetching bulk answers:", err);
       setBulkDownloadError("Failed to load student answers. Please try again.");
@@ -801,7 +821,7 @@ export default function GroupStudentPage() {
 
   // Pivot bulk answers: one row per student+assessment, each question as a column
   const pivotedBulkData = useMemo(() => {
-    if (bulkDownloadAnswers.length === 0 && bulkGameResults.size === 0) return { rows: [] as any[], questionColumns: [] as string[], hasGameData: false };
+    if (bulkDownloadAnswers.length === 0 && bulkGameResults.size === 0 && bulkDemographicData.length === 0) return { rows: [] as any[], questionColumns: [] as string[], hasGameData: false, demographicColumns: [] as string[], unmappedCount: 0 };
 
     // Collect all unique question column headers in order of first appearance
     const questionColumnsSet = new Set<string>();
@@ -811,37 +831,102 @@ export default function GroupStudentPage() {
     }
     const questionColumns = Array.from(questionColumnsSet);
 
+    // Build demographic lookup: key = "userStudentId_assessmentId" -> { label: value }
+    const demoColumnsSet = new Set<string>();
+    const demoLookup = new Map<string, Record<string, string>>();
+    for (const d of bulkDemographicData) {
+      const key = `${d.userStudentId}_${d.assessmentId}`;
+      const label = d.displayLabel || d.fieldName || "";
+      if (label) {
+        demoColumnsSet.add(label);
+        if (!demoLookup.has(key)) demoLookup.set(key, {});
+        demoLookup.get(key)![label] = d.value || "";
+      }
+    }
+    const demographicColumns = Array.from(demoColumnsSet);
+
+    // Build a lookup for assessment names by ID from filtered students
+    const assessmentNameById = new Map<number, string>();
+    for (const student of filteredStudents) {
+      for (const a of (student.assessments || [])) {
+        assessmentNameById.set(Number(a.assessmentId), a.assessmentName);
+      }
+    }
+
     // Group by student + assessment
-    const groupMap = new Map<string, { studentName: string; userStudentId: string; assessmentName: string; answers: Record<string, string>; gameData: Record<string, any> }>();
+    type RowData = { studentName: string; userStudentId: string; assessmentName: string; assessmentId: string; answers: Record<string, string>; gameData: Record<string, any>; demographics: Record<string, string> };
+    const groupMap = new Map<string, RowData>();
+
+    // First pass: populate from answers
     for (const row of bulkDownloadAnswers) {
       const key = `${row.userStudentId}_${row.assessmentName}`;
       if (!groupMap.has(key)) {
         const gameDoc = bulkGameResults.get(String(row.userStudentId));
+        const demoKey = `${row.userStudentId}_${row.assessmentId}`;
         groupMap.set(key, {
           studentName: row.studentName || "",
           userStudentId: row.userStudentId || "",
           assessmentName: row.assessmentName || "",
+          assessmentId: row.assessmentId || "",
           answers: {},
           gameData: extractGameData(gameDoc),
+          demographics: demoLookup.get(demoKey) || {},
         });
       }
       const colKey = row.excelQuestionHeader || row.questionText || "";
       if (colKey) {
-        groupMap.get(key)!.answers[colKey] = row.optionText || "";
+        const displayValue = row.optionText || "";
+        const existing = groupMap.get(key)!.answers[colKey];
+        // For text answers, append multiple responses with semicolons
+        groupMap.get(key)!.answers[colKey] = existing ? `${existing}; ${displayValue}` : displayValue;
       }
     }
 
+    // Second pass: ensure students with demographics but no answers are included
+    // Group demographic data by unique student+assessment combos
+    const demoStudentAssessments = new Map<string, { userStudentId: string; assessmentId: string }>();
+    for (const d of bulkDemographicData) {
+      const key = `${d.userStudentId}_${d.assessmentId}`;
+      if (!demoStudentAssessments.has(key)) {
+        demoStudentAssessments.set(key, { userStudentId: String(d.userStudentId), assessmentId: String(d.assessmentId) });
+      }
+    }
+    Array.from(demoStudentAssessments.entries()).forEach(([demoKey, info]) => {
+      const aName = assessmentNameById.get(Number(info.assessmentId)) || "";
+      const rowKey = `${info.userStudentId}_${aName}`;
+      if (!groupMap.has(rowKey)) {
+        // Find student name from filteredStudents
+        const student = filteredStudents.find(s => String(s.userStudentId) === info.userStudentId);
+        const gameDoc = bulkGameResults.get(info.userStudentId);
+        groupMap.set(rowKey, {
+          studentName: student?.name || "",
+          userStudentId: info.userStudentId,
+          assessmentName: aName,
+          assessmentId: info.assessmentId,
+          answers: {},
+          gameData: extractGameData(gameDoc),
+          demographics: demoLookup.get(demoKey) || {},
+        });
+      }
+    });
+
     const rows = Array.from(groupMap.values());
     const hasGameData = bulkGameResults.size > 0;
-    return { rows, questionColumns, hasGameData };
-  }, [bulkDownloadAnswers, bulkGameResults]);
+
+    // Count unmapped text responses (have textResponse but no optionText/optionId)
+    const unmappedCount = bulkDownloadAnswers.filter(
+      (row: any) => row.textResponse && !row.optionText && !row.optionId
+    ).length;
+
+    return { rows, questionColumns, hasGameData, demographicColumns, unmappedCount };
+  }, [bulkDownloadAnswers, bulkGameResults, bulkDemographicData, filteredStudents]);
 
   const handleBulkDownloadExcel = () => {
-    if (bulkDownloadAnswers.length === 0) return;
+    if (pivotedBulkData.rows.length === 0) return;
 
     setBulkDownloading(true);
     try {
-      const { rows, questionColumns, hasGameData } = pivotedBulkData;
+      const { rows, questionColumns, hasGameData, demographicColumns } = pivotedBulkData;
 
       const excelData = rows.map((row, index) => {
         const base: Record<string, any> = {
@@ -850,6 +935,10 @@ export default function GroupStudentPage() {
           "User ID": row.userStudentId,
           "Assessment": row.assessmentName,
         };
+        // Add demographic columns after base info
+        for (const col of demographicColumns) {
+          base[col] = row.demographics[col] || "";
+        }
         for (const col of questionColumns) {
           base[col] = row.answers[col] || "";
         }
@@ -868,6 +957,7 @@ export default function GroupStudentPage() {
         { wch: 25 }, // Student Name
         { wch: 10 }, // User ID
         { wch: 25 }, // Assessment
+        ...demographicColumns.map(() => ({ wch: 20 })),
         ...questionColumns.map(() => ({ wch: 20 })),
         ...(hasGameData ? gameColumns.map(() => ({ wch: 18 })) : []),
       ];
@@ -942,6 +1032,25 @@ export default function GroupStudentPage() {
       return true;
     });
     setStudentAssessments(deduplicated);
+  };
+
+  const handleViewDemographics = async (student: Student, assessmentId: number, assessmentName: string) => {
+    setDemographicsStudent(student);
+    setDemographicsAssessmentId(assessmentId);
+    setDemographicsAssessmentName(assessmentName);
+    setShowDemographicsModal(true);
+    setDemographicsLoading(true);
+    setDemographicsData([]);
+
+    try {
+      const response = await getDemographicFieldsForStudent(assessmentId, student.userStudentId);
+      setDemographicsData(Array.isArray(response.data) ? response.data : []);
+    } catch (err) {
+      console.error("Error fetching demographics:", err);
+      setDemographicsData([]);
+    } finally {
+      setDemographicsLoading(false);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -1685,19 +1794,20 @@ export default function GroupStudentPage() {
                   <button
                     className="btn d-flex align-items-center gap-2"
                     onClick={handleBulkDownloadClick}
-                    disabled={filteredStudents.length === 0}
+                    disabled={filteredStudents.length === 0 || !appliedEnabled.has("assessment") || appliedAssessmentIds.size === 0}
+                    title={!appliedEnabled.has("assessment") || appliedAssessmentIds.size === 0 ? "Select an assessment in the filter first" : ""}
                     style={{
-                      background: filteredStudents.length > 0
+                      background: filteredStudents.length > 0 && appliedEnabled.has("assessment") && appliedAssessmentIds.size > 0
                         ? "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)"
                         : "#e0e0e0",
                       border: "none",
                       borderRadius: "10px",
                       padding: "0.6rem 1.2rem",
                       fontWeight: 600,
-                      color: filteredStudents.length > 0 ? "#fff" : "#9e9e9e",
-                      cursor: filteredStudents.length > 0 ? "pointer" : "not-allowed",
+                      color: filteredStudents.length > 0 && appliedEnabled.has("assessment") && appliedAssessmentIds.size > 0 ? "#fff" : "#9e9e9e",
+                      cursor: filteredStudents.length > 0 && appliedEnabled.has("assessment") && appliedAssessmentIds.size > 0 ? "pointer" : "not-allowed",
                       transition: "all 0.3s ease",
-                      boxShadow: filteredStudents.length > 0
+                      boxShadow: filteredStudents.length > 0 && appliedEnabled.has("assessment") && appliedAssessmentIds.size > 0
                         ? "0 4px 15px rgba(67, 97, 238, 0.3)"
                         : "none",
                     }}
@@ -2329,7 +2439,27 @@ export default function GroupStudentPage() {
                           </span>
                         </div>
                       </div>
-                      <div className="d-flex gap-2">
+                      <div className="d-flex gap-2 flex-wrap">
+                        <button
+                          className="btn btn-outline-info btn-sm d-flex align-items-center gap-1"
+                          onClick={() =>
+                            handleViewDemographics(
+                              modalStudent,
+                              assessment.assessmentId,
+                              assessment.assessmentName
+                            )
+                          }
+                          style={{
+                            borderRadius: "8px",
+                            padding: "6px 12px",
+                            fontWeight: 500,
+                            fontSize: "0.8rem",
+                            transition: "all 0.2s",
+                          }}
+                        >
+                          <i className="bi bi-person-lines-fill"></i>
+                          Demographics
+                        </button>
                         <button
                           className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1"
                           onClick={() =>
@@ -2392,6 +2522,136 @@ export default function GroupStudentPage() {
               <button
                 className="btn btn-secondary w-100"
                 onClick={() => setShowAssessmentModal(false)}
+                style={{ borderRadius: "10px" }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Demographics Modal */}
+      {showDemographicsModal && demographicsStudent && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10060,
+          }}
+          onClick={() => setShowDemographicsModal(false)}
+        >
+          <div
+            style={{
+              backgroundColor: "white",
+              borderRadius: "20px",
+              maxWidth: "550px",
+              width: "90%",
+              maxHeight: "80vh",
+              overflow: "hidden",
+              boxShadow: "0 25px 50px rgba(0, 0, 0, 0.15)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                background: "linear-gradient(135deg, #0891b2 0%, #065f73 100%)",
+                padding: "1rem 1.25rem",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+              }}
+            >
+              <div>
+                <h5 className="mb-0 text-white fw-bold" style={{ fontSize: "1.1rem" }}>
+                  <i className="bi bi-person-lines-fill me-2"></i>
+                  Demographic Data
+                </h5>
+                <p className="mb-0 text-white mt-1" style={{ fontSize: "0.85rem", opacity: 0.9 }}>
+                  {demographicsStudent.name} - {demographicsAssessmentName}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-close btn-close-white"
+                onClick={() => setShowDemographicsModal(false)}
+                style={{ marginTop: "2px" }}
+              ></button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: "1rem", maxHeight: "60vh", overflowY: "auto" }}>
+              {demographicsLoading ? (
+                <div className="text-center py-4">
+                  <div className="spinner-border spinner-border-sm text-primary" role="status"></div>
+                  <span className="ms-2 text-muted">Loading demographics...</span>
+                </div>
+              ) : demographicsData.length === 0 ? (
+                <div className="text-center py-4">
+                  <i className="bi bi-inbox text-muted" style={{ fontSize: "2.5rem", opacity: 0.5 }}></i>
+                  <p className="mt-2 text-muted mb-0">No demographic fields configured for this assessment</p>
+                </div>
+              ) : (
+                <div className="d-flex flex-column gap-2">
+                  {demographicsData.map((field: any) => (
+                    <div
+                      key={field.fieldId}
+                      className="p-3"
+                      style={{
+                        backgroundColor: "#f8fafc",
+                        borderRadius: "12px",
+                        border: "1px solid #e2e8f0",
+                      }}
+                    >
+                      <div className="d-flex justify-content-between align-items-start">
+                        <div style={{ flex: 1 }}>
+                          <div
+                            className="text-muted"
+                            style={{ fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}
+                          >
+                            {field.customLabel || field.displayLabel}
+                          </div>
+                          <div
+                            className="mt-1 fw-semibold"
+                            style={{ fontSize: "0.95rem", color: field.currentValue ? "#1a1a2e" : "#a0aec0" }}
+                          >
+                            {field.currentValue || "Not provided"}
+                          </div>
+                        </div>
+                        {field.isMandatory && (
+                          <span
+                            style={{
+                              backgroundColor: "#fef3c7",
+                              color: "#d97706",
+                              padding: "2px 8px",
+                              borderRadius: "6px",
+                              fontSize: "0.7rem",
+                              fontWeight: 600,
+                            }}
+                          >
+                            Required
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ padding: "0.75rem 1rem", borderTop: "1px solid #e2e8f0" }}>
+              <button
+                className="btn btn-secondary w-100"
+                onClick={() => setShowDemographicsModal(false)}
                 style={{ borderRadius: "10px" }}
               >
                 Close
@@ -2948,6 +3208,61 @@ export default function GroupStudentPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Unmapped Text Responses Warning */}
+                  {!bulkDownloadLoading && !bulkDownloadError && pivotedBulkData.unmappedCount > 0 && (
+                    <div
+                      className="mb-4 p-3 d-flex align-items-center justify-content-between flex-wrap gap-3"
+                      style={{
+                        background: "linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.08) 100%)",
+                        border: "1px solid rgba(245, 158, 11, 0.3)",
+                        borderRadius: "12px",
+                      }}
+                    >
+                      <div className="d-flex align-items-center gap-3">
+                        <div
+                          style={{
+                            width: "42px",
+                            height: "42px",
+                            borderRadius: "50%",
+                            background: "rgba(245, 158, 11, 0.2)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <i className="bi bi-exclamation-triangle-fill" style={{ color: "#d97706", fontSize: "1.2rem" }}></i>
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, color: "#92400e", fontSize: "0.95rem" }}>
+                            {pivotedBulkData.unmappedCount} Unmapped Text Response{pivotedBulkData.unmappedCount > 1 ? "s" : ""} Found
+                          </div>
+                          <div style={{ color: "#a16207", fontSize: "0.85rem" }}>
+                            Some student answers contain free-text responses that haven't been mapped to existing options. Map them first for accurate scoring.
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        className="btn btn-sm d-flex align-items-center gap-2"
+                        onClick={() => navigate("/text-response-mapping")}
+                        style={{
+                          background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: "10px",
+                          padding: "8px 20px",
+                          fontWeight: 600,
+                          fontSize: "0.85rem",
+                          boxShadow: "0 4px 12px rgba(245, 158, 11, 0.3)",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        <i className="bi bi-arrow-right-circle-fill"></i>
+                        Map Text Responses
+                      </button>
+                    </div>
+                  )}
 
                   {/* Answers Table */}
                   <div className="mb-3">

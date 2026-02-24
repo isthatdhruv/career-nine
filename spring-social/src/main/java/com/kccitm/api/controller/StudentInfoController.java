@@ -155,6 +155,7 @@ public class StudentInfoController {
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("studentName", studentName != null ? studentName : "");
                 row.put("userStudentId", userStudentId);
+                row.put("assessmentId", assessmentId);
                 row.put("assessmentName", assessmentName);
 
                 row.put("questionId", aa.getQuestionnaireQuestion() != null
@@ -168,6 +169,7 @@ public class StudentInfoController {
 
                 row.put("optionId", aa.getOption() != null ? aa.getOption().getOptionId() : null);
                 row.put("optionText", aa.getOption() != null ? aa.getOption().getOptionText() : "");
+                row.put("textResponse", aa.getTextResponse() != null ? aa.getTextResponse() : "");
 
                 String sectionName = "";
                 try {

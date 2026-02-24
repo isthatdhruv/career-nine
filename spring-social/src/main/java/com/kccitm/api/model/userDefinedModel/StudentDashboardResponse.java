@@ -185,6 +185,7 @@ public class StudentDashboardResponse {
         private Long assessmentAnswerId;
         private Long questionnaireQuestionId;
         private Integer rankOrder;
+        private String textResponse;
         private OptionData selectedOption;
 
         public AnswerDetail() {
@@ -213,6 +214,14 @@ public class StudentDashboardResponse {
 
         public void setRankOrder(Integer rankOrder) {
             this.rankOrder = rankOrder;
+        }
+
+        public String getTextResponse() {
+            return textResponse;
+        }
+
+        public void setTextResponse(String textResponse) {
+            this.textResponse = textResponse;
         }
 
         public OptionData getSelectedOption() {

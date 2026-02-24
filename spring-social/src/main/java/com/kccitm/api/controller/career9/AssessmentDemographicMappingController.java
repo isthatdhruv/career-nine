@@ -44,8 +44,10 @@ public class AssessmentDemographicMappingController {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> fields = (List<Map<String, Object>>) request.get("fields");
 
-            // Delete existing mappings for this assessment
+            // Delete existing mappings for this assessment and flush to DB
+            // so unique constraint doesn't conflict with subsequent inserts
             mappingRepository.deleteByAssessmentId(assessmentId);
+            mappingRepository.flush();
 
             // Create new mappings
             List<AssessmentDemographicMapping> savedMappings = new ArrayList<>();

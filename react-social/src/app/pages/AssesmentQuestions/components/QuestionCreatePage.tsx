@@ -34,6 +34,8 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const [games, setGames] = useState<any[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string>("");
 
+  const [isMQT, setIsMQT] = useState(false);
+
   const initialValues = {
     questionText: "",
     questionType: "",
@@ -311,6 +313,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                 questionText: formikValues.questionText,
                 questionType: formikValues.questionType,
                 maxOptionsAllowed: Number(formikValues.maxOptionsAllowed) || 0,
+                isMQT: isMQT,
                 options,
                 section: { sectionId: Number(formikValues.sectionId) },
                 flag: useMQTAsOptions ? 1 : 0
@@ -369,7 +372,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                 <option value="multiple-choice">Multiple Choice</option>
                 <option value="single-choice">Single Choice</option>
                 <option value="ranking">Ranking</option>
-
+                <option value="text">Text Input</option>
               </select>
             </div>
             <div className="fv-row mb-7">
@@ -615,7 +618,9 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
               )}
             </div>
             <div className="fv-row mb-7">
-              <label className="fs-6 fw-bold mb-2">Max Options Allowed</label>
+              <label className="fs-6 fw-bold mb-2">
+                {formikValues.questionType === "text" ? "Number of Text Input Boxes" : "Max Options Allowed"}
+              </label>
               <input
                 type="number"
                 min={0}
@@ -627,10 +632,31 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                     maxOptionsAllowed: e.target.value
                   }))
                 }
-                placeholder="Max Options Allowed"
+                placeholder={formikValues.questionType === "text" ? "Number of text input boxes" : "Max Options Allowed"}
                 className="form-control form-control-lg form-control-solid w-25"
                 style={{ width: 200 }}
               />
+            </div>
+            {formikValues.questionType === "text" && (
+              <div className="alert alert-info mb-7">
+                <strong>Text Input Mode:</strong> Students will type free-text answers instead of selecting options.
+                The options below serve as reference options for autocomplete suggestions and scoring after admin mapping.
+              </div>
+            )}
+            <div className="fv-row mb-7">
+              <div className="form-check form-switch">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  id="isMQTToggle"
+                  checked={isMQT}
+                  onChange={() => setIsMQT(v => !v)}
+                />
+                <label className="form-check-label fs-6 fw-bold" htmlFor="isMQTToggle">
+                  isMQT
+                </label>
+              </div>
             </div>
             <div className="mb-4 d-flex gap-4">
               <label>

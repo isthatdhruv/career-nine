@@ -12,7 +12,7 @@ import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
 @Repository
 public interface QuestionnaireQuestionRepository extends JpaRepository<QuestionnaireQuestion, Long> {
 
-    @Query("SELECT qq FROM QuestionnaireQuestion qq " +
+    @Query("SELECT DISTINCT qq FROM QuestionnaireQuestion qq " +
            "JOIN FETCH qq.question q " +
            "LEFT JOIN FETCH q.options o " +
            "JOIN FETCH qq.section s " +

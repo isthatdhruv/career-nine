@@ -218,6 +218,7 @@ public class AssessmentQuestionController {
         existingQuestion.setQuestionText(assessmentQuestions.getQuestionText());
         existingQuestion.setQuestionType(assessmentQuestions.getQuestionType());
         existingQuestion.setMaxOptionsAllowed(assessmentQuestions.getMaxOptionsAllowed());
+        existingQuestion.setIsMQT(assessmentQuestions.getIsMQT());
 
         // Step 3: Update section relationship (validate section exists first)
         if (assessmentQuestions.getSection() != null && assessmentQuestions.getSection().getSectionId() != null) {

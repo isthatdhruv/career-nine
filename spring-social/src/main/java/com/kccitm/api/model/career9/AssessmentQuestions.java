@@ -29,7 +29,8 @@ public class AssessmentQuestions implements Serializable {
     private String questionText;
     private String questionType;
 
-    private Boolean flag;
+    @Column(name = "is_mqt", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
+    private Boolean isMQT;
 
     @Column(name = "is_deleted", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
     private Boolean isDeleted = false;
@@ -93,11 +94,12 @@ public class AssessmentQuestions implements Serializable {
         return questionText;
     }
 
-    public Boolean getFlag() {
-        return flag;
+    public Boolean getIsMQT() {
+        return isMQT;
     }
-    public void setFlag(Boolean flag) {
-        this.flag = flag;
+
+    public void setIsMQT(Boolean isMQT) {
+        this.isMQT = isMQT;
     }
 
     public Boolean getIsDeleted() {

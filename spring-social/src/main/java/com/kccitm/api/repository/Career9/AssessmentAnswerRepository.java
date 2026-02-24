@@ -1,6 +1,8 @@
 package com.kccitm.api.repository.Career9;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -35,6 +37,14 @@ public interface AssessmentAnswerRepository extends JpaRepository<AssessmentAnsw
 
        @Transactional
        void deleteByUserStudent_UserStudentIdAndAssessment_Id(Long userStudentId, Long assessmentId);
+
+       List<AssessmentAnswer> findByAssessment_IdAndTextResponseIsNotNull(Long assessmentId);
+
+       List<AssessmentAnswer> findByUserStudent_UserStudentIdAndAssessment_Id(Long userStudentId, Long assessmentId);
+
+       // Find a previously mapped text response for the same question (for auto-mapping)
+       Optional<AssessmentAnswer> findFirstByQuestionnaireQuestion_QuestionnaireQuestionIdAndTextResponseAndMappedOptionIsNotNull(
+                     Long questionnaireQuestionId, String textResponse);
 
        // @Query("SELECT"+
        // " new

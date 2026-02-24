@@ -129,6 +129,16 @@ export function getBulkStudentAnswersWithDetails(pairs: { userStudentId: number;
     return axios.post<any[]>(`${STUDENT_INFO_BASE}/getBulkStudentAnswersWithDetails`, pairs);
 }
 
+// Bulk fetch demographic data for multiple student+assessment pairs
+export function getBulkDemographicData(pairs: { userStudentId: number; assessmentId: number }[]) {
+    return axios.post<any[]>(`${API_URL}/student-demographics/bulk-fields`, pairs);
+}
+
+// Get demographic fields with values for a single student+assessment
+export function getDemographicFieldsForStudent(assessmentId: number, userStudentId: number) {
+    return axios.get<any[]>(`${API_URL}/student-demographics/fields/${assessmentId}/${userStudentId}`);
+}
+
 // Reset assessment - sets status to 'notstarted' and deletes raw scores
 export function resetAssessment(userStudentId: number, assessmentId: number) {
     return axios.post(`${STUDENT_INFO_BASE}/resetAssessment`, {
