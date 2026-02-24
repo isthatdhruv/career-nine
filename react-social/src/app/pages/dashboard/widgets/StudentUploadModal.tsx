@@ -12,6 +12,7 @@ type Props = {
 const TEMPLATE_HEADERS = [
   "Name",
   "Roll Number",
+  "Control Number",
   "Phone1",
   "Phone2",
   "Email",
@@ -29,6 +30,8 @@ const findColumnIndexMap = (hdrRow: any[]): Record<string, number> => {
     if (["name", "full name", "student name"].includes(n)) map["Name"] = idx;
     else if (["roll", "rollno", "roll number", "roll_number"].includes(n))
       map["Roll Number"] = idx;
+    else if (["control number", "control_number", "controlnumber", "control no", "control"].includes(n))
+      map["Control Number"] = idx;
     else if (["phone1", "phone_1", "mobile1", "mobile_1", "phone"].includes(n))
       map["Phone1"] = idx;
     else if (["phone2", "phone_2", "mobile2", "mobile_2"].includes(n))
@@ -62,7 +65,7 @@ const buildFilteredRows = (raw: any[][]): any[][] => {
 };
 
 const downloadTemplate = () => {
-  const csv = [TEMPLATE_HEADERS, ["John Doe", "R001", "9876543210", "9123456780", "john@example.com", "10", "A"]]
+  const csv = [TEMPLATE_HEADERS, ["John Doe", "R001", "12345", "9876543210", "9123456780", "john@example.com", "10", "A"]]
     .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
     .join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });

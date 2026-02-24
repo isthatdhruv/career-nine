@@ -43,8 +43,11 @@ public class StudentInfo implements Serializable {
     private Integer sibling;
 
     private String family;
+    
 
     private String schoolBoard;
+
+    private Long controlNumber;
 
     private Integer studentClass;
 
@@ -195,6 +198,14 @@ public class StudentInfo implements Serializable {
 
     public void setSchoolSectionId(Integer schoolSectionId) {
         this.schoolSectionId = schoolSectionId;
+    }
+
+    public Long getControlNumber() {
+        return controlNumber;
+    }
+
+    public void setControlNumber(Long controlNumber) {
+        this.controlNumber = controlNumber;
     }
 
 }

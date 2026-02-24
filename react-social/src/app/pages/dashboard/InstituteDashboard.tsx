@@ -569,6 +569,7 @@ const StudentListModal: FC<{
                       <th className="ps-4 min-w-50px">#</th>
                       <th className="min-w-150px">Name</th>
                       <th className="min-w-100px">Roll Number</th>
+                      <th className="min-w-100px">Control Number</th>
                       <th className="min-w-200px">Assessment Status</th>
                     </tr>
                   </thead>
@@ -580,6 +581,7 @@ const StudentListModal: FC<{
                           <td className="ps-4">{index + 1}</td>
                           <td className="fw-semibold text-gray-800">{student.name || 'N/A'}</td>
                           <td className="text-gray-600">{student.schoolRollNumber || 'N/A'}</td>
+                          <td className="text-gray-600">{student.controlNumber ?? 'N/A'}</td>
                           <td>
                             {visibleAssessments.length > 0 ? (
                               <div className="d-flex flex-wrap gap-1">

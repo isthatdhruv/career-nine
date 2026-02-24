@@ -10,6 +10,7 @@ export type Student = {
   id: number;
   name: string;
   schoolRollNumber: string;
+  controlNumber?: number;
   selectedAssessment: string;
   userStudentId: number;
   assignedAssessmentIds: number[];
@@ -71,6 +72,7 @@ export default function StudentsList() {
               id: student.id,
               name: student.name || "",
               schoolRollNumber: student.schoolRollNumber || "",
+              controlNumber: student.controlNumber ?? undefined,
               selectedAssessment: "",
               userStudentId: student.userStudentId,
               assignedAssessmentIds: assignedIds,
@@ -328,6 +330,9 @@ export default function StudentsList() {
                     <th style={{ padding: '16px 24px', fontWeight: 600, color: '#1a1a2e', borderBottom: '2px solid #e0e0e0' }}>
                       Roll Number
                     </th>
+                    <th style={{ padding: '16px 24px', fontWeight: 600, color: '#1a1a2e', borderBottom: '2px solid #e0e0e0' }}>
+                      Control Number
+                    </th>
                     <th style={{ padding: '16px 24px', fontWeight: 600, color: '#1a1a2e', borderBottom: '2px solid #e0e0e0', minWidth: '220px' }}>
                       Assessment
                     </th>
@@ -384,6 +389,11 @@ export default function StudentsList() {
                       <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
                         <span style={{ fontWeight: 500, color: '#555' }}>
                           {student.schoolRollNumber || '-'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>
+                        <span style={{ fontWeight: 500, color: '#555' }}>
+                          {student.controlNumber ?? '-'}
                         </span>
                       </td>
                       <td style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0' }}>

@@ -8,6 +8,7 @@ export interface StudentInfo {
     id?: number;
     name: string;
     schoolRollNumber: string;
+    controlNumber?: number;
     phoneNumber?: number;
     email?: string;
     address?: string;
@@ -41,6 +42,7 @@ export interface StudentWithMapping {
     id: number;
     name: string;
     schoolRollNumber: string;
+    controlNumber?: number;
     phoneNumber?: string;
     email?: string;
     instituteId?: number;

@@ -295,6 +295,7 @@ public class StudentInfoController {
                 studentData.put("instituteId", si.getInstituteId());
                 studentData.put("studentDob", si.getStudentDob());
                 studentData.put("schoolSectionId", si.getSchoolSectionId());
+                studentData.put("controlNumber", si.getControlNumber());
                 studentData.put("username", si.getUser().getUsername());
 
                 // Find UserStudent for this StudentInfo to get userStudentId
@@ -665,7 +666,7 @@ public class StudentInfoController {
 
             // Create header row
             Row headerRow = sheet.createRow(0);
-            String[] fixedHeaders = {"Name", "Roll Number", "Class", "DOB"};
+            String[] fixedHeaders = {"Name", "Roll Number", "Control Number", "Class", "DOB"};
             int colIndex = 0;
 
             for (String header : fixedHeaders) {
@@ -692,6 +693,7 @@ public class StudentInfoController {
                 // Fixed columns
                 row.createCell(colIndex++).setCellValue(si != null && si.getName() != null ? si.getName() : "");
                 row.createCell(colIndex++).setCellValue(si != null && si.getSchoolRollNumber() != null ? si.getSchoolRollNumber() : "");
+                row.createCell(colIndex++).setCellValue(si != null && si.getControlNumber() != null ? si.getControlNumber().toString() : "");
                 row.createCell(colIndex++).setCellValue(si != null && si.getStudentClass() != null ? si.getStudentClass().toString() : "");
 
                 // Format DOB as string

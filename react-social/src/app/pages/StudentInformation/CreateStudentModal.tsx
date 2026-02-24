@@ -13,6 +13,7 @@ const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, o
   const [formData, setFormData] = useState({
     name: "",
     schoolRollNumber: "",
+    controlNumber: "",
     phoneNumber: "",
     dob: "",
     selectedAssessmentId: "",
@@ -65,6 +66,7 @@ const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, o
         const payload: StudentInfo = {
             name: formData.name,
             schoolRollNumber: formData.schoolRollNumber || "",
+            controlNumber: formData.controlNumber ? Number(formData.controlNumber) : undefined,
             phoneNumber: formData.phoneNumber ? Number(formData.phoneNumber) : undefined, // Check if this should be string or number based on interface
             email: "",
             address: "",
@@ -128,7 +130,18 @@ const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, o
                 placeholder="Enter roll number"
               />
             </Form.Group>
-            
+
+            <Form.Group className="mb-3">
+              <Form.Label>Control Number</Form.Label>
+              <Form.Control
+                type="number"
+                name="controlNumber"
+                value={formData.controlNumber}
+                onChange={handleChange}
+                placeholder="Enter control number (optional)"
+              />
+            </Form.Group>
+
             <Form.Group className="mb-3">
               <Form.Label>Phone Number</Form.Label>
               <Form.Control

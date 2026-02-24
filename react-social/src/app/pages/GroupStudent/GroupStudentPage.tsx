@@ -19,6 +19,7 @@ type Student = {
   id: number;
   name: string;
   schoolRollNumber: string;
+  controlNumber?: number;
   selectedAssessment: string;
   userStudentId: number;
   assessmentName?: string;
@@ -322,6 +323,7 @@ export default function GroupStudentPage() {
             phoneNumber: student.phoneNumber || "",
             studentDob: student.studentDob || "",
             schoolRollNumber: student.schoolRollNumber || "",
+            controlNumber: student.controlNumber ?? undefined,
             selectedAssessment: "",
             userStudentId: student.userStudentId,
             assessmentName: assessment?.assessmentName || "",
@@ -460,6 +462,7 @@ export default function GroupStudentPage() {
             phoneNumber: student.phoneNumber || "",
             studentDob: student.studentDob || "",
             schoolRollNumber: student.schoolRollNumber || "",
+            controlNumber: student.controlNumber ?? undefined,
             selectedAssessment: "",
             userStudentId: student.userStudentId,
             assessmentName: assessment?.assessmentName || "",
@@ -561,6 +564,7 @@ export default function GroupStudentPage() {
               phoneNumber: student.phoneNumber || "",
               studentDob: student.studentDob || "",
               schoolRollNumber: student.schoolRollNumber || "",
+              controlNumber: student.controlNumber ?? undefined,
               selectedAssessment: "",
               userStudentId: student.userStudentId,
               assessmentName: assessment?.assessmentName || "",
@@ -589,6 +593,7 @@ export default function GroupStudentPage() {
       const matchesQuery =
         s.name.toLowerCase().includes(query.toLowerCase()) ||
         s.schoolRollNumber.toLowerCase().includes(query.toLowerCase()) ||
+        (s.controlNumber != null && s.controlNumber.toString().includes(query)) ||
         s.userStudentId.toString().includes(query);
 
       // Session/Grade/Section filter
@@ -647,8 +652,8 @@ export default function GroupStudentPage() {
       // Prepare data for Excel
       const excelData = filteredStudents.map((student, index) => ({
         "S.No": index + 1,
-        "User ID": student.userStudentId,
-        "Username": student.username || "N/A",
+        "Control Number": student.controlNumber ?? "N/A",
+        "Username": student.username && !isNaN(Number(student.username)) ? Number(student.username) : (student.username || "N/A"),
         "Student Name": student.name,
         // "Roll Number": student.schoolRollNumber || "N/A",
         // "Phone Number": student.phoneNumber || "N/A",
@@ -662,11 +667,9 @@ export default function GroupStudentPage() {
       // Set column widths
       worksheet["!cols"] = [
         { wch: 8 },   // S.No
-        { wch: 12 },  // User ID
+        { wch: 18 },  // Control Number
         { wch: 20 },  // Username
         { wch: 30 },  // Student Name
-        { wch: 18 },  // Roll Number
-        { wch: 18 },  // Phone Number
         { wch: 15 },  // Date of Birth
         { wch: 30 },  // Institute
       ];
@@ -1807,6 +1810,16 @@ export default function GroupStudentPage() {
                             borderBottom: "2px solid #e0e0e0",
                           }}
                         >
+                          Control Number
+                        </th>
+                        <th
+                          style={{
+                            padding: "16px 24px",
+                            fontWeight: 600,
+                            color: "#1a1a2e",
+                            borderBottom: "2px solid #e0e0e0",
+                          }}
+                        >
                           Student Name
                         </th>
                         <th
@@ -1928,6 +1941,16 @@ export default function GroupStudentPage() {
                           >
                             <span style={{ fontWeight: 500, color: "#555" }}>
                               {student.schoolRollNumber || "-"}
+                            </span>
+                          </td>
+                          <td
+                            style={{
+                              padding: "16px 24px",
+                              borderBottom: "1px solid #f0f0f0",
+                            }}
+                          >
+                            <span style={{ fontWeight: 500, color: "#555" }}>
+                              {student.controlNumber ?? "-"}
                             </span>
                           </td>
                           <td
