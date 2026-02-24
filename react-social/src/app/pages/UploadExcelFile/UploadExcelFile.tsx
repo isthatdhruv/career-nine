@@ -12,6 +12,7 @@ import { ReadCollegeData, GetSessionsByInstituteCode, ResolveOrCreateSection } f
 const SCHEMA_FIELDS = [
   "name",
   "schoolRollNumber",
+  "controlNumber",
   "phoneNumber",
   "email",
   "address",
@@ -26,6 +27,7 @@ const SCHEMA_FIELDS = [
 const DEFAULT_SCHEMA_OBJECT: Record<string, any> = {
   name: "",
   schoolRollNumber: "",
+  controlNumber: null,
   phoneNumber: "",
   email: "",
   address: "",
@@ -144,6 +146,7 @@ export default function UploadExcelFile() {
         const lowerH = h.toLowerCase();
         const match = SCHEMA_FIELDS.find(f => f.toLowerCase() === lowerH ||
           (f === 'schoolRollNumber' && lowerH.includes('roll')) ||
+          (f === 'controlNumber' && lowerH.includes('control')) ||
           (f === 'phoneNumber' && (lowerH.includes('phone') || lowerH.includes('mobile'))) ||
           (f === 'sessionYear' && (lowerH.includes('session') || lowerH === 'year' || lowerH.includes('academic year'))) ||
           (f === 'className' && (lowerH.includes('class') || lowerH.includes('grade'))) ||

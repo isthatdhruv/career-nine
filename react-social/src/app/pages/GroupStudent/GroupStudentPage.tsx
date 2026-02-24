@@ -12,6 +12,9 @@ import {
   StudentAnswerDetail,
   resetAssessment,
   getAllGameResults,
+  getDemographicFieldsForStudent,
+  getBulkDemographicData,
+  getBulkProctoringData,
 } from "../StudentInformation/StudentInfo_APIs";
 import * as XLSX from "xlsx";
 
@@ -19,6 +22,7 @@ type Student = {
   id: number;
   name: string;
   schoolRollNumber: string;
+  controlNumber?: number;
   selectedAssessment: string;
   userStudentId: number;
   assessmentName?: string;
@@ -74,6 +78,14 @@ export default function GroupStudentPage() {
   const [bulkDownloadError, setBulkDownloadError] = useState<string>("");
   const [bulkDownloading, setBulkDownloading] = useState(false);
   const [bulkGameResults, setBulkGameResults] = useState<Map<string, any>>(new Map());
+  const [bulkDemographicData, setBulkDemographicData] = useState<any[]>([]);
+
+  // Bulk download proctoring data state
+  const [showProctoringModal, setShowProctoringModal] = useState(false);
+  const [proctoringLoading, setProctoringLoading] = useState(false);
+  const [proctoringData, setProctoringData] = useState<any[]>([]);
+  const [proctoringError, setProctoringError] = useState<string>("");
+  const [proctoringDownloading, setProctoringDownloading] = useState(false);
 
   // Filter panel state
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -105,6 +117,14 @@ export default function GroupStudentPage() {
   const [resetAssessmentName, setResetAssessmentName] = useState<string>("");
   const [resetting, setResetting] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  // Demographics modal state
+  const [showDemographicsModal, setShowDemographicsModal] = useState(false);
+  const [demographicsStudent, setDemographicsStudent] = useState<Student | null>(null);
+  const [demographicsAssessmentId, setDemographicsAssessmentId] = useState<number | null>(null);
+  const [demographicsAssessmentName, setDemographicsAssessmentName] = useState<string>("");
+  const [demographicsData, setDemographicsData] = useState<any[]>([]);
+  const [demographicsLoading, setDemographicsLoading] = useState(false);
 
   const normalizeAnswers = (data: any): StudentAnswerDetail[] => {
     const rawList = Array.isArray(data)
@@ -322,6 +342,7 @@ export default function GroupStudentPage() {
             phoneNumber: student.phoneNumber || "",
             studentDob: student.studentDob || "",
             schoolRollNumber: student.schoolRollNumber || "",
+            controlNumber: student.controlNumber ?? undefined,
             selectedAssessment: "",
             userStudentId: student.userStudentId,
             assessmentName: assessment?.assessmentName || "",
@@ -460,6 +481,7 @@ export default function GroupStudentPage() {
             phoneNumber: student.phoneNumber || "",
             studentDob: student.studentDob || "",
             schoolRollNumber: student.schoolRollNumber || "",
+            controlNumber: student.controlNumber ?? undefined,
             selectedAssessment: "",
             userStudentId: student.userStudentId,
             assessmentName: assessment?.assessmentName || "",
@@ -561,6 +583,7 @@ export default function GroupStudentPage() {
               phoneNumber: student.phoneNumber || "",
               studentDob: student.studentDob || "",
               schoolRollNumber: student.schoolRollNumber || "",
+              controlNumber: student.controlNumber ?? undefined,
               selectedAssessment: "",
               userStudentId: student.userStudentId,
               assessmentName: assessment?.assessmentName || "",
@@ -589,6 +612,7 @@ export default function GroupStudentPage() {
       const matchesQuery =
         s.name.toLowerCase().includes(query.toLowerCase()) ||
         s.schoolRollNumber.toLowerCase().includes(query.toLowerCase()) ||
+        (s.controlNumber != null && s.controlNumber.toString().includes(query)) ||
         s.userStudentId.toString().includes(query);
 
       // Session/Grade/Section filter
@@ -644,17 +668,28 @@ export default function GroupStudentPage() {
     }
 
     try {
+      // Build section ID → {className, sectionName} lookup
+      const sectionLookup = new Map<number, { className: string; sectionName: string }>();
+      for (const sec of allSectionsFlat) {
+        sectionLookup.set(sec.id, { className: sec.className, sectionName: sec.sectionName });
+      }
+
       // Prepare data for Excel
-      const excelData = filteredStudents.map((student, index) => ({
-        "S.No": index + 1,
-        "User ID": student.userStudentId,
-        "Username": student.username || "N/A",
-        "Student Name": student.name,
-        // "Roll Number": student.schoolRollNumber || "N/A",
-        // "Phone Number": student.phoneNumber || "N/A",
-        "Date of Birth": student.studentDob ? formatDate(student.studentDob) : "N/A",
-        "Institute": getSelectedInstituteName(),
-      }));
+      const excelData = filteredStudents.map((student, index) => {
+        const secInfo = student.schoolSectionId ? sectionLookup.get(student.schoolSectionId) : undefined;
+        return {
+          "S.No": index + 1,
+          "Control Number": student.controlNumber ?? "N/A",
+          "Username": student.username && !isNaN(Number(student.username)) ? Number(student.username) : (student.username || "N/A"),
+          "Student Name": student.name,
+          "Class": secInfo?.className || "N/A",
+          "Section": secInfo?.sectionName || "N/A",
+          // "Roll Number": student.schoolRollNumber || "N/A",
+          // "Phone Number": student.phoneNumber || "N/A",
+          "Date of Birth": student.studentDob ? formatDate(student.studentDob) : "N/A",
+          "Institute": getSelectedInstituteName(),
+        };
+      });
 
       // Create worksheet
       const worksheet = XLSX.utils.json_to_sheet(excelData);
@@ -662,11 +697,11 @@ export default function GroupStudentPage() {
       // Set column widths
       worksheet["!cols"] = [
         { wch: 8 },   // S.No
-        { wch: 12 },  // User ID
+        { wch: 18 },  // Control Number
         { wch: 20 },  // Username
         { wch: 30 },  // Student Name
-        { wch: 18 },  // Roll Number
-        { wch: 18 },  // Phone Number
+        { wch: 15 },  // Class
+        { wch: 15 },  // Section
         { wch: 15 },  // Date of Birth
         { wch: 30 },  // Institute
       ];
@@ -695,17 +730,21 @@ export default function GroupStudentPage() {
     setBulkDownloadError("");
     setBulkDownloadAnswers([]);
     setBulkGameResults(new Map());
+    setBulkDemographicData([]);
 
     try {
-      // Build pairs: for each filtered student, include all their active assessments
+      // Build pairs: for each filtered student, include selected assessments (or all if no filter)
+      const hasAssessmentFilterApplied = appliedEnabled.has("assessment") && appliedAssessmentIds.size > 0;
       const pairs: { userStudentId: number; assessmentId: number }[] = [];
       for (const student of filteredStudents) {
-        const activeStudentAssessments = (student.assessments || []).filter(
-          (a) => activeAssessmentIds.has(Number(a.assessmentId))
+        const studentAssessments = (student.assessments || []).filter(
+          (a) => hasAssessmentFilterApplied
+            ? appliedAssessmentIds.has(Number(a.assessmentId))
+            : activeAssessmentIds.has(Number(a.assessmentId))
         );
         // Deduplicate by assessmentId
         const seen = new Set<number>();
-        for (const a of activeStudentAssessments) {
+        for (const a of studentAssessments) {
           const id = Number(a.assessmentId);
           if (!seen.has(id)) {
             seen.add(id);
@@ -720,10 +759,11 @@ export default function GroupStudentPage() {
         return;
       }
 
-      // Fetch answers and game results in parallel
-      const [answersResponse, gameResponse] = await Promise.all([
+      // Fetch answers, game results, and demographic data in parallel
+      const [answersResponse, gameResponse, demoResponse] = await Promise.all([
         getBulkStudentAnswersWithDetails(pairs),
         getAllGameResults().catch(() => ({ data: [] })),
+        getBulkDemographicData(pairs).catch(() => ({ data: [] })),
       ]);
 
       setBulkDownloadAnswers(Array.isArray(answersResponse.data) ? answersResponse.data : []);
@@ -736,6 +776,7 @@ export default function GroupStudentPage() {
         if (id) gameMap.set(id, doc);
       }
       setBulkGameResults(gameMap);
+      setBulkDemographicData(Array.isArray(demoResponse.data) ? demoResponse.data : []);
     } catch (err: any) {
       console.error("Error fetching bulk answers:", err);
       setBulkDownloadError("Failed to load student answers. Please try again.");
@@ -798,7 +839,7 @@ export default function GroupStudentPage() {
 
   // Pivot bulk answers: one row per student+assessment, each question as a column
   const pivotedBulkData = useMemo(() => {
-    if (bulkDownloadAnswers.length === 0 && bulkGameResults.size === 0) return { rows: [] as any[], questionColumns: [] as string[], hasGameData: false };
+    if (bulkDownloadAnswers.length === 0 && bulkGameResults.size === 0 && bulkDemographicData.length === 0) return { rows: [] as any[], questionColumns: [] as string[], hasGameData: false, demographicColumns: [] as string[], unmappedCount: 0 };
 
     // Collect all unique question column headers in order of first appearance
     const questionColumnsSet = new Set<string>();
@@ -808,37 +849,102 @@ export default function GroupStudentPage() {
     }
     const questionColumns = Array.from(questionColumnsSet);
 
+    // Build demographic lookup: key = "userStudentId_assessmentId" -> { label: value }
+    const demoColumnsSet = new Set<string>();
+    const demoLookup = new Map<string, Record<string, string>>();
+    for (const d of bulkDemographicData) {
+      const key = `${d.userStudentId}_${d.assessmentId}`;
+      const label = d.displayLabel || d.fieldName || "";
+      if (label) {
+        demoColumnsSet.add(label);
+        if (!demoLookup.has(key)) demoLookup.set(key, {});
+        demoLookup.get(key)![label] = d.value || "";
+      }
+    }
+    const demographicColumns = Array.from(demoColumnsSet);
+
+    // Build a lookup for assessment names by ID from filtered students
+    const assessmentNameById = new Map<number, string>();
+    for (const student of filteredStudents) {
+      for (const a of (student.assessments || [])) {
+        assessmentNameById.set(Number(a.assessmentId), a.assessmentName);
+      }
+    }
+
     // Group by student + assessment
-    const groupMap = new Map<string, { studentName: string; userStudentId: string; assessmentName: string; answers: Record<string, string>; gameData: Record<string, any> }>();
+    type RowData = { studentName: string; userStudentId: string; assessmentName: string; assessmentId: string; answers: Record<string, string>; gameData: Record<string, any>; demographics: Record<string, string> };
+    const groupMap = new Map<string, RowData>();
+
+    // First pass: populate from answers
     for (const row of bulkDownloadAnswers) {
       const key = `${row.userStudentId}_${row.assessmentName}`;
       if (!groupMap.has(key)) {
         const gameDoc = bulkGameResults.get(String(row.userStudentId));
+        const demoKey = `${row.userStudentId}_${row.assessmentId}`;
         groupMap.set(key, {
           studentName: row.studentName || "",
           userStudentId: row.userStudentId || "",
           assessmentName: row.assessmentName || "",
+          assessmentId: row.assessmentId || "",
           answers: {},
           gameData: extractGameData(gameDoc),
+          demographics: demoLookup.get(demoKey) || {},
         });
       }
       const colKey = row.excelQuestionHeader || row.questionText || "";
       if (colKey) {
-        groupMap.get(key)!.answers[colKey] = row.optionText || "";
+        const displayValue = row.optionText || "";
+        const existing = groupMap.get(key)!.answers[colKey];
+        // For text answers, append multiple responses with semicolons
+        groupMap.get(key)!.answers[colKey] = existing ? `${existing}; ${displayValue}` : displayValue;
       }
     }
 
+    // Second pass: ensure students with demographics but no answers are included
+    // Group demographic data by unique student+assessment combos
+    const demoStudentAssessments = new Map<string, { userStudentId: string; assessmentId: string }>();
+    for (const d of bulkDemographicData) {
+      const key = `${d.userStudentId}_${d.assessmentId}`;
+      if (!demoStudentAssessments.has(key)) {
+        demoStudentAssessments.set(key, { userStudentId: String(d.userStudentId), assessmentId: String(d.assessmentId) });
+      }
+    }
+    Array.from(demoStudentAssessments.entries()).forEach(([demoKey, info]) => {
+      const aName = assessmentNameById.get(Number(info.assessmentId)) || "";
+      const rowKey = `${info.userStudentId}_${aName}`;
+      if (!groupMap.has(rowKey)) {
+        // Find student name from filteredStudents
+        const student = filteredStudents.find(s => String(s.userStudentId) === info.userStudentId);
+        const gameDoc = bulkGameResults.get(info.userStudentId);
+        groupMap.set(rowKey, {
+          studentName: student?.name || "",
+          userStudentId: info.userStudentId,
+          assessmentName: aName,
+          assessmentId: info.assessmentId,
+          answers: {},
+          gameData: extractGameData(gameDoc),
+          demographics: demoLookup.get(demoKey) || {},
+        });
+      }
+    });
+
     const rows = Array.from(groupMap.values());
     const hasGameData = bulkGameResults.size > 0;
-    return { rows, questionColumns, hasGameData };
-  }, [bulkDownloadAnswers, bulkGameResults]);
+
+    // Count unmapped text responses (have textResponse but no optionText/optionId)
+    const unmappedCount = bulkDownloadAnswers.filter(
+      (row: any) => row.textResponse && !row.optionText && !row.optionId
+    ).length;
+
+    return { rows, questionColumns, hasGameData, demographicColumns, unmappedCount };
+  }, [bulkDownloadAnswers, bulkGameResults, bulkDemographicData, filteredStudents]);
 
   const handleBulkDownloadExcel = () => {
-    if (bulkDownloadAnswers.length === 0) return;
+    if (pivotedBulkData.rows.length === 0) return;
 
     setBulkDownloading(true);
     try {
-      const { rows, questionColumns, hasGameData } = pivotedBulkData;
+      const { rows, questionColumns, hasGameData, demographicColumns } = pivotedBulkData;
 
       const excelData = rows.map((row, index) => {
         const base: Record<string, any> = {
@@ -847,6 +953,10 @@ export default function GroupStudentPage() {
           "User ID": row.userStudentId,
           "Assessment": row.assessmentName,
         };
+        // Add demographic columns after base info
+        for (const col of demographicColumns) {
+          base[col] = row.demographics[col] || "";
+        }
         for (const col of questionColumns) {
           base[col] = row.answers[col] || "";
         }
@@ -865,6 +975,7 @@ export default function GroupStudentPage() {
         { wch: 25 }, // Student Name
         { wch: 10 }, // User ID
         { wch: 25 }, // Assessment
+        ...demographicColumns.map(() => ({ wch: 20 })),
         ...questionColumns.map(() => ({ wch: 20 })),
         ...(hasGameData ? gameColumns.map(() => ({ wch: 18 })) : []),
       ];
@@ -884,6 +995,178 @@ export default function GroupStudentPage() {
       alert("Failed to download. Please try again.");
     } finally {
       setBulkDownloading(false);
+    }
+  };
+
+  // ── Download All Proctoring Data ──
+
+  const handleProctoringDownloadClick = async () => {
+    setShowProctoringModal(true);
+    setProctoringLoading(true);
+    setProctoringError("");
+    setProctoringData([]);
+
+    try {
+      const hasAssessmentFilterApplied = appliedEnabled.has("assessment") && appliedAssessmentIds.size > 0;
+      const pairs: { userStudentId: number; assessmentId: number }[] = [];
+      for (const student of filteredStudents) {
+        const studentAssessments = (student.assessments || []).filter(
+          (a) => hasAssessmentFilterApplied
+            ? appliedAssessmentIds.has(Number(a.assessmentId))
+            : activeAssessmentIds.has(Number(a.assessmentId))
+        );
+        const seen = new Set<number>();
+        for (const a of studentAssessments) {
+          const id = Number(a.assessmentId);
+          if (!seen.has(id)) {
+            seen.add(id);
+            pairs.push({ userStudentId: student.userStudentId, assessmentId: id });
+          }
+        }
+      }
+
+      if (pairs.length === 0) {
+        setProctoringData([]);
+        setProctoringLoading(false);
+        return;
+      }
+
+      const response = await getBulkProctoringData(pairs);
+      setProctoringData(Array.isArray(response.data) ? response.data : []);
+    } catch (err: any) {
+      console.error("Error fetching bulk proctoring data:", err);
+      setProctoringError("Failed to load proctoring data. Please try again.");
+    } finally {
+      setProctoringLoading(false);
+    }
+  };
+
+  const proctoringColumns = [
+    "Time Spent (ms)",
+    "Mouse Clicks",
+    "Max Faces",
+    "Avg Faces",
+    "Head Away Count",
+    "Tab Switches",
+    "Screen Width",
+    "Screen Height",
+    "Created At",
+  ];
+
+  const pivotedProctoringData = useMemo(() => {
+    if (proctoringData.length === 0) return { rows: [] as any[], questionColumns: [] as string[] };
+
+    // Collect unique question headers
+    const questionColumnsSet = new Set<string>();
+    for (const row of proctoringData) {
+      const colKey = row.questionText || `Q${row.questionnaireQuestionId}`;
+      if (colKey) questionColumnsSet.add(colKey);
+    }
+    const questionColumns = Array.from(questionColumnsSet);
+
+    // Group by student + assessment — one row per student+assessment, each question's metrics as sub-columns
+    type RowData = {
+      studentName: string;
+      userStudentId: string;
+      assessmentName: string;
+      metrics: Record<string, Record<string, any>>;
+    };
+    const groupMap = new Map<string, RowData>();
+
+    for (const row of proctoringData) {
+      const key = `${row.userStudentId}_${row.assessmentId}`;
+      if (!groupMap.has(key)) {
+        groupMap.set(key, {
+          studentName: row.studentName || "",
+          userStudentId: String(row.userStudentId),
+          assessmentName: row.assessmentName || "",
+          metrics: {},
+        });
+      }
+      const colKey = row.questionText || `Q${row.questionnaireQuestionId}`;
+      // If there are multiple rows for the same question (re-submissions), keep latest
+      groupMap.get(key)!.metrics[colKey] = {
+        timeSpentMs: row.timeSpentMs ?? "",
+        mouseClickCount: row.mouseClickCount ?? "",
+        maxFacesDetected: row.maxFacesDetected ?? "",
+        avgFacesDetected: row.avgFacesDetected ?? "",
+        headAwayCount: row.headAwayCount ?? "",
+        tabSwitchCount: row.tabSwitchCount ?? "",
+        screenWidth: row.screenWidth ?? "",
+        screenHeight: row.screenHeight ?? "",
+        createdAt: row.createdAt ?? "",
+      };
+    }
+
+    return { rows: Array.from(groupMap.values()), questionColumns };
+  }, [proctoringData]);
+
+  const handleProctoringDownloadExcel = () => {
+    if (pivotedProctoringData.rows.length === 0) return;
+
+    setProctoringDownloading(true);
+    try {
+      const { rows, questionColumns } = pivotedProctoringData;
+
+      // Flat format: one row per student+assessment+question for easy analysis
+      const excelRows: Record<string, any>[] = [];
+      let sno = 1;
+      for (const row of rows) {
+        for (const qCol of questionColumns) {
+          const m = row.metrics[qCol];
+          if (!m) continue;
+          excelRows.push({
+            "S.No": sno++,
+            "Student Name": row.studentName,
+            "User ID": row.userStudentId,
+            "Assessment": row.assessmentName,
+            "Question": qCol.length > 80 ? qCol.substring(0, 80) + "..." : qCol,
+            "Time Spent (ms)": m.timeSpentMs,
+            "Mouse Clicks": m.mouseClickCount,
+            "Max Faces": m.maxFacesDetected,
+            "Avg Faces": m.avgFacesDetected,
+            "Head Away Count": m.headAwayCount,
+            "Tab Switches": m.tabSwitchCount,
+            "Screen Width": m.screenWidth,
+            "Screen Height": m.screenHeight,
+            "Created At": m.createdAt,
+          });
+        }
+      }
+
+      const worksheet = XLSX.utils.json_to_sheet(excelRows);
+      worksheet["!cols"] = [
+        { wch: 8 },   // S.No
+        { wch: 25 },  // Student Name
+        { wch: 10 },  // User ID
+        { wch: 25 },  // Assessment
+        { wch: 40 },  // Question
+        { wch: 15 },  // Time Spent
+        { wch: 14 },  // Mouse Clicks
+        { wch: 12 },  // Max Faces
+        { wch: 12 },  // Avg Faces
+        { wch: 16 },  // Head Away Count
+        { wch: 14 },  // Tab Switches
+        { wch: 14 },  // Screen Width
+        { wch: 14 },  // Screen Height
+        { wch: 22 },  // Created At
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Proctoring Data");
+
+      const instituteName = getSelectedInstituteName().replace(/\s+/g, "_");
+      const filename = `${instituteName}_Proctoring_Data_${Date.now()}.xlsx`;
+      XLSX.writeFile(workbook, filename);
+
+      alert("Download successful!");
+      setShowProctoringModal(false);
+      setProctoringData([]);
+    } catch (error) {
+      console.error("Error downloading proctoring data:", error);
+      alert("Failed to download. Please try again.");
+    } finally {
+      setProctoringDownloading(false);
     }
   };
 
@@ -939,6 +1222,25 @@ export default function GroupStudentPage() {
       return true;
     });
     setStudentAssessments(deduplicated);
+  };
+
+  const handleViewDemographics = async (student: Student, assessmentId: number, assessmentName: string) => {
+    setDemographicsStudent(student);
+    setDemographicsAssessmentId(assessmentId);
+    setDemographicsAssessmentName(assessmentName);
+    setShowDemographicsModal(true);
+    setDemographicsLoading(true);
+    setDemographicsData([]);
+
+    try {
+      const response = await getDemographicFieldsForStudent(assessmentId, student.userStudentId);
+      setDemographicsData(Array.isArray(response.data) ? response.data : []);
+    } catch (err) {
+      console.error("Error fetching demographics:", err);
+      setDemographicsData([]);
+    } finally {
+      setDemographicsLoading(false);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -1702,6 +2004,29 @@ export default function GroupStudentPage() {
                     <i className="bi bi-file-earmark-spreadsheet"></i>
                     Download All Answers
                   </button>
+                  <button
+                    className="btn d-flex align-items-center gap-2"
+                    onClick={handleProctoringDownloadClick}
+                    disabled={filteredStudents.length === 0}
+                    style={{
+                      background: filteredStudents.length > 0
+                        ? "linear-gradient(135deg, #e63946 0%, #a4133c 100%)"
+                        : "#e0e0e0",
+                      border: "none",
+                      borderRadius: "10px",
+                      padding: "0.6rem 1.2rem",
+                      fontWeight: 600,
+                      color: filteredStudents.length > 0 ? "#fff" : "#9e9e9e",
+                      cursor: filteredStudents.length > 0 ? "pointer" : "not-allowed",
+                      transition: "all 0.3s ease",
+                      boxShadow: filteredStudents.length > 0
+                        ? "0 4px 15px rgba(230, 57, 70, 0.3)"
+                        : "none",
+                    }}
+                  >
+                    <i className="bi bi-shield-exclamation"></i>
+                    Download All Data
+                  </button>
                 </div>
               </div>
             </div>
@@ -1798,6 +2123,16 @@ export default function GroupStudentPage() {
                           }}
                         >
                           Roll Number
+                        </th>
+                        <th
+                          style={{
+                            padding: "16px 24px",
+                            fontWeight: 600,
+                            color: "#1a1a2e",
+                            borderBottom: "2px solid #e0e0e0",
+                          }}
+                        >
+                          Control Number
                         </th>
                         <th
                           style={{
@@ -1928,6 +2263,16 @@ export default function GroupStudentPage() {
                           >
                             <span style={{ fontWeight: 500, color: "#555" }}>
                               {student.schoolRollNumber || "-"}
+                            </span>
+                          </td>
+                          <td
+                            style={{
+                              padding: "16px 24px",
+                              borderBottom: "1px solid #f0f0f0",
+                            }}
+                          >
+                            <span style={{ fontWeight: 500, color: "#555" }}>
+                              {student.controlNumber ?? "-"}
                             </span>
                           </td>
                           <td
@@ -2306,7 +2651,27 @@ export default function GroupStudentPage() {
                           </span>
                         </div>
                       </div>
-                      <div className="d-flex gap-2">
+                      <div className="d-flex gap-2 flex-wrap">
+                        <button
+                          className="btn btn-outline-info btn-sm d-flex align-items-center gap-1"
+                          onClick={() =>
+                            handleViewDemographics(
+                              modalStudent,
+                              assessment.assessmentId,
+                              assessment.assessmentName
+                            )
+                          }
+                          style={{
+                            borderRadius: "8px",
+                            padding: "6px 12px",
+                            fontWeight: 500,
+                            fontSize: "0.8rem",
+                            transition: "all 0.2s",
+                          }}
+                        >
+                          <i className="bi bi-person-lines-fill"></i>
+                          Demographics
+                        </button>
                         <button
                           className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1"
                           onClick={() =>
@@ -2369,6 +2734,136 @@ export default function GroupStudentPage() {
               <button
                 className="btn btn-secondary w-100"
                 onClick={() => setShowAssessmentModal(false)}
+                style={{ borderRadius: "10px" }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Demographics Modal */}
+      {showDemographicsModal && demographicsStudent && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10060,
+          }}
+          onClick={() => setShowDemographicsModal(false)}
+        >
+          <div
+            style={{
+              backgroundColor: "white",
+              borderRadius: "20px",
+              maxWidth: "550px",
+              width: "90%",
+              maxHeight: "80vh",
+              overflow: "hidden",
+              boxShadow: "0 25px 50px rgba(0, 0, 0, 0.15)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                background: "linear-gradient(135deg, #0891b2 0%, #065f73 100%)",
+                padding: "1rem 1.25rem",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+              }}
+            >
+              <div>
+                <h5 className="mb-0 text-white fw-bold" style={{ fontSize: "1.1rem" }}>
+                  <i className="bi bi-person-lines-fill me-2"></i>
+                  Demographic Data
+                </h5>
+                <p className="mb-0 text-white mt-1" style={{ fontSize: "0.85rem", opacity: 0.9 }}>
+                  {demographicsStudent.name} - {demographicsAssessmentName}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-close btn-close-white"
+                onClick={() => setShowDemographicsModal(false)}
+                style={{ marginTop: "2px" }}
+              ></button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: "1rem", maxHeight: "60vh", overflowY: "auto" }}>
+              {demographicsLoading ? (
+                <div className="text-center py-4">
+                  <div className="spinner-border spinner-border-sm text-primary" role="status"></div>
+                  <span className="ms-2 text-muted">Loading demographics...</span>
+                </div>
+              ) : demographicsData.length === 0 ? (
+                <div className="text-center py-4">
+                  <i className="bi bi-inbox text-muted" style={{ fontSize: "2.5rem", opacity: 0.5 }}></i>
+                  <p className="mt-2 text-muted mb-0">No demographic fields configured for this assessment</p>
+                </div>
+              ) : (
+                <div className="d-flex flex-column gap-2">
+                  {demographicsData.map((field: any) => (
+                    <div
+                      key={field.fieldId}
+                      className="p-3"
+                      style={{
+                        backgroundColor: "#f8fafc",
+                        borderRadius: "12px",
+                        border: "1px solid #e2e8f0",
+                      }}
+                    >
+                      <div className="d-flex justify-content-between align-items-start">
+                        <div style={{ flex: 1 }}>
+                          <div
+                            className="text-muted"
+                            style={{ fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}
+                          >
+                            {field.customLabel || field.displayLabel}
+                          </div>
+                          <div
+                            className="mt-1 fw-semibold"
+                            style={{ fontSize: "0.95rem", color: field.currentValue ? "#1a1a2e" : "#a0aec0" }}
+                          >
+                            {field.currentValue || "Not provided"}
+                          </div>
+                        </div>
+                        {field.isMandatory && (
+                          <span
+                            style={{
+                              backgroundColor: "#fef3c7",
+                              color: "#d97706",
+                              padding: "2px 8px",
+                              borderRadius: "6px",
+                              fontSize: "0.7rem",
+                              fontWeight: 600,
+                            }}
+                          >
+                            Required
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ padding: "0.75rem 1rem", borderTop: "1px solid #e2e8f0" }}>
+              <button
+                className="btn btn-secondary w-100"
+                onClick={() => setShowDemographicsModal(false)}
                 style={{ borderRadius: "10px" }}
               >
                 Close
@@ -2926,6 +3421,61 @@ export default function GroupStudentPage() {
                     </div>
                   </div>
 
+                  {/* Unmapped Text Responses Warning */}
+                  {!bulkDownloadLoading && !bulkDownloadError && pivotedBulkData.unmappedCount > 0 && (
+                    <div
+                      className="mb-4 p-3 d-flex align-items-center justify-content-between flex-wrap gap-3"
+                      style={{
+                        background: "linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.08) 100%)",
+                        border: "1px solid rgba(245, 158, 11, 0.3)",
+                        borderRadius: "12px",
+                      }}
+                    >
+                      <div className="d-flex align-items-center gap-3">
+                        <div
+                          style={{
+                            width: "42px",
+                            height: "42px",
+                            borderRadius: "50%",
+                            background: "rgba(245, 158, 11, 0.2)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <i className="bi bi-exclamation-triangle-fill" style={{ color: "#d97706", fontSize: "1.2rem" }}></i>
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, color: "#92400e", fontSize: "0.95rem" }}>
+                            {pivotedBulkData.unmappedCount} Unmapped Text Response{pivotedBulkData.unmappedCount > 1 ? "s" : ""} Found
+                          </div>
+                          <div style={{ color: "#a16207", fontSize: "0.85rem" }}>
+                            Some student answers contain free-text responses that haven't been mapped to existing options. Map them first for accurate scoring.
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        className="btn btn-sm d-flex align-items-center gap-2"
+                        onClick={() => navigate("/text-response-mapping")}
+                        style={{
+                          background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: "10px",
+                          padding: "8px 20px",
+                          fontWeight: 600,
+                          fontSize: "0.85rem",
+                          boxShadow: "0 4px 12px rgba(245, 158, 11, 0.3)",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        <i className="bi bi-arrow-right-circle-fill"></i>
+                        Map Text Responses
+                      </button>
+                    </div>
+                  )}
+
                   {/* Answers Table */}
                   <div className="mb-3">
                     <h6
@@ -3191,6 +3741,275 @@ export default function GroupStudentPage() {
                       <>
                         <i className="bi bi-download me-2"></i>
                         Download Excel ({pivotedBulkData.rows.length} students)
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Bulk Download Proctoring Data Modal */}
+      {showProctoringModal && (
+        <>
+          <div
+            className="modal-backdrop fade show"
+            onClick={() => {
+              if (!proctoringDownloading) {
+                setShowProctoringModal(false);
+                setProctoringData([]);
+                setProctoringError("");
+              }
+            }}
+            style={{ zIndex: 10040 }}
+          ></div>
+
+          <div
+            className="modal fade show"
+            style={{ display: "block", zIndex: 10050 }}
+            tabIndex={-1}
+            role="dialog"
+          >
+            <div
+              className="modal-dialog modal-dialog-centered modal-xl"
+              role="document"
+            >
+              <div
+                className="modal-content"
+                style={{
+                  borderRadius: "16px",
+                  border: "none",
+                  boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
+                }}
+              >
+                {/* Header */}
+                <div
+                  className="modal-header"
+                  style={{ borderBottom: "2px solid #f0f0f0", padding: "1.5rem" }}
+                >
+                  <h5
+                    className="modal-title"
+                    style={{ color: "#1a1a2e", fontWeight: 700 }}
+                  >
+                    <i
+                      className="bi bi-shield-exclamation me-2"
+                      style={{ color: "#e63946" }}
+                    ></i>
+                    All Students Proctoring Data
+                  </h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => {
+                      setShowProctoringModal(false);
+                      setProctoringData([]);
+                      setProctoringError("");
+                    }}
+                    disabled={proctoringDownloading}
+                    aria-label="Close"
+                  ></button>
+                </div>
+
+                {/* Body */}
+                <div
+                  className="modal-body"
+                  style={{ padding: "2rem", maxHeight: "70vh", overflowY: "auto" }}
+                >
+                  {/* Summary */}
+                  <div className="mb-4">
+                    <div
+                      className="card border-0"
+                      style={{ background: "#f8f9fa", borderRadius: "12px" }}
+                    >
+                      <div className="card-body p-3">
+                        <div className="row g-3">
+                          <div className="col-md-4">
+                            <div className="d-flex align-items-center gap-2">
+                              <i className="bi bi-people-fill" style={{ color: "#e63946" }}></i>
+                              <div>
+                                <small className="text-muted d-block">Filtered Students</small>
+                                <strong style={{ color: "#1a1a2e", fontSize: "0.9rem" }}>
+                                  {filteredStudents.length}
+                                </strong>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="col-md-4">
+                            <div className="d-flex align-items-center gap-2">
+                              <i className="bi bi-clipboard-data" style={{ color: "#e63946" }}></i>
+                              <div>
+                                <small className="text-muted d-block">Data Rows</small>
+                                <strong style={{ color: "#1a1a2e", fontSize: "0.9rem" }}>
+                                  {pivotedProctoringData.rows.length} students ({proctoringData.length} records)
+                                </strong>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="col-md-4">
+                            <div className="d-flex align-items-center gap-2">
+                              <i className="bi bi-building" style={{ color: "#e63946" }}></i>
+                              <div>
+                                <small className="text-muted d-block">Institute</small>
+                                <strong style={{ color: "#1a1a2e", fontSize: "0.9rem" }}>
+                                  {getSelectedInstituteName()}
+                                </strong>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Proctoring Table */}
+                  <div className="mb-3">
+                    <h6 className="mb-3" style={{ color: "#1a1a2e", fontWeight: 600 }}>
+                      <i className="bi bi-table me-2"></i>
+                      Proctoring Data Preview
+                    </h6>
+
+                    {proctoringLoading ? (
+                      <div className="text-center py-5">
+                        <div className="spinner-border text-danger" role="status">
+                          <span className="visually-hidden">Loading...</span>
+                        </div>
+                        <p className="mt-3 text-muted">
+                          Loading proctoring data for all students... This may take a moment.
+                        </p>
+                      </div>
+                    ) : proctoringError ? (
+                      <div className="alert alert-danger" style={{ borderRadius: "10px" }}>
+                        <i className="bi bi-exclamation-triangle me-2"></i>
+                        {proctoringError}
+                      </div>
+                    ) : proctoringData.length === 0 ? (
+                      <div className="alert alert-info" style={{ borderRadius: "10px" }}>
+                        <i className="bi bi-info-circle me-2"></i>
+                        No proctoring data found for the filtered students.
+                      </div>
+                    ) : (
+                      <div
+                        className="table-responsive"
+                        style={{ borderRadius: "12px", border: "1px solid #e0e0e0" }}
+                      >
+                        <table className="table table-hover mb-0">
+                          <thead
+                            style={{
+                              background: "#f8f9fa",
+                              position: "sticky",
+                              top: 0,
+                              zIndex: 1,
+                            }}
+                          >
+                            <tr>
+                              <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", width: "60px" }}>S.No</th>
+                              <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", width: "160px" }}>Student Name</th>
+                              <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", width: "80px" }}>User ID</th>
+                              <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", width: "160px" }}>Assessment</th>
+                              <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", width: "200px" }}>Question</th>
+                              {proctoringColumns.slice(0, 4).map((col) => (
+                                <th key={col} style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", minWidth: "120px" }}>
+                                  {col}
+                                </th>
+                              ))}
+                              {proctoringColumns.length > 4 && (
+                                <th style={{ padding: "12px 16px", fontWeight: 600, color: "#999", fontStyle: "italic" }}>
+                                  +{proctoringColumns.length - 4} more
+                                </th>
+                              )}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {proctoringData.slice(0, 50).map((row, index) => (
+                              <tr key={index}>
+                                <td style={{ padding: "12px 16px" }}>
+                                  <span className="badge bg-light text-dark" style={{ fontSize: "0.85rem" }}>{index + 1}</span>
+                                </td>
+                                <td style={{ padding: "12px 16px", color: "#333", fontWeight: 500 }}>
+                                  {row.studentName || "N/A"}
+                                </td>
+                                <td style={{ padding: "12px 16px", color: "#333" }}>
+                                  #{row.userStudentId || "N/A"}
+                                </td>
+                                <td style={{ padding: "12px 16px", color: "#333" }}>
+                                  <span className="badge" style={{ background: "rgba(230, 57, 70, 0.1)", color: "#e63946", padding: "4px 8px", borderRadius: "6px", fontSize: "0.8rem" }}>
+                                    {row.assessmentName || "N/A"}
+                                  </span>
+                                </td>
+                                <td style={{ padding: "12px 16px", color: "#333", maxWidth: "200px" }} title={row.questionText}>
+                                  {row.questionText ? (row.questionText.length > 30 ? row.questionText.substring(0, 30) + "..." : row.questionText) : "N/A"}
+                                </td>
+                                <td style={{ padding: "12px 16px" }}>
+                                  <span className="badge" style={{ background: "rgba(67, 97, 238, 0.1)", color: "#4361ee", padding: "6px 12px", borderRadius: "6px", fontWeight: 500, fontSize: "0.85rem" }}>
+                                    {row.timeSpentMs ?? "-"}
+                                  </span>
+                                </td>
+                                <td style={{ padding: "12px 16px" }}>{row.mouseClickCount ?? "-"}</td>
+                                <td style={{ padding: "12px 16px" }}>{row.maxFacesDetected ?? "-"}</td>
+                                <td style={{ padding: "12px 16px" }}>{row.avgFacesDetected ?? "-"}</td>
+                                {proctoringColumns.length > 4 && (
+                                  <td style={{ padding: "12px 16px", color: "#999", fontSize: "0.8rem" }}>...</td>
+                                )}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {proctoringData.length > 50 && (
+                          <div
+                            className="text-center py-3"
+                            style={{ background: "#f8f9fa", borderTop: "1px solid #e0e0e0", color: "#666", fontSize: "0.9rem" }}
+                          >
+                            <i className="bi bi-info-circle me-2"></i>
+                            Showing first 50 of {proctoringData.length} rows. All rows will be included in the Excel download.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div
+                  className="modal-footer"
+                  style={{ borderTop: "2px solid #f0f0f0", padding: "1.5rem" }}
+                >
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary"
+                    onClick={() => {
+                      setShowProctoringModal(false);
+                      setProctoringData([]);
+                      setProctoringError("");
+                    }}
+                    disabled={proctoringDownloading}
+                    style={{ borderRadius: "10px", padding: "0.6rem 1.5rem", fontWeight: 600 }}
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleProctoringDownloadExcel}
+                    disabled={proctoringDownloading || proctoringLoading || proctoringData.length === 0}
+                    style={{
+                      background: "linear-gradient(135deg, #e63946 0%, #a4133c 100%)",
+                      border: "none",
+                      borderRadius: "10px",
+                      padding: "0.6rem 1.5rem",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {proctoringDownloading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Downloading...
+                      </>
+                    ) : (
+                      <>
+                        <i className="bi bi-download me-2"></i>
+                        Download Excel ({proctoringData.length} records)
                       </>
                     )}
                   </button>

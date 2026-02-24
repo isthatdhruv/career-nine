@@ -68,6 +68,8 @@ public class StudentInfoController {
     private AssessmentRawScoreRepository assessmentRawScoreRepository;
     @Autowired
     private com.kccitm.api.repository.Career9.AssessmentTableRepository assessmentTableRepository;
+    @Autowired
+    private com.kccitm.api.repository.Career9.AssessmentProctoringQuestionLogRepository assessmentProctoringQuestionLogRepository;
 
     @GetMapping("/getAll")
     public List<StudentInfo> getAllStudentInfo() {
@@ -155,6 +157,7 @@ public class StudentInfoController {
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("studentName", studentName != null ? studentName : "");
                 row.put("userStudentId", userStudentId);
+                row.put("assessmentId", assessmentId);
                 row.put("assessmentName", assessmentName);
 
                 row.put("questionId", aa.getQuestionnaireQuestion() != null
@@ -168,6 +171,7 @@ public class StudentInfoController {
 
                 row.put("optionId", aa.getOption() != null ? aa.getOption().getOptionId() : null);
                 row.put("optionText", aa.getOption() != null ? aa.getOption().getOptionText() : "");
+                row.put("textResponse", aa.getTextResponse() != null ? aa.getTextResponse() : "");
 
                 String sectionName = "";
                 try {
@@ -295,6 +299,7 @@ public class StudentInfoController {
                 studentData.put("instituteId", si.getInstituteId());
                 studentData.put("studentDob", si.getStudentDob());
                 studentData.put("schoolSectionId", si.getSchoolSectionId());
+                studentData.put("controlNumber", si.getControlNumber());
                 studentData.put("username", si.getUser().getUsername());
 
                 // Find UserStudent for this StudentInfo to get userStudentId
@@ -515,6 +520,10 @@ public class StudentInfoController {
             assessmentRawScoreRepository.deleteByStudentAssessmentMappingStudentAssessmentId(
                     mapping.getStudentAssessmentId());
 
+            // Delete proctoring data for this student + assessment
+            assessmentProctoringQuestionLogRepository.deleteByUserStudentUserStudentIdAndAssessmentId(
+                    userStudentId, assessmentId);
+
             // Reset status to 'notstarted'
             mapping.setStatus("notstarted");
             studentAssessmentMappingRepository.save(mapping);
@@ -665,7 +674,7 @@ public class StudentInfoController {
 
             // Create header row
             Row headerRow = sheet.createRow(0);
-            String[] fixedHeaders = {"Name", "Roll Number", "Class", "DOB"};
+            String[] fixedHeaders = {"Name", "Roll Number", "Control Number", "Class", "DOB"};
             int colIndex = 0;
 
             for (String header : fixedHeaders) {
@@ -692,6 +701,7 @@ public class StudentInfoController {
                 // Fixed columns
                 row.createCell(colIndex++).setCellValue(si != null && si.getName() != null ? si.getName() : "");
                 row.createCell(colIndex++).setCellValue(si != null && si.getSchoolRollNumber() != null ? si.getSchoolRollNumber() : "");
+                row.createCell(colIndex++).setCellValue(si != null && si.getControlNumber() != null ? si.getControlNumber().toString() : "");
                 row.createCell(colIndex++).setCellValue(si != null && si.getStudentClass() != null ? si.getStudentClass().toString() : "");
 
                 // Format DOB as string

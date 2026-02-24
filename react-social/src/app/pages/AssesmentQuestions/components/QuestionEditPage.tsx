@@ -344,6 +344,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
       questionText: questionData.questionText || "",
       questionType: questionData.questionType || "",
       maxOptionsAllowed: questionData.maxOptionsAllowed || 0,
+      isMQT: questionData.isMQT ?? false,
       section: questionData.section && typeof questionData.section === "object" && "sectionId" in questionData.section
         ? { sectionId: String(questionData.section.sectionId) }
         : questionData.section
@@ -425,6 +426,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
           questionText: values.questionText,
           questionType: values.questionType,
           maxOptionsAllowed: Number(values.maxOptionsAllowed) || 0,
+          isMQT: values.isMQT,
           options,
           section: { sectionId: values.section.sectionId },
         };
@@ -629,7 +631,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                 <option value="multiple-choice">Multiple Choice</option>
                 <option value="single-choice">Single Choice</option>
                 <option value="ranking">Ranking</option>
-
+                <option value="text">Text Input</option>
               </select>
               {formik.touched.questionType && formik.errors.questionType && (
                 <div className="fv-plugins-message-container">
@@ -989,7 +991,9 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
 
             {/* Max Options Allowed */}
             <div className="fv-row mb-7">
-              <label className="fs-6 fw-bold mb-2">Max Options Allowed</label>
+              <label className="fs-6 fw-bold mb-2">
+                {formik.values.questionType === "text" ? "Number of Text Input Boxes" : "Max Options Allowed"}
+              </label>
               <input
                 type="number"
                 min={0}
@@ -998,10 +1002,33 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                 onChange={e =>
                   formik.setFieldValue("maxOptionsAllowed", e.target.value)
                 }
-                placeholder="Max Options Allowed"
+                placeholder={formik.values.questionType === "text" ? "Number of text input boxes" : "Max Options Allowed"}
                 className="form-control form-control-lg form-control-solid"
                 style={{ width: 200 }}
               />
+            </div>
+            {formik.values.questionType === "text" && (
+              <div className="alert alert-info mb-7">
+                <strong>Text Input Mode:</strong> Students will type free-text answers instead of selecting options.
+                The options below serve as reference options for autocomplete suggestions and scoring after admin mapping.
+              </div>
+            )}
+
+            {/* isMQT Toggle */}
+            <div className="fv-row mb-7">
+              <div className="form-check form-switch">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  id="isMQTToggleEdit"
+                  checked={formik.values.isMQT || false}
+                  onChange={() => formik.setFieldValue("isMQT", !formik.values.isMQT)}
+                />
+                <label className="form-check-label fs-6 fw-bold" htmlFor="isMQTToggleEdit">
+                  isMQT
+                </label>
+              </div>
             </div>
           </div> {/* Close card-body */}
 

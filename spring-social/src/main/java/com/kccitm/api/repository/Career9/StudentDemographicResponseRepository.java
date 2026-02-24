@@ -14,4 +14,9 @@ public interface StudentDemographicResponseRepository extends JpaRepository<Stud
     Optional<StudentDemographicResponse> findByUserStudentIdAndAssessmentIdAndFieldDefinitionFieldId(
             Long userStudentId, Long assessmentId, Long fieldId);
     void deleteByUserStudentIdAndAssessmentId(Long userStudentId, Long assessmentId);
+
+    // Cross-assessment lookups: demographic data is per-student per-field, not per-assessment
+    List<StudentDemographicResponse> findByUserStudentId(Long userStudentId);
+    List<StudentDemographicResponse> findByUserStudentIdAndFieldDefinitionFieldId(
+            Long userStudentId, Long fieldId);
 }

@@ -8,6 +8,7 @@ export interface StudentInfo {
     id?: number;
     name: string;
     schoolRollNumber: string;
+    controlNumber?: number;
     phoneNumber?: number;
     email?: string;
     address?: string;
@@ -41,6 +42,7 @@ export interface StudentWithMapping {
     id: number;
     name: string;
     schoolRollNumber: string;
+    controlNumber?: number;
     phoneNumber?: string;
     email?: string;
     instituteId?: number;
@@ -127,12 +129,27 @@ export function getBulkStudentAnswersWithDetails(pairs: { userStudentId: number;
     return axios.post<any[]>(`${STUDENT_INFO_BASE}/getBulkStudentAnswersWithDetails`, pairs);
 }
 
+// Bulk fetch demographic data for multiple student+assessment pairs
+export function getBulkDemographicData(pairs: { userStudentId: number; assessmentId: number }[]) {
+    return axios.post<any[]>(`${API_URL}/student-demographics/bulk-fields`, pairs);
+}
+
+// Get demographic fields with values for a single student+assessment
+export function getDemographicFieldsForStudent(assessmentId: number, userStudentId: number) {
+    return axios.get<any[]>(`${API_URL}/student-demographics/fields/${assessmentId}/${userStudentId}`);
+}
+
 // Reset assessment - sets status to 'notstarted' and deletes raw scores
 export function resetAssessment(userStudentId: number, assessmentId: number) {
     return axios.post(`${STUDENT_INFO_BASE}/resetAssessment`, {
         userStudentId,
         assessmentId
     });
+}
+
+// Bulk fetch proctoring data for multiple student+assessment pairs
+export function getBulkProctoringData(pairs: { userStudentId: number; assessmentId: number }[]) {
+    return axios.post<any[]>(`${API_URL}/assessment-proctoring/getBulkProctoringData`, pairs);
 }
 
 // Game Results APIs (Firestore via backend)

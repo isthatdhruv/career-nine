@@ -49,6 +49,13 @@ public class AssessmentAnswer implements Serializable {
 
     private Integer rankOrder;
 
+    @Column(name = "text_response", columnDefinition = "TEXT")
+    private String textResponse;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "mapped_option_id")
+    private AssessmentQuestionOptions mappedOption;
+
     public AssessmentAnswer() {
     }
 
@@ -91,5 +98,17 @@ public class AssessmentAnswer implements Serializable {
     }
     public void setRankOrder(Integer rankOrder) {
         this.rankOrder = rankOrder;
+    }
+    public String getTextResponse() {
+        return textResponse;
+    }
+    public void setTextResponse(String textResponse) {
+        this.textResponse = textResponse;
+    }
+    public AssessmentQuestionOptions getMappedOption() {
+        return mappedOption;
+    }
+    public void setMappedOption(AssessmentQuestionOptions mappedOption) {
+        this.mappedOption = mappedOption;
     }
 }

@@ -188,6 +188,141 @@ app.post('/translate/all', async (req, res) => {
     }
 });
 
+// ============ AI OPTION MATCHING ENDPOINTS ============
+
+// Match a single text response to the closest existing option
+app.post('/match/option', async (req, res) => {
+    try {
+        const { textResponse, options } = req.body;
+
+        if (!textResponse) {
+            return res.status(400).json({ error: 'textResponse is required' });
+        }
+        if (!options || !Array.isArray(options) || options.length === 0) {
+            return res.status(400).json({ error: 'options array is required and must not be empty' });
+        }
+
+        const optionTexts = options.map(o => `${o.optionId}: ${o.optionText}`).join('\n');
+
+        const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+            model: 'gpt-3.5-turbo',
+            messages: [
+                {
+                    role: 'system',
+                    content: 'You are a matching assistant. Given a student\'s text response and a list of predefined options (each with an ID and text), find the closest matching option. Return ONLY a JSON object with two fields: "optionId" (the ID number of the best match, or -1 if no reasonable match) and "reason" (a brief explanation in 10 words or less).'
+                },
+                {
+                    role: 'user',
+                    content: `Student response: "${textResponse}"\n\nAvailable options:\n${optionTexts}`
+                }
+            ],
+            max_tokens: 100,
+            temperature: 0.1
+        }, {
+            headers: {
+                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const content = response.data.choices[0].message.content.trim();
+        let parsed;
+        try {
+            parsed = JSON.parse(content);
+        } catch {
+            // Fallback: try to extract just the number
+            const match = content.match(/-?\d+/);
+            parsed = { optionId: match ? parseInt(match[0]) : -1, reason: 'Could not parse AI response' };
+        }
+
+        const matchedId = parsed.optionId;
+        const matchedOption = options.find(o => o.optionId === matchedId);
+
+        res.json({
+            success: true,
+            textResponse,
+            matchedOptionId: matchedId !== -1 ? matchedId : null,
+            matchedOptionText: matchedOption ? matchedOption.optionText : null,
+            reason: parsed.reason || null
+        });
+    } catch (error) {
+        console.error('Option Matching Error:', error.response?.data || error.message);
+        res.status(500).json({ error: 'Matching failed', message: error.message });
+    }
+});
+
+// Bulk match multiple text responses to options
+app.post('/match/options-bulk', async (req, res) => {
+    try {
+        const { responses } = req.body;
+        // responses = [{ textResponse, options: [{ optionId, optionText }] }, ...]
+
+        if (!responses || !Array.isArray(responses) || responses.length === 0) {
+            return res.status(400).json({ error: 'responses array is required' });
+        }
+
+        const results = await Promise.all(
+            responses.map(async (item) => {
+                try {
+                    const optionTexts = item.options.map(o => `${o.optionId}: ${o.optionText}`).join('\n');
+
+                    const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+                        model: 'gpt-3.5-turbo',
+                        messages: [
+                            {
+                                role: 'system',
+                                content: 'You are a matching assistant. Given a student\'s text response and a list of predefined options (each with an ID and text), find the closest matching option. Return ONLY a JSON object with two fields: "optionId" (the ID number of the best match, or -1 if no reasonable match) and "reason" (a brief explanation in 10 words or less).'
+                            },
+                            {
+                                role: 'user',
+                                content: `Student response: "${item.textResponse}"\n\nAvailable options:\n${optionTexts}`
+                            }
+                        ],
+                        max_tokens: 100,
+                        temperature: 0.1
+                    }, {
+                        headers: {
+                            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    const content = response.data.choices[0].message.content.trim();
+                    let parsed;
+                    try {
+                        parsed = JSON.parse(content);
+                    } catch {
+                        const match = content.match(/-?\d+/);
+                        parsed = { optionId: match ? parseInt(match[0]) : -1, reason: 'Could not parse AI response' };
+                    }
+
+                    const matchedId = parsed.optionId;
+                    const matchedOption = item.options.find(o => o.optionId === matchedId);
+
+                    return {
+                        textResponse: item.textResponse,
+                        matchedOptionId: matchedId !== -1 ? matchedId : null,
+                        matchedOptionText: matchedOption ? matchedOption.optionText : null,
+                        reason: parsed.reason || null
+                    };
+                } catch (err) {
+                    return {
+                        textResponse: item.textResponse,
+                        matchedOptionId: null,
+                        matchedOptionText: null,
+                        reason: 'Error: ' + err.message
+                    };
+                }
+            })
+        );
+
+        res.json({ success: true, results });
+    } catch (error) {
+        console.error('Bulk Matching Error:', error.response?.data || error.message);
+        res.status(500).json({ error: 'Bulk matching failed', message: error.message });
+    }
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error(err.stack);
