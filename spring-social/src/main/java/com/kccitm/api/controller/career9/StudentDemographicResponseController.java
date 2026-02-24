@@ -64,9 +64,9 @@ public class StudentDemographicResponseController {
             UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
             StudentInfo studentInfo = (userStudent != null) ? userStudent.getStudentInfo() : null;
 
-            // Get existing custom responses for pre-filling CUSTOM fields
+            // Get existing custom responses for pre-filling CUSTOM fields (across all assessments)
             List<StudentDemographicResponse> existingResponses =
-                    responseRepository.findByUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+                    responseRepository.findByUserStudentId(userStudentId);
             Map<Long, String> responseMap = new HashMap<>();
             for (StudentDemographicResponse resp : existingResponses) {
                 responseMap.put(resp.getFieldDefinition().getFieldId(), resp.getResponseValue());
@@ -210,16 +210,20 @@ public class StudentDemographicResponseController {
                     // Update StudentInfo field directly
                     updateSystemField(studentInfo, field.getSystemFieldKey(), value);
                 } else if ("CUSTOM".equals(field.getFieldSource())) {
-                    // Upsert into StudentDemographicResponse
-                    Optional<StudentDemographicResponse> existingOpt =
-                            responseRepository.findByUserStudentIdAndAssessmentIdAndFieldDefinitionFieldId(
-                                    userStudentId, assessmentId, field.getFieldId());
+                    // Upsert by (userStudentId, fieldId) - shared across assessments
+                    List<StudentDemographicResponse> existingList =
+                            responseRepository.findByUserStudentIdAndFieldDefinitionFieldId(
+                                    userStudentId, field.getFieldId());
 
                     StudentDemographicResponse response;
-                    if (existingOpt.isPresent()) {
-                        response = existingOpt.get();
+                    if (!existingList.isEmpty()) {
+                        // Keep the first entry, delete any duplicates from old data
+                        response = existingList.get(0);
                         response.setResponseValue(value);
                         response.setSubmittedAt(new Date());
+                        for (int i = 1; i < existingList.size(); i++) {
+                            responseRepository.delete(existingList.get(i));
+                        }
                     } else {
                         response = new StudentDemographicResponse();
                         response.setUserStudentId(userStudentId);
@@ -273,9 +277,9 @@ public class StudentDemographicResponseController {
             UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
             StudentInfo studentInfo = (userStudent != null) ? userStudent.getStudentInfo() : null;
 
-            // Get existing custom responses
+            // Get existing custom responses (across all assessments - data is shared per field)
             List<StudentDemographicResponse> existingResponses =
-                    responseRepository.findByUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+                    responseRepository.findByUserStudentId(userStudentId);
             Map<Long, String> responseMap = new HashMap<>();
             for (StudentDemographicResponse resp : existingResponses) {
                 responseMap.put(resp.getFieldDefinition().getFieldId(), resp.getResponseValue());
@@ -317,6 +321,59 @@ public class StudentDemographicResponseController {
             Map<String, String> error = new HashMap<>();
             error.put("error", "Failed to check demographic status: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
+
+    @PostMapping("/bulk-fields")
+    public ResponseEntity<?> getBulkDemographicData(@RequestBody List<Map<String, Object>> pairs) {
+        try {
+            List<Map<String, Object>> result = new ArrayList<>();
+
+            for (Map<String, Object> pair : pairs) {
+                Long userStudentId = Long.valueOf(pair.get("userStudentId").toString());
+                Long assessmentId = Long.valueOf(pair.get("assessmentId").toString());
+
+                List<AssessmentDemographicMapping> mappings =
+                        mappingRepository.findByAssessmentIdOrderByDisplayOrderAsc(assessmentId);
+
+                if (mappings.isEmpty()) continue;
+
+                UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
+                StudentInfo studentInfo = (userStudent != null) ? userStudent.getStudentInfo() : null;
+
+                // Fetch responses across all assessments (data is shared per field)
+                List<StudentDemographicResponse> existingResponses =
+                        responseRepository.findByUserStudentId(userStudentId);
+                Map<Long, String> responseMap = new HashMap<>();
+                for (StudentDemographicResponse resp : existingResponses) {
+                    responseMap.put(resp.getFieldDefinition().getFieldId(), resp.getResponseValue());
+                }
+
+                for (AssessmentDemographicMapping mapping : mappings) {
+                    DemographicFieldDefinition field = mapping.getFieldDefinition();
+                    String currentValue = null;
+                    if ("SYSTEM".equals(field.getFieldSource()) && studentInfo != null) {
+                        currentValue = getSystemFieldValue(studentInfo, field.getSystemFieldKey());
+                    } else if ("CUSTOM".equals(field.getFieldSource())) {
+                        currentValue = responseMap.get(field.getFieldId());
+                    }
+
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("userStudentId", userStudentId);
+                    row.put("assessmentId", assessmentId);
+                    row.put("fieldName", field.getFieldName());
+                    row.put("displayLabel", mapping.getCustomLabel() != null ? mapping.getCustomLabel() : field.getDisplayLabel());
+                    row.put("value", currentValue);
+                    result.add(row);
+                }
+            }
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            System.err.println("Error fetching bulk demographic data: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to fetch bulk demographic data: " + e.getMessage()));
         }
     }
 

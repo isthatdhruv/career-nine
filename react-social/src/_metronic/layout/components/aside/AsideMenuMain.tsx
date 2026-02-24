@@ -45,7 +45,8 @@ export function AsideMenuMain() {
 
   const showAssessment =
     allowed("/assessments") || allowed("/assessment-sections") ||
-    allowed("/assessment-questions") || allowed("/question-sections");
+    allowed("/assessment-questions") || allowed("/question-sections") ||
+    allowed("/text-response-mapping");
 
   const showReports = allowed("/reports");
 
@@ -329,6 +330,14 @@ export function AsideMenuMain() {
                 icon="/media/icons/duotune/general/gen044.svg"
                 title="Offline Upload"
                 fontIcon="bi-cloud-upload"
+              />
+            )}
+            {allowed("/text-response-mapping") && (
+              <AsideMenuItem
+                to="/text-response-mapping"
+                icon="/media/icons/duotune/general/gen005.svg"
+                title="Text Response Mapping"
+                fontIcon="bi-card-text"
               />
             )}
           </AsideMenuItemWithSub>

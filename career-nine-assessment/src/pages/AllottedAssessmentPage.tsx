@@ -79,7 +79,19 @@ export default function AllottedAssessmentPage() {
       // Store the selected assessment ID for use in other pages
       localStorage.setItem('assessmentId', String(assessment.assessmentId));
 
-      // Update status to 'ongoing' on the backend
+      // Check if demographic fields are configured and need to be filled
+      const statusRes = await http.get(
+        `/student-demographics/status/${assessment.assessmentId}/${userStudentId}`
+      );
+      const demographicStatus = statusRes.data;
+
+      if (demographicStatus.totalFields > 0 && !demographicStatus.completed) {
+        // Redirect to dynamic demographics form
+        navigate(`/demographics/${assessment.assessmentId}`);
+        return;
+      }
+
+      // No demographics needed or already completed - proceed directly
       await http.post('/assessments/startAssessment', { userStudentId: Number(userStudentId), assessmentId: assessment.assessmentId });
 
       await fetchAssessmentData(String(assessment.assessmentId));
