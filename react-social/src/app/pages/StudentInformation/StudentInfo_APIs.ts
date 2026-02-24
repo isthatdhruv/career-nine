@@ -147,6 +147,11 @@ export function resetAssessment(userStudentId: number, assessmentId: number) {
     });
 }
 
+// Bulk fetch proctoring data for multiple student+assessment pairs
+export function getBulkProctoringData(pairs: { userStudentId: number; assessmentId: number }[]) {
+    return axios.post<any[]>(`${API_URL}/assessment-proctoring/getBulkProctoringData`, pairs);
+}
+
 // Game Results APIs (Firestore via backend)
 export function getAllGameResults() {
     return axios.get<any[]>(`${API_URL}/game-results/getAll`);

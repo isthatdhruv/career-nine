@@ -1,8 +1,14 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAssessment } from "../../StudentLogin/AssessmentContext";
 import { usePreventReload } from "../../StudentLogin/usePreventReload";
 import { AssessmentGameWrapper } from "./AssessmentGameWrapper";
+import { useEyeGazeTracking } from "../hooks/useFaceTracking";
+import { useFaceCounter } from "../hooks/useFaceCounter";
+import { useMouseClickTracker } from "../hooks/useMouseClickTracker";
+import { usePerQuestionProctoring } from "../hooks/usePerQuestionProctoring";
+import { submitProctoringData } from "../api/proctoringApi";
+import type { ProctoringPayload } from "../types/proctoring";
 
 type GameTable = {
   gameId: number;
@@ -60,9 +66,24 @@ const SectionQuestionPage: React.FC = () => {
   const showTimer = assessmentConfig?.showTimer !== false;
   usePreventReload();
 
+  // Proctoring: silent webcam eye-tracking + face counter + mouse click tracking
+  // Shared ref so face count is stamped in real-time on every gaze snapshot
+  const faceCountRef = useRef<number>(0);
+  const { snapshots: proctoringSnapshots, videoElement } = useEyeGazeTracking({ faceCountRef });
+  useFaceCounter({ videoElement, faceCountRef });
+  const { clicks: proctoringClicks } = useMouseClickTracker();
+
   const [questionnaire, setQuestionnaire] = useState<any>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
+
+  // Per-question proctoring: tracks timing, positions, tab switches per question
+  const currentQuestionId = questions[currentIndex]?.questionnaireQuestionId ?? null;
+  const { perQuestionData: proctoringPerQuestion, finalizeCurrentQuestion } = usePerQuestionProctoring({
+    questionnaireQuestionId: currentQuestionId,
+    proctoringSnapshots,
+    proctoringClicks,
+  });
   const [languages, setLanguages] = useState<QuestionnaireLanguage[]>([]);
   const [currentSection, setCurrentSection] = useState<any>(null);
   const [showWarning, setShowWarning] = useState<boolean>(false);
@@ -599,6 +620,43 @@ const SectionQuestionPage: React.FC = () => {
         const result = await response.json();
         console.log("=== SUBMISSION SUCCESSFUL ===");
         console.log("Saved answers:", result);
+
+        // Submit proctoring data (non-blocking - failure does not prevent completion)
+        try {
+          // Finalize the last question before submitting
+          finalizeCurrentQuestion();
+
+          const userStudentId = parseInt(localStorage.getItem('userStudentId') || '0');
+          const assessmentId = parseInt(localStorage.getItem('assessmentId') || '0');
+
+          // Convert per-question Map to array for backend
+          const perQuestionDataArray = Array.from(proctoringPerQuestion.current.values());
+
+          const proctoringPayload: ProctoringPayload = {
+            userStudentId,
+            assessmentId,
+            perQuestionData: perQuestionDataArray,
+          };
+
+          await submitProctoringData(proctoringPayload);
+          console.log("=== PROCTORING DATA SUBMITTED ===");
+
+          // Clear proctoring localStorage
+          localStorage.removeItem('proctoring_per_question');
+        } catch (proctoringError) {
+          console.error("Proctoring data submission failed (non-blocking):", proctoringError);
+        }
+
+        // Stop the webcam before navigating away
+        try {
+          const webgazerVideo = document.getElementById('webgazerVideoFeed') as HTMLVideoElement | null;
+          if (webgazerVideo && webgazerVideo.srcObject) {
+            (webgazerVideo.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
+            webgazerVideo.srcObject = null;
+          }
+        } catch (e) {
+          // Camera cleanup is best-effort
+        }
 
         // Navigate to completion page
         navigate("/studentAssessment/completed");
@@ -1214,6 +1272,7 @@ const SectionQuestionPage: React.FC = () => {
 
             {availableLanguages.length > 0 ? (
               <div
+                data-proctoring="question-text"
                 style={{
                   display: "grid",
                   gridTemplateColumns: availableLanguages.length > 1 ? "1fr 1px 1fr" : "1fr",
@@ -1246,7 +1305,7 @@ const SectionQuestionPage: React.FC = () => {
                 ))}
               </div>
             ) : (
-              <h4 className="mb-4" style={{ fontSize: "1.2rem", color: "#1a202c", fontWeight: 500 }}>{question.question.questionText}</h4>
+              <h4 data-proctoring="question-text" className="mb-4" style={{ fontSize: "1.2rem", color: "#1a202c", fontWeight: 500 }}>{question.question.questionText}</h4>
             )}
 
             {/* Display maxOptionsAllowed */}
@@ -1282,6 +1341,7 @@ const SectionQuestionPage: React.FC = () => {
                     return (
                       <div
                         key={opt.optionId}
+                        data-proctoring-option-id={opt.optionId}
                         className="rounded p-4 mb-3"
                         style={{ border: "1px solid #dee2e6", background: "#faf5ff" }}
                       >
@@ -1348,6 +1408,7 @@ const SectionQuestionPage: React.FC = () => {
                     return (
                       <div
                         key={opt.optionId}
+                        data-proctoring-option-id={opt.optionId}
                         className="rounded p-3 d-block mb-2"
                         style={{ display: "flex", alignItems: "center", gap: "15px", background: currentRank ? "#f8f9fa" : "#fff", border: "1px solid #dee2e6" }}
                       >
@@ -1406,6 +1467,7 @@ const SectionQuestionPage: React.FC = () => {
                   return (
                     <label
                       key={opt.optionId}
+                      data-proctoring-option-id={opt.optionId}
                       className="rounded p-3 d-block mb-2"
                       style={{ cursor: "pointer", background: selectedOptions.includes(opt.optionId) ? "#f8f9fa" : "#fff", border: "1px solid #dee2e6" }}
                     >

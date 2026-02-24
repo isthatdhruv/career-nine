@@ -1,8 +1,29 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const ThankYouPage: React.FC = () => {
     const navigate = useNavigate();
+
+    // Safety net: stop any remaining camera/media streams when this page mounts
+    useEffect(() => {
+        // Stop WebGazer's video element if it still exists
+        const webgazerVideo = document.getElementById('webgazerVideoFeed') as HTMLVideoElement | null;
+        if (webgazerVideo && webgazerVideo.srcObject) {
+            (webgazerVideo.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
+            webgazerVideo.srcObject = null;
+        }
+
+        // Also stop any other active camera streams the browser may have
+        navigator.mediaDevices?.enumerateDevices?.().then(() => {
+            // Remove any leftover WebGazer DOM elements
+            ['webgazerVideoContainer', 'webgazerFaceFeedbackBox', 'webgazerGazeDot', 'webgazerFaceOverlay'].forEach(
+                (id) => {
+                    const el = document.getElementById(id);
+                    if (el) el.remove();
+                }
+            );
+        });
+    }, []);
 
     const handleGoHome = () => {
         navigate('/student-login');
