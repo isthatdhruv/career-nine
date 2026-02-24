@@ -28,6 +28,7 @@ public class QuestionnaireLanguage {
     @JoinColumn(name = "languageId")
     private LanguagesSupported language;
 
+    @Column(name = "instructions" , columnDefinition = "TEXT")
     private String instructions;
 
 
