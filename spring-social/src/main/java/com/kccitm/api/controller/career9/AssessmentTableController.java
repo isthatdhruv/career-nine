@@ -1,6 +1,5 @@
 package com.kccitm.api.controller.career9;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -253,12 +252,16 @@ public class AssessmentTableController {
     public ResponseEntity<HashMap<String, Object>> isLockedByQuestionnaire(
             @PathVariable Long questionnaireId) {
         HashMap<String, Object> response = new HashMap<>();
-        Optional<AssessmentTable> assessmentOpt = assessmentTableRepository
+        List<AssessmentTable> assessments = assessmentTableRepository
                 .findByQuestionnaireQuestionnaireId(questionnaireId);
-        if (assessmentOpt.isPresent()) {
-            response.put("isLocked", Boolean.TRUE.equals(assessmentOpt.get().getIsLocked()));
-            response.put("assessmentId", assessmentOpt.get().getId());
-            response.put("assessmentName", assessmentOpt.get().getAssessmentName());
+        // If any linked assessment is locked, treat as locked
+        AssessmentTable lockedAssessment = assessments.stream()
+                .filter(a -> Boolean.TRUE.equals(a.getIsLocked()))
+                .findFirst().orElse(null);
+        if (lockedAssessment != null) {
+            response.put("isLocked", true);
+            response.put("assessmentId", lockedAssessment.getId());
+            response.put("assessmentName", lockedAssessment.getAssessmentName());
         } else {
             response.put("isLocked", false);
         }
@@ -276,11 +279,14 @@ public class AssessmentTableController {
             return ResponseEntity.ok(response);
         }
         Long sectionId = questionOpt.get().getSection().getSectionId();
-        Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findByQuestionSectionId(sectionId);
-        if (assessmentOpt.isPresent()) {
-            response.put("isLocked", Boolean.TRUE.equals(assessmentOpt.get().getIsLocked()));
-            response.put("assessmentId", assessmentOpt.get().getId());
-            response.put("assessmentName", assessmentOpt.get().getAssessmentName());
+        List<AssessmentTable> assessments = assessmentTableRepository.findByQuestionSectionId(sectionId);
+        AssessmentTable lockedAssessment = assessments.stream()
+                .filter(a -> Boolean.TRUE.equals(a.getIsLocked()))
+                .findFirst().orElse(null);
+        if (lockedAssessment != null) {
+            response.put("isLocked", true);
+            response.put("assessmentId", lockedAssessment.getId());
+            response.put("assessmentName", lockedAssessment.getAssessmentName());
         } else {
             response.put("isLocked", false);
         }

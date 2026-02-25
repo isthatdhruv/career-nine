@@ -1,7 +1,6 @@
 package com.kccitm.api.repository.Career9;
 
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -13,10 +12,10 @@ import com.kccitm.api.model.career9.AssessmentTable;
 @Repository
 public interface AssessmentTableRepository extends JpaRepository<AssessmentTable, Long> {
 
-    Optional<AssessmentTable> findByQuestionnaireQuestionnaireId(Long questionnaireId);
+    List<AssessmentTable> findByQuestionnaireQuestionnaireId(Long questionnaireId);
 
     @Query("SELECT a FROM AssessmentTable a JOIN a.questionnaire q JOIN q.section qs WHERE qs.section.sectionId = :sectionId")
-    Optional<AssessmentTable> findByQuestionSectionId(@Param("sectionId") Long sectionId);
+    List<AssessmentTable> findByQuestionSectionId(@Param("sectionId") Long sectionId);
 
     /**
      * Lightweight projection returning only id, name, and isActive.
