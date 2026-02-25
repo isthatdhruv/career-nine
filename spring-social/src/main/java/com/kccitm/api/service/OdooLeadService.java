@@ -132,19 +132,12 @@ public class OdooLeadService {
         vals.put("type", "lead");
         vals.put("description", buildDescription(lead));
 
-        // Map extras fields to Odoo fields
-        if (lead.getExtras() != null && !lead.getExtras().isEmpty()) {
-            try {
-                JsonNode extras = objectMapper.readTree(lead.getExtras());
-                if (extras.has("city")) {
-                    vals.put("city", extras.get("city").asText());
-                }
-                if (extras.has("schoolName")) {
-                    vals.put("partner_name", extras.get("schoolName").asText());
-                }
-            } catch (Exception e) {
-                logger.warn("Failed to parse extras JSON for lead {}: {}", lead.getId(), e.getMessage());
-            }
+        // Map dedicated fields to Odoo fields
+        if (lead.getCity() != null) {
+            vals.put("city", lead.getCity());
+        }
+        if (lead.getSchoolName() != null) {
+            vals.put("partner_name", lead.getSchoolName());
         }
 
         // Build JSON-RPC call_kw payload

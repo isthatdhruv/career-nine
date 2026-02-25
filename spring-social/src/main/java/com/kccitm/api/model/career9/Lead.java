@@ -45,6 +45,24 @@ public class Lead implements Serializable {
     @Column(name = "source", length = 100)
     private String source;
 
+    @Column(name = "designation", length = 100)
+    private String designation;
+
+    @Column(name = "school_name")
+    private String schoolName;
+
+    @Column(name = "city", length = 100)
+    private String city;
+
+    @Column(name = "cbse_affiliation_no", length = 50)
+    private String cbseAffiliationNo;
+
+    @Column(name = "total_students", length = 50)
+    private String totalStudents;
+
+    @Column(name = "classes_offered", length = 50)
+    private String classesOffered;
+
     @Column(name = "extras", columnDefinition = "TEXT")
     private String extras;
 
@@ -129,6 +147,54 @@ public class Lead implements Serializable {
 
     public void setSource(String source) {
         this.source = source;
+    }
+
+    public String getDesignation() {
+        return designation;
+    }
+
+    public void setDesignation(String designation) {
+        this.designation = designation;
+    }
+
+    public String getSchoolName() {
+        return schoolName;
+    }
+
+    public void setSchoolName(String schoolName) {
+        this.schoolName = schoolName;
+    }
+
+    public String getCity() {
+        return city;
+    }
+
+    public void setCity(String city) {
+        this.city = city;
+    }
+
+    public String getCbseAffiliationNo() {
+        return cbseAffiliationNo;
+    }
+
+    public void setCbseAffiliationNo(String cbseAffiliationNo) {
+        this.cbseAffiliationNo = cbseAffiliationNo;
+    }
+
+    public String getTotalStudents() {
+        return totalStudents;
+    }
+
+    public void setTotalStudents(String totalStudents) {
+        this.totalStudents = totalStudents;
+    }
+
+    public String getClassesOffered() {
+        return classesOffered;
+    }
+
+    public void setClassesOffered(String classesOffered) {
+        this.classesOffered = classesOffered;
     }
 
     public String getExtras() {
