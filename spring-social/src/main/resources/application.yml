@@ -14,11 +14,11 @@ server:
 spring:
   profiles: dev
   datasource:
-    url: jdbc:mysql://localhost:3307/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3306/live-db?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     # url: jdbc:mysql://192.168.10.73:3306/kiraya-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     username: root
-    password: Career-qCsfeuECc3MW
-    # password: MyStrongPass@123
+    # password: Career-qCsfeuECc3MW
+    password: MyStrongPass@123
   jpa:
     show-sql: true
     hibernate:
@@ -104,6 +104,11 @@ app:
       - myiosapp://oauth2/redirect
       - http://192.168.0.204:3000
   mandrill: WXX3fC00pJTZgonjnVvkgQ
+  odoo:
+    url: career-91.odoo.com
+    database: career-91
+    username: prasad.khake@career-9.com
+    password: 5685cadbbee4aee3f65cf0bd1bdc9112c9dc772f
   gmail:
     sender-email: ${GMAIL_SENDER:notifications@career-9.net}
   firebase:
@@ -185,7 +190,7 @@ app:
     tokenSecret: 04ca023b39512e46d0c2cf4b48d5aac61d34302994c87ed4eff225dcf3b0a218739f3897051a057f9b846a69ea2927a587044164b7bae5e1306219d50b588cb1
     tokenExpirationMsec: 864000000
   cors:
-    allowedOrigins: https://dashboard.career-9.com,https://walrus-app-e2a6a.ondigitalocean.app,https://assessment.career-9.com
+    allowedOrigins: https://dashboard.career-9.com,https://walrus-app-e2a6a.ondigitalocean.app,https://assessment.career-9.com,https://*.career-9.com
   oauth2:
     # After successfully authenticating with the OAuth2 Provider,
     # we'll be generating an auth token for the user and sending the token to the
@@ -201,6 +206,11 @@ app:
       - http://localhost:80/oauth2/redirect
       - myiosapp://oauth2/redirect
   mandrill: WXX3fC00pJTZgonjnVvkgQ
+  odoo:
+    url: ${ODOO_URL:https://your-odoo-instance.odoo.com}
+    database: ${ODOO_DATABASE:your-odoo-db}
+    username: ${ODOO_USERNAME:admin@example.com}
+    password: ${ODOO_PASSWORD:your-api-key}
   gmail:
     sender-email: ${GMAIL_SENDER:notifications@career-9.net}
 ---
@@ -295,6 +305,11 @@ app:
       - http://localhost:80/oauth2/redirect
       - myiosapp://oauth2/redirect
   mandrill: WXX3fC00pJTZgonjnVvkgQ
+  odoo:
+    url: career-91.odoo.com
+    database: career-91
+    username: prasad.khake@career-9.com 
+    password: 5685cadbbee4aee3f65cf0bd1bdc9112c9dc772f
   gmail:
     sender-email: ${GMAIL_SENDER:notifications@career-9.net}
 

@@ -63,6 +63,7 @@ export function AsideMenuMain() {
     allowed("/roles/role_roleGroup") || allowed("/roles/roleUser");
 
   const showActivityLog = allowed("/activity-log");
+  const showLeads = allowed("/leads");
 
   return (
     <>
@@ -538,6 +539,14 @@ export function AsideMenuMain() {
             fontIcon="bi-journal-text"
           />
         </>
+      )}
+      {showLeads && (
+        <AsideMenuItem
+          to="/leads"
+          icon="/media/icons/duotune/communication/com005.svg"
+          title="Leads"
+          fontIcon="bi-people"
+        />
       )}
     </>
   );

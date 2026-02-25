@@ -95,6 +95,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 "https://192.168.0.204:3000",
                 "https://dashboard.career-9.com",
                 "https://assessment.career-9.com",
+                "https://*.career-9.com",
                 "http://localhost:5173"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
@@ -135,7 +136,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                         "/**/*.css",
                         "/**/*.js")
                 .permitAll()
-.antMatchers("/assessment-mapping/public/**",
+.antMatchers("/assessment-mapping/public/**", "/leads/capture",
                         "/user/*/*","/user/*","/assessment-section-instructions/**", "/language-question/create-with-options",
                         "/**/**/**", "/**/**/**/**","/dashboard/game-results/*",
                         "/languages/**","/game-results/*",
