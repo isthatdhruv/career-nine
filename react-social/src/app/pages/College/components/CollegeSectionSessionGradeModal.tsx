@@ -5,6 +5,8 @@ import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import {
   CreateSessionData,
+  CreateClassData,
+  CreateSectionData,
   GetSessionsByInstituteCode,
   UpdateSessionData,
   DeleteSessionData,
@@ -94,9 +96,20 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
   const [currentSessionIndex, setCurrentSessionIndex] = useState<number | null>(null);
   const [currentGradeIndex, setCurrentGradeIndex] = useState<number | null>(null);
 
+  // Track whether selection is from existing or new data
+  const [selectionSource, setSelectionSource] = useState<'new' | 'existing' | null>(null);
+  const [existingSessionIdx, setExistingSessionIdx] = useState<number | null>(null);
+  const [existingGradeIdx, setExistingGradeIdx] = useState<number | null>(null);
+
   // Edit mode tracking
   const [editState, setEditState] = useState<EditState | null>(null);
   const [editValue, setEditValue] = useState("");
+
+  // Inline edit in dropdowns (existing items saved to backend)
+  const [dropdownEdit, setDropdownEdit] = useState<{ type: 'session' | 'grade' | 'section'; index: number; id: number; value: string } | null>(null);
+
+  // Inline edit for new (unsaved) items in dropdowns
+  const [newItemEdit, setNewItemEdit] = useState<{ type: 'session' | 'grade' | 'section'; index: number; value: string } | null>(null);
 
   // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState | null>(null);
@@ -160,7 +173,12 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
       setSessionDropdownOpen(false);
       setGradeDropdownOpen(false);
       setSectionDropdownOpen(false);
+      setSelectionSource(null);
+      setExistingSessionIdx(null);
+      setExistingGradeIdx(null);
       setEditState(null);
+      setDropdownEdit(null);
+      setNewItemEdit(null);
       setDeleteConfirm(null);
       setError(null);
       setExistingData([]);
@@ -193,24 +211,49 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
   };
 
   const handleSelectSession = (index: number) => {
+    setSelectionSource('new');
     setCurrentSessionIndex(index);
+    setCurrentGradeIndex(null);
+    setExistingSessionIdx(null);
+    setExistingGradeIdx(null);
+    setSessionDropdownOpen(false);
+  };
+
+  const handleSelectExistingSession = (index: number) => {
+    setSelectionSource('existing');
+    setExistingSessionIdx(index);
+    setExistingGradeIdx(null);
+    setCurrentSessionIndex(null);
     setCurrentGradeIndex(null);
     setSessionDropdownOpen(false);
   };
 
-  const handleAddGrade = () => {
-    if (currentSessionIndex !== null && newGradeInput.trim()) {
+  const handleAddGrade = async () => {
+    if (!newGradeInput.trim()) return;
+
+    if (selectionSource === 'existing' && existingSessionIdx !== null) {
+      // Add grade to existing session via API
+      const session = existingData[existingSessionIdx];
+      const gradeExists = session.grades.some(g => g.gradeName === newGradeInput.trim());
+      if (gradeExists) return;
+
+      setLoading(true);
+      try {
+        await CreateClassData({ className: newGradeInput.trim(), schoolSession: { id: session.id } });
+        setNewGradeInput("");
+        if (props.data?.instituteCode) await fetchExistingData(props.data.instituteCode);
+      } catch (err) {
+        console.error("Error creating class:", err);
+        setError("Failed to add grade. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    } else if (selectionSource === 'new' && currentSessionIndex !== null) {
       const updatedSessions = [...newSessionsData];
       const currentSession = updatedSessions[currentSessionIndex];
-
       const gradeExists = currentSession.grades.some(g => g.gradeName === newGradeInput.trim());
       if (!gradeExists) {
-        currentSession.grades.push({
-          id: null,
-          gradeName: newGradeInput.trim(),
-          sections: [],
-          isNew: true
-        });
+        currentSession.grades.push({ id: null, gradeName: newGradeInput.trim(), sections: [], isNew: true });
         setNewSessionsData(updatedSessions);
         setNewGradeInput("");
       }
@@ -218,22 +261,40 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
   };
 
   const handleSelectGrade = (gradeIndex: number) => {
-    setCurrentGradeIndex(gradeIndex);
+    if (selectionSource === 'existing') {
+      setExistingGradeIdx(gradeIndex);
+    } else {
+      setCurrentGradeIndex(gradeIndex);
+    }
     setGradeDropdownOpen(false);
   };
 
-  const handleAddSection = () => {
-    if (currentSessionIndex !== null && currentGradeIndex !== null && newSectionInput.trim()) {
+  const handleAddSection = async () => {
+    if (!newSectionInput.trim()) return;
+
+    if (selectionSource === 'existing' && existingSessionIdx !== null && existingGradeIdx !== null) {
+      // Add section to existing grade via API
+      const grade = existingData[existingSessionIdx].grades[existingGradeIdx];
+      const sectionExists = grade.sections.some(s => s.sectionName === newSectionInput.trim());
+      if (sectionExists) return;
+
+      setLoading(true);
+      try {
+        await CreateSectionData({ sectionName: newSectionInput.trim(), schoolClasses: { id: grade.id } });
+        setNewSectionInput("");
+        if (props.data?.instituteCode) await fetchExistingData(props.data.instituteCode);
+      } catch (err) {
+        console.error("Error creating section:", err);
+        setError("Failed to add section. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    } else if (selectionSource === 'new' && currentSessionIndex !== null && currentGradeIndex !== null) {
       const updatedSessions = [...newSessionsData];
       const currentGrade = updatedSessions[currentSessionIndex].grades[currentGradeIndex];
-
       const sectionExists = currentGrade.sections.some(s => s.sectionName === newSectionInput.trim());
       if (!sectionExists) {
-        currentGrade.sections.push({
-          id: null,
-          sectionName: newSectionInput.trim(),
-          isNew: true
-        });
+        currentGrade.sections.push({ id: null, sectionName: newSectionInput.trim(), isNew: true });
         setNewSessionsData(updatedSessions);
         setNewSectionInput("");
       }
@@ -241,7 +302,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
   };
 
   const handleRemoveNewSection = (sectionIndex: number) => {
-    if (currentSessionIndex !== null && currentGradeIndex !== null) {
+    if (selectionSource === 'new' && currentSessionIndex !== null && currentGradeIndex !== null) {
       const updatedSessions = [...newSessionsData];
       updatedSessions[currentSessionIndex].grades[currentGradeIndex].sections.splice(sectionIndex, 1);
       setNewSessionsData(updatedSessions);
@@ -317,6 +378,30 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
 
       setExistingData(rollbackData);
       setError("Failed to update. Please try again.");
+    }
+  };
+
+  // ============ DROPDOWN INLINE EDIT ============
+
+  const handleDropdownEditSave = async () => {
+    if (!dropdownEdit || !dropdownEdit.value.trim()) return;
+
+    setLoading(true);
+    try {
+      if (dropdownEdit.type === 'session') {
+        await UpdateSessionData(dropdownEdit.id, { sessionYear: dropdownEdit.value.trim() });
+      } else if (dropdownEdit.type === 'grade') {
+        await UpdateClassData(dropdownEdit.id, { className: dropdownEdit.value.trim() });
+      } else if (dropdownEdit.type === 'section') {
+        await UpdateSectionData(dropdownEdit.id, { sectionName: dropdownEdit.value.trim() });
+      }
+      if (props.data?.instituteCode) await fetchExistingData(props.data.instituteCode);
+    } catch (err) {
+      console.error("Error updating:", err);
+      setError("Failed to update. Please try again.");
+    } finally {
+      setLoading(false);
+      setDropdownEdit(null);
     }
   };
 
@@ -400,25 +485,54 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
   // ============ HELPER FUNCTIONS ============
 
   const getCurrentSessionName = () => {
-    if (currentSessionIndex !== null) {
+    if (selectionSource === 'existing' && existingSessionIdx !== null) {
+      return existingData[existingSessionIdx]?.sessionName;
+    }
+    if (selectionSource === 'new' && currentSessionIndex !== null) {
       return newSessionsData[currentSessionIndex]?.sessionName;
     }
     return null;
   };
 
   const getCurrentGradeName = () => {
-    if (currentSessionIndex !== null && currentGradeIndex !== null) {
+    if (selectionSource === 'existing' && existingSessionIdx !== null && existingGradeIdx !== null) {
+      return existingData[existingSessionIdx]?.grades[existingGradeIdx]?.gradeName;
+    }
+    if (selectionSource === 'new' && currentSessionIndex !== null && currentGradeIndex !== null) {
       return newSessionsData[currentSessionIndex]?.grades[currentGradeIndex]?.gradeName;
     }
     return null;
   };
 
-  const getCurrentSections = () => {
-    if (currentSessionIndex !== null && currentGradeIndex !== null) {
+  const getCurrentSections = (): SectionData[] => {
+    if (selectionSource === 'existing' && existingSessionIdx !== null && existingGradeIdx !== null) {
+      return existingData[existingSessionIdx]?.grades[existingGradeIdx]?.sections || [];
+    }
+    if (selectionSource === 'new' && currentSessionIndex !== null && currentGradeIndex !== null) {
       return newSessionsData[currentSessionIndex]?.grades[currentGradeIndex]?.sections || [];
     }
     return [];
   };
+
+  const getCurrentGrades = (): GradeData[] => {
+    if (selectionSource === 'existing' && existingSessionIdx !== null) {
+      return existingData[existingSessionIdx]?.grades || [];
+    }
+    if (selectionSource === 'new' && currentSessionIndex !== null) {
+      return newSessionsData[currentSessionIndex]?.grades || [];
+    }
+    return [];
+  };
+
+  const isSessionSelected = selectionSource !== null && (
+    (selectionSource === 'new' && currentSessionIndex !== null) ||
+    (selectionSource === 'existing' && existingSessionIdx !== null)
+  );
+
+  const isGradeSelected = isSessionSelected && (
+    (selectionSource === 'new' && currentGradeIndex !== null) ||
+    (selectionSource === 'existing' && existingGradeIdx !== null)
+  );
 
   // Flatten existing data for table display
   const tableRows = useMemo(() => {
@@ -603,23 +717,163 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                           </div>
                         </div>
 
+                        {existingData.length > 0 && (
+                          <>
+                            <div className="dropdown-divider"></div>
+                            <label className="form-label small fw-semibold">Existing Sessions</label>
+                            <div className="list-group">
+                              {existingData.map((session, index) => (
+                                <div
+                                  key={`existing-${index}`}
+                                  className={`list-group-item ${selectionSource === 'existing' && existingSessionIdx === index ? 'active' : ''}`}
+                                >
+                                  {dropdownEdit?.type === 'session' && dropdownEdit.index === index ? (
+                                    <div className="d-flex gap-1">
+                                      <input
+                                        type="text"
+                                        className="form-control form-control-sm"
+                                        value={dropdownEdit.value}
+                                        onChange={(e) => setDropdownEdit({ ...dropdownEdit, value: e.target.value })}
+                                        onKeyPress={(e) => {
+                                          if (e.key === 'Enter') handleDropdownEditSave();
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Escape') setDropdownEdit(null);
+                                        }}
+                                        autoFocus
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                      <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); handleDropdownEditSave(); }}>
+                                        <i className="bi bi-check"></i>
+                                      </button>
+                                      <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); setDropdownEdit(null); }}>
+                                        <i className="bi bi-x"></i>
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="d-flex justify-content-between align-items-center">
+                                      <span
+                                        className="flex-grow-1"
+                                        style={{ cursor: 'pointer' }}
+                                        onClick={() => handleSelectExistingSession(index)}
+                                      >
+                                        {session.sessionName}
+                                      </span>
+                                      <div className="d-flex align-items-center gap-1">
+                                        <span className="badge bg-primary me-1">{session.grades.length} grades</span>
+                                        <button
+                                          className="btn btn-sm btn-outline-primary py-0 px-1"
+                                          style={{ fontSize: '0.7rem', lineHeight: 1.2 }}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setDropdownEdit({ type: 'session', index, id: session.id!, value: session.sessionName });
+                                          }}
+                                          title="Edit session"
+                                        >
+                                          <i className="bi bi-pencil"></i>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+
                         {newSessionsData.length > 0 && (
                           <>
                             <div className="dropdown-divider"></div>
                             <label className="form-label small fw-semibold">New Sessions</label>
                             <div className="list-group">
                               {newSessionsData.map((session, index) => (
-                                <button
-                                  key={index}
-                                  type="button"
-                                  className={`list-group-item list-group-item-action ${currentSessionIndex === index ? 'active' : ''}`}
-                                  onClick={() => handleSelectSession(index)}
+                                <div
+                                  key={`new-${index}`}
+                                  className={`list-group-item ${selectionSource === 'new' && currentSessionIndex === index ? 'active' : ''}`}
                                 >
-                                  <div className="d-flex justify-content-between align-items-center">
-                                    <span>{session.sessionName}</span>
-                                    <span className="badge bg-secondary">{session.grades.length} grades</span>
-                                  </div>
-                                </button>
+                                  {newItemEdit?.type === 'session' && newItemEdit.index === index ? (
+                                    <div className="d-flex gap-1">
+                                      <input
+                                        type="text"
+                                        className="form-control form-control-sm"
+                                        value={newItemEdit.value}
+                                        onChange={(e) => setNewItemEdit({ ...newItemEdit, value: e.target.value })}
+                                        onKeyPress={(e) => {
+                                          if (e.key === 'Enter') {
+                                            if (newItemEdit.value.trim()) {
+                                              const updated = [...newSessionsData];
+                                              updated[index].sessionName = newItemEdit.value.trim();
+                                              setNewSessionsData(updated);
+                                            }
+                                            setNewItemEdit(null);
+                                          }
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Escape') setNewItemEdit(null);
+                                        }}
+                                        autoFocus
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                      <button className="btn btn-sm btn-success" onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (newItemEdit.value.trim()) {
+                                          const updated = [...newSessionsData];
+                                          updated[index].sessionName = newItemEdit.value.trim();
+                                          setNewSessionsData(updated);
+                                        }
+                                        setNewItemEdit(null);
+                                      }}>
+                                        <i className="bi bi-check"></i>
+                                      </button>
+                                      <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); setNewItemEdit(null); }}>
+                                        <i className="bi bi-x"></i>
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="d-flex justify-content-between align-items-center">
+                                      <span
+                                        className="flex-grow-1"
+                                        style={{ cursor: 'pointer' }}
+                                        onClick={() => handleSelectSession(index)}
+                                      >
+                                        {session.sessionName}
+                                      </span>
+                                      <div className="d-flex align-items-center gap-1">
+                                        <span className="badge bg-secondary me-1">{session.grades.length} grades</span>
+                                        <button
+                                          className="btn btn-sm btn-outline-primary py-0 px-1"
+                                          style={{ fontSize: '0.7rem', lineHeight: 1.2 }}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setNewItemEdit({ type: 'session', index, value: session.sessionName });
+                                          }}
+                                          title="Edit session"
+                                        >
+                                          <i className="bi bi-pencil"></i>
+                                        </button>
+                                        <button
+                                          className="btn btn-sm btn-outline-danger py-0 px-1"
+                                          style={{ fontSize: '0.7rem', lineHeight: 1.2 }}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            const updated = newSessionsData.filter((_, i) => i !== index);
+                                            setNewSessionsData(updated);
+                                            if (currentSessionIndex === index) {
+                                              setCurrentSessionIndex(null);
+                                              setCurrentGradeIndex(null);
+                                              setSelectionSource(null);
+                                            } else if (currentSessionIndex !== null && currentSessionIndex > index) {
+                                              setCurrentSessionIndex(currentSessionIndex - 1);
+                                            }
+                                          }}
+                                          title="Remove session"
+                                        >
+                                          <i className="bi bi-trash"></i>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
                               ))}
                             </div>
                           </>
@@ -634,21 +888,21 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                       type="button"
                       className="btn btn-success dropdown-toggle d-flex align-items-center justify-content-between gap-2 w-100"
                       onClick={() => {
-                        if (currentSessionIndex !== null) {
+                        if (isSessionSelected) {
                           setGradeDropdownOpen(!gradeDropdownOpen);
                           setSessionDropdownOpen(false);
                           setSectionDropdownOpen(false);
                         }
                       }}
-                      disabled={currentSessionIndex === null}
+                      disabled={!isSessionSelected}
                     >
                       <div className="d-flex align-items-center gap-2">
                         <i className="bi bi-award"></i>
                         <span>{getCurrentGradeName() || "Grade"}</span>
-                        {currentSessionIndex === null && <small className="ms-1 text-light">(select session)</small>}
+                        {!isSessionSelected && <small className="ms-1 text-light">(select session)</small>}
                       </div>
                     </button>
-                    {gradeDropdownOpen && currentSessionIndex !== null && (
+                    {gradeDropdownOpen && isSessionSelected && (
                       <div
                         className="dropdown-menu show w-100 p-3 shadow-lg"
                         style={{ minWidth: '100%', maxHeight: '300px', overflowY: 'auto', position: 'absolute', zIndex: 1000 }}
@@ -682,24 +936,124 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                           </div>
                         </div>
 
-                        {newSessionsData[currentSessionIndex]?.grades.length > 0 && (
+                        {getCurrentGrades().length > 0 && (
                           <>
                             <div className="dropdown-divider"></div>
                             <label className="form-label small fw-semibold">Grades</label>
                             <div className="list-group">
-                              {newSessionsData[currentSessionIndex].grades.map((grade, index) => (
-                                <button
-                                  key={index}
-                                  type="button"
-                                  className={`list-group-item list-group-item-action ${currentGradeIndex === index ? 'active' : ''}`}
-                                  onClick={() => handleSelectGrade(index)}
-                                >
-                                  <div className="d-flex justify-content-between align-items-center">
-                                    <span>{grade.gradeName}</span>
-                                    <span className="badge bg-secondary">{grade.sections.length} sections</span>
+                              {getCurrentGrades().map((grade, index) => {
+                                const isActive = selectionSource === 'existing'
+                                  ? existingGradeIdx === index
+                                  : currentGradeIndex === index;
+                                const isExistingGrade = selectionSource === 'existing' && grade.id;
+                                return (
+                                  <div
+                                    key={index}
+                                    className={`list-group-item ${isActive ? 'active' : ''}`}
+                                  >
+                                    {isExistingGrade && dropdownEdit?.type === 'grade' && dropdownEdit.index === index ? (
+                                      <div className="d-flex gap-1">
+                                        <input
+                                          type="text"
+                                          className="form-control form-control-sm"
+                                          value={dropdownEdit.value}
+                                          onChange={(e) => setDropdownEdit({ ...dropdownEdit, value: e.target.value })}
+                                          onKeyPress={(e) => {
+                                            if (e.key === 'Enter') handleDropdownEditSave();
+                                          }}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Escape') setDropdownEdit(null);
+                                          }}
+                                          autoFocus
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                        <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); handleDropdownEditSave(); }}>
+                                          <i className="bi bi-check"></i>
+                                        </button>
+                                        <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); setDropdownEdit(null); }}>
+                                          <i className="bi bi-x"></i>
+                                        </button>
+                                      </div>
+                                    ) : !isExistingGrade && newItemEdit?.type === 'grade' && newItemEdit.index === index ? (
+                                      <div className="d-flex gap-1">
+                                        <input
+                                          type="text"
+                                          className="form-control form-control-sm"
+                                          value={newItemEdit.value}
+                                          onChange={(e) => setNewItemEdit({ ...newItemEdit, value: e.target.value })}
+                                          onKeyPress={(e) => {
+                                            if (e.key === 'Enter') {
+                                              if (newItemEdit.value.trim() && currentSessionIndex !== null) {
+                                                const updated = [...newSessionsData];
+                                                updated[currentSessionIndex].grades[index].gradeName = newItemEdit.value.trim();
+                                                setNewSessionsData(updated);
+                                              }
+                                              setNewItemEdit(null);
+                                            }
+                                          }}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Escape') setNewItemEdit(null);
+                                          }}
+                                          autoFocus
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                        <button className="btn btn-sm btn-success" onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (newItemEdit.value.trim() && currentSessionIndex !== null) {
+                                            const updated = [...newSessionsData];
+                                            updated[currentSessionIndex].grades[index].gradeName = newItemEdit.value.trim();
+                                            setNewSessionsData(updated);
+                                          }
+                                          setNewItemEdit(null);
+                                        }}>
+                                          <i className="bi bi-check"></i>
+                                        </button>
+                                        <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); setNewItemEdit(null); }}>
+                                          <i className="bi bi-x"></i>
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <div className="d-flex justify-content-between align-items-center">
+                                        <span
+                                          className="flex-grow-1"
+                                          style={{ cursor: 'pointer' }}
+                                          onClick={() => handleSelectGrade(index)}
+                                        >
+                                          {grade.gradeName}
+                                        </span>
+                                        <div className="d-flex align-items-center gap-1">
+                                          <span className="badge bg-secondary me-1">{grade.sections.length} sections</span>
+                                          {isExistingGrade ? (
+                                            <button
+                                              className="btn btn-sm btn-outline-primary py-0 px-1"
+                                              style={{ fontSize: '0.7rem', lineHeight: 1.2 }}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setDropdownEdit({ type: 'grade', index, id: grade.id!, value: grade.gradeName });
+                                              }}
+                                              title="Edit grade"
+                                            >
+                                              <i className="bi bi-pencil"></i>
+                                            </button>
+                                          ) : (
+                                            <button
+                                              className="btn btn-sm btn-outline-primary py-0 px-1"
+                                              style={{ fontSize: '0.7rem', lineHeight: 1.2 }}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setNewItemEdit({ type: 'grade', index, value: grade.gradeName });
+                                              }}
+                                              title="Edit grade"
+                                            >
+                                              <i className="bi bi-pencil"></i>
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
-                                </button>
-                              ))}
+                                );
+                              })}
                             </div>
                           </>
                         )}
@@ -713,21 +1067,21 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                       type="button"
                       className="btn btn-info dropdown-toggle d-flex align-items-center justify-content-between gap-2 w-100"
                       onClick={() => {
-                        if (currentGradeIndex !== null) {
+                        if (isGradeSelected) {
                           setSectionDropdownOpen(!sectionDropdownOpen);
                           setSessionDropdownOpen(false);
                           setGradeDropdownOpen(false);
                         }
                       }}
-                      disabled={currentGradeIndex === null}
+                      disabled={!isGradeSelected}
                     >
                       <div className="d-flex align-items-center gap-2">
                         <i className="bi bi-grid-3x3"></i>
                         <span>Section ({getCurrentSections().length})</span>
-                        {currentGradeIndex === null && <small className="ms-1 text-light">(select grade)</small>}
+                        {!isGradeSelected && <small className="ms-1 text-light">(select grade)</small>}
                       </div>
                     </button>
-                    {sectionDropdownOpen && currentGradeIndex !== null && (
+                    {sectionDropdownOpen && isGradeSelected && (
                       <div
                         className="dropdown-menu show w-100 p-3 shadow-lg"
                         style={{ minWidth: '100%', maxHeight: '300px', overflowY: 'auto', position: 'absolute', zIndex: 1000 }}
@@ -769,16 +1123,116 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                               {getCurrentSections().map((section, index) => (
                                 <div
                                   key={index}
-                                  className="list-group-item d-flex justify-content-between align-items-center"
+                                  className="list-group-item"
                                 >
-                                  <span>{section.sectionName}</span>
-                                  <button
-                                    type="button"
-                                    className="btn btn-sm btn-danger"
-                                    onClick={() => handleRemoveNewSection(index)}
-                                  >
-                                    <i className="bi bi-trash"></i>
-                                  </button>
+                                  {selectionSource === 'existing' && dropdownEdit?.type === 'section' && dropdownEdit.index === index ? (
+                                    <div className="d-flex gap-1">
+                                      <input
+                                        type="text"
+                                        className="form-control form-control-sm"
+                                        value={dropdownEdit.value}
+                                        onChange={(e) => setDropdownEdit({ ...dropdownEdit, value: e.target.value })}
+                                        onKeyPress={(e) => {
+                                          if (e.key === 'Enter') handleDropdownEditSave();
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Escape') setDropdownEdit(null);
+                                        }}
+                                        autoFocus
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                      <button className="btn btn-sm btn-success" onClick={(e) => { e.stopPropagation(); handleDropdownEditSave(); }}>
+                                        <i className="bi bi-check"></i>
+                                      </button>
+                                      <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); setDropdownEdit(null); }}>
+                                        <i className="bi bi-x"></i>
+                                      </button>
+                                    </div>
+                                  ) : selectionSource === 'new' && newItemEdit?.type === 'section' && newItemEdit.index === index ? (
+                                    <div className="d-flex gap-1">
+                                      <input
+                                        type="text"
+                                        className="form-control form-control-sm"
+                                        value={newItemEdit.value}
+                                        onChange={(e) => setNewItemEdit({ ...newItemEdit, value: e.target.value })}
+                                        onKeyPress={(e) => {
+                                          if (e.key === 'Enter') {
+                                            if (newItemEdit.value.trim() && currentSessionIndex !== null && currentGradeIndex !== null) {
+                                              const updated = [...newSessionsData];
+                                              updated[currentSessionIndex].grades[currentGradeIndex].sections[index].sectionName = newItemEdit.value.trim();
+                                              setNewSessionsData(updated);
+                                            }
+                                            setNewItemEdit(null);
+                                          }
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Escape') setNewItemEdit(null);
+                                        }}
+                                        autoFocus
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                      <button className="btn btn-sm btn-success" onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (newItemEdit.value.trim() && currentSessionIndex !== null && currentGradeIndex !== null) {
+                                          const updated = [...newSessionsData];
+                                          updated[currentSessionIndex].grades[currentGradeIndex].sections[index].sectionName = newItemEdit.value.trim();
+                                          setNewSessionsData(updated);
+                                        }
+                                        setNewItemEdit(null);
+                                      }}>
+                                        <i className="bi bi-check"></i>
+                                      </button>
+                                      <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); setNewItemEdit(null); }}>
+                                        <i className="bi bi-x"></i>
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="d-flex justify-content-between align-items-center">
+                                      <span>
+                                        {section.sectionName}
+                                        {section.id && <span className="badge bg-light text-muted ms-2" style={{ fontSize: '0.65rem' }}>existing</span>}
+                                      </span>
+                                      <div className="d-flex align-items-center gap-1">
+                                        {section.id && selectionSource === 'existing' && (
+                                          <button
+                                            className="btn btn-sm btn-outline-primary py-0 px-1"
+                                            style={{ fontSize: '0.7rem', lineHeight: 1.2 }}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setDropdownEdit({ type: 'section', index, id: section.id!, value: section.sectionName });
+                                            }}
+                                            title="Edit section"
+                                          >
+                                            <i className="bi bi-pencil"></i>
+                                          </button>
+                                        )}
+                                        {selectionSource === 'new' && (
+                                          <>
+                                            <button
+                                              className="btn btn-sm btn-outline-primary py-0 px-1"
+                                              style={{ fontSize: '0.7rem', lineHeight: 1.2 }}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setNewItemEdit({ type: 'section', index, value: section.sectionName });
+                                              }}
+                                              title="Edit section"
+                                            >
+                                              <i className="bi bi-pencil"></i>
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="btn btn-sm btn-outline-danger py-0 px-1"
+                                              style={{ fontSize: '0.7rem', lineHeight: 1.2 }}
+                                              onClick={() => handleRemoveNewSection(index)}
+                                              title="Remove section"
+                                            >
+                                              <i className="bi bi-trash"></i>
+                                            </button>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -815,7 +1269,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                   <div>
                     <h5 className="mb-1 fw-semibold">Existing Data</h5>
                     <small className="text-muted">
-                      Click on any cell to edit. Changes are saved immediately.
+                      Use the edit and delete buttons to manage existing data. Changes are saved immediately.
                     </small>
                   </div>
                   {fetchLoading && (
@@ -944,14 +1398,43 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
 
                             {/* Actions Cell */}
                             <td>
-                              <div className="d-flex gap-1">
+                              <div className="d-flex gap-1 flex-wrap">
+                                {/* Edit buttons */}
+                                {row.sectionId && (
+                                  <button
+                                    className="btn btn-sm btn-outline-primary"
+                                    onClick={() => handleStartEdit('section', row.sectionId, row.sessionIndex, row.sectionName, row.gradeIndex, row.sectionIndex)}
+                                    title="Edit section"
+                                  >
+                                    <i className="bi bi-pencil"></i>
+                                  </button>
+                                )}
+                                {row.gradeId && !row.sectionId && (
+                                  <button
+                                    className="btn btn-sm btn-outline-primary"
+                                    onClick={() => handleStartEdit('grade', row.gradeId, row.sessionIndex, row.gradeName, row.gradeIndex)}
+                                    title="Edit grade"
+                                  >
+                                    <i className="bi bi-pencil"></i>
+                                  </button>
+                                )}
+                                {row.sessionId && !row.gradeId && (
+                                  <button
+                                    className="btn btn-sm btn-outline-primary"
+                                    onClick={() => handleStartEdit('session', row.sessionId, row.sessionIndex, row.sessionName)}
+                                    title="Edit session"
+                                  >
+                                    <i className="bi bi-pencil"></i>
+                                  </button>
+                                )}
+                                {/* Delete buttons */}
                                 {row.sectionId && (
                                   <button
                                     className="btn btn-sm btn-outline-danger"
                                     onClick={() => handleDeleteConfirm('section', row.sectionId, row.sectionName, row.sessionIndex, row.gradeIndex, row.sectionIndex)}
                                     title="Delete section"
                                   >
-                                    <i className="bi bi-trash"></i> Section
+                                    <i className="bi bi-trash"></i>
                                   </button>
                                 )}
                                 {row.gradeId && !row.sectionId && (
@@ -960,7 +1443,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                     onClick={() => handleDeleteConfirm('grade', row.gradeId, row.gradeName, row.sessionIndex, row.gradeIndex)}
                                     title="Delete grade"
                                   >
-                                    <i className="bi bi-trash"></i> Grade
+                                    <i className="bi bi-trash"></i>
                                   </button>
                                 )}
                                 {row.sessionId && !row.gradeId && (
@@ -969,7 +1452,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
                                     onClick={() => handleDeleteConfirm('session', row.sessionId, row.sessionName, row.sessionIndex)}
                                     title="Delete session"
                                   >
-                                    <i className="bi bi-trash"></i> Session
+                                    <i className="bi bi-trash"></i>
                                   </button>
                                 )}
                               </div>
