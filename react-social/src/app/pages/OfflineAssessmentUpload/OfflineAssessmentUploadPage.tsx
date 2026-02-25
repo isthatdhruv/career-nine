@@ -1,10 +1,9 @@
 import { useEffect, useState, useRef, useMemo } from "react";
-import { Spinner, Button, Form, Badge, Alert, ProgressBar } from "react-bootstrap";
+import { Spinner, Button, Form, Badge, Alert } from "react-bootstrap";
 import * as XLSX from "xlsx";
 import { ReadCollegeData } from "../College/API/College_APIs";
 import { getAssessmentMappingsByInstitute, getAssessmentSummaryList } from "../AssessmentMapping/API/AssessmentMapping_APIs";
-import { getOfflineMapping, bulkSubmitAnswers } from "./API/OfflineUpload_APIs";
-import { getDemographicsByAssessment } from "../CreateAssessment/API/Assessment_Demographics_APIs";
+import { getOfflineMapping, bulkSubmitWithStudents } from "./API/OfflineUpload_APIs";
 
 // ============ Interfaces ============
 
@@ -42,52 +41,15 @@ interface MappingData {
 }
 
 interface ParsedRow {
-  userId: number | null;
+  name: string;
+  dob: string;
+  phone: string;
   answers: { [questionnaireQuestionId: number]: number | null };
-  errors: { [label: string]: string };
-  userIdError?: string;
-}
-
-// Dynamic demographic field from AssessmentDemographicMapping API
-interface DemographicField {
-  mappingId: number;
-  assessmentId: number;
-  fieldDefinition: {
-    fieldId: number;
-    fieldName: string;
-    displayLabel: string;
-    fieldSource: string; // "SYSTEM" | "CUSTOM"
-    systemFieldKey: string | null;
-    dataType: string;
-    options?: { optionId: number; optionValue: string; optionLabel: string; displayOrder: number }[];
-  };
-  isMandatory: boolean;
-  displayOrder: number;
-  customLabel: string | null;
+  rowErrors: string[];
 }
 
 // ============ Helpers ============
 
-/** Generate section code from alphabetical index: 0 -> SEC_A, 1 -> SEC_B, etc. */
-const sectionCode = (index: number): string => {
-  const letter = String.fromCharCode(65 + index); // A, B, C...
-  return `SEC_${letter}`;
-};
-
-/** Generate label for a question or option dropdown */
-const generateLabel = (
-  secCode: string,
-  questionIndex: number,
-  optionIndex?: number
-): string => {
-  const qLabel = `${secCode}_Q${questionIndex + 1}`;
-  if (optionIndex !== undefined) {
-    return `${qLabel}_O${optionIndex + 1}`;
-  }
-  return qLabel;
-};
-
-/** Resolve cell value to optionId for non-MQT questions */
 const resolveOptionId = (
   cellValue: any,
   options: OptionInfo[]
@@ -103,7 +65,6 @@ const resolveOptionId = (
     return { optionId: null, error: "No options defined" };
   }
 
-  // Try numeric: 1, 2, 3... -> sequence
   const num = Number(val);
   if (!isNaN(num) && Number.isInteger(num) && num >= 1) {
     const opt = options.find((o) => o.sequence === num);
@@ -111,7 +72,6 @@ const resolveOptionId = (
     return { optionId: null, error: `Sequence ${num} out of range (max ${options.length})` };
   }
 
-  // Try alphabetic: A, B, C... -> 1, 2, 3
   const upper = val.toUpperCase();
   if (/^[A-Z]$/.test(upper)) {
     const seq = upper.charCodeAt(0) - 64;
@@ -120,7 +80,6 @@ const resolveOptionId = (
     return { optionId: null, error: `Letter ${upper} out of range (max ${options.length} options)` };
   }
 
-  // Try Yes/No
   const lower = val.toLowerCase();
   if (lower === "yes" || lower === "y") {
     const opt = options.find((o) => o.sequence === 1);
@@ -134,10 +93,32 @@ const resolveOptionId = (
   return { optionId: null, error: `Unrecognized value: "${val}"` };
 };
 
+/** Normalize Excel date value to dd-MM-yyyy string */
+const normalizeDob = (raw: any): string => {
+  if (raw === null || raw === undefined || raw === "") return "";
+  if (raw instanceof Date) {
+    const d = raw.getDate().toString().padStart(2, "0");
+    const m = (raw.getMonth() + 1).toString().padStart(2, "0");
+    const y = raw.getFullYear();
+    return `${d}-${m}-${y}`;
+  }
+  const str = String(raw).trim();
+  if (/^\d{2}-\d{2}-\d{4}$/.test(str)) return str;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const [y, m, d] = str.split("-");
+    return `${d}-${m}-${y}`;
+  }
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
+    const [d, m, y] = str.split("/");
+    return `${d}-${m}-${y}`;
+  }
+  return str;
+};
+
 // ============ Component ============
 
 const OfflineAssessmentUploadPage = () => {
-  // Selection state
+  // --- School & Assessment selection ---
   const [institutes, setInstitutes] = useState<any[]>([]);
   const [selectedInstitute, setSelectedInstitute] = useState<string>("");
   const [assessmentMappings, setAssessmentMappings] = useState<any[]>([]);
@@ -145,102 +126,128 @@ const OfflineAssessmentUploadPage = () => {
   const [loadingInstitutes, setLoadingInstitutes] = useState(false);
   const [loadingAssessments, setLoadingAssessments] = useState(false);
 
-  // Mapping data from backend
   const [mappingData, setMappingData] = useState<MappingData | null>(null);
   const [loadingMapping, setLoadingMapping] = useState(false);
 
-  // Dynamic demographic fields for the selected assessment
-  const [demographicFields, setDemographicFields] = useState<DemographicField[]>([]);
-
-  // Excel & column mapping state
+  // --- Excel upload ---
   const [excelHeaders, setExcelHeaders] = useState<string[]>([]);
   const [rawExcelData, setRawExcelData] = useState<any[]>([]);
-  const [columnMap, setColumnMap] = useState<Record<string, string>>({});
-  const [mappingApplied, setMappingApplied] = useState(false);
-
-  // Preview state
-  const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [fileName, setFileName] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Submit state
+  // --- Mapping: DB field key → Excel header ---
+  // Keys: "name", "dob", "phone", "q_{qqId}", "mqt_{qqId}_{optionId}"
+  const [fieldToHeader, setFieldToHeader] = useState<Record<string, string>>({});
+  const [mappingApplied, setMappingApplied] = useState(false);
+
+  const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<any>(null);
-  const [submitProgress, setSubmitProgress] = useState<{
-    phase: string;
-    current: number;
-    total: number;
-  } | null>(null);
 
-  // ============ Derived: build mapping labels from sections ============
-
-  const mappingLabels = useMemo(() => {
+  // --- Build flat rows for the mapping table ---
+  const mappingRows = useMemo(() => {
     if (!mappingData?.sections) return [];
 
-    const labels: {
+    const rows: {
+      key: string;
       label: string;
       sectionName: string;
-      secCode: string;
-      questionnaireQuestionId: number;
-      questionText: string;
       isMQT: boolean;
-      optionId?: number;
-      optionText?: string;
-      type: "question" | "option";
+      type: "identity" | "question" | "mqt_option";
     }[] = [];
 
-    mappingData.sections.forEach((section, secIdx) => {
-      const secC = sectionCode(secIdx);
-      section.questions.forEach((q, qIdx) => {
+    // Identity fields first
+    rows.push({ key: "name", label: "Student Name", sectionName: "Student Identity", isMQT: false, type: "identity" });
+    rows.push({ key: "dob", label: "Date of Birth", sectionName: "Student Identity", isMQT: false, type: "identity" });
+    rows.push({ key: "phone", label: "Phone Number", sectionName: "Student Identity", isMQT: false, type: "identity" });
+
+    // Questions grouped by section
+    for (const section of mappingData.sections) {
+      for (const q of section.questions) {
         if (q.isMQT) {
-          // One dropdown per option
-          q.options.forEach((opt, optIdx) => {
-            labels.push({
-              label: generateLabel(secC, qIdx, optIdx),
+          for (const opt of q.options) {
+            rows.push({
+              key: `mqt_${q.questionnaireQuestionId}_${opt.optionId}`,
+              label: `${q.questionText?.substring(0, 50) || "Q" + q.questionnaireQuestionId} → ${opt.optionText?.substring(0, 40)}`,
               sectionName: section.sectionName,
-              secCode: secC,
-              questionnaireQuestionId: q.questionnaireQuestionId,
-              questionText: q.questionText,
               isMQT: true,
-              optionId: opt.optionId,
-              optionText: opt.optionText,
-              type: "option",
+              type: "mqt_option",
             });
-          });
+          }
         } else {
-          // One dropdown per question
-          labels.push({
-            label: generateLabel(secC, qIdx),
+          rows.push({
+            key: `q_${q.questionnaireQuestionId}`,
+            label: q.questionText?.substring(0, 80) || `Question ${q.questionnaireQuestionId}`,
             sectionName: section.sectionName,
-            secCode: secC,
-            questionnaireQuestionId: q.questionnaireQuestionId,
-            questionText: q.questionText,
             isMQT: false,
             type: "question",
           });
         }
-      });
-    });
+      }
+    }
 
-    return labels;
+    return rows;
   }, [mappingData]);
 
-  // Group labels by section code for rendering
-  const labelsBySection = useMemo(() => {
-    const grouped: Record<string, { sectionName: string; labels: typeof mappingLabels }> = {};
-    for (const lbl of mappingLabels) {
-      if (!grouped[lbl.secCode]) {
-        grouped[lbl.secCode] = { sectionName: lbl.sectionName, labels: [] };
-      }
-      grouped[lbl.secCode].labels.push(lbl);
-    }
-    return grouped;
-  }, [mappingLabels]);
+  // Build preview column list from applied mapping
+  const previewColumns = useMemo(() => {
+    if (!mappingApplied || !mappingData) return [];
 
-  // Mapping progress
-  const mappedCount = Object.values(columnMap).filter(Boolean).length;
-  // +1 for userId
-  const totalMappable = 1 + demographicFields.length + mappingLabels.length;
+    const mappedQQIds = new Set<number>();
+    for (const [key] of Object.entries(fieldToHeader)) {
+      if (key.startsWith("q_")) {
+        mappedQQIds.add(Number(key.substring(2)));
+      } else if (key.startsWith("mqt_")) {
+        const qqId = Number(key.split("_")[1]);
+        mappedQQIds.add(qqId);
+      }
+    }
+
+    const cols: {
+      qqId: number;
+      questionText: string;
+      isMQT: boolean;
+      options: OptionInfo[];
+      sectionName: string;
+    }[] = [];
+
+    for (const section of mappingData.sections) {
+      for (const q of section.questions) {
+        if (mappedQQIds.has(q.questionnaireQuestionId)) {
+          cols.push({
+            qqId: q.questionnaireQuestionId,
+            questionText: q.questionText,
+            isMQT: q.isMQT,
+            options: q.options,
+            sectionName: section.sectionName,
+          });
+        }
+      }
+    }
+    return cols;
+  }, [mappingApplied, fieldToHeader, mappingData]);
+
+  // Mapping validation
+  const mappingValidation = useMemo(() => {
+    const issues: string[] = [];
+    const hasName = !!fieldToHeader["name"];
+    if (!hasName) issues.push("Map a column to 'Student Name' (required)");
+
+    const mappedQQIds = new Set<number>();
+    for (const key of Object.keys(fieldToHeader)) {
+      if (key.startsWith("q_")) mappedQQIds.add(Number(key.substring(2)));
+      else if (key.startsWith("mqt_")) mappedQQIds.add(Number(key.split("_")[1]));
+    }
+
+    const totalQuestions = mappingData?.questions.length || 0;
+    if (mappedQQIds.size === 0) {
+      issues.push("No question columns mapped");
+    } else if (mappedQQIds.size < totalQuestions) {
+      issues.push(`${mappedQQIds.size} of ${totalQuestions} questions mapped`);
+    }
+
+    return { issues, hasName, mappedCount: mappedQQIds.size };
+  }, [fieldToHeader, mappingData]);
 
   // ============ Load data ============
 
@@ -276,10 +283,8 @@ const OfflineAssessmentUploadPage = () => {
     setLoadingAssessments(true);
     setSelectedAssessment("");
     setMappingData(null);
-    setDemographicFields([]);
     resetUploadState();
     try {
-      // Fetch independently so one failure doesn't block the other
       let mappings: any[] = [];
       let allAssessments: any[] = [];
 
@@ -302,7 +307,6 @@ const OfflineAssessmentUploadPage = () => {
         const filtered = allAssessments.filter((a: any) => mappedIds.has(a.id));
         setAssessmentMappings(filtered);
       } else {
-        // No institute mappings: show all assessments
         setAssessmentMappings(allAssessments);
       }
     } catch (error) {
@@ -317,7 +321,6 @@ const OfflineAssessmentUploadPage = () => {
       loadMapping(Number(selectedAssessment));
     } else {
       setMappingData(null);
-      setDemographicFields([]);
       resetUploadState();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -326,14 +329,9 @@ const OfflineAssessmentUploadPage = () => {
   const loadMapping = async (assessmentId: number) => {
     setLoadingMapping(true);
     resetUploadState();
-    setDemographicFields([]);
     try {
-      const [mappingRes, demoRes] = await Promise.all([
-        getOfflineMapping(assessmentId),
-        getDemographicsByAssessment(assessmentId),
-      ]);
+      const mappingRes = await getOfflineMapping(assessmentId);
       setMappingData(mappingRes.data);
-      setDemographicFields(demoRes.data || []);
     } catch (error) {
       console.error("Failed to load mapping:", error);
       alert("Failed to load assessment mapping. Make sure the assessment has a linked questionnaire.");
@@ -343,77 +341,14 @@ const OfflineAssessmentUploadPage = () => {
   };
 
   const resetUploadState = () => {
-    setParsedRows([]);
-    setFileName("");
     setExcelHeaders([]);
     setRawExcelData([]);
-    setColumnMap({});
+    setFieldToHeader({});
     setMappingApplied(false);
+    setParsedRows([]);
+    setFileName("");
     setSubmitResult(null);
-    setSubmitProgress(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  // ============ Auto-mapping ============
-
-  const runAutoMapping = (headers: string[]) => {
-    const headersLower = headers.map((h) => h.toLowerCase().trim());
-    const newMap: Record<string, string> = {};
-
-    // Auto-map userId
-    const userIdIdx = headersLower.findIndex(
-      (h) => h === "userid" || h === "user_id" || h === "user id" || h === "studentid" || h === "student_id"
-    );
-    if (userIdIdx >= 0) newMap["userId"] = headers[userIdIdx];
-
-    // Auto-map demographics by matching fieldName or displayLabel
-    for (const df of demographicFields) {
-      const fd = df.fieldDefinition;
-      const label = (df.customLabel || fd.displayLabel).toLowerCase();
-      const fieldName = fd.fieldName.toLowerCase();
-      const sysKey = (fd.systemFieldKey || "").toLowerCase();
-      for (let i = 0; i < headers.length; i++) {
-        const hLower = headersLower[i];
-        if (hLower === label || hLower === fieldName || (sysKey && hLower === sysKey) || hLower.includes(fieldName)) {
-          newMap[`demo_${fd.fieldId}`] = headers[i];
-          break;
-        }
-      }
-    }
-
-    // Auto-map question/option labels by exact match
-    for (const lbl of mappingLabels) {
-      const idx = headersLower.indexOf(lbl.label.toLowerCase());
-      if (idx >= 0) newMap[lbl.label] = headers[idx];
-    }
-
-    setColumnMap(newMap);
-  };
-
-  // ============ Template Download ============
-
-  const handleDownloadTemplate = () => {
-    if (!mappingData) return;
-
-    const headers: string[] = ["userId"];
-
-    // Demographics headers from assessment config
-    for (const df of demographicFields) {
-      headers.push(df.customLabel || df.fieldDefinition.displayLabel);
-    }
-
-    // Question/option headers using labels
-    for (const lbl of mappingLabels) {
-      headers.push(lbl.label);
-    }
-
-    const ws = XLSX.utils.aoa_to_sheet([headers]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Data");
-    XLSX.writeFile(
-      wb,
-      `offline_template_${mappingData.assessmentName.replace(/\s+/g, "_")}.xlsx`
-    );
   };
 
   // ============ File Upload ============
@@ -424,17 +359,16 @@ const OfflineAssessmentUploadPage = () => {
 
     setFileName(file.name);
     setSubmitResult(null);
-    setSubmitProgress(null);
     setMappingApplied(false);
     setParsedRows([]);
 
     const reader = new FileReader();
     reader.onload = (evt) => {
       const data = evt.target?.result;
-      const workbook = XLSX.read(data, { type: "binary" });
+      const workbook = XLSX.read(data, { type: "binary", cellDates: true });
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
-      const jsonData: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      const jsonData: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
 
       if (jsonData.length === 0) {
         alert("The Excel file is empty or has no data rows.");
@@ -444,79 +378,110 @@ const OfflineAssessmentUploadPage = () => {
       const headers = Object.keys(jsonData[0]);
       setExcelHeaders(headers);
       setRawExcelData(jsonData);
-      runAutoMapping(headers);
+
+      // Auto-detect: try to map identity columns by common names
+      const autoMap: Record<string, string> = {};
+      for (const header of headers) {
+        const lower = header.toLowerCase().trim();
+        if (lower === "name" || lower === "student name" || lower === "student_name") {
+          autoMap["name"] = header;
+        } else if (lower === "dob" || lower === "date of birth" || lower === "date_of_birth" || lower === "birth date") {
+          autoMap["dob"] = header;
+        } else if (lower === "phone" || lower === "phone number" || lower === "phone_number" || lower === "mobile" || lower === "mobile number") {
+          autoMap["phone"] = header;
+        }
+      }
+      setFieldToHeader(autoMap);
     };
     reader.readAsBinaryString(file);
   };
 
+  // ============ Mapping Handlers ============
+
+  const handleFieldMapping = (fieldKey: string, excelHeader: string) => {
+    setFieldToHeader((prev) => {
+      const updated = { ...prev };
+      if (excelHeader === "") {
+        delete updated[fieldKey];
+      } else {
+        updated[fieldKey] = excelHeader;
+      }
+      return updated;
+    });
+  };
+
+  // Get set of already-used Excel headers (to prevent duplicate mapping)
+  const usedHeaders = useMemo(() => {
+    return new Set(Object.values(fieldToHeader));
+  }, [fieldToHeader]);
+
   // ============ Apply Mapping & Parse ============
 
-  const applyMapping = () => {
+  const handleApplyMapping = () => {
     if (!mappingData || rawExcelData.length === 0) return;
 
-    const rows: ParsedRow[] = rawExcelData.map((row) => {
-      // Resolve userId
-      const userIdCol = columnMap["userId"];
-      let userId: number | null = null;
-      let userIdError: string | undefined;
-      if (userIdCol && row[userIdCol] !== undefined && row[userIdCol] !== "") {
-        userId = Number(row[userIdCol]);
-        if (isNaN(userId)) {
-          userId = null;
-          userIdError = "Invalid userId";
+    const nameHeader = fieldToHeader["name"];
+    const dobHeader = fieldToHeader["dob"];
+    const phoneHeader = fieldToHeader["phone"];
+
+    const rows = rawExcelData.map((row) => {
+      const rowErrors: string[] = [];
+
+      const name = nameHeader ? String(row[nameHeader] ?? "").trim() : "";
+      if (!name) rowErrors.push("Name is required");
+
+      let dob = "";
+      if (dobHeader) {
+        dob = normalizeDob(row[dobHeader]);
+        if (dob && !/^\d{2}-\d{2}-\d{4}$/.test(dob)) {
+          rowErrors.push(`DOB "${row[dobHeader]}" could not be parsed to dd-MM-yyyy`);
         }
-      } else {
-        userIdError = "Missing userId";
       }
 
-      // Resolve answers
+      const phone = phoneHeader ? String(row[phoneHeader] ?? "").trim() : "";
+
       const answers: { [qqId: number]: number | null } = {};
-      const errors: { [label: string]: string } = {};
+      const mqtSelections: Record<number, number[]> = {};
 
-      for (const section of mappingData!.sections) {
-        const secIdx = mappingData!.sections.indexOf(section);
-        const secC = sectionCode(secIdx);
+      for (const [fieldKey, excelHeader] of Object.entries(fieldToHeader)) {
+        if (fieldKey === "name" || fieldKey === "dob" || fieldKey === "phone") continue;
 
-        section.questions.forEach((q, qIdx) => {
-          if (q.isMQT) {
-            // MQT: check each option column, find the one with value 1
-            const selectedOptionIds: number[] = [];
-            q.options.forEach((opt, optIdx) => {
-              const optLabel = generateLabel(secC, qIdx, optIdx);
-              const excelCol = columnMap[optLabel];
-              if (excelCol) {
-                const cellVal = String(row[excelCol] ?? "").trim();
-                if (cellVal === "1" || cellVal.toLowerCase() === "yes" || cellVal.toLowerCase() === "y") {
-                  selectedOptionIds.push(opt.optionId);
-                }
-              }
-            });
+        const cellVal = row[excelHeader];
 
-            const qLabel = generateLabel(secC, qIdx);
-            if (selectedOptionIds.length === 1) {
-              answers[q.questionnaireQuestionId] = selectedOptionIds[0];
-            } else if (selectedOptionIds.length > 1) {
-              answers[q.questionnaireQuestionId] = null;
-              errors[qLabel] = `Multiple options selected for MQT question`;
-            } else {
-              answers[q.questionnaireQuestionId] = null; // none selected
-            }
-          } else {
-            // Non-MQT: single column with option number/letter
-            const qLabel = generateLabel(secC, qIdx);
-            const excelCol = columnMap[qLabel];
-            if (excelCol) {
-              const result = resolveOptionId(row[excelCol], q.options);
-              answers[q.questionnaireQuestionId] = result.optionId;
-              if (result.error) errors[qLabel] = result.error;
-            } else {
-              answers[q.questionnaireQuestionId] = null;
-            }
+        if (fieldKey.startsWith("q_")) {
+          const qqId = Number(fieldKey.substring(2));
+          const q = mappingData.questions.find(
+            (q) => q.questionnaireQuestionId === qqId
+          );
+          if (q) {
+            const result = resolveOptionId(cellVal, q.options);
+            answers[qqId] = result.optionId;
+            if (result.error) rowErrors.push(`${excelHeader}: ${result.error}`);
           }
-        });
+        } else if (fieldKey.startsWith("mqt_")) {
+          const parts = fieldKey.split("_");
+          const qqId = Number(parts[1]);
+          const optionId = Number(parts[2]);
+          const val = String(cellVal ?? "").trim();
+          if (val === "1" || val.toLowerCase() === "yes" || val.toLowerCase() === "y") {
+            if (!mqtSelections[qqId]) mqtSelections[qqId] = [];
+            mqtSelections[qqId].push(optionId);
+          }
+        }
       }
 
-      return { userId, answers, errors, userIdError };
+      // Resolve MQT selections
+      for (const [qqIdStr, selectedIds] of Object.entries(mqtSelections)) {
+        const qqId = Number(qqIdStr);
+        if (selectedIds.length === 1) {
+          answers[qqId] = selectedIds[0];
+        } else if (selectedIds.length > 1) {
+          answers[qqId] = null;
+          rowErrors.push(`Question ${qqId}: Multiple MQT options selected`);
+        }
+      }
+
+      return { name, dob, phone, answers, rowErrors };
     });
 
     setParsedRows(rows);
@@ -525,24 +490,15 @@ const OfflineAssessmentUploadPage = () => {
 
   // ============ Edit Handlers ============
 
-  const handleUserIdChange = (rowIndex: number, value: string) => {
+  const handleFieldChange = (rowIndex: number, field: "name" | "dob" | "phone", value: string) => {
     setParsedRows((prev) => {
       const updated = [...prev];
-      const numVal = value === "" ? null : Number(value);
-      updated[rowIndex] = {
-        ...updated[rowIndex],
-        userId: numVal,
-        userIdError: numVal === null || isNaN(numVal) ? "Invalid userId" : undefined,
-      };
+      updated[rowIndex] = { ...updated[rowIndex], [field]: value };
       return updated;
     });
   };
 
-  const handleAnswerChange = (
-    rowIndex: number,
-    qqId: number,
-    optionId: number | null
-  ) => {
+  const handleAnswerChange = (rowIndex: number, qqId: number, optionId: number | null) => {
     setParsedRows((prev) => {
       const updated = [...prev];
       const row = { ...updated[rowIndex] };
@@ -552,53 +508,45 @@ const OfflineAssessmentUploadPage = () => {
     });
   };
 
-  // ============ Column Map update helper ============
-
-  const updateColumnMap = (key: string, value: string) => {
-    setColumnMap((prev) => ({ ...prev, [key]: value }));
-  };
-
   // ============ Submit ============
 
   const handleSubmit = async () => {
     if (!mappingData || parsedRows.length === 0) return;
 
-    const invalidRows = parsedRows.filter((r) => r.userId === null || r.userIdError);
-    if (invalidRows.length > 0) {
-      alert(`${invalidRows.length} row(s) have invalid or missing userId. Please fix them before submitting.`);
+    const rowsWithNameError = parsedRows.filter((r) => !r.name.trim());
+    if (rowsWithNameError.length > 0) {
+      alert(`${rowsWithNameError.length} row(s) have no student name. Please fix before submitting.`);
       return;
     }
 
-    const rowsWithErrors = parsedRows.filter((r) => Object.keys(r.errors).length > 0);
+    const rowsWithErrors = parsedRows.filter((r) => r.rowErrors.length > 0);
     if (rowsWithErrors.length > 0) {
-      if (!window.confirm(`${rowsWithErrors.length} row(s) have parsing errors. Those answers will be skipped. Continue?`))
+      if (!window.confirm(`${rowsWithErrors.length} row(s) have parsing warnings. Those answers may be skipped. Continue?`))
         return;
     }
 
     setSubmitting(true);
     setSubmitResult(null);
-    setSubmitProgress({ phase: "Submitting answers", current: 0, total: 1 });
 
     try {
-      const students = parsedRows.map((row) => {
-        const answers: { questionnaireQuestionId: number; optionId: number }[] = [];
-        for (const [qqIdStr, optionId] of Object.entries(row.answers)) {
-          if (optionId !== null && optionId !== undefined) {
-            answers.push({
-              questionnaireQuestionId: Number(qqIdStr),
-              optionId,
-            });
-          }
-        }
-        return { userStudentId: row.userId!, answers };
-      });
+      const students = parsedRows.map((row) => ({
+        name: row.name.trim(),
+        dob: row.dob || undefined,
+        phone: row.phone || undefined,
+        answers: Object.entries(row.answers)
+          .filter(([, optId]) => optId !== null)
+          .map(([qqId, optId]) => ({
+            questionnaireQuestionId: Number(qqId),
+            optionId: optId!,
+          })),
+      }));
 
-      const res = await bulkSubmitAnswers({
-        assessmentId: mappingData!.assessmentId,
+      const res = await bulkSubmitWithStudents({
+        assessmentId: mappingData.assessmentId,
+        instituteId: Number(selectedInstitute),
         students,
       });
 
-      setSubmitProgress({ phase: "Submitting answers", current: 1, total: 1 });
       setSubmitResult(res.data);
     } catch (error: any) {
       console.error("Submit failed:", error);
@@ -608,48 +556,20 @@ const OfflineAssessmentUploadPage = () => {
       });
     } finally {
       setSubmitting(false);
-      setSubmitProgress(null);
     }
   };
 
-  // ============ Get option text for preview ============
-
-  const getOptionTextByQQ = (qqId: number, optionId: number | null): string => {
-    if (optionId === null) return "";
-    if (!mappingData) return String(optionId);
-    const q = mappingData.questions.find((q) => q.questionnaireQuestionId === qqId);
-    if (!q) return String(optionId);
-    const opt = q.options.find((o) => o.optionId === optionId);
-    return opt ? opt.optionText : String(optionId);
-  };
-
-  // Build flat list of question columns for preview table
-  const previewColumns = useMemo(() => {
-    if (!mappingData?.sections) return [];
-    const cols: {
-      label: string;
-      qqId: number;
-      questionText: string;
-      isMQT: boolean;
-      options: OptionInfo[];
-    }[] = [];
-
-    mappingData.sections.forEach((section, secIdx) => {
-      const secC = sectionCode(secIdx);
-      section.questions.forEach((q, qIdx) => {
-        cols.push({
-          label: generateLabel(secC, qIdx),
-          qqId: q.questionnaireQuestionId,
-          questionText: q.questionText,
-          isMQT: q.isMQT,
-          options: q.options,
-        });
-      });
-    });
-    return cols;
-  }, [mappingData]);
-
   // ============ Render ============
+
+  // Group mapping rows by section for display
+  const groupedMappingRows = useMemo(() => {
+    const groups: Record<string, typeof mappingRows> = {};
+    for (const row of mappingRows) {
+      if (!groups[row.sectionName]) groups[row.sectionName] = [];
+      groups[row.sectionName].push(row);
+    }
+    return groups;
+  }, [mappingRows]);
 
   return (
     <div className="card">
@@ -710,29 +630,20 @@ const OfflineAssessmentUploadPage = () => {
               <Badge bg="info" className="me-2">
                 {mappingData.sections?.length || 0} sections
               </Badge>
-              <Badge bg="secondary" className="me-2">
+              <Badge bg="secondary">
                 {mappingData.questions.length} questions
-              </Badge>
-              <Badge bg="warning" text="dark">
-                {demographicFields.length} demographics
               </Badge>
             </div>
           )}
         </div>
 
-        {/* Section 2: Template Download & Upload */}
+        {/* Section 2: Upload Excel */}
         {mappingData && (
           <div className="card card-body bg-light mb-4">
-            <h6 className="mb-3">Template & Upload</h6>
+            <h6 className="mb-3">Upload Excel File</h6>
             <div className="row g-3 align-items-end">
-              <div className="col-md-4">
-                <Button variant="outline-primary" onClick={handleDownloadTemplate}>
-                  <i className="bi bi-download me-2" />
-                  Download Excel Template
-                </Button>
-              </div>
               <div className="col-md-6">
-                <Form.Label>Upload Filled Excel</Form.Label>
+                <Form.Label>Choose Excel File</Form.Label>
                 <Form.Control
                   type="file"
                   accept=".xlsx,.xls"
@@ -740,257 +651,99 @@ const OfflineAssessmentUploadPage = () => {
                   onChange={handleFileUpload}
                 />
               </div>
-              <div className="col-md-2">
+              <div className="col-md-4">
                 {fileName && <small className="text-muted">{fileName}</small>}
               </div>
+              <div className="col-md-2">
+                {excelHeaders.length > 0 && (
+                  <Badge bg="info">{rawExcelData.length} rows, {excelHeaders.length} columns</Badge>
+                )}
+              </div>
+            </div>
+            <div className="mt-2">
+              <small className="text-muted">
+                Upload any Excel file with one student per row. You will map its columns to questions next.
+              </small>
             </div>
           </div>
         )}
 
-        {/* Section 3: Column Mapping UI */}
+        {/* Section 3: Column Mapping - DB questions on left, Excel headers dropdown on right */}
         {excelHeaders.length > 0 && mappingData && !mappingApplied && (
           <div className="card card-body bg-light mb-4">
             <div className="d-flex justify-content-between align-items-center mb-3">
-              <h6 className="mb-0">
-                Map Excel Columns{" "}
-                <Badge bg="secondary" className="ms-2">
-                  {mappedCount} / {totalMappable} mapped
-                </Badge>
-              </h6>
-              <Button
-                variant="primary"
-                onClick={applyMapping}
-                disabled={!columnMap["userId"]}
-              >
-                Apply Mapping & Preview
-              </Button>
-            </div>
-
-            {/* Identity */}
-            <div className="mb-4">
-              <h6 className="text-muted border-bottom pb-2">Identity</h6>
-              <div className="row g-3">
-                <div className="col-md-4">
-                  <Form.Label className="mb-1 small fw-bold">userId (Student ID)</Form.Label>
-                  <Form.Select
-                    size="sm"
-                    value={columnMap["userId"] || ""}
-                    onChange={(e) => updateColumnMap("userId", e.target.value)}
-                  >
-                    <option value="">-- not mapped --</option>
-                    {excelHeaders.map((h) => (
-                      <option key={h} value={h}>{h}</option>
-                    ))}
-                  </Form.Select>
-                </div>
+              <h6 className="mb-0">Map DB Questions to Excel Columns</h6>
+              <div className="d-flex gap-2 align-items-center">
+                {mappingValidation.issues.length > 0 && (
+                  <small className="text-warning">
+                    {mappingValidation.issues[0]}
+                  </small>
+                )}
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleApplyMapping}
+                  disabled={!mappingValidation.hasName || mappingValidation.mappedCount === 0}
+                >
+                  Apply Mapping & Preview
+                </Button>
               </div>
             </div>
 
-            {/* Demographics */}
-            {demographicFields.length > 0 && (
-              <div className="mb-4">
-                <h6 className="text-muted border-bottom pb-2">
-                  Demographics
-                  <Badge bg="secondary" className="ms-2" style={{ fontSize: "0.7rem" }}>
-                    {demographicFields.length} fields
-                  </Badge>
-                </h6>
-                <div className="row g-3">
-                  {demographicFields.map((df) => {
-                    const fd = df.fieldDefinition;
-                    const label = df.customLabel || fd.displayLabel;
-                    return (
-                      <div className="col-md-4" key={fd.fieldId}>
-                        <Form.Label className="mb-1 small fw-bold">
-                          {label}
-                          {df.isMandatory && <span className="text-danger ms-1">*</span>}
-                          <span className="text-muted fw-normal ms-1" style={{ fontSize: "0.7rem" }}>
-                            ({fd.fieldSource === "SYSTEM" ? fd.systemFieldKey : "custom"})
-                          </span>
-                        </Form.Label>
-                        <Form.Select
-                          size="sm"
-                          value={columnMap[`demo_${fd.fieldId}`] || ""}
-                          onChange={(e) => updateColumnMap(`demo_${fd.fieldId}`, e.target.value)}
-                        >
-                          <option value="">-- not mapped --</option>
-                          {excelHeaders.map((h) => (
-                            <option key={h} value={h}>{h}</option>
-                          ))}
-                        </Form.Select>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Question Mapping by Section */}
-            {Object.entries(labelsBySection).map(([secC, { sectionName, labels }]) => (
-              <div className="mb-4" key={secC}>
-                <h6 className="text-muted border-bottom pb-2">
-                  {secC} - {sectionName}
-                </h6>
-                <div className="row g-3">
-                  {labels.map((lbl) => (
-                    <div className="col-md-4" key={lbl.label}>
-                      <Form.Label className="mb-1 small fw-bold" title={lbl.questionText}>
-                        {lbl.label}
-                        <span className="text-muted fw-normal ms-1" style={{ fontSize: "0.75rem" }}>
-                          {lbl.type === "option" ? (
-                            <>({lbl.optionText})</>
-                          ) : (
-                            <>
-                              ({lbl.questionText && lbl.questionText.length > 30
-                                ? lbl.questionText.substring(0, 30) + "..."
-                                : lbl.questionText})
-                            </>
-                          )}
-                        </span>
-                      </Form.Label>
-                      <Form.Select
-                        size="sm"
-                        value={columnMap[lbl.label] || ""}
-                        onChange={(e) => updateColumnMap(lbl.label, e.target.value)}
-                      >
-                        <option value="">-- not mapped --</option>
-                        {excelHeaders.map((h) => (
-                          <option key={h} value={h}>{h}</option>
-                        ))}
-                      </Form.Select>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Back to Mapping button */}
-        {mappingApplied && parsedRows.length > 0 && (
-          <div className="mb-3">
-            <Button
-              variant="outline-secondary"
-              size="sm"
-              onClick={() => {
-                setMappingApplied(false);
-                setParsedRows([]);
-              }}
-            >
-              Back to Column Mapping
-            </Button>
-          </div>
-        )}
-
-        {/* Section 4: Preview & Edit Table */}
-        {parsedRows.length > 0 && mappingData && (
-          <div className="mb-4">
-            <h6 className="mb-3">
-              Preview ({parsedRows.length} students)
-              {parsedRows.some((r) => Object.keys(r.errors).length > 0) && (
-                <Badge bg="warning" className="ms-2">Has errors</Badge>
-              )}
-            </h6>
-            <div className="table-responsive" style={{ maxHeight: "500px" }}>
-              <table className="table table-bordered table-sm table-hover">
-                <thead className="table-dark" style={{ position: "sticky", top: 0 }}>
-                  {/* Section header row */}
+            <div style={{ maxHeight: "500px", overflowY: "auto", border: "1px solid #dee2e6" }}>
+              <table className="table table-bordered table-sm mb-0">
+                <thead style={{ position: "sticky", top: 0, zIndex: 2, backgroundColor: "#212529", color: "#fff" }}>
                   <tr>
-                    <th rowSpan={2} style={{ minWidth: "50px" }}>#</th>
-                    <th rowSpan={2} style={{ minWidth: "120px" }}>userId</th>
-                    {Object.entries(labelsBySection).map(([secC, { sectionName, labels }]) => {
-                      // Count unique questions in this section
-                      const uniqueQQIds = new Set(labels.map((l) => l.questionnaireQuestionId));
-                      return (
-                        <th
-                          key={secC}
-                          colSpan={uniqueQQIds.size}
-                          className="text-center"
-                          style={{ borderLeft: "2px solid #666" }}
-                        >
-                          {secC} - {sectionName}
-                        </th>
-                      );
-                    })}
-                  </tr>
-                  {/* Question label row */}
-                  <tr>
-                    {previewColumns.map((col, idx) => {
-                      // Add section border on first question of each section
-                      const isFirstInSection = idx === 0 || previewColumns[idx - 1] &&
-                        mappingData.questions.find(q => q.questionnaireQuestionId === previewColumns[idx - 1].qqId)?.questionnaireSectionId !==
-                        mappingData.questions.find(q => q.questionnaireQuestionId === col.qqId)?.questionnaireSectionId;
-                      return (
-                        <th
-                          key={col.label}
-                          style={{
-                            minWidth: "140px",
-                            ...(isFirstInSection ? { borderLeft: "2px solid #666" } : {}),
-                          }}
-                          title={col.questionText}
-                        >
-                          {col.label}
-                          {col.isMQT && (
-                            <Badge bg="info" className="ms-1" style={{ fontSize: "0.6rem" }}>MQT</Badge>
-                          )}
-                        </th>
-                      );
-                    })}
+                    <th style={{ width: "50%", backgroundColor: "#212529", color: "#fff" }}>DB Question / Field</th>
+                    <th style={{ width: "50%", backgroundColor: "#212529", color: "#fff" }}>Excel Column</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {parsedRows.map((row, rowIdx) => (
-                    <tr key={rowIdx}>
-                      <td>{rowIdx + 1}</td>
-                      <td className={row.userIdError ? "table-danger" : ""}>
-                        <input
-                          type="number"
-                          className="form-control form-control-sm"
-                          value={row.userId ?? ""}
-                          onChange={(e) => handleUserIdChange(rowIdx, e.target.value)}
-                          style={{ width: "100px" }}
-                        />
-                      </td>
-                      {previewColumns.map((col) => {
-                        const optionId = row.answers[col.qqId];
-                        const hasError = Object.keys(row.errors).some(
-                          (errKey) => errKey.startsWith(col.label.split("_O")[0])
-                        );
-                        const isBlank = optionId === null && !hasError;
+                  {Object.entries(groupedMappingRows).map(([sectionName, rows]) => (
+                    <>
+                      <tr key={`section-${sectionName}`} className="table-secondary">
+                        <td colSpan={2}>
+                          <strong>{sectionName}</strong>
+                          <small className="text-muted ms-2">({rows.length} fields)</small>
+                        </td>
+                      </tr>
+                      {rows.map((row) => {
+                        const currentHeader = fieldToHeader[row.key] || "";
+                        const isMapped = !!currentHeader;
 
                         return (
-                          <td
-                            key={col.label}
-                            className={hasError ? "table-danger" : isBlank ? "table-warning" : ""}
-                            title={
-                              Object.entries(row.errors)
-                                .filter(([k]) => k.startsWith(col.label.split("_O")[0]))
-                                .map(([, v]) => v)
-                                .join(", ") || ""
-                            }
-                          >
-                            <select
-                              className="form-select form-select-sm"
-                              value={optionId ?? ""}
-                              onChange={(e) =>
-                                handleAnswerChange(
-                                  rowIdx,
-                                  col.qqId,
-                                  e.target.value === "" ? null : Number(e.target.value)
-                                )
-                              }
-                            >
-                              <option value="">-- Skip --</option>
-                              {col.options.map((opt) => (
-                                <option key={opt.optionId} value={opt.optionId}>
-                                  {opt.optionText}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
+                          <tr key={row.key} className={isMapped ? "" : "text-muted"}>
+                            <td>
+                              {row.label}
+                              {row.isMQT && (
+                                <Badge bg="info" className="ms-1" style={{ fontSize: "0.65rem" }}>MQT</Badge>
+                              )}
+                              {row.key === "name" && (
+                                <Badge bg="danger" className="ms-1" style={{ fontSize: "0.65rem" }}>Required</Badge>
+                              )}
+                            </td>
+                            <td>
+                              <Form.Select
+                                size="sm"
+                                value={currentHeader}
+                                onChange={(e) => handleFieldMapping(row.key, e.target.value)}
+                              >
+                                <option value="">-- Not mapped --</option>
+                                {excelHeaders.map((h) => (
+                                  <option
+                                    key={h}
+                                    value={h}
+                                    disabled={usedHeaders.has(h) && h !== currentHeader}
+                                  >
+                                    {h}{usedHeaders.has(h) && h !== currentHeader ? " (already used)" : ""}
+                                  </option>
+                                ))}
+                              </Form.Select>
+                            </td>
+                          </tr>
                         );
                       })}
-                    </tr>
+                    </>
                   ))}
                 </tbody>
               </table>
@@ -998,24 +751,141 @@ const OfflineAssessmentUploadPage = () => {
           </div>
         )}
 
-        {/* Section 5: Submit */}
-        {parsedRows.length > 0 && mappingData && (
-          <div className="card card-body bg-light">
-            {submitting && submitProgress && (
-              <div className="mb-3">
-                <div className="d-flex justify-content-between mb-1">
-                  <small className="fw-bold">{submitProgress.phase}...</small>
-                  <small>{submitProgress.current} / {submitProgress.total}</small>
-                </div>
-                <ProgressBar
-                  now={submitProgress.total > 0 ? (submitProgress.current / submitProgress.total) * 100 : 0}
-                  animated
-                  striped
-                />
+        {/* Section 4: Preview & Edit Table */}
+        {mappingApplied && parsedRows.length > 0 && mappingData && (
+          <div className="mb-4">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h6 className="mb-0">
+                Preview ({parsedRows.length} students)
+                {parsedRows.some((r) => r.rowErrors.length > 0) && (
+                  <Badge bg="warning" className="ms-2">Has warnings</Badge>
+                )}
+              </h6>
+              <div className="d-flex gap-2">
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  onClick={() => { setMappingApplied(false); setParsedRows([]); }}
+                >
+                  Back to Mapping
+                </Button>
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  onClick={resetUploadState}
+                >
+                  Clear & Re-upload
+                </Button>
               </div>
-            )}
+            </div>
+            <div style={{ maxHeight: "500px", overflow: "auto", border: "1px solid #dee2e6" }}>
+              <table className="table table-bordered table-sm table-hover mb-0">
+                <thead style={{ position: "sticky", top: 0, zIndex: 2, backgroundColor: "#212529", color: "#fff" }}>
+                  <tr>
+                    <th style={{ minWidth: "40px", backgroundColor: "#212529", color: "#fff" }}>#</th>
+                    <th style={{ minWidth: "150px", backgroundColor: "#212529", color: "#fff" }}>Name</th>
+                    <th style={{ minWidth: "110px", backgroundColor: "#212529", color: "#fff" }}>DOB</th>
+                    <th style={{ minWidth: "120px", backgroundColor: "#212529", color: "#fff" }}>Phone</th>
+                    {previewColumns.map((col) => (
+                      <th
+                        key={col.qqId}
+                        style={{ minWidth: "140px", backgroundColor: "#212529", color: "#fff" }}
+                        title={col.questionText}
+                      >
+                        {col.questionText?.substring(0, 25) || `Q${col.qqId}`}
+                        {col.isMQT && (
+                          <Badge bg="info" className="ms-1" style={{ fontSize: "0.6rem" }}>MQT</Badge>
+                        )}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {parsedRows.map((row, rowIdx) => {
+                    const hasErrors = row.rowErrors.length > 0;
+                    const noName = !row.name.trim();
+                    const weakMatch = !row.dob && !row.phone && !noName;
 
-            <div className="d-flex align-items-center gap-3">
+                    return (
+                      <tr
+                        key={rowIdx}
+                        className={noName ? "table-danger" : hasErrors ? "table-danger" : weakMatch ? "table-warning" : ""}
+                        title={row.rowErrors.length > 0 ? row.rowErrors.join("; ") : weakMatch ? "No DOB or phone - may create duplicate" : ""}
+                      >
+                        <td>{rowIdx + 1}</td>
+                        <td>
+                          <input
+                            type="text"
+                            className={`form-control form-control-sm ${noName ? "is-invalid" : ""}`}
+                            value={row.name}
+                            onChange={(e) => handleFieldChange(rowIdx, "name", e.target.value)}
+                            style={{ minWidth: "130px" }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            className="form-control form-control-sm"
+                            value={row.dob}
+                            onChange={(e) => handleFieldChange(rowIdx, "dob", e.target.value)}
+                            placeholder="dd-MM-yyyy"
+                            style={{ minWidth: "100px" }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            className="form-control form-control-sm"
+                            value={row.phone}
+                            onChange={(e) => handleFieldChange(rowIdx, "phone", e.target.value)}
+                            style={{ minWidth: "110px" }}
+                          />
+                        </td>
+                        {previewColumns.map((col) => {
+                          const optionId = row.answers[col.qqId];
+                          const hasAnswerError = row.rowErrors.some(
+                            (err) => err.includes(`${col.qqId}`)
+                          );
+
+                          return (
+                            <td
+                              key={col.qqId}
+                              className={hasAnswerError ? "table-danger" : ""}
+                            >
+                              <select
+                                className="form-select form-select-sm"
+                                value={optionId ?? ""}
+                                onChange={(e) =>
+                                  handleAnswerChange(
+                                    rowIdx,
+                                    col.qqId,
+                                    e.target.value === "" ? null : Number(e.target.value)
+                                  )
+                                }
+                              >
+                                <option value="">-- Skip --</option>
+                                {col.options.map((opt) => (
+                                  <option key={opt.optionId} value={opt.optionId}>
+                                    {opt.optionText}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Section 5: Submit */}
+        {mappingApplied && parsedRows.length > 0 && mappingData && (
+          <div className="card card-body bg-light">
+            <div className="d-flex align-items-center gap-3 flex-wrap">
               <Button
                 variant="success"
                 size="lg"
@@ -1031,22 +901,31 @@ const OfflineAssessmentUploadPage = () => {
 
               {submitResult && submitResult.status === "success" && (
                 <Alert variant="success" className="mb-0 flex-grow-1">
-                  Successfully processed{" "}
-                  <strong>{submitResult.studentsProcessed}</strong> students.
+                  <strong>Upload complete.</strong>
+                  <div>Students processed: <strong>{submitResult.studentsProcessed}</strong></div>
+                  {submitResult.matchSummary && (
+                    <div>
+                      Matched existing: <Badge bg="primary">{submitResult.matchSummary.matched}</Badge>{" "}
+                      Newly created: <Badge bg="success">{submitResult.matchSummary.created}</Badge>{" "}
+                      Failed: <Badge bg={submitResult.matchSummary.failed > 0 ? "danger" : "secondary"}>{submitResult.matchSummary.failed}</Badge>
+                    </div>
+                  )}
                   {submitResult.errors?.length > 0 && (
-                    <span className="text-danger ms-2">
-                      {submitResult.errors.length} error(s):
+                    <div className="mt-2">
+                      <strong>Errors:</strong>
                       {submitResult.errors.map((err: any, i: number) => (
-                        <div key={i}>Student {err.userStudentId}: {err.error}</div>
+                        <div key={i} className="text-danger">
+                          Row {(err.rowIndex ?? 0) + 1} ({err.name}): {err.error}
+                        </div>
                       ))}
-                    </span>
+                    </div>
                   )}
                 </Alert>
               )}
 
               {submitResult && submitResult.status === "error" && (
                 <Alert variant="danger" className="mb-0 flex-grow-1">
-                  Submission failed: {submitResult.message}
+                  Submission failed: {typeof submitResult.message === "string" ? submitResult.message : JSON.stringify(submitResult.message)}
                 </Alert>
               )}
             </div>

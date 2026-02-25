@@ -1,6 +1,5 @@
 package com.kccitm.api.controller.career9;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -16,10 +15,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.model.career9.AssessmentQuestions;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.Questionaire.Questionnaire;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
+import com.kccitm.api.repository.Career9.AssessmentQuestionRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireRepository;
 
@@ -35,6 +36,9 @@ public class AssessmentTableController {
 
     @Autowired
     private QuestionnaireRepository questionnaireRepository;
+
+    @Autowired
+    private AssessmentQuestionRepository assessmentQuestionRepository;
 
     @GetMapping("/getAll")
     // @org.springframework.transaction.annotation.Transactional(readOnly = true)
@@ -217,6 +221,76 @@ public class AssessmentTableController {
         assessmentTableRepository.findAll()
                 .forEach(assessment -> assessmentIdandName.put(assessment.getId(), assessment.getAssessmentName()));
         return assessmentIdandName;
+    }
+
+    // Lock an assessment
+    @PutMapping("/{id}/lock")
+    public ResponseEntity<AssessmentTable> lockAssessment(@PathVariable Long id) {
+        Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
+        if (assessmentOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        AssessmentTable assessment = assessmentOpt.get();
+        assessment.setIsLocked(true);
+        return ResponseEntity.ok(assessmentTableRepository.save(assessment));
+    }
+
+    // Unlock an assessment
+    @PutMapping("/{id}/unlock")
+    public ResponseEntity<AssessmentTable> unlockAssessment(@PathVariable Long id) {
+        Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
+        if (assessmentOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        AssessmentTable assessment = assessmentOpt.get();
+        assessment.setIsLocked(false);
+        return ResponseEntity.ok(assessmentTableRepository.save(assessment));
+    }
+
+    // Check if an assessment is locked by questionnaire ID
+    @GetMapping("/is-locked-by-questionnaire/{questionnaireId}")
+    public ResponseEntity<HashMap<String, Object>> isLockedByQuestionnaire(
+            @PathVariable Long questionnaireId) {
+        HashMap<String, Object> response = new HashMap<>();
+        List<AssessmentTable> assessments = assessmentTableRepository
+                .findByQuestionnaireQuestionnaireId(questionnaireId);
+        // If any linked assessment is locked, treat as locked
+        AssessmentTable lockedAssessment = assessments.stream()
+                .filter(a -> Boolean.TRUE.equals(a.getIsLocked()))
+                .findFirst().orElse(null);
+        if (lockedAssessment != null) {
+            response.put("isLocked", true);
+            response.put("assessmentId", lockedAssessment.getId());
+            response.put("assessmentName", lockedAssessment.getAssessmentName());
+        } else {
+            response.put("isLocked", false);
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    // Check if an assessment is locked by question ID (traverses question -> section -> questionnaire -> assessment)
+    @GetMapping("/is-locked-by-question/{questionId}")
+    public ResponseEntity<HashMap<String, Object>> isLockedByQuestion(
+            @PathVariable Long questionId) {
+        HashMap<String, Object> response = new HashMap<>();
+        Optional<AssessmentQuestions> questionOpt = assessmentQuestionRepository.findById(questionId);
+        if (questionOpt.isEmpty() || questionOpt.get().getSection() == null) {
+            response.put("isLocked", false);
+            return ResponseEntity.ok(response);
+        }
+        Long sectionId = questionOpt.get().getSection().getSectionId();
+        List<AssessmentTable> assessments = assessmentTableRepository.findByQuestionSectionId(sectionId);
+        AssessmentTable lockedAssessment = assessments.stream()
+                .filter(a -> Boolean.TRUE.equals(a.getIsLocked()))
+                .findFirst().orElse(null);
+        if (lockedAssessment != null) {
+            response.put("isLocked", true);
+            response.put("assessmentId", lockedAssessment.getId());
+            response.put("assessmentName", lockedAssessment.getAssessmentName());
+        } else {
+            response.put("isLocked", false);
+        }
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/startAssessment")

@@ -141,7 +141,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                         "/**/**/**", "/**/**/**/**","/dashboard/game-results/*",
                         "/languages/**","/game-results/*",
                         "/question-sections/**", "/language-supported/*", "/contact-person/**",
-                        "/assessment-questions/*/*", "/assessment-questions/*", "/assessments/*", "/api/**",
+                        "/assessment-questions/*/*", "/assessment-questions/*", "/assessments/*", "/assessments/**", "/api/**",
                         "/api/**/**", "/api/**/**/**", "/api/assessment-questions/**",
                         "/api/question-sections/**", "/api/assessment-questions/*/*", "/api/firebase/*/*",
                         "/api/firebase/*", "/api/firebase/*", "/actuator/*", "/auth/**", "/oauth2/callback/google/*",

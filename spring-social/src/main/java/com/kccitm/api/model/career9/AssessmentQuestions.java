@@ -29,6 +29,9 @@ public class AssessmentQuestions implements Serializable {
     private String questionText;
     private String questionType;
 
+    @Column(name="isMQTtyped", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
+    private Boolean isMQTtyped;
+
     @Column(name = "is_mqt", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
     private Boolean isMQT;
 
@@ -166,5 +169,13 @@ public class AssessmentQuestions implements Serializable {
                 ", questionType='" + questionType + '\'' +
                 ", section=" + (section != null ? section.getSectionId() : null) +
                 '}';
+    }
+
+    public Boolean getIsMQTtyped() {
+        return isMQTtyped;
+    }
+
+    public void setIsMQTtyped(Boolean isMQTtyped) {
+        this.isMQTtyped = isMQTtyped;
     }
 }

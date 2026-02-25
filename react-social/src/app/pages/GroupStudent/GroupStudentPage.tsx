@@ -668,10 +668,16 @@ export default function GroupStudentPage() {
     }
 
     try {
-      // Build section ID → {className, sectionName} lookup
+      // Build section ID → {className, sectionName} lookup from full hierarchy (not deduped)
       const sectionLookup = new Map<number, { className: string; sectionName: string }>();
-      for (const sec of allSectionsFlat) {
-        sectionLookup.set(sec.id, { className: sec.className, sectionName: sec.sectionName });
+      for (const session of hierarchyData) {
+        for (const cls of session.schoolClasses || []) {
+          for (const sec of cls.schoolSections || []) {
+            if (!sectionLookup.has(sec.id)) {
+              sectionLookup.set(sec.id, { className: cls.className, sectionName: sec.sectionName });
+            }
+          }
+        }
       }
 
       // Prepare data for Excel
