@@ -82,6 +82,9 @@ public class AssessmentInstituteMappingController {
     @Autowired
     private SmtpEmailService gmailApiEmailService;
 
+    @Autowired
+    private com.kccitm.api.service.CareerNineRollNumberService rollNumberService;
+
     // ============ ADMIN ENDPOINTS ============
 
     @PostMapping("/create")
@@ -295,6 +298,13 @@ public class AssessmentInstituteMappingController {
             user.setPhone(phone);
             user = userRepository.save(user);
 
+            // Generate and set careerNineRollNumber
+            String rollNumber = rollNumberService.generateNextRollNumber(instituteCode, schoolSectionId);
+            if (rollNumber != null) {
+                user.setCareerNineRollNumber(rollNumber);
+                user = userRepository.save(user);
+            }
+
             // Create StudentInfo
             StudentInfo studentInfo = new StudentInfo();
             studentInfo.setName(name);
@@ -356,6 +366,15 @@ public class AssessmentInstituteMappingController {
                 existingUser.setName(existingStudentInfo.getName());
                 existingUser.setEmail(existingStudentInfo.getEmail());
                 existingUser = userRepository.save(existingUser);
+
+                // Generate and set careerNineRollNumber
+                String edgeRollNumber = rollNumberService.generateNextRollNumber(
+                        instituteCode, existingStudentInfo.getSchoolSectionId());
+                if (edgeRollNumber != null) {
+                    existingUser.setCareerNineRollNumber(edgeRollNumber);
+                    existingUser = userRepository.save(existingUser);
+                }
+
                 existingStudentInfo.setUser(existingUser);
                 studentInfoRepository.save(existingStudentInfo);
             }

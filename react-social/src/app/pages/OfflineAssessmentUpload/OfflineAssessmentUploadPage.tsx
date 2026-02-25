@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import { Spinner, Button, Form, Badge, Alert } from "react-bootstrap";
 import * as XLSX from "xlsx";
-import { ReadCollegeData } from "../College/API/College_APIs";
+import { ReadCollegeData, GetSessionsByInstituteCode } from "../College/API/College_APIs";
 import { getAssessmentMappingsByInstitute, getAssessmentSummaryList } from "../AssessmentMapping/API/AssessmentMapping_APIs";
-import { getOfflineMapping, bulkSubmitWithStudents } from "./API/OfflineUpload_APIs";
+import { getOfflineMapping, bulkSubmitByRollNumber } from "./API/OfflineUpload_APIs";
 
 // ============ Interfaces ============
 
@@ -41,9 +41,7 @@ interface MappingData {
 }
 
 interface ParsedRow {
-  name: string;
-  dob: string;
-  phone: string;
+  rollNumber: string;
   answers: { [questionnaireQuestionId: number]: number | null };
   rowErrors: string[];
 }
@@ -93,28 +91,6 @@ const resolveOptionId = (
   return { optionId: null, error: `Unrecognized value: "${val}"` };
 };
 
-/** Normalize Excel date value to dd-MM-yyyy string */
-const normalizeDob = (raw: any): string => {
-  if (raw === null || raw === undefined || raw === "") return "";
-  if (raw instanceof Date) {
-    const d = raw.getDate().toString().padStart(2, "0");
-    const m = (raw.getMonth() + 1).toString().padStart(2, "0");
-    const y = raw.getFullYear();
-    return `${d}-${m}-${y}`;
-  }
-  const str = String(raw).trim();
-  if (/^\d{2}-\d{2}-\d{4}$/.test(str)) return str;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-    const [y, m, d] = str.split("-");
-    return `${d}-${m}-${y}`;
-  }
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
-    const [d, m, y] = str.split("/");
-    return `${d}-${m}-${y}`;
-  }
-  return str;
-};
-
 // ============ Component ============
 
 const OfflineAssessmentUploadPage = () => {
@@ -136,7 +112,7 @@ const OfflineAssessmentUploadPage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Mapping: DB field key → Excel header ---
-  // Keys: "name", "dob", "phone", "q_{qqId}", "mqt_{qqId}_{optionId}"
+  // Keys: "rollNumber", "q_{qqId}", "mqt_{qqId}_{optionId}"
   const [fieldToHeader, setFieldToHeader] = useState<Record<string, string>>({});
   const [mappingApplied, setMappingApplied] = useState(false);
 
@@ -156,10 +132,8 @@ const OfflineAssessmentUploadPage = () => {
       type: "identity" | "question" | "mqt_option";
     }[] = [];
 
-    // Identity fields first
-    rows.push({ key: "name", label: "Student Name", sectionName: "Student Identity", isMQT: false, type: "identity" });
-    rows.push({ key: "dob", label: "Date of Birth", sectionName: "Student Identity", isMQT: false, type: "identity" });
-    rows.push({ key: "phone", label: "Phone Number", sectionName: "Student Identity", isMQT: false, type: "identity" });
+    // Identity field: Roll Number only
+    rows.push({ key: "rollNumber", label: "Career Nine Roll Number", sectionName: "Student Identity", isMQT: false, type: "identity" });
 
     // Questions grouped by section
     for (const section of mappingData.sections) {
@@ -230,8 +204,8 @@ const OfflineAssessmentUploadPage = () => {
   // Mapping validation
   const mappingValidation = useMemo(() => {
     const issues: string[] = [];
-    const hasName = !!fieldToHeader["name"];
-    if (!hasName) issues.push("Map a column to 'Student Name' (required)");
+    const hasRollNumber = !!fieldToHeader["rollNumber"];
+    if (!hasRollNumber) issues.push("Map a column to 'Roll Number' (required)");
 
     const mappedQQIds = new Set<number>();
     for (const key of Object.keys(fieldToHeader)) {
@@ -246,7 +220,7 @@ const OfflineAssessmentUploadPage = () => {
       issues.push(`${mappedQQIds.size} of ${totalQuestions} questions mapped`);
     }
 
-    return { issues, hasName, mappedCount: mappedQQIds.size };
+    return { issues, hasRollNumber, mappedCount: mappedQQIds.size };
   }, [fieldToHeader, mappingData]);
 
   // ============ Load data ============
@@ -379,16 +353,13 @@ const OfflineAssessmentUploadPage = () => {
       setExcelHeaders(headers);
       setRawExcelData(jsonData);
 
-      // Auto-detect: try to map identity columns by common names
+      // Auto-detect: try to map roll number column by common names
       const autoMap: Record<string, string> = {};
       for (const header of headers) {
         const lower = header.toLowerCase().trim();
-        if (lower === "name" || lower === "student name" || lower === "student_name") {
-          autoMap["name"] = header;
-        } else if (lower === "dob" || lower === "date of birth" || lower === "date_of_birth" || lower === "birth date") {
-          autoMap["dob"] = header;
-        } else if (lower === "phone" || lower === "phone number" || lower === "phone_number" || lower === "mobile" || lower === "mobile number") {
-          autoMap["phone"] = header;
+        if (lower === "roll number" || lower === "rollnumber" || lower === "roll_number"
+          || lower === "career nine roll number" || lower === "careerninerollnumber") {
+          autoMap["rollNumber"] = header;
         }
       }
       setFieldToHeader(autoMap);
@@ -420,31 +391,19 @@ const OfflineAssessmentUploadPage = () => {
   const handleApplyMapping = () => {
     if (!mappingData || rawExcelData.length === 0) return;
 
-    const nameHeader = fieldToHeader["name"];
-    const dobHeader = fieldToHeader["dob"];
-    const phoneHeader = fieldToHeader["phone"];
+    const rollNumberHeader = fieldToHeader["rollNumber"];
 
     const rows = rawExcelData.map((row) => {
       const rowErrors: string[] = [];
 
-      const name = nameHeader ? String(row[nameHeader] ?? "").trim() : "";
-      if (!name) rowErrors.push("Name is required");
-
-      let dob = "";
-      if (dobHeader) {
-        dob = normalizeDob(row[dobHeader]);
-        if (dob && !/^\d{2}-\d{2}-\d{4}$/.test(dob)) {
-          rowErrors.push(`DOB "${row[dobHeader]}" could not be parsed to dd-MM-yyyy`);
-        }
-      }
-
-      const phone = phoneHeader ? String(row[phoneHeader] ?? "").trim() : "";
+      const rollNumber = rollNumberHeader ? String(row[rollNumberHeader] ?? "").trim() : "";
+      if (!rollNumber) rowErrors.push("Roll number is required");
 
       const answers: { [qqId: number]: number | null } = {};
       const mqtSelections: Record<number, number[]> = {};
 
       for (const [fieldKey, excelHeader] of Object.entries(fieldToHeader)) {
-        if (fieldKey === "name" || fieldKey === "dob" || fieldKey === "phone") continue;
+        if (fieldKey === "rollNumber") continue;
 
         const cellVal = row[excelHeader];
 
@@ -481,7 +440,7 @@ const OfflineAssessmentUploadPage = () => {
         }
       }
 
-      return { name, dob, phone, answers, rowErrors };
+      return { rollNumber, answers, rowErrors };
     });
 
     setParsedRows(rows);
@@ -490,10 +449,10 @@ const OfflineAssessmentUploadPage = () => {
 
   // ============ Edit Handlers ============
 
-  const handleFieldChange = (rowIndex: number, field: "name" | "dob" | "phone", value: string) => {
+  const handleRollNumberChange = (rowIndex: number, value: string) => {
     setParsedRows((prev) => {
       const updated = [...prev];
-      updated[rowIndex] = { ...updated[rowIndex], [field]: value };
+      updated[rowIndex] = { ...updated[rowIndex], rollNumber: value };
       return updated;
     });
   };
@@ -513,9 +472,9 @@ const OfflineAssessmentUploadPage = () => {
   const handleSubmit = async () => {
     if (!mappingData || parsedRows.length === 0) return;
 
-    const rowsWithNameError = parsedRows.filter((r) => !r.name.trim());
-    if (rowsWithNameError.length > 0) {
-      alert(`${rowsWithNameError.length} row(s) have no student name. Please fix before submitting.`);
+    const rowsWithNoRoll = parsedRows.filter((r) => !r.rollNumber.trim());
+    if (rowsWithNoRoll.length > 0) {
+      alert(`${rowsWithNoRoll.length} row(s) have no roll number. Please fix before submitting.`);
       return;
     }
 
@@ -530,9 +489,7 @@ const OfflineAssessmentUploadPage = () => {
 
     try {
       const students = parsedRows.map((row) => ({
-        name: row.name.trim(),
-        dob: row.dob || undefined,
-        phone: row.phone || undefined,
+        rollNumber: row.rollNumber.trim(),
         answers: Object.entries(row.answers)
           .filter(([, optId]) => optId !== null)
           .map(([qqId, optId]) => ({
@@ -541,7 +498,7 @@ const OfflineAssessmentUploadPage = () => {
           })),
       }));
 
-      const res = await bulkSubmitWithStudents({
+      const res = await bulkSubmitByRollNumber({
         assessmentId: mappingData.assessmentId,
         instituteId: Number(selectedInstitute),
         students,
@@ -662,7 +619,8 @@ const OfflineAssessmentUploadPage = () => {
             </div>
             <div className="mt-2">
               <small className="text-muted">
-                Upload any Excel file with one student per row. You will map its columns to questions next.
+                Upload any Excel file with one student per row. Students are matched by their <strong>Career Nine Roll Number</strong>.
+                You will map columns to questions next.
               </small>
             </div>
           </div>
@@ -683,7 +641,7 @@ const OfflineAssessmentUploadPage = () => {
                   variant="primary"
                   size="sm"
                   onClick={handleApplyMapping}
-                  disabled={!mappingValidation.hasName || mappingValidation.mappedCount === 0}
+                  disabled={!mappingValidation.hasRollNumber || mappingValidation.mappedCount === 0}
                 >
                   Apply Mapping & Preview
                 </Button>
@@ -718,7 +676,7 @@ const OfflineAssessmentUploadPage = () => {
                               {row.isMQT && (
                                 <Badge bg="info" className="ms-1" style={{ fontSize: "0.65rem" }}>MQT</Badge>
                               )}
-                              {row.key === "name" && (
+                              {row.key === "rollNumber" && (
                                 <Badge bg="danger" className="ms-1" style={{ fontSize: "0.65rem" }}>Required</Badge>
                               )}
                             </td>
@@ -783,9 +741,7 @@ const OfflineAssessmentUploadPage = () => {
                 <thead style={{ position: "sticky", top: 0, zIndex: 2, backgroundColor: "#212529", color: "#fff" }}>
                   <tr>
                     <th style={{ minWidth: "40px", backgroundColor: "#212529", color: "#fff" }}>#</th>
-                    <th style={{ minWidth: "150px", backgroundColor: "#212529", color: "#fff" }}>Name</th>
-                    <th style={{ minWidth: "110px", backgroundColor: "#212529", color: "#fff" }}>DOB</th>
-                    <th style={{ minWidth: "120px", backgroundColor: "#212529", color: "#fff" }}>Phone</th>
+                    <th style={{ minWidth: "150px", backgroundColor: "#212529", color: "#fff" }}>Roll Number</th>
                     {previewColumns.map((col) => (
                       <th
                         key={col.qqId}
@@ -803,42 +759,22 @@ const OfflineAssessmentUploadPage = () => {
                 <tbody>
                   {parsedRows.map((row, rowIdx) => {
                     const hasErrors = row.rowErrors.length > 0;
-                    const noName = !row.name.trim();
-                    const weakMatch = !row.dob && !row.phone && !noName;
+                    const noRoll = !row.rollNumber.trim();
 
                     return (
                       <tr
                         key={rowIdx}
-                        className={noName ? "table-danger" : hasErrors ? "table-danger" : weakMatch ? "table-warning" : ""}
-                        title={row.rowErrors.length > 0 ? row.rowErrors.join("; ") : weakMatch ? "No DOB or phone - may create duplicate" : ""}
+                        className={noRoll ? "table-danger" : hasErrors ? "table-danger" : ""}
+                        title={row.rowErrors.length > 0 ? row.rowErrors.join("; ") : ""}
                       >
                         <td>{rowIdx + 1}</td>
                         <td>
                           <input
                             type="text"
-                            className={`form-control form-control-sm ${noName ? "is-invalid" : ""}`}
-                            value={row.name}
-                            onChange={(e) => handleFieldChange(rowIdx, "name", e.target.value)}
+                            className={`form-control form-control-sm ${noRoll ? "is-invalid" : ""}`}
+                            value={row.rollNumber}
+                            onChange={(e) => handleRollNumberChange(rowIdx, e.target.value)}
                             style={{ minWidth: "130px" }}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            value={row.dob}
-                            onChange={(e) => handleFieldChange(rowIdx, "dob", e.target.value)}
-                            placeholder="dd-MM-yyyy"
-                            style={{ minWidth: "100px" }}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="text"
-                            className="form-control form-control-sm"
-                            value={row.phone}
-                            onChange={(e) => handleFieldChange(rowIdx, "phone", e.target.value)}
-                            style={{ minWidth: "110px" }}
                           />
                         </td>
                         {previewColumns.map((col) => {
@@ -905,8 +841,7 @@ const OfflineAssessmentUploadPage = () => {
                   <div>Students processed: <strong>{submitResult.studentsProcessed}</strong></div>
                   {submitResult.matchSummary && (
                     <div>
-                      Matched existing: <Badge bg="primary">{submitResult.matchSummary.matched}</Badge>{" "}
-                      Newly created: <Badge bg="success">{submitResult.matchSummary.created}</Badge>{" "}
+                      Matched by roll number: <Badge bg="primary">{submitResult.matchSummary.matched}</Badge>{" "}
                       Failed: <Badge bg={submitResult.matchSummary.failed > 0 ? "danger" : "secondary"}>{submitResult.matchSummary.failed}</Badge>
                     </div>
                   )}
@@ -915,7 +850,7 @@ const OfflineAssessmentUploadPage = () => {
                       <strong>Errors:</strong>
                       {submitResult.errors.map((err: any, i: number) => (
                         <div key={i} className="text-danger">
-                          Row {(err.rowIndex ?? 0) + 1} ({err.name}): {err.error}
+                          Row {(err.rowIndex ?? 0) + 1} (Roll: {err.rollNumber}): {err.error}
                         </div>
                       ))}
                     </div>
