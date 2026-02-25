@@ -1085,7 +1085,7 @@ const QuestionareEditSinglePage: React.FC = () => {
                         <>
                           <div className="alert alert-info mb-4">
                             <i className="fas fa-info-circle me-2"></i>
-                            Provide specific instructions for each section. English instructions are required, other languages are optional.
+                            Provide specific instructions for each section. All section instructions are optional.
                           </div>
 
                           {values.sectionIds.map((sectionId) => {
@@ -1099,11 +1099,11 @@ const QuestionareEditSinglePage: React.FC = () => {
                                   {sectionName}
                                 </h5>
                                 
-                                {/* English Instructions (Required) */}
+                                {/* English Instructions (Optional) */}
                                 <div className="fv-row mb-4">
-                                  <label className="required fs-6 fw-bold mb-2">
+                                  <label className="fs-6 fw-bold mb-2">
                                     <i className="fas fa-flag text-muted me-1"></i>
-                                    English Instructions:
+                                    English Instructions (Optional):
                                   </label>
                                   <Field name={`sectionInstructions.${sectionId}.English`}>
                                     {({ field }: any) => (
