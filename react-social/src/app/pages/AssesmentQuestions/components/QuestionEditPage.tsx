@@ -9,6 +9,7 @@ import * as Yup from "yup";
 import { ReadQuestionSectionData, ReadQuestionSectionDataList } from "../../QuestionSections/API/Question_Section_APIs";
 import { CreateQuestionData, UpdateQuestionData, ReadMeasuredQualityTypes, ReadQuestionByIdData } from "../API/Question_APIs";
 import { ListGamesData } from "../../Games/components/API/GAME_APIs";
+import { CheckLockedByQuestion } from "../../CreateAssessment/API/Create_Assessment_APIs";
 
 const validationSchema = Yup.object().shape({
   questionText: Yup.string().required("Question text is required"),
@@ -34,6 +35,7 @@ interface Option {
 
 const QuestionEditPage = (props?: { setPageLoading?: any }) => {
   const [loading, setLoading] = useState(true);
+  const [isAssessmentLocked, setIsAssessmentLocked] = useState(false);
   const [sections, setSections] = useState<any[]>([]);
   const [mqt, setMqt] = useState<any[]>([]);
   const [questionData, setQuestionData] = useState<any>({
@@ -322,6 +324,16 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
           gamesResult = [];
         }
         setGames(gamesResult);
+
+        // Check if this question's assessment is locked
+        if (id) {
+          try {
+            const lockRes = await CheckLockedByQuestion(id);
+            setIsAssessmentLocked(lockRes.data?.isLocked === true);
+          } catch (err) {
+            setIsAssessmentLocked(false);
+          }
+        }
       } finally {
         // Mark data as loaded so enableReinitialize gets disabled
         // after formik picks up the real initialValues
@@ -345,6 +357,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
       questionType: questionData.questionType || "",
       maxOptionsAllowed: questionData.maxOptionsAllowed || 0,
       isMQT: questionData.isMQT ?? false,
+      isMQTtyped: questionData.isMQTtyped ?? false,
       section: questionData.section && typeof questionData.section === "object" && "sectionId" in questionData.section
         ? { sectionId: String(questionData.section.sectionId) }
         : questionData.section
@@ -427,6 +440,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
           questionType: values.questionType,
           maxOptionsAllowed: Number(values.maxOptionsAllowed) || 0,
           isMQT: values.isMQT,
+          isMQTtyped: values.isMQTtyped,
           options,
           section: { sectionId: values.section.sectionId },
         };
@@ -552,6 +566,24 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
     }
   };
 
+
+  if (isAssessmentLocked) {
+    return (
+      <div className="container py-5">
+        <div className="card shadow-sm">
+          <div className="card-body text-center py-5">
+            <h2 className="mb-4">Question Locked</h2>
+            <p className="text-muted fs-5">
+              This question cannot be edited as there is an active assessment going on.
+            </p>
+            <button className="btn btn-secondary mt-3" onClick={() => navigate(-1)}>
+              Go Back
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container py-5">
@@ -1014,8 +1046,8 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
               </div>
             )}
 
-            {/* isMQT Toggle */}
-            <div className="fv-row mb-7">
+            {/* isMQT and isMQTtyped Toggles */}
+            <div className="fv-row mb-7 d-flex gap-5">
               <div className="form-check form-switch">
                 <input
                   className="form-check-input"
@@ -1027,6 +1059,19 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                 />
                 <label className="form-check-label fs-6 fw-bold" htmlFor="isMQTToggleEdit">
                   isMQT
+                </label>
+              </div>
+              <div className="form-check form-switch">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  id="isMQTtypedToggleEdit"
+                  checked={formik.values.isMQTtyped || false}
+                  onChange={() => formik.setFieldValue("isMQTtyped", !formik.values.isMQTtyped)}
+                />
+                <label className="form-check-label fs-6 fw-bold" htmlFor="isMQTtypedToggleEdit">
+                  isMQTtyped
                 </label>
               </div>
             </div>

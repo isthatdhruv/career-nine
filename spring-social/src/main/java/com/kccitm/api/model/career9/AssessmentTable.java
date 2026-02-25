@@ -45,6 +45,9 @@ public class AssessmentTable implements java.io.Serializable {
     @Column(name = "show_timer", columnDefinition = "BOOLEAN DEFAULT TRUE")
     private Boolean showTimer = true;
 
+    @Column(name = "is_locked", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean isLocked = false;
+
 
     public Long getId() {
         return id;
@@ -119,6 +122,14 @@ public class AssessmentTable implements java.io.Serializable {
 
     public void setShowTimer(Boolean showTimer) {
         this.showTimer = showTimer;
+    }
+
+    public Boolean getIsLocked() {
+        return isLocked;
+    }
+
+    public void setIsLocked(Boolean isLocked) {
+        this.isLocked = isLocked;
     }
 
 }

@@ -35,6 +35,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const [selectedGameId, setSelectedGameId] = useState<string>("");
 
   const [isMQT, setIsMQT] = useState(false);
+  const [isMQTtyped, setIsMQTtyped] = useState(false);
 
   const initialValues = {
     questionText: "",
@@ -314,6 +315,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                 questionType: formikValues.questionType,
                 maxOptionsAllowed: Number(formikValues.maxOptionsAllowed) || 0,
                 isMQT: isMQT,
+                isMQTtyped: isMQTtyped,
                 options,
                 section: { sectionId: Number(formikValues.sectionId) },
                 flag: useMQTAsOptions ? 1 : 0
@@ -643,7 +645,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                 The options below serve as reference options for autocomplete suggestions and scoring after admin mapping.
               </div>
             )}
-            <div className="fv-row mb-7">
+            <div className="fv-row mb-7 d-flex gap-5">
               <div className="form-check form-switch">
                 <input
                   className="form-check-input"
@@ -655,6 +657,19 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                 />
                 <label className="form-check-label fs-6 fw-bold" htmlFor="isMQTToggle">
                   isMQT
+                </label>
+              </div>
+              <div className="form-check form-switch">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  role="switch"
+                  id="isMQTtypedToggle"
+                  checked={isMQTtyped}
+                  onChange={() => setIsMQTtyped(v => !v)}
+                />
+                <label className="form-check-label fs-6 fw-bold" htmlFor="isMQTtypedToggle">
+                  isMQTtyped
                 </label>
               </div>
             </div>

@@ -11,6 +11,7 @@ import { ReadQuestionSectionData } from "../../../QuestionSections/API/Question_
 import { ReadToolData } from "../../../Tool/API/Tool_APIs";
 import { ReadQuestionsDataList, ReadQuestionByIdData } from "../../../AssesmentQuestions/API/Question_APIs";
 import { ReadLanguageData, ReadQuestionaireById, UpdateQuestionaire } from "../../API/Create_Questionaire_APIs";
+import { CheckLockedByQuestionnaire } from "../../API/Create_Assessment_APIs";
 
 // Component imports
 import CollegeCreateModal from "../../../College/components/CollegeCreateModal";
@@ -76,6 +77,7 @@ const QuestionareEditSinglePage: React.FC = () => {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   const [pageLoadingState, setPageLoadingState] = useState(["false"]);
+  const [isAssessmentLocked, setIsAssessmentLocked] = useState(false);
   
   // Question assignment state
   const [selectedSectionForQuestions, setSelectedSectionForQuestions] = useState<string>("");
@@ -209,6 +211,16 @@ const QuestionareEditSinglePage: React.FC = () => {
         fetchLanguages(),
         fetchQuestionnaireData(),
       ]);
+      // Check if the questionnaire's assessment is locked
+      if (id) {
+        try {
+          const lockRes = await CheckLockedByQuestionnaire(id);
+          setIsAssessmentLocked(lockRes.data?.isLocked === true);
+        } catch (err) {
+          // If no assessment linked, treat as unlocked
+          setIsAssessmentLocked(false);
+        }
+      }
       setDataLoading(false);
     };
 
@@ -590,6 +602,28 @@ const QuestionareEditSinglePage: React.FC = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAssessmentLocked) {
+    return (
+      <div className="container-fluid py-5">
+        <div className="row justify-content-center">
+          <div className="col-12 col-xl-8">
+            <div className="card shadow-sm">
+              <div className="card-body text-center py-5">
+                <h2 className="mb-4">Questionnaire Locked</h2>
+                <p className="text-muted fs-5">
+                  This questionnaire cannot be edited as there is an active assessment going on.
+                </p>
+                <button className="btn btn-secondary mt-3" onClick={() => navigate("/questionaire/List")}>
+                  Go Back to List
+                </button>
               </div>
             </div>
           </div>

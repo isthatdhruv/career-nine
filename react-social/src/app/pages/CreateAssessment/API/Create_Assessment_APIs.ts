@@ -46,3 +46,19 @@ export function DeactivateAssessment(id: any, currentData: any) {
     isActive: false,
   });
 }
+
+export function LockAssessment(id: any) {
+  return axios.put(`${API_URL}/assessments/${id}/lock`);
+}
+
+export function UnlockAssessment(id: any) {
+  return axios.put(`${API_URL}/assessments/${id}/unlock`);
+}
+
+export function CheckLockedByQuestionnaire(questionnaireId: any) {
+  return axios.get(`${API_URL}/assessments/is-locked-by-questionnaire/${questionnaireId}`);
+}
+
+export function CheckLockedByQuestion(questionId: any) {
+  return axios.get(`${API_URL}/assessments/is-locked-by-question/${questionId}`);
+}

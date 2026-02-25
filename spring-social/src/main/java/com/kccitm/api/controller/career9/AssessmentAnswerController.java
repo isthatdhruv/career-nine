@@ -1,10 +1,13 @@
 package com.kccitm.api.controller.career9;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import javax.transaction.Transactional;
 
@@ -41,6 +44,12 @@ import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.model.userDefinedModel.StudentDashboardResponse;
 import com.kccitm.api.model.userDefinedModel.StudentDashboardResponse.*;
 import com.kccitm.api.model.career9.MeasuredQualities;
+import com.kccitm.api.model.career9.StudentInfo;
+import com.kccitm.api.model.career9.school.InstituteDetail;
+import com.kccitm.api.model.User;
+import com.kccitm.api.repository.Career9.StudentInfoRepository;
+import com.kccitm.api.repository.UserRepository;
+import com.kccitm.api.repository.InstituteDetailRepository;
 
 @RestController
 @RequestMapping("/assessment-answer")
@@ -68,6 +77,15 @@ public class AssessmentAnswerController {
 
     @Autowired
     private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
+
+    @Autowired
+    private StudentInfoRepository studentInfoRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private InstituteDetailRepository instituteDetailRepository;
 
     @GetMapping(value = "/getByStudent/{studentId}", headers = "Accept=application/json")
     public List<AssessmentAnswer> getAssessmentAnswersByStudent(@PathVariable("studentId") Long studentId) {
@@ -445,6 +463,229 @@ public class AssessmentAnswerController {
             result.put("status", "success");
             result.put("studentsProcessed", successCount);
             result.put("errors", errors);
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        }
+    }
+
+    // ============ BULK SUBMIT WITH STUDENT AUTO-CREATION ============
+
+    /** Simple wrapper to indicate whether a student was matched or created. */
+    private static class ResolveResult {
+        final UserStudent userStudent;
+        final boolean created;
+        ResolveResult(UserStudent userStudent, boolean created) {
+            this.userStudent = userStudent;
+            this.created = created;
+        }
+    }
+
+    /**
+     * Resolve an existing student or create a new one.
+     * Matching tiers: (1) name+DOB+institute, (2) name+phone+institute, (3) name+institute if unique.
+     */
+    private ResolveResult resolveOrCreateUserStudent(
+            String name, Date dob, String phone, Integer instituteId, InstituteDetail institute) {
+
+        // Tier 1: name + DOB + institute
+        if (dob != null) {
+            List<StudentInfo> candidates = studentInfoRepository
+                    .findByNameIgnoreCaseAndStudentDobAndInstituteId(name, dob, instituteId);
+            if (candidates.size() == 1) {
+                Optional<UserStudent> us = userStudentRepository.findByStudentInfo(candidates.get(0));
+                if (us.isPresent()) return new ResolveResult(us.get(), false);
+                return new ResolveResult(userStudentRepository.save(
+                        new UserStudent(candidates.get(0).getUser(), candidates.get(0), institute)), false);
+            }
+        }
+
+        // Tier 2: name + phone + institute
+        if (phone != null && !phone.isEmpty()) {
+            List<StudentInfo> candidates = studentInfoRepository
+                    .findByNameIgnoreCaseAndPhoneNumberAndInstituteId(name, phone, instituteId);
+            if (candidates.size() == 1) {
+                Optional<UserStudent> us = userStudentRepository.findByStudentInfo(candidates.get(0));
+                if (us.isPresent()) return new ResolveResult(us.get(), false);
+                return new ResolveResult(userStudentRepository.save(
+                        new UserStudent(candidates.get(0).getUser(), candidates.get(0), institute)), false);
+            }
+        }
+
+        // Tier 3: name + institute (only if unique)
+        List<StudentInfo> candidates = studentInfoRepository
+                .findByNameIgnoreCaseAndInstituteId(name, instituteId);
+        if (candidates.size() == 1) {
+            Optional<UserStudent> us = userStudentRepository.findByStudentInfo(candidates.get(0));
+            if (us.isPresent()) return new ResolveResult(us.get(), false);
+            return new ResolveResult(userStudentRepository.save(
+                    new UserStudent(candidates.get(0).getUser(), candidates.get(0), institute)), false);
+        }
+        if (candidates.size() > 1) {
+            throw new RuntimeException("Multiple students matched by name at this institute. Provide DOB or phone to disambiguate.");
+        }
+
+        // No match: create new student
+        User user = userRepository.save(new User((int) (Math.random() * 9000) + 1000, dob));
+        user.setName(name);
+        user = userRepository.save(user);
+
+        StudentInfo si = new StudentInfo();
+        si.setName(name);
+        si.setStudentDob(dob);
+        si.setPhoneNumber(phone);
+        si.setInstituteId(instituteId);
+        si.setUser(user);
+        si = studentInfoRepository.save(si);
+
+        return new ResolveResult(userStudentRepository.save(new UserStudent(user, si, institute)), true);
+    }
+
+    /**
+     * Bulk submit offline assessment answers with automatic student matching/creation.
+     * For each student row: matches existing student or creates new one, then submits answers.
+     * Supports re-upload: deletes old answers before saving new ones.
+     */
+    @Transactional
+    @PostMapping(value = "/bulk-submit-with-students", headers = "Accept=application/json")
+    public ResponseEntity<?> bulkSubmitWithStudents(@RequestBody Map<String, Object> payload) {
+        try {
+            Long assessmentId = ((Number) payload.get("assessmentId")).longValue();
+            Integer instituteId = ((Number) payload.get("instituteId")).intValue();
+
+            AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
+                    .orElseThrow(() -> new RuntimeException("Assessment not found"));
+
+            InstituteDetail institute = instituteDetailRepository.findById(instituteId)
+                    .orElseThrow(() -> new RuntimeException("Institute not found"));
+
+            List<Map<String, Object>> students = (List<Map<String, Object>>) payload.get("students");
+            int successCount = 0;
+            int matchedCount = 0;
+            int createdCount = 0;
+            List<Map<String, Object>> errors = new ArrayList<>();
+
+            for (int i = 0; i < students.size(); i++) {
+                Map<String, Object> studentData = students.get(i);
+                String studentName = (String) studentData.getOrDefault("name", "");
+
+                try {
+                    String name = studentName.trim();
+                    if (name.isEmpty()) {
+                        throw new RuntimeException("Student name is required");
+                    }
+
+                    String dobStr = studentData.get("dob") != null
+                            ? String.valueOf(studentData.get("dob")).trim() : "";
+                    String phone = studentData.get("phone") != null
+                            ? String.valueOf(studentData.get("phone")).trim() : "";
+
+                    Date dob = null;
+                    if (!dobStr.isEmpty()) {
+                        dob = new SimpleDateFormat("dd-MM-yyyy").parse(dobStr);
+                    }
+
+                    ResolveResult result = resolveOrCreateUserStudent(name, dob, phone, instituteId, institute);
+                    UserStudent userStudent = result.userStudent;
+                    if (result.created) {
+                        createdCount++;
+                    } else {
+                        matchedCount++;
+                    }
+
+                    Long userStudentId = userStudent.getUserStudentId();
+
+                    // Find or create mapping
+                    StudentAssessmentMapping mapping = studentAssessmentMappingRepository
+                            .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                            .orElseGet(() -> {
+                                StudentAssessmentMapping newMapping = new StudentAssessmentMapping();
+                                newMapping.setUserStudent(userStudent);
+                                newMapping.setAssessmentId(assessmentId);
+                                return studentAssessmentMappingRepository.save(newMapping);
+                            });
+
+                    mapping.setStatus("completed");
+                    studentAssessmentMappingRepository.save(mapping);
+
+                    // Delete old answers for re-upload support
+                    assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(
+                            userStudentId, assessmentId);
+
+                    // Delete old raw scores
+                    assessmentRawScoreRepository
+                            .deleteByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId());
+
+                    // Process answers
+                    List<Map<String, Object>> answers = (List<Map<String, Object>>) studentData.get("answers");
+                    Map<Long, Integer> qualityTypeScores = new HashMap<>();
+                    Map<Long, MeasuredQualityTypes> qualityTypeCache = new HashMap<>();
+
+                    if (answers != null) {
+                        for (Map<String, Object> ansMap : answers) {
+                            Long qId = ((Number) ansMap.get("questionnaireQuestionId")).longValue();
+                            Long oId = ((Number) ansMap.get("optionId")).longValue();
+
+                            QuestionnaireQuestion question = questionnaireQuestionRepository.findById(qId)
+                                    .orElse(null);
+                            AssessmentQuestionOptions option = assessmentQuestionOptionsRepository.findById(oId)
+                                    .orElse(null);
+
+                            if (question != null && option != null) {
+                                AssessmentAnswer ans = new AssessmentAnswer();
+                                ans.setUserStudent(userStudent);
+                                ans.setAssessment(assessment);
+                                ans.setQuestionnaireQuestion(question);
+                                ans.setOption(option);
+                                assessmentAnswerRepository.save(ans);
+
+                                // Accumulate scores
+                                List<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository
+                                        .findByOptionId(oId);
+                                for (OptionScoreBasedOnMEasuredQualityTypes s : scores) {
+                                    MeasuredQualityTypes type = s.getMeasuredQualityType();
+                                    Long typeId = type.getMeasuredQualityTypeId();
+                                    qualityTypeScores.merge(typeId, s.getScore(), Integer::sum);
+                                    qualityTypeCache.putIfAbsent(typeId, type);
+                                }
+                            }
+                        }
+                    }
+
+                    // Save raw scores
+                    for (Map.Entry<Long, Integer> entry : qualityTypeScores.entrySet()) {
+                        MeasuredQualityTypes mqt = qualityTypeCache.get(entry.getKey());
+                        AssessmentRawScore ars = new AssessmentRawScore();
+                        ars.setStudentAssessmentMapping(mapping);
+                        ars.setMeasuredQualityType(mqt);
+                        ars.setMeasuredQuality(mqt.getMeasuredQuality());
+                        ars.setRawScore(entry.getValue());
+                        assessmentRawScoreRepository.save(ars);
+                    }
+
+                    successCount++;
+
+                } catch (Exception e) {
+                    Map<String, Object> err = new HashMap<>();
+                    err.put("rowIndex", i);
+                    err.put("name", studentName);
+                    err.put("error", e.getMessage());
+                    errors.add(err);
+                }
+            }
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("status", "success");
+            result.put("studentsProcessed", successCount);
+            result.put("errors", errors);
+
+            Map<String, Object> matchSummary = new HashMap<>();
+            matchSummary.put("matched", matchedCount);
+            matchSummary.put("created", createdCount);
+            matchSummary.put("failed", errors.size());
+            result.put("matchSummary", matchSummary);
+
             return ResponseEntity.ok(result);
 
         } catch (Exception e) {

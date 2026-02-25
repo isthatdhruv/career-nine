@@ -42,6 +42,7 @@ type Question = {
   question: {
     questionText: string;
     questionType?: string;
+    isMQTtyped?: boolean;
     options: Option[];
     languageQuestions?: LanguageQuestion[];
     maxOptionsAllowed: number;
@@ -294,7 +295,7 @@ const SectionQuestionPage: React.FC = () => {
 
         // Check if question is answered
         const isRankingQuestion = q.question.questionType === "ranking";
-        const isTextQuestion = q.question.questionType === "text" || q.question.isMQT === true;
+        const isTextQuestion = q.question.questionType === "text" || q.question.isMQTtyped === true;
         let isAnswered = false;
         if (isTextQuestion) {
           const texts = textAnswers[secId]?.[qId] || {};
@@ -325,7 +326,7 @@ const SectionQuestionPage: React.FC = () => {
         for (const q of section.questions) {
           const questionnaireQuestionId = q.questionnaireQuestionId;
           const isRankingQuestion = q.question.questionType === "ranking";
-          const isTextQuestion = q.question.questionType === "text" || q.question.isMQT === true;
+          const isTextQuestion = q.question.questionType === "text" || q.question.isMQTtyped === true;
 
           if (isTextQuestion) {
             // Handle text-type questions
@@ -711,7 +712,7 @@ const SectionQuestionPage: React.FC = () => {
         if (excludeQuestionId && questionId === excludeQuestionId) continue;
 
         const isRanking = q.question.questionType === "ranking";
-        const isText = q.question.questionType === "text" || q.question.isMQT === true;
+        const isText = q.question.questionType === "text" || q.question.isMQTtyped === true;
         let isAnswered = false;
         if (isText) {
           isAnswered = Object.values(textAnswers[secId]?.[questionId] || {}).some((t: string) => t.trim().length > 0);
@@ -741,7 +742,7 @@ const SectionQuestionPage: React.FC = () => {
         if (excludeQuestionId && questionId === excludeQuestionId) continue;
 
         const isRanking = q.question.questionType === "ranking";
-        const isText = q.question.questionType === "text" || q.question.isMQT === true;
+        const isText = q.question.questionType === "text" || q.question.isMQTtyped === true;
         let isAnswered = false;
         if (isText) {
           isAnswered = Object.values(textAnswers[secId]?.[questionId] || {}).some((t: string) => t.trim().length > 0);
@@ -1305,7 +1306,7 @@ const SectionQuestionPage: React.FC = () => {
             {/* Display maxOptionsAllowed */}
             <div className="text-muted mb-3">
               <small style={{ fontSize: "1.1rem", color: "#4a5568", fontWeight: 500 }}>
-                {(question.question.questionType === "text" || question.question.isMQT === true) ? (
+                {(question.question.questionType === "text" || question.question.isMQTtyped === true) ? (
                   <>
                     Please type your response(s) below. You can enter up to <strong>{question.question.maxOptionsAllowed || 1}</strong> response(s).
                   </>
@@ -1331,19 +1332,12 @@ const SectionQuestionPage: React.FC = () => {
               {(() => {
                 const options = question.question.options;
                 const isRankingQuestion = question.question.questionType === "ranking";
-                const isTextQuestion = question.question.questionType === "text" || question.question.isMQT === true;
+                const isTextQuestion = question.question.questionType === "text" || question.question.isMQTtyped === true;
 
                 // Text-type or isMQT question: render text input boxes with autocomplete
                 if (isTextQuestion) {
                   const maxInputs = question.question.maxOptionsAllowed || 1;
                   const currentTexts = textAnswers[sectionId!]?.[qId] || {};
-
-                  // Collect values already used in other text boxes (for deduplication)
-                  const usedValues = new Set(
-                    Object.entries(currentTexts)
-                      .filter(([, v]) => (v as string).trim())
-                      .map(([, v]) => (v as string).trim().toLowerCase())
-                  );
 
                   const handleTextInput = (inputIdx: number, value: string) => {
                     setTextAnswers(prev => ({

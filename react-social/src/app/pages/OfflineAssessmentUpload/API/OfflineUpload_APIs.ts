@@ -6,8 +6,6 @@ export function getOfflineMapping(assessmentId: number) {
   return axios.get(`${API_URL}/assessment-answer/offline-mapping/${assessmentId}`);
 }
 
-export { addStudentInfo } from '../../StudentInformation/StudentInfo_APIs';
-
 export function bulkSubmitAnswers(data: {
   assessmentId: number;
   students: {
@@ -16,4 +14,17 @@ export function bulkSubmitAnswers(data: {
   }[];
 }) {
   return axios.post(`${API_URL}/assessment-answer/bulk-submit`, data);
+}
+
+export function bulkSubmitWithStudents(data: {
+  assessmentId: number;
+  instituteId: number;
+  students: {
+    name: string;
+    dob?: string;
+    phone?: string;
+    answers: { questionnaireQuestionId: number; optionId: number }[];
+  }[];
+}) {
+  return axios.post(`${API_URL}/assessment-answer/bulk-submit-with-students`, data);
 }

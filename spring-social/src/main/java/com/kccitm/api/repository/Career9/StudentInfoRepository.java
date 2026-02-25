@@ -18,4 +18,12 @@ public interface StudentInfoRepository extends JpaRepository<StudentInfo, Long> 
     List<StudentInfo> findByStudentDobAndInstituteIdAndStudentClass(Date studentDob, Integer instituteId,
             Integer studentClass);
 
+    List<StudentInfo> findByNameIgnoreCaseAndStudentDobAndInstituteId(String name, Date studentDob,
+            Integer instituteId);
+
+    List<StudentInfo> findByNameIgnoreCaseAndPhoneNumberAndInstituteId(String name, String phoneNumber,
+            Integer instituteId);
+
+    List<StudentInfo> findByNameIgnoreCaseAndInstituteId(String name, Integer instituteId);
+
 }
