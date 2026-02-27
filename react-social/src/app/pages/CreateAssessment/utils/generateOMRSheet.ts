@@ -1,7 +1,7 @@
 import jsPDF from "jspdf";
 import { ReadQuestionnaireByAssessmentId } from "../API/Create_Assessment_APIs";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types ──────────────────────────────────────────────────────────────────
 
 interface SectionData {
   sectionName: string;
@@ -9,388 +9,493 @@ interface SectionData {
   questions: { questionId: number; optionCount: number; maxOptionsAllowed: number }[];
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// ─── Constants ──────────────────────────────────────────────────────────────
 
 const PAGE_W = 210;
 const PAGE_H = 297;
-const MARGIN = 12;
+const MARGIN = 7;
 const CONTENT_W = PAGE_W - MARGIN * 2;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// Theme color (pink/magenta matching reference)
+const TR = 140, TG = 30, TB = 90;
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function setTheme(doc: jsPDF) {
+  doc.setDrawColor(TR, TG, TB);
+  doc.setTextColor(TR, TG, TB);
+}
 
 function bubble(doc: jsPDF, x: number, y: number, r: number, filled = false) {
-  doc.setDrawColor(60, 60, 60);
+  doc.setDrawColor(TR, TG, TB);
   doc.setLineWidth(0.25);
   if (filled) {
-    doc.setFillColor(40, 40, 40);
+    doc.setFillColor(TR, TG, TB);
     doc.circle(x, y, r, "FD");
   } else {
     doc.circle(x, y, r, "S");
   }
 }
 
-/** Draw a labeled write-in box with character cells */
-function writeInField(doc: jsPDF, label: string, x: number, y: number, w: number, cells: number): number {
+function digitGrid(doc: jsPDF, label: string, x: number, y: number, cols: number, cs: number): number {
+  const bR = cs * 0.3;
+  const rowStep = cs * 0.75; // tighter vertical spacing for bubble rows
+
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(0);
-  doc.text(label, x, y);
-  const boxY = y + 2;
-  const boxH = 7;
-  const cellW = w / cells;
-  // Outer box
-  doc.setDrawColor(0);
+  doc.setFontSize(6);
+  setTheme(doc);
+  doc.text(label, x + (cols * cs) / 2, y, { align: "center" });
+
+  const gy = y + 2.5;
+  doc.setDrawColor(TR, TG, TB);
   doc.setLineWidth(0.4);
-  doc.rect(x, boxY, w, boxH);
-  // Cell dividers
+  doc.rect(x, gy, cols * cs, cs);
   doc.setLineWidth(0.15);
-  doc.setDrawColor(180);
-  for (let i = 1; i < cells; i++) {
-    doc.line(x + i * cellW, boxY, x + i * cellW, boxY + boxH);
-  }
-  return boxY + boxH + 2; // return y after field
-}
+  for (let c = 1; c < cols; c++) doc.line(x + c * cs, gy, x + c * cs, gy + cs);
 
-/** Draw a digit bubble grid (0-9 rows × N columns) for numeric fields */
-function digitGrid(
-  doc: jsPDF,
-  label: string,
-  x: number,
-  y: number,
-  numDigits: number,
-  cellSize: number
-): number {
-  const gridW = numDigits * cellSize;
-  const bR = cellSize * 0.3; // bubble radius relative to cell
-
-  // Label
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(0);
-  doc.text(label, x, y);
-  const gridY = y + 3;
-
-  // Header cells (write-in boxes)
-  doc.setDrawColor(0);
-  doc.setLineWidth(0.4);
-  doc.rect(x, gridY, gridW, cellSize);
-  doc.setLineWidth(0.15);
-  doc.setDrawColor(150);
-  for (let c = 1; c < numDigits; c++) {
-    doc.line(x + c * cellSize, gridY, x + c * cellSize, gridY + cellSize);
-  }
-
-  // Digit rows 0-9
-  const startRow = gridY + cellSize + 1;
+  const startRow = gy + cs + bR + 1.5; // enough gap so bubbles don't overlap header boxes
   for (let r = 0; r < 10; r++) {
-    const ry = startRow + r * (cellSize - 0.5);
-    // Row digit label
-    doc.setFontSize(5.5);
+    const ry = startRow + r * rowStep;
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(80);
-    doc.text(String(r), x - 3, ry + bR * 0.4, { align: "center" });
-    // Bubbles
-    for (let c = 0; c < numDigits; c++) {
-      const cx = x + c * cellSize + cellSize / 2;
-      bubble(doc, cx, ry, bR);
-    }
+    doc.setFontSize(4.5);
+    doc.setTextColor(TR, TG, TB);
+    doc.text(String(r), x - 2, ry + bR * 0.35, { align: "center" });
+    for (let c = 0; c < cols; c++) bubble(doc, x + c * cs + cs / 2, ry, bR);
   }
-
-  return startRow + 10 * (cellSize - 0.5) + 2;
+  return startRow + 10 * rowStep + 1;
 }
 
-// ─── Main ────────────────────────────────────────────────────────────────────
+// ─── Main ───────────────────────────────────────────────────────────────────
 
 export async function generateOMRSheet(assessmentId: number, assessmentName: string) {
-  // 1. Fetch questionnaire
+  /* 1. Fetch questionnaire */
   const res = await ReadQuestionnaireByAssessmentId(assessmentId);
-  const questionnaireArr = res.data;
-  const questionnaire = Array.isArray(questionnaireArr) ? questionnaireArr[0] : questionnaireArr;
-
-  console.log("OMR: Questionnaire response keys:", questionnaire ? Object.keys(questionnaire) : "null");
-
+  const raw = res.data;
+  const questionnaire = Array.isArray(raw) ? raw[0] : raw;
   const qSectionList = questionnaire?.section || questionnaire?.sections || [];
   if (!questionnaire || qSectionList.length === 0) {
     alert("This assessment has no questionnaire/sections configured.");
     return;
   }
 
-  // 2. Parse sections
+  /* 2. Parse sections */
   const sections: SectionData[] = [];
-  const sortedSections = [...qSectionList].sort(
+  const sorted = [...qSectionList].sort(
     (a: any, b: any) => parseInt(a.orderIndex || a.order || "0") - parseInt(b.orderIndex || b.order || "0")
   );
-
-  for (const qs of sortedSections) {
-    const sectionInfo = qs.section;
-    const qQuestions = qs.questions || qs.question || [];
-    const sorted = [...qQuestions].sort(
+  for (const qs of sorted) {
+    const info = qs.section;
+    const qqList = [...(qs.questions || qs.question || [])].sort(
       (a: any, b: any) => parseInt(a.orderIndex || a.order || "0") - parseInt(b.orderIndex || b.order || "0")
     );
-
-    const questions = sorted.map((qq: any) => {
+    const questions = qqList.map((qq: any) => {
       const q = qq.question;
-      const optCount = q?.options?.length || 4; // default 4 if options not loaded
       return {
         questionId: q?.questionId || 0,
-        optionCount: optCount,
+        optionCount: q?.options?.length || 4,
         maxOptionsAllowed: q?.maxOptionsAllowed || 1,
       };
     });
-
     sections.push({
-      sectionName: sectionInfo?.sectionName || "Section",
+      sectionName: info?.sectionName || "Section",
       maxOptionsAllowed: questions.length > 0 ? Math.max(...questions.map((q) => q.maxOptionsAllowed)) : 1,
       questions,
     });
   }
 
-  // 3. Create PDF
+  /* 3. Create PDF */
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   let curY = MARGIN;
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  //  HEADER BOX
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
+  //  TITLE BAR
+  // ═══════════════════════════════════════════════════════════════════════
+  const titleH = 16;
+  doc.setDrawColor(TR, TG, TB);
+  doc.setLineWidth(0.8);
+  doc.rect(MARGIN, curY, CONTENT_W, titleH);
 
-  const headerH = 24;
-  doc.setDrawColor(0);
-  doc.setLineWidth(1);
-  doc.rect(MARGIN, curY, CONTENT_W, headerH);
-
-  // Title
+  // Logo text
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(15);
-  doc.setTextColor(0);
-  doc.text("Career-9 NAVIGATOR 360", PAGE_W / 2, curY + 7, { align: "center" });
   doc.setFontSize(11);
-  doc.text("OMR ANSWER SHEET", PAGE_W / 2, curY + 13, { align: "center" });
-
-  // Assessment name
+  doc.setTextColor(TR, TG, TB);
+  doc.text("Career-9", MARGIN + 3, curY + 6);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.text(`Assessment: ${assessmentName}`, PAGE_W / 2, curY + 18, { align: "center" });
+  doc.setFontSize(4);
+  doc.text("ENSURING CAREER SUCCESS", MARGIN + 3, curY + 9.5);
 
-  // Marking guide (bottom-left of header)
-  doc.setFontSize(6.5);
+  // Center title
   doc.setFont("helvetica", "bold");
-  const guideY = curY + 22;
-  doc.text("WRONG:", MARGIN + 3, guideY);
-  const wx = MARGIN + 19;
-  bubble(doc, wx, guideY - 1, 2);
+  doc.setFontSize(14);
+  doc.text("NAVIGATOR 360", PAGE_W / 2, curY + 6, { align: "center" });
+  doc.setFontSize(9);
+  doc.text("OMR ANSWER SHEET", PAGE_W / 2, curY + 11, { align: "center" });
+
+  // Wrong marking guide (right)
+  const gmX = PAGE_W - MARGIN - 52;
+  doc.setLineWidth(0.3);
+  doc.setDrawColor(TR, TG, TB);
+  doc.rect(gmX, curY + 1.5, 23, 13);
+  doc.setFontSize(5.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(TR, TG, TB);
+  doc.text("Wrong Marking", gmX + 11.5, curY + 5, { align: "center" });
+  bubble(doc, gmX + 11.5, curY + 10, 2);
   doc.setLineWidth(0.5);
-  doc.line(wx - 1.4, guideY - 2.4, wx + 1.4, guideY + 0.4);
-  doc.line(wx - 1.4, guideY + 0.4, wx + 1.4, guideY - 2.4);
+  doc.setDrawColor(TR, TG, TB);
+  doc.line(gmX + 10, curY + 8.5, gmX + 13, curY + 11.5);
+  doc.line(gmX + 10, curY + 11.5, gmX + 13, curY + 8.5);
 
-  doc.text("CORRECT:", MARGIN + 28, guideY);
-  bubble(doc, MARGIN + 45, guideY - 1, 2, true);
+  // Correct marking guide
+  const cmX = gmX + 25;
+  doc.setLineWidth(0.3);
+  doc.setDrawColor(TR, TG, TB);
+  doc.rect(cmX, curY + 1.5, 25, 13);
+  doc.setFontSize(5.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(TR, TG, TB);
+  doc.text("Correct Marking", cmX + 12.5, curY + 5, { align: "center" });
+  const cLabels = ["A", "B", "C", "D"];
+  for (let i = 0; i < 4; i++) {
+    const bx = cmX + 4 + i * 5.5;
+    bubble(doc, bx, curY + 10, 2, true);
+    doc.setFontSize(3.5);
+    doc.setTextColor(255, 255, 255);
+    doc.text(cLabels[i], bx, curY + 10.8, { align: "center" });
+  }
 
-  curY += headerH + 4;
+  curY += titleH + 2;
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  //  STUDENT INFO — Row 1: First Name + Last Name (full width)
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
+  //  NAME FIELDS
+  // ═══════════════════════════════════════════════════════════════════════
+  const nameH = 7;
+  const halfW = (CONTENT_W - 6) / 2;
 
-  const halfW = (CONTENT_W - 6) / 2; // 6mm gap between columns
+  // First Name
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.5);
+  doc.setTextColor(TR, TG, TB);
+  doc.text("First Name", MARGIN, curY + 4);
+  const fnX = MARGIN + 20;
+  const fnW = halfW - 20;
+  doc.setDrawColor(TR, TG, TB);
+  doc.setLineWidth(0.4);
+  doc.rect(fnX, curY, fnW, nameH);
+  doc.setLineWidth(0.12);
+  const fnCells = Math.floor(fnW / 5);
+  for (let i = 1; i < fnCells; i++) doc.line(fnX + i * (fnW / fnCells), curY, fnX + i * (fnW / fnCells), curY + nameH);
 
-  curY = writeInField(doc, "FIRST NAME", MARGIN, curY, halfW, 15);
-  const lastNameEndY = writeInField(doc, "LAST NAME", MARGIN + halfW + 6, curY - 9, halfW, 15);
-  curY = Math.max(curY, lastNameEndY);
+  // Last Name
+  const lnLabelX = MARGIN + halfW + 6;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.5);
+  doc.setTextColor(TR, TG, TB);
+  doc.text("Last Name", lnLabelX, curY + 4);
+  const lnX = lnLabelX + 19;
+  const lnW = halfW - 19;
+  doc.setLineWidth(0.4);
+  doc.rect(lnX, curY, lnW, nameH);
+  doc.setLineWidth(0.12);
+  const lnCells = Math.floor(lnW / 5);
+  for (let i = 1; i < lnCells; i++) doc.line(lnX + i * (lnW / lnCells), curY, lnX + i * (lnW / lnCells), curY + nameH);
 
-  curY += 2;
+  curY += nameH + 3;
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  //  STUDENT INFO — Row 2: Mobile Number (left) + Roll Number (right)
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
+  //  INFO ROW: Mobile | Roll Number | Grade/Class | Signatures
+  // ═══════════════════════════════════════════════════════════════════════
+  const cs = 4.2; // cell size for digit grids
 
-  const leftX = MARGIN;
-  const rightX = MARGIN + halfW + 6;
-  const cellSz = 7; // cell size for digit grid
+  // Mobile Number (left)
+  const mobileEndY = digitGrid(doc, "MOBILE NUMBER", MARGIN, curY, 10, cs);
 
-  const mobileEndY = digitGrid(doc, "MOBILE NUMBER", leftX, curY, 10, cellSz);
-  const rollEndY = digitGrid(doc, "ROLL NUMBER", rightX, curY, 8, cellSz);
-  curY = Math.max(mobileEndY, rollEndY) + 2;
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  //  STUDENT INFO — Row 3: Grade/Class + Signatures
-  // ═══════════════════════════════════════════════════════════════════════════
+  // Roll Number
+  const rollX = MARGIN + 10 * cs + 6;
+  const rollEndY = digitGrid(doc, "ROLL NUMBER", rollX, curY, 7, cs);
 
   // Grade/Class
+  const gradeX = rollX + 7 * cs + 6;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(0);
-  doc.text("GRADE / CLASS", leftX, curY);
-  curY += 4;
-
+  doc.setFontSize(6);
+  doc.setTextColor(TR, TG, TB);
+  doc.text("GRADE/CLASS", gradeX, curY);
   const grades = ["6th", "7th", "8th", "9th", "10th", "11th", "12th"];
-  const gradeGap = halfW / grades.length;
-  grades.forEach((g, i) => {
-    const gx = leftX + 3 + i * gradeGap;
-    bubble(doc, gx, curY, 2);
-    doc.setFontSize(6);
+  const gradeGap = 5;
+  for (let i = 0; i < grades.length; i++) {
+    const gy = curY + 4 + i * gradeGap;
+    bubble(doc, gradeX + 3, gy, 1.6);
     doc.setFont("helvetica", "normal");
-    doc.text(g, gx + 4, curY + 0.5);
-  });
-  curY += 7;
+    doc.setFontSize(5.5);
+    doc.setTextColor(TR, TG, TB);
+    doc.text(grades[i], gradeX + 7, gy + 0.5);
+  }
 
-  // Signatures (side by side)
-  const sigBoxW = halfW - 2;
-  const sigBoxH = 12;
+  // Signatures (right)
+  const sigX = gradeX + 25;
+  const sigW = PAGE_W - MARGIN - sigX;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.text("Student Signature", leftX, curY);
-  doc.text("Invigilator Signature", rightX, curY);
-  curY += 2;
-  doc.setDrawColor(0);
-  doc.setLineWidth(0.4);
-  doc.rect(leftX, curY, sigBoxW, sigBoxH);
-  doc.rect(rightX, curY, sigBoxW, sigBoxH);
-  curY += sigBoxH + 4;
+  doc.setFontSize(6);
+  doc.setTextColor(TR, TG, TB);
 
-  // Thick divider
-  doc.setDrawColor(0);
+  doc.text("STUDENT SIGNATURE", sigX, curY);
+  doc.setDrawColor(TR, TG, TB);
+  doc.setLineWidth(0.4);
+  doc.rect(sigX, curY + 2, sigW, 16);
+
+  doc.text("INVIGILATOR SIGNATURE", sigX, curY + 22);
+  doc.rect(sigX, curY + 24, sigW, 16);
+
+  curY = Math.max(mobileEndY, rollEndY, curY + 4 + grades.length * gradeGap) + 2;
+
+  // Divider
+  doc.setDrawColor(TR, TG, TB);
   doc.setLineWidth(1);
   doc.line(MARGIN, curY, PAGE_W - MARGIN, curY);
-  curY += 5;
+  curY += 3;
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  //  DYNAMIC SECTIONS — Question Grids
-  // ═══════════════════════════════════════════════════════════════════════════
-
+  // ═══════════════════════════════════════════════════════════════════════
+  //  DYNAMIC SECTIONS — Columns Side by Side
+  // ═══════════════════════════════════════════════════════════════════════
   const OPT_LABELS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
-  const ROW_H = 7;
-  const BUBBLE_R = 2.2;
-  const SNUM_W = 12; // S.No. column width
+  const SEC_HDR_H = 6.5;
+  const COL_HDR_H = 6;
+  const FOOTER_SPACE = 6;
+  const availH = PAGE_H - curY - MARGIN - FOOTER_SPACE;
 
-  for (let sIdx = 0; sIdx < sections.length; sIdx++) {
-    const section = sections[sIdx];
-    const sLetter = String.fromCharCode(65 + sIdx);
-    const maxOpts = Math.max(...section.questions.map((q) => q.optionCount), 4);
-    const optColW = Math.min((CONTENT_W - SNUM_W) / maxOpts, 14); // cap column width
+  // Group consecutive 1-question sections into merged visual columns
+  type VisualCol = { type: "merged"; entries: { sec: SectionData; idx: number }[] }
+    | { type: "multi"; sec: SectionData; idx: number };
 
-    // Space check
-    const neededH = 10 + ROW_H + section.questions.length * ROW_H + 4;
-    if (curY + Math.min(neededH, 40) > PAGE_H - 12) {
-      doc.addPage();
-      curY = MARGIN;
+  const visCols: VisualCol[] = [];
+  let si = 0;
+  while (si < sections.length) {
+    if (sections[si].questions.length === 1) {
+      const group: { sec: SectionData; idx: number }[] = [];
+      while (si < sections.length && sections[si].questions.length === 1) {
+        group.push({ sec: sections[si], idx: si });
+        si++;
+      }
+      visCols.push({ type: "merged", entries: group });
+    } else {
+      visCols.push({ type: "multi", sec: sections[si], idx: si });
+      si++;
     }
+  }
 
-    // Section header bar
-    doc.setFillColor(60, 60, 60);
-    doc.rect(MARGIN, curY, CONTENT_W, 8, "F");
-    doc.setDrawColor(0);
-    doc.setLineWidth(0.3);
-    doc.rect(MARGIN, curY, CONTENT_W, 8);
+  // Column width allocation
+  const GAP = 1.5;
+  const totalGaps = (visCols.length - 1) * GAP;
+  const availW = CONTENT_W - totalGaps;
+  const SN_WT = 1.5;
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(255, 255, 255);
-    doc.text(`Section ${sLetter}: ${section.sectionName}`, MARGIN + 4, curY + 5.5);
-
-    // Instruction
-    const maxAllowed = section.maxOptionsAllowed;
-    const instruction = maxAllowed > 1 ? `Select Top ${maxAllowed}` : "Mark any 1 Answer";
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.text(instruction, MARGIN + CONTENT_W - 4, curY + 5.5, { align: "right" });
-
-    curY += 9;
-
-    // Column header row
-    doc.setFillColor(230, 230, 230);
-    doc.setDrawColor(0);
-    doc.setLineWidth(0.3);
-    doc.rect(MARGIN, curY, CONTENT_W, ROW_H, "FD");
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7);
-    doc.setTextColor(0);
-    doc.text("S.No.", MARGIN + SNUM_W / 2, curY + ROW_H / 2 + 1, { align: "center" });
-
-    // Vertical line after S.No.
-    doc.line(MARGIN + SNUM_W, curY, MARGIN + SNUM_W, curY + ROW_H);
-
-    for (let o = 0; o < maxOpts; o++) {
-      const ox = MARGIN + SNUM_W + (o + 0.5) * optColW;
-      doc.text(OPT_LABELS[o] || String(o + 1), ox, curY + ROW_H / 2 + 1, { align: "center" });
+  const colWeights = visCols.map((vc) => {
+    if (vc.type === "merged") {
+      return SN_WT + vc.entries.length; // S.N. + one bubble column per section
     }
-    curY += ROW_H;
+    const maxOpts = Math.max(...vc.sec.questions.map((q) => q.optionCount), 2);
+    return SN_WT + maxOpts;
+  });
+  const totalWt = colWeights.reduce((a, b) => a + b, 0);
+  const colWidths = colWeights.map((w) => (w / totalWt) * availW);
 
-    // Question rows
-    for (let qIdx = 0; qIdx < section.questions.length; qIdx++) {
-      const q = section.questions[qIdx];
+  // Row height based on tallest visual column
+  const effectiveRows = visCols.map((vc) => {
+    if (vc.type === "merged") {
+      return Math.max(...vc.entries.map((e) => e.sec.questions[0].optionCount));
+    }
+    return vc.sec.questions.length;
+  });
+  const maxQ = Math.max(...effectiveRows);
+  const rowH = Math.min(Math.max((availH - SEC_HDR_H - COL_HDR_H) / maxQ, 3.5), 7);
 
-      // Page break mid-section
-      if (curY + ROW_H > PAGE_H - 10) {
-        doc.addPage();
-        curY = MARGIN;
-        // Continuation header
-        doc.setFillColor(60, 60, 60);
-        doc.rect(MARGIN, curY, CONTENT_W, 6, "F");
-        doc.rect(MARGIN, curY, CONTENT_W, 6);
+  let colX = MARGIN;
+  for (let vcIdx = 0; vcIdx < visCols.length; vcIdx++) {
+    const vc = visCols[vcIdx];
+    const colW = colWidths[vcIdx];
+    const weight = colWeights[vcIdx];
+    const snW = colW * (SN_WT / weight);
+    let sy = curY;
+
+    if (vc.type === "merged") {
+      // ══ MERGED 1-question sections: shared S.N. + bubble column per section ══
+      const numSec = vc.entries.length;
+      const secColW = (colW - snW) / numSec;
+      const maxOpts = Math.max(...vc.entries.map((e) => e.sec.questions[0].optionCount));
+      const bR = Math.min(rowH * 0.3, secColW * 0.35, 2.5);
+      const sLetters = vc.entries.map((e) => String.fromCharCode(65 + e.idx));
+
+      // Header label: "SECTION - A, B & C"
+      const headerLabel = numSec === 1
+        ? `SECTION - ${sLetters[0]}`
+        : numSec === 2
+          ? `SECTION - ${sLetters[0]} & ${sLetters[1]}`
+          : `SECTION - ${sLetters.slice(0, -1).join(", ")} & ${sLetters[sLetters.length - 1]}`;
+
+      // Section header bar
+      doc.setFillColor(TR, TG, TB);
+      doc.rect(colX, sy, colW, SEC_HDR_H, "F");
+      doc.setDrawColor(TR, TG, TB);
+      doc.setLineWidth(0.3);
+      doc.rect(colX, sy, colW, SEC_HDR_H);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(5.5);
+      doc.setTextColor(255, 255, 255);
+      doc.text(headerLabel, colX + 1.5, sy + 4);
+      sy += SEC_HDR_H;
+
+      // Column headers: S.N. | A (instruction) | B (instruction) | ...
+      doc.setFillColor(250, 230, 240);
+      doc.rect(colX, sy, colW, COL_HDR_H, "F");
+      doc.setDrawColor(TR, TG, TB);
+      doc.setLineWidth(0.2);
+      doc.rect(colX, sy, colW, COL_HDR_H);
+      doc.line(colX + snW, sy, colX + snW, sy + COL_HDR_H);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(4.5);
+      doc.setTextColor(TR, TG, TB);
+      doc.text("S.N.", colX + snW / 2, sy + COL_HDR_H / 2 + 0.5, { align: "center" });
+
+      for (let s = 0; s < numSec; s++) {
+        const sx = colX + snW + s * secColW;
+        if (s > 0) doc.line(sx, sy, sx, sy + COL_HDR_H);
+        // Section letter
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(7);
-        doc.setTextColor(255);
-        doc.text(`Section ${sLetter} (continued)`, MARGIN + 4, curY + 4);
-        curY += 7;
+        doc.setFontSize(4.5);
+        doc.text(sLetters[s], sx + secColW / 2, sy + 2.2, { align: "center" });
+        // Instruction below
+        const entry = vc.entries[s].sec;
+        const instr = entry.maxOptionsAllowed > 1 ? `Select Top ${entry.maxOptionsAllowed}` : "Mark 1";
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(3);
+        doc.text(instr, sx + secColW / 2, sy + 4.8, { align: "center" });
+      }
+      sy += COL_HDR_H;
+
+      // Rows: shared S.N. + one bubble per section column
+      for (let r = 0; r < maxOpts; r++) {
+        if (r % 2 === 0) {
+          doc.setFillColor(253, 247, 250);
+          doc.rect(colX, sy, colW, rowH, "F");
+        }
+        doc.setDrawColor(TR, TG, TB);
+        doc.setLineWidth(0.08);
+        doc.rect(colX, sy, colW, rowH);
+        doc.line(colX + snW, sy, colX + snW, sy + rowH);
+
+        // S.N.
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(4.5);
+        doc.setTextColor(TR, TG, TB);
+        doc.text(String(r + 1), colX + snW / 2, sy + rowH / 2 + 0.7, { align: "center" });
+
+        // One bubble per section column
+        for (let s = 0; s < numSec; s++) {
+          const sx = colX + snW + s * secColW;
+          if (s > 0) doc.line(sx, sy, sx, sy + rowH);
+          // Only draw bubble if this section has enough options
+          if (r < vc.entries[s].sec.questions[0].optionCount) {
+            bubble(doc, sx + secColW / 2, sy + rowH / 2, bR);
+          }
+        }
+        sy += rowH;
       }
 
-      // Alternating row background
-      if (qIdx % 2 === 0) {
-        doc.setFillColor(248, 248, 248);
-        doc.rect(MARGIN, curY, CONTENT_W, ROW_H, "F");
-      }
+    } else {
+      // ══ MULTI-QUESTION section: rows = questions, columns = options ══
+      const sec = vc.sec;
+      const sLetter = String.fromCharCode(65 + vc.idx);
+      const maxOpts = Math.max(...sec.questions.map((q) => q.optionCount), 2);
+      const optAreaW = colW - snW;
+      const optColW = optAreaW / maxOpts;
+      const bR = Math.min(rowH * 0.3, optColW * 0.36, 2.5);
 
-      // Row border
-      doc.setDrawColor(180);
-      doc.setLineWidth(0.15);
-      doc.rect(MARGIN, curY, CONTENT_W, ROW_H);
-
-      // S.No. separator
-      doc.setDrawColor(180);
-      doc.line(MARGIN + SNUM_W, curY, MARGIN + SNUM_W, curY + ROW_H);
-
-      // Question number
+      // Section header bar
+      doc.setFillColor(TR, TG, TB);
+      doc.rect(colX, sy, colW, SEC_HDR_H, "F");
+      doc.setDrawColor(TR, TG, TB);
+      doc.setLineWidth(0.3);
+      doc.rect(colX, sy, colW, SEC_HDR_H);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(5.5);
+      doc.setTextColor(255, 255, 255);
+      doc.text(`SECTION - ${sLetter}`, colX + 1.5, sy + 3);
+      const instruction = sec.maxOptionsAllowed > 1 ? `(Select Top ${sec.maxOptionsAllowed})` : "(Mark any 1 Answer)";
+      doc.setFontSize(4);
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(7);
-      doc.setTextColor(0);
-      doc.text(String(qIdx + 1), MARGIN + SNUM_W / 2, curY + ROW_H / 2 + 1, { align: "center" });
+      doc.text(instruction, colX + colW - 1.5, sy + 3, { align: "right" });
+      doc.setFontSize(3.5);
+      const maxChars = Math.max(Math.floor(colW / 2), 8);
+      doc.text(sec.sectionName.substring(0, maxChars), colX + 1.5, sy + 5.5);
+      sy += SEC_HDR_H;
 
-      // Option bubbles
-      const numBubbles = Math.max(q.optionCount, maxOpts); // always show all columns
-      for (let o = 0; o < numBubbles; o++) {
-        const ox = MARGIN + SNUM_W + (o + 0.5) * optColW;
-        bubble(doc, ox, curY + ROW_H / 2, BUBBLE_R);
+      // Column headers: S.N. | A | B | C | D ...
+      doc.setFillColor(250, 230, 240);
+      doc.rect(colX, sy, colW, COL_HDR_H, "F");
+      doc.setDrawColor(TR, TG, TB);
+      doc.setLineWidth(0.2);
+      doc.rect(colX, sy, colW, COL_HDR_H);
+      doc.line(colX + snW, sy, colX + snW, sy + COL_HDR_H);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(4.5);
+      doc.setTextColor(TR, TG, TB);
+      doc.text("S.N.", colX + snW / 2, sy + COL_HDR_H / 2 + 0.5, { align: "center" });
+
+      for (let o = 0; o < maxOpts; o++) {
+        const ox = colX + snW + (o + 0.5) * optColW;
+        if (o > 0) doc.line(colX + snW + o * optColW, sy, colX + snW + o * optColW, sy + COL_HDR_H);
+        doc.text(OPT_LABELS[o] || String(o + 1), ox, sy + COL_HDR_H / 2 + 0.5, { align: "center" });
       }
+      sy += COL_HDR_H;
 
-      curY += ROW_H;
+      // Question rows
+      for (let qIdx = 0; qIdx < sec.questions.length; qIdx++) {
+        if (qIdx % 2 === 0) {
+          doc.setFillColor(253, 247, 250);
+          doc.rect(colX, sy, colW, rowH, "F");
+        }
+        doc.setDrawColor(TR, TG, TB);
+        doc.setLineWidth(0.08);
+        doc.rect(colX, sy, colW, rowH);
+        doc.line(colX + snW, sy, colX + snW, sy + rowH);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(4.5);
+        doc.setTextColor(TR, TG, TB);
+        doc.text(String(qIdx + 1), colX + snW / 2, sy + rowH / 2 + 0.7, { align: "center" });
+
+        for (let o = 0; o < maxOpts; o++) {
+          const ox = colX + snW + (o + 0.5) * optColW;
+          bubble(doc, ox, sy + rowH / 2, bR);
+        }
+        sy += rowH;
+      }
     }
 
-    curY += 4;
+    // Outer border for visual column
+    doc.setDrawColor(TR, TG, TB);
+    doc.setLineWidth(0.4);
+    doc.rect(colX, curY, colW, sy - curY);
+
+    colX += colW + GAP;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════
   //  FOOTER
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  if (curY + 12 > PAGE_H - 5) {
-    doc.addPage();
-    curY = MARGIN;
-  }
-
-  doc.setDrawColor(0);
-  doc.setLineWidth(0.5);
-  doc.line(MARGIN, curY, PAGE_W - MARGIN, curY);
-  curY += 5;
-
+  // ═══════════════════════════════════════════════════════════════════════
   doc.setFont("helvetica", "italic");
-  doc.setFontSize(7);
-  doc.setTextColor(120);
-  doc.text("Fill bubbles completely using a dark pen. Do not fold or damage this sheet.", PAGE_W / 2, curY, { align: "center" });
-  curY += 4;
-  doc.text("Career-9 NAVIGATOR 360 | Powered by Career-9", PAGE_W / 2, curY, { align: "center" });
+  doc.setFontSize(4.5);
+  doc.setTextColor(130, 130, 130);
+  doc.text(
+    "Fill bubbles completely using a dark pen. Do not fold or damage this sheet. | Career-9 NAVIGATOR 360",
+    PAGE_W / 2,
+    PAGE_H - MARGIN - 1,
+    { align: "center" }
+  );
 
-  // 4. Save
+  /* 4. Save */
   const sanitizedName = assessmentName.replace(/[^a-zA-Z0-9]/g, "_");
   doc.save(`OMR_${sanitizedName}.pdf`);
 }
