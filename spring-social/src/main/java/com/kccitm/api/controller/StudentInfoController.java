@@ -70,6 +70,8 @@ public class StudentInfoController {
     private com.kccitm.api.repository.Career9.AssessmentTableRepository assessmentTableRepository;
     @Autowired
     private com.kccitm.api.repository.Career9.AssessmentProctoringQuestionLogRepository assessmentProctoringQuestionLogRepository;
+    @Autowired
+    private com.kccitm.api.service.CareerNineRollNumberService rollNumberService;
 
     @GetMapping("/getAll")
     public List<StudentInfo> getAllStudentInfo() {
@@ -208,6 +210,15 @@ public class StudentInfoController {
 
             User user = userRepository.save(new User((int) (Math.random() * 1000),
                     studentInfo.getStudentDob()));
+
+            // Generate and set careerNineRollNumber
+            String rollNumber = rollNumberService.generateNextRollNumber(
+                    studentInfo.getInstituteId(), studentInfo.getSchoolSectionId());
+            if (rollNumber != null) {
+                user.setCareerNineRollNumber(rollNumber);
+                user = userRepository.save(user);
+            }
+
             studentInfo.setUser(user);
             Integer instituteId = studentInfo.getInstituteId();
             UserStudent userStudent = new UserStudent(user, studentInfoRepository.save(studentInfo),

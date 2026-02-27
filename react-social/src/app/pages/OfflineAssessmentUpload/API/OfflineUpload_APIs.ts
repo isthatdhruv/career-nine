@@ -23,8 +23,20 @@ export function bulkSubmitWithStudents(data: {
     name: string;
     dob?: string;
     phone?: string;
+    schoolSectionId?: number;
     answers: { questionnaireQuestionId: number; optionId: number }[];
   }[];
 }) {
   return axios.post(`${API_URL}/assessment-answer/bulk-submit-with-students`, data);
+}
+
+export function bulkSubmitByRollNumber(data: {
+  assessmentId: number;
+  instituteId: number;
+  students: {
+    rollNumber: string;
+    answers: { questionnaireQuestionId: number; optionId: number }[];
+  }[];
+}) {
+  return axios.post(`${API_URL}/assessment-answer/bulk-submit-by-rollnumber`, data);
 }

@@ -87,6 +87,9 @@ public class AssessmentAnswerController {
     @Autowired
     private InstituteDetailRepository instituteDetailRepository;
 
+    @Autowired
+    private com.kccitm.api.service.CareerNineRollNumberService rollNumberService;
+
     @GetMapping(value = "/getByStudent/{studentId}", headers = "Accept=application/json")
     public List<AssessmentAnswer> getAssessmentAnswersByStudent(@PathVariable("studentId") Long studentId) {
         UserStudent userStudent = userStudentRepository.findById(studentId).orElse(null);
@@ -487,7 +490,8 @@ public class AssessmentAnswerController {
      * Matching tiers: (1) name+DOB+institute, (2) name+phone+institute, (3) name+institute if unique.
      */
     private ResolveResult resolveOrCreateUserStudent(
-            String name, Date dob, String phone, Integer instituteId, InstituteDetail institute) {
+            String name, Date dob, String phone, Integer instituteId, InstituteDetail institute,
+            Integer schoolSectionId) {
 
         // Tier 1: name + DOB + institute
         if (dob != null) {
@@ -529,6 +533,12 @@ public class AssessmentAnswerController {
         // No match: create new student
         User user = userRepository.save(new User((int) (Math.random() * 9000) + 1000, dob));
         user.setName(name);
+
+        // Generate and set careerNineRollNumber
+        String rollNumber = rollNumberService.generateNextRollNumber(instituteId, schoolSectionId);
+        if (rollNumber != null) {
+            user.setCareerNineRollNumber(rollNumber);
+        }
         user = userRepository.save(user);
 
         StudentInfo si = new StudentInfo();
@@ -536,6 +546,7 @@ public class AssessmentAnswerController {
         si.setStudentDob(dob);
         si.setPhoneNumber(phone);
         si.setInstituteId(instituteId);
+        si.setSchoolSectionId(schoolSectionId);
         si.setUser(user);
         si = studentInfoRepository.save(si);
 
@@ -581,12 +592,15 @@ public class AssessmentAnswerController {
                     String phone = studentData.get("phone") != null
                             ? String.valueOf(studentData.get("phone")).trim() : "";
 
+                    Integer schoolSectionId = studentData.get("schoolSectionId") != null
+                            ? ((Number) studentData.get("schoolSectionId")).intValue() : null;
+
                     Date dob = null;
                     if (!dobStr.isEmpty()) {
                         dob = new SimpleDateFormat("dd-MM-yyyy").parse(dobStr);
                     }
 
-                    ResolveResult result = resolveOrCreateUserStudent(name, dob, phone, instituteId, institute);
+                    ResolveResult result = resolveOrCreateUserStudent(name, dob, phone, instituteId, institute, schoolSectionId);
                     UserStudent userStudent = result.userStudent;
                     if (result.created) {
                         createdCount++;
@@ -683,6 +697,162 @@ public class AssessmentAnswerController {
             Map<String, Object> matchSummary = new HashMap<>();
             matchSummary.put("matched", matchedCount);
             matchSummary.put("created", createdCount);
+            matchSummary.put("failed", errors.size());
+            result.put("matchSummary", matchSummary);
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        }
+    }
+
+    // ============ BULK SUBMIT BY ROLL NUMBER ============
+
+    /**
+     * Bulk submit offline assessment answers matched by careerNineRollNumber.
+     * Students must already exist. Each row has a rollNumber + answers.
+     */
+    @Transactional
+    @PostMapping(value = "/bulk-submit-by-rollnumber", headers = "Accept=application/json")
+    public ResponseEntity<?> bulkSubmitByRollNumber(@RequestBody Map<String, Object> payload) {
+        try {
+            Long assessmentId = ((Number) payload.get("assessmentId")).longValue();
+            Integer instituteId = ((Number) payload.get("instituteId")).intValue();
+
+            AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
+                    .orElseThrow(() -> new RuntimeException("Assessment not found"));
+
+            InstituteDetail institute = instituteDetailRepository.findById(instituteId)
+                    .orElseThrow(() -> new RuntimeException("Institute not found"));
+
+            List<Map<String, Object>> students = (List<Map<String, Object>>) payload.get("students");
+            int successCount = 0;
+            int matchedCount = 0;
+            List<Map<String, Object>> errors = new ArrayList<>();
+
+            for (int i = 0; i < students.size(); i++) {
+                Map<String, Object> studentData = students.get(i);
+                String rollNumber = studentData.get("rollNumber") != null
+                        ? String.valueOf(studentData.get("rollNumber")).trim() : "";
+
+                try {
+                    if (rollNumber.isEmpty()) {
+                        throw new RuntimeException("Roll number is required");
+                    }
+
+                    // Find user by careerNineRollNumber
+                    Optional<User> userOpt = userRepository.findByCareerNineRollNumber(rollNumber);
+                    if (!userOpt.isPresent()) {
+                        throw new RuntimeException("No student found with roll number: " + rollNumber);
+                    }
+
+                    User user = userOpt.get();
+
+                    // Find StudentInfo for this user
+                    StudentInfo studentInfo = studentInfoRepository.findByUser(user);
+                    if (studentInfo == null) {
+                        throw new RuntimeException("No student info found for roll number: " + rollNumber);
+                    }
+
+                    // Find or create UserStudent
+                    Optional<UserStudent> userStudentOpt = userStudentRepository.findByStudentInfo(studentInfo);
+                    UserStudent userStudent;
+                    if (userStudentOpt.isPresent()) {
+                        userStudent = userStudentOpt.get();
+                    } else {
+                        userStudent = userStudentRepository.save(new UserStudent(user, studentInfo, institute));
+                    }
+
+                    matchedCount++;
+                    Long userStudentId = userStudent.getUserStudentId();
+
+                    // Find or create mapping
+                    StudentAssessmentMapping mapping = studentAssessmentMappingRepository
+                            .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                            .orElseGet(() -> {
+                                StudentAssessmentMapping newMapping = new StudentAssessmentMapping();
+                                newMapping.setUserStudent(userStudent);
+                                newMapping.setAssessmentId(assessmentId);
+                                return studentAssessmentMappingRepository.save(newMapping);
+                            });
+
+                    mapping.setStatus("completed");
+                    studentAssessmentMappingRepository.save(mapping);
+
+                    // Delete old answers for re-upload support
+                    assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(
+                            userStudentId, assessmentId);
+
+                    // Delete old raw scores
+                    assessmentRawScoreRepository
+                            .deleteByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId());
+
+                    // Process answers
+                    List<Map<String, Object>> answers = (List<Map<String, Object>>) studentData.get("answers");
+                    Map<Long, Integer> qualityTypeScores = new HashMap<>();
+                    Map<Long, MeasuredQualityTypes> qualityTypeCache = new HashMap<>();
+
+                    if (answers != null) {
+                        for (Map<String, Object> ansMap : answers) {
+                            Long qId = ((Number) ansMap.get("questionnaireQuestionId")).longValue();
+                            Long oId = ((Number) ansMap.get("optionId")).longValue();
+
+                            QuestionnaireQuestion question = questionnaireQuestionRepository.findById(qId)
+                                    .orElse(null);
+                            AssessmentQuestionOptions option = assessmentQuestionOptionsRepository.findById(oId)
+                                    .orElse(null);
+
+                            if (question != null && option != null) {
+                                AssessmentAnswer ans = new AssessmentAnswer();
+                                ans.setUserStudent(userStudent);
+                                ans.setAssessment(assessment);
+                                ans.setQuestionnaireQuestion(question);
+                                ans.setOption(option);
+                                assessmentAnswerRepository.save(ans);
+
+                                // Accumulate scores
+                                List<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository
+                                        .findByOptionId(oId);
+                                for (OptionScoreBasedOnMEasuredQualityTypes s : scores) {
+                                    MeasuredQualityTypes type = s.getMeasuredQualityType();
+                                    Long typeId = type.getMeasuredQualityTypeId();
+                                    qualityTypeScores.merge(typeId, s.getScore(), Integer::sum);
+                                    qualityTypeCache.putIfAbsent(typeId, type);
+                                }
+                            }
+                        }
+                    }
+
+                    // Save raw scores
+                    for (Map.Entry<Long, Integer> entry : qualityTypeScores.entrySet()) {
+                        MeasuredQualityTypes mqt = qualityTypeCache.get(entry.getKey());
+                        AssessmentRawScore ars = new AssessmentRawScore();
+                        ars.setStudentAssessmentMapping(mapping);
+                        ars.setMeasuredQualityType(mqt);
+                        ars.setMeasuredQuality(mqt.getMeasuredQuality());
+                        ars.setRawScore(entry.getValue());
+                        assessmentRawScoreRepository.save(ars);
+                    }
+
+                    successCount++;
+
+                } catch (Exception e) {
+                    Map<String, Object> err = new HashMap<>();
+                    err.put("rowIndex", i);
+                    err.put("rollNumber", rollNumber);
+                    err.put("error", e.getMessage());
+                    errors.add(err);
+                }
+            }
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("status", "success");
+            result.put("studentsProcessed", successCount);
+            result.put("errors", errors);
+
+            Map<String, Object> matchSummary = new HashMap<>();
+            matchSummary.put("matched", matchedCount);
             matchSummary.put("failed", errors.size());
             result.put("matchSummary", matchSummary);
 

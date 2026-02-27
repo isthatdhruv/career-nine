@@ -34,4 +34,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query("SELECT u FROM User u WHERE u.username = :username AND DATE(u.dobDate) = DATE(:dobDate)")
     Optional<User> findByUsernameAndDobDate(@Param("username") String username, @Param("dobDate") Date dobDate);
+
+    @Query(value = "SELECT u.career_nine_rollnumber FROM student_user u " +
+           "JOIN student_info si ON si.user_id = u.id " +
+           "WHERE si.institute_id = :instituteId AND si.school_section_id = :sectionId " +
+           "AND u.career_nine_rollnumber IS NOT NULL", nativeQuery = true)
+    List<String> findRollNumbersByInstituteAndSection(
+        @Param("instituteId") Integer instituteId,
+        @Param("sectionId") Integer sectionId);
+
+    Optional<User> findByCareerNineRollNumber(String careerNineRollNumber);
 }
