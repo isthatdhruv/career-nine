@@ -251,6 +251,17 @@ const SectionQuestionPage: React.FC = () => {
     return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const getQuestionColor = useCallback((secId: string, questionId: number) => {
+    if (answers[secId]?.[questionId]?.length) return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+    const rankingCount = Object.keys(rankingAnswers[secId]?.[questionId] || {}).length;
+    if (rankingCount > 0) return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+    const textCount = Object.values(textAnswers[secId]?.[questionId] || {}).filter((t: string) => t.trim()).length;
+    if (textCount > 0) return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+    if (savedForLater[secId]?.has(questionId)) return "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)";
+    if (skipped[secId]?.has(questionId)) return "linear-gradient(135deg, #f87171 0%, #dc2626 100%)";
+    return "#d1d5db";
+  }, [answers, rankingAnswers, textAnswers, savedForLater, skipped]);
+
   if (!questionnaire || !questions.length) {
     return <div className="text-center mt-5">No questions found</div>;
   }
@@ -678,22 +689,6 @@ const SectionQuestionPage: React.FC = () => {
       navigate(`/studentAssessment/sections/${firstUnanswered.sectionId}/questions/${firstUnanswered.questionIndex}`);
     }
   };
-
-  const getQuestionColor = useCallback((secId: string, questionId: number) => {
-    // Check regular answers
-    if (answers[secId]?.[questionId]?.length) return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
-    // Check ranking answers
-    const rankingCount = Object.keys(rankingAnswers[secId]?.[questionId] || {}).length;
-    if (rankingCount > 0) return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
-    // Check text answers
-    const textCount = Object.values(textAnswers[secId]?.[questionId] || {}).filter((t: string) => t.trim()).length;
-    if (textCount > 0) return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
-    // Check saved for later
-    if (savedForLater[secId]?.has(questionId)) return "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)";
-    // Check skipped
-    if (skipped[secId]?.has(questionId)) return "linear-gradient(135deg, #f87171 0%, #dc2626 100%)";
-    return "#d1d5db";
-  }, [answers, rankingAnswers, textAnswers, savedForLater, skipped]);
 
   // Find the next unanswered question starting after the current position
   // Skips over already-answered questions so auto-advance lands on unanswered ones
