@@ -28,10 +28,18 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       ]);
 
       setAssessmentData(questionnaireRes.data);
-      localStorage.setItem('assessmentData', JSON.stringify(questionnaireRes.data));
+      try {
+        sessionStorage.setItem('assessmentData', JSON.stringify(questionnaireRes.data));
+      } catch (e) {
+        console.warn('Could not cache assessmentData to storage');
+      }
 
       setAssessmentConfig(configRes.data);
-      localStorage.setItem('assessmentConfig', JSON.stringify(configRes.data));
+      try {
+        sessionStorage.setItem('assessmentConfig', JSON.stringify(configRes.data));
+      } catch (e) {
+        console.warn('Could not cache assessmentConfig to storage');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
       console.error('Error fetching assessment data:', err);
@@ -41,7 +49,7 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   useEffect(() => {
-    const stored = localStorage.getItem('assessmentData');
+    const stored = sessionStorage.getItem('assessmentData');
     if (stored) {
       try {
         setAssessmentData(JSON.parse(stored));
@@ -50,7 +58,7 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
     }
 
-    const storedConfig = localStorage.getItem('assessmentConfig');
+    const storedConfig = sessionStorage.getItem('assessmentConfig');
     if (storedConfig) {
       try {
         setAssessmentConfig(JSON.parse(storedConfig));

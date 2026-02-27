@@ -1,6 +1,6 @@
 spring:
   profiles:
-    active: dev
+    active: staging
 
 server:
   port: 8080
@@ -119,10 +119,15 @@ app:
 spring:
   profiles: staging
   datasource:
-    url: jdbc:mysql://mysql_db_api:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://mysql_db_api:3306/career-9-staging?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     username: root
     password: Career-qCsfeuECc3MW # password: Google.com1
-
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 20
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
   jpa:
     show-sql: false
     hibernate:
@@ -181,6 +186,13 @@ spring:
             authorizationUri: https://www.facebook.com/v3.0/dialog/oauth
             tokenUri: https://graph.facebook.com/v3.0/oauth/access_token
             userInfoUri: https://graph.facebook.com/v3.0/me?fields=id,first_name,middle_name,last_name,name,email,verified,is_verified,picture.width(250).height(250)
+server:
+  tomcat:
+    threads:
+      max: 300
+      min-spare: 50
+    accept-count: 100
+    connection-timeout: 60000
 app:
   protocol: https
   name: api.career-9.com
