@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import http from '../api/http';
 
 type AssessmentContextType = {
@@ -7,6 +7,8 @@ type AssessmentContextType = {
   loading: boolean;
   error: string | null;
   fetchAssessmentData: (assessmentId: string) => Promise<void>;
+  prefetchAssessmentData: (userStudentId: string) => void;
+  prefetchedAssessments: any[] | null;
 };
 
 const AssessmentContext = createContext<AssessmentContextType | undefined>(undefined);
@@ -16,8 +18,52 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [assessmentConfig, setAssessmentConfig] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [prefetchedAssessments, setPrefetchedAssessments] = useState<any[] | null>(null);
+  const prefetchingRef = useRef(false);
+
+  const prefetchAssessmentData = (userStudentId: string) => {
+    if (prefetchingRef.current || !userStudentId.trim()) return;
+    prefetchingRef.current = true;
+
+    http.get(`/assessments/prefetch/${userStudentId}`)
+      .then(({ data }) => {
+        if (data && Array.isArray(data) && data.length > 0) {
+          setPrefetchedAssessments(data);
+          // Also prefetch the full questionnaire data for the first active assessment
+          const firstActive = data.find((a: any) => a.isActive && a.questionnaireId);
+          if (firstActive) {
+            Promise.all([
+              http.get(`/assessments/getby/${firstActive.assessmentId}`),
+              http.get(`/assessments/getById/${firstActive.assessmentId}`),
+            ]).then(([questionnaireRes, configRes]) => {
+              try {
+                sessionStorage.setItem('assessmentData', JSON.stringify(questionnaireRes.data));
+                sessionStorage.setItem('assessmentConfig', JSON.stringify(configRes.data));
+              } catch (e) {
+                // Storage quota exceeded - non-critical
+              }
+              setAssessmentData(questionnaireRes.data);
+              setAssessmentConfig(configRes.data);
+            }).catch(() => {
+              // Prefetch failure is non-critical
+            });
+          }
+        }
+      })
+      .catch(() => {
+        // Prefetch failure is non-critical
+      })
+      .finally(() => {
+        prefetchingRef.current = false;
+      });
+  };
 
   const fetchAssessmentData = async (assessmentId: string): Promise<void> => {
+    // If data was already prefetched, skip the API call
+    if (assessmentData && assessmentConfig) {
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -69,7 +115,10 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, []);
 
   return (
-    <AssessmentContext.Provider value={{ assessmentData, assessmentConfig, loading, error, fetchAssessmentData }}>
+    <AssessmentContext.Provider value={{
+      assessmentData, assessmentConfig, loading, error,
+      fetchAssessmentData, prefetchAssessmentData, prefetchedAssessments
+    }}>
       {children}
     </AssessmentContext.Provider>
   );

@@ -2,9 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePreventReload } from '../hooks/usePreventReload';
 import http from '../api/http';
+import { useAssessment } from '../contexts/AssessmentContext';
 
 const StudentLoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const { prefetchAssessmentData } = useAssessment();
   const [userId, setUserId] = useState('');
   const [dob, setDob] = useState('');
 
@@ -58,6 +60,10 @@ const StudentLoginPage: React.FC = () => {
   const handleUserIdBlur = () => {
     setTouched(prev => ({ ...prev, userId: true }));
     setErrors(prev => ({ ...prev, userId: validateUserId(userId) }));
+    // Prefetch assessment data while user fills in DOB
+    if (userId.trim()) {
+      prefetchAssessmentData(userId.trim());
+    }
   };
 
   const handleDobBlur = () => {

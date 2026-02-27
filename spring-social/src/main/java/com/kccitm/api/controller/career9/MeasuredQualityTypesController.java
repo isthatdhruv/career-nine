@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,6 +43,7 @@ public class MeasuredQualityTypesController {
     @Autowired
     private MeasuredQualitiesRepository measuredQualitiesRepository;
 
+    @Cacheable("measuredQualityTypes")
     @GetMapping("/getAll")
     public List<MeasuredQualityTypes> getAllMeasuredQualityTypes() {
         return measuredQualityTypesRepository.findAll();
@@ -51,10 +54,12 @@ public class MeasuredQualityTypesController {
         return measuredQualityTypesRepository.findById(id).orElse(null);
     }
 
+    @CacheEvict(value = "measuredQualityTypes", allEntries = true)
     @PostMapping("/create")
     public MeasuredQualityTypes createMeasuredQualityTypes(@RequestBody MeasuredQualityTypes measuredQualityTypes) {
         return measuredQualityTypesRepository.save(measuredQualityTypes);
     }
+    @CacheEvict(value = "measuredQualityTypes", allEntries = true)
     @PutMapping("/update/{id}")
     public MeasuredQualityTypes updateMeasuredQualityTypes(@PathVariable Long id, @RequestBody MeasuredQualityTypes measuredQualityTypes) {
         MeasuredQualityTypes existingType = measuredQualityTypesRepository.findById(id)
@@ -68,6 +73,7 @@ public class MeasuredQualityTypesController {
 
         return measuredQualityTypesRepository.save(existingType);
     }
+    @CacheEvict(value = "measuredQualityTypes", allEntries = true)
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<String> deleteMeasuredQualityTypes(@PathVariable Long id) {
         MeasuredQualityTypes type = measuredQualityTypesRepository.findById(id).orElse(null);
