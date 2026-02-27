@@ -62,3 +62,7 @@ export function CheckLockedByQuestionnaire(questionnaireId: any) {
 export function CheckLockedByQuestion(questionId: any) {
   return axios.get(`${API_URL}/assessments/is-locked-by-question/${questionId}`);
 }
+
+export function ReadQuestionnaireByAssessmentId(assessmentId: any) {
+  return axios.get(`${API_URL}/assessments/getby/${assessmentId}`);
+}
