@@ -685,6 +685,7 @@ export default function GroupStudentPage() {
         const secInfo = student.schoolSectionId ? sectionLookup.get(student.schoolSectionId) : undefined;
         return {
           "S.No": index + 1,
+          "User Student ID": student.userStudentId,
           "Control Number": student.controlNumber ?? "N/A",
           "Username": student.username && !isNaN(Number(student.username)) ? Number(student.username) : (student.username || "N/A"),
           "Student Name": student.name,
@@ -703,6 +704,7 @@ export default function GroupStudentPage() {
       // Set column widths
       worksheet["!cols"] = [
         { wch: 8 },   // S.No
+        { wch: 18 },  // User Student ID
         { wch: 18 },  // Control Number
         { wch: 20 },  // Username
         { wch: 30 },  // Student Name
