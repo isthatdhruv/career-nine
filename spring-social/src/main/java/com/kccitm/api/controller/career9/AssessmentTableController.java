@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -129,12 +131,14 @@ public class AssessmentTableController {
         return questionnaireRepository.findAllByQuestionnaireId(questionnaireId);
     }
 
+    @Cacheable(value = "assessmentDetails", key = "#id")
     @GetMapping("/getById/{id}")
     public ResponseEntity<AssessmentTable> getAssessmentDetailsById(@PathVariable Long id) {
         Optional<AssessmentTable> assessment = assessmentTableRepository.findById(id);
         return assessment.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    @CacheEvict(value = "assessmentDetails", allEntries = true)
     @PostMapping("/create")
     public ResponseEntity<AssessmentTable> createAssessment(@RequestBody java.util.Map<String, Object> requestBody) {
         AssessmentTable assessment = new AssessmentTable();
@@ -189,6 +193,7 @@ public class AssessmentTableController {
         return ResponseEntity.ok(savedAssessment);
     }
 
+    @CacheEvict(value = "assessmentDetails", allEntries = true)
     @PutMapping("/update/{id}")
     public ResponseEntity<AssessmentTable> updateAssessment(@PathVariable Long id,
             @RequestBody AssessmentTable assessment) {
@@ -201,6 +206,7 @@ public class AssessmentTableController {
         return ResponseEntity.ok(updatedAssessment);
     }
 
+    @CacheEvict(value = "assessmentDetails", allEntries = true)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteAssessment(@PathVariable Long id) {
         if (!assessmentTableRepository.existsById(id)) {
@@ -224,6 +230,7 @@ public class AssessmentTableController {
     }
 
     // Lock an assessment
+    @CacheEvict(value = "assessmentDetails", allEntries = true)
     @PutMapping("/{id}/lock")
     public ResponseEntity<AssessmentTable> lockAssessment(@PathVariable Long id) {
         Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
@@ -236,6 +243,7 @@ public class AssessmentTableController {
     }
 
     // Unlock an assessment
+    @CacheEvict(value = "assessmentDetails", allEntries = true)
     @PutMapping("/{id}/unlock")
     public ResponseEntity<AssessmentTable> unlockAssessment(@PathVariable Long id) {
         Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
@@ -327,6 +335,49 @@ public class AssessmentTableController {
         response.put("success", true);
         response.put("status", mapping.getStatus());
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Public prefetch endpoint - returns assessment data for a student before auth.
+     * Called when student types their ID on login page to pre-load assessment data.
+     * Benefits from Caffeine cache - first request warms cache, rest are instant.
+     */
+    @GetMapping("/prefetch/{userStudentId}")
+    public ResponseEntity<?> prefetchAssessmentData(@PathVariable Long userStudentId) {
+        try {
+            List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
+                    .findByUserStudentUserStudentId(userStudentId);
+
+            if (mappings.isEmpty()) {
+                return ResponseEntity.ok(java.util.Collections.emptyMap());
+            }
+
+            java.util.ArrayList<HashMap<String, Object>> result = new java.util.ArrayList<>();
+
+            for (StudentAssessmentMapping mapping : mappings) {
+                HashMap<String, Object> assessmentInfo = new HashMap<>();
+                assessmentInfo.put("assessmentId", mapping.getAssessmentId());
+                assessmentInfo.put("status", mapping.getStatus());
+
+                Optional<AssessmentTable> assessment = assessmentTableRepository.findById(mapping.getAssessmentId());
+                if (assessment.isPresent()) {
+                    assessmentInfo.put("assessmentName", assessment.get().getAssessmentName());
+                    assessmentInfo.put("isActive", assessment.get().getIsActive());
+                    assessmentInfo.put("showTimer", assessment.get().getShowTimer());
+
+                    if (assessment.get().getQuestionnaire() != null) {
+                        assessmentInfo.put("questionnaireType", assessment.get().getQuestionnaire().getType());
+                        assessmentInfo.put("questionnaireId", assessment.get().getQuestionnaire().getQuestionnaireId());
+                    }
+                }
+
+                result.add(assessmentInfo);
+            }
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.ok(java.util.Collections.emptyMap());
+        }
     }
 
 }

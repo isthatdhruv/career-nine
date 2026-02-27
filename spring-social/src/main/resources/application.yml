@@ -19,6 +19,12 @@ spring:
     username: root
     # password: Career-qCsfeuECc3MW
     password: MyStrongPass@123
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
   jpa:
     show-sql: true
     hibernate:
@@ -27,6 +33,15 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+        jdbc:
+          batch_size: 30
+        order_inserts: true
+        order_updates: true
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=600s
+    cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
   mail:
     host: smtp.gmail.com
     port: 587
@@ -119,7 +134,7 @@ app:
 spring:
   profiles: staging
   datasource:
-    url: jdbc:mysql://mysql_db_api:3306/career-9-staging?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://mysql_db_api:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     username: root
     password: Career-qCsfeuECc3MW # password: Google.com1
     hikari:
@@ -136,6 +151,15 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+        jdbc:
+          batch_size: 30
+        order_inserts: true
+        order_updates: true
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=600s
+    cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
   mail:
     host: smtp.gmail.com
     port: 587
@@ -233,7 +257,12 @@ spring:
     username: root
     password: qCsfeuECc3MW
     # password: Google.com1
-
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
   jpa:
     show-sql: true
     hibernate:
@@ -242,6 +271,15 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+        jdbc:
+          batch_size: 30
+        order_inserts: true
+        order_updates: true
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=600s
+    cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
   mail:
     host: smtp.gmail.com
     port: 587

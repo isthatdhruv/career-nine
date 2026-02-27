@@ -2,9 +2,6 @@ package com.kccitm.api.controller.career9;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -27,6 +24,8 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -41,8 +40,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kccitm.api.model.career9.AssessmentQuestionOptions;
 import com.kccitm.api.model.career9.AssessmentQuestions;
 import com.kccitm.api.model.career9.GameTable;
@@ -59,9 +56,6 @@ public class AssessmentQuestionController {
 
     private final Logger logger = LoggerFactory.getLogger(AssessmentQuestionController.class);
 
-    private static final Path CACHE_DIR = Paths.get("cache");
-    private static final Path CACHE_FILE = CACHE_DIR.resolve("assessment_questions.json");
-
     @Autowired
     private AssessmentQuestionRepository assessmentQuestionRepository;
 
@@ -70,35 +64,6 @@ public class AssessmentQuestionController {
 
     @Autowired
     private MeasuredQualityTypesRepository measuredQualityTypesRepository;
-
-    private Optional<List<AssessmentQuestions>> readCache() {
-        try {
-            if (Files.exists(CACHE_FILE) && Files.size(CACHE_FILE) > 0) {
-                ObjectMapper mapper = new ObjectMapper();
-                List<AssessmentQuestions> cached = mapper.readValue(CACHE_FILE.toFile(),
-                        new TypeReference<List<AssessmentQuestions>>() {
-                        });
-                return Optional.ofNullable(cached);
-            }
-        } catch (IOException e) {
-            logger.error("Error reading assessment questions cache file", e);
-        }
-        return Optional.empty();
-    }
-
-    private void writeCache(List<AssessmentQuestions> data) {
-        System.out.println(CACHE_DIR);
-        System.out.println(CACHE_FILE);
-        try {
-            if (!Files.exists(CACHE_DIR)) {
-                Files.createDirectories(CACHE_DIR);
-            }
-            ObjectMapper mapper = new ObjectMapper();
-            mapper.writerWithDefaultPrettyPrinter().writeValue(CACHE_FILE.toFile(), data);
-        } catch (IOException e) {
-            logger.error("Error writing assessment questions cache file", e);
-        }
-    }
 
     private List<AssessmentQuestions> fetchAndTransformFromDb() {
         List<AssessmentQuestions> assementQuestionsObject = assessmentQuestionRepository.findByIsDeletedFalseOrIsDeletedIsNull();
@@ -116,6 +81,7 @@ public class AssessmentQuestionController {
 
     // When called: return cached JSON if present, otherwise fetch from DB, cache it
     // and return.
+    @Cacheable("assessmentQuestions")
     @GetMapping("/getAll")
     public List<AssessmentQuestions> getAllAssessmentQuestions() {
        
@@ -138,6 +104,7 @@ public class AssessmentQuestionController {
 
     
 
+    @CacheEvict(value = "assessmentQuestions", allEntries = true)
     @PostMapping(value = "/create", consumes = "application/json")
     public AssessmentQuestions createAssessmentQuestion(@RequestBody AssessmentQuestions assessmentQuestions)
             throws Exception {
@@ -177,14 +144,6 @@ public class AssessmentQuestionController {
 
         AssessmentQuestions assementQustionObject = assessmentQuestionRepository.save(assessmentQuestions);
 
-        // Refresh cache after create
-        try {
-            List<AssessmentQuestions> refreshed = fetchAndTransformFromDb();
-            writeCache(refreshed);
-        } catch (Exception e) {
-            logger.warn("Failed to refresh assessment questions cache after create", e);
-        }
-
         return assementQustionObject.getId() != null ? assementQustionObject : null;
     }
 
@@ -206,6 +165,7 @@ public class AssessmentQuestionController {
      * @param assessmentQuestions The updated question data
      * @return The saved question with all relationships
      */
+    @CacheEvict(value = "assessmentQuestions", allEntries = true)
     @PutMapping("/update/{id}")
     public AssessmentQuestions updateAssessmentQuestion(@PathVariable Long id,
             @RequestBody AssessmentQuestions assessmentQuestions) {
@@ -261,17 +221,10 @@ public class AssessmentQuestionController {
         // Step 5: Save the updated question (cascade saves options and scores)
         AssessmentQuestions saved = assessmentQuestionRepository.save(existingQuestion);
 
-        // Step 6: Refresh cache after update to keep it in sync
-        try {
-            List<AssessmentQuestions> refreshed = fetchAndTransformFromDb();
-            writeCache(refreshed);
-        } catch (Exception e) {
-            logger.warn("Failed to refresh assessment questions cache after update", e);
-        }
-
         return saved;
     }
 
+    @CacheEvict(value = "assessmentQuestions", allEntries = true)
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<String> deleteAssessmentQuestion(@PathVariable Long id) {
         // Soft delete: set isDeleted flag instead of removing from database
@@ -283,14 +236,6 @@ public class AssessmentQuestionController {
         question.setIsDeleted(true);
         assessmentQuestionRepository.save(question);
 
-        // refresh cache after soft delete
-        try {
-            List<AssessmentQuestions> refreshed = fetchAndTransformFromDb();
-            writeCache(refreshed);
-        } catch (Exception e) {
-            logger.warn("Failed to refresh assessment questions cache after delete", e);
-        }
-
         return ResponseEntity.ok("AssessmentQuestion soft-deleted successfully.");
     }
 
@@ -299,6 +244,7 @@ public class AssessmentQuestionController {
         return assessmentQuestionRepository.findByIsDeletedTrue();
     }
 
+    @CacheEvict(value = "assessmentQuestions", allEntries = true)
     @PutMapping("/restore/{id}")
     public ResponseEntity<String> restoreAssessmentQuestion(@PathVariable Long id) {
         AssessmentQuestions question = assessmentQuestionRepository.findById(id)
@@ -309,17 +255,10 @@ public class AssessmentQuestionController {
         question.setIsDeleted(false);
         assessmentQuestionRepository.save(question);
 
-        // refresh cache after restore
-        try {
-            List<AssessmentQuestions> refreshed = fetchAndTransformFromDb();
-            writeCache(refreshed);
-        } catch (Exception e) {
-            logger.warn("Failed to refresh assessment questions cache after restore", e);
-        }
-
         return ResponseEntity.ok("AssessmentQuestion restored successfully.");
     }
 
+    @CacheEvict(value = "assessmentQuestions", allEntries = true)
     @DeleteMapping("/permanent-delete/{id}")
     public ResponseEntity<String> permanentlyDeleteAssessmentQuestion(@PathVariable Long id) {
         assessmentQuestionRepository.deleteById(id);
@@ -508,6 +447,7 @@ public class AssessmentQuestionController {
      * @return Import result with success/failure counts and error messages
      * @throws Exception if file reading or parsing fails
      */
+    @CacheEvict(value = "assessmentQuestions", allEntries = true)
     @PostMapping("/import-excel")
     public ResponseEntity<Map<String, Object>> importQuestionsFromExcel(
             @RequestParam("file") MultipartFile file) throws Exception {
@@ -662,14 +602,6 @@ public class AssessmentQuestionController {
         }
 
         workbook.close();
-
-        // Step 5: Refresh cache after import to sync with database
-        try {
-            List<AssessmentQuestions> refreshed = fetchAndTransformFromDb();
-            writeCache(refreshed);
-        } catch (Exception e) {
-            logger.warn("Failed to refresh cache after import", e);
-        }
 
         logger.info("Excel import completed: {} success, {} failed", successCount, failedCount);
 

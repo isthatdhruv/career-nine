@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAssessment } from '../contexts/AssessmentContext';
 import { usePreventReload } from '../hooks/usePreventReload';
 import { AssessmentGameWrapper } from '../games/AssessmentGameWrapper';
+import { useDebouncedLocalStorage } from '../hooks/useDebouncedLocalStorage';
+import QuestionNavigationGrid from '../components/QuestionNavigationGrid';
 
 type GameTable = {
   gameId: number;
@@ -60,6 +62,7 @@ const SectionQuestionPage: React.FC = () => {
   const { assessmentData, assessmentConfig } = useAssessment();
   const showTimer = assessmentConfig?.showTimer !== false;
   usePreventReload();
+  const { scheduleWrite, flush: flushLocalStorage } = useDebouncedLocalStorage(500);
 
   const [questionnaire, setQuestionnaire] = useState<any>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -127,6 +130,9 @@ const SectionQuestionPage: React.FC = () => {
   });
   // Track which autocomplete dropdown is open: "questionId-inputIdx" or null
   const [activeAutocomplete, setActiveAutocomplete] = useState<string | null>(null);
+  // Local text input state for debouncing - immediate UI update without triggering re-renders
+  const [localTextInputs, setLocalTextInputs] = useState<Record<string, string>>({});
+  const textDebounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   // Track completed games: gameCode -> boolean
   const [completedGames, setCompletedGames] = useState<Record<number, boolean>>(() => {
     const stored = localStorage.getItem('assessmentCompletedGames');
@@ -151,53 +157,47 @@ const SectionQuestionPage: React.FC = () => {
     }
   }, [sectionId, questionIndex, assessmentData]);
 
-  // Save answers to localStorage whenever they change
+  // Debounced localStorage writes - batches all state into single write cycles
   useEffect(() => {
-    localStorage.setItem('assessmentAnswers', JSON.stringify(answers));
-  }, [answers]);
+    scheduleWrite('assessmentAnswers', JSON.stringify(answers));
+  }, [answers, scheduleWrite]);
 
-  // Save ranking answers to localStorage
   useEffect(() => {
-    localStorage.setItem('assessmentRankingAnswers', JSON.stringify(rankingAnswers));
-  }, [rankingAnswers]);
+    scheduleWrite('assessmentRankingAnswers', JSON.stringify(rankingAnswers));
+  }, [rankingAnswers, scheduleWrite]);
 
-  // Save savedForLater to localStorage (convert Sets to arrays for JSON)
   useEffect(() => {
     const toStore: Record<string, number[]> = {};
     for (const key in savedForLater) {
       toStore[key] = Array.from(savedForLater[key]);
     }
-    localStorage.setItem('assessmentSavedForLater', JSON.stringify(toStore));
-  }, [savedForLater]);
+    scheduleWrite('assessmentSavedForLater', JSON.stringify(toStore));
+  }, [savedForLater, scheduleWrite]);
 
-  // Save skipped to localStorage (convert Sets to arrays for JSON)
   useEffect(() => {
     const toStore: Record<string, number[]> = {};
     for (const key in skipped) {
       toStore[key] = Array.from(skipped[key]);
     }
-    localStorage.setItem('assessmentSkipped', JSON.stringify(toStore));
-  }, [skipped]);
+    scheduleWrite('assessmentSkipped', JSON.stringify(toStore));
+  }, [skipped, scheduleWrite]);
 
-  // Save elapsed time to localStorage
+  // Keep elapsed time as immediate write (timer accuracy matters)
   useEffect(() => {
     localStorage.setItem('assessmentElapsedTime', String(elapsedTime));
   }, [elapsedTime]);
 
-  // Save completed games to localStorage
   useEffect(() => {
-    localStorage.setItem('assessmentCompletedGames', JSON.stringify(completedGames));
-  }, [completedGames]);
+    scheduleWrite('assessmentCompletedGames', JSON.stringify(completedGames));
+  }, [completedGames, scheduleWrite]);
 
-  // Save text answers to localStorage
   useEffect(() => {
-    localStorage.setItem('assessmentTextAnswers', JSON.stringify(textAnswers));
-  }, [textAnswers]);
+    scheduleWrite('assessmentTextAnswers', JSON.stringify(textAnswers));
+  }, [textAnswers, scheduleWrite]);
 
-  // Save seen section instructions to localStorage
   useEffect(() => {
-    localStorage.setItem('assessmentSeenSectionInstructions', JSON.stringify(Array.from(seenSectionInstructions)));
-  }, [seenSectionInstructions]);
+    scheduleWrite('assessmentSeenSectionInstructions', JSON.stringify(Array.from(seenSectionInstructions)));
+  }, [seenSectionInstructions, scheduleWrite]);
 
   // Show section instruction popup when entering a new section (only once per section)
   useEffect(() => {
@@ -619,40 +619,50 @@ const SectionQuestionPage: React.FC = () => {
 
   const handleSubmitAssessment = async () => {
     if (areAllQuestionsAnswered()) {
-      try {
-        // Generate the submission JSON
-        const submissionJSON = generateSubmissionJSON();
-        console.log("=== ASSESSMENT SUBMISSION DATA ===");
-        console.log(JSON.stringify(submissionJSON, null, 2));
-        console.log("=== END OF SUBMISSION DATA ===");
+      // Flush any pending localStorage writes before submitting
+      flushLocalStorage();
 
-        // Send POST request to backend
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/assessment-answer/submit`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-          },
-          body: JSON.stringify(submissionJSON)
-        });
+      const submissionJSON = generateSubmissionJSON();
+      console.log("=== ASSESSMENT SUBMISSION DATA ===");
+      console.log(JSON.stringify(submissionJSON, null, 2));
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to submit assessment: ${errorText}`);
+      const maxRetries = 3;
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const response = await fetch(`${import.meta.env.VITE_API_URL}/assessment-answer/submit`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json"
+            },
+            body: JSON.stringify(submissionJSON),
+            signal: AbortSignal.timeout(30000), // 30s timeout
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to submit assessment: ${errorText}`);
+          }
+
+          const result = await response.json();
+          console.log("=== SUBMISSION SUCCESSFUL ===");
+          console.log("Saved answers:", result);
+
+          navigate("/studentAssessment/completed");
+          return;
+        } catch (error) {
+          console.error(`Submit attempt ${attempt}/${maxRetries} failed:`, error);
+          if (attempt < maxRetries) {
+            // Exponential backoff: 1s, 2s, 4s
+            const delay = Math.pow(2, attempt - 1) * 1000;
+            alert(`Submission failed (attempt ${attempt}/${maxRetries}). Retrying in ${delay / 1000}s...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          } else {
+            alert("Failed to submit assessment after 3 attempts. Your answers are saved locally. Please check your connection and try again.");
+          }
         }
-
-        const result = await response.json();
-        console.log("=== SUBMISSION SUCCESSFUL ===");
-        console.log("Saved answers:", result);
-
-        // Navigate to completion page
-        navigate("/studentAssessment/completed");
-      } catch (error) {
-        console.error("Error submitting assessment:", error);
-        alert("Failed to submit assessment. Please try again.");
       }
     } else {
-      // Show popup asking user to mark all answers
       setShowWarning(true);
     }
   };
@@ -669,7 +679,7 @@ const SectionQuestionPage: React.FC = () => {
     }
   };
 
-  const getQuestionColor = (secId: string, questionId: number) => {
+  const getQuestionColor = useCallback((secId: string, questionId: number) => {
     // Check regular answers
     if (answers[secId]?.[questionId]?.length) return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
     // Check ranking answers
@@ -683,7 +693,7 @@ const SectionQuestionPage: React.FC = () => {
     // Check skipped
     if (skipped[secId]?.has(questionId)) return "linear-gradient(135deg, #f87171 0%, #dc2626 100%)";
     return "#d1d5db";
-  };
+  }, [answers, rankingAnswers, textAnswers, savedForLater, skipped]);
 
   // Find the next unanswered question starting after the current position
   // Skips over already-answered questions so auto-advance lands on unanswered ones
@@ -1340,6 +1350,48 @@ const SectionQuestionPage: React.FC = () => {
                   const currentTexts = textAnswers[sectionId!]?.[qId] || {};
 
                   const handleTextInput = (inputIdx: number, value: string) => {
+                    const key = `${sectionId}-${qId}-${inputIdx}`;
+                    // Immediate local update for responsive UI
+                    setLocalTextInputs(prev => ({ ...prev, [key]: value }));
+
+                    // Clear previous debounce timer
+                    if (textDebounceRef.current[key]) {
+                      clearTimeout(textDebounceRef.current[key]);
+                    }
+
+                    // Debounce sync to main state (triggers localStorage write)
+                    textDebounceRef.current[key] = setTimeout(() => {
+                      setTextAnswers(prev => ({
+                        ...prev,
+                        [sectionId!]: {
+                          ...prev[sectionId!],
+                          [qId]: {
+                            ...(prev[sectionId!]?.[qId] || {}),
+                            [inputIdx]: value
+                          }
+                        }
+                      }));
+                      // Remove from skipped
+                      setSkipped(prev => {
+                        const s = new Set(prev[sectionId!] || []);
+                        s.delete(qId);
+                        return { ...prev, [sectionId!]: s };
+                      });
+                      // Clear local input once synced to main state
+                      setLocalTextInputs(prev => {
+                        const { [key]: _, ...rest } = prev;
+                        return rest;
+                      });
+                    }, 300);
+                  };
+
+                  const handleSelectSuggestion = (inputIdx: number, value: string) => {
+                    const key = `${sectionId}-${qId}-${inputIdx}`;
+                    // Clear any pending debounce for this input
+                    if (textDebounceRef.current[key]) {
+                      clearTimeout(textDebounceRef.current[key]);
+                    }
+                    // Sync immediately for suggestion selection (no debounce needed)
                     setTextAnswers(prev => ({
                       ...prev,
                       [sectionId!]: {
@@ -1350,16 +1402,16 @@ const SectionQuestionPage: React.FC = () => {
                         }
                       }
                     }));
-                    // Remove from skipped
                     setSkipped(prev => {
                       const s = new Set(prev[sectionId!] || []);
                       s.delete(qId);
                       return { ...prev, [sectionId!]: s };
                     });
-                  };
-
-                  const handleSelectSuggestion = (inputIdx: number, value: string) => {
-                    handleTextInput(inputIdx, value);
+                    // Clear local input
+                    setLocalTextInputs(prev => {
+                      const { [key]: _, ...rest } = prev;
+                      return rest;
+                    });
                     // Close dropdown by clearing focus state
                     setActiveAutocomplete(null);
                   };
@@ -1367,8 +1419,10 @@ const SectionQuestionPage: React.FC = () => {
                   return (
                     <div>
                       {Array.from({ length: maxInputs }, (_, inputIdx) => {
-                        const inputValue = (currentTexts[inputIdx] || '').toLowerCase();
-                        const thisBoxValue = (currentTexts[inputIdx] || '').trim().toLowerCase();
+                        const localKey = `${sectionId}-${qId}-${inputIdx}`;
+                        const displayValue = localTextInputs[localKey] ?? currentTexts[inputIdx] ?? '';
+                        const inputValue = displayValue.toLowerCase();
+                        const thisBoxValue = displayValue.trim().toLowerCase();
 
                         // Filter suggestions: existing mapped options always show,
                         // typed text only filters after 4+ characters
@@ -1397,7 +1451,7 @@ const SectionQuestionPage: React.FC = () => {
                               type="text"
                               className="form-control form-control-lg"
                               placeholder="Type your answer..."
-                              value={currentTexts[inputIdx] || ''}
+                              value={localTextInputs[localKey] ?? currentTexts[inputIdx] ?? ''}
                               onChange={(e) => {
                                 handleTextInput(inputIdx, e.target.value);
                                 setActiveAutocomplete(`${qId}-${inputIdx}`);
