@@ -9,6 +9,7 @@ const StudentLoginPage: React.FC = () => {
   const { prefetchAssessmentData } = useAssessment();
   const [userId, setUserId] = useState('');
   const [dob, setDob] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     localStorage.clear();
@@ -94,8 +95,13 @@ const StudentLoginPage: React.FC = () => {
 
     if (!userIdError && !dobError) {
       const requestBody = { dobDate: dob, username: userId };
+      setIsLoading(true);
       try {
         const { data } = await http.post('/user/auth', requestBody);
+        if (!data || !data.userStudentId) {
+          alert('Invalid credentials. Please try again.');
+          return;
+        }
         localStorage.clear();
         localStorage.setItem('userStudentId', data.userStudentId);
         localStorage.setItem('allottedAssessments', JSON.stringify(data.assessments));
@@ -106,6 +112,8 @@ const StudentLoginPage: React.FC = () => {
         } else {
           alert('An error occurred. Please try again later.');
         }
+      } finally {
+        setIsLoading(false);
       }
     }
   };
@@ -149,7 +157,7 @@ const StudentLoginPage: React.FC = () => {
               </div>
               {touched.dob && errors.dob && <div style={{ color: '#e53e3e', fontSize: '0.875rem', marginTop: '0.5rem' }}>{errors.dob}</div>}
             </div>
-            <button type="submit" className="btn w-100" style={{ padding: '0.875rem', fontSize: '1.1rem', fontWeight: '600', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', border: 'none', borderRadius: '10px', boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)', transition: 'all 0.3s ease', marginTop: '1rem' }} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.5)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.4)'; }}>Sign In</button>
+            <button type="submit" className="btn w-100" disabled={isLoading} style={{ padding: '0.875rem', fontSize: '1.1rem', fontWeight: '600', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', border: 'none', borderRadius: '10px', boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)', transition: 'all 0.3s ease', marginTop: '1rem', opacity: isLoading ? 0.7 : 1 }} onMouseEnter={(e) => { if (!isLoading) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.5)'; } }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.4)'; }}>{isLoading ? (<><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Signing In...</>) : 'Sign In'}</button>
             <div className="text-center mt-4" style={{ color: '#718096', fontSize: '0.9rem' }}>Need help? Contact your administrator</div>
           </form>
         </div>

@@ -12,6 +12,7 @@ type Section = {
 
 const SelectSectionPage: React.FC = () => {
   const [sections, setSections] = useState<Section[]>([]);
+  const [sectionsReady, setSectionsReady] = useState(false);
   const navigate = useNavigate();
   const { assessmentData, loading } = useAssessment();
   usePreventReload();
@@ -20,6 +21,11 @@ const SelectSectionPage: React.FC = () => {
     const checkStudentStatus = async () => {
       const assessmentId = localStorage.getItem('assessmentId');
       const userStudentId = localStorage.getItem('userStudentId');
+
+      if (!assessmentId || !userStudentId) {
+        navigate('/student-login', { replace: true });
+        return;
+      }
 
       if (assessmentId && userStudentId) {
         try {
@@ -61,6 +67,7 @@ const SelectSectionPage: React.FC = () => {
         } catch (error) {
           console.error("Failed to process sections:", error);
         }
+        setSectionsReady(true);
       }
     };
 
@@ -147,7 +154,7 @@ const SelectSectionPage: React.FC = () => {
           </p>
 
           {/* Loading State */}
-          {loading && (
+          {(loading || !sectionsReady) && (
             <div
               className="text-center my-5"
               style={{
@@ -173,7 +180,7 @@ const SelectSectionPage: React.FC = () => {
           )}
 
           {/* Empty State */}
-          {!loading && sections.length === 0 && (
+          {!loading && sectionsReady && sections.length === 0 && (
             <div
               className="text-center my-5"
               style={{
@@ -215,7 +222,7 @@ const SelectSectionPage: React.FC = () => {
           )}
 
           {/* Sections List */}
-          {!loading && sections.length > 0 && (
+          {!loading && sectionsReady && sections.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               {sections.map((section, index) => (
                 <div
@@ -330,7 +337,7 @@ const SelectSectionPage: React.FC = () => {
           )}
 
           {/* Footer Note */}
-          {!loading && sections.length > 0 && (
+          {!loading && sectionsReady && sections.length > 0 && (
             <div
               className="text-center mt-4"
               style={{

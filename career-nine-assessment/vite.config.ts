@@ -4,6 +4,20 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   plugins: [
+    // Rewrite requests for mediapipe/face_mesh WASM files to /mediapipe/face_mesh/
+    // WebGazer resolves these relative to the current page URL, which breaks on
+    // nested routes like /studentAssessment/sections/19/questions/0
+    {
+      name: 'mediapipe-wasm-rewrite',
+      configureServer(server) {
+        server.middlewares.use((req, _res, next) => {
+          if (req.url && req.url.includes('mediapipe/face_mesh/')) {
+            req.url = '/mediapipe/face_mesh/' + req.url.split('mediapipe/face_mesh/').pop();
+          }
+          next();
+        });
+      },
+    },
     react(),
     VitePWA({
       registerType: 'autoUpdate',

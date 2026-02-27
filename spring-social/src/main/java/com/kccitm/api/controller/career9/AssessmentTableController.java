@@ -123,6 +123,7 @@ public class AssessmentTableController {
         return ResponseEntity.ok(result);
     }
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     @GetMapping("/getby/{id}")
     public List<Questionnaire> getQuestionnaireById(@PathVariable Long id) {
 
@@ -131,6 +132,7 @@ public class AssessmentTableController {
         return questionnaireRepository.findAllByQuestionnaireId(questionnaireId);
     }
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     @Cacheable(value = "assessmentDetails", key = "#id")
     @GetMapping("/getById/{id}")
     public ResponseEntity<AssessmentTable> getAssessmentDetailsById(@PathVariable Long id) {

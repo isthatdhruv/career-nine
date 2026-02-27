@@ -1,8 +1,21 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const ThankYouPage: React.FC = () => {
     const navigate = useNavigate();
+
+    // Clean up webcam/WebGazer on mount
+    useEffect(() => {
+        const webgazerVideo = document.getElementById('webgazerVideoFeed') as HTMLVideoElement | null;
+        if (webgazerVideo && webgazerVideo.srcObject) {
+            (webgazerVideo.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
+            webgazerVideo.srcObject = null;
+        }
+        ['webgazerVideoContainer', 'webgazerFaceFeedbackBox', 'webgazerGazeDot', 'webgazerFaceOverlay'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        });
+    }, []);
 
     const handleGoToDashboard = () => {
         navigate('/student-dashboard');

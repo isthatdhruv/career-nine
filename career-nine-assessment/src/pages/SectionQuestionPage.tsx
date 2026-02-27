@@ -5,6 +5,12 @@ import { usePreventReload } from '../hooks/usePreventReload';
 import { AssessmentGameWrapper } from '../games/AssessmentGameWrapper';
 import { useDebouncedLocalStorage } from '../hooks/useDebouncedLocalStorage';
 import QuestionNavigationGrid from '../components/QuestionNavigationGrid';
+import { useEyeGazeTracking } from '../hooks/useFaceTracking';
+import { useFaceCounter } from '../hooks/useFaceCounter';
+import { useMouseClickTracker } from '../hooks/useMouseClickTracker';
+import { usePerQuestionProctoring } from '../hooks/usePerQuestionProctoring';
+import { submitProctoringData } from '../api/proctoringApi';
+import type { ProctoringPayload } from '../types/proctoring';
 
 type GameTable = {
   gameId: number;
@@ -64,9 +70,23 @@ const SectionQuestionPage: React.FC = () => {
   usePreventReload();
   const { scheduleWrite, flush: flushLocalStorage } = useDebouncedLocalStorage(500);
 
+  // Proctoring hooks — eye gaze, face counting, mouse tracking, per-question aggregation
+  const faceCountRef = useRef<number>(0);
+  const { snapshots: proctoringSnapshots, videoElement } = useEyeGazeTracking({ faceCountRef });
+  useFaceCounter({ videoElement, faceCountRef });
+  const { clicks: proctoringClicks } = useMouseClickTracker();
+
   const [questionnaire, setQuestionnaire] = useState<any>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
+
+  // Derive current questionnaireQuestionId for proctoring (null when data not loaded)
+  const currentQuestionnaireQuestionId = questions[currentIndex]?.questionnaireQuestionId ?? null;
+  const { perQuestionData, finalizeCurrentQuestion } = usePerQuestionProctoring({
+    questionnaireQuestionId: currentQuestionnaireQuestionId,
+    proctoringSnapshots,
+    proctoringClicks,
+  });
   const [languages, setLanguages] = useState<QuestionnaireLanguage[]>([]);
   const [currentSection, setCurrentSection] = useState<any>(null);
   const [showWarning, setShowWarning] = useState<boolean>(false);
@@ -633,9 +653,25 @@ const SectionQuestionPage: React.FC = () => {
       // Flush any pending localStorage writes before submitting
       flushLocalStorage();
 
+      // Finalize the current question's proctoring data before submission
+      finalizeCurrentQuestion();
+
       const submissionJSON = generateSubmissionJSON();
       console.log("=== ASSESSMENT SUBMISSION DATA ===");
       console.log(JSON.stringify(submissionJSON, null, 2));
+
+      // Build proctoring payload from collected per-question data
+      const userStudentId = localStorage.getItem('userStudentId')
+        ? parseInt(localStorage.getItem('userStudentId')!)
+        : 0;
+      const assessmentId = localStorage.getItem('assessmentId')
+        ? parseInt(localStorage.getItem('assessmentId')!)
+        : 0;
+      const proctoringPayload: ProctoringPayload = {
+        userStudentId,
+        assessmentId,
+        perQuestionData: Array.from(perQuestionData.current.values()),
+      };
 
       const maxRetries = 3;
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -658,6 +694,14 @@ const SectionQuestionPage: React.FC = () => {
           const result = await response.json();
           console.log("=== SUBMISSION SUCCESSFUL ===");
           console.log("Saved answers:", result);
+
+          // Submit proctoring data (fire-and-forget — don't block navigation)
+          submitProctoringData(proctoringPayload)
+            .then(() => {
+              console.log("=== PROCTORING DATA SUBMITTED ===");
+              localStorage.removeItem('proctoring_per_question');
+            })
+            .catch((err) => console.warn("Proctoring submit failed:", err));
 
           navigate("/studentAssessment/completed");
           return;
@@ -1273,6 +1317,7 @@ const SectionQuestionPage: React.FC = () => {
 
             {availableLanguages.length > 0 ? (
               <div
+                data-proctoring="question-text"
                 style={{
                   display: "grid",
                   gridTemplateColumns: availableLanguages.length > 1 ? "1fr 1px 1fr" : "1fr",
@@ -1305,7 +1350,7 @@ const SectionQuestionPage: React.FC = () => {
                 ))}
               </div>
             ) : (
-              <h4 className="mb-4" style={{ fontSize: "1.2rem", color: "#1a202c", fontWeight: 500 }}>{question.question.questionText}</h4>
+              <h4 data-proctoring="question-text" className="mb-4" style={{ fontSize: "1.2rem", color: "#1a202c", fontWeight: 500 }}>{question.question.questionText}</h4>
             )}
 
             {/* Display maxOptionsAllowed */}
@@ -1514,6 +1559,7 @@ const SectionQuestionPage: React.FC = () => {
                     return (
                       <div
                         key={opt.optionId}
+                        data-proctoring-option-id={opt.optionId}
                         className="rounded p-4 mb-3"
                         style={{ border: "1px solid #dee2e6", background: "#faf5ff" }}
                       >
@@ -1580,6 +1626,7 @@ const SectionQuestionPage: React.FC = () => {
                     return (
                       <div
                         key={opt.optionId}
+                        data-proctoring-option-id={opt.optionId}
                         className="rounded p-3 d-block mb-2"
                         style={{ display: "flex", alignItems: "center", gap: "15px", background: currentRank ? "#f8f9fa" : "#fff", border: "1px solid #dee2e6" }}
                       >
@@ -1638,6 +1685,7 @@ const SectionQuestionPage: React.FC = () => {
                   return (
                     <label
                       key={opt.optionId}
+                      data-proctoring-option-id={opt.optionId}
                       className="rounded p-3 d-block mb-2"
                       style={{ cursor: "pointer", background: selectedOptions.includes(opt.optionId) ? "#f8f9fa" : "#fff", border: "1px solid #dee2e6" }}
                     >

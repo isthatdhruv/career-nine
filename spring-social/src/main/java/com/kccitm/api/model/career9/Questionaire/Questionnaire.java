@@ -37,11 +37,11 @@ public class Questionnaire implements Serializable {
     private Tool tool;
 
     // List of languages supported by this questionnaire
-    @OneToMany(mappedBy = "questionnaire", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "questionnaire", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnoreProperties("questionnaire")
     private List<QuestionnaireLanguage> languages;
 
-    @OneToMany(mappedBy = "questionnaire", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "questionnaire", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnoreProperties("questionnaire")
     private List<QuestionnaireSection> section;
 

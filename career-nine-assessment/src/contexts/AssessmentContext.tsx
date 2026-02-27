@@ -20,22 +20,24 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [error, setError] = useState<string | null>(null);
   const [prefetchedAssessments, setPrefetchedAssessments] = useState<any[] | null>(null);
   const prefetchingRef = useRef(false);
+  const prefetchPromiseRef = useRef<Promise<void> | null>(null);
 
   const prefetchAssessmentData = (userStudentId: string) => {
     if (prefetchingRef.current || !userStudentId.trim()) return;
     prefetchingRef.current = true;
 
-    http.get(`/assessments/prefetch/${userStudentId}`)
-      .then(({ data }) => {
+    const promise = http.get(`/assessments/prefetch/${userStudentId}`)
+      .then(async ({ data }) => {
         if (data && Array.isArray(data) && data.length > 0) {
           setPrefetchedAssessments(data);
           // Also prefetch the full questionnaire data for the first active assessment
           const firstActive = data.find((a: any) => a.isActive && a.questionnaireId);
           if (firstActive) {
-            Promise.all([
-              http.get(`/assessments/getby/${firstActive.assessmentId}`),
-              http.get(`/assessments/getById/${firstActive.assessmentId}`),
-            ]).then(([questionnaireRes, configRes]) => {
+            try {
+              const [questionnaireRes, configRes] = await Promise.all([
+                http.get(`/assessments/getby/${firstActive.assessmentId}`),
+                http.get(`/assessments/getById/${firstActive.assessmentId}`),
+              ]);
               try {
                 sessionStorage.setItem('assessmentData', JSON.stringify(questionnaireRes.data));
                 sessionStorage.setItem('assessmentConfig', JSON.stringify(configRes.data));
@@ -44,9 +46,9 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               }
               setAssessmentData(questionnaireRes.data);
               setAssessmentConfig(configRes.data);
-            }).catch(() => {
+            } catch {
               // Prefetch failure is non-critical
-            });
+            }
           }
         }
       })
@@ -55,10 +57,16 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       })
       .finally(() => {
         prefetchingRef.current = false;
+        prefetchPromiseRef.current = null;
       });
+    prefetchPromiseRef.current = promise;
   };
 
   const fetchAssessmentData = async (assessmentId: string): Promise<void> => {
+    // Wait for any in-flight prefetch to complete first
+    if (prefetchPromiseRef.current) {
+      await prefetchPromiseRef.current;
+    }
     // If data was already prefetched, skip the API call
     if (assessmentData && assessmentConfig) {
       return;
