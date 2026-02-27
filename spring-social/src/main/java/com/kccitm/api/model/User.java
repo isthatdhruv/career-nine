@@ -79,6 +79,9 @@ public class User implements Serializable {
     @Column(nullable = true)
     private String username;
 
+    @Column(name="career_nine_rollnumber", nullable = true)
+    private String careerNineRollNumber;
+
     private String imageUrl;
 
     @Column(nullable = true)
@@ -340,5 +343,13 @@ public class User implements Serializable {
 
     public void setGroups(Set<Group> groups) {
         this.groups = groups;
+    }
+
+    public String getCareerNineRollNumber() {
+        return careerNineRollNumber;
+    }
+
+    public void setCareerNineRollNumber(String careerNineRollNumber) {
+        this.careerNineRollNumber = careerNineRollNumber;
     }
 }
