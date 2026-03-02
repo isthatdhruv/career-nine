@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.transaction.Transactional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,17 +16,15 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import javax.transaction.Transactional;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kccitm.api.model.career9.AssessmentProctoringQuestionLog;
 import com.kccitm.api.model.career9.AssessmentTable;
-import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
+import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.repository.Career9.AssessmentProctoringQuestionLogRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
-import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
+import com.kccitm.api.repository.Career9.UserStudentRepository;
 
 @RestController
 @RequestMapping("/assessment-proctoring")
@@ -159,6 +159,12 @@ public class AssessmentProctoringController {
                             ? log.getQuestionnaireQuestion().getQuestion().getQuestionText() : "");
                     row.put("screenWidth", log.getScreenWidth());
                     row.put("screenHeight", log.getScreenHeight());
+                    // Include raw JSON fields for proctoring (gaze, rects, mouse clicks, eye gaze)
+                    row.put("questionRectJson", log.getQuestionRectJson());
+                    row.put("optionsRectJson", log.getOptionsRectJson());
+                    row.put("gazePointsJson", log.getGazePointsJson());
+                    row.put("mouseClicksJson", log.getMouseClicksJson());
+                    row.put("eyeGazePointsJson", log.getEyeGazePointsJson());
                     row.put("timeSpentMs", log.getTimeSpentMs());
                     row.put("questionStartTime", log.getQuestionStartTime());
                     row.put("questionEndTime", log.getQuestionEndTime());
