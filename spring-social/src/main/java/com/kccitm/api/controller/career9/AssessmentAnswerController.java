@@ -106,6 +106,9 @@ public class AssessmentAnswerController {
     public ResponseEntity<?> submitAssessmentAnswers(@RequestBody Map<String, Object> submissionData) {
         try {
             // 1. Basic Extraction & Validation
+            if (submissionData.get("userStudentId") == null || submissionData.get("assessmentId") == null) {
+                return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
+            }
             Long userStudentId = ((Number) submissionData.get("userStudentId")).longValue();
             Long assessmentId = ((Number) submissionData.get("assessmentId")).longValue();
 
@@ -145,6 +148,9 @@ public class AssessmentAnswerController {
             }
 
             List<Map<String, Object>> answers = (List<Map<String, Object>>) submissionData.get("answers");
+            if (answers == null || answers.isEmpty()) {
+                return ResponseEntity.badRequest().body("No answers provided");
+            }
 
             // 4. Pre-fetch all needed entities in bulk
             // Collect all questionnaireQuestion IDs and option IDs
@@ -186,6 +192,7 @@ public class AssessmentAnswerController {
             Map<Long, Integer> qualityTypeScores = new HashMap<>();
             Map<Long, MeasuredQualityTypes> qualityTypeCache = new HashMap<>();
             List<AssessmentAnswer> answersToSave = new ArrayList<>();
+            int skippedCount = 0;
 
             for (Map<String, Object> ansMap : answers) {
                 Long qId = ((Number) ansMap.get("questionnaireQuestionId")).longValue();
@@ -210,9 +217,16 @@ public class AssessmentAnswerController {
                         ans.setOption(mappedOpt);
                         answersToSave.add(ans);
 
+                        // Fetch scores for mapped option if not already in cache
+                        Long mappedOptId = mappedOpt.getOptionId();
+                        if (!scoresByOptionId.containsKey(mappedOptId)) {
+                            List<OptionScoreBasedOnMEasuredQualityTypes> mappedScores =
+                                    optionScoreRepository.findByOptionId(mappedOptId);
+                            scoresByOptionId.put(mappedOptId, mappedScores);
+                        }
                         // Accumulate scores from the mapped option
                         List<OptionScoreBasedOnMEasuredQualityTypes> scores = scoresByOptionId
-                                .getOrDefault(mappedOpt.getOptionId(), java.util.Collections.emptyList());
+                                .getOrDefault(mappedOptId, java.util.Collections.emptyList());
                         for (OptionScoreBasedOnMEasuredQualityTypes s : scores) {
                             MeasuredQualityTypes type = s.getMeasuredQualityType();
                             Long typeId = type.getMeasuredQualityTypeId();
@@ -235,33 +249,37 @@ public class AssessmentAnswerController {
 
                     AssessmentQuestionOptions option = optionCache.get(oId);
 
-                    if (question != null && option != null) {
-                        AssessmentAnswer ans = new AssessmentAnswer();
-                        ans.setUserStudent(userStudent);
-                        ans.setAssessment(assessment);
-                        ans.setQuestionnaireQuestion(question);
-                        ans.setOption(option);
+                    if (question == null || option == null) {
+                        skippedCount++;
+                        continue;
+                    }
 
-                        if (rankOrder != null) {
-                            ans.setRankOrder(rankOrder);
-                        }
+                    AssessmentAnswer ans = new AssessmentAnswer();
+                    ans.setUserStudent(userStudent);
+                    ans.setAssessment(assessment);
+                    ans.setQuestionnaireQuestion(question);
+                    ans.setOption(option);
 
-                        answersToSave.add(ans);
+                    if (rankOrder != null) {
+                        ans.setRankOrder(rankOrder);
+                    }
 
-                        // Accumulate Scores from bulk-fetched data
-                        List<OptionScoreBasedOnMEasuredQualityTypes> scores = scoresByOptionId
-                                .getOrDefault(oId, java.util.Collections.emptyList());
-                        for (OptionScoreBasedOnMEasuredQualityTypes s : scores) {
-                            MeasuredQualityTypes type = s.getMeasuredQualityType();
-                            Long typeId = type.getMeasuredQualityTypeId();
-                            qualityTypeScores.merge(typeId, s.getScore(), Integer::sum);
-                            qualityTypeCache.putIfAbsent(typeId, type);
-                        }
+                    answersToSave.add(ans);
+
+                    // Accumulate Scores from bulk-fetched data
+                    List<OptionScoreBasedOnMEasuredQualityTypes> scores = scoresByOptionId
+                            .getOrDefault(oId, java.util.Collections.emptyList());
+                    for (OptionScoreBasedOnMEasuredQualityTypes s : scores) {
+                        MeasuredQualityTypes type = s.getMeasuredQualityType();
+                        Long typeId = type.getMeasuredQualityTypeId();
+                        qualityTypeScores.merge(typeId, s.getScore(), Integer::sum);
+                        qualityTypeCache.putIfAbsent(typeId, type);
                     }
                 }
             }
 
-            // 6. Batch save all answers
+            // 6. Delete old answers (prevents duplicates on re-submission) then batch save
+            assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
             assessmentAnswerRepository.saveAll(answersToSave);
 
             // 7. Update Raw Scores (Delete old, Batch save new)
@@ -282,7 +300,12 @@ public class AssessmentAnswerController {
             }
             assessmentRawScoreRepository.saveAll(rawScoresToSave);
 
-            return ResponseEntity.ok(Map.of("status", "success", "scoresSaved", rawScoresToSave.size()));
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "scoresSaved", rawScoresToSave.size(),
+                    "answersSaved", answersToSave.size(),
+                    "skippedAnswers", skippedCount
+            ));
 
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Error: " + e.getMessage());

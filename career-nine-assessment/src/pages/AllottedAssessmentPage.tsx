@@ -9,6 +9,7 @@ type Assessment = {
   assessmentName: string;
   studentStatus: string | null;
   isActive: boolean;
+  isLocked?: boolean;
 };
 
 export default function AllottedAssessmentPage() {

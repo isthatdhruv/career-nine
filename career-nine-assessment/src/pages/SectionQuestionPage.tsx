@@ -333,7 +333,8 @@ const SectionQuestionPage: React.FC = () => {
           isAnswered = Object.values(texts).some((t: string) => t.trim().length > 0);
         } else if (isRankingQuestion) {
           const rankings = rankingAnswers[secId]?.[qId] || {};
-          isAnswered = Object.keys(rankings).length > 0;
+          const totalOptions = q.question.options?.length || 0;
+          isAnswered = Object.keys(rankings).length >= totalOptions;
         } else {
           isAnswered = answers[secId]?.[qId]?.length > 0;
         }
@@ -657,6 +658,14 @@ const SectionQuestionPage: React.FC = () => {
       finalizeCurrentQuestion();
 
       const submissionJSON = generateSubmissionJSON();
+
+      // Guard against missing session data
+      if (!submissionJSON.userStudentId || !submissionJSON.assessmentId) {
+        alert("Session data missing. Please log in again.");
+        navigate("/studentAssessment/login");
+        return;
+      }
+
       console.log("=== ASSESSMENT SUBMISSION DATA ===");
       console.log(JSON.stringify(submissionJSON, null, 2));
 
@@ -702,6 +711,15 @@ const SectionQuestionPage: React.FC = () => {
               localStorage.removeItem('proctoring_per_question');
             })
             .catch((err) => console.warn("Proctoring submit failed:", err));
+
+          // Clear all assessment-related localStorage to prevent stale data
+          localStorage.removeItem('assessmentAnswers');
+          localStorage.removeItem('assessmentRankingAnswers');
+          localStorage.removeItem('assessmentTextAnswers');
+          localStorage.removeItem('assessmentSavedForLater');
+          localStorage.removeItem('assessmentSkipped');
+          localStorage.removeItem('assessmentElapsedTime');
+          localStorage.removeItem('assessmentCompletedGames');
 
           navigate("/studentAssessment/completed");
           return;
