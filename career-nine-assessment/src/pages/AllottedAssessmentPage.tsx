@@ -80,18 +80,19 @@ export default function AllottedAssessmentPage() {
       localStorage.setItem('assessmentId', String(assessment.assessmentId));
 
       // Check if demographic fields are configured and need to be filled
+      console.log('[Demographics] Checking status for assessment:', assessment.assessmentId, 'student:', userStudentId);
       const statusRes = await http.get(
         `/student-demographics/status/${assessment.assessmentId}/${userStudentId}`
       );
       const demographicStatus = statusRes.data;
+      console.log('[Demographics] Status response:', demographicStatus);
 
-      if (demographicStatus.totalFields > 0 && !demographicStatus.completed) {
-        // Redirect to dynamic demographics form
+      if (demographicStatus.totalFields > 0) {
         navigate(`/demographics/${assessment.assessmentId}`);
         return;
       }
 
-      // No demographics needed or already completed - proceed directly
+      // No demographics needed or already completed - start assessment directly
       await http.post('/assessments/startAssessment', { userStudentId: Number(userStudentId), assessmentId: assessment.assessmentId });
 
       await fetchAssessmentData(String(assessment.assessmentId));
@@ -402,7 +403,7 @@ export default function AllottedAssessmentPage() {
                       {loadingId === assessment.assessmentId ? (
                         <>
                           <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                          <span>Loading...</span>
+                          <span>Preparing Assessment...</span>
                         </>
                       ) : (
                         <>

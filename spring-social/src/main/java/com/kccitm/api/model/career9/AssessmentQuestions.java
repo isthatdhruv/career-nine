@@ -11,13 +11,17 @@ import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
+import javax.persistence.Index;
 import javax.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 
 @Entity
-@Table(name = "assessment_questions")
+@Table(name = "assessment_questions",
+       indexes = {
+           @Index(name = "idx_question_deleted", columnList = "is_deleted")
+       })
 public class AssessmentQuestions implements Serializable {
     private static final long serialVersionUID = 1L;
 

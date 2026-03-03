@@ -1,8 +1,21 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const ThankYouPage: React.FC = () => {
     const navigate = useNavigate();
+
+    // Clean up webcam/WebGazer on mount
+    useEffect(() => {
+        const webgazerVideo = document.getElementById('webgazerVideoFeed') as HTMLVideoElement | null;
+        if (webgazerVideo && webgazerVideo.srcObject) {
+            (webgazerVideo.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
+            webgazerVideo.srcObject = null;
+        }
+        ['webgazerVideoContainer', 'webgazerFaceFeedbackBox', 'webgazerGazeDot', 'webgazerFaceOverlay'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        });
+    }, []);
 
     const handleGoToDashboard = () => {
         navigate('/student-dashboard');
@@ -174,7 +187,7 @@ const ThankYouPage: React.FC = () => {
                         }}
                     >
                         {/* Dashboard Button Card */}
-                        <div
+                        {/* <div
                             onClick={handleGoToDashboard}
                             style={{
                                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -229,7 +242,7 @@ const ThankYouPage: React.FC = () => {
                             }}>
                                 Comprehensive Student Insight Dashboard
                             </p>
-                        </div>
+                        </div> */}
 
                         {/* Career Library Button Card */}
                         <div

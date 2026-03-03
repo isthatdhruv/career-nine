@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { MDBDataTableV5 } from "mdbreact";
 import { AiFillEdit } from "react-icons/ai";
-import { FaLock, FaLockOpen } from "react-icons/fa";
+import { FaLock, FaLockOpen, FaFileDownload } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { DeactivateAssessment, LockAssessment, UnlockAssessment } from "../../API/Create_Assessment_APIs";
+import { generateOMRSheet } from "../../utils/generateOMRSheet";
 
 const AssessmentTable = (props: {
   data: any;
@@ -14,6 +15,21 @@ const AssessmentTable = (props: {
 }) => {
   const navigate = useNavigate();
   const [showLockedModal, setShowLockedModal] = useState(false);
+  const [omrLoading, setOmrLoading] = useState<number | null>(null);
+
+  const handleDownloadOMR = async (data: any) => {
+    const id = data.id || data.assessmentId;
+    const name = data.AssessmentName || data.assessmentName || "Assessment";
+    setOmrLoading(id);
+    try {
+      await generateOMRSheet(id, name);
+    } catch (error) {
+      console.error("OMR generation failed:", error);
+      alert("Failed to generate OMR sheet. Please try again.");
+    } finally {
+      setOmrLoading(null);
+    }
+  };
 
   const handleToggleLock = async (data: any) => {
     const id = data.id || data.assessmentId;
@@ -116,6 +132,18 @@ const AssessmentTable = (props: {
               size={22}
               strokeColor={"#EFF8FE"}
             />
+          </button>
+          <button
+            onClick={() => handleDownloadOMR(data)}
+            className="btn btn-icon btn-info btn-sm"
+            title="Download OMR Sheet"
+            disabled={omrLoading === (data.id || data.assessmentId)}
+          >
+            {omrLoading === (data.id || data.assessmentId) ? (
+              <span className="spinner-border spinner-border-sm" />
+            ) : (
+              <FaFileDownload size={14} />
+            )}
           </button>
         </>
       ),

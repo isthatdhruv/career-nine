@@ -20,4 +20,10 @@ public interface QuestionnaireQuestionRepository extends JpaRepository<Questionn
            "ORDER BY qq.questionnaireQuestionId")
     List<QuestionnaireQuestion> findByQuestionnaireIdWithOptions(
             @Param("questionnaireId") Long questionnaireId);
+
+    @Query("SELECT qq FROM QuestionnaireQuestion qq " +
+           "JOIN FETCH qq.question q " +
+           "LEFT JOIN FETCH q.options o " +
+           "WHERE qq.questionnaireQuestionId IN :ids")
+    List<QuestionnaireQuestion> findAllByIdIn(@Param("ids") List<Long> ids);
 }

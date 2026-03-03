@@ -9,6 +9,7 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
+import javax.persistence.Index;
 import javax.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -18,7 +19,11 @@ import com.kccitm.api.model.career9.UserStudent;
 
 
 @Entity
-@Table(name = "assessment_answer")
+@Table(name = "assessment_answer",
+       indexes = {
+           @Index(name = "idx_answer_student_assessment", columnList = "user_student_id, assessment_id"),
+           @Index(name = "idx_answer_question", columnList = "questionnaire_question_id")
+       })
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class AssessmentAnswer implements Serializable {
 

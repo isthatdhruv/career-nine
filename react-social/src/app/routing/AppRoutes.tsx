@@ -26,11 +26,6 @@ import StudentLoginPage from "../pages/StudentLogin/StudentLoginPage";
 import DemographicDetailsPage from "../pages/StudentLogin/DemographicDetailsPage";
 import DynamicDemographicForm from "../pages/StudentLogin/DynamicDemographicForm";
 import AllottedAssessmentPage from "../pages/StudentLogin/AllottedAssessmentPage";
-import SectionInstructionPage from "../pages/StudentOnlineAssessment/components/SectionInstructionPage";
-import SectionQuestionPage from "../pages/StudentOnlineAssessment/components/SectionQuestionPage";
-import GeneralInstructionsPage from "../pages/StudentOnlineAssessment/components/GeneralInstructionsPage";
-
-import SelectSectionPage from "../pages/StudentOnlineAssessment/components/SelectSectionPage";
 import PrincipalDashboard from "../pages/PrincipalDashboard/PrincipalDashboard";
 import { MasterLayout } from "../../_metronic/layout/MasterLayout";
 
@@ -106,23 +101,12 @@ const AppRoutes: FC = () => {
           </SuspensedView>
         }
       />
-      <Route path="/studentAssessment" element={<SelectSectionPage />} />
-            <Route
-              path="/studentAssessment/sections/:sectionId"
-              element={<SectionInstructionPage />}
-            />
-            <Route
-              path="/studentAssessment/sections/:sectionId/questions/:questionIndex"
-              element={<SectionQuestionPage />}
-            />
+     
             <Route
               path="/allotted-assessment"
               element={<AllottedAssessmentPage />}
             />
-            <Route
-              path="/general-instructions"
-              element={<GeneralInstructionsPage />}
-            />
+    
             <Route
               path="/demographics/:assessmentId"
               element={<DynamicDemographicForm />}
