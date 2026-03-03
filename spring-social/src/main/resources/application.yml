@@ -1,6 +1,6 @@
 spring:
   profiles:
-    active: dev
+    active: staging
 
 server:
   port: 8080
@@ -14,17 +14,11 @@ server:
 spring:
   profiles: dev
   datasource:
-    url: jdbc:mysql://localhost:3307/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3306/live-db?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     # url: jdbc:mysql://192.168.10.73:3306/kiraya-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     username: root
-    password: Career-qCsfeuECc3MW
-    # password: MyStrongPass@123
-    hikari:
-      maximum-pool-size: 30
-      minimum-idle: 10
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
+    # password: Career-qCsfeuECc3MW
+    password: MyStrongPass@123
   jpa:
     show-sql: true
     hibernate:
@@ -33,15 +27,6 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5InnoDBDialect
-        jdbc:
-          batch_size: 30
-        order_inserts: true
-        order_updates: true
-  cache:
-    type: caffeine
-    caffeine:
-      spec: maximumSize=500,expireAfterWrite=600s
-    cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
   mail:
     host: smtp.gmail.com
     port: 587
@@ -151,15 +136,6 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5InnoDBDialect
-        jdbc:
-          batch_size: 30
-        order_inserts: true
-        order_updates: true
-  cache:
-    type: caffeine
-    caffeine:
-      spec: maximumSize=500,expireAfterWrite=600s
-    cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
   mail:
     host: smtp.gmail.com
     port: 587
@@ -257,12 +233,7 @@ spring:
     username: root
     password: qCsfeuECc3MW
     # password: Google.com1
-    hikari:
-      maximum-pool-size: 30
-      minimum-idle: 10
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
+
   jpa:
     show-sql: true
     hibernate:
@@ -271,15 +242,6 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5InnoDBDialect
-        jdbc:
-          batch_size: 30
-        order_inserts: true
-        order_updates: true
-  cache:
-    type: caffeine
-    caffeine:
-      spec: maximumSize=500,expireAfterWrite=600s
-    cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
   mail:
     host: smtp.gmail.com
     port: 587
