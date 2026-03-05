@@ -15,7 +15,9 @@ import java.util.stream.Collectors;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.FillPatternType;
 import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -35,6 +37,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.AssessmentRawScore;
+import com.kccitm.api.model.career9.MeasuredQualities;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
@@ -651,7 +654,7 @@ public class StudentInfoController {
             for (UserStudent us : userStudents) {
                 Optional<StudentAssessmentMapping> mappingOpt = studentAssessmentMappingRepository
                         .findFirstByUserStudentUserStudentIdAndAssessmentId(us.getUserStudentId(), assessmentId);
-                if (mappingOpt.isPresent()) {
+                if (mappingOpt.isPresent() && "completed".equals(mappingOpt.get().getStatus())) {
                     StudentAssessmentMapping mapping = mappingOpt.get();
                     mappingIds.add(mapping.getStudentAssessmentId());
                     mappingByUserStudentId.put(us.getUserStudentId(), mapping);
@@ -663,56 +666,127 @@ public class StudentInfoController {
                     ? new ArrayList<>()
                     : assessmentRawScoreRepository.findByStudentAssessmentMappingStudentAssessmentIdIn(mappingIds);
 
-            // Collect all unique MQT names (in order)
-            Set<String> mqtNamesSet = new LinkedHashSet<>();
+            // Group scores by MeasuredQuality -> MeasuredQualityType
+            // Build ordered structure: Quality -> [Type1, Type2, ...]
+            Map<String, Set<String>> qualityToTypesOrdered = new LinkedHashMap<>();
             Map<Long, Map<String, Integer>> scoresByMappingId = new HashMap<>();
 
             for (AssessmentRawScore score : allScores) {
                 Long mappingId = score.getStudentAssessmentMapping().getStudentAssessmentId();
-                String mqtName = score.getMeasuredQualityType().getMeasuredQualityTypeDisplayName() != null
+
+                String qualityName = "";
+                if (score.getMeasuredQuality() != null) {
+                    qualityName = score.getMeasuredQuality().getQualityDisplayName() != null
+                            ? score.getMeasuredQuality().getQualityDisplayName()
+                            : score.getMeasuredQuality().getMeasuredQualityName();
+                } else if (score.getMeasuredQualityType() != null && score.getMeasuredQualityType().getMeasuredQuality() != null) {
+                    MeasuredQualities mq = score.getMeasuredQualityType().getMeasuredQuality();
+                    qualityName = mq.getQualityDisplayName() != null ? mq.getQualityDisplayName() : mq.getMeasuredQualityName();
+                }
+                if (qualityName == null || qualityName.isEmpty()) qualityName = "Other";
+
+                String typeName = score.getMeasuredQualityType().getMeasuredQualityTypeDisplayName() != null
                         ? score.getMeasuredQualityType().getMeasuredQualityTypeDisplayName()
                         : score.getMeasuredQualityType().getMeasuredQualityTypeName();
 
-                mqtNamesSet.add(mqtName);
+                qualityToTypesOrdered.computeIfAbsent(qualityName, k -> new LinkedHashSet<>()).add(typeName);
 
                 scoresByMappingId.computeIfAbsent(mappingId, k -> new HashMap<>())
-                        .put(mqtName, score.getRawScore());
+                        .put(typeName, score.getRawScore());
             }
 
-            List<String> mqtNames = new ArrayList<>(mqtNamesSet);
+            // Build flat column list: for each quality -> individual types + cumulative
+            List<String> columnHeaders = new ArrayList<>();
+            List<String> columnQualityGroup = new ArrayList<>(); // tracks which quality each col belongs to
+            List<Boolean> isCumulativeCol = new ArrayList<>();
+
+            for (Map.Entry<String, Set<String>> entry : qualityToTypesOrdered.entrySet()) {
+                String qualityName = entry.getKey();
+                Set<String> types = entry.getValue();
+                for (String typeName : types) {
+                    columnHeaders.add(typeName);
+                    columnQualityGroup.add(qualityName);
+                    isCumulativeCol.add(false);
+                }
+                // Add cumulative column for this quality
+                columnHeaders.add(qualityName + " (Total)");
+                columnQualityGroup.add(qualityName);
+                isCumulativeCol.add(true);
+            }
 
             // Create Excel workbook
             Workbook workbook = new XSSFWorkbook();
             Sheet sheet = workbook.createSheet("Student Scores");
 
-            // Create header style
+            // Create header styles
             CellStyle headerStyle = workbook.createCellStyle();
             Font headerFont = workbook.createFont();
             headerFont.setBold(true);
             headerStyle.setFont(headerFont);
 
-            // Create header row
-            Row headerRow = sheet.createRow(0);
+            CellStyle qualityHeaderStyle = workbook.createCellStyle();
+            Font qualityFont = workbook.createFont();
+            qualityFont.setBold(true);
+            qualityFont.setColor(IndexedColors.WHITE.getIndex());
+            qualityHeaderStyle.setFont(qualityFont);
+            qualityHeaderStyle.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
+            qualityHeaderStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+            CellStyle totalHeaderStyle = workbook.createCellStyle();
+            Font totalFont = workbook.createFont();
+            totalFont.setBold(true);
+            totalFont.setColor(IndexedColors.WHITE.getIndex());
+            totalHeaderStyle.setFont(totalFont);
+            totalHeaderStyle.setFillForegroundColor(IndexedColors.GREEN.getIndex());
+            totalHeaderStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+            // Row 0: Quality group headers
+            Row qualityRow = sheet.createRow(0);
             String[] fixedHeaders = {"Name", "Roll Number", "Control Number", "Class", "DOB"};
             int colIndex = 0;
 
+            for (String header : fixedHeaders) {
+                Cell cell = qualityRow.createCell(colIndex++);
+                cell.setCellValue(header);
+                cell.setCellStyle(headerStyle);
+            }
+
+            // Write quality group names in row 0
+            String prevQuality = "";
+            for (int i = 0; i < columnHeaders.size(); i++) {
+                String quality = columnQualityGroup.get(i);
+                Cell cell = qualityRow.createCell(colIndex + i);
+                if (!quality.equals(prevQuality)) {
+                    cell.setCellValue(quality);
+                    cell.setCellStyle(qualityHeaderStyle);
+                    prevQuality = quality;
+                } else {
+                    cell.setCellStyle(qualityHeaderStyle);
+                }
+            }
+
+            // Row 1: Individual type headers
+            Row headerRow = sheet.createRow(1);
+            colIndex = 0;
             for (String header : fixedHeaders) {
                 Cell cell = headerRow.createCell(colIndex++);
                 cell.setCellValue(header);
                 cell.setCellStyle(headerStyle);
             }
 
-            for (String mqtName : mqtNames) {
-                Cell cell = headerRow.createCell(colIndex++);
-                cell.setCellValue(mqtName);
-                cell.setCellStyle(headerStyle);
+            for (int i = 0; i < columnHeaders.size(); i++) {
+                Cell cell = headerRow.createCell(colIndex + i);
+                cell.setCellValue(columnHeaders.get(i));
+                cell.setCellStyle(isCumulativeCol.get(i) ? totalHeaderStyle : headerStyle);
             }
 
-            // Create data rows
-            int rowIndex = 1;
+            // Create data rows (only completed students)
+            int rowIndex = 2;
             for (UserStudent us : userStudents) {
-                StudentInfo si = us.getStudentInfo();
                 StudentAssessmentMapping mapping = mappingByUserStudentId.get(us.getUserStudentId());
+                if (mapping == null) continue; // skip students without completed mapping
+
+                StudentInfo si = us.getStudentInfo();
 
                 Row row = sheet.createRow(rowIndex++);
                 colIndex = 0;
@@ -731,23 +805,45 @@ public class StudentInfoController {
                 }
                 row.createCell(colIndex++).setCellValue(dobStr);
 
-                // MQT score columns
+                // Score columns
                 Map<String, Integer> studentScores = mapping != null
                         ? scoresByMappingId.getOrDefault(mapping.getStudentAssessmentId(), new HashMap<>())
                         : new HashMap<>();
 
-                for (String mqtName : mqtNames) {
-                    Integer score = studentScores.get(mqtName);
-                    if (score != null) {
-                        row.createCell(colIndex++).setCellValue(score);
+                for (int i = 0; i < columnHeaders.size(); i++) {
+                    Cell cell = row.createCell(colIndex + i);
+                    if (isCumulativeCol.get(i)) {
+                        // Cumulative: sum all types for this quality
+                        String qualityName = columnQualityGroup.get(i);
+                        int cumulative = 0;
+                        boolean hasScore = false;
+                        for (String typeName : qualityToTypesOrdered.get(qualityName)) {
+                            Integer score = studentScores.get(typeName);
+                            if (score != null) {
+                                cumulative += score;
+                                hasScore = true;
+                            }
+                        }
+                        if (hasScore) {
+                            cell.setCellValue(cumulative);
+                        } else {
+                            cell.setCellValue("");
+                        }
                     } else {
-                        row.createCell(colIndex++).setCellValue("");
+                        // Individual type score
+                        Integer score = studentScores.get(columnHeaders.get(i));
+                        if (score != null) {
+                            cell.setCellValue(score);
+                        } else {
+                            cell.setCellValue("");
+                        }
                     }
                 }
             }
 
             // Auto-size columns
-            for (int i = 0; i < fixedHeaders.length + mqtNames.size(); i++) {
+            int totalCols = fixedHeaders.length + columnHeaders.size();
+            for (int i = 0; i < totalCols; i++) {
                 sheet.autoSizeColumn(i);
             }
 
