@@ -70,7 +70,7 @@ export default function AllottedAssessmentPage() {
 
     // Check if device is mobile/tablet/iPad - prevent assessment on non-desktop devices
     if (isMobileOrTablet()) {
-      setShowMobileWarning(false);
+      // setShowMobileWarning(false);
       return;
     }
 
