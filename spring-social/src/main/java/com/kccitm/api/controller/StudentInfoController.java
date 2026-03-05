@@ -41,10 +41,16 @@ import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.userDefinedModel.ExcelOptionData;
 import com.kccitm.api.model.userDefinedModel.MeasuredQualityList;
 import com.kccitm.api.model.userDefinedModel.QuestionOptionID;
+import com.kccitm.api.model.career9.AssessmentTable;
+import com.kccitm.api.model.career9.AssessmentQuestionOptions;
+import com.kccitm.api.model.career9.OptionScoreBasedOnMEasuredQualityTypes;
+import com.kccitm.api.model.career9.Questionaire.AssessmentAnswer;
+import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
 import com.kccitm.api.repository.AssessmentRawScoreRepository;
 import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
 import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
+import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
@@ -72,6 +78,8 @@ public class StudentInfoController {
     private com.kccitm.api.repository.Career9.AssessmentProctoringQuestionLogRepository assessmentProctoringQuestionLogRepository;
     @Autowired
     private com.kccitm.api.service.CareerNineRollNumberService rollNumberService;
+    @Autowired
+    private QuestionnaireQuestionRepository questionnaireQuestionRepository;
 
     @GetMapping("/getAll")
     public List<StudentInfo> getAllStudentInfo() {
@@ -764,6 +772,163 @@ public class StudentInfoController {
             Map<String, String> error = new HashMap<>();
             error.put("error", "Failed to export scores: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
+
+    @GetMapping("/bet-report/{instituteId}/{assessmentId}")
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public ResponseEntity<?> getBetReport(
+            @PathVariable("instituteId") Integer instituteId,
+            @PathVariable("assessmentId") Long assessmentId) {
+        try {
+            // 1. Validate assessment exists and is BET type
+            Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(assessmentId);
+            if (assessmentOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Assessment not found"));
+            }
+            AssessmentTable assessment = assessmentOpt.get();
+            if (assessment.getQuestionnaire() == null) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Assessment has no linked questionnaire"));
+            }
+            Boolean qType = assessment.getQuestionnaire().getType();
+            if (qType == null || !qType) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Assessment is not a BET type"));
+            }
+
+            Long questionnaireId = assessment.getQuestionnaire().getQuestionnaireId();
+
+            // 2. Get question structure sorted by section order then question order
+            List<QuestionnaireQuestion> qqList = questionnaireQuestionRepository
+                    .findByQuestionnaireIdWithOptions(questionnaireId);
+
+            // Sort by section orderIndex, then by questionnaireQuestionId within section
+            qqList.sort((a, b) -> {
+                String orderA = a.getSection() != null ? a.getSection().getOrder() : "";
+                String orderB = b.getSection() != null ? b.getSection().getOrder() : "";
+                int cmp = (orderA != null ? orderA : "").compareTo(orderB != null ? orderB : "");
+                if (cmp != 0) return cmp;
+                return Long.compare(a.getQuestionnaireQuestionId(), b.getQuestionnaireQuestionId());
+            });
+
+            // 3. Build dynamic columns
+            List<Map<String, Object>> columns = new ArrayList<>();
+            for (QuestionnaireQuestion qq : qqList) {
+                String header = qq.getExcelQuestionHeader();
+                if (header == null || header.isEmpty()) {
+                    header = "Q_" + qq.getQuestionnaireQuestionId();
+                }
+                boolean isMQT = qq.getQuestion() != null
+                        && qq.getQuestion().getIsMQT() != null
+                        && qq.getQuestion().getIsMQT();
+
+                Map<String, Object> col = new LinkedHashMap<>();
+                col.put("key", header);
+                col.put("header", header);
+                col.put("questionId", qq.getQuestionnaireQuestionId());
+                col.put("isMQT", isMQT);
+                columns.add(col);
+            }
+
+            // 4. Get completed students for this institute and assessment
+            List<UserStudent> userStudents = userStudentRepository.findByInstituteInstituteCode(instituteId);
+            String instituteName = "";
+            var instituteList = instituteDetailRepository.findByInstituteCode(instituteId);
+            if (!instituteList.isEmpty()) {
+                instituteName = instituteList.get(0).getInstituteName();
+            }
+
+            List<Map<String, Object>> rows = new ArrayList<>();
+
+            for (UserStudent us : userStudents) {
+                Optional<StudentAssessmentMapping> mappingOpt = studentAssessmentMappingRepository
+                        .findFirstByUserStudentUserStudentIdAndAssessmentId(
+                                us.getUserStudentId(), assessmentId);
+                if (mappingOpt.isEmpty() || !"completed".equals(mappingOpt.get().getStatus())) {
+                    continue;
+                }
+
+                // 5. Get this student's answers
+                var answers = assessmentAnswerRepository
+                        .findByUserStudentIdAndAssessmentIdWithDetails(
+                                us.getUserStudentId(), assessmentId);
+
+                // Index answers by questionnaireQuestionId (multiple answers possible for isMQT)
+                Map<Long, List<AssessmentAnswer>> answersByQuestionId = new HashMap<>();
+                for (var aa : answers) {
+                    if (aa.getQuestionnaireQuestion() != null) {
+                        answersByQuestionId
+                                .computeIfAbsent(aa.getQuestionnaireQuestion().getQuestionnaireQuestionId(),
+                                        k -> new ArrayList<>())
+                                .add(aa);
+                    }
+                }
+
+                // 6. Build row
+                Map<String, Object> row = new LinkedHashMap<>();
+                StudentInfo si = us.getStudentInfo();
+                row.put("name", si != null && si.getName() != null ? si.getName() : "");
+                row.put("institute", instituteName);
+
+                for (Map<String, Object> col : columns) {
+                    String key = (String) col.get("key");
+                    Long questionId = ((Number) col.get("questionId")).longValue();
+                    boolean colIsMQT = (Boolean) col.get("isMQT");
+
+                    List<AssessmentAnswer> questionAnswers = answersByQuestionId.get(questionId);
+
+                    if (!colIsMQT) {
+                        // Non-MQT: show MQT score of the single selected option
+                        Object value = "";
+                        if (questionAnswers != null && !questionAnswers.isEmpty()) {
+                            AssessmentAnswer aa = questionAnswers.get(0);
+                            if (aa.getOption() != null && aa.getOption().getOptionScores() != null) {
+                                int totalScore = 0;
+                                for (OptionScoreBasedOnMEasuredQualityTypes os : aa.getOption().getOptionScores()) {
+                                    if (os.getScore() != null) {
+                                        totalScore += os.getScore();
+                                    }
+                                }
+                                value = totalScore;
+                            }
+                        }
+                        row.put(key, value);
+                    } else {
+                        // MQT: cumulative score of all selected options
+                        int cumulativeScore = 0;
+                        boolean hasAnswers = false;
+                        if (questionAnswers != null) {
+                            for (AssessmentAnswer aa : questionAnswers) {
+                                if (aa.getOption() != null && aa.getOption().getOptionScores() != null) {
+                                    hasAnswers = true;
+                                    for (OptionScoreBasedOnMEasuredQualityTypes os : aa.getOption().getOptionScores()) {
+                                        if (os.getScore() != null) {
+                                            cumulativeScore += os.getScore();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        row.put(key, hasAnswers ? cumulativeScore : "");
+                    }
+                }
+
+                rows.add(row);
+            }
+
+            // 7. Build response
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("columns", columns);
+            response.put("rows", rows);
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            System.err.println("Error generating BET report: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to generate BET report: " + e.getMessage()));
         }
     }
 
