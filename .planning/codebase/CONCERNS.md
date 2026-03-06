@@ -1,312 +1,306 @@
-# Codebase Concerns
+# Technical Debt & Concerns
 
-**Analysis Date:** 2026-02-06
+**Analysis Date:** 2026-03-06
 
-## Tech Debt
+## Summary
 
-**Unhandled Exception Blocks:**
-- Issue: Multiple catch blocks use `e.printStackTrace()` instead of proper logging or error responses
-- Files:
-  - `spring-social/src/main/java/com/kccitm/api/controller/career9/StudentController.java` (lines 403, 406)
-  - `spring-social/src/main/java/com/kccitm/api/controller/StudentInfoController.java` (lines 270, 320, 382, 429, 498, 642)
-  - `spring-social/src/main/java/com/kccitm/api/service/PdfServiceImpl.java` (lines 63, 92)
-  - `spring-social/src/main/java/com/kccitm/api/service/CsvReaderImp.java` (line 25)
-- Impact: Errors silently printed to stdout, not tracked in logging systems or returned to clients; debugging difficult in production
-- Fix approach: Replace with proper SLF4J logging and meaningful error responses to API clients
-
-**Generic TODO Comments Without Context:**
-- Issue: Auto-generated catch blocks left with placeholder TODOs instead of proper implementation
-- Files:
-  - `spring-social/src/main/java/com/kccitm/api/controller/career9/StudentController.java` (lines 403, 406, 454, 489)
-  - `spring-social/src/main/java/com/kccitm/api/controller/DataController.java` (line 26)
-  - `react-social/src/app/pages/StudentInformation/EmailVerification.tsx` (lines 20, 23)
-- Impact: Incomplete exception handling leaves code path behavior unclear; client-side verification missing error notifications
-- Fix approach: Complete all TODO items with specific logic or create issue tickets for deferred work
-
-**Dangerous List Access Pattern (.get(0)):**
-- Issue: Unsafe direct list access without checking if list is empty, causing IndexOutOfBoundsException at runtime
-- Files:
-  - `spring-social/src/main/java/com/kccitm/api/service/GoogleAPIAdminImpl.java` (lines 185, 238, 304, 307, 309)
-  - `spring-social/src/main/java/com/kccitm/api/controller/UserRoleGroupMappingController.java` (lines 103, 105, 106)
-  - `spring-social/src/main/java/com/kccitm/api/controller/GoogleAdminController.java` (lines 89, 98, 106)
-  - `spring-social/src/main/java/com/kccitm/api/controller/RoleRoleGroupMappingController.java` (lines 68, 94)
-  - `spring-social/src/main/java/com/kccitm/api/controller/InstituteBranchController.java` (line 43)
-- Impact: Application crashes with unhandled exceptions when list results are empty; no defensive programming for optional results
-- Fix approach: Replace all `.get(0)` with proper Optional handling or use `.isEmpty()` checks before access
+| Category | Severity | Count | Key Examples |
+|----------|----------|-------|--------------|
+| Security | CRITICAL | 12+ | Hardcoded credentials, CORS issues |
+| Deprecated Tech | CRITICAL | 5 | Spring Boot 2.5.5 EOL, javax.* imports |
+| Code Quality | HIGH | 100+ | Field injection, large classes, System.out.println |
+| Database | HIGH | 8+ | Missing validation, N+1 queries, naming inconsistency |
+| Performance | MEDIUM | 5+ | Small cache, eager loading, blocking IO |
+| Testing | CRITICAL | 0 | No tests at all (backend or frontend) |
+| Documentation | MEDIUM | 3+ | No API docs, no migration guide |
 
 ---
 
-## Known Bugs
+## 1. CRITICAL SECURITY ISSUES
 
-**Database Name Inconsistency (kareer-9 vs career-9):**
-- Symptoms: Development environment uses `kareer-9` while Docker/staging uses `career-9`; typo inconsistency creates confusion and potential migration errors
-- Files: `spring-social/src/main/resources/application.yml`
-  - Dev profile (line 18): `jdbc:mysql://localhost:3306/kareer-9`
-  - Staging profile (line 100): `jdbc:mysql://mysql_db_api:3306/career-9`
-- Trigger: Switching between dev and staging deployments; developers unfamiliar with the typo
-- Workaround: Ensure both databases exist with both names or standardize on one name across all profiles
-- Priority: High - causes environment-specific failures
+### Hardcoded Credentials in Source Control
 
-**Incomplete Frontend Error Handling:**
-- Symptoms: API error responses in `EmailVerification.tsx` are caught but not handled; users receive no feedback
-- Files: `react-social/src/app/pages/StudentInformation/EmailVerification.tsx` (lines 20-23)
-- Trigger: Any API call failure (network, validation, server error)
-- Current state: Error caught but TODO comments indicate handler missing
-- Fix approach: Implement proper error notification (toast, modal, or state-based message)
+**File:** `spring-social/src/main/resources/application.yml`
 
-**Null Pointer Risk in Assessment Answer Submission:**
-- Symptoms: `AssessmentAnswerController.submitAssessmentAnswers()` assumes all extracted values exist without null checks
-- Files: `spring-social/src/main/java/com/kccitm/api/controller/career9/AssessmentAnswerController.java` (line 80)
-- Trigger: Malformed submission data missing required fields (e.g., `userStudentId`, `assessmentId`)
-- Current behavior: Results in NumberFormatException or NullPointerException instead of validation error response
+Credentials exposed across all profiles:
+- Database passwords in plaintext (dev, staging, production)
+- Google OAuth2 Client IDs and Secrets
+- Facebook and GitHub OAuth2 Secrets
+- JWT Token Secret in plaintext
+- Mandrill API key (`WXX3fC00pJTZgonjnVvkgQ`)
+- Odoo CRM credentials
+- Production database password
 
----
+**Also:** `.env` file contains SMTP password in plaintext.
 
-## Security Considerations
+**Risk:** CRITICAL - All credentials in git history even if removed now.
+**Fix:** Migrate ALL secrets to environment variables. Use Spring Cloud Config or HashiCorp Vault.
 
-**Hardcoded Credentials in Configuration:**
-- Risk: OAuth2 client secrets and API keys exposed in source code (`application.yml`)
-- Files: `spring-social/src/main/resources/application.yml`
-  - Google OAuth2: Lines 35-36 (clientId, clientSecret)
-  - Facebook OAuth2: Lines 47-48 (clientId, clientSecret)
-  - GitHub OAuth2: Lines 54-55 (clientId, clientSecret)
-  - Mandrill API Key: Line 91
-  - JWT Token Secret: Line 72
-- Current mitigation: File is checked into git, but `.gitignore` should prevent this
-- Recommendations:
-  - Move all credentials to environment variables
-  - Use Spring Cloud Config or AWS Secrets Manager
-  - Rotate all exposed OAuth2 credentials immediately
-  - Add pre-commit hook to prevent credential commits
+### Hardcoded Test Password in Code
 
-**SQL Injection Risk in Dynamic Queries:**
-- Risk: While repository layer uses parameterized queries, some manual query construction may exist
-- Files: Search for raw SQL queries in service layer
-- Recommendations:
-  - Audit all `@Query` annotations for string concatenation
-  - Use JPA criteria API or JPQL with parameter binding exclusively
+**File:** `spring-social/src/main/java/com/kccitm/api/service/GoogleAPIAdminImpl.java` (line ~97)
+- `newUser.setPassword("Google.com1");` hardcoded for new Google Workspace users.
 
-**Overly Permissive CORS Configuration:**
-- Risk: CORS allowedOrigins includes broad patterns including IPs and multiple environments
-- Files: `spring-social/src/main/resources/application.yml` (line 75)
-- Current: Multiple staging/prod domains mixed with localhost and test IPs
-- Recommendations:
-  - Segregate profiles: dev (localhost only), staging (staging domain), production (production domain)
-  - Remove test IPs from production config
+### CORS Configuration Too Permissive
 
-**JWT Token Expiration Too Long (10 days):**
-- Risk: Token expiration set to 864000000ms = 10 days; longer window increases compromise damage
-- Files: `spring-social/src/main/resources/application.yml` (line 73)
-- Recommendations:
-  - Reduce to 1-2 hours for access tokens
-  - Implement refresh token flow for longer-lived sessions
-  - Add token revocation support
+**File:** `application.yml`
+- Dev profile mixes localhost origins with production domains
+- `https://*.career-9.com` allows all subdomains
+- `allowCredentials = true` likely set
+- No CSRF token protection
+
+### JWT Token Expiration Too Long
+
+- Expiration: 864,000,000ms (10 days)
+- Stolen tokens valid for 10 days
+- No refresh token pattern implemented
+- **Fix:** Reduce to 1-4 hours, implement refresh tokens.
+
+### Missing Security Features
+
+- No rate limiting on any endpoint
+- No CSRF protection for state-changing operations
+- No HSTS headers or HTTPS redirect enforcement
+- OAuth2 requests admin.directory.* scopes for all users (overprivileged)
 
 ---
 
-## Performance Bottlenecks
+## 2. DEPRECATED & OUTDATED DEPENDENCIES
 
-**Manual File-Based Caching Without Invalidation:**
-- Problem: Assessment questions cached to `cache/assessment_questions.json` but no TTL or invalidation strategy
-- Files: `spring-social/src/main/java/com/kccitm/api/controller/career9/AssessmentQuestionController.java` (lines 62-63, 74-89)
-- Cause: Static cache file written to disk; stale data served until application restart or manual file deletion
-- Risk: Updated questions don't appear to users without restart; no way to invalidate on demand
-- Improvement path:
-  - Implement Spring Cache abstraction with Redis
-  - Add `@CacheEvict` on update/delete operations
-  - Set reasonable TTL (5-30 minutes depending on change frequency)
+### Spring Boot 2.5.5 (EOL)
 
-**N+1 Query Pattern in Assessment Scoring:**
-- Problem: `AssessmentAnswerController.submitAssessmentAnswers()` likely iterates questions/answers and loads related objects one-by-one
-- Files: `spring-social/src/main/java/com/kccitm/api/controller/career9/AssessmentAnswerController.java` (lines 75-120+)
-- Cause: Not using eager loading or batch queries for option scores and measured quality mappings
-- Impact: Single assessment submission with 50 questions = 50+ individual queries instead of 1-2 joins
-- Improvement path:
-  - Use `@EntityGraph` or `LEFT JOIN FETCH` in repository queries
-  - Batch load option scores by assessment ID
-  - Consider query optimization for scoring calculations
+**File:** `spring-social/pom.xml` (line 18)
+- Released June 2021, EOL November 2022
+- No security patches available
+- Uses `javax.persistence.*` / `javax.servlet.*` (deprecated, replaced by `jakarta.*`)
+- **Fix:** Upgrade to Spring Boot 3.x (requires Java 17+) or at minimum 2.7.x
 
-**Large Model Classes Without Proper Indexing:**
-- Problem: Large entity models like `Student` (1191 lines) and `CheckRegistrationFeild` (980 lines) have many column properties
-- Files:
-  - `spring-social/src/main/java/com/kccitm/api/model/Student.java` (1191 lines)
-  - `spring-social/src/main/java/com/kccitm/api/model/CheckRegistrationFeild.java` (980 lines)
-- Cause: Over-normalized database schema requiring all attributes fetched for every query
-- Impact: Slow list endpoints; high memory usage; no selective projection queries
-- Improvement path:
-  - Create database indexes on frequently searched columns (email, enrollment number)
-  - Implement DTOs for list operations to reduce payload
-  - Consider schema normalization to reduce attribute count per entity
+### Outdated Libraries
 
-**Excessive Debug Logging (console.log in React):**
-- Problem: 297 `console.log()` calls across 84 frontend files left in production code
-- Impact: Memory leaks in browser; performance degradation on logging-heavy components; sensitive data may be logged
-- Improvement path:
-  - Implement debug flag to enable/disable logging by environment
-  - Use proper logging library (e.g., winston, loglevel)
-  - Remove or comment out development-only console.logs
+| Library | Current | Latest | Risk |
+|---------|---------|--------|------|
+| commons-io | 2.11.0 | 2.15+ | Known vulnerabilities |
+| gson | 2.9.0 | 2.10+ | Security updates |
+| jsoup | 1.15.4 | 1.17+ | Security updates |
+| jjwt | 0.11.2 | 0.12+ | Security improvements |
+| axios (frontend) | 0.26.1 | 1.6+ | 2+ years old, security issues |
+| react-query | 3.38.0 | @tanstack/react-query 5.x | Renamed package |
+| react-scripts | 5.0.1 | - | EOL concerns |
+| mysql-connector-java | (unspecified) | - | No version pinned |
 
 ---
 
-## Fragile Areas
+## 3. CODE QUALITY & ARCHITECTURE
 
-**Student Information Registration Flow:**
-- Files: `spring-social/src/main/java/com/kccitm/api/controller/career9/StudentController.java`
-- Why fragile:
-  - Heavy dependency on Google Admin API integration; fails silently if Google is unavailable
-  - Nested try-catch blocks with TODO comments hide real error causes
-  - Assumes email addresses exist and are unique without validation
-  - No transactional consistency: student saved to DB even if Google group add fails
-- Safe modification:
-  - Add explicit Google API availability check at start of flow
-  - Wrap entire flow in transaction with rollback on any failure
-  - Add detailed validation with meaningful error messages
-- Test coverage: Likely missing integration tests for Google API failure scenarios
+### Field Injection Anti-pattern (262+ instances)
 
-**Assessment Answer Submission and Scoring:**
-- Files: `spring-social/src/main/java/com/kccitm/api/controller/career9/AssessmentAnswerController.java`
-- Why fragile:
-  - Assumes `userStudentId` and `assessmentId` exist without validation
-  - No constraint on answer format or value ranges
-  - Score calculation logic not visible; possible inconsistency between frontend and backend
-  - Deletes previous raw scores without archival; data loss on resubmission
-- Safe modification:
-  - Add explicit existence checks with meaningful 404/400 responses
-  - Validate answer data against question type before saving
-  - Implement soft deletes or audit trail for score changes
-  - Add logging for all score calculations for debugging
+Found in 79+ files. Should use constructor injection.
 
-**Questionnaire Update Logic (Complex Nested Relationships):**
-- Files: `spring-social/src/main/java/com/kccitm/api/controller/career9/Questionaire/QuestionnaireController.java` (385 lines)
-- Why fragile:
-  - Updates questionnaire with sections, questions, and languages in single operation
-  - No clear definition of what "update" means (replace all vs merge)
-  - Orphaned sections/questions not cleaned up explicitly
-  - Language translations may be lost if not included in update payload
-- Safe modification:
-  - Separate concerns: allow section, question, and language updates independently
-  - Implement explicit delete operations for removed items
-  - Add tests for edge cases: null sections, empty questions, missing translations
-  - Log all structural changes for audit trail
+**Worst offenders:**
+- `StudentController.java`: 19 `@Autowired` fields (lines 14-111)
+- `StudentService.java`: 11 `@Autowired` fields (lines 13-77)
+- `SecurityConfig.java`: lines 37-47
 
----
+### Overly Large Controllers
 
-## Scaling Limits
+- `StudentController.java`: 590+ lines - contains bulk save, CSV parsing, PDF generation, email sending, registration logic
+- `AssessmentAnswerController.java`: Complex scoring logic mixed with HTTP handling
+- **Fix:** Extract business logic into service classes
 
-**Database Connection Pool:**
-- Current capacity: Not explicitly configured; uses Spring Data defaults (10-20 connections)
-- Limit: Each assessment submission opens multiple connections for cascading queries; peak load (100 students) = pool exhaustion
-- Scaling path:
-  - Configure `spring.datasource.hikari.maximum-pool-size` explicitly
-  - Implement connection monitoring and alerting
-  - Consider read replicas for reporting queries
-  - Implement query result caching to reduce connection demand
+### System.out.println Instead of Logging (82+ instances)
 
-**File System Cache (assessment_questions.json):**
-- Current capacity: Single 5MB+ JSON file served from disk
-- Limit: File read/write contention under concurrent API requests; grows unbounded
-- Scaling path:
-  - Move cache to Redis for distributed access
-  - Implement cache eviction policy and TTL
-  - Add cache statistics monitoring
+**Critical files:**
+- `StudentController.java` (lines 128, 148-149, 175)
+- `FacultyContoller.java` (multiple instances)
+- `StudentInfoController.java` (11 instances)
+- `UniversityMarkController.java` (14 instances)
 
-**Assessment Results Storage:**
-- Current: All raw scores stored in `AssessmentRawScore` table without partitioning
-- Limit: Linear scan performance degrades as rows grow; potential growth to 1M+ rows
-- Scaling path:
-  - Implement table partitioning by assessment ID or date
-  - Archive old results to separate schema
-  - Create appropriate indexes on (userStudentId, assessmentId)
+**Risk:** Logs won't go to proper logging framework in production.
 
-**OAuth2 Token Storage:**
-- Current: JWT tokens are stateless (good) but no token revocation list
-- Limit: Cannot invalidate compromised tokens without restart
-- Scaling path:
-  - Implement Redis-backed token blacklist
-  - Add logout functionality that revokes tokens
-  - Consider shorter token expiration (currently 10 days)
+### Bare Exception Catching (29+ instances)
+
+Pattern: `catch (Exception e)` throughout codebase - swallows specific exceptions, masks bugs.
+
+### No Global Exception Handler
+
+- No `@ControllerAdvice` for centralized error handling
+- Inconsistent error responses across controllers
+- Some return null, some return 404, some throw RuntimeException
+
+### Console Logging in Frontend (374 instances)
+
+`console.error`/`console.warn` throughout `/react-social/src/app/pages/` - sensitive data may leak to browser console.
+
+### Unresolved TODOs (28+ instances)
+
+Scattered across `UserStudent.java`, `DataController.java`, `GoogleAPIAdminImpl.java`, etc.
 
 ---
 
-## Dependencies at Risk
+## 4. DATABASE & PERSISTENCE ISSUES
 
-**jQuery (via Metronic Theme):**
-- Risk: jQuery is legacy; modern React should not use jQuery for DOM manipulation
-- Impact: Potential conflicts with React state management; maintenance burden
-- Files: `react-social/src/_metronic/` (theme integration)
-- Migration plan: Gradually replace jQuery utilities with React hooks and native DOM APIs
+### No Database Migration Tool
 
-**Outdated Spring Boot Version (2.5.5):**
-- Risk: Released June 2021; many security patches and features available in 3.x
-- Impact: Missing security updates; inability to use modern Spring ecosystem features
-- Recommendations:
-  - Plan migration to Spring Boot 3.x (Java 17+)
-  - Address breaking changes in authentication filters, data access layer
-  - Update all transitive dependencies
+**File:** `application.yml` - `ddl-auto: update`
+- Auto-migrations don't handle renames, deletes, or constraint changes
+- No rollback capability
+- **Fix:** Implement Flyway or Liquibase
 
-**Direct Use of iTextPDF for PDF Generation:**
-- Risk: iTextPDF requires licensing compliance for commercial use; license terms may conflict with project goals
-- Files: `spring-social/src/main/java/com/kccitm/api/service/PdfServiceImpl.java` (and iTextPDF 5.5.13)
-- Alternative: Consider Apache PDFBox (LGPL) or OpenPDF (LGPL, open-source fork of iText)
+### Database Naming Inconsistency
 
-**Mandrill Email Service Dependency:**
-- Risk: MailChimp (Mandrill owner) may discontinue service; no warning of deprecation
-- Files: Dependency in `application.yml` (line 91 shows API key); usage in `StudentController.java`, `EmailService.java`
-- Migration plan: Implement email service abstraction layer; evaluate AWS SES, SendGrid, or self-hosted solution
+| Environment | Database Name |
+|-------------|--------------|
+| Dev | `career-9` |
+| Docker/Staging | `career-9` |
+| Production | `kcc_student` |
 
----
+### Missing Input Validation
 
-## Missing Critical Features
+- Only 15 occurrences of `@NotNull`, `@NotBlank`, `@Valid` across entire codebase
+- `StudentController` - no input validation on POST endpoints
+- `AssessmentAnswerController` - manual `Map<String, Object>` casting instead of typed DTOs
+- **Risk:** Untrusted data reaches database directly
 
-**Authentication Audit Trail:**
-- Problem: No audit log of who accessed what and when; cannot investigate unauthorized access
-- Impact: Compliance gap; security investigations impossible
-- Recommendation: Implement aspect-based audit logging for all OAuth2 authentication events
+### N+1 Query Problems
 
-**Data Validation Framework:**
-- Problem: Validation scattered across controllers with no consistent pattern
-- Impact: Inconsistent error messages; malformed data reaches database
-- Recommendation: Implement Spring Validation annotations (`@Valid`) with custom validators
+- 39 `findAll()` methods in repositories without `JOIN FETCH`
+- Controllers call `findAll()` then iterate over relationships
+- **Risk:** Loading 1000 students could trigger 1000+ separate queries
 
-**Graceful Error Responses:**
-- Problem: Many endpoints return raw exceptions instead of standardized error responses
-- Impact: Frontend cannot reliably parse error messages; inconsistent error handling
-- Recommendation: Implement `@RestControllerAdvice` with standardized error DTO
+### Eager Loading Issues
 
----
+**File:** `AssessmentAnswer.java` (lines 36-62)
+- All relationships set to `FetchType.EAGER`
+- 21 instances of `CascadeType.ALL` or `orphanRemoval=true`
+- **Risk:** Loading entire object graphs, memory pressure
 
-## Test Coverage Gaps
+### Missing NOT NULL Constraints
 
-**StudentController Endpoints - No Tests:**
-- What's not tested: Email verification, PDF generation, Google API integration, bulk student import
-- Files: `spring-social/src/main/java/com/kccitm/api/controller/career9/StudentController.java`
-- Risk: Regressions in critical student onboarding flow undetected; Google API failures discovered in production
-- Priority: High
+- Only 15 validation annotations vs 50+ entity fields
+- Database constraints not visible in entity mappings
+- **Risk:** Invalid data persists silently
 
-**AssessmentAnswerController.submitAssessmentAnswers - No Validation Tests:**
-- What's not tested: Null submissions, missing students, invalid assessment IDs, score calculation accuracy
-- Files: `spring-social/src/main/java/com/kccitm/api/controller/career9/AssessmentAnswerController.java`
-- Risk: Data integrity issues, score miscalculations affect student results; bugs only found after submission
-- Priority: High
+### Transaction Boundary Issues
 
-**Frontend Assessment Component - No Integration Tests:**
-- What's not tested: Form state management, answer submission flow, error handling, multi-page navigation
-- Files: `react-social/src/app/pages/StudentOnlineAssessment/`
-- Risk: Assessment flows break without detection; user-facing bugs only caught in QA/production
-- Priority: Medium
-
-**OAuth2 Security Flows - No Tests:**
-- What's not tested: Token validation, redirect URI matching, provider-specific error handling
-- Files: `spring-social/src/main/java/com/kccitm/api/security/oauth2/`
-- Risk: Security bypasses or token leaks undetected; authentication regressions in updates
-- Priority: High
-
-**Database Migration Tests:**
-- What's not tested: Hibernate schema updates with real database; custom migrations
-- Files: Uses Hibernate `ddl-auto: update` without testing
-- Risk: Schema mismatches between environments; data loss on certain updates
-- Priority: Medium
+- Services use `@Autowired` fields but not all methods are `@Transactional`
+- **Risk:** `LazyInitializationException` when accessing lazy relationships outside transaction
 
 ---
 
-*Concerns audit: 2026-02-06*
+## 5. PERFORMANCE ISSUES
+
+### Limited Caching
+
+- Cache config: Only 4 cache names, max 500 items
+- With 50,000+ students, most queries bypass cache
+- **Fix:** Increase cache size, add more cacheable queries
+
+### File System Access in Controllers
+
+**File:** `AssessmentTableController.java` (lines 63-119)
+- Creates JSON snapshots on disk for locked assessments in `assessment-cache` directory
+- **Risk:** Path traversal potential, disk space issues
+
+### Blocking IO in Request Threads
+
+- Email sending, PDF generation block the request thread
+- `StudentController` POST `/student/update` blocks on email send
+- **Fix:** Use `@Async`, message queues (RabbitMQ, Kafka)
+
+### Inefficient Data Transfer
+
+- `Map<String, Object>` used instead of DTOs in `AssessmentAnswerController`
+- No pagination on many `findAll()` endpoints
+- Runtime type checking instead of compile-time safety
+
+---
+
+## 6. FRAGILE & TIGHTLY COUPLED AREAS
+
+### Assessment Scoring System
+
+**Files:** `AssessmentAnswerController`, `OptionScoreBasedOnMeasuredQualityTypesRepository`
+- Race condition handling via catching `DataIntegrityViolationException`
+- Works but fragile - should use database-level constraints + proper locking
+
+### Google Workspace Integration
+
+- `StudentController` directly calls `GoogleAPIAdmin` - if Google API fails, student operations fail
+- **Fix:** Decouple with async event processing, fallback behavior
+
+### Dual Language Systems
+
+- `LanguageQuestion` + `LanguageOption` (simple system)
+- `QuestionnaireLanguage` + translations (complex system)
+- Duplicate logic, inconsistent translations
+- **Fix:** Consolidate into single translation system
+
+### Dual Assessment Systems
+
+- Legacy: `AssessmentTable` / `AssessmentQuestions` / `AssessmentQuestionOptions`
+- New: `Questionnaire` / `QuestionnaireSection` / `QuestionnaireQuestion`
+- Both active, creating confusion about which system to use
+
+---
+
+## 7. TESTING GAPS
+
+| Test Type | Status |
+|-----------|--------|
+| Unit Tests (Backend) | None - test directory empty |
+| Unit Tests (Frontend) | None - 0 test files |
+| Integration Tests | None |
+| End-to-End Tests | None (no Cypress/Playwright/Selenium) |
+| Load/Performance Tests | None |
+| **Total Coverage** | **0%** |
+
+---
+
+## 8. BUILD & DEPLOYMENT CONCERNS
+
+### Docker Configuration
+
+- Manual `docker network create career_shared_net` required before compose
+- No health checks in service definitions
+- No backup strategy documented for MySQL
+
+### Build Configuration
+
+- No validation of required environment variables
+- No build-time secret stripping
+- Frontend dependencies may not be locked (package-lock.json status unclear)
+
+### Conflicting Dependencies
+
+- `jackson-databind` inherited vs explicit versions
+- Multiple `commons-io` declarations in pom.xml
+- Potentially unused frontend deps: `draft-js`, `openai`, `jspdf`
+
+---
+
+## 9. MISSING BEST PRACTICES
+
+| Practice | Status |
+|----------|--------|
+| Service layer abstraction | Partial - some controllers access repos directly |
+| Async processing | Missing - blocking IO everywhere |
+| API versioning | Missing - all on `/api/` directly |
+| Structured logging | Missing - no JSON logs |
+| Metrics/observability | Missing - no Micrometer, no tracing |
+| API documentation | Missing - no Swagger/OpenAPI |
+| Secrets management | Missing - credentials in git |
+| Error boundaries (React) | Missing - single error crashes app |
+| TypeScript strict mode | Partial - `noImplicitAny: false` |
+
+---
+
+## Immediate Actions Required
+
+1. **Extract credentials to environment variables** (SECURITY CRITICAL)
+2. **Remove hardcoded OAuth secrets** from application.yml
+3. **Upgrade Spring Boot** to at least 2.7.x (or 3.x with jakarta.*)
+4. **Add minimal test suite** (10-15 core integration tests)
+5. **Add input validation** to DTOs and entity classes
+6. **Implement `@ControllerAdvice`** for centralized exception handling
+7. **Replace System.out.println** with SLF4J logging
+8. **Implement database migrations** with Flyway or Liquibase
