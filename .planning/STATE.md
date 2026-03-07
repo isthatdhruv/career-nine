@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** Students can reliably take assessments without data loss, wrong assessment loading, or submission failures — even under peak concurrent load.
-**Current focus:** Phase 10 — Session Management
+**Current focus:** Phase 11 — Safe Submission Pattern
 
 ## Current Position
 
-Phase: 10 of 12 (Session Management)
+Phase: 11 of 12 (Safe Submission Pattern)
 Plan: 2 of 2 complete
 Status: Phase Complete
-Last activity: 2026-03-07 — Completed 10-02 Idempotent Submission
+Last activity: 2026-03-07 — Completed 11-02 Draft Auto-Save
 
-Progress: [██████░░░░] 55%
+Progress: [███████░░░] 65%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6 (v2.0 milestone)
-- Average duration: 1.5min
-- Total execution time: 9min
+- Total plans completed: 8 (v2.0 milestone)
+- Average duration: 1.6min
+- Total execution time: 13min
 
 **By Phase:**
 
@@ -30,9 +30,10 @@ Progress: [██████░░░░] 55%
 | 08-redis-infrastructure | 2/2 | 3min | 1.5min |
 | 09-redis-caching-layer | 2/2 | 2min | 1min |
 | 10-session-management | 2/2 | 4min | 2min |
+| 11-safe-submission-pattern | 2/2 | 4min | 2min |
 
 **Recent Trend:**
-- Last 5 plans: 09-01 (1min), 09-02 (1min), 10-01 (2min), 10-02 (2min)
+- Last 5 plans: 09-02 (1min), 10-01 (2min), 10-02 (2min), 11-01 (2min), 11-02 (2min)
 - Trend: Consistent
 
 *Updated after each plan completion*
@@ -70,6 +71,8 @@ Recent decisions affecting current work:
 - Release idempotency lock on validation failure (no answers) — not a real submission, allow retry (10-02)
 - HashMap for cached result — compatible with GenericJackson2JsonRedisSerializer (10-02)
 - Bulk-submit endpoints excluded from idempotency — admin-only, handle re-upload by design (10-02)
+- career9:draft: key prefix for draft namespace isolation, consistent with session/submit prefixes (11-02)
+- 24h TTL on drafts — matches session TTL, long enough for any assessment (11-02)
 
 ### Roadmap Evolution
 
@@ -96,5 +99,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-07
-Stopped at: Completed 10-02-PLAN.md (Idempotent Submission) — Phase 10 complete
-Resume file: .planning/phases/10-session-management/10-02-SUMMARY.md
+Stopped at: Completed 11-02-PLAN.md (Draft Auto-Save) — Phase 11 complete
+Resume file: .planning/phases/11-safe-submission-pattern/11-02-SUMMARY.md
