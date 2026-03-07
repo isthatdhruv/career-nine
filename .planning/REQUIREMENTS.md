@@ -66,26 +66,28 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | — | Pending |
-| INFRA-02 | — | Pending |
-| INFRA-03 | — | Pending |
-| INFRA-04 | — | Pending |
-| CACHE-01 | — | Pending |
-| CACHE-02 | — | Pending |
-| CACHE-03 | — | Pending |
-| CACHE-04 | — | Pending |
-| SESS-01 | — | Pending |
-| SESS-02 | — | Pending |
-| SESS-03 | — | Pending |
-| SESS-04 | — | Pending |
-| FRONT-01 | — | Pending |
-| FRONT-02 | — | Pending |
-| FRONT-03 | — | Pending |
+| INFRA-01 | Phase 8 | Pending |
+| INFRA-02 | Phase 8 | Pending |
+| INFRA-03 | Phase 8 | Pending |
+| INFRA-04 | Phase 8 | Pending |
+| CACHE-01 | Phase 9 | Pending |
+| CACHE-02 | Phase 9 | Pending |
+| CACHE-03 | Phase 9 | Pending |
+| CACHE-04 | Phase 9 | Pending |
+| SESS-01 | Phase 10 | Pending |
+| SESS-02 | Phase 10 | Pending |
+| SESS-03 | Phase 11 | Pending |
+| SESS-04 | Phase 11 | Pending |
+| FRONT-01 | Phase 12 | Pending |
+| FRONT-02 | Phase 12 | Pending |
+| FRONT-03 | Phase 12 | Pending |
 
 **Coverage:**
 - v2 requirements: 15 total
-- Mapped to phases: 0
-- Unmapped: 15
+- Mapped to phases: 15
+- Unmapped: 0
+
+**Coverage verification:** ✓ All 15 v2 requirements mapped to exactly one phase
 
 ---
 *Requirements defined: 2026-03-07*
