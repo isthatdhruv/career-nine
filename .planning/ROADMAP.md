@@ -125,10 +125,11 @@ Plans:
 4. Submission processing completes even under 200 concurrent submissions
 5. No duplicate answer records exist after concurrent submissions from same student
 
-**Plans**: TBD
+**Plans:** 2 plans (1 wave)
 
 Plans:
-- [ ] TBD after planning
+- [ ] 11-01-PLAN.md — Save-before-delete refactor for all 4 submit endpoints
+- [ ] 11-02-PLAN.md — Draft auto-save backend endpoints + draft cleanup on submission
 
 ---
 
