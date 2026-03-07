@@ -9,29 +9,29 @@ See: .planning/PROJECT.md (updated 2026-03-07)
 
 ## Current Position
 
-Phase: 8 of 12 (Redis Infrastructure)
-Plan: 1 of 2 complete
-Status: Plan 08-01 complete, ready for 08-02
-Last activity: 2026-03-07 — Completed 08-01 Redis Infrastructure Setup
+Phase: 8 of 12 (Redis Infrastructure) -- COMPLETE
+Plan: 2 of 2 complete
+Status: Phase 08 complete, ready for Phase 09
+Last activity: 2026-03-07 — Completed 08-02 Redis Spring Beans
 
-Progress: [█░░░░░░░░░] 10%
+Progress: [██░░░░░░░░] 20%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1 (v2.0 milestone)
-- Average duration: 2min
-- Total execution time: 2min
+- Total plans completed: 2 (v2.0 milestone)
+- Average duration: 1.5min
+- Total execution time: 3min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 08-redis-infrastructure | 1/2 | 2min | 2min |
+| 08-redis-infrastructure | 2/2 | 3min | 1.5min |
 
 **Recent Trend:**
-- Last 5 plans: 08-01 (2min)
-- Trend: Starting
+- Last 5 plans: 08-01 (2min), 08-02 (1min)
+- Trend: Accelerating
 
 *Updated after each plan completion*
 
@@ -51,6 +51,9 @@ Recent decisions affecting current work:
 - MySQL memory reduced 3GB->2GB, total budget: MySQL 2GB + API 3GB + Redis 1.5GB = 6.5GB (08-01)
 - Used spring.redis.* namespace (Spring Boot 2.5.x), not spring.data.redis.* (08-01)
 - Lettuce pool: dev=8 max-active, staging/prod=50 max-active (08-01)
+- GenericJackson2JsonRedisSerializer for human-readable JSON values in Redis (08-02)
+- CachingConfigurerSupport pattern for Spring Boot 2.5.x cache error handling (08-02)
+- WARN-level logging for cache errors, not ERROR (08-02)
 
 ### Roadmap Evolution
 
@@ -76,5 +79,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-07
-Stopped at: Completed 08-01-PLAN.md (Redis Infrastructure Setup)
-Resume file: .planning/phases/08-redis-infrastructure/08-01-SUMMARY.md
+Stopped at: Completed 08-02-PLAN.md (Redis Spring Beans) -- Phase 08 complete
+Resume file: .planning/phases/08-redis-infrastructure/08-02-SUMMARY.md
