@@ -148,10 +148,11 @@ Plans:
 4. User can retry failed submission without losing answers
 5. Loading states prevent double-submission during network delays
 
-**Plans**: TBD
+**Plans:** 2 plans (2 waves)
 
 Plans:
-- [ ] TBD after planning
+- [ ] 12-01-PLAN.md — assessmentApi module with session headers, retry interceptor, and session token capture
+- [ ] 12-02-PLAN.md — Migrate pages to assessmentApi, submission state machine, error UI
 
 ---
 
