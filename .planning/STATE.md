@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-03-07)
 ## Current Position
 
 Phase: 10 of 12 (Session Management)
-Plan: 1 of 2 complete
-Status: In Progress
-Last activity: 2026-03-07 — Completed 10-01 Server-Side Session Management
+Plan: 2 of 2 complete
+Status: Phase Complete
+Last activity: 2026-03-07 — Completed 10-02 Idempotent Submission
 
-Progress: [█████░░░░░] 45%
+Progress: [██████░░░░] 55%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5 (v2.0 milestone)
-- Average duration: 1.4min
-- Total execution time: 7min
+- Total plans completed: 6 (v2.0 milestone)
+- Average duration: 1.5min
+- Total execution time: 9min
 
 **By Phase:**
 
@@ -29,10 +29,10 @@ Progress: [█████░░░░░] 45%
 |-------|-------|-------|----------|
 | 08-redis-infrastructure | 2/2 | 3min | 1.5min |
 | 09-redis-caching-layer | 2/2 | 2min | 1min |
-| 10-session-management | 1/2 | 2min | 2min |
+| 10-session-management | 2/2 | 4min | 2min |
 
 **Recent Trend:**
-- Last 5 plans: 08-02 (1min), 09-01 (1min), 09-02 (1min), 10-01 (2min)
+- Last 5 plans: 09-01 (1min), 09-02 (1min), 10-01 (2min), 10-02 (2min)
 - Trend: Consistent
 
 *Updated after each plan completion*
@@ -67,6 +67,9 @@ Recent decisions affecting current work:
 - Backwards compatible interceptor — no X-Assessment-Session header means pass through (10-01)
 - Three separate headers (token, student ID, assessment ID) — avoids reading request body which is consumed once (10-01)
 - Interceptor excludes admin/CRUD and startAssessment endpoints — only assessment-taking paths validated (10-01)
+- Release idempotency lock on validation failure (no answers) — not a real submission, allow retry (10-02)
+- HashMap for cached result — compatible with GenericJackson2JsonRedisSerializer (10-02)
+- Bulk-submit endpoints excluded from idempotency — admin-only, handle re-upload by design (10-02)
 
 ### Roadmap Evolution
 
@@ -93,5 +96,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-07
-Stopped at: Completed 10-01-PLAN.md (Server-Side Session Management)
-Resume file: .planning/phases/10-session-management/10-01-SUMMARY.md
+Stopped at: Completed 10-02-PLAN.md (Idempotent Submission) — Phase 10 complete
+Resume file: .planning/phases/10-session-management/10-02-SUMMARY.md
