@@ -38,10 +38,12 @@ spring:
         order_inserts: true
         order_updates: true
   cache:
-    type: caffeine
-    caffeine:
-      spec: maximumSize=500,expireAfterWrite=600s
+    type: redis
     cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
+    redis:
+      time-to-live: 86400000
+      key-prefix: "career9:"
+      use-key-prefix: true
   redis:
     host: localhost
     port: 6379
@@ -180,10 +182,12 @@ spring:
         order_inserts: true
         order_updates: true
   cache:
-    type: caffeine
-    caffeine:
-      spec: maximumSize=500,expireAfterWrite=600s
+    type: redis
     cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
+    redis:
+      time-to-live: 86400000
+      key-prefix: "career9:"
+      use-key-prefix: true
   redis:
     host: redis_cache
     port: 6379
@@ -323,10 +327,12 @@ spring:
         order_inserts: true
         order_updates: true
   cache:
-    type: caffeine
-    caffeine:
-      spec: maximumSize=500,expireAfterWrite=600s
+    type: redis
     cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
+    redis:
+      time-to-live: 86400000
+      key-prefix: "career9:"
+      use-key-prefix: true
   redis:
     host: redis_cache
     port: 6379
