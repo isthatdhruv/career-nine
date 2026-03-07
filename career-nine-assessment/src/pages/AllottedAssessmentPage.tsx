@@ -22,14 +22,14 @@ export default function AllottedAssessmentPage() {
   usePreventReload();
 
   // Device detection function
-  const isMobileOrTablet = () => {
-    const userAgent = navigator.userAgent.toLowerCase();
-    const isMobile = /iphone|ipod|android|blackberry|windows phone|webos/.test(userAgent);
-    const isTablet = /ipad|android(?!.*mobile)|tablet|kindle|silk/.test(userAgent);
-    const isSmallScreen = window.innerWidth <= 1024; // Consider screens <= 1024px as non-desktop
+  // const isMobileOrTablet = () => {
+  //   const userAgent = navigator.userAgent.toLowerCase();
+  //   const isMobile = /iphone|ipod|android|blackberry|windows phone|webos/.test(userAgent);
+  //   const isTablet = /ipad|android(?!.*mobile)|tablet|kindle|silk/.test(userAgent);
+  //   const isSmallScreen = window.innerWidth <= 1024; // Consider screens <= 1024px as non-desktop
 
-    return isMobile || isTablet || isSmallScreen;
-  };
+  //   return isMobile || isTablet || isSmallScreen;
+  // };
 
   useEffect(() => {
     const storedAssessments = localStorage.getItem('allottedAssessments');
@@ -69,10 +69,10 @@ export default function AllottedAssessmentPage() {
     }
 
     // Check if device is mobile/tablet/iPad - prevent assessment on non-desktop devices
-    if (isMobileOrTablet()) {
-      setShowMobileWarning(true);
-      return;
-    }
+    // if (isMobileOrTablet()) {
+    //   setShowMobileWarning(true);
+    //   return;
+    // }
 
     setLoadingId(assessment.assessmentId);
 

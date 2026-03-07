@@ -103,6 +103,28 @@ public class StudentInfoController {
                     row.put("optionId", aa.getOption() != null ? aa.getOption().getOptionId() : null);
                     row.put("optionText", aa.getOption() != null ? aa.getOption().getOptionText() : "");
 
+                    // Option number (1-based index) - useful when option is an image
+                    int optionNumber = 0;
+                    boolean isImageOption = false;
+                    if (aa.getOption() != null && aa.getQuestionnaireQuestion() != null
+                            && aa.getQuestionnaireQuestion().getQuestion() != null
+                            && aa.getQuestionnaireQuestion().getQuestion().getOptions() != null) {
+                        Long selectedOptionId = aa.getOption().getOptionId();
+                        var allOptions = aa.getQuestionnaireQuestion().getQuestion().getOptions();
+                        for (int i = 0; i < allOptions.size(); i++) {
+                            if (allOptions.get(i).getOptionId().equals(selectedOptionId)) {
+                                optionNumber = i + 1;
+                                break;
+                            }
+                        }
+                        isImageOption = (aa.getOption().getOptionText() == null
+                                || aa.getOption().getOptionText().trim().isEmpty())
+                                && aa.getOption().getOptionImage() != null
+                                && aa.getOption().getOptionImage().length > 0;
+                    }
+                    row.put("optionNumber", optionNumber);
+                    row.put("isImageOption", isImageOption);
+
                     // Section name (QuestionnaireQuestion -> section -> section -> sectionName)
                     String sectionName = "";
                     try {
@@ -174,6 +196,28 @@ public class StudentInfoController {
                 row.put("optionId", aa.getOption() != null ? aa.getOption().getOptionId() : null);
                 row.put("optionText", aa.getOption() != null ? aa.getOption().getOptionText() : "");
                 row.put("textResponse", aa.getTextResponse() != null ? aa.getTextResponse() : "");
+
+                // Option number (1-based index) - useful when option is an image
+                int optionNumber = 0;
+                boolean isImageOption = false;
+                if (aa.getOption() != null && aa.getQuestionnaireQuestion() != null
+                        && aa.getQuestionnaireQuestion().getQuestion() != null
+                        && aa.getQuestionnaireQuestion().getQuestion().getOptions() != null) {
+                    Long selectedOptionId = aa.getOption().getOptionId();
+                    var allOptions = aa.getQuestionnaireQuestion().getQuestion().getOptions();
+                    for (int i = 0; i < allOptions.size(); i++) {
+                        if (allOptions.get(i).getOptionId().equals(selectedOptionId)) {
+                            optionNumber = i + 1;
+                            break;
+                        }
+                    }
+                    isImageOption = (aa.getOption().getOptionText() == null
+                            || aa.getOption().getOptionText().trim().isEmpty())
+                            && aa.getOption().getOptionImage() != null
+                            && aa.getOption().getOptionImage().length > 0;
+                }
+                row.put("optionNumber", optionNumber);
+                row.put("isImageOption", isImageOption);
 
                 String sectionName = "";
                 try {
