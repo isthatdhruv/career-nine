@@ -56,10 +56,11 @@ Plans:
 4. Spring Actuator health endpoint reports Redis connection status and memory usage
 5. Docker compose up starts MySQL + API + Redis without manual intervention
 
-**Plans**: TBD
+**Plans:** 2 plans (2 waves)
 
 Plans:
-- [ ] TBD after planning
+- [ ] 08-01-PLAN.md — Docker Redis container + Maven deps + application.yml config
+- [ ] 08-02-PLAN.md — RedisConfig + CacheErrorConfig Java classes
 
 ---
 
@@ -159,7 +160,7 @@ Phases execute in numeric order: 8 → 9 → 10 → 11 → 12
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 7. Dashboard Responsive Overhaul | v1.0 | 0/5 | Complete | - |
-| 8. Redis Infrastructure | v2.0 | 0/TBD | Not started | - |
+| 8. Redis Infrastructure | v2.0 | 0/2 | Not started | - |
 | 9. Redis Caching Layer | v2.0 | 0/TBD | Not started | - |
 | 10. Session Management | v2.0 | 0/TBD | Not started | - |
 | 11. Safe Submission Pattern | v2.0 | 0/TBD | Not started | - |
