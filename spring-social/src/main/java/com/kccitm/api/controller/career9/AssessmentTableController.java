@@ -487,6 +487,11 @@ public class AssessmentTableController {
 
         // Create a Redis-backed session and return the token
         AssessmentSession session = assessmentSessionService.createSession(userStudentId, assessmentId);
+
+        // Clear any stale submission lock from a previous attempt
+        // This allows re-assessment after admin resets the student's status
+        assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
+
         response.put("sessionToken", session.getSessionToken());
 
         response.put("success", true);
