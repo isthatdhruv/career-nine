@@ -334,12 +334,28 @@ public class AssessmentTableController {
     @PutMapping("/update/{id}")
     public ResponseEntity<AssessmentTable> updateAssessment(@PathVariable Long id,
             @RequestBody AssessmentTable assessment) {
-        if (!assessmentTableRepository.existsById(id)) {
+        Optional<AssessmentTable> existingOpt = assessmentTableRepository.findById(id);
+        if (existingOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        assessment.setId(id);
-        assessment.setAssessmentName(assessment.getAssessmentName());
-        AssessmentTable updatedAssessment = assessmentTableRepository.save(assessment);
+        AssessmentTable existing = existingOpt.get();
+        existing.setAssessmentName(assessment.getAssessmentName());
+        existing.setStarDate(assessment.getStarDate());
+        existing.setEndDate(assessment.getEndDate());
+        existing.setIsActive(assessment.getIsActive());
+        existing.setModeofAssessment(assessment.getModeofAssessment());
+        existing.setShowTimer(assessment.getShowTimer());
+        existing.setIsLocked(assessment.getIsLocked());
+
+        // Only update questionnaire reference by ID, don't replace the deserialized object
+        if (assessment.getQuestionnaire() != null && assessment.getQuestionnaire().getQuestionnaireId() != null) {
+            Optional<Questionnaire> q = questionnaireRepository.findById(assessment.getQuestionnaire().getQuestionnaireId());
+            q.ifPresent(existing::setQuestionnaire);
+        } else {
+            existing.setQuestionnaire(null);
+        }
+
+        AssessmentTable updatedAssessment = assessmentTableRepository.save(existing);
         return ResponseEntity.ok(updatedAssessment);
     }
 
