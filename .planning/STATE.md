@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** Students can reliably take assessments without data loss, wrong assessment loading, or submission failures — even under peak concurrent load.
-**Current focus:** Phase 11 — Safe Submission Pattern
+**Current focus:** Phase 12 — Frontend Resilience
 
 ## Current Position
 
-Phase: 11 of 12 (Safe Submission Pattern)
-Plan: 2 of 2 complete
-Status: Phase Complete
-Last activity: 2026-03-07 — Completed 11-02 Draft Auto-Save
+Phase: 12 of 12 (Frontend Resilience)
+Plan: 1 of 2 complete
+Status: In Progress
+Last activity: 2026-03-07 — Completed 12-01 Assessment API Module
 
-Progress: [███████░░░] 65%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8 (v2.0 milestone)
+- Total plans completed: 9 (v2.0 milestone)
 - Average duration: 1.6min
-- Total execution time: 13min
+- Total execution time: 14min
 
 **By Phase:**
 
@@ -31,9 +31,10 @@ Progress: [███████░░░] 65%
 | 09-redis-caching-layer | 2/2 | 2min | 1min |
 | 10-session-management | 2/2 | 4min | 2min |
 | 11-safe-submission-pattern | 2/2 | 4min | 2min |
+| 12-frontend-resilience | 1/2 | 1min | 1min |
 
 **Recent Trend:**
-- Last 5 plans: 09-02 (1min), 10-01 (2min), 10-02 (2min), 11-01 (2min), 11-02 (2min)
+- Last 5 plans: 10-01 (2min), 10-02 (2min), 11-01 (2min), 11-02 (2min), 12-01 (1min)
 - Trend: Consistent
 
 *Updated after each plan completion*
@@ -74,6 +75,9 @@ Recent decisions affecting current work:
 - deleteAllById for ID-specific deletion instead of broad deleteByUserStudent query — no new repository methods needed (11-01)
 - career9:draft: key prefix for draft namespace isolation, consistent with session/submit prefixes (11-02)
 - 24h TTL on drafts — matches session TTL, long enough for any assessment (11-02)
+- Direct config mutation for retry count — axios 0.26.x compatible, no config cloning (12-01)
+- Three separate storage reads per request for header injection — keeps headers independent, backwards compatible (12-01)
+- All 3 startAssessment call sites updated for session token capture (12-01)
 
 ### Roadmap Evolution
 
@@ -100,5 +104,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-07
-Stopped at: Completed 11-02-PLAN.md (Draft Auto-Save) — Phase 11 complete
-Resume file: .planning/phases/11-safe-submission-pattern/11-02-SUMMARY.md
+Stopped at: Completed 12-01-PLAN.md (Assessment API Module) — Phase 12 in progress
+Resume file: .planning/phases/12-frontend-resilience/12-01-SUMMARY.md
