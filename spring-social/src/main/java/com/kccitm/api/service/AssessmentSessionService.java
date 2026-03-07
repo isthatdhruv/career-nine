@@ -25,6 +25,8 @@ public class AssessmentSessionService {
 
     private static final String SESSION_KEY_PREFIX = "career9:session:";
     private static final int SESSION_TTL_HOURS = 24;
+    private static final String DRAFT_KEY_PREFIX = "career9:draft:";
+    private static final int DRAFT_TTL_HOURS = 24;
     private static final String SUBMIT_KEY_PREFIX = "career9:submit:";
     private static final int SUBMIT_TTL_HOURS = 24;
 
@@ -117,6 +119,34 @@ public class AssessmentSessionService {
     public void clearSubmissionLock(Long studentId, Long assessmentId) {
         String key = SUBMIT_KEY_PREFIX + studentId + ":" + assessmentId;
         redisTemplate.delete(key);
+    }
+
+    /**
+     * Save a draft of student's current answer state to Redis.
+     * Overwrites any existing draft for the same student+assessment.
+     */
+    public void saveDraft(Long studentId, Long assessmentId, Object draftData) {
+        String key = DRAFT_KEY_PREFIX + studentId + ":" + assessmentId;
+        redisTemplate.opsForValue().set(key, draftData, DRAFT_TTL_HOURS, TimeUnit.HOURS);
+        logger.debug("Saved draft for student={} assessment={}", studentId, assessmentId);
+    }
+
+    /**
+     * Retrieve a saved draft for a student+assessment pair.
+     * Returns null if no draft exists (expired or never saved).
+     */
+    public Object getDraft(Long studentId, Long assessmentId) {
+        String key = DRAFT_KEY_PREFIX + studentId + ":" + assessmentId;
+        return redisTemplate.opsForValue().get(key);
+    }
+
+    /**
+     * Delete a draft after successful submission.
+     */
+    public void deleteDraft(Long studentId, Long assessmentId) {
+        String key = DRAFT_KEY_PREFIX + studentId + ":" + assessmentId;
+        redisTemplate.delete(key);
+        logger.debug("Deleted draft for student={} assessment={}", studentId, assessmentId);
     }
 
     /**
