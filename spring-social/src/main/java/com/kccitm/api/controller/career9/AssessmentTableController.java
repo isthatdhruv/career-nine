@@ -488,8 +488,10 @@ public class AssessmentTableController {
     /**
      * Public prefetch endpoint - returns assessment data for a student before auth.
      * Called when student types their ID on login page to pre-load assessment data.
-     * Benefits from Caffeine cache - first request warms cache, rest are instant.
+     * Benefits from Redis cache - first request warms cache, rest are instant.
+     * Uses "assessmentDetails" cache with prefixed key to share eviction with mutation endpoints.
      */
+    @Cacheable(value = "assessmentDetails", key = "'prefetch-' + #userStudentId")
     @GetMapping("/prefetch/{userStudentId}")
     public ResponseEntity<?> prefetchAssessmentData(@PathVariable Long userStudentId) {
         try {
