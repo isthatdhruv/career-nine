@@ -26,8 +26,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kccitm.api.model.career9.AssessmentQuestions;
+import com.kccitm.api.model.career9.AssessmentSession;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
+import com.kccitm.api.service.AssessmentSessionService;
 import com.kccitm.api.model.career9.Questionaire.Questionnaire;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.Career9.AssessmentQuestionRepository;
@@ -57,6 +59,9 @@ public class AssessmentTableController {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private AssessmentSessionService assessmentSessionService;
 
     // ─── Locked assessment JSON snapshot helpers ───
 
@@ -479,6 +484,10 @@ public class AssessmentTableController {
             mapping.setStatus("ongoing");
             studentAssessmentMappingRepository.save(mapping);
         }
+
+        // Create a Redis-backed session and return the token
+        AssessmentSession session = assessmentSessionService.createSession(userStudentId, assessmentId);
+        response.put("sessionToken", session.getSessionToken());
 
         response.put("success", true);
         response.put("status", mapping.getStatus());
