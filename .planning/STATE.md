@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-03-07)
 ## Current Position
 
 Phase: 9 of 12 (Redis Caching Layer)
-Plan: 1 of 2 complete
-Status: Executing Phase 09
-Last activity: 2026-03-07 — Completed 09-01 RedisCacheManager Migration
+Plan: 2 of 2 complete
+Status: Phase 09 Complete
+Last activity: 2026-03-07 — Completed 09-02 Cache Warming and Prefetch
 
-Progress: [███░░░░░░░] 30%
+Progress: [████░░░░░░] 40%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3 (v2.0 milestone)
+- Total plans completed: 4 (v2.0 milestone)
 - Average duration: 1.3min
-- Total execution time: 4min
+- Total execution time: 5min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 08-redis-infrastructure | 2/2 | 3min | 1.5min |
-| 09-redis-caching-layer | 1/2 | 1min | 1min |
+| 09-redis-caching-layer | 2/2 | 2min | 1min |
 
 **Recent Trend:**
-- Last 5 plans: 08-01 (2min), 08-02 (1min), 09-01 (1min)
+- Last 5 plans: 08-01 (2min), 08-02 (1min), 09-01 (1min), 09-02 (1min)
 - Trend: Accelerating
 
 *Updated after each plan completion*
@@ -59,6 +59,9 @@ Recent decisions affecting current work:
 - "career9:" key prefix for cache namespace isolation (09-01)
 - transactionAware() on RedisCacheManager for Spring transaction participation (09-01)
 - disableCachingNullValues() to avoid caching empty results (09-01)
+- Inject controllers (not repos) for cache warming — @Cacheable on controller methods requires Spring AOP proxy (09-02)
+- "prefetch-" key prefix in assessmentDetails cache — shares eviction with existing @CacheEvict annotations (09-02)
+- Skip warming assessmentDetails at startup — per-ID keyed, expensive to iterate all; warm on-demand (09-02)
 
 ### Roadmap Evolution
 
@@ -80,9 +83,10 @@ None yet.
 - Spring Boot 2.5.5 compatibility with Redis libraries needs verification (addressed in Phase 8)
 - Existing Caffeine cache migrated to Redis in 09-01 (RESOLVED)
 - AssessmentQuestions serialization: Jackson serialization proven safe by existing HTTP responses — same serializer used for Redis (RESOLVED in 09-01)
+- Cache warming and prefetch caching complete (RESOLVED in 09-02)
 
 ## Session Continuity
 
 Last session: 2026-03-07
-Stopped at: Completed 09-01-PLAN.md (RedisCacheManager Migration)
-Resume file: .planning/phases/09-redis-caching-layer/09-01-SUMMARY.md
+Stopped at: Completed 09-02-PLAN.md (Cache Warming and Prefetch) — Phase 09 complete
+Resume file: .planning/phases/09-redis-caching-layer/09-02-SUMMARY.md
