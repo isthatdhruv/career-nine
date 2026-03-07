@@ -348,6 +348,7 @@ public class AssessmentAnswerController {
                 // Cache result and clean up session
                 assessmentSessionService.markSubmissionComplete(userStudentId, assessmentId, result);
                 assessmentSessionService.deleteSession(userStudentId, assessmentId);
+                assessmentSessionService.deleteDraft(userStudentId, assessmentId);
 
                 return ResponseEntity.ok(result);
 
@@ -359,6 +360,48 @@ public class AssessmentAnswerController {
 
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Save a draft of student's current answer state to Redis.
+     * Called periodically (every 30s) by the frontend to back up localStorage.
+     * Accepts a JSON blob with userStudentId, assessmentId, and answer state.
+     */
+    @PostMapping(value = "/draft-save", headers = "Accept=application/json")
+    public ResponseEntity<?> saveDraft(@RequestBody Map<String, Object> draftData) {
+        try {
+            Long studentId = ((Number) draftData.get("userStudentId")).longValue();
+            Long assessmentId = ((Number) draftData.get("assessmentId")).longValue();
+
+            assessmentSessionService.saveDraft(studentId, assessmentId, draftData);
+
+            Map<String, String> response = new HashMap<>();
+            response.put("status", "saved");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Draft save failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Restore a saved draft for a student+assessment pair.
+     * Called by the frontend on page load to recover answers after browser crash.
+     * Returns 404 if no draft exists.
+     */
+    @GetMapping(value = "/draft-restore/{studentId}/{assessmentId}", headers = "Accept=application/json")
+    public ResponseEntity<?> restoreDraft(@PathVariable Long studentId, @PathVariable Long assessmentId) {
+        try {
+            Object draft = assessmentSessionService.getDraft(studentId, assessmentId);
+
+            if (draft == null) {
+                Map<String, String> response = new HashMap<>();
+                response.put("status", "no_draft");
+                return ResponseEntity.status(404).body(response);
+            }
+            return ResponseEntity.ok(draft);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Draft restore failed: " + e.getMessage());
         }
     }
 
