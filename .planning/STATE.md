@@ -71,6 +71,7 @@ Recent decisions affecting current work:
 - Release idempotency lock on validation failure (no answers) — not a real submission, allow retry (10-02)
 - HashMap for cached result — compatible with GenericJackson2JsonRedisSerializer (10-02)
 - Bulk-submit endpoints excluded from idempotency — admin-only, handle re-upload by design (10-02)
+- deleteAllById for ID-specific deletion instead of broad deleteByUserStudent query — no new repository methods needed (11-01)
 - career9:draft: key prefix for draft namespace isolation, consistent with session/submit prefixes (11-02)
 - 24h TTL on drafts — matches session TTL, long enough for any assessment (11-02)
 
