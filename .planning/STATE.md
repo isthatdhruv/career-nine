@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** Students can reliably take assessments without data loss, wrong assessment loading, or submission failures — even under peak concurrent load.
-**Current focus:** Phase 9 — Redis Caching Layer
+**Current focus:** Phase 10 — Session Management
 
 ## Current Position
 
-Phase: 9 of 12 (Redis Caching Layer)
-Plan: 2 of 2 complete
-Status: Phase 09 Complete
-Last activity: 2026-03-07 — Completed 09-02 Cache Warming and Prefetch
+Phase: 10 of 12 (Session Management)
+Plan: 1 of 2 complete
+Status: In Progress
+Last activity: 2026-03-07 — Completed 10-01 Server-Side Session Management
 
-Progress: [████░░░░░░] 40%
+Progress: [█████░░░░░] 45%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4 (v2.0 milestone)
-- Average duration: 1.3min
-- Total execution time: 5min
+- Total plans completed: 5 (v2.0 milestone)
+- Average duration: 1.4min
+- Total execution time: 7min
 
 **By Phase:**
 
@@ -29,10 +29,11 @@ Progress: [████░░░░░░] 40%
 |-------|-------|-------|----------|
 | 08-redis-infrastructure | 2/2 | 3min | 1.5min |
 | 09-redis-caching-layer | 2/2 | 2min | 1min |
+| 10-session-management | 1/2 | 2min | 2min |
 
 **Recent Trend:**
-- Last 5 plans: 08-01 (2min), 08-02 (1min), 09-01 (1min), 09-02 (1min)
-- Trend: Accelerating
+- Last 5 plans: 08-02 (1min), 09-01 (1min), 09-02 (1min), 10-01 (2min)
+- Trend: Consistent
 
 *Updated after each plan completion*
 
@@ -62,6 +63,10 @@ Recent decisions affecting current work:
 - Inject controllers (not repos) for cache warming — @Cacheable on controller methods requires Spring AOP proxy (09-02)
 - "prefetch-" key prefix in assessmentDetails cache — shares eviction with existing @CacheEvict annotations (09-02)
 - Skip warming assessmentDetails at startup — per-ID keyed, expensive to iterate all; warm on-demand (09-02)
+- ISO-8601 string for session startTime instead of Instant — avoids Jackson serialization issues with GenericJackson2JsonRedisSerializer (10-01)
+- Backwards compatible interceptor — no X-Assessment-Session header means pass through (10-01)
+- Three separate headers (token, student ID, assessment ID) — avoids reading request body which is consumed once (10-01)
+- Interceptor excludes admin/CRUD and startAssessment endpoints — only assessment-taking paths validated (10-01)
 
 ### Roadmap Evolution
 
@@ -88,5 +93,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-07
-Stopped at: Completed 09-02-PLAN.md (Cache Warming and Prefetch) — Phase 09 complete
-Resume file: .planning/phases/09-redis-caching-layer/09-02-SUMMARY.md
+Stopped at: Completed 10-01-PLAN.md (Server-Side Session Management)
+Resume file: .planning/phases/10-session-management/10-01-SUMMARY.md
