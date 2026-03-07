@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAssessment } from "./AssessmentContext";
 import { usePreventReload } from "./usePreventReload";
+import assessmentApi, { getErrorMessage } from "./API/assessmentApi";
 
 type Assessment = {
   assessmentId: number;
@@ -15,6 +16,8 @@ export default function AllottedAssessmentPage() {
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [showOngoingModal, setShowOngoingModal] = useState(false);
   const [showMobileWarning, setShowMobileWarning] = useState(false);
+  const [submissionState, setSubmissionState] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
   const navigate = useNavigate();
   const { fetchAssessmentData } = useAssessment();
   usePreventReload();
@@ -41,10 +44,14 @@ export default function AllottedAssessmentPage() {
   }, []);
 
   const handleStartAssessment = async (assessment: Assessment) => {
+    // Prevent double-click via submission state machine
+    if (submissionState === 'submitting') return;
+
     const userStudentId = localStorage.getItem('userStudentId');
 
     if (!userStudentId) {
-      alert("Session expired. Please login again.");
+      setSubmissionState('error');
+      setSubmissionError('Session expired. Please login again.');
       navigate('/student-login');
       return;
     }
@@ -62,7 +69,8 @@ export default function AllottedAssessmentPage() {
 
     // Check if active
     if (!assessment.isActive) {
-      alert("This assessment is not currently active.");
+      setSubmissionState('error');
+      setSubmissionError('This assessment is not currently active.');
       return;
     }
 
@@ -73,6 +81,8 @@ export default function AllottedAssessmentPage() {
     }
 
     setLoadingId(assessment.assessmentId);
+    setSubmissionState('submitting');
+    setSubmissionError(null);
 
     try {
       // Store the selected assessment ID for use in other pages
@@ -86,11 +96,13 @@ export default function AllottedAssessmentPage() {
 
       if (statusData.totalFields > 0 && !statusData.completed) {
         // Demographics required and not yet completed - go to demographics form
+        setSubmissionState('idle');
         navigate(`/demographics/${assessment.assessmentId}`);
         return;
       }
 
       // No demographics needed or already completed - proceed to assessment
+      // Note: startAssessment is excluded from backend interceptor, stays as fetch()
       const startRes = await fetch(`${process.env.REACT_APP_API_URL}/assessments/startAssessment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -105,10 +117,20 @@ export default function AllottedAssessmentPage() {
       }
 
       await fetchAssessmentData(String(assessment.assessmentId));
+      setSubmissionState('success');
       navigate('/general-instructions');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error starting assessment:', error);
-      alert('Failed to start assessment. Please try again.');
+      // Handle 409 as success (already started/submitted)
+      if (error?.response?.status === 409) {
+        setSubmissionState('success');
+        navigate('/general-instructions');
+        return;
+      }
+      setSubmissionState('error');
+      setSubmissionError(
+        error?.response ? getErrorMessage(error) : 'Failed to start assessment. Please check your connection and try again.'
+      );
     } finally {
       setLoadingId(null);
     }
@@ -368,7 +390,8 @@ export default function AllottedAssessmentPage() {
                       disabled={
                         assessment.studentStatus === 'completed' ||
                         !assessment.isActive ||
-                        loadingId === assessment.assessmentId
+                        loadingId === assessment.assessmentId ||
+                        submissionState === 'submitting'
                       }
                       style={{
                         width: '100%',
@@ -409,10 +432,10 @@ export default function AllottedAssessmentPage() {
                         }
                       }}
                     >
-                      {loadingId === assessment.assessmentId ? (
+                      {(loadingId === assessment.assessmentId || (submissionState === 'submitting' && loadingId === assessment.assessmentId)) ? (
                         <>
                           <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                          <span>Loading...</span>
+                          <span>Submitting...</span>
                         </>
                       ) : (
                         <>
@@ -455,6 +478,49 @@ export default function AllottedAssessmentPage() {
           </div>
         )}
       </div>
+
+      {/* Submission Error Banner */}
+      {submissionState === 'error' && submissionError && (
+        <div
+          style={{
+            maxWidth: '1200px',
+            width: '100%',
+            margin: '0 auto 2rem',
+          }}
+        >
+          <div className="alert alert-danger" role="alert" style={{
+            borderRadius: '16px',
+            padding: '1.25rem 1.5rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.75rem',
+            border: '2px solid #fca5a5',
+            backgroundColor: '#fef2f2',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <strong style={{ color: '#991b1b', fontSize: '1rem' }}>Assessment Failed to Start</strong>
+            </div>
+            <p style={{ color: '#991b1b', margin: 0, fontSize: '0.95rem' }}>{submissionError}</p>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => { setSubmissionState('idle'); setSubmissionError(null); }}
+              style={{
+                alignSelf: 'flex-start',
+                borderRadius: '8px',
+                padding: '0.5rem 1.25rem',
+                fontWeight: '600',
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Ongoing Assessment Modal */}
       {showOngoingModal && (
