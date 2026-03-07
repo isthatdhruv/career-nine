@@ -560,15 +560,20 @@ public class AssessmentAnswerController {
                     mapping.setStatus("completed");
                     studentAssessmentMappingRepository.save(mapping);
 
-                    // Delete old answers for re-upload support
-                    assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(
-                            userStudentId, assessmentId);
+                    // SAFE: Collect existing IDs before any writes
+                    List<Long> existingAnswerIds = assessmentAnswerRepository
+                        .findByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId)
+                        .stream()
+                        .map(AssessmentAnswer::getAssessmentAnswerId)
+                        .collect(Collectors.toList());
 
-                    // Delete old raw scores
-                    assessmentRawScoreRepository
-                            .deleteByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId());
+                    List<Long> existingScoreIds = assessmentRawScoreRepository
+                        .findByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId())
+                        .stream()
+                        .map(AssessmentRawScore::getAssessmentRawScoreId)
+                        .collect(Collectors.toList());
 
-                    // Process answers
+                    // Process and save new answers
                     List<Map<String, Object>> answers = (List<Map<String, Object>>) studentData.get("answers");
                     Map<Long, Integer> qualityTypeScores = new HashMap<>();
                     Map<Long, MeasuredQualityTypes> qualityTypeCache = new HashMap<>();
@@ -601,7 +606,7 @@ public class AssessmentAnswerController {
                         }
                     }
 
-                    // Save raw scores
+                    // Save new raw scores
                     for (Map.Entry<Long, Integer> entry : qualityTypeScores.entrySet()) {
                         MeasuredQualityTypes mqt = qualityTypeCache.get(entry.getKey());
                         AssessmentRawScore ars = new AssessmentRawScore();
@@ -610,6 +615,14 @@ public class AssessmentAnswerController {
                         ars.setMeasuredQuality(mqt.getMeasuredQuality());
                         ars.setRawScore(entry.getValue());
                         assessmentRawScoreRepository.save(ars);
+                    }
+
+                    // Delete old records by specific IDs
+                    if (!existingAnswerIds.isEmpty()) {
+                        assessmentAnswerRepository.deleteAllById(existingAnswerIds);
+                    }
+                    if (!existingScoreIds.isEmpty()) {
+                        assessmentRawScoreRepository.deleteAllById(existingScoreIds);
                     }
 
                     successCount++;
@@ -783,15 +796,20 @@ public class AssessmentAnswerController {
                     mapping.setStatus("completed");
                     studentAssessmentMappingRepository.save(mapping);
 
-                    // Delete old answers for re-upload support
-                    assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(
-                            userStudentId, assessmentId);
+                    // SAFE: Collect existing IDs before any writes
+                    List<Long> existingAnswerIds = assessmentAnswerRepository
+                        .findByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId)
+                        .stream()
+                        .map(AssessmentAnswer::getAssessmentAnswerId)
+                        .collect(Collectors.toList());
 
-                    // Delete old raw scores
-                    assessmentRawScoreRepository
-                            .deleteByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId());
+                    List<Long> existingScoreIds = assessmentRawScoreRepository
+                        .findByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId())
+                        .stream()
+                        .map(AssessmentRawScore::getAssessmentRawScoreId)
+                        .collect(Collectors.toList());
 
-                    // Process answers
+                    // Process and save new answers
                     List<Map<String, Object>> answers = (List<Map<String, Object>>) studentData.get("answers");
                     Map<Long, Integer> qualityTypeScores = new HashMap<>();
                     Map<Long, MeasuredQualityTypes> qualityTypeCache = new HashMap<>();
@@ -827,7 +845,7 @@ public class AssessmentAnswerController {
                         }
                     }
 
-                    // Save raw scores
+                    // Save new raw scores
                     for (Map.Entry<Long, Integer> entry : qualityTypeScores.entrySet()) {
                         MeasuredQualityTypes mqt = qualityTypeCache.get(entry.getKey());
                         AssessmentRawScore ars = new AssessmentRawScore();
@@ -836,6 +854,14 @@ public class AssessmentAnswerController {
                         ars.setMeasuredQuality(mqt.getMeasuredQuality());
                         ars.setRawScore(entry.getValue());
                         assessmentRawScoreRepository.save(ars);
+                    }
+
+                    // Delete old records by specific IDs
+                    if (!existingAnswerIds.isEmpty()) {
+                        assessmentAnswerRepository.deleteAllById(existingAnswerIds);
+                    }
+                    if (!existingScoreIds.isEmpty()) {
+                        assessmentRawScoreRepository.deleteAllById(existingScoreIds);
                     }
 
                     successCount++;
@@ -940,15 +966,20 @@ public class AssessmentAnswerController {
                     mapping.setStatus("completed");
                     studentAssessmentMappingRepository.save(mapping);
 
-                    // Delete old answers for re-upload support
-                    assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(
-                            userStudentId, assessmentId);
+                    // SAFE: Collect existing IDs before any writes
+                    List<Long> existingAnswerIds = assessmentAnswerRepository
+                        .findByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId)
+                        .stream()
+                        .map(AssessmentAnswer::getAssessmentAnswerId)
+                        .collect(Collectors.toList());
 
-                    // Delete old raw scores
-                    assessmentRawScoreRepository
-                            .deleteByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId());
+                    List<Long> existingScoreIds = assessmentRawScoreRepository
+                        .findByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId())
+                        .stream()
+                        .map(AssessmentRawScore::getAssessmentRawScoreId)
+                        .collect(Collectors.toList());
 
-                    // Process answers
+                    // Process and save new answers
                     List<Map<String, Object>> answers = (List<Map<String, Object>>) studentData.get("answers");
                     Map<Long, Integer> qualityTypeScores = new HashMap<>();
                     Map<Long, MeasuredQualityTypes> qualityTypeCache = new HashMap<>();
@@ -984,7 +1015,7 @@ public class AssessmentAnswerController {
                         }
                     }
 
-                    // Save raw scores
+                    // Save new raw scores
                     for (Map.Entry<Long, Integer> entry : qualityTypeScores.entrySet()) {
                         MeasuredQualityTypes mqt = qualityTypeCache.get(entry.getKey());
                         AssessmentRawScore ars = new AssessmentRawScore();
@@ -993,6 +1024,14 @@ public class AssessmentAnswerController {
                         ars.setMeasuredQuality(mqt.getMeasuredQuality());
                         ars.setRawScore(entry.getValue());
                         assessmentRawScoreRepository.save(ars);
+                    }
+
+                    // Delete old records by specific IDs
+                    if (!existingAnswerIds.isEmpty()) {
+                        assessmentAnswerRepository.deleteAllById(existingAnswerIds);
+                    }
+                    if (!existingScoreIds.isEmpty()) {
+                        assessmentRawScoreRepository.deleteAllById(existingScoreIds);
                     }
 
                     successCount++;
