@@ -165,6 +165,22 @@ public class UserController {
             } else {
                 row.put("dob", null);
             }
+            // Include userRoleGroupMappings so the frontend can display assigned roles
+            List<Map<String, Object>> mappings = new ArrayList<>();
+            if (u.getUserRoleGroupMappings() != null) {
+                for (UserRoleGroupMapping mapping : u.getUserRoleGroupMappings()) {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("id", mapping.getId());
+                    if (mapping.getRoleGroup() != null) {
+                        Map<String, Object> rg = new HashMap<>();
+                        rg.put("id", mapping.getRoleGroup().getId());
+                        rg.put("name", mapping.getRoleGroup().getName());
+                        m.put("roleGroup", rg);
+                    }
+                    mappings.add(m);
+                }
+            }
+            row.put("userRoleGroupMappings", mappings);
             result.add(row);
         }
         return result;
