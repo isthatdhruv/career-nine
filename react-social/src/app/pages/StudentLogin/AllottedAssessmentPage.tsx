@@ -91,7 +91,7 @@ export default function AllottedAssessmentPage() {
       }
 
       // No demographics needed or already completed - proceed to assessment
-      await fetch(`${process.env.REACT_APP_API_URL}/assessments/startAssessment`, {
+      const startRes = await fetch(`${process.env.REACT_APP_API_URL}/assessments/startAssessment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -99,6 +99,10 @@ export default function AllottedAssessmentPage() {
           assessmentId: assessment.assessmentId
         })
       });
+      const startData = await startRes.json();
+      if (startData.sessionToken) {
+        sessionStorage.setItem('assessmentSessionToken', startData.sessionToken);
+      }
 
       await fetchAssessmentData(String(assessment.assessmentId));
       navigate('/general-instructions');
