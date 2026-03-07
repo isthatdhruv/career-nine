@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import javax.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -101,7 +101,7 @@ public class AssessmentAnswerController {
         return assessmentAnswerRepository.findAll();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     @PostMapping(value = "/submit", headers = "Accept=application/json")
     public ResponseEntity<?> submitAssessmentAnswers(@RequestBody Map<String, Object> submissionData) {
         try {
@@ -139,6 +139,14 @@ public class AssessmentAnswerController {
                 mapping = studentAssessmentMappingRepository
                         .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
                         .orElseThrow(() -> new RuntimeException("Failed to create/find assessment mapping"));
+            }
+
+            // Guard against duplicate submissions - if already completed, return success without reprocessing
+            if ("completed".equals(mapping.getStatus())) {
+                return ResponseEntity.ok(Map.of(
+                        "status", "already_submitted",
+                        "message", "Assessment was already submitted successfully"
+                ));
             }
 
             // Update status if provided
@@ -308,8 +316,21 @@ public class AssessmentAnswerController {
             ));
 
         } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+            // Re-throw as RuntimeException to ensure @Transactional rolls back all DB changes
+            throw new RuntimeException("Assessment submission failed: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Global exception handler for submission failures - returns proper HTTP 500
+     * while allowing @Transactional to rollback via the thrown exception.
+     */
+    @org.springframework.web.bind.annotation.ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<?> handleSubmissionError(RuntimeException e) {
+        return ResponseEntity.status(500).body(Map.of(
+                "status", "error",
+                "message", e.getMessage() != null ? e.getMessage() : "Unknown error"
+        ));
     }
 
     // ============ OFFLINE ASSESSMENT UPLOAD ENDPOINTS ============
