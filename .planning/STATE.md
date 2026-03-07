@@ -5,32 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** Students can reliably take assessments without data loss, wrong assessment loading, or submission failures — even under peak concurrent load.
-**Current focus:** Phase 8 — Redis Infrastructure
+**Current focus:** Phase 9 — Redis Caching Layer
 
 ## Current Position
 
-Phase: 8 of 12 (Redis Infrastructure) -- COMPLETE
-Plan: 2 of 2 complete
-Status: Phase 08 complete, ready for Phase 09
-Last activity: 2026-03-07 — Completed 08-02 Redis Spring Beans
+Phase: 9 of 12 (Redis Caching Layer)
+Plan: 1 of 2 complete
+Status: Executing Phase 09
+Last activity: 2026-03-07 — Completed 09-01 RedisCacheManager Migration
 
-Progress: [██░░░░░░░░] 20%
+Progress: [███░░░░░░░] 30%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2 (v2.0 milestone)
-- Average duration: 1.5min
-- Total execution time: 3min
+- Total plans completed: 3 (v2.0 milestone)
+- Average duration: 1.3min
+- Total execution time: 4min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 08-redis-infrastructure | 2/2 | 3min | 1.5min |
+| 09-redis-caching-layer | 1/2 | 1min | 1min |
 
 **Recent Trend:**
-- Last 5 plans: 08-01 (2min), 08-02 (1min)
+- Last 5 plans: 08-01 (2min), 08-02 (1min), 09-01 (1min)
 - Trend: Accelerating
 
 *Updated after each plan completion*
@@ -54,6 +55,10 @@ Recent decisions affecting current work:
 - GenericJackson2JsonRedisSerializer for human-readable JSON values in Redis (08-02)
 - CachingConfigurerSupport pattern for Spring Boot 2.5.x cache error handling (08-02)
 - WARN-level logging for cache errors, not ERROR (08-02)
+- GenericJackson2JsonRedisSerializer for cache values — consistent with RedisTemplate (09-01)
+- "career9:" key prefix for cache namespace isolation (09-01)
+- transactionAware() on RedisCacheManager for Spring transaction participation (09-01)
+- disableCachingNullValues() to avoid caching empty results (09-01)
 
 ### Roadmap Evolution
 
@@ -73,11 +78,11 @@ None yet.
 
 - 8GB RAM constraint requires careful Redis memory management (addressed in Phase 8)
 - Spring Boot 2.5.5 compatibility with Redis libraries needs verification (addressed in Phase 8)
-- Existing Caffeine cache must be migrated gracefully (addressed in Phase 9 — not broken during transition)
-- AssessmentQuestions serialization schema needs verification for circular references (flagged in research — address in Phase 9)
+- Existing Caffeine cache migrated to Redis in 09-01 (RESOLVED)
+- AssessmentQuestions serialization: Jackson serialization proven safe by existing HTTP responses — same serializer used for Redis (RESOLVED in 09-01)
 
 ## Session Continuity
 
 Last session: 2026-03-07
-Stopped at: Completed 08-02-PLAN.md (Redis Spring Beans) -- Phase 08 complete
-Resume file: .planning/phases/08-redis-infrastructure/08-02-SUMMARY.md
+Stopped at: Completed 09-01-PLAN.md (RedisCacheManager Migration)
+Resume file: .planning/phases/09-redis-caching-layer/09-01-SUMMARY.md
