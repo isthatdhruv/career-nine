@@ -102,10 +102,11 @@ Plans:
 4. Student can resume assessment after server restart without losing progress
 5. Session expires after 24 hours of inactivity
 
-**Plans**: TBD
+**Plans:** 2 plans (2 waves)
 
 Plans:
-- [ ] TBD after planning
+- [ ] 10-01-PLAN.md — Session service + interceptor + startAssessment integration
+- [ ] 10-02-PLAN.md — Idempotent submission via SET NX + session cleanup
 
 ---
 
@@ -163,7 +164,7 @@ Phases execute in numeric order: 8 → 9 → 10 → 11 → 12
 | 7. Dashboard Responsive Overhaul | v1.0 | 0/5 | Complete | - |
 | 8. Redis Infrastructure | v2.0 | 2/2 | ✓ Complete | 2026-03-07 |
 | 9. Redis Caching Layer | v2.0 | 2/2 | ✓ Complete | 2026-03-07 |
-| 10. Session Management | v2.0 | 0/TBD | Not started | - |
+| 10. Session Management | v2.0 | 0/2 | Not started | - |
 | 11. Safe Submission Pattern | v2.0 | 0/TBD | Not started | - |
 | 12. Frontend Resilience | v2.0 | 0/TBD | Not started | - |
 
