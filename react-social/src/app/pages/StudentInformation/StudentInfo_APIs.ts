@@ -62,6 +62,8 @@ export interface StudentAnswerDetail {
     optionText: string;
     sectionName?: string | null;
     excelQuestionHeader?: string | null;
+    optionNumber?: number;
+    isImageOption?: boolean;
 }
 
 export function getStudentInfoByInstituteId(instituteId: number) {
