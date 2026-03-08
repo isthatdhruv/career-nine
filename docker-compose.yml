@@ -16,31 +16,62 @@ services:
     deploy:
       resources:
         limits:
-          memory: 3g
+          memory: 2g
     networks:
       - career_shared_net
 
+  redis_cache:
+    image: redis:7.2-alpine
+    restart: always
+    command: >
+      redis-server
+      --maxmemory 1536mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+    ports:
+      - '6379:6379'
+    deploy:
+      resources:
+        limits:
+          memory: 1.5g
+    networks:
+      - career_shared_net
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
   api:
+    container_name: api
     build:
       context: ./spring-social
       dockerfile: dockerfile
     ports:
       - 8080:8080
-    command: ["java", "-Xms2g", "-Xmx4g", "-jar", "/usr/local/lib/demo.jar"]
+    command: ["java", "-Xms1g", "-Xmx2g", "-jar", "/usr/local/lib/demo.jar"]
     restart: always
     env_file:
       - .env
     deploy:
       resources:
         limits:
-          memory: 4g
+          memory: 3g
     depends_on:
-      - mysql_db_api
+      mysql_db_api:
+        condition: service_started
+      redis_cache:
+        condition: service_healthy
     networks:
       - career_shared_net
 
 volumes:
   mysql_data:
+  redis_data:
 
 networks:
   career_shared_net:

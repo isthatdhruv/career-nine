@@ -1,9 +1,16 @@
 spring:
   profiles:
     active: staging
+    active: staging
 
 server:
   port: 8080
+  tomcat:
+    threads:
+      max: 300
+      min-spare: 50
+    accept-count: 100
+    connection-timeout: 60000
   # ssl:
   #   enabled: true
   #   key-store: classpath:keystore.p12
@@ -17,8 +24,14 @@ spring:
     url: jdbc:mysql://localhost:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     # url: jdbc:mysql://192.168.10.73:3306/kiraya-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     username: root
-    # password: Career-qCsfeuECc3MW
-    password: MyStrongPass@123
+    password: Career-qCsfeuECc3MW
+    # password: MyStrongPass@123
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 20
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
   jpa:
     show-sql: true
     hibernate:
@@ -27,6 +40,29 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+        default_batch_fetch_size: 30
+        jdbc:
+          batch_size: 30
+        order_inserts: true
+        order_updates: true
+  cache:
+    type: redis
+    cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
+    redis:
+      time-to-live: 86400000
+      key-prefix: "career9:"
+      use-key-prefix: true
+  redis:
+    host: localhost
+    port: 6379
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 2
+        max-wait: 5000ms
+      shutdown-timeout: 200ms
   mail:
     host: smtp.gmail.com
     port: 587
@@ -77,6 +113,19 @@ spring:
             authorizationUri: https://www.facebook.com/v3.0/dialog/oauth
             tokenUri: https://graph.facebook.com/v3.0/oauth/access_token
             userInfoUri: https://graph.facebook.com/v3.0/me?fields=id,first_name,middle_name,last_name,name,email,verified,is_verified,picture.width(250).height(250)
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,caches
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  health:
+    redis:
+      enabled: true
 
 app:
   protocol: http
@@ -136,6 +185,29 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+        default_batch_fetch_size: 30
+        jdbc:
+          batch_size: 30
+        order_inserts: true
+        order_updates: true
+  cache:
+    type: redis
+    cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
+    redis:
+      time-to-live: 86400000
+      key-prefix: "career9:"
+      use-key-prefix: true
+  redis:
+    host: redis_cache
+    port: 6379
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 50
+        max-idle: 20
+        min-idle: 5
+        max-wait: 5000ms
+      shutdown-timeout: 200ms
   mail:
     host: smtp.gmail.com
     port: 587
@@ -186,6 +258,18 @@ spring:
             authorizationUri: https://www.facebook.com/v3.0/dialog/oauth
             tokenUri: https://graph.facebook.com/v3.0/oauth/access_token
             userInfoUri: https://graph.facebook.com/v3.0/me?fields=id,first_name,middle_name,last_name,name,email,verified,is_verified,picture.width(250).height(250)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,caches
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  health:
+    redis:
+      enabled: true
 server:
   tomcat:
     threads:
@@ -233,15 +317,43 @@ spring:
     username: root
     password: qCsfeuECc3MW
     # password: Google.com1
-
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 20
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
   jpa:
-    show-sql: true
+    show-sql: false
     hibernate:
       naming-strategy: org.hibernate.cfg.EJB3NamingStrategy
       ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+        default_batch_fetch_size: 30
+        jdbc:
+          batch_size: 30
+        order_inserts: true
+        order_updates: true
+  cache:
+    type: redis
+    cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
+    redis:
+      time-to-live: 86400000
+      key-prefix: "career9:"
+      use-key-prefix: true
+  redis:
+    host: redis_cache
+    port: 6379
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 50
+        max-idle: 20
+        min-idle: 5
+        max-wait: 5000ms
+      shutdown-timeout: 200ms
   mail:
     host: smtp.gmail.com
     port: 587
@@ -292,6 +404,18 @@ spring:
             authorizationUri: https://www.facebook.com/v3.0/dialog/oauth
             tokenUri: https://graph.facebook.com/v3.0/oauth/access_token
             userInfoUri: https://graph.facebook.com/v3.0/me?fields=id,first_name,middle_name,last_name,name,email,verified,is_verified,picture.width(250).height(250)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,caches
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  health:
+    redis:
+      enabled: true
 app:
   protocol: http
   name: student.kccitm.in

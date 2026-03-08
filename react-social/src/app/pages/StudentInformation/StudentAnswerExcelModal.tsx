@@ -71,6 +71,9 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
           item.excelquestionheader ??
           item.excel_question_header;
 
+        const optionNumber = item.optionNumber ?? item.option_number ?? 0;
+        const isImageOption = item.isImageOption ?? item.is_image_option ?? false;
+
         return {
           questionId: item.questionId ?? item.questionid ?? item.question_id,
           questionText,
@@ -78,6 +81,8 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
           optionText,
           sectionName,
           excelQuestionHeader,
+          optionNumber,
+          isImageOption,
         };
       })
       .filter((item) => item.questionText || item.optionText || item.sectionName || item.excelQuestionHeader);
@@ -140,12 +145,12 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
   const handleDownloadAnswers = () => {
     setDownloading(true);
     try {
-      const excelData = answers.map((answer, index) => ({
+      const excelData = answers.map((answer: any, index: number) => ({
         "S.No": index + 1,
         "Section": answer.sectionName || "",
         "Excel Header": answer.excelQuestionHeader || "",
         "Question": answer.questionText,
-        "Selected Answer": answer.optionText
+        "Selected Answer": answer.optionText || (answer.isImageOption && answer.optionNumber ? `Option ${answer.optionNumber} (Image)` : ""),
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(excelData);
@@ -430,7 +435,7 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
                                     fontSize: '0.85rem'
                                   }}
                                 >
-                                  {answer.optionText}
+                                  {answer.optionText || (answer.isImageOption && answer.optionNumber ? `Option ${answer.optionNumber} (Image)` : answer.optionText || "")}
                                 </span>
                               </td>
                             </tr>

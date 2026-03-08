@@ -21,6 +21,7 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [prefetchedAssessments, setPrefetchedAssessments] = useState<any[] | null>(null);
   const prefetchingRef = useRef(false);
   const prefetchPromiseRef = useRef<Promise<void> | null>(null);
+  const cachedAssessmentIdRef = useRef<string | null>(null);
 
   const prefetchAssessmentData = (userStudentId: string) => {
     if (prefetchingRef.current || !userStudentId.trim()) return;
@@ -38,9 +39,11 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 http.get(`/assessments/getby/${firstActive.assessmentId}`),
                 http.get(`/assessments/getById/${firstActive.assessmentId}`),
               ]);
+              cachedAssessmentIdRef.current = String(firstActive.assessmentId);
               try {
                 sessionStorage.setItem('assessmentData', JSON.stringify(questionnaireRes.data));
                 sessionStorage.setItem('assessmentConfig', JSON.stringify(configRes.data));
+                sessionStorage.setItem('cachedAssessmentId', String(firstActive.assessmentId));
               } catch (e) {
                 // Storage quota exceeded - non-critical
               }
@@ -67,8 +70,8 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (prefetchPromiseRef.current) {
       await prefetchPromiseRef.current;
     }
-    // If data was already prefetched, skip the API call
-    if (assessmentData && assessmentConfig) {
+    // Only use cached data if it matches the requested assessmentId
+    if (assessmentData && assessmentConfig && cachedAssessmentIdRef.current === assessmentId) {
       return;
     }
 
@@ -82,17 +85,14 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       ]);
 
       setAssessmentData(questionnaireRes.data);
+      setAssessmentConfig(configRes.data);
+      cachedAssessmentIdRef.current = assessmentId;
       try {
         sessionStorage.setItem('assessmentData', JSON.stringify(questionnaireRes.data));
-      } catch (e) {
-        console.warn('Could not cache assessmentData to storage');
-      }
-
-      setAssessmentConfig(configRes.data);
-      try {
         sessionStorage.setItem('assessmentConfig', JSON.stringify(configRes.data));
+        sessionStorage.setItem('cachedAssessmentId', assessmentId);
       } catch (e) {
-        console.warn('Could not cache assessmentConfig to storage');
+        console.warn('Could not cache assessment data to storage');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
@@ -103,6 +103,11 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   useEffect(() => {
+    const storedId = sessionStorage.getItem('cachedAssessmentId');
+    if (storedId) {
+      cachedAssessmentIdRef.current = storedId;
+    }
+
     const stored = sessionStorage.getItem('assessmentData');
     if (stored) {
       try {
