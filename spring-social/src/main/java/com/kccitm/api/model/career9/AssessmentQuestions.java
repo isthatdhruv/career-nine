@@ -20,7 +20,8 @@ import com.fasterxml.jackson.annotation.JsonManagedReference;
 @Entity
 @Table(name = "assessment_questions",
        indexes = {
-           @Index(name = "idx_question_deleted", columnList = "is_deleted")
+           @Index(name = "idx_question_deleted", columnList = "is_deleted"),
+           @Index(name = "idx_question_section", columnList = "section_id")
        })
 public class AssessmentQuestions implements Serializable {
     private static final long serialVersionUID = 1L;

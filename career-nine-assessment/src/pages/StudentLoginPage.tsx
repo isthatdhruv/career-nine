@@ -12,7 +12,26 @@ const StudentLoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    localStorage.clear();
+    // Check if there are unsaved assessment answers before clearing
+    const hasUnsavedAnswers = localStorage.getItem('assessmentAnswers');
+    if (hasUnsavedAnswers) {
+      console.warn('Unsaved assessment answers detected - preserving for recovery');
+      // Preserve answer keys, clear everything else
+      const keysToPreserve = [
+        'assessmentAnswers', 'assessmentRankingAnswers', 'assessmentTextAnswers',
+        'assessmentSavedForLater', 'assessmentSkipped', 'assessmentElapsedTime',
+        'assessmentCompletedGames', 'assessmentId', 'userStudentId'
+      ];
+      const preserved: Record<string, string> = {};
+      keysToPreserve.forEach(key => {
+        const val = localStorage.getItem(key);
+        if (val) preserved[key] = val;
+      });
+      localStorage.clear();
+      Object.entries(preserved).forEach(([key, val]) => localStorage.setItem(key, val));
+    } else {
+      localStorage.clear();
+    }
     sessionStorage.clear();
     if ('caches' in window) {
       caches.keys().then(names => names.forEach(name => caches.delete(name)));

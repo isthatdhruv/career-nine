@@ -4,6 +4,12 @@ spring:
 
 server:
   port: 8080
+  tomcat:
+    threads:
+      max: 300
+      min-spare: 50
+    accept-count: 100
+    connection-timeout: 60000
   # ssl:
   #   enabled: true
   #   key-store: classpath:keystore.p12
@@ -20,8 +26,8 @@ spring:
     password: Career-qCsfeuECc3MW
     # password: MyStrongPass@123
     hikari:
-      maximum-pool-size: 30
-      minimum-idle: 10
+      maximum-pool-size: 50
+      minimum-idle: 20
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
@@ -33,6 +39,7 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+        default_batch_fetch_size: 30
         jdbc:
           batch_size: 30
         order_inserts: true
@@ -177,6 +184,7 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+        default_batch_fetch_size: 30
         jdbc:
           batch_size: 30
         order_inserts: true
@@ -309,19 +317,20 @@ spring:
     password: qCsfeuECc3MW
     # password: Google.com1
     hikari:
-      maximum-pool-size: 30
-      minimum-idle: 10
+      maximum-pool-size: 50
+      minimum-idle: 20
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
   jpa:
-    show-sql: true
+    show-sql: false
     hibernate:
       naming-strategy: org.hibernate.cfg.EJB3NamingStrategy
       ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+        default_batch_fetch_size: 30
         jdbc:
           batch_size: 30
         order_inserts: true
