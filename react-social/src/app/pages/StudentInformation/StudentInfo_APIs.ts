@@ -190,3 +190,23 @@ export function exportScoresByInstitute(instituteId: number, assessmentId: numbe
         responseType: 'blob'
     });
 }
+
+// BET Report APIs
+export interface BetReportColumn {
+    key: string;
+    header: string;
+    questionId: number;
+    optionId?: number;
+    isMQT: boolean;
+}
+
+export interface BetReportResponse {
+    columns: BetReportColumn[];
+    rows: Record<string, any>[];
+}
+
+export function getBetReport(instituteId: number, assessmentId: number) {
+    return axios.get<BetReportResponse>(
+        `${STUDENT_INFO_BASE}/bet-report/${instituteId}/${assessmentId}`
+    );
+}

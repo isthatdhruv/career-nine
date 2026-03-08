@@ -187,7 +187,7 @@ const ThankYouPage: React.FC = () => {
                         }}
                     >
                         {/* Dashboard Button Card */}
-                        <div
+                        {/* <div
                             onClick={handleGoToDashboard}
                             style={{
                                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -242,7 +242,7 @@ const ThankYouPage: React.FC = () => {
                             }}>
                                 Comprehensive Student Insight Dashboard
                             </p>
-                        </div>
+                        </div> */}
 
                         {/* Career Library Button Card */}
                         <div

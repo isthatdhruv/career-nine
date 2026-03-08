@@ -248,13 +248,18 @@ public class AssessmentAnswerController {
 
                         answersToSave.add(ans);
 
-                        // Accumulate Scores from bulk-fetched data
+                        // Accumulate Scores from bulk-fetched data (deduplicate by MQT type per option)
                         List<OptionScoreBasedOnMEasuredQualityTypes> scores = scoresByOptionId
                                 .getOrDefault(oId, java.util.Collections.emptyList());
+                        Map<Long, OptionScoreBasedOnMEasuredQualityTypes> dedupedScores = new java.util.LinkedHashMap<>();
                         for (OptionScoreBasedOnMEasuredQualityTypes s : scores) {
+                            dedupedScores.putIfAbsent(s.getMeasuredQualityType().getMeasuredQualityTypeId(), s);
+                        }
+                        for (OptionScoreBasedOnMEasuredQualityTypes s : dedupedScores.values()) {
                             MeasuredQualityTypes type = s.getMeasuredQualityType();
                             Long typeId = type.getMeasuredQualityTypeId();
-                            qualityTypeScores.merge(typeId, s.getScore(), Integer::sum);
+                            int effectiveScore = (rankOrder != null) ? s.getScore() * rankOrder : s.getScore();
+                            qualityTypeScores.merge(typeId, effectiveScore, Integer::sum);
                             qualityTypeCache.putIfAbsent(typeId, type);
                         }
                     }
@@ -471,15 +476,28 @@ public class AssessmentAnswerController {
                             ans.setAssessment(assessment);
                             ans.setQuestionnaireQuestion(question);
                             ans.setOption(option);
+
+                            Integer rankOrder = ansMap.containsKey("rankOrder")
+                                    ? ((Number) ansMap.get("rankOrder")).intValue()
+                                    : null;
+                            if (rankOrder != null) {
+                                ans.setRankOrder(rankOrder);
+                            }
+
                             assessmentAnswerRepository.save(ans);
 
-                            // Accumulate scores
+                            // Accumulate scores (deduplicate by MQT type per option)
                             List<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository
                                     .findByOptionId(oId);
+                            Map<Long, OptionScoreBasedOnMEasuredQualityTypes> dedupedScores = new java.util.LinkedHashMap<>();
                             for (OptionScoreBasedOnMEasuredQualityTypes s : scores) {
+                                dedupedScores.putIfAbsent(s.getMeasuredQualityType().getMeasuredQualityTypeId(), s);
+                            }
+                            for (OptionScoreBasedOnMEasuredQualityTypes s : dedupedScores.values()) {
                                 MeasuredQualityTypes type = s.getMeasuredQualityType();
                                 Long typeId = type.getMeasuredQualityTypeId();
-                                qualityTypeScores.merge(typeId, s.getScore(), Integer::sum);
+                                int effectiveScore = (rankOrder != null) ? s.getScore() * rankOrder : s.getScore();
+                                qualityTypeScores.merge(typeId, effectiveScore, Integer::sum);
                                 qualityTypeCache.putIfAbsent(typeId, type);
                             }
                         }
@@ -696,15 +714,28 @@ public class AssessmentAnswerController {
                                 ans.setAssessment(assessment);
                                 ans.setQuestionnaireQuestion(question);
                                 ans.setOption(option);
+
+                                Integer rankOrder = ansMap.containsKey("rankOrder")
+                                        ? ((Number) ansMap.get("rankOrder")).intValue()
+                                        : null;
+                                if (rankOrder != null) {
+                                    ans.setRankOrder(rankOrder);
+                                }
+
                                 assessmentAnswerRepository.save(ans);
 
-                                // Accumulate scores
+                                // Accumulate scores (deduplicate by MQT type per option)
                                 List<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository
                                         .findByOptionId(oId);
+                                Map<Long, OptionScoreBasedOnMEasuredQualityTypes> dedupedScores = new java.util.LinkedHashMap<>();
                                 for (OptionScoreBasedOnMEasuredQualityTypes s : scores) {
+                                    dedupedScores.putIfAbsent(s.getMeasuredQualityType().getMeasuredQualityTypeId(), s);
+                                }
+                                for (OptionScoreBasedOnMEasuredQualityTypes s : dedupedScores.values()) {
                                     MeasuredQualityTypes type = s.getMeasuredQualityType();
                                     Long typeId = type.getMeasuredQualityTypeId();
-                                    qualityTypeScores.merge(typeId, s.getScore(), Integer::sum);
+                                    int effectiveScore = (rankOrder != null) ? s.getScore() * rankOrder : s.getScore();
+                                    qualityTypeScores.merge(typeId, effectiveScore, Integer::sum);
                                     qualityTypeCache.putIfAbsent(typeId, type);
                                 }
                             }
@@ -853,15 +884,28 @@ public class AssessmentAnswerController {
                                 ans.setAssessment(assessment);
                                 ans.setQuestionnaireQuestion(question);
                                 ans.setOption(option);
+
+                                Integer rankOrder = ansMap.containsKey("rankOrder")
+                                        ? ((Number) ansMap.get("rankOrder")).intValue()
+                                        : null;
+                                if (rankOrder != null) {
+                                    ans.setRankOrder(rankOrder);
+                                }
+
                                 assessmentAnswerRepository.save(ans);
 
-                                // Accumulate scores
+                                // Accumulate scores (deduplicate by MQT type per option)
                                 List<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository
                                         .findByOptionId(oId);
+                                Map<Long, OptionScoreBasedOnMEasuredQualityTypes> dedupedScores = new java.util.LinkedHashMap<>();
                                 for (OptionScoreBasedOnMEasuredQualityTypes s : scores) {
+                                    dedupedScores.putIfAbsent(s.getMeasuredQualityType().getMeasuredQualityTypeId(), s);
+                                }
+                                for (OptionScoreBasedOnMEasuredQualityTypes s : dedupedScores.values()) {
                                     MeasuredQualityTypes type = s.getMeasuredQualityType();
                                     Long typeId = type.getMeasuredQualityTypeId();
-                                    qualityTypeScores.merge(typeId, s.getScore(), Integer::sum);
+                                    int effectiveScore = (rankOrder != null) ? s.getScore() * rankOrder : s.getScore();
+                                    qualityTypeScores.merge(typeId, effectiveScore, Integer::sum);
                                     qualityTypeCache.putIfAbsent(typeId, type);
                                 }
                             }
@@ -1066,8 +1110,20 @@ public class AssessmentAnswerController {
                 Long userStudentId = mapping.getUserStudent().getUserStudentId();
 
                 // Get all answers for this student + assessment
-                List<AssessmentAnswer> answers = assessmentAnswerRepository
+                List<AssessmentAnswer> allAnswers = assessmentAnswerRepository
                         .findByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
+
+                // Deduplicate answers by question + option to handle re-submissions
+                Map<String, AssessmentAnswer> uniqueAnswerMap = new java.util.LinkedHashMap<>();
+                for (AssessmentAnswer a : allAnswers) {
+                    Long qqId = a.getQuestionnaireQuestion() != null
+                            ? a.getQuestionnaireQuestion().getQuestionnaireQuestionId() : 0L;
+                    Long optId = a.getOption() != null ? a.getOption().getOptionId()
+                            : (a.getMappedOption() != null ? a.getMappedOption().getOptionId() : 0L);
+                    String key = qqId + "_" + optId;
+                    uniqueAnswerMap.putIfAbsent(key, a);
+                }
+                List<AssessmentAnswer> answers = new ArrayList<>(uniqueAnswerMap.values());
 
                 Map<Long, Integer> qualityTypeScores = new HashMap<>();
                 Map<Long, MeasuredQualityTypes> qualityTypeCache = new HashMap<>();
@@ -1083,12 +1139,18 @@ public class AssessmentAnswerController {
                     }
 
                     if (scoringOption != null) {
+                        Integer rankOrder = answer.getRankOrder();
                         List<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository
                                 .findByOptionId(scoringOption.getOptionId());
+                        Map<Long, OptionScoreBasedOnMEasuredQualityTypes> dedupedScores = new java.util.LinkedHashMap<>();
                         for (OptionScoreBasedOnMEasuredQualityTypes s : scores) {
+                            dedupedScores.putIfAbsent(s.getMeasuredQualityType().getMeasuredQualityTypeId(), s);
+                        }
+                        for (OptionScoreBasedOnMEasuredQualityTypes s : dedupedScores.values()) {
                             MeasuredQualityTypes type = s.getMeasuredQualityType();
                             Long typeId = type.getMeasuredQualityTypeId();
-                            qualityTypeScores.merge(typeId, s.getScore(), Integer::sum);
+                            int effectiveScore = (rankOrder != null) ? s.getScore() * rankOrder : s.getScore();
+                            qualityTypeScores.merge(typeId, effectiveScore, Integer::sum);
                             qualityTypeCache.putIfAbsent(typeId, type);
                         }
                     }
@@ -1112,6 +1174,98 @@ public class AssessmentAnswerController {
             }
 
             return ResponseEntity.ok(Map.of("status", "success", "studentsProcessed", studentsProcessed));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Recalculate raw scores for ALL students across ALL assessments.
+     * Uses the corrected ranking logic: mqtScore * rankOrder for ranked answers.
+     */
+    @Transactional
+    @PostMapping(value = "/recalculate-all-scores", headers = "Accept=application/json")
+    public ResponseEntity<?> recalculateAllScores() {
+        try {
+            List<StudentAssessmentMapping> allMappings = studentAssessmentMappingRepository.findAll();
+            int studentsProcessed = 0;
+            int errors = 0;
+
+            for (StudentAssessmentMapping mapping : allMappings) {
+                try {
+                    Long userStudentId = mapping.getUserStudent().getUserStudentId();
+                    Long assessmentId = mapping.getAssessmentId();
+
+                    List<AssessmentAnswer> allAnswers = assessmentAnswerRepository
+                            .findByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
+
+                    // Deduplicate answers by question + option to handle re-submissions
+                    Map<String, AssessmentAnswer> uniqueAnswerMap = new java.util.LinkedHashMap<>();
+                    for (AssessmentAnswer a : allAnswers) {
+                        Long qqId = a.getQuestionnaireQuestion() != null
+                                ? a.getQuestionnaireQuestion().getQuestionnaireQuestionId() : 0L;
+                        Long optId = a.getOption() != null ? a.getOption().getOptionId()
+                                : (a.getMappedOption() != null ? a.getMappedOption().getOptionId() : 0L);
+                        String key = qqId + "_" + optId;
+                        uniqueAnswerMap.putIfAbsent(key, a);
+                    }
+                    List<AssessmentAnswer> answers = new ArrayList<>(uniqueAnswerMap.values());
+
+                    Map<Long, Integer> qualityTypeScores = new HashMap<>();
+                    Map<Long, MeasuredQualityTypes> qualityTypeCache = new HashMap<>();
+
+                    for (AssessmentAnswer answer : answers) {
+                        AssessmentQuestionOptions scoringOption = null;
+                        if (answer.getOption() != null) {
+                            scoringOption = answer.getOption();
+                        } else if (answer.getMappedOption() != null) {
+                            scoringOption = answer.getMappedOption();
+                        }
+
+                        if (scoringOption != null) {
+                            Integer rankOrder = answer.getRankOrder();
+                            List<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository
+                                    .findByOptionId(scoringOption.getOptionId());
+                            Map<Long, OptionScoreBasedOnMEasuredQualityTypes> dedupedScores = new java.util.LinkedHashMap<>();
+                            for (OptionScoreBasedOnMEasuredQualityTypes s : scores) {
+                                dedupedScores.putIfAbsent(s.getMeasuredQualityType().getMeasuredQualityTypeId(), s);
+                            }
+                            for (OptionScoreBasedOnMEasuredQualityTypes s : dedupedScores.values()) {
+                                MeasuredQualityTypes type = s.getMeasuredQualityType();
+                                Long typeId = type.getMeasuredQualityTypeId();
+                                int baseScore = s.getScore() != null ? s.getScore() : 0;
+                                int effectiveScore = (rankOrder != null) ? baseScore * rankOrder : baseScore;
+                                qualityTypeScores.merge(typeId, effectiveScore, Integer::sum);
+                                qualityTypeCache.putIfAbsent(typeId, type);
+                            }
+                        }
+                    }
+
+                    // Delete old raw scores and save new ones
+                    assessmentRawScoreRepository
+                            .deleteByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId());
+
+                    for (Map.Entry<Long, Integer> entry : qualityTypeScores.entrySet()) {
+                        MeasuredQualityTypes mqt = qualityTypeCache.get(entry.getKey());
+                        AssessmentRawScore ars = new AssessmentRawScore();
+                        ars.setStudentAssessmentMapping(mapping);
+                        ars.setMeasuredQualityType(mqt);
+                        ars.setMeasuredQuality(mqt.getMeasuredQuality());
+                        ars.setRawScore(entry.getValue());
+                        assessmentRawScoreRepository.save(ars);
+                    }
+
+                    studentsProcessed++;
+                } catch (Exception e) {
+                    errors++;
+                }
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "totalMappings", allMappings.size(),
+                    "studentsProcessed", studentsProcessed,
+                    "errors", errors));
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Error: " + e.getMessage());
         }
