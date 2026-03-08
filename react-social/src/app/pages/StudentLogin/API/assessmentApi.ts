@@ -1,11 +1,7 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError, AxiosRequestConfig } from 'axios';
 
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
-
-interface RetryableConfig extends InternalAxiosRequestConfig {
-  __retryCount?: number;
-}
 
 const assessmentApi = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8091',
@@ -16,10 +12,14 @@ const assessmentApi = axios.create({
 });
 
 // Request interceptor — inject session headers on every request
-assessmentApi.interceptors.request.use((config: RetryableConfig) => {
+assessmentApi.interceptors.request.use((config) => {
   const sessionToken = sessionStorage.getItem('assessmentSessionToken');
   const userStudentId = localStorage.getItem('userStudentId');
   const assessmentId = localStorage.getItem('assessmentId');
+
+  if (!config.headers) {
+    config.headers = {};
+  }
 
   if (sessionToken) {
     config.headers['X-Assessment-Session'] = sessionToken;
@@ -38,7 +38,7 @@ assessmentApi.interceptors.request.use((config: RetryableConfig) => {
 assessmentApi.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const config = error.config as RetryableConfig | undefined;
+    const config = error.config as (AxiosRequestConfig & { __retryCount?: number }) | undefined;
 
     if (!config) {
       return Promise.reject(error);
@@ -53,7 +53,6 @@ assessmentApi.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Increment retry count directly on the config object (axios 0.26.x compatible)
     config.__retryCount = retryCount + 1;
 
     // Exponential backoff: 1s, 2s, 4s
