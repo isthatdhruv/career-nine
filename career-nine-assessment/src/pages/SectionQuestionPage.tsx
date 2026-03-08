@@ -333,8 +333,8 @@ const SectionQuestionPage: React.FC = () => {
           isAnswered = Object.values(texts).some((t: string) => t.trim().length > 0);
         } else if (isRankingQuestion) {
           const rankings = rankingAnswers[secId]?.[qId] || {};
-          const totalOptions = q.question.options?.length || 0;
-          isAnswered = Object.keys(rankings).length >= totalOptions;
+          const maxAllowed = q.question.maxOptionsAllowed || q.question.options?.length || 0;
+          isAnswered = Object.keys(rankings).length >= maxAllowed;
         } else {
           isAnswered = answers[secId]?.[qId]?.length > 0;
         }

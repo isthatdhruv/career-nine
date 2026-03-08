@@ -47,6 +47,7 @@ services:
       start_period: 5s
 
   api:
+    container_name: api
     build:
       context: ./spring-social
       dockerfile: dockerfile
