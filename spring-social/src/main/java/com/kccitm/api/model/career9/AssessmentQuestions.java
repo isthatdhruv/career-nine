@@ -11,13 +11,18 @@ import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
+import javax.persistence.Index;
 import javax.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 
 @Entity
-@Table(name = "assessment_questions")
+@Table(name = "assessment_questions",
+       indexes = {
+           @Index(name = "idx_question_deleted", columnList = "is_deleted"),
+           @Index(name = "idx_question_section", columnList = "section_id")
+       })
 public class AssessmentQuestions implements Serializable {
     private static final long serialVersionUID = 1L;
 
@@ -29,7 +34,14 @@ public class AssessmentQuestions implements Serializable {
     private String questionText;
     private String questionType;
 
-    private Boolean flag;
+    @Column(name="isMQTtyped", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
+    private Boolean isMQTtyped;
+
+    @Column(name = "is_mqt", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
+    private Boolean isMQT;
+
+    @Column(name = "is_deleted", nullable = false, columnDefinition = "TINYINT(1) DEFAULT 0")
+    private Boolean isDeleted = false;
 
     @Column(name = "max_options_allowed")
     private int maxOptionsAllowed;
@@ -48,15 +60,33 @@ public class AssessmentQuestions implements Serializable {
     private QuestionSection section;
 
     // Link Question -> Language
-    @OneToMany(mappedBy = "assessmentQuestion", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "assessmentQuestion", cascade = CascadeType.ALL)
     @JsonIgnoreProperties("assessmentQuestion")
     private List<LanguageQuestion> languageQuestions;
 
+    // Constructor for projection
+    public AssessmentQuestions(Long questionId, String questionText, String questionType) {
+        this.questionId = questionId;
+        this.questionText = questionText;
+        this.questionType = questionType;
+    }
+
+    // Constructor for projection with section
+    public AssessmentQuestions(Long questionId, String questionText, String questionType, QuestionSection section) {
+        this.questionId = questionId;
+        this.questionText = questionText;
+        this.questionType = questionType;
+        this.section = section;
+    }
+
+    public AssessmentQuestions() {
+    }
+
     // --- getters and setters ---
-    public int getmaxOptionsAllowed() {
+    public int getMaxOptionsAllowed() {
         return maxOptionsAllowed;
     }
-    public void setmaxAllowedOptions(int maxAllowedOptions) {
+    public void setMaxOptionsAllowed(int maxOptionsAllowed) {
         this.maxOptionsAllowed = maxOptionsAllowed;
     }
 
@@ -72,11 +102,19 @@ public class AssessmentQuestions implements Serializable {
         return questionText;
     }
 
-    public Boolean getFlag() {
-        return flag;
+    public Boolean getIsMQT() {
+        return isMQT;
     }
-    public void setFlag(Boolean flag) {
-        this.flag = flag;
+
+    public void setIsMQT(Boolean isMQT) {
+        this.isMQT = isMQT;
+    }
+
+    public Boolean getIsDeleted() {
+        return isDeleted;
+    }
+    public void setIsDeleted(Boolean isDeleted) {
+        this.isDeleted = isDeleted;
     }
     public void setQuestionText(String questionText) {
         this.questionText = questionText;
@@ -136,5 +174,13 @@ public class AssessmentQuestions implements Serializable {
                 ", questionType='" + questionType + '\'' +
                 ", section=" + (section != null ? section.getSectionId() : null) +
                 '}';
+    }
+
+    public Boolean getIsMQTtyped() {
+        return isMQTtyped;
+    }
+
+    public void setIsMQTtyped(Boolean isMQTtyped) {
+        this.isMQTtyped = isMQTtyped;
     }
 }

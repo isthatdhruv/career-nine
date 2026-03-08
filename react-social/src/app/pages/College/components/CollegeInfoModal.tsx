@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Modal } from "react-bootstrap-v5";
 import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
-import { UpdateCollegeData } from "../API/College_APIs";
+import { MapContactsAndBoards, GetInstituteMappings, UpdateCollegeData } from "../API/College_APIs";
 import { ReadBoardData } from "../../Board/API/Board_APIs";
 import { ReadContactInformationData } from "../../ContactPerson/API/Contact_Person_APIs";
 
@@ -54,55 +54,36 @@ const CollegeInfoModal = (props: Props) => {
   useEffect(() => {
     if (!props.show) return;
 
-    // ✅ Fetch ALL contact persons from API
-    const fetchContacts = async () => {
-      try {
-        const res = await ReadContactInformationData();
-        const rawContacts: any[] =
-          (res as any)?.data?.data ??
-          (res as any)?.data?.contacts ??
-          (res as any)?.data ??
-          [];
+    const instituteCode = props.data?.instituteCode;
 
+    // Fetch all contacts, all boards, and existing mappings in parallel
+    const fetchData = async () => {
+      try {
+        const [contactsRes, boardsRes, mappingsRes] = await Promise.all([
+          ReadContactInformationData(),
+          ReadBoardData(),
+          instituteCode
+            ? GetInstituteMappings(instituteCode).catch(() => null)
+            : Promise.resolve(null),
+        ]);
+
+        // Parse contacts
+        const rawContacts: any[] =
+          (contactsRes as any)?.data?.data ??
+          (contactsRes as any)?.data?.contacts ??
+          (contactsRes as any)?.data ??
+          [];
         const contacts: ContactPerson[] = rawContacts.filter(
           (c) => c && (c.name || c.email || c.phone || c.designation)
         );
-
         setAvailableContacts(contacts);
 
-        // ✅ Pre-select contacts already mapped to this institute
-        const instituteContacts = props.data?.contactPersons ?? [];
-        const preSelected: number[] = [];
-
-        contacts.forEach((contact, index) => {
-          const match = instituteContacts.find(
-            (ic) =>
-              (ic.id && contact.id && ic.id === contact.id) ||
-              (ic.email && contact.email && ic.email === contact.email)
-          );
-          if (match) {
-            preSelected.push(index);
-          }
-        });
-
-        setSelectedContactIndexes(preSelected);
-      } catch (err) {
-        console.error("Failed to load contacts:", err);
-        setAvailableContacts([]);
-        setSelectedContactIndexes([]);
-      }
-    };
-
-    // ✅ BOARDS FROM API
-    const fetchBoards = async () => {
-      try {
-        const res = await ReadBoardData();
+        // Parse boards
         const rawBoards: any[] =
-          (res as any)?.data?.data ??
-          (res as any)?.data?.boards ??
-          (res as any)?.data ??
+          (boardsRes as any)?.data?.data ??
+          (boardsRes as any)?.data?.boards ??
+          (boardsRes as any)?.data ??
           [];
-
         const boards: Board[] = rawBoards.filter(
           (b) =>
             b &&
@@ -111,17 +92,44 @@ const CollegeInfoModal = (props: Props) => {
               typeof b.id !== "undefined")
         );
         setAvailableBoards(boards);
-        setSelectedBoardIndexes([]);
+
+        // Pre-select contacts and boards from existing mappings
+        const mappedContacts: any[] = mappingsRes?.data?.contactPersons ?? [];
+        const mappedBoards: any[] = mappingsRes?.data?.boards ?? [];
+
+        // Pre-select contacts
+        const preSelectedContacts: number[] = [];
+        contacts.forEach((contact, index) => {
+          const match = mappedContacts.find(
+            (mc: any) =>
+              (mc.id && contact.id && String(mc.id) === String(contact.id)) ||
+              (mc.email && contact.email && mc.email === contact.email)
+          );
+          if (match) preSelectedContacts.push(index);
+        });
+        setSelectedContactIndexes(preSelectedContacts);
+
+        // Pre-select boards
+        const preSelectedBoards: number[] = [];
+        boards.forEach((board, index) => {
+          const match = mappedBoards.find(
+            (mb: any) => mb.id !== undefined && board.id !== undefined && String(mb.id) === String(board.id)
+          );
+          if (match) preSelectedBoards.push(index);
+        });
+        setSelectedBoardIndexes(preSelectedBoards);
       } catch (err) {
-        console.error("Failed to load boards:", err);
+        console.error("Failed to load data:", err);
+        setAvailableContacts([]);
         setAvailableBoards([]);
+        setSelectedContactIndexes([]);
+        setSelectedBoardIndexes([]);
       }
     };
 
-    fetchContacts();
-    fetchBoards();
+    fetchData();
 
-    // 🔹 Initialize maxClass from props (if present)
+    // Initialize maxClass from props (if present)
     if (props.data?.maxClass !== undefined && props.data?.maxClass !== null) {
       const num = Number(props.data.maxClass);
       if (!isNaN(num) && num >= 1 && num <= 12) {
@@ -164,35 +172,38 @@ const CollegeInfoModal = (props: Props) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!props.data) {
+    if (!props.data || !props.data.instituteCode) {
       props.onHide();
       return;
     }
 
-    const selectedContacts = selectedContactIndexes.map((i) => availableContacts[i]);
-    const selectedBoards = selectedBoardIndexes.map((i) => availableBoards[i]);
+    const contactPersonIds = selectedContactIndexes
+      .map((i) => availableContacts[i]?.id)
+      .filter((id) => id !== undefined)
+      .map((id) => Number(id));
+
+    const boardIds = selectedBoardIndexes
+      .map((i) => availableBoards[i]?.id)
+      .filter((id) => id !== undefined)
+      .map((id) => Number(id));
 
     setLoading(true);
     try {
-      const payload: any = {
-        ...props.data,
-        contactPersons: selectedContacts,
-      };
+      // Save contact person and board mappings via dedicated endpoint
+      await MapContactsAndBoards(props.data.instituteCode, contactPersonIds, boardIds);
 
-      if (selectedBoards.length > 0) {
-        payload.boards = selectedBoards;
-      }
-
-      // 🔹 include maxClass if selected
+      // Update maxClass via the existing institute update endpoint
       if (maxClass !== null) {
-        payload.maxClass = maxClass;
+        await UpdateCollegeData({
+          ...props.data,
+          maxClass,
+        });
       }
 
-      await UpdateCollegeData(payload);
       props.setPageLoading(["true"]);
       props.onHide(false);
     } catch (error) {
-      console.error("UpdateCollegeData failed", error);
+      console.error("Mapping failed", error);
       window.location.replace("/error");
     } finally {
       setLoading(false);
@@ -473,64 +484,6 @@ const CollegeInfoModal = (props: Props) => {
                     </div>
                   </div>
                 )}
-              </div>
-            </div>
-
-            {/* ====== STEP 3: MAX CLASS ====== */}
-            <div className="card shadow-sm border-0">
-              <div className="card-body">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <div>
-                    <div className="badge bg-light text-dark mb-1">Step 3</div>
-                    <h5 className="mb-0">Max Class</h5>
-                    <small className="text-muted">
-                      Set the maximum class for which this institute is applicable (1–12).
-                    </small>
-                  </div>
-
-                  {maxClass !== null && (
-                    <span className="badge bg-info-subtle text-info">
-                      Class {maxClass}
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-3">
-                  <div className="d-flex align-items-center gap-3 flex-wrap">
-                    {/* Slider */}
-                    <div className="flex-grow-1">
-                      <input
-                        type="range"
-                        className="form-range"
-                        min={1}
-                        max={12}
-                        step={1}
-                        value={maxClass ?? 1}
-                        onChange={(e) => handleMaxClassChange(e.target.value)}
-                      />
-                      <div className="d-flex justify-content-between text-muted small mt-1">
-                        <span>1</span>
-                        <span>12</span>
-                      </div>
-                    </div>
-
-                    {/* Numeric input */}
-                    <div style={{ minWidth: 90 }}>
-                      <label className="form-label mb-1 small text-muted">
-                        Max Class
-                      </label>
-                      <input
-                        type="number"
-                        className="form-control form-control-sm"
-                        min={1}
-                        max={12}
-                        value={maxClass ?? ""}
-                        placeholder="1–12"
-                        onChange={(e) => handleMaxClassChange(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>

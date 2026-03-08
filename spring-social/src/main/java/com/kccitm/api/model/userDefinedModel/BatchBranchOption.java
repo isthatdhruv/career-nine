@@ -3,7 +3,7 @@ package com.kccitm.api.model.userDefinedModel;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.kccitm.api.model.InstituteDetail;
+import com.kccitm.api.model.career9.school.InstituteDetail;
 
 public class BatchBranchOption {
 

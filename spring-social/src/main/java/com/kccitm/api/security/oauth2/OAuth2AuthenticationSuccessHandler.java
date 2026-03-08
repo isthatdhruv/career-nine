@@ -19,7 +19,11 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import com.kccitm.api.config.AppProperties;
 import com.kccitm.api.exception.BadRequestException;
+import com.kccitm.api.model.User;
+import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.security.TokenProvider;
+import com.kccitm.api.security.UserPrincipal;
+import com.kccitm.api.service.UserActivityLogService;
 import com.kccitm.api.util.CookieUtils;
 
 @Component
@@ -30,6 +34,12 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
     private AppProperties appProperties;
 
     private HttpCookieOAuth2AuthorizationRequestRepository httpCookieOAuth2AuthorizationRequestRepository;
+
+    @Autowired
+    private UserActivityLogService userActivityLogService;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Autowired
     OAuth2AuthenticationSuccessHandler(TokenProvider tokenProvider, AppProperties appProperties,
@@ -47,6 +57,32 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         if (response.isCommitted()) {
             logger.debug("Response has already been committed. Unable to redirect to " + targetUrl);
             return;
+        }
+
+        // Async login activity logging - wrapped in try-catch so login is never affected
+        try {
+            UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
+            String ipAddress = UserActivityLogService.getClientIp(request);
+            String userAgent = request.getHeader("User-Agent");
+
+            String userName = "";
+            String email = userPrincipal.getEmail();
+            String organisation = "";
+
+            try {
+                User user = userRepository.findById(userPrincipal.getId()).orElse(null);
+                if (user != null) {
+                    userName = user.getName() != null ? user.getName() : "";
+                    organisation = user.getOrganisation() != null ? user.getOrganisation() : "";
+                }
+            } catch (Exception e) {
+                logger.error("Failed to load user details for activity logging", e);
+            }
+
+            userActivityLogService.logLogin(userPrincipal.getId(), userName, email,
+                    organisation, ipAddress, userAgent);
+        } catch (Exception e) {
+            logger.error("Failed to initiate login activity logging", e);
         }
 
         clearAuthenticationAttributes(request, response);

@@ -30,6 +30,11 @@ public class QuestionSectionController {
         return questionSectionRepository.findAll();
     }
 
+    @GetMapping("/getAllList")
+    public List<QuestionSection> getAllQuestionSectionsList() {
+        return questionSectionRepository.findAllSectionsProjection();
+    }
+
     @GetMapping("/get/{id}")
     public QuestionSection getQuestionSectionById(@PathVariable Long id) {
         return questionSectionRepository.findById(id).orElse(null);

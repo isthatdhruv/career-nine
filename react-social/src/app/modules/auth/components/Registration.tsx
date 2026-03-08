@@ -3,11 +3,10 @@ import { useState, useEffect } from "react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import clsx from "clsx";
-import { getUserByToken, register } from "../core/_requests";
 import { Link } from "react-router-dom";
-import { toAbsoluteUrl } from "../../../../_metronic/helpers";
 import { PasswordMeterComponent } from "../../../../_metronic/assets/ts/components";
-import { useAuth } from "../core/Auth";
+
+const API_URL = process.env.REACT_APP_API_URL;
 
 const initialValues = {
   firstname: "",
@@ -15,7 +14,9 @@ const initialValues = {
   email: "",
   password: "",
   changepassword: "",
-  acceptTerms: false,
+  phone: "",
+  organisation:"",
+  designation:"",
 };
 
 const registrationSchema = Yup.object().shape({
@@ -36,6 +37,18 @@ const registrationSchema = Yup.object().shape({
     .min(3, "Minimum 3 symbols")
     .max(50, "Maximum 50 symbols")
     .required("Password is required"),
+  phone: Yup.string()
+    .min(10, "Minimum 10 symbols")
+    .max(15, "Maximum 15 symbols")
+    .required("Phone number is required"),
+  organisation: Yup.string()
+    .min(3, "Minimum 3 symbols")
+    .max(50, "Maximum 50 symbols")
+    .required("Organisation is required"),
+  designation: Yup.string()
+    .min(3, "Minimum 3 symbols")
+    .max(50, "Maximum 50 symbols")
+    .required("Designation is required"),
   changepassword: Yup.string()
     .required("Password confirmation is required")
     .when("password", {
@@ -45,34 +58,48 @@ const registrationSchema = Yup.object().shape({
         "Password and Confirm Password didn't match"
       ),
     }),
-  acceptTerms: Yup.bool().required("You must accept the terms and conditions"),
 });
 
 export function Registration() {
-  const [loading, setLoading] = useState(false);
-  const { saveAuth, setCurrentUser } = useAuth();
+  const [loading] = useState(false);
   const formik = useFormik({
     initialValues,
     validationSchema: registrationSchema,
     onSubmit: async (values, { setStatus, setSubmitting }) => {
-      setLoading(true);
+      setStatus(undefined);
       try {
-        const { data: auth } = await register(
-          values.email,
-          values.firstname,
-          values.lastname,
-          values.password,
-          values.changepassword
-        );
-        saveAuth(auth);
-        const { data: user } = await getUserByToken(auth.api_token);
-        setCurrentUser(user);
-      } catch (error) {
-        console.error(error);
-        saveAuth(undefined);
-        setStatus("The registration details is incorrect");
+        const payload = {
+          name: `${values.firstname} ${values.lastname}`,
+          firstname: values.firstname,
+          lastname: values.lastname,
+          email: values.email,
+          password: values.password,
+          phone: values.phone,
+          organisation: values.organisation,
+          designation: values.designation,
+        };
+        console.log("Submitting registration with payload:", payload);
+
+        const res = await fetch(`${API_URL}/auth/signup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          // server-side validation or error message
+          const msg = data && (data.message || data.error) ? (data.message || data.error) : 'Registration failed';
+          setStatus(msg);
+        } else {
+          // success - redirect to login
+          window.location.href = '/auth/login';
+        }
+      } catch (err: any) {
+        setStatus(err && err.message ? err.message : 'Unexpected error');
+      } finally {
         setSubmitting(false);
-        setLoading(false);
       }
     },
   });
@@ -92,9 +119,6 @@ export function Registration() {
       <div className="mb-10 text-center">
         {/* begin::Title */}
         <h1 className="text-dark mb-3">Create an Account</h1>
-        {/* end::Title */}
-
-        {/* begin::Link */}
         <div className="text-gray-400 fw-bold fs-4">
           Already have an account?
           <Link
@@ -108,26 +132,6 @@ export function Registration() {
         {/* end::Link */}
       </div>
       {/* end::Heading */}
-
-      {/* begin::Action */}
-      <button
-        type="button"
-        className="btn btn-light-primary fw-bolder w-100 mb-10"
-      >
-        <img
-          alt="Logo"
-          src={toAbsoluteUrl("/media/svg/brand-logos/google-icon.svg")}
-          className="h-20px me-3"
-        />
-        Sign in with Google
-      </button>
-      {/* end::Action */}
-
-      <div className="d-flex align-items-center mb-10">
-        <div className="border-bottom border-gray-300 mw-50 w-100"></div>
-        <span className="fw-bold text-gray-400 fs-7 mx-2">OR</span>
-        <div className="border-bottom border-gray-300 mw-50 w-100"></div>
-      </div>
 
       {formik.status && (
         <div className="mb-lg-15 alert alert-danger">
@@ -226,6 +230,79 @@ export function Registration() {
           </div>
         )}
       </div>
+
+      <div className="fv-row mb-7">
+        <label className="form-label fw-bolder text-dark fs-6">Phone Number</label>
+        <input
+          placeholder="Phone Number"
+          type="tel"
+          autoComplete="off"
+          {...formik.getFieldProps("phone")}
+          className={clsx(
+            "form-control form-control-lg form-control-solid",
+            { "is-invalid": formik.touched.phone && formik.errors.phone },
+            {
+              "is-valid": formik.touched.phone && !formik.errors.phone,
+            }
+          )}
+        />
+        {formik.touched.phone && formik.errors.phone && (
+          <div className="fv-plugins-message-container">
+            <div className="fv-help-block">
+              <span role="alert">{formik.errors.phone}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="fv-row mb-7">
+        <label className="form-label fw-bolder text-dark fs-6">Organisation</label>
+        <input
+          placeholder="Organisation"
+          type="text"
+          autoComplete="off"
+          {...formik.getFieldProps("organisation")}
+          className={clsx(
+            "form-control form-control-lg form-control-solid",
+            { "is-invalid": formik.touched.organisation && formik.errors.organisation },
+            {
+              "is-valid": formik.touched.organisation && !formik.errors.organisation,
+            }
+          )}
+        />
+        {formik.touched.organisation && formik.errors.organisation && (
+          <div className="fv-plugins-message-container">
+            <div className="fv-help-block">
+              <span role="alert">{formik.errors.organisation}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="fv-row mb-7">
+        <label className="form-label fw-bolder text-dark fs-6">Designation</label>
+        <input
+          placeholder="Designation"
+          type="text"
+          autoComplete="off"
+          {...formik.getFieldProps("designation")}
+          className={clsx(
+            "form-control form-control-lg form-control-solid",
+            { "is-invalid": formik.touched.designation && formik.errors.designation },
+            {
+              "is-valid": formik.touched.designation && !formik.errors.designation,
+            }
+          )}
+        />
+        {formik.touched.designation && formik.errors.designation && (
+          <div className="fv-plugins-message-container">
+            <div className="fv-help-block">
+              <span role="alert">{formik.errors.designation}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* end::Form group */}
 
       {/* begin::Form group Password */}
@@ -311,7 +388,7 @@ export function Registration() {
       {/* end::Form group */}
 
       {/* begin::Form group */}
-      <div className="fv-row mb-10">
+      {/* <div className="fv-row mb-10">
         <div className="form-check form-check-custom form-check-solid">
           <input
             className="form-check-input"
@@ -337,7 +414,7 @@ export function Registration() {
             </div>
           )}
         </div>
-      </div>
+      </div> */}
       {/* end::Form group */}
 
       {/* begin::Form group */}
@@ -346,9 +423,7 @@ export function Registration() {
           type="submit"
           id="kt_sign_up_submit"
           className="btn btn-lg btn-primary w-100 mb-5"
-          disabled={
-            formik.isSubmitting || !formik.isValid || !formik.values.acceptTerms
-          }
+          disabled={formik.isSubmitting || !formik.isValid}
         >
           {!loading && <span className="indicator-label">Submit</span>}
           {loading && (

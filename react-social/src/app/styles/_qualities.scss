@@ -1,0 +1,35 @@
+// Qualities, Tools, Career page responsive fixes (Plan 04)
+//
+// Pages covered:
+//   - MeasuredQualities (MeasuredQualitiesTable.tsx) — MDB table + MUI multi-Select (width:200)
+//   - MeasuredQualityTypes (MeasuredQualityTypesTable.tsx) — MDB table + MUI single-Select (width:200)
+//   - CreateTool / ToolTable — MDB table, standard form fields
+//   - Career (CareerTable.tsx) — MDB table + MUI multi-Select (width:200)
+//
+// Global note:
+//   The global _tables.scss fix (Plan 01) wraps every .mdb-datatable in overflow-x:auto,
+//   enabling horizontal scroll on all MDB table pages. No per-table overrides are needed
+//   for basic scrolling.
+//
+// Create/edit sub-pages for Qualities, Tools, Career:
+//   MeasuredQualitiesCreatePage.tsx — vertical fv-row stacking, no grid cols — already responsive.
+//   MeasuredQualityTypesCreatePage.tsx — same — already responsive.
+//   CareerCreatePage.tsx — single-column Bootstrap container — already responsive.
+//   ToolCreatePage.tsx — single-column stacked form — already responsive.
+//   ToolEditPage.tsx — same — already responsive.
+//   No additional CSS needed for these form pages.
+
+// MUI Select inside MDB table cells (supplementary to horizontal scroll)
+// The <FormControl sx={{ m: 1, width: 200 }}> creates a 200px minimum width.
+// Horizontal scroll handles overflow, but we also set max-width on mobile so
+// the select can shrink when the viewport is very narrow (belt-and-suspenders).
+@media (max-width: 576px) {
+  // MeasuredQualitiesTable: Tools column MUI Select
+  // MeasuredQualityTypesTable: Measured Quality column MUI Select
+  // CareerTable: MeasuredQualityTypes column MUI Select
+  div.mdb-datatable .MuiFormControl-root {
+    width: 100% !important;
+    max-width: 200px;
+    min-width: 140px;
+  }
+}

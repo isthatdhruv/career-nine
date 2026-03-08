@@ -1,0 +1,14 @@
+// Career-Nine responsive overrides.
+// All rules must be inside @media (max-width: ...) blocks.
+// Import order: global fixes first, then page-group partials.
+
+// Global fixes
+@import 'tables';
+@import 'modals';
+@import 'nav';
+
+// Page-group partials (populated by subsequent plans)
+@import 'institute';
+@import 'assessment';
+@import 'qualities';
+@import 'misc';

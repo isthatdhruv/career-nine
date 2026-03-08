@@ -35,6 +35,8 @@ interface SectionQuestionSelectorProps {
   questions: Question[];
   values: FormikValues;
   setFieldValue: (field: string, value: any) => void;
+  languages?: string[];
+  onAddTranslation?: (questionId: number, language: string) => void;
 }
 
 const SectionQuestionSelector: FC<SectionQuestionSelectorProps> = ({
@@ -47,6 +49,8 @@ const SectionQuestionSelector: FC<SectionQuestionSelectorProps> = ({
   questions,
   values,
   setFieldValue,
+  languages,
+  onAddTranslation,
 }) => {
   const getSectionName = (sectionId: string) => {
     const s = sections.find(
@@ -165,7 +169,7 @@ const SectionQuestionSelector: FC<SectionQuestionSelectorProps> = ({
                     };
 
                     return (
-                      <div key={questionId} className="form-check mb-2 d-flex align-items-start">
+                      <div key={questionId} className="form-check mb-2 d-flex align-items-start border-bottom pb-2">
                         <input
                           type="checkbox"
                           className="form-check-input mt-1"
@@ -176,12 +180,32 @@ const SectionQuestionSelector: FC<SectionQuestionSelectorProps> = ({
                         />
                         <div className="ms-2 w-100">
                           <div className="d-flex justify-content-between align-items-start">
-                            <label
-                              className="form-check-label d-block"
-                              htmlFor={`question-${selectedSection}-${questionId}`}
-                            >
-                              {question.questionText || question.question || "Question text not available"}
-                            </label>
+                            <div>
+                              <label
+                                className="form-check-label d-block fw-semibold"
+                                htmlFor={`question-${selectedSection}-${questionId}`}
+                              >
+                                {question.questionText || question.question || "Question text not available"}
+                              </label>
+                              
+                              {/* Translation Buttons */}
+                              {checked && languages && languages.length > 0 && (
+                                <div className="mt-2 d-flex flex-wrap gap-2">
+                                  {languages.filter(l => l !== 'English').map(lang => (
+                                    <button
+                                      key={lang}
+                                      type="button"
+                                      className="btn btn-sm btn-light-info py-0 px-2"
+                                      style={{ fontSize: '0.75rem' }}
+                                      onClick={() => onAddTranslation?.(Number(questionId), lang)}
+                                    >
+                                      <i className="fas fa-language me-1"></i>
+                                      Add {lang}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
 
                             {checked && (
                               <select

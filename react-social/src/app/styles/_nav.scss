@@ -1,0 +1,11 @@
+// Increase hamburger button tap target to 44x44px minimum (WCAG).
+
+@media (max-width: 991.98px) {
+  #kt_aside_mobile_toggle {
+    min-width: 44px !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+  }
+}

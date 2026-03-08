@@ -44,3 +44,30 @@ export const translateAll = async (question: string, options: Array<string>, tar
     throw error;
   }
 };
+
+const MATCH_API_URL = "http://localhost:5000/match";
+
+export const matchTextToOption = async (textResponse: string, options: Array<{ optionId: number; optionText: string }>) => {
+  try {
+    const response = await axios.post(`${MATCH_API_URL}/option`, {
+      textResponse,
+      options
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error matching text to option:", error);
+    throw error;
+  }
+};
+
+export const matchTextToOptionsBulk = async (responses: Array<{ textResponse: string; options: Array<{ optionId: number; optionText: string }> }>) => {
+  try {
+    const response = await axios.post(`${MATCH_API_URL}/options-bulk`, {
+      responses
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error bulk matching text to options:", error);
+    throw error;
+  }
+};

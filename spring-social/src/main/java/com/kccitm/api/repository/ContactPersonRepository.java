@@ -20,4 +20,10 @@ public interface ContactPersonRepository extends JpaRepository<ContactPerson, Lo
 
     // findById exists in JpaRepository as Optional<T>, but redeclare if you want direct return (not recommended)
     Optional<ContactPerson> findById(Long id);
+
+    // Find all contact person entries for a user (across all institutes)
+    List<ContactPerson> findByUserId(Long userId);
+
+    // Find a specific user+institute pair
+    Optional<ContactPerson> findByUserIdAndInstitute_InstituteCode(Long userId, int instituteCode);
 }

@@ -21,6 +21,7 @@ interface QuestionLanguageModalProps {
   onHide: () => void;
   setPageLoading?: (loading: boolean) => void;
   questionId: number | null;
+  targetLanguage?: string;
 }
 
 const QuestionLanguageModal = ({
@@ -28,6 +29,7 @@ const QuestionLanguageModal = ({
   onHide,
   setPageLoading,
   questionId,
+  targetLanguage,
 }: QuestionLanguageModalProps) => {
   const [loading, setLoading] = useState(false);
   const [translatingOptions, setTranslatingOptions] = useState<{ [key: number]: boolean }>({});
@@ -69,13 +71,20 @@ const QuestionLanguageModal = ({
     const fetchLanguages = async () => {
       try {
         const response = await readLanguageData();
-        setLanguages(response.data || []);
+        const langs = response.data || [];
+        setLanguages(langs);
+        
+        // Pre-select language if targetLanguage is provided
+        if (targetLanguage) {
+          const found = langs.find((l: any) => l.languageName === targetLanguage);
+          if (found) setSelectedLanguage(found);
+        }
       } catch (error) {
         console.error("Error fetching languages:", error);
       }
     };
     if (show) fetchLanguages();
-  }, [show]);
+  }, [show, targetLanguage]);
 
   if (loading) {
     return (

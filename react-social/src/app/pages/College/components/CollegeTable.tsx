@@ -1,16 +1,20 @@
 // CollegeTable.tsx
-import React, { useState } from "react";
+import { useState } from "react";
 import { MDBDataTableV5 } from "mdbreact";
 import { AiFillEdit, AiOutlineInfoCircle } from "react-icons/ai";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
-import { Button, Dropdown } from "react-bootstrap-v5";
+import { Button, Dropdown } from "react-bootstrap";
+import { IconContext } from "react-icons";
+import { MdEdit, MdDelete, MdSchool, MdOutlineDashboard } from "react-icons/md";
 
 import { DeleteCollegeData } from "../API/College_APIs";
 import CollegeEditModal from "./CollegeEditModal";
 import CollegeInfoModal from "./CollegeInfoModal";
 import CollegeAssignRoleModal from "../components/CollegeAssignRoleModal";
+import CollegeDetailModal from "./CollegeSectionSessionGradeModal";
+import AssessmentMappingModal from "./AssessmentMappingModal";
 
 // Layout reference image (local path)
 const layoutImagePath = "/mnt/data/556d6c4d-1033-4fd7-8d4f-f02d4f436ce2.png";
@@ -48,6 +52,7 @@ const CollegeTable = (props: {
   data?: CollegeRow[];
   setLoading: (v: boolean) => void;
   setPageLoading: (v: any) => void;
+  onUploadClick?: (college: CollegeRow) => void;
 }) => {
   const [modalShowEdit, setModalShowEdit] = useState(false);
   const [editModalData, setEditModalData] = useState<CollegeRow>({
@@ -62,10 +67,23 @@ const CollegeTable = (props: {
     undefined
   );
 
+  const [detailModalShow, setDetailModalShow] = useState(false);
+  const [detailModalData, setDetailModalData] = useState<ModalData | undefined>(
+    undefined
+  );
+
   const [infoRolesModalShow, setInfoRolesModalShow] = useState(false);
   const [infoRolesModalData, setInfoRolesModalData] = useState<ModalData | undefined>(
     undefined
   );
+
+  const [assessmentMappingModalShow, setAssessmentMappingModalShow] = useState(false);
+  const [assessmentMappingInstitute, setAssessmentMappingInstitute] = useState<{
+    code: number;
+    name: string;
+  }>({ code: 0, name: "" });
+
+  const navigate = useNavigate();
   // convert a table row into the modal-compatible partial form shape
   const toModalData = (row: CollegeRow): ModalData => {
     // convert boolean display -> numeric (1/0), keep numeric/string as is
@@ -179,12 +197,12 @@ const CollegeTable = (props: {
                 Actions
               </Dropdown.Toggle>
 
-              <Dropdown.Menu 
-                style={{ 
-                  maxHeight: 'unset', 
-                  overflow: 'visible',
-                  minWidth: '150px'
+              <Dropdown.Menu
+                style={{
+                  minWidth: '150px',
+                  zIndex: 1050,
                 }}
+                popperConfig={{ strategy: 'fixed' }}
                 renderOnMount
               >
                 {/* Add Course */}
@@ -213,6 +231,17 @@ const CollegeTable = (props: {
                   Info
                 </Dropdown.Item>
 
+                {/* Add Details */}
+                <Dropdown.Item
+                  onClick={() => {
+                    setDetailModalData(toModalData(data));
+                    setDetailModalShow(true);
+                  }}
+                >
+                  <AiOutlineInfoCircle size={18} className="me-2" />
+                  Add Details
+                </Dropdown.Item>
+
                 {/* Assign Role */}
                 <Dropdown.Item
                   onClick={() => {
@@ -223,8 +252,50 @@ const CollegeTable = (props: {
                   <AiOutlineInfoCircle size={18} className="me-2" />
                   Assign Roles
                 </Dropdown.Item>
+
+                {/* Assessment Mapping */}
+                <Dropdown.Item
+                  onClick={() => {
+                    setAssessmentMappingInstitute({
+                      code: Number(data.instituteCode),
+                      name: data.instituteName || "",
+                    });
+                    setAssessmentMappingModalShow(true);
+                  }}
+                >
+                  <MdSchool size={18} className="me-2" />
+                  Assessment Mapping
+                </Dropdown.Item>
               </Dropdown.Menu>
             </Dropdown>
+
+            {/* Upload students excel for this institute */}
+            {/* <Button
+              variant="outline-success"
+              size="sm"
+              onClick={() => {
+                if (props.onUploadClick) {
+                  props.onUploadClick(editModalData);
+                }
+              }}
+              onClickCapture={() => {
+                if (typeof ({} as any) === "undefined") {}
+              }}
+            >
+            </Button> */}
+            {/* School Dashboard */}
+            <Button
+              variant="outline-info"
+              size="sm"
+              className="me-2"
+              onClick={() => navigate(`/school/dashboard/${data.instituteCode || data.id}`)}
+            >
+              <IconContext.Provider value={{ style: { paddingBottom: "3px" } }}>
+                <MdOutlineDashboard />
+              </IconContext.Provider>
+              <span style={{ marginLeft: 6 }}>Dashboard</span>
+            </Button>
+
           </>
         ),
       })) ?? [];
@@ -263,15 +334,27 @@ const CollegeTable = (props: {
 
   return (
     <>
-      <MDBDataTableV5
-        hover
-        scrollY
-        maxHeight="160vh"
-        entriesOptions={[5, 20, 25]}
-        entries={25}
-        pagesAmount={4}
-        data={datatable}
-      />
+      <style>{`
+        .college-table-wrapper table tbody tr {
+          position: relative;
+        }
+        .college-table-wrapper table tbody tr:has(.dropdown-menu.show) {
+          z-index: 10;
+        }
+        .college-table-wrapper .dropdown-menu.show {
+          position: fixed !important;
+          z-index: 1050 !important;
+        }
+      `}</style>
+      <div className="college-table-wrapper" style={{ overflow: 'visible' }}>
+        <MDBDataTableV5
+          hover
+          entriesOptions={[5, 20, 25]}
+          entries={25}
+          pagesAmount={4}
+          data={datatable}
+        />
+      </div>
 
       {/* Edit modal (existing) */}
       <CollegeEditModal
@@ -288,6 +371,13 @@ const CollegeTable = (props: {
         data={infoModalData}
         setPageLoading={props.setPageLoading}
       />
+      {/* Detail modal */}
+      <CollegeDetailModal
+        show={detailModalShow}
+        onHide={() => setDetailModalShow(false)}
+        data={detailModalData}
+        setPageLoading={props.setPageLoading}
+      />
 
       {/* Assign Roles */}
       <CollegeAssignRoleModal
@@ -295,6 +385,14 @@ const CollegeTable = (props: {
         onHide={() => setInfoRolesModalShow(false)}
         data={infoRolesModalData}
         setPageLoading={props.setPageLoading}
+      />
+
+      {/* Assessment Mapping */}
+      <AssessmentMappingModal
+        show={assessmentMappingModalShow}
+        onHide={() => setAssessmentMappingModalShow(false)}
+        instituteCode={assessmentMappingInstitute.code}
+        instituteName={assessmentMappingInstitute.name}
       />
     </>
   );

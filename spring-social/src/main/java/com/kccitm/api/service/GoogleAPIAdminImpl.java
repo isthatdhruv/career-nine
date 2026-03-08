@@ -184,8 +184,8 @@ public class GoogleAPIAdminImpl implements GoogleAPIAdmin {
             createGoogleUser(member, id);
             Student stu = studentRepository.getById(id).get(0);
 
-            stu.setInstituteGoogleGroup(
-                    studentService.getAllGroupEmailIds(stu.getBatch_id(), stu.getBranch_id(), stu.getCourse()));
+            // stu.setInstituteGoogleGroup(
+            //         studentService.getAllGroupEmailIds(stu.getBatch_id(), stu.getBranch_id(), stu.getCourse()));
             Directory service = googleDirectoryService.gooogleDirectory(member);
             ArrayList<String> t = stu.getInstituteGoogleGroup();
             String OfficialEmailId = studentService.getOfficialemailid(stu);

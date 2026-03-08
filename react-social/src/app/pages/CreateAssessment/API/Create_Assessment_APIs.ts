@@ -2,13 +2,20 @@ import axios from "axios";
 const API_URL = process.env.REACT_APP_API_URL;
 
 const readAssessment = `${API_URL}/assessments/getAll`;
-const readAssessmentById = `${API_URL}/assessments/get/`;
+const readAssessmentList = `${API_URL}/assessments/get/list`
+const readAssessmentById = `${API_URL}/assessments/getById/`;
 const createAssessment = `${API_URL}/assessments/create`;
 const updateAssessment = `${API_URL}/assessments/update`;
 const deleteAssessment = `${API_URL}/assessments/delete/`;
 const readLanguageData = `${API_URL}/language-supported/getAll`;
+
+
 export function ReadAssessmentData() {
   return axios.get(readAssessment);
+}
+
+export function ReadAssessmentList(){
+  return axios.get(readAssessmentList);
 }
 
 export function ReadLanguageData() {
@@ -29,4 +36,33 @@ export function UpdateAssessmentData(id: any, values: any) {
 
 export function DeleteAssessmentData(id: any) {
   return axios.delete(deleteAssessment + id);
+}
+
+// Soft-delete: sets isActive to false instead of removing from DB
+export function DeactivateAssessment(id: any, currentData: any) {
+  return axios.put(`${updateAssessment}/${id}`, {
+    ...currentData,
+    id,
+    isActive: false,
+  });
+}
+
+export function LockAssessment(id: any) {
+  return axios.put(`${API_URL}/assessments/${id}/lock`);
+}
+
+export function UnlockAssessment(id: any) {
+  return axios.put(`${API_URL}/assessments/${id}/unlock`);
+}
+
+export function CheckLockedByQuestionnaire(questionnaireId: any) {
+  return axios.get(`${API_URL}/assessments/is-locked-by-questionnaire/${questionnaireId}`);
+}
+
+export function CheckLockedByQuestion(questionId: any) {
+  return axios.get(`${API_URL}/assessments/is-locked-by-question/${questionId}`);
+}
+
+export function ReadQuestionnaireByAssessmentId(assessmentId: any) {
+  return axios.get(`${API_URL}/assessments/getby/${assessmentId}`);
 }

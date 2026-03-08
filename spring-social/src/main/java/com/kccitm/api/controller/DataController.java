@@ -50,11 +50,11 @@ public class DataController {
             ts.set_2thRollNoss(rs.getString("12thRollNoSS"));
             ts.setAadharCardNo(rs.getString("AadharCardNo"));
             var batch = rs.getString("Batch");
-            if (batch == "2018-22") {
-                ts.setBatch_id(10);
-            } else {
-                ts.setBatch_id(1);
-            }
+            // if (batch == "2018-22") {
+            //     ts.setBatch_id(10);
+            // } else {
+            //     ts.setBatch_id(1);
+            // }
             var branch = rs.getString("Branch");
             ts.setBirthdayMail(rs.getString("birthdayMail"));
             if (branch == "CSE") {

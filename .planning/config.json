@@ -1,0 +1,8 @@
+{
+  "model_profile": "quality",
+  "workflow": {
+    "research": true,
+    "plan_check": true,
+    "verifier": false
+  }
+}

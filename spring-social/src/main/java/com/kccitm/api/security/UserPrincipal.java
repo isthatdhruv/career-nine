@@ -123,16 +123,14 @@ public class UserPrincipal implements OAuth2User, UserDetails {
     }
 
     public Student getStudnetData() {
-        try{
-        return studentRepository.findByPersonalEmailAddress(this.email).get(0) != null
-                ? studentRepository.findByPersonalEmailAddress(this.email).get(0)
-                : new Student();
+        try {
+            return studentRepository.findByPersonalEmailAddress(this.email).get(0) != null
+                    ? studentRepository.findByPersonalEmailAddress(this.email).get(0)
+                    : new Student();
+        } catch (Exception e) {
+            return new Student();
+        }
     }
-    catch(Exception e){
-        return new Student();
-    }
-}
-
 
     public void setStudnetData(Student studnetData) {
         this.studnetData = studnetData;

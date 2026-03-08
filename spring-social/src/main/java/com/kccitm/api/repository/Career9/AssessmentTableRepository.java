@@ -1,23 +1,40 @@
 package com.kccitm.api.repository.Career9;
 
-import org.springframework.stereotype.Repository;
-
-import com.kccitm.api.model.career9.AssessmentTable;
-
-import java.util.Optional;
+import java.util.List;
+import java.util.Collection;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import com.kccitm.api.model.career9.AssessmentTable;
 
 @Repository
 public interface AssessmentTableRepository extends JpaRepository<AssessmentTable, Long> {
 
-    // Optional<AssessmentTable> findByInstituteId(Long instituteId);
-    // Optional<AssessmentTable> findByToolId(Long toolId);
-     @Query("SELECT a FROM AssessmentTable a WHERE a.institute.id = :instituteId")
-    Optional<AssessmentTable> findByInstituteId(@Param("instituteId") Long instituteId);
-    
-    @Query("SELECT a FROM AssessmentTable a WHERE a.tool.id = :toolId")
-    Optional<AssessmentTable> findByToolId(@Param("toolId") Long toolId);
+    List<AssessmentTable> findByQuestionnaireQuestionnaireId(Long questionnaireId);
+
+    /**
+     * Batch fetch assessments by IDs - eliminates N+1 queries in prefetch/login.
+     */
+    @Query("SELECT a FROM AssessmentTable a LEFT JOIN FETCH a.questionnaire WHERE a.id IN :ids")
+    List<AssessmentTable> findAllByIdInWithQuestionnaire(@Param("ids") Collection<Long> ids);
+
+    @Query("SELECT a FROM AssessmentTable a JOIN a.questionnaire q JOIN q.section qs WHERE qs.section.sectionId = :sectionId")
+    List<AssessmentTable> findByQuestionSectionId(@Param("sectionId") Long sectionId);
+
+    /**
+     * Lightweight projection returning only id, name, and isActive.
+     * Does not cascade into questionnaire/questions/options.
+     */
+    interface AssessmentSummary {
+        Long getId();
+        String getAssessmentName();
+        Boolean getIsActive();
+    }
+
+    @Query("SELECT a.id AS id, a.AssessmentName AS assessmentName, a.isActive AS isActive FROM AssessmentTable a")
+    List<AssessmentSummary> findAssessmentSummaryList();
+
 }

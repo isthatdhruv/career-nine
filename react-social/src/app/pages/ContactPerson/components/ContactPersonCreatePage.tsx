@@ -1,39 +1,68 @@
 // ContactPersonCreatePage.tsx
 import clsx from "clsx";
 import { Formik, Form } from "formik";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
+import axios from "axios";
 import { CreateContactInformationData } from "../API/Contact_Person_APIs";
+
+const API_URL = process.env.REACT_APP_API_URL;
+
+interface UserRow {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  organisation: string;
+  designation: string;
+  isActive: boolean | null;
+  provider: string;
+  dob?: string;
+}
 
 const validationSchema = Yup.object().shape({
   contactPersons: Yup.array()
     .of(
       Yup.object().shape({
+        userId: Yup.number().nullable(),
         name: Yup.string().required("Contact name is required"),
         email: Yup.string().email("Invalid email").required("Email is required"),
         phoneNumber: Yup.string().required("Phone number is required"),
-        gender: Yup.string().nullable(),
+        organisation: Yup.string().nullable(),
         designation: Yup.string().nullable(),
+        dob: Yup.string().nullable(),
+        gender: Yup.string().nullable(),
       })
     )
     .min(1, "At least one contact person is required"),
 });
 
+const emptyPerson = {
+  userId: null as number | null,
+  name: "",
+  email: "",
+  phoneNumber: "",
+  organisation: "",
+  designation: "",
+  dob: "",
+  gender: "",
+};
+
 const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState<UserRow[]>([]);
   const navigate = useNavigate();
 
+  useEffect(() => {
+    axios
+      .get<UserRow[]>(`${API_URL}/user/registered-users`)
+      .then(({ data }) => setUsers(data))
+      .catch((err) => console.error("Failed to fetch users", err));
+  }, []);
+
   const initialValues = {
-    contactPersons: [
-      {
-        name: "",
-        email: "",
-        phoneNumber: "",
-        gender: "",
-        designation: "",
-      },
-    ],
+    contactPersons: [{ ...emptyPerson }],
   };
 
   return (
@@ -58,7 +87,6 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
               resetForm();
               if (setPageLoading) setPageLoading(["true"]);
 
-              // ✅ Navigate after successful submit
               navigate("/contact-person");
             } catch (error) {
               console.error(error);
@@ -72,13 +100,7 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
             const addContactPerson = () => {
               setFieldValue("contactPersons", [
                 ...values.contactPersons,
-                {
-                  name: "",
-                  email: "",
-                  phoneNumber: "",
-                  gender: "",
-                  designation: "",
-                },
+                { ...emptyPerson },
               ]);
             };
 
@@ -93,6 +115,34 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
               const updated = [...values.contactPersons];
               updated[index] = { ...updated[index], [field]: value };
               setFieldValue("contactPersons", updated);
+            };
+
+            const handleUserSelect = (index: number, userId: string) => {
+              if (!userId) {
+                const updated = [...values.contactPersons];
+                updated[index] = {
+                  ...emptyPerson,
+                  gender: values.contactPersons[index].gender,
+                };
+                setFieldValue("contactPersons", updated);
+                return;
+              }
+
+              const selectedUser = users.find((u) => u.id === Number(userId));
+              if (selectedUser) {
+                const updated = [...values.contactPersons];
+                updated[index] = {
+                  ...updated[index],
+                  userId: selectedUser.id,
+                  name: selectedUser.name || "",
+                  email: selectedUser.email || "",
+                  phoneNumber: selectedUser.phone || "",
+                  organisation: selectedUser.organisation || "",
+                  designation: selectedUser.designation || "",
+                  dob: selectedUser.dob || "",
+                };
+                setFieldValue("contactPersons", updated);
+              }
             };
 
             return (
@@ -137,24 +187,29 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
                           </div>
                         </div>
 
+                        {/* Row 1 */}
                         <div className="row gx-3">
-                          {/* Name */}
+                          {/* Name Dropdown */}
                           <div className="col-md-4">
                             <div className="p-3" style={{ background: "#f8fafc", borderRadius: 6 }}>
                               <label className="required fs-6 fw-bold mb-1">
                                 Contact Person Name :
                               </label>
-                              <input
-                                type="text"
-                                placeholder="Enter Contact Person Name"
-                                value={person.name}
-                                onChange={(e) => updateField(index, "name", e.target.value)}
-                                onBlur={handleBlur}
+                              <select
+                                value={person.userId || ""}
+                                onChange={(e) => handleUserSelect(index, e.target.value)}
                                 className={clsx(
-                                  "form-control form-control-lg form-control-solid mt-2",
+                                  "form-select form-select-lg form-select-solid mt-2",
                                   { "is-invalid text-danger": t.name && e.name }
                                 )}
-                              />
+                              >
+                                <option value="">Select a user</option>
+                                {users.map((u) => (
+                                  <option key={u.id} value={u.id}>
+                                    {u.name}
+                                  </option>
+                                ))}
+                              </select>
                               {t.name && e.name && (
                                 <div className="fv-help-block text-danger mt-2">{e.name}</div>
                               )}
@@ -165,11 +220,11 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
                           <div className="col-md-4">
                             <div className="p-3" style={{ background: "#f8fafc", borderRadius: 6 }}>
                               <label className="required fs-6 fw-bold mb-1">
-                                Contact Person Email :
+                                Email :
                               </label>
                               <input
                                 type="email"
-                                placeholder="Enter Contact Person Email"
+                                placeholder="Email"
                                 value={person.email}
                                 onChange={(e) => updateField(index, "email", e.target.value)}
                                 onBlur={handleBlur}
@@ -188,11 +243,11 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
                           <div className="col-md-4">
                             <div className="p-3" style={{ background: "#f8fafc", borderRadius: 6 }}>
                               <label className="required fs-6 fw-bold mb-1">
-                                Contact Person Phone Number :
+                                Phone Number :
                               </label>
                               <input
                                 type="text"
-                                placeholder="Enter Contact Person Phone Number"
+                                placeholder="Phone Number"
                                 value={person.phoneNumber}
                                 onChange={(e) =>
                                   updateField(index, "phoneNumber", e.target.value)
@@ -214,32 +269,42 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
 
                         {/* Row 2 */}
                         <div className="row gx-3 mt-3">
-                          {/* Gender */}
-                          <div className="col-md-6">
+                          {/* Organisation */}
+                          <div className="col-md-4">
                             <div className="p-3" style={{ background: "#f8fafc", borderRadius: 6 }}>
-                              <label className="fs-6 fw-bold mb-1">Gender :</label>
-                              <select
-                                value={person.gender}
-                                onChange={(e) => updateField(index, "gender", e.target.value)}
-                                className="form-select form-select-lg form-select-solid mt-2"
-                              >
-                                <option value="">Select gender</option>
-                                <option value="Male">Male</option>
-                                <option value="Female">Female</option>
-                                <option value="Other">Other</option>
-                              </select>
+                              <label className="fs-6 fw-bold mb-1">Organisation :</label>
+                              <input
+                                type="text"
+                                placeholder="Organisation"
+                                value={person.organisation}
+                                onChange={(e) => updateField(index, "organisation", e.target.value)}
+                                className="form-control form-control-lg form-control-solid mt-2"
+                              />
                             </div>
                           </div>
 
                           {/* Designation */}
-                          <div className="col-md-6">
+                          <div className="col-md-4">
                             <div className="p-3" style={{ background: "#f8fafc", borderRadius: 6 }}>
                               <label className="fs-6 fw-bold mb-1">Designation :</label>
                               <input
                                 type="text"
-                                placeholder="Enter Designation"
+                                placeholder="Designation"
                                 value={person.designation}
                                 onChange={(e) => updateField(index, "designation", e.target.value)}
+                                className="form-control form-control-lg form-control-solid mt-2"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Date of Birth */}
+                          <div className="col-md-4">
+                            <div className="p-3" style={{ background: "#f8fafc", borderRadius: 6 }}>
+                              <label className="fs-6 fw-bold mb-1">Date of Birth :</label>
+                              <input
+                                type="date"
+                                value={person.dob}
+                                onChange={(e) => updateField(index, "dob", e.target.value)}
                                 className="form-control form-control-lg form-control-solid mt-2"
                               />
                             </div>

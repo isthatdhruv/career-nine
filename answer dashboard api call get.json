@@ -1,0 +1,1923 @@
+{
+    "studentInfo": {
+        "userStudentId": 9,
+        "userId": 8,
+        "instituteName": "KCC",
+        "instituteCode": 12
+    },
+    "assessments": [
+        {
+            "assessmentId": 3,
+            "assessmentName": "test assessment name change",
+            "status": "notstarted",
+            "isActive": false,
+            "startDate": "2026-01-24",
+            "endDate": "2026-02-24",
+            "studentAssessmentMappingId": 9,
+            "answers": [],
+            "rawScores": []
+        },
+        {
+            "assessmentId": 5,
+            "assessmentName": "BET ASSESSMENT",
+            "status": "completed",
+            "isActive": true,
+            "startDate": "2026-01-29",
+            "endDate": "2027-01-29",
+            "studentAssessmentMappingId": 263,
+            "answers": [
+                {
+                    "assessmentAnswerId": 278,
+                    "questionnaireQuestionId": 39,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 372,
+                        "optionText": null,
+                        "optionDescription": "Steel lunch box",
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 190,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 47,
+                                    "name": "Environmental Awareness",
+                                    "description": "Environmental Awareness",
+                                    "displayName": "Environmental Awareness",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 8,
+                                        "name": "Environmental Awareness",
+                                        "description": "Environmental Awareness",
+                                        "displayName": "Environmental Awareness"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 279,
+                    "questionnaireQuestionId": 39,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 375,
+                        "optionText": null,
+                        "optionDescription": "Ceiling Fan and light on, but no one in room",
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 193,
+                                "score": -1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 47,
+                                    "name": "Environmental Awareness",
+                                    "description": "Environmental Awareness",
+                                    "displayName": "Environmental Awareness",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 8,
+                                        "name": "Environmental Awareness",
+                                        "description": "Environmental Awareness",
+                                        "displayName": "Environmental Awareness"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 280,
+                    "questionnaireQuestionId": 39,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 376,
+                        "optionText": null,
+                        "optionDescription": "Open Packet of Chips",
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 194,
+                                "score": -1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 47,
+                                    "name": "Environmental Awareness",
+                                    "description": "Environmental Awareness",
+                                    "displayName": "Environmental Awareness",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 8,
+                                        "name": "Environmental Awareness",
+                                        "description": "Environmental Awareness",
+                                        "displayName": "Environmental Awareness"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 281,
+                    "questionnaireQuestionId": 39,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 377,
+                        "optionText": null,
+                        "optionDescription": "Milk bag in transparent polythene",
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 195,
+                                "score": -1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 47,
+                                    "name": "Environmental Awareness",
+                                    "description": "Environmental Awareness",
+                                    "displayName": "Environmental Awareness",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 8,
+                                        "name": "Environmental Awareness",
+                                        "description": "Environmental Awareness",
+                                        "displayName": "Environmental Awareness"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 282,
+                    "questionnaireQuestionId": 40,
+                    "rankOrder": 2,
+                    "selectedOption": {
+                        "optionId": 272,
+                        "optionText": "Honesty:Â I tell the truth even when Iâm scared.",
+                        "optionDescription": "",
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 106,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 37,
+                                    "name": "Honesty",
+                                    "description": "Honesty",
+                                    "displayName": "Honesty",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 7,
+                                        "name": "Values",
+                                        "description": "Values",
+                                        "displayName": "Values"
+                                    }
+                                }
+                            },
+                            {
+                                "scoreId": 196,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 37,
+                                    "name": "Honesty",
+                                    "description": "Honesty",
+                                    "displayName": "Honesty",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 7,
+                                        "name": "Values",
+                                        "description": "Values",
+                                        "displayName": "Values"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 283,
+                    "questionnaireQuestionId": 40,
+                    "rankOrder": 1,
+                    "selectedOption": {
+                        "optionId": 273,
+                        "optionText": "Kindness: I help others and show a kind heart.",
+                        "optionDescription": "",
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 107,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 38,
+                                    "name": "Kindness",
+                                    "description": "Kindness",
+                                    "displayName": "Kindness",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 7,
+                                        "name": "Values",
+                                        "description": "Values",
+                                        "displayName": "Values"
+                                    }
+                                }
+                            },
+                            {
+                                "scoreId": 197,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 38,
+                                    "name": "Kindness",
+                                    "description": "Kindness",
+                                    "displayName": "Kindness",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 7,
+                                        "name": "Values",
+                                        "description": "Values",
+                                        "displayName": "Values"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 284,
+                    "questionnaireQuestionId": 40,
+                    "rankOrder": 3,
+                    "selectedOption": {
+                        "optionId": 279,
+                        "optionText": "Patience: I can wait calmly for my turn.",
+                        "optionDescription": "",
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 113,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 44,
+                                    "name": "Patience",
+                                    "description": "Patience",
+                                    "displayName": "Patience",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 7,
+                                        "name": "Values",
+                                        "description": "Values",
+                                        "displayName": "Values"
+                                    }
+                                }
+                            },
+                            {
+                                "scoreId": 203,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 44,
+                                    "name": "Patience",
+                                    "description": "Patience",
+                                    "displayName": "Patience",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 7,
+                                        "name": "Values",
+                                        "description": "Values",
+                                        "displayName": "Values"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 285,
+                    "questionnaireQuestionId": 41,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 366,
+                        "optionText": null,
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": []
+                    }
+                },
+                {
+                    "assessmentAnswerId": 286,
+                    "questionnaireQuestionId": 45,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 285,
+                        "optionText": "...want to quit after making a mistake.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 103,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 48,
+                                    "name": "Self Efficacy",
+                                    "description": "Self Efficacy",
+                                    "displayName": "Self Efficacy",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 287,
+                    "questionnaireQuestionId": 59,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 300,
+                        "optionText": "...know how to cheer themselves up.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 156,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 49,
+                                    "name": "Emotion Regulation",
+                                    "description": "Emotion Regulation",
+                                    "displayName": "Emotion Regulation",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 288,
+                    "questionnaireQuestionId": 46,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 355,
+                        "optionText": "...feel they don't know what to do when they have a problem.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 119,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 48,
+                                    "name": "Self Efficacy",
+                                    "description": "Self Efficacy",
+                                    "displayName": "Self Efficacy",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 289,
+                    "questionnaireQuestionId": 73,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 282,
+                        "optionText": "...find it easy to solve hard puzzles.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 96,
+                                "score": 0,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 48,
+                                    "name": "Self Efficacy",
+                                    "description": "Self Efficacy",
+                                    "displayName": "Self Efficacy",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            },
+                            {
+                                "scoreId": 100,
+                                "score": 0,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 48,
+                                    "name": "Self Efficacy",
+                                    "description": "Self Efficacy",
+                                    "displayName": "Self Efficacy",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 290,
+                    "questionnaireQuestionId": 76,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 318,
+                        "optionText": "...never say anything mean to others.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 174,
+                                "score": 0,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 50,
+                                    "name": "Social Desirability",
+                                    "description": "Social Desirability",
+                                    "displayName": "Social Desirability",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 291,
+                    "questionnaireQuestionId": 63,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 334,
+                        "optionText": "...find it easy to say \"I'm sorry.\"",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 138,
+                                "score": 0,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 51,
+                                    "name": "Bully",
+                                    "description": "Bully",
+                                    "displayName": "Bully",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 292,
+                    "questionnaireQuestionId": 74,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 314,
+                        "optionText": "...like trying new, scary things.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 170,
+                                "score": 0,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 48,
+                                    "name": "Self Efficacy",
+                                    "description": "Self Efficacy",
+                                    "displayName": "Self Efficacy",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 293,
+                    "questionnaireQuestionId": 75,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 328,
+                        "optionText": "...feel brave trying new activities.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 184,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 48,
+                                    "name": "Self Efficacy",
+                                    "description": "Self Efficacy",
+                                    "displayName": "Self Efficacy",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 294,
+                    "questionnaireQuestionId": 42,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 292,
+                        "optionText": "...never get angry with anyone.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 148,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 50,
+                                    "name": "Social Desirability",
+                                    "description": "Social Desirability",
+                                    "displayName": "Social Desirability",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 295,
+                    "questionnaireQuestionId": 54,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 349,
+                        "optionText": "...find it very hard to wait when they are excited.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 125,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 52,
+                                    "name": "Self Management",
+                                    "description": "Self Management",
+                                    "displayName": "Self Management",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 296,
+                    "questionnaireQuestionId": 43,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 306,
+                        "optionText": "...think of many ways to fix a problem.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 162,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 48,
+                                    "name": "Self Efficacy",
+                                    "description": "Self Efficacy",
+                                    "displayName": "Self Efficacy",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 297,
+                    "questionnaireQuestionId": 78,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 352,
+                        "optionText": "...understand why their friends get upset.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 120,
+                                "score": 0,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 49,
+                                    "name": "Emotion Regulation",
+                                    "description": "Emotion Regulation",
+                                    "displayName": "Emotion Regulation",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 298,
+                    "questionnaireQuestionId": 52,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 302,
+                        "optionText": "...always tell the truth, every time.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 158,
+                                "score": 0,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 50,
+                                    "name": "Social Desirability",
+                                    "description": "Social Desirability",
+                                    "displayName": "Social Desirability",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 299,
+                    "questionnaireQuestionId": 77,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 343,
+                        "optionText": "...wish they could just give up when things get hard.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 131,
+                                "score": 0,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 48,
+                                    "name": "Self Efficacy",
+                                    "description": "Self Efficacy",
+                                    "displayName": "Self Efficacy",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 300,
+                    "questionnaireQuestionId": 64,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 316,
+                        "optionText": "...are good at waiting for their turn.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 172,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 52,
+                                    "name": "Self Management",
+                                    "description": "Self Management",
+                                    "displayName": "Self Management",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 301,
+                    "questionnaireQuestionId": 65,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 297,
+                        "optionText": "...stop working if the task is boring.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 153,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 52,
+                                    "name": "Self Management",
+                                    "description": "Self Management",
+                                    "displayName": "Self Management",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 302,
+                    "questionnaireQuestionId": 69,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 341,
+                        "optionText": "...don't let losing a game bother them too much.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 133,
+                                "score": 0,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 49,
+                                    "name": "Emotion Regulation",
+                                    "description": "Emotion Regulation",
+                                    "displayName": "Emotion Regulation",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 303,
+                    "questionnaireQuestionId": 72,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 326,
+                        "optionText": "...always listen to parents and teachers.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 182,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 50,
+                                    "name": "Social Desirability",
+                                    "description": "Social Desirability",
+                                    "displayName": "Social Desirability",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 304,
+                    "questionnaireQuestionId": 50,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 298,
+                        "optionText": "...can stand up to bossy people.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 154,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 51,
+                                    "name": "Bully",
+                                    "description": "Bully",
+                                    "displayName": "Bully",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 305,
+                    "questionnaireQuestionId": 55,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 350,
+                        "optionText": "...worry a lot about what others think of them.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 122,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 48,
+                                    "name": "Self Efficacy",
+                                    "description": "Self Efficacy",
+                                    "displayName": "Self Efficacy",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 306,
+                    "questionnaireQuestionId": 60,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 330,
+                        "optionText": "...like to fix their own mistakes.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 186,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 52,
+                                    "name": "Self Management",
+                                    "description": "Self Management",
+                                    "displayName": "Self Management",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 307,
+                    "questionnaireQuestionId": 44,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 338,
+                        "optionText": "...usually stay calm when they get angry.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 134,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 49,
+                                    "name": "Emotion Regulation",
+                                    "description": "Emotion Regulation",
+                                    "displayName": "Emotion Regulation",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 308,
+                    "questionnaireQuestionId": 56,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 324,
+                        "optionText": "...can be quiet when they are asked.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 180,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 52,
+                                    "name": "Self Management",
+                                    "description": "Self Management",
+                                    "displayName": "Self Management",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 309,
+                    "questionnaireQuestionId": 47,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 288,
+                        "optionText": "...feel sure they can learn from others.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 116,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 48,
+                                    "name": "Self Efficacy",
+                                    "description": "Self Efficacy",
+                                    "displayName": "Self Efficacy",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 310,
+                    "questionnaireQuestionId": 67,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 346,
+                        "optionText": "...feel they have to hide their feelings from friends.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 126,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 49,
+                                    "name": "Emotion Regulation",
+                                    "description": "Emotion Regulation",
+                                    "displayName": "Emotion Regulation",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 311,
+                    "questionnaireQuestionId": 71,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 345,
+                        "optionText": "...are often confused about why they feel a certain way.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 129,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 49,
+                                    "name": "Emotion Regulation",
+                                    "description": "Emotion Regulation",
+                                    "displayName": "Emotion Regulation",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 312,
+                    "questionnaireQuestionId": 62,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 333,
+                        "optionText": "...feel happy sharing their toys/games.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 144,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 51,
+                                    "name": "Bully",
+                                    "description": "Bully",
+                                    "displayName": "Bully",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            },
+                            {
+                                "scoreId": 145,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 51,
+                                    "name": "Bully",
+                                    "description": "Bully",
+                                    "displayName": "Bully",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 313,
+                    "questionnaireQuestionId": 68,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 323,
+                        "optionText": "...ask for help to do better next time.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 179,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 51,
+                                    "name": "Bully",
+                                    "description": "Bully",
+                                    "displayName": "Bully",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 314,
+                    "questionnaireQuestionId": 48,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 308,
+                        "optionText": "...feel proud of what they do alone.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 164,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 52,
+                                    "name": "Self Management",
+                                    "description": "Self Management",
+                                    "displayName": "Self Management",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 315,
+                    "questionnaireQuestionId": 51,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 320,
+                        "optionText": "...can ignore noise while working.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 176,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 52,
+                                    "name": "Self Management",
+                                    "description": "Self Management",
+                                    "displayName": "Self Management",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 316,
+                    "questionnaireQuestionId": 49,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 310,
+                        "optionText": "...stay calm even if they lose a game.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 166,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 52,
+                                    "name": "Self Management",
+                                    "description": "Self Management",
+                                    "displayName": "Self Management",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 317,
+                    "questionnaireQuestionId": 61,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 286,
+                        "optionText": "...feel they can learn any new sport.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 104,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 48,
+                                    "name": "Self Efficacy",
+                                    "description": "Self Efficacy",
+                                    "displayName": "Self Efficacy",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 318,
+                    "questionnaireQuestionId": 58,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 313,
+                        "optionText": "...sometimes want to keep things to themselves.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 169,
+                                "score": 0,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 50,
+                                    "name": "Social Desirability",
+                                    "description": "Social Desirability",
+                                    "displayName": "Social Desirability",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 319,
+                    "questionnaireQuestionId": 66,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 337,
+                        "optionText": "...think they can't change how smart they are.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 137,
+                                "score": 0,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 48,
+                                    "name": "Self Efficacy",
+                                    "description": "Self Efficacy",
+                                    "displayName": "Self Efficacy",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 320,
+                    "questionnaireQuestionId": 70,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 295,
+                        "optionText": "...find it hard to fix arguments.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 151,
+                                "score": 0,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 51,
+                                    "name": "Bully",
+                                    "description": "Bully",
+                                    "displayName": "Bully",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 321,
+                    "questionnaireQuestionId": 57,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 305,
+                        "optionText": "...break rules if their friends do.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 161,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 52,
+                                    "name": "Self Management",
+                                    "description": "Self Management",
+                                    "displayName": "Self Management",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 322,
+                    "questionnaireQuestionId": 53,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 290,
+                        "optionText": "...stay calm before a big school test.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 140,
+                                "score": 0,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 49,
+                                    "name": "Emotion Regulation",
+                                    "description": "Emotion Regulation",
+                                    "displayName": "Emotion Regulation",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            },
+                            {
+                                "scoreId": 142,
+                                "score": 0,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 49,
+                                    "name": "Emotion Regulation",
+                                    "description": "Emotion Regulation",
+                                    "displayName": "Emotion Regulation",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 9,
+                                        "name": "Self Management",
+                                        "description": "Self Management",
+                                        "displayName": "Self Management"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 323,
+                    "questionnaireQuestionId": 79,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 367,
+                        "optionText": null,
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": []
+                    }
+                },
+                {
+                    "assessmentAnswerId": 324,
+                    "questionnaireQuestionId": 85,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 247,
+                        "optionText": "No, the friend is trying to be polite.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 71,
+                                "score": 0,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 36,
+                                    "name": "Social Insight",
+                                    "description": "Social Insight",
+                                    "displayName": "Social Insight",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 6,
+                                        "name": "Social Insight",
+                                        "description": "Social Insight",
+                                        "displayName": "Social Insight"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 325,
+                    "questionnaireQuestionId": 84,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 265,
+                        "optionText": "He wants her to think he's lying and look elsewhere.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 89,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 36,
+                                    "name": "Social Insight",
+                                    "description": "Social Insight",
+                                    "displayName": "Social Insight",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 6,
+                                        "name": "Social Insight",
+                                        "description": "Social Insight",
+                                        "displayName": "Social Insight"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 326,
+                    "questionnaireQuestionId": 86,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 256,
+                        "optionText": "To make Sameer feel okay taking it.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 80,
+                                "score": 0,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 36,
+                                    "name": "Social Insight",
+                                    "description": "Social Insight",
+                                    "displayName": "Social Insight",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 6,
+                                        "name": "Social Insight",
+                                        "description": "Social Insight",
+                                        "displayName": "Social Insight"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 327,
+                    "questionnaireQuestionId": 81,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 262,
+                        "optionText": "She made an honest mistake.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 86,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 36,
+                                    "name": "Social Insight",
+                                    "description": "Social Insight",
+                                    "displayName": "Social Insight",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 6,
+                                        "name": "Social Insight",
+                                        "description": "Social Insight",
+                                        "displayName": "Social Insight"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 328,
+                    "questionnaireQuestionId": 80,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 252,
+                        "optionText": "She wanted everyone to know.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 76,
+                                "score": 0,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 36,
+                                    "name": "Social Insight",
+                                    "description": "Social Insight",
+                                    "displayName": "Social Insight",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 6,
+                                        "name": "Social Insight",
+                                        "description": "Social Insight",
+                                        "displayName": "Social Insight"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 329,
+                    "questionnaireQuestionId": 83,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 250,
+                        "optionText": "No, he is being sarcastic.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 74,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 36,
+                                    "name": "Social Insight",
+                                    "description": "Social Insight",
+                                    "displayName": "Social Insight",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 6,
+                                        "name": "Social Insight",
+                                        "description": "Social Insight",
+                                        "displayName": "Social Insight"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 330,
+                    "questionnaireQuestionId": 88,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 268,
+                        "optionText": "To keep Mom believing the stash is untouched.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 92,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 36,
+                                    "name": "Social Insight",
+                                    "description": "Social Insight",
+                                    "displayName": "Social Insight",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 6,
+                                        "name": "Social Insight",
+                                        "description": "Social Insight",
+                                        "displayName": "Social Insight"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 331,
+                    "questionnaireQuestionId": 82,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 258,
+                        "optionText": "Giving up on the game.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 82,
+                                "score": 0,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 36,
+                                    "name": "Social Insight",
+                                    "description": "Social Insight",
+                                    "displayName": "Social Insight",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 6,
+                                        "name": "Social Insight",
+                                        "description": "Social Insight",
+                                        "displayName": "Social Insight"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 332,
+                    "questionnaireQuestionId": 87,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 271,
+                        "optionText": "Point out the mess and tell Aditi to clean up.",
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": [
+                            {
+                                "scoreId": 95,
+                                "score": 1,
+                                "measuredQualityType": {
+                                    "measuredQualityTypeId": 36,
+                                    "name": "Social Insight",
+                                    "description": "Social Insight",
+                                    "displayName": "Social Insight",
+                                    "measuredQuality": {
+                                        "measuredQualityId": 6,
+                                        "name": "Social Insight",
+                                        "description": "Social Insight",
+                                        "displayName": "Social Insight"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "assessmentAnswerId": 333,
+                    "questionnaireQuestionId": 89,
+                    "rankOrder": null,
+                    "selectedOption": {
+                        "optionId": 369,
+                        "optionText": null,
+                        "optionDescription": null,
+                        "isCorrect": false,
+                        "mqtScores": []
+                    }
+                }
+            ],
+            "rawScores": [
+                {
+                    "assessmentRawScoreId": 41,
+                    "rawScore": 7,
+                    "measuredQualityType": {
+                        "measuredQualityTypeId": 48,
+                        "name": "Self Efficacy",
+                        "description": "Self Efficacy",
+                        "displayName": "Self Efficacy",
+                        "measuredQuality": {
+                            "measuredQualityId": 9,
+                            "name": "Self Management",
+                            "description": "Self Management",
+                            "displayName": "Self Management"
+                        }
+                    },
+                    "measuredQuality": {
+                        "measuredQualityId": 9,
+                        "name": "Self Management",
+                        "description": "Self Management",
+                        "displayName": "Self Management"
+                    }
+                },
+                {
+                    "assessmentRawScoreId": 42,
+                    "rawScore": 4,
+                    "measuredQualityType": {
+                        "measuredQualityTypeId": 49,
+                        "name": "Emotion Regulation",
+                        "description": "Emotion Regulation",
+                        "displayName": "Emotion Regulation",
+                        "measuredQuality": {
+                            "measuredQualityId": 9,
+                            "name": "Self Management",
+                            "description": "Self Management",
+                            "displayName": "Self Management"
+                        }
+                    },
+                    "measuredQuality": {
+                        "measuredQualityId": 9,
+                        "name": "Self Management",
+                        "description": "Self Management",
+                        "displayName": "Self Management"
+                    }
+                },
+                {
+                    "assessmentRawScoreId": 43,
+                    "rawScore": 2,
+                    "measuredQualityType": {
+                        "measuredQualityTypeId": 50,
+                        "name": "Social Desirability",
+                        "description": "Social Desirability",
+                        "displayName": "Social Desirability",
+                        "measuredQuality": {
+                            "measuredQualityId": 9,
+                            "name": "Self Management",
+                            "description": "Self Management",
+                            "displayName": "Self Management"
+                        }
+                    },
+                    "measuredQuality": {
+                        "measuredQualityId": 9,
+                        "name": "Self Management",
+                        "description": "Self Management",
+                        "displayName": "Self Management"
+                    }
+                },
+                {
+                    "assessmentRawScoreId": 44,
+                    "rawScore": 4,
+                    "measuredQualityType": {
+                        "measuredQualityTypeId": 51,
+                        "name": "Bully",
+                        "description": "Bully",
+                        "displayName": "Bully",
+                        "measuredQuality": {
+                            "measuredQualityId": 9,
+                            "name": "Self Management",
+                            "description": "Self Management",
+                            "displayName": "Self Management"
+                        }
+                    },
+                    "measuredQuality": {
+                        "measuredQualityId": 9,
+                        "name": "Self Management",
+                        "description": "Self Management",
+                        "displayName": "Self Management"
+                    }
+                },
+                {
+                    "assessmentRawScoreId": 45,
+                    "rawScore": 5,
+                    "measuredQualityType": {
+                        "measuredQualityTypeId": 36,
+                        "name": "Social Insight",
+                        "description": "Social Insight",
+                        "displayName": "Social Insight",
+                        "measuredQuality": {
+                            "measuredQualityId": 6,
+                            "name": "Social Insight",
+                            "description": "Social Insight",
+                            "displayName": "Social Insight"
+                        }
+                    },
+                    "measuredQuality": {
+                        "measuredQualityId": 6,
+                        "name": "Social Insight",
+                        "description": "Social Insight",
+                        "displayName": "Social Insight"
+                    }
+                },
+                {
+                    "assessmentRawScoreId": 46,
+                    "rawScore": 9,
+                    "measuredQualityType": {
+                        "measuredQualityTypeId": 52,
+                        "name": "Self Management",
+                        "description": "Self Management",
+                        "displayName": "Self Management",
+                        "measuredQuality": {
+                            "measuredQualityId": 9,
+                            "name": "Self Management",
+                            "description": "Self Management",
+                            "displayName": "Self Management"
+                        }
+                    },
+                    "measuredQuality": {
+                        "measuredQualityId": 9,
+                        "name": "Self Management",
+                        "description": "Self Management",
+                        "displayName": "Self Management"
+                    }
+                },
+                {
+                    "assessmentRawScoreId": 47,
+                    "rawScore": 2,
+                    "measuredQualityType": {
+                        "measuredQualityTypeId": 37,
+                        "name": "Honesty",
+                        "description": "Honesty",
+                        "displayName": "Honesty",
+                        "measuredQuality": {
+                            "measuredQualityId": 7,
+                            "name": "Values",
+                            "description": "Values",
+                            "displayName": "Values"
+                        }
+                    },
+                    "measuredQuality": {
+                        "measuredQualityId": 7,
+                        "name": "Values",
+                        "description": "Values",
+                        "displayName": "Values"
+                    }
+                },
+                {
+                    "assessmentRawScoreId": 48,
+                    "rawScore": 2,
+                    "measuredQualityType": {
+                        "measuredQualityTypeId": 38,
+                        "name": "Kindness",
+                        "description": "Kindness",
+                        "displayName": "Kindness",
+                        "measuredQuality": {
+                            "measuredQualityId": 7,
+                            "name": "Values",
+                            "description": "Values",
+                            "displayName": "Values"
+                        }
+                    },
+                    "measuredQuality": {
+                        "measuredQualityId": 7,
+                        "name": "Values",
+                        "description": "Values",
+                        "displayName": "Values"
+                    }
+                },
+                {
+                    "assessmentRawScoreId": 49,
+                    "rawScore": 2,
+                    "measuredQualityType": {
+                        "measuredQualityTypeId": 44,
+                        "name": "Patience",
+                        "description": "Patience",
+                        "displayName": "Patience",
+                        "measuredQuality": {
+                            "measuredQualityId": 7,
+                            "name": "Values",
+                            "description": "Values",
+                            "displayName": "Values"
+                        }
+                    },
+                    "measuredQuality": {
+                        "measuredQualityId": 7,
+                        "name": "Values",
+                        "description": "Values",
+                        "displayName": "Values"
+                    }
+                },
+                {
+                    "assessmentRawScoreId": 50,
+                    "rawScore": -2,
+                    "measuredQualityType": {
+                        "measuredQualityTypeId": 47,
+                        "name": "Environmental Awareness",
+                        "description": "Environmental Awareness",
+                        "displayName": "Environmental Awareness",
+                        "measuredQuality": {
+                            "measuredQualityId": 8,
+                            "name": "Environmental Awareness",
+                            "description": "Environmental Awareness",
+                            "displayName": "Environmental Awareness"
+                        }
+                    },
+                    "measuredQuality": {
+                        "measuredQualityId": 8,
+                        "name": "Environmental Awareness",
+                        "description": "Environmental Awareness",
+                        "displayName": "Environmental Awareness"
+                    }
+                }
+            ]
+        }
+    ]
+}

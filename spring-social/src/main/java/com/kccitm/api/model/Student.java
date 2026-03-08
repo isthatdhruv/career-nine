@@ -1173,28 +1173,7 @@ public class Student implements Serializable {
 		return null;
 	}
 
-	public String getOfficialemailid() {
-		var lname = !(this.lastName == null) ? (this.lastName.charAt(0) +
-				"").toLowerCase() : "";
-		var dob = !(this.dob == null)
-				? (this.dob.split("-").length > 1 ? this.dob.split("-")[2] + this.dob.split("-")[1]
-						: this.dob.split("-")[2])
-				: "";
-		String branch = !(this.branchData == null) ? (this.branchData.getAbbreviation().toLowerCase()) : "";
-		var fname = !(this.firstName == null) ? this.firstName.toLowerCase() : "";
-		String course = !(this.courseData == null)
-				? this.courseData.getAbbreviation().replace(" ", "").toLowerCase().trim().replace(".", "")
-				: "";
-		String batch = !(this.batchData == null) ? this.batchData.getBatchEnd() : "";
-		var email = fname.trim() +
-				lname.trim() +
-				dob.trim() +
-				course.trim() +
-				branch.trim()
-				+ batch.trim() + "@kccitm.edu.in";
 
-		return email;
-	}
 
 	public boolean isGoogle() {
 		return google;
@@ -1209,3 +1188,4 @@ public class Student implements Serializable {
 	}
 
 }
+

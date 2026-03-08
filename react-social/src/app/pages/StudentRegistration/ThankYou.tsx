@@ -1,5 +1,22 @@
+import { useEffect } from 'react';
+
 /*  */
 const ThankYouPage = () => {
+  // Safety net: stop any remaining camera/media streams (from assessment proctoring)
+  useEffect(() => {
+    const webgazerVideo = document.getElementById('webgazerVideoFeed') as HTMLVideoElement | null;
+    if (webgazerVideo && webgazerVideo.srcObject) {
+      (webgazerVideo.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
+      webgazerVideo.srcObject = null;
+    }
+    ['webgazerVideoContainer', 'webgazerFaceFeedbackBox', 'webgazerGazeDot', 'webgazerFaceOverlay'].forEach(
+      (id) => {
+        const el = document.getElementById(id);
+        if (el) el.remove();
+      }
+    );
+  }, []);
+
   return (
     <>
       <div className="d-flex flex-column flex-root" id="kt_app_root">
@@ -16,7 +33,7 @@ const ThankYouPage = () => {
                 <div className="mb-7">
                   <img
                     alt="Logo"
-                    src="https://www.kccitm.edu.in/images/kcc-logo-new.png"
+                    src="/media/logos/kcc.jpg"
                     className="h-80px"
                   />
                 </div>

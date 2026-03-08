@@ -1,16 +1,22 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "react-bootstrap";
 import { IconContext } from "react-icons";
 import { MdSchool } from "react-icons/md";
+import { MdPersonAdd } from "react-icons/md";
 import { ReadCollegeData } from "./API/College_APIs";
 import CollegeCreateModal from "./components/CollegeCreateModal";
 import CollegeTable from "./components/CollegeTable";
+import StudentUploadModal from "./components/StudentUploadModal";
 
 const CollegePage = () => {
   const [modalShowCreate, setModalShowCreate] = useState(false);
   const [collegeData, setCollegeData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(["false"]);
+  const [showStudentUpload, setShowStudentUpload] = useState(false);
+  const [selectedCollegeForUpload, setSelectedCollegeForUpload] = useState<any>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     setLoading(true);
@@ -24,6 +30,18 @@ const CollegePage = () => {
       // window.location.replace("/error");
     }
   }, [pageLoading]);
+
+  const openUploadForCollege = (college: any) => {
+    setSelectedCollegeForUpload(college);
+    setShowStudentUpload(true);
+  };
+
+  const onUploadComplete = () => {
+    // trigger refresh
+    setShowStudentUpload(false);
+    setSelectedCollegeForUpload(null);
+    setPageLoading([String(Date.now())]);
+  };
 
   return (
     <div className="card">
@@ -42,20 +60,20 @@ const CollegePage = () => {
 
           <div className="card-toolbar">
             <div className="d-flex justify-content-end">
-              <Button
-                variant="primary"
-                onClick={() => {
-                  setModalShowCreate(true);
-                }}
-              >
-                <IconContext.Provider
-                  value={{ style: { paddingBottom: "4px" } }}
+              <div style={{ display: "flex", gap: 8 }}>
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    setModalShowCreate(true);
+                  }}
                 >
-                  <div>
-                    Add Institute <MdSchool size={21} />
-                  </div>
-                </IconContext.Provider>
-              </Button>
+                  <IconContext.Provider value={{ style: { paddingBottom: "4px" } }}>
+                    <div>
+                      Add Institute <MdSchool size={21} />
+                    </div>
+                  </IconContext.Provider>
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -67,6 +85,7 @@ const CollegePage = () => {
             data={collegeData}
             setLoading={setLoading}
             setPageLoading={setPageLoading}
+            onUploadClick={openUploadForCollege}
           />
         </div>
       )}
@@ -75,6 +94,13 @@ const CollegePage = () => {
         setPageLoading={setPageLoading}
         show={modalShowCreate}
         onHide={() => setModalShowCreate(false)}
+      />
+
+      <StudentUploadModal
+        show={showStudentUpload}
+        onHide={() => setShowStudentUpload(false)}
+        college={selectedCollegeForUpload}
+        onUploaded={onUploadComplete}
       />
     </div>
   );
