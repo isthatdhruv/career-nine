@@ -1,183 +1,278 @@
 # Architecture
 
-**Analysis Date:** 2026-02-06
+**Analysis Date:** 2026-03-06
 
-## Pattern Overview
+## Pattern: Three-Tier Monolithic Application
 
-**Overall:** Three-Tier Client-Server Monolithic Architecture with OAuth2-based Authentication
+```
+React SPA (Frontend - port 3000/5173)
+    ↓ HTTP/REST (Axios + JWT)
+Spring Boot 2.5.5 REST API (Backend - port 8091 dev / 8080 docker)
+    ↓ JDBC/JPA (HikariCP)
+MySQL 5.7+ Database (port 3306/3307)
+```
 
 **Key Characteristics:**
-- Stateless REST API backend with JWT token authentication
-- Single-Page Application frontend with context-based state management
-- MySQL relational database with Hibernate ORM
-- Multi-provider OAuth2 (Google, GitHub, Facebook) for user authentication
-- Dual assessment systems: legacy AssessmentTable + new Questionnaire model
+- Frontend: Single Page Application (React 18 + TypeScript)
+- Backend: Monolithic Spring Boot REST API
+- Database: MySQL with Hibernate ORM (DDL auto-update)
+- Authentication: OAuth2 (Google, GitHub, Facebook) + JWT tokens
+- Deployment: Docker Compose orchestration
 
-## Layers
+## Application Layers
 
-**Presentation Layer (Frontend):**
-- Purpose: React SPA providing user interface for assessment, student management, and reporting
-- Location: `src/app/pages/`, `src/app/modules/`
-- Contains: Page components, modals, forms, routing configuration
-- Depends on: HTTP REST API via axios, React Router, Context APIs for state
-- Used by: End users (students, faculty, admins)
+### 1. Controller Layer (REST Endpoints)
 
-**API Layer (Controllers):**
-- Purpose: REST endpoints exposing business operations
-- Location: `src/main/java/com/kccitm/api/controller/career9/`
-- Contains: Spring RestControllers with @GetMapping, @PostMapping, @PutMapping, @DeleteMapping endpoints
-- Depends on: Services, repositories, security filters
-- Used by: Frontend application via HTTP
+47+ controllers organized by domain:
 
-**Service Layer:**
-- Purpose: Business logic, Google API integrations, PDF/email generation
-- Location: `src/main/java/com/kccitm/api/service/`
-- Contains: Service interfaces and implementations for Google Directory API, Cloud Storage, PDF generation, email (Mandrill)
-- Depends on: Repositories, external SDKs (Google Admin SDK, iTextPDF, Mandrill)
-- Used by: Controllers for complex operations (student email generation, PDF cards, Google Groups)
+- `controller/career9/` - Career-Nine specific (assessment, student, scoring)
+- `controller/career9/Questionaire/` - Questionnaire management
+- `controller/dashboard/` - Dashboard aggregation
+- `controller/teacher/` - Teacher-specific
+- `controller/principal/` - Principal-specific
+- Root controllers: `AuthController`, `UserController`, `StudentInfoController`
 
-**Repository Layer (Data Access):**
-- Purpose: Database abstraction via Spring Data JPA
-- Location: `src/main/java/com/kccitm/api/repository/Career9/`
-- Contains: JPA repository interfaces with custom query methods
-- Depends on: JPA, Hibernate, MySQL dialect
-- Used by: Services and controllers for CRUD and custom queries
+**REST Endpoint Pattern:**
+```java
+@RestController
+@RequestMapping("/entity-name")
+public class EntityController {
+    @GetMapping("/getAll")           // List all
+    @GetMapping("/get/{id}")         // Get by ID
+    @PostMapping("/create")          // Create
+    @PutMapping("/update/{id}")      // Update
+    @DeleteMapping("/delete/{id}")   // Delete
+}
+```
 
-**Domain Model (Entities):**
-- Purpose: JPA entities representing database tables
-- Location: `src/main/java/com/kccitm/api/model/career9/`
-- Contains: Entity classes with @Entity, @Table, @JoinColumn annotations
-- Depends on: JPA annotations, Hibernate
-- Used by: Repositories for ORM mapping
+### 2. Service Layer (Business Logic)
 
-**Security Layer:**
-- Purpose: Authentication, authorization, OAuth2 handling
-- Location: `src/main/java/com/kccitm/api/security/`
-- Contains: JWT token handling, OAuth2 user service, authentication filters, user principals
-- Depends on: Spring Security, JWT library
-- Used by: Security configuration for request filtering
+30+ services with interface + implementation pattern:
 
-## Data Flow
+- `EmailService` / `SmtpEmailServiceImpl` / `GmailApiEmailServiceImpl`
+- `PdfService` / `PdfServiceImpl` / `StudentPdfServiceImpl`
+- `GoogleCloudAPI` / `GoogleCloudAPIImpl`
+- `GoogleDirectoryService` / `GoogleDirectoryServiceImpl`
+- `StudentService`, `UserService`, `FacultyService`
+- `FirebaseService`, `OdooLeadService`
+- `DashboardService`, `ClassTeacherDashboardService`, `PrincipalDashboardService`
 
-**Authentication Flow:**
-1. User initiates OAuth2 login (Google/GitHub/Facebook) via frontend
-2. Frontend receives auth token from OAuth2 provider callback (`/oauth2/redirect`)
-3. Spring Security processes OAuth2 callback → CustomOAuth2UserService loads/creates User
-4. OAuth2AuthenticationSuccessHandler generates JWT token
-5. Token stored in localStorage (frontend) and used in subsequent API calls via Authorization header
-6. TokenAuthenticationFilter validates JWT on each request
+**Note:** Many controllers bypass the service layer and access repositories directly.
 
-**Assessment Completion Flow:**
-1. Student loads StudentOnlineAssessment page
-2. Frontend fetches available assessments via `/assessments/student/{userStudentId}`
-3. Student starts assessment → calls `/assessments/startAssessment` (sets status to "ongoing")
-4. Student answers questions → submitted to `/assessment-answer/submit`
-5. Backend validates UserStudent + AssessmentTable, creates StudentAssessmentMapping
-6. Calculates raw scores from OptionScoreBasedOnMEasuredQualityTypes
-7. Saves AssessmentRawScore entries per MeasuredQualityType
-8. Returns scores to frontend for result display
+### 3. Repository Layer (Data Access)
 
-**Question Management Flow:**
-1. Admin uploads Excel via QuestionBulkUploadModal
-2. Frontend parses Excel → displays preview with Next/Previous navigation
-3. Admin edits questions, options, MQT scores in modal
-4. Submits all questions → each question calls `/assessment-questions/create`
-5. Backend processes question with options and MQT score mappings
-6. Returns results to frontend for confirmation
+83 JPA repositories extending `JpaRepository<Entity, ID>`:
 
-**State Management - Frontend:**
-- Global auth state: `AuthContext` → stores JWT token, current user
-- Page-level state: React useState, individual page contexts
-- Assessment state: `AssessmentProvider` context for test-taking flow
-- Data context: `DataProvider` for games module
+- `repository/Career9/` - Career-Nine domain repositories
+- `repository/Career9/Questionaire/` - Questionnaire repositories
+- `repository/Career9/School/` - Institute/school repositories
+- Root repositories: `UserRepository`, `RoleRepository`, etc.
 
-**State Management - Backend:**
-- Stateless: All state in request/response, JWT contains user identity
-- Database: AssessmentTable, StudentAssessmentMapping track assessment progress
-- Session: None (disabled in SecurityConfig)
+### 4. Model Layer (JPA Entities)
 
-## Key Abstractions
+112 JPA entities organized by domain:
 
-**Assessment (Dual Model):**
-- Purpose: Represents evaluations students take
-- Examples: `src/main/java/com/kccitm/api/model/career9/AssessmentTable.java`, `Questionnaire.java`
-- Pattern: AssessmentTable links to Questionnaire; legacy system also has standalone AssessmentQuestions
-- Flow: Assessment → StudentAssessmentMapping → AssessmentAnswer (responses) → AssessmentRawScore (results)
+- `model/career9/` - Assessment, scoring, student entities
+- `model/career9/Questionaire/` - Questionnaire system entities
+- `model/career9/school/` - Institute/school structure
+- `model/userDefinedModel/` - Custom DTOs/response objects
+- Root models: `User`, `Role`, `Group`, academic structure entities
 
-**Measured Quality Types (MQT):**
-- Purpose: Psychometric scoring dimensions (e.g., "Leadership", "Problem-Solving")
-- Examples: `MeasuredQualityTypes.java`, `MeasuredQualities.java`
-- Pattern: Questions → Options → OptionScoreBasedOnMeasuredQualityTypes (mapping scores to QT)
-- Tree: Tool → MeasuredQualities → MeasuredQualityTypes
+## Authentication Flow
 
-**Student Entities:**
-- Purpose: Represent student records in system
-- Examples: `UserStudent.java`, `StudentInfo.java`
-- Pattern: UserStudent (OAuth2 user account), StudentInfo (registration details), linked via student ID
+```
+1. User clicks OAuth2 login (Google/GitHub/Facebook)
+   ↓
+2. Redirected to OAuth2 provider
+   ↓
+3. Provider redirects to /oauth2/redirect with auth code
+   ↓
+4. CustomOAuth2UserService processes user info
+   ↓
+5. OAuth2AuthenticationSuccessHandler generates JWT
+   ↓
+6. JWT token sent to frontend via redirect URL
+   ↓
+7. Frontend stores token in localStorage (AuthInit.tsx)
+   ↓
+8. Axios interceptor adds Authorization header to all requests
+   ↓
+9. TokenAuthenticationFilter validates JWT on each request
+```
 
-**Language Support:**
-- Purpose: Multi-language content storage
-- Examples: `LanguageQuestion.java`, `LanguageOption.java`, `QuestionnaireLanguage.java`
-- Pattern: Question/Option → LanguageQuestion/LanguageOption (translations by language ID)
+**Key Security Classes:**
+- `SecurityConfig.java` - OAuth2 + JWT + CORS configuration
+- `TokenProvider.java` - JWT generation/validation
+- `TokenAuthenticationFilter.java` - Request authentication
+- `CustomOAuth2UserService.java` - OAuth2 user processing
+- `OAuth2AuthenticationSuccessHandler.java` - Post-auth redirect
 
-**Google Integration:**
-- Purpose: Directory API, Groups, Cloud Storage
-- Examples: `GoogleDirectoryService.java`, `GoogleGroupHandler.java`, `GoogleCloudAPI.java`
-- Pattern: Service interfaces with Impl classes; configured via google.json service account
+## Assessment System Architecture
 
-## Entry Points
+### Two Parallel Systems
 
-**Backend Application Entry:**
-- Location: `src/main/java/com/kccitm/api/SpringSocialApplication.java`
-- Triggers: Spring Boot main() method on server start
-- Responsibilities: Initialize Spring context, enable configuration properties (AppProperties)
+**Legacy Assessment System:**
+```
+AssessmentTable (assessment definition)
+  ↓ has many
+AssessmentQuestions (question bank)
+  ↓ has many
+AssessmentQuestionOptions (answer options)
+  ↓ scored by
+OptionScoreBasedOnMEasuredQualityTypes (MQT scores)
+  ↓ aggregated into
+AssessmentRawScore (computed scores per student)
+```
 
-**Frontend Application Entry:**
-- Location: `src/index.tsx`
-- Triggers: React app mount to DOM root element
-- Responsibilities: Initialize providers (QueryClient, AuthProvider, AssessmentProvider, BrowserRouter), setup axios interceptors
+**New Questionnaire System:**
+```
+Questionnaire (structured assessment)
+  ↓ has many
+QuestionnaireSection (sections with instructions)
+  ↓ has many
+QuestionnaireQuestion (questions linked to sections)
+  ↓ supports
+QuestionnaireLanguage (multi-language settings)
+```
 
-**Auth Redirect Entry:**
-- Location: `src/app/pages/authRedirectPage.tsx`
-- Triggers: OAuth2 callback from provider (`/oauth2/redirect` route)
-- Responsibilities: Extract JWT token from URL query, save to context, redirect to authenticated page
+**Shared between systems:**
+- `StudentAssessmentMapping` - Links students to assessments
+- `AssessmentAnswer` - Stores student responses
+- `AssessmentRawScore` - Stores computed scores
 
-**Assessment Start Entry:**
-- Location: `src/app/pages/StudentOnlineAssessment/StudentOnlineAssessment.tsx`
-- Triggers: Student navigates to assessment taking page
-- Responsibilities: Load assessments, initialize assessment context, render question UI
+### Scoring Flow
 
-## Error Handling
+```
+Student submits answers (AssessmentAnswerController /submit)
+  ↓
+Validate student + assessment exist
+  ↓
+Create/update StudentAssessmentMapping
+  ↓
+Save each answer to AssessmentAnswer table
+  ↓
+Look up OptionScoreBasedOnMEasuredQualityTypes for each selected option
+  ↓
+Accumulate scores by MeasuredQualityType
+  ↓
+Delete old AssessmentRawScore entries for this mapping
+  ↓
+Save new AssessmentRawScore entries per MQT
+```
 
-**Strategy:** Exception-driven with HTTP status codes mapping
+### Multi-Language Support
 
-**Patterns:**
-- Custom exceptions in `src/main/java/com/kccitm/api/exception/`: ResourceNotFoundException (404), BadRequestException (400), OAuth2AuthenticationProcessingException
-- @ResponseStatus annotations map exceptions to HTTP status codes
-- Controllers return ResponseEntity with explicit status: `.ok()`, `.notFound()`, `.status(HttpStatus.X)`
-- Frontend axios interceptors (AuthHelpers) handle 401 → logout flow
-- Frontend try-catch blocks in API calls with error console logging
+```
+LanguageSupported (available languages)
+  ↓
+LanguageQuestion (translated question text)
+  ↓
+LanguageOptions (translated option text)
+```
 
-## Cross-Cutting Concerns
+## Frontend Architecture
 
-**Logging:** Console.log in frontend components; SLF4J (Spring default) in backend with show-sql: true for Hibernate queries
+### Routing Structure
 
-**Validation:**
-- Frontend: FormBuilder/Formik-style form handling in modals
-- Backend: JPA entity validation, null checks before operations
+**AppRoutes.tsx** - Top-level routes:
+- Public: Login, registration, OAuth2 redirect
+- Assessment: Student login, assessment taking
+- Authenticated: Wrapped in `<PrivateRoutes />`
 
-**Authentication:**
-- Frontend: JWT token stored in localStorage, checked in AuthInit on app load
-- Backend: SecurityConfig → TokenAuthenticationFilter validates JWT on each request, UsernamePasswordAuthenticationFilter for OAuth2
+**PrivateRoutes.tsx** - Protected routes:
+- Role-based access via `currentUser.authorityUrls`
+- Wildcard patterns (e.g., `/dashboard/*`)
+- `ALWAYS_ALLOWED` routes bypass permission checks
+- 401 redirect for unauthorized access
 
-**Authorization:**
-- Method-level: @PreAuthorize, @Secured annotations (enabled in SecurityConfig)
-- Role-based: Current user roles checked in UserPrincipal from token claims
+### Component Structure Pattern
 
-**CORS:**
-- Configured in WebMvcConfig.java
-- Allowed origins from application.yml (dev/staging profiles have different origins)
+```
+Feature/
+├── FeaturePage.tsx              (Main page - data fetching, loading state)
+├── API/
+│   └── Feature_APIs.ts          (Axios API calls with BASE_URL)
+└── components/
+    ├── FeatureTable.tsx         (Data table with CRUD buttons)
+    ├── FeatureCreatePage.tsx    (Create form with Formik/Yup)
+    ├── FeatureEditPage.tsx      (Edit form, pre-filled from URL params)
+    └── index.ts                 (Barrel export)
+```
 
----
+### State Management
 
-*Architecture analysis: 2026-02-06*
+- **Auth State:** React Context (AuthContext.tsx + useAuth hook)
+- **Server State:** React Query for data fetching/caching
+- **Form State:** Formik + Yup validation
+- **Assessment State:** AssessmentContext.tsx (student assessment flow)
+- **No Redux** - all state via hooks and context
+
+### UI Framework
+
+- **Layout:** Metronic theme (`_metronic/layout/MasterLayout.tsx`)
+- **Components:** Mix of Material-UI and React Bootstrap
+- **Styling:** Bootstrap 5 + SCSS + Metronic custom styles
+- **Internationalization:** React Intl (Metronic i18n provider)
+
+## Data Flow: Request → Response
+
+### Example: Create Assessment Question
+
+**Frontend:**
+```
+User fills form → Submit
+  → CreateQuestionPage.tsx calls CreateAssessmentQuestionData(values)
+  → axios.post("${API_URL}/assessment-questions/create", values)
+  → Request sent with Authorization: Bearer <token>
+```
+
+**Backend:**
+```
+TokenAuthenticationFilter validates JWT
+  → AssessmentQuestionController.create() receives request
+  → Controller processes DTO, handles business logic
+  → AssessmentQuestionRepository.save(entity)
+  → Hibernate executes SQL INSERT
+  → ResponseEntity<AssessmentQuestion> returned
+```
+
+**Frontend:**
+```
+Response received
+  → UI updates (table refreshes, modal closes)
+  → Success feedback shown
+```
+
+## Entity Relationship Patterns
+
+**One-to-Many:**
+- Tool → Questionnaire
+- Assessment → AssessmentQuestion
+- Questionnaire → QuestionnaireSection → QuestionnaireQuestion
+
+**Many-to-Many:**
+- Career ↔ MeasuredQualityTypes
+- Tool ↔ MeasuredQualities
+
+**One-to-One:**
+- User → StudentInfo
+- AssessmentTable → Questionnaire
+
+## Caching Strategy
+
+- **Backend:** Caffeine in-memory cache (500 items, 10min TTL)
+- **Cached:** assessmentQuestions, assessmentDetails, measuredQualityTypes, questionnaireQuestions
+- **Frontend:** React Query with default stale time
+
+## Key Entry Points
+
+| Entry Point | Location |
+|-------------|----------|
+| Backend Main | `spring-social/src/main/java/com/kccitm/api/SpringSocialApplication.java` |
+| Frontend Main | `react-social/src/index.tsx` |
+| Root Component | `react-social/src/app/App.tsx` |
+| Routes | `react-social/src/app/routing/AppRoutes.tsx` |
+| Private Routes | `react-social/src/app/routing/PrivateRoutes.tsx` |
+| Security Config | `spring-social/src/main/java/com/kccitm/api/config/SecurityConfig.java` |
+| App Config | `spring-social/src/main/resources/application.yml` |
+| Docker | `docker-compose.yml` |

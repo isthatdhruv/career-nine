@@ -1,183 +1,191 @@
 # Technology Stack
 
-**Analysis Date:** 2026-02-06
+**Analysis Date:** 2026-03-06
 
-## Languages
+## Languages & Runtimes
 
-**Primary:**
-- Java 11 - Backend API (Spring Boot)
-- TypeScript 4.6.3 - React frontend type safety
-- JavaScript (ES5/ESNext) - React frontend runtime, Node.js translator service
+| Component | Language | Version |
+|-----------|----------|---------|
+| Backend API | Java | 11 |
+| Admin Frontend | TypeScript | 4.6.3 |
+| Assessment Frontend | TypeScript | ~5.9.3 |
+| Translator Service | JavaScript (Node.js) | 16.17.0 |
 
-**Secondary:**
-- YAML - Spring Boot configuration
-- SQL - MySQL database queries
-- HTML/CSS - Frontend views (Bootstrap 5, SCSS)
+## Core Frameworks
 
-## Runtime
+### Backend (Spring Boot)
 
-**Environment:**
-- Java 11 (JDK) - Spring Boot backend runtime
-- Node.js 16.17.0 - Frontend build and translator service runtime (specified in `.nvmrc`)
-- npm 8.x (implicit from Node 16.17.0)
+| Framework | Version | Purpose |
+|-----------|---------|---------|
+| Spring Boot | 2.5.5 | Application framework |
+| Spring Security | (Boot managed) | OAuth2 + JWT authentication |
+| Spring Data JPA | (Boot managed) | ORM / database access |
+| Spring Boot Mail | (Boot managed) | Email integration |
+| Spring Cache + Caffeine | (Boot managed) | In-memory caching |
+| Hibernate | (Boot managed) | JPA implementation |
 
-**Package Manager:**
-- Maven 3.x (configured in `spring-social/pom.xml`) - Backend dependency management
-- npm - Frontend and translator service dependency management
-- Lockfile: `react-social/package-lock.json` and `translator-service/package-lock.json` (assumed, standard npm)
+### Admin Frontend (React - CRA)
 
-## Frameworks
+| Framework | Version | Purpose |
+|-----------|---------|---------|
+| React | 18.0.0 | UI framework |
+| React Router DOM | 6.3.0 | Client-side routing |
+| Material-UI (@mui/material) | 5.10.11 | UI component library |
+| React Bootstrap | 2.5.0-beta.1 | UI components |
+| Bootstrap | 5.2.2 | CSS framework |
+| Axios | 0.26.1 | HTTP client |
+| React Query | 3.38.0 | Server state management |
+| Formik | 2.2.9 | Form state management |
+| Yup | 0.32.11 | Form validation |
 
-**Core Backend:**
-- Spring Boot 2.5.5 - REST API framework, IoC container
-- Spring Security OAuth2 Client - OAuth2 authentication (Google, GitHub, Facebook)
-- Spring Data JPA 2.5.5 - ORM and database abstraction
-- Hibernate - JPA implementation for MySQL
+### Assessment Frontend (Vite)
 
-**Core Frontend:**
-- React 18.0.0 - UI framework and component library
-- React Router DOM 6.3.0 - Client-side routing (`src/app/routing/AppRoutes.tsx`)
-- React Bootstrap 2.5.0-beta.1 - Bootstrap component library
-- React Query 3.38.0 - Server state management and data fetching
-- TypeScript 4.6.3 - Static type checking
+| Framework | Version | Purpose |
+|-----------|---------|---------|
+| React | 19.2.0 | UI framework |
+| React Router DOM | 6.30.3 | Client-side routing |
+| Vite | 7.3.1 | Build tool / dev server |
+| MediaPipe | 0.10.22 | Face mesh detection (proctoring) |
+| WebGazer | 3.4.0 | Eye tracking |
+| Firebase | 12.8.0 | Real-time data sync |
 
-**UI & Styling:**
-- Bootstrap 5.2.2 - CSS framework and grid system
-- SASS 1.50.1 - CSS preprocessor
-- Material-UI (@mui/material 5.10.11) - Material Design components
-- Chart.js 3.7.1 - Data visualization
-- ApexCharts 3.35.0 - Advanced charting library
-- Lucide React 0.562.0 - Icon library
+### Translator Microservice
 
-**Testing & Build:**
-- React Scripts 5.0.1 - Create React App build tool (dev server, webpack, Babel)
-- Jest (implicit from react-scripts) - Frontend unit testing
-- React Testing Library - Component testing
-- Spring Boot Test - Backend testing framework
-- JUnit & Spring Security Test - Backend unit and security testing
+| Framework | Version | Purpose |
+|-----------|---------|---------|
+| Express.js | 5.1.0 | HTTP server |
+| OpenAI SDK | 5.22.1 | GPT-3.5-turbo translation |
+| Axios | 1.12.2 | HTTP client |
 
-**Build & Dev Tools:**
-- Maven (Spring Boot projects) - Compile, test, package backend
-- Webpack 5.74.0 - Module bundler for advanced builds
-- Prettier 2.6.2 - Code formatter (configured with `npm run format`)
-- ESLint (implicit from react-scripts) - Code linting
-- TypeScript Compiler 4.6.3 - TypeScript to JavaScript transpilation
-- env-cmd 11.0.0 - Environment-based build execution (`npm run build:stage`, `npm run build:production`)
-
-**Translation & Utilities:**
-- Express 5.1.0 - Node.js web framework for translator microservice
-- Axios 0.26.1 (frontend), 1.12.2 (translator) - HTTP client for API calls
-- Formik 2.2.9 - Form state management
-- Yup 0.32.11 - Form validation schema
-- React Intl 5.25.0 - Internationalization and localization
-- Draft.js 0.11.7 - Rich text editing
-- OpenAI 5.22.0 (frontend & translator) - ChatGPT API client
-
-**PDF Generation:**
-- iTextPDF 5.5.13 - PDF generation from content
-- OpenHTMLtoPDF 1.0.10 - HTML to PDF conversion
-- Flying Saucer 9.1.20 - XML/HTML rendering engine
-
-**Data Handling:**
-- XLSX 0.18.5 - Excel file reading and writing (bulk question upload)
-- Apache POI 5.2.3 - Excel generation and parsing (backend)
-- Gson 2.9.0 - JSON serialization/deserialization
-- Jackson Databind - JSON processing
+## Key Backend Dependencies
 
 **Authentication & Security:**
-- JJWT 0.11.2 (jjwt-api, jjwt-impl, jjwt-jackson) - JWT token generation and validation
-- Spring Security OAuth2 Client - OAuth2 provider integration
+- JJWT: 0.11.2 (JWT token generation/validation)
+- Spring Security OAuth2 Client
 
-**Google Cloud & APIs:**
-- Google Cloud Storage Client - File upload/download to GCS
-- Google API Client 1.31.1 - Google Workspace API integration
-- Google OAuth Client Jetty 1.23.0 - OAuth2 authentication
-- Google Admin Directory API 1.32.1 - User and group management
-- Google Zxing 3.3.0 - QR code generation and reading
+**Google Cloud Platform:**
+- Google Cloud Storage (BOM 26.1.0)
+- Firebase Admin SDK: 9.2.0
+- Google APIs Client: 1.31.1
+- Google Admin Directory API: directory_v1-rev20211221-1.32.1
+- Google Gmail API: v1-rev20220404-2.0.0
 
-**Email & Messaging:**
-- Mandrill Client 1.1 - Email delivery API (deprecated, but in use)
-- Lutung 0.0.8 - Mandrill API wrapper
+**Email:**
+- Mandrill Client: 1.1 + Lutung: 0.0.8 (transactional email)
+- Spring Boot Mail (Gmail SMTP)
 
-**Code Quality & Utilities:**
-- Commons IO 2.11.0 - File and I/O utilities
-- JSoup 1.15.4 - HTML parsing
-- Nodemon 3.1.10 - Auto-restart translator service during development
-- Dotenv 17.2.2 - Environment variable loading
+**PDF & Document Processing:**
+- iTextPDF: 5.5.13
+- OpenHTMLToPDF: 1.0.10
+- Flying Saucer PDF: 9.1.20
+- Apache POI: 5.2.3 (Excel read/write)
 
-## Configuration
+**Other:**
+- Google ZXing: 3.3.0 (QR code generation)
+- Google Gson: 2.9.0
+- JSoup: 1.15.4 (HTML parsing)
+- Apache Commons IO: 2.11.0
+- OpenAI Java: 0.31.0 (AI integration)
 
-**Environment:**
-- `application.yml` at `spring-social/src/main/resources/application.yml` - Spring Boot profile-based configuration
-- `.env` files for React frontend:
-  - `.env.development` - Dev API URL and settings
-  - `staging.env` - Staging environment build
-  - `production.env` - Production environment build
-  - Pattern: `REACT_APP_*` variables for runtime access
-- Profile support: `dev` (default), `staging`, `production`
+## Key Frontend Dependencies
 
-**Key Configuration Properties:**
-- `REACT_APP_API_URL` - Backend API endpoint
-- `REACT_APP_URL` - Frontend application URL
-- `REACT_APP_COMPLIER` - Code compiler service URL (Judge0)
-- `TRANSLATE_APP_API_URL` - Translator microservice endpoint
-- `MYSQL_DATABASE` - Database name (`kareer-9` dev, `career-9` docker/staging)
-- `app.mandrill` - Mandrill API key
-- `app.firebase.project-id` - Firebase project identifier
-- `app.auth.tokenSecret` - JWT token signing secret
-- `app.auth.tokenExpirationMsec` - JWT expiration (864000000ms = 10 days)
+**Data & Export:**
+- XLSX: 0.18.5 (Excel processing)
+- jsPDF: 4.2.0 (PDF generation)
+- React CSV Reader: 3.5.2
 
-**Build:**
-- `pom.xml` - Maven build configuration for Spring Boot backend
-- `.babelrc` (implicit in react-scripts) - JavaScript transpilation
-- TypeScript configuration: `react-social/tsconfig.json` (target: ES5, module: ESNext)
+**Charts & Visualization:**
+- Chart.js: 3.7.1
+- ApexCharts: 3.35.0
 
-## Platform Requirements
+**Content Editing:**
+- React Draft WYSIWYG: 1.15.0
+- Draft.js: 0.11.7
 
-**Development:**
-- Java 11+ JDK installed
-- Maven 3.5+ for backend builds
-- Node.js 16.17.0 (via nvm or direct install)
-- npm 8.x or compatible
-- MySQL 5.7+ running locally (port 3306) with database `kareer-9`
-- Google Cloud credentials (google.json in classpath)
-- Firebase service account credentials
+**Utilities:**
+- Moment.js: 2.30.1
+- React Intl: 5.25.0 (i18n)
+- Universal Cookie: 4.0.4
 
-**Production/Staging:**
-- Docker with Docker Compose support
-- MySQL 5.7+ (containerized or remote)
-- Java 11 runtime in container
-- Node.js 16.x runtime (for translator service if deployed separately)
-- Nginx or reverse proxy for frontend serving
-- TLS certificates for HTTPS (configured via Spring Boot SSL settings, commented in `application.yml`)
+## Build Tools
 
-## Development Commands Summary
+| Tool | Version | Component |
+|------|---------|-----------|
+| Maven | 3.8.1 | Backend build |
+| React Scripts (CRA) | 5.0.1 | Admin frontend build |
+| Vite | 7.3.1 | Assessment frontend build |
+| env-cmd | 10.1.0 | Environment-based builds |
+| Prettier | 2.6.2 | Code formatting (frontend) |
+| ESLint | (CRA default) | Linting (frontend) |
 
-**Backend:**
-```bash
-mvn spring-boot:run                    # Run with dev profile
-mvn spring-boot:run -Dspring-boot.run.profiles=staging  # Run with staging profile
-mvn clean package                      # Build JAR (default skips tests)
-mvn test                               # Run all tests
-```
+## Docker Configuration
 
-**Frontend:**
-```bash
-npm start                              # Dev server on port 3000
-npm run build                          # Production build
-npm run build:stage                    # Staging build with staging.env
-npm run build:production               # Production build with production.env
-npm test                               # Run Jest tests
-npm run format                         # Format code with Prettier
-npm run lint                           # Check formatting with Prettier
-```
+**Backend Dockerfile:** Multi-stage build
+- Build stage: `maven:3.8.1-jdk-11-slim`
+- Runtime stage: `eclipse-temurin:11-jre-focal`
+- JVM args: `-Xms2g -Xmx4g`
 
-**Docker Deployment:**
-```bash
-docker-compose up -d                   # Start MySQL and Spring Boot API
-docker-compose down                    # Stop services
-```
+**Docker Compose Services:**
+- `mysql_db_api`: MySQL latest, port 3306, 3GB memory limit, persistent volume
+- `api`: Spring Boot JAR, port 8080, 4GB memory limit
+- Network: `career_shared_net` (external, must pre-create)
 
----
+## Environment Configurations
 
-*Stack analysis: 2026-02-06*
+### Dev Profile
+- Backend port: 8091
+- Database: `jdbc:mysql://localhost:3307/career-9`
+- Hikari pool: 30 max, 10 min-idle
+- Show SQL: true
+- Caffeine cache: 500 items, 10min TTL
+
+### Staging Profile
+- Backend port: 8080
+- Database: `jdbc:mysql://mysql_db_api:3306/career-9`
+- Hikari pool: 50 max, 20 min-idle
+- Show SQL: false
+- Tomcat: 300 max threads, 50 min-spare
+
+### Production Profile
+- Backend port: 8080
+- Database: `jdbc:mysql://easylearning.guru:3310/kcc_student`
+- Hikari pool: 30 max, 10 min-idle
+- Show SQL: true
+
+### Frontend Environment URLs
+
+| Env | API URL | App URL |
+|-----|---------|---------|
+| Dev | http://localhost:8080 | http://localhost:3000 |
+| Staging | https://staging.api.kccitm.in | https://staging.student.kccitm.in |
+| Production | https://api.career-9.com | https://dashboard.career-9.com |
+
+### Assessment App URLs
+
+| Env | API URL |
+|-----|---------|
+| Dev | http://localhost:8080 |
+| Staging | https://staging.api.kccitm.in |
+| Production | https://api.career-9.com |
+
+## Database Configuration
+
+**Engine:** MySQL 5.7+ (Docker uses latest)
+
+**Database Names (inconsistent):**
+- Dev: `career-9` (was `kareer-9` historically)
+- Docker/Staging: `career-9`
+- Production: `kcc_student`
+
+**Hibernate Settings (all profiles):**
+- DDL Auto: `update` (auto schema migration)
+- Naming Strategy: EJB3NamingStrategy
+- Dialect: MySQL5InnoDBDialect
+- Batch Size: 30
+- Order Inserts/Updates: true
+
+## Caching
+
+- **Type:** Caffeine (in-memory)
+- **Spec:** maximumSize=500, expireAfterWrite=600s
+- **Cached Collections:** assessmentQuestions, assessmentDetails, measuredQualityTypes, questionnaireQuestions

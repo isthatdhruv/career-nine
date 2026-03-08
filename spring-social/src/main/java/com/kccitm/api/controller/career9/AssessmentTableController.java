@@ -26,8 +26,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kccitm.api.model.career9.AssessmentQuestions;
+import com.kccitm.api.model.career9.AssessmentSession;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
+import com.kccitm.api.service.AssessmentSessionService;
 import com.kccitm.api.model.career9.Questionaire.Questionnaire;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.Career9.AssessmentQuestionRepository;
@@ -57,6 +59,9 @@ public class AssessmentTableController {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private AssessmentSessionService assessmentSessionService;
 
     // ─── Locked assessment JSON snapshot helpers ───
 
@@ -496,6 +501,15 @@ public class AssessmentTableController {
             studentAssessmentMappingRepository.save(mapping);
         }
 
+        // Create a Redis-backed session and return the token
+        AssessmentSession session = assessmentSessionService.createSession(userStudentId, assessmentId);
+
+        // Clear any stale submission lock from a previous attempt
+        // This allows re-assessment after admin resets the student's status
+        assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
+
+        response.put("sessionToken", session.getSessionToken());
+
         response.put("success", true);
         response.put("status", mapping.getStatus());
         return ResponseEntity.ok(response);
@@ -504,8 +518,10 @@ public class AssessmentTableController {
     /**
      * Public prefetch endpoint - returns assessment data for a student before auth.
      * Called when student types their ID on login page to pre-load assessment data.
-     * Benefits from Caffeine cache - first request warms cache, rest are instant.
+     * Benefits from Redis cache - first request warms cache, rest are instant.
+     * Uses "assessmentDetails" cache with prefixed key to share eviction with mutation endpoints.
      */
+    @Cacheable(value = "assessmentDetails", key = "'prefetch-' + #userStudentId")
     @GetMapping("/prefetch/{userStudentId}")
     public ResponseEntity<?> prefetchAssessmentData(@PathVariable Long userStudentId) {
         try {
