@@ -83,6 +83,8 @@ public class StudentInfoController {
     private com.kccitm.api.service.CareerNineRollNumberService rollNumberService;
     @Autowired
     private QuestionnaireQuestionRepository questionnaireQuestionRepository;
+    @Autowired
+    private com.kccitm.api.service.AssessmentSessionService assessmentSessionService;
 
     @GetMapping("/getAll")
     public List<StudentInfo> getAllStudentInfo() {
@@ -582,6 +584,10 @@ public class StudentInfoController {
 
             StudentAssessmentMapping mapping = mappingOpt.get();
 
+            // Delete assessment answers for this student + assessment
+            assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(
+                    userStudentId, assessmentId);
+
             // Delete raw scores for this mapping
             assessmentRawScoreRepository.deleteByStudentAssessmentMappingStudentAssessmentId(
                     mapping.getStudentAssessmentId());
@@ -589,6 +595,10 @@ public class StudentInfoController {
             // Delete proctoring data for this student + assessment
             assessmentProctoringQuestionLogRepository.deleteByUserStudentUserStudentIdAndAssessmentId(
                     userStudentId, assessmentId);
+
+            // Clear Redis submission lock and session
+            assessmentSessionService.deleteSession(userStudentId, assessmentId);
+            assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
 
             // Reset status to 'notstarted'
             mapping.setStatus("notstarted");
