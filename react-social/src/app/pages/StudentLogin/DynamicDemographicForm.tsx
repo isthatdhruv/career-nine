@@ -201,7 +201,7 @@ const DynamicDemographicForm: React.FC = () => {
       });
 
       // Start assessment
-      await fetch(`${process.env.REACT_APP_API_URL}/assessments/startAssessment`, {
+      const startRes = await fetch(`${process.env.REACT_APP_API_URL}/assessments/startAssessment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -209,6 +209,11 @@ const DynamicDemographicForm: React.FC = () => {
           assessmentId: Number(assessmentId),
         }),
       });
+      const startData = await startRes.json();
+      if (startData.sessionToken) {
+        sessionStorage.setItem('assessmentSessionToken', startData.sessionToken);
+      }
+      localStorage.setItem('assessmentId', String(assessmentId));
 
       await fetchAssessmentData(String(assessmentId));
       navigate('/general-instructions');
@@ -514,7 +519,7 @@ const DynamicDemographicForm: React.FC = () => {
             <button
               className='btn btn-primary'
               onClick={async () => {
-                await fetch(`${process.env.REACT_APP_API_URL}/assessments/startAssessment`, {
+                const startRes = await fetch(`${process.env.REACT_APP_API_URL}/assessments/startAssessment`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -522,6 +527,11 @@ const DynamicDemographicForm: React.FC = () => {
                     assessmentId: Number(assessmentId),
                   }),
                 });
+                const startData = await startRes.json();
+                if (startData.sessionToken) {
+                  sessionStorage.setItem('assessmentSessionToken', startData.sessionToken);
+                }
+                localStorage.setItem('assessmentId', String(assessmentId));
                 await fetchAssessmentData(String(assessmentId));
                 navigate('/general-instructions');
               }}

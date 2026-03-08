@@ -27,8 +27,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kccitm.api.model.career9.AssessmentQuestions;
+import com.kccitm.api.model.career9.AssessmentSession;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
+import com.kccitm.api.service.AssessmentSessionService;
 import com.kccitm.api.model.career9.Questionaire.Questionnaire;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.Career9.AssessmentQuestionRepository;
@@ -58,6 +60,9 @@ public class AssessmentTableController {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private AssessmentSessionService assessmentSessionService;
 
     // ─── Locked assessment JSON snapshot helpers ───
 
@@ -348,12 +353,28 @@ public class AssessmentTableController {
     @PutMapping("/update/{id}")
     public ResponseEntity<AssessmentTable> updateAssessment(@PathVariable Long id,
             @RequestBody AssessmentTable assessment) {
-        if (!assessmentTableRepository.existsById(id)) {
+        Optional<AssessmentTable> existingOpt = assessmentTableRepository.findById(id);
+        if (existingOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        assessment.setId(id);
-        assessment.setAssessmentName(assessment.getAssessmentName());
-        AssessmentTable updatedAssessment = assessmentTableRepository.save(assessment);
+        AssessmentTable existing = existingOpt.get();
+        existing.setAssessmentName(assessment.getAssessmentName());
+        existing.setStarDate(assessment.getStarDate());
+        existing.setEndDate(assessment.getEndDate());
+        existing.setIsActive(assessment.getIsActive());
+        existing.setModeofAssessment(assessment.getModeofAssessment());
+        existing.setShowTimer(assessment.getShowTimer());
+        existing.setIsLocked(assessment.getIsLocked());
+
+        // Only update questionnaire reference by ID, don't replace the deserialized object
+        if (assessment.getQuestionnaire() != null && assessment.getQuestionnaire().getQuestionnaireId() != null) {
+            Optional<Questionnaire> q = questionnaireRepository.findById(assessment.getQuestionnaire().getQuestionnaireId());
+            q.ifPresent(existing::setQuestionnaire);
+        } else {
+            existing.setQuestionnaire(null);
+        }
+
+        AssessmentTable updatedAssessment = assessmentTableRepository.save(existing);
         return ResponseEntity.ok(updatedAssessment);
     }
 
@@ -494,6 +515,15 @@ public class AssessmentTableController {
             studentAssessmentMappingRepository.save(mapping);
         }
 
+        // Create a Redis-backed session and return the token
+        AssessmentSession session = assessmentSessionService.createSession(userStudentId, assessmentId);
+
+        // Clear any stale submission lock from a previous attempt
+        // This allows re-assessment after admin resets the student's status
+        assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
+
+        response.put("sessionToken", session.getSessionToken());
+
         response.put("success", true);
         response.put("status", mapping.getStatus());
         return ResponseEntity.ok(response);
@@ -502,8 +532,10 @@ public class AssessmentTableController {
     /**
      * Public prefetch endpoint - returns assessment data for a student before auth.
      * Called when student types their ID on login page to pre-load assessment data.
-     * Uses batch query to avoid N+1 problem.
+     * Benefits from Redis cache - first request warms cache, rest are instant.
+     * Uses "assessmentDetails" cache with prefixed key to share eviction with mutation endpoints.
      */
+    @Cacheable(value = "assessmentDetails", key = "'prefetch-' + #userStudentId")
     @GetMapping("/prefetch/{userStudentId}")
     public ResponseEntity<?> prefetchAssessmentData(@PathVariable Long userStudentId) {
         try {
