@@ -1,7 +1,7 @@
 spring:
   profiles:
     active: staging
-    active: staging
+    
 
 server:
   port: 8080
