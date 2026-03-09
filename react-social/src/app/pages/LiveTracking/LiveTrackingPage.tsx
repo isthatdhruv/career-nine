@@ -174,8 +174,14 @@ const LiveTrackingPage = () => {
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevDataRef = useRef<string>("");
-  // High watermark: progress should never go backwards per student
+  // High watermark: progress & position should never go backwards per student
   const progressHighWaterRef = useRef<Record<number, number>>({});
+  // Cache last known position so heartbeat gaps don't flash "No signal"
+  const positionCacheRef = useRef<Record<number, {
+    currentPage: string;
+    currentSection?: string | null;
+    currentQuestionIndex?: number | null;
+  }>>({});
 
   // Load assessment list on mount
   useEffect(() => {
@@ -197,22 +203,38 @@ const LiveTrackingPage = () => {
       const res = await getLiveTracking(selectedId);
       const newData: TrackingData = res.data;
 
-      // High watermark logic:
-      // - "ongoing" students: NEVER let progress drop (heartbeat gaps on flaky networks
-      //   would show 0 since answers are in localStorage, not DB, until submission)
-      // - "completed"/"notstarted": trust the DB count, reset watermark
+      // High watermark logic for ongoing students:
+      // - Progress never drops (answers are in localStorage until submission)
+      // - Position sticks to last known value during heartbeat gaps
       const hw = progressHighWaterRef.current;
+      const pc = positionCacheRef.current;
       for (const s of newData.students) {
         if (s.status === "ongoing") {
+          // Progress watermark
           const prev = hw[s.userStudentId] ?? 0;
           if (s.answeredCount >= prev) {
             hw[s.userStudentId] = s.answeredCount;
           } else {
             s.answeredCount = prev;
           }
+
+          // Position cache: update when we have fresh data, restore when gap
+          if (s.currentPage) {
+            pc[s.userStudentId] = {
+              currentPage: s.currentPage,
+              currentSection: s.currentSection,
+              currentQuestionIndex: s.currentQuestionIndex,
+            };
+          } else if (pc[s.userStudentId]) {
+            // Heartbeat expired — show last known position instead of "No signal"
+            s.currentPage = pc[s.userStudentId].currentPage;
+            s.currentSection = pc[s.userStudentId].currentSection;
+            s.currentQuestionIndex = pc[s.userStudentId].currentQuestionIndex;
+          }
         } else {
-          // Student completed or not started — DB count is authoritative
+          // Student completed or not started — reset caches
           delete hw[s.userStudentId];
+          delete pc[s.userStudentId];
         }
       }
 
@@ -274,6 +296,7 @@ const LiveTrackingPage = () => {
     setData(null);
     prevDataRef.current = "";
     progressHighWaterRef.current = {};
+    positionCacheRef.current = {};
     setFilterStatus("all");
     setFilterInstitute("all");
     setSearchQuery("");
