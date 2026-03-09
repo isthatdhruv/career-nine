@@ -60,6 +60,7 @@ import DashboardAdminPage from "../pages/demo-dashboard-v2/dashboard-admin";
 import InstituteDashboard from "../pages/dashboard/InstituteDashboard";
 import ActivityLogPage from "../pages/ActivityLog/ActivityLogPage";
 import LeadsPage from "../pages/Leads/LeadsPage";
+import LiveTrackingPage from "../pages/LiveTracking/LiveTrackingPage";
 import ReportsPage from "../pages/Reports/ReportsPage";
 import StudentDashboard from "../pages/StudentDashboard/StudentDashboard";
 import ClassTeacherDashboard from "../pages/ClassTeacherDashboard/ClassTeacherDashboard";
@@ -904,6 +905,15 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <ActivityLogPage />
+            </SuspensedView>
+          }
+        />
+
+        <Route
+          path="/live-tracking"
+          element={
+            <SuspensedView>
+              <LiveTrackingPage />
             </SuspensedView>
           }
         />
