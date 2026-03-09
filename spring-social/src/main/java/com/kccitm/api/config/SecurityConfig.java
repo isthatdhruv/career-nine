@@ -3,6 +3,7 @@ package com.kccitm.api.config;
 import java.util.Arrays;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -35,6 +36,9 @@ import com.kccitm.api.security.oauth2.OAuth2AuthenticationSuccessHandler;
 @EnableWebSecurity
 @EnableGlobalMethodSecurity(securedEnabled = true, jsr250Enabled = true, prePostEnabled = true)
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
+
+    @Value("${app.cors.allowedOrigins}")
+    private String[] allowedOrigins;
 
     @Autowired
     private CustomUserDetailsService customUserDetailsService;
@@ -98,15 +102,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(Arrays.asList(
-                "http://localhost:3000",
-                "http://192.168.3.78:3000",
-                "http://192.168.0.204:3000",
-                "https://192.168.0.204:3000",
-                "https://dashboard.career-9.com",
-                "https://assessment.career-9.com",
-                "https://*.career-9.com",
-                "http://localhost:5173"));
+        configuration.setAllowedOriginPatterns(Arrays.asList(allowedOrigins));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);

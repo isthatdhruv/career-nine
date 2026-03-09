@@ -1099,7 +1099,11 @@ export default function GroupStudentPage() {
       const colKey = row.questionText || `Q${row.questionnaireQuestionId}`;
       // If there are multiple rows for the same question (re-submissions), keep latest
       groupMap.get(key)!.metrics[colKey] = {
+        proctoringLogId: row.proctoringLogId ?? "",
+        questionnaireQuestionId: row.questionnaireQuestionId ?? "",
         timeSpentMs: row.timeSpentMs ?? "",
+        questionStartTime: row.questionStartTime ?? "",
+        questionEndTime: row.questionEndTime ?? "",
         mouseClickCount: row.mouseClickCount ?? "",
         maxFacesDetected: row.maxFacesDetected ?? "",
         avgFacesDetected: row.avgFacesDetected ?? "",
@@ -1108,6 +1112,11 @@ export default function GroupStudentPage() {
         screenWidth: row.screenWidth ?? "",
         screenHeight: row.screenHeight ?? "",
         createdAt: row.createdAt ?? "",
+        questionRectJson: row.questionRectJson ?? "",
+        optionsRectJson: row.optionsRectJson ?? "",
+        gazePointsJson: row.gazePointsJson ?? "",
+        mouseClicksJson: row.mouseClicksJson ?? "",
+        eyeGazePointsJson: row.eyeGazePointsJson ?? "",
       };
     }
 
@@ -1118,24 +1127,35 @@ export default function GroupStudentPage() {
     if (pivotedProctoringData.rows.length === 0) return;
 
     setProctoringDownloading(true);
+    // Declare these outside try so fallback code in catch can access them
+    let excelRows: Record<string, any>[] = [];
+    let rawJsonRows: Record<string, any>[] = [];
     try {
       const { rows, questionColumns } = pivotedProctoringData;
-
-      // Flat format: one row per student+assessment+question for easy analysis
-      const excelRows: Record<string, any>[] = [];
       let sno = 1;
       for (const row of rows) {
         for (const qCol of questionColumns) {
           const m = row.metrics[qCol];
           if (!m) continue;
+          // truncate large JSON for the main sheet for stability
+          const truncated = (s: any, limit = 200) => {
+            if (!s && s !== 0) return "";
+            const str = typeof s === "string" ? s : JSON.stringify(s);
+            return str.length > limit ? str.substring(0, limit) + "..." : str;
+          };
+
           excelRows.push({
             "S.No": sno++,
+            "Proctoring Log ID": m.proctoringLogId,
             "Student Name": row.studentName,
             "User ID": row.userStudentId,
             "Assessment": row.assessmentName,
+            "Question ID": m.questionnaireQuestionId,
             "Question": qCol.length > 80 ? qCol.substring(0, 80) + "..." : qCol,
             "Time Spent (ms)": m.timeSpentMs,
-            "Mouse Clicks": m.mouseClickCount,
+            "Question Start Time": m.questionStartTime,
+            "Question End Time": m.questionEndTime,
+            "Mouse Click Count": m.mouseClickCount,
             "Max Faces": m.maxFacesDetected,
             "Avg Faces": m.avgFacesDetected,
             "Head Away Count": m.headAwayCount,
@@ -1143,19 +1163,47 @@ export default function GroupStudentPage() {
             "Screen Width": m.screenWidth,
             "Screen Height": m.screenHeight,
             "Created At": m.createdAt,
+            "Question Rect (JSON)": truncated(m.questionRectJson, 300),
+            "Options Rect (JSON)": truncated(m.optionsRectJson, 300),
+            "Gaze Points (JSON)": truncated(m.gazePointsJson, 500),
+            "Mouse Clicks (JSON)": truncated(m.mouseClicksJson, 500),
+            "Eye Gaze Points (JSON)": truncated(m.eyeGazePointsJson, 500),
+          });
+
+          // Full raw JSON row for separate sheet (untruncated JSON)
+          rawJsonRows.push({
+            "S.No": sno - 1,
+            "Proctoring Log ID": m.proctoringLogId,
+            "Student Name": row.studentName,
+            "User ID": row.userStudentId,
+            "Assessment": row.assessmentName,
+            "Question ID": m.questionnaireQuestionId,
+            "Question": qCol,
+            "Time Spent (ms)": m.timeSpentMs,
+            "Question Start Time": m.questionStartTime,
+            "Question End Time": m.questionEndTime,
+            "Question Rect (JSON)": m.questionRectJson || "",
+            "Options Rect (JSON)": m.optionsRectJson || "",
+            "Gaze Points (JSON)": m.gazePointsJson || "",
+            "Mouse Clicks (JSON)": m.mouseClicksJson || "",
+            "Eye Gaze Points (JSON)": m.eyeGazePointsJson || "",
           });
         }
       }
 
-      const worksheet = XLSX.utils.json_to_sheet(excelRows);
+  const worksheet = XLSX.utils.json_to_sheet(excelRows);
       worksheet["!cols"] = [
         { wch: 8 },   // S.No
+        { wch: 18 },  // Proctoring Log ID
         { wch: 25 },  // Student Name
         { wch: 10 },  // User ID
         { wch: 25 },  // Assessment
+        { wch: 14 },  // Question ID
         { wch: 40 },  // Question
-        { wch: 15 },  // Time Spent
-        { wch: 14 },  // Mouse Clicks
+        { wch: 15 },  // Time Spent (ms)
+        { wch: 22 },  // Question Start Time
+        { wch: 22 },  // Question End Time
+        { wch: 18 },  // Mouse Click Count
         { wch: 12 },  // Max Faces
         { wch: 12 },  // Avg Faces
         { wch: 16 },  // Head Away Count
@@ -1163,10 +1211,38 @@ export default function GroupStudentPage() {
         { wch: 14 },  // Screen Width
         { wch: 14 },  // Screen Height
         { wch: 22 },  // Created At
+        { wch: 40 },  // Question Rect (JSON)
+        { wch: 40 },  // Options Rect (JSON)
+        { wch: 60 },  // Gaze Points (JSON)
+        { wch: 60 },  // Mouse Clicks (JSON)
+        { wch: 60 },  // Eye Gaze Points (JSON)
       ];
 
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Proctoring Data");
+
+      // Append sheet with full raw JSON blobs (separate sheet to keep main CSV/lightweight)
+      if (rawJsonRows.length > 0) {
+        const rawSheet = XLSX.utils.json_to_sheet(rawJsonRows);
+        rawSheet["!cols"] = [
+          { wch: 8 },   // S.No
+          { wch: 18 },  // Proctoring Log ID
+          { wch: 25 },  // Student Name
+          { wch: 10 },  // User ID
+          { wch: 25 },  // Assessment
+          { wch: 14 },  // Question ID
+          { wch: 40 },  // Question
+          { wch: 15 },  // Time Spent (ms)
+          { wch: 22 },  // Question Start Time
+          { wch: 22 },  // Question End Time
+          { wch: 60 },  // Question Rect (JSON)
+          { wch: 60 },  // Options Rect (JSON)
+          { wch: 120 }, // Gaze Points (JSON)
+          { wch: 120 }, // Mouse Clicks (JSON)
+          { wch: 120 }, // Eye Gaze Points (JSON)
+        ];
+        XLSX.utils.book_append_sheet(workbook, rawSheet, "Proctoring Raw JSON");
+      }
 
       const instituteName = getSelectedInstituteName().replace(/\s+/g, "_");
       const filename = `${instituteName}_Proctoring_Data_${Date.now()}.xlsx`;
@@ -1175,9 +1251,51 @@ export default function GroupStudentPage() {
       alert("Download successful!");
       setShowProctoringModal(false);
       setProctoringData([]);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error downloading proctoring data:", error);
-      alert("Failed to download. Please try again.");
+
+      // Try a graceful fallback: write only the main (truncated) sheet and download raw JSON separately.
+      try {
+        console.warn("Attempting fallback: write only main sheet and download raw JSON separately.");
+
+  // Main workbook (without raw JSON sheet)
+  const fallbackWorkbook = XLSX.utils.book_new();
+        const instituteName = getSelectedInstituteName().replace(/\s+/g, "_");
+        const mainFilename = `${instituteName}_Proctoring_Data_${Date.now()}_summary.xlsx`;
+
+          try {
+            const fallbackSheet = XLSX.utils.json_to_sheet(excelRows);
+            XLSX.utils.book_append_sheet(fallbackWorkbook, fallbackSheet, "Proctoring Data");
+            XLSX.writeFile(fallbackWorkbook, mainFilename);
+          } catch (wfErr) {
+            console.error("Fallback: writing main workbook also failed:", wfErr);
+            // continue to attempt JSON download
+          }
+
+        if (rawJsonRows && rawJsonRows.length > 0) {
+          try {
+            const jsonContent = JSON.stringify(rawJsonRows, null, 2);
+            const blob = new Blob([jsonContent], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${instituteName}_Proctoring_RawJSON_${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+          } catch (jsonErr) {
+            console.error("Fallback: failed to download raw JSON file:", jsonErr);
+          }
+        }
+
+        alert(`Failed to create full XLSX in browser: ${error?.message || String(error)}. A summary XLSX and a separate JSON file were downloaded as a fallback (if available).`);
+      } catch (fallbackErr) {
+        console.error("Fallback also failed:", fallbackErr);
+        const msg = error?.message || String(error) || "unknown error";
+        const stack = (error && error.stack) ? `\nStack: ${String(error.stack).slice(0,1000)}` : "";
+        alert(`Failed to download proctoring data: ${msg}${stack}\n\nIf this persists, please open the browser console and paste the error here or consider exporting smaller batches.`);
+      }
     } finally {
       setProctoringDownloading(false);
     }
