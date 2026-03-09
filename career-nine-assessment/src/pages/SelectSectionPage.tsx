@@ -24,6 +24,25 @@ const SelectSectionPage: React.FC = () => {
     page: 'section-select',
   });
 
+  // Extract sections immediately when assessmentData is available (no API dependency)
+  useEffect(() => {
+    if (assessmentData && assessmentData[0]) {
+      try {
+        const questionnaire = assessmentData[0];
+        const sectionsData = questionnaire.sections.map((item: any) => ({
+          sectionId: item.section.sectionId,
+          sectionName: item.section.sectionName,
+          sectionDescription: item.section.sectionDescription || "",
+        }));
+        setSections(sectionsData || []);
+      } catch (error) {
+        console.error("Failed to process sections:", error);
+      }
+      setSectionsReady(true);
+    }
+  }, [assessmentData]);
+
+  // Status check runs independently — doesn't block section rendering
   useEffect(() => {
     const checkStudentStatus = async () => {
       const assessmentId = localStorage.getItem('assessmentId');
@@ -34,47 +53,30 @@ const SelectSectionPage: React.FC = () => {
         return;
       }
 
-      if (assessmentId && userStudentId) {
-        try {
-          const response = await http.get(
-            `/assessments/${assessmentId}/student/${userStudentId}`
-          );
-          const { isActive, studentStatus } = response.data;
+      try {
+        const response = await http.get(
+          `/assessments/${assessmentId}/student/${userStudentId}`
+        );
+        const { isActive, studentStatus } = response.data;
 
-          if (!isActive) {
-            alert("This assessment is not active.");
-            navigate("/student-login");
-            return;
-          }
-
-          if (studentStatus === 'completed') {
-            alert("You have already completed this assessment.");
-            navigate("/student-login");
-            return;
-          }
-        } catch (error) {
-          console.error("Error checking student status:", error);
+        if (!isActive) {
+          alert("This assessment is not active.");
+          navigate("/student-login");
+          return;
         }
-      }
 
-      if (assessmentData && assessmentData[0]) {
-        try {
-          const questionnaire = assessmentData[0];
-          const sectionsData = questionnaire.sections.map((item: any) => ({
-            sectionId: item.section.sectionId,
-            sectionName: item.section.sectionName,
-            sectionDescription: item.section.sectionDescription || "",
-          }));
-          setSections(sectionsData || []);
-        } catch (error) {
-          console.error("Failed to process sections:", error);
+        if (studentStatus === 'completed') {
+          alert("You have already completed this assessment.");
+          navigate("/student-login");
+          return;
         }
-        setSectionsReady(true);
+      } catch (error) {
+        console.error("Error checking student status:", error);
       }
     };
 
     checkStudentStatus();
-  }, [assessmentData, navigate]);
+  }, [navigate]);
 
   const handleSectionClick = (section: Section) => {
     navigate(`/studentAssessment/sections/${section.sectionId}`);
