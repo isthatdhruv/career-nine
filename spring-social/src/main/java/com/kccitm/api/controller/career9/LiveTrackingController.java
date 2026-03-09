@@ -27,13 +27,13 @@ import com.kccitm.api.service.AssessmentSessionService;
 public class LiveTrackingController {
 
     @Autowired
+    private AssessmentAnswerRepository assessmentAnswerRepository;
+
+    @Autowired
     private AssessmentTableRepository assessmentTableRepository;
 
     @Autowired
     private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
-
-    @Autowired
-    private AssessmentAnswerRepository assessmentAnswerRepository;
 
     @Autowired
     private QuestionnaireQuestionRepository questionnaireQuestionRepository;
@@ -98,31 +98,26 @@ public class LiveTrackingController {
             entry.put("instituteName",
                     us.getInstitute() != null ? us.getInstitute().getInstituteName() : "");
 
-            // For ongoing students: use live heartbeat data (localStorage-based count)
-            // For completed students: use DB count (final submitted answers)
-            // For notstarted: 0
-            if ("ongoing".equals(status)) {
-                Map<String, Object> heartbeat = assessmentSessionService
-                        .getHeartbeat(us.getUserStudentId(), assessmentId);
-                if (heartbeat != null) {
-                    entry.put("currentPage", heartbeat.get("page"));
-                    entry.put("currentSection", heartbeat.get("sectionName"));
-                    entry.put("currentQuestionIndex", heartbeat.get("questionIndex"));
-                    entry.put("lastSeen", heartbeat.get("timestamp"));
-                    // Live answer count from student's browser
-                    Object liveCount = heartbeat.get("answeredCount");
-                    entry.put("answeredCount", liveCount != null ? liveCount : 0);
-                } else {
-                    entry.put("currentPage", null);
-                    entry.put("answeredCount", 0);
-                }
-            } else if ("completed".equals(status)) {
-                Long answered = assessmentAnswerRepository
+            // Hybrid progress: Redis heartbeat when active, DB when inactive
+            Map<String, Object> heartbeat = assessmentSessionService
+                    .getHeartbeat(us.getUserStudentId(), assessmentId);
+            if (heartbeat != null) {
+                // Student is actively giving assessment — use live Redis data
+                entry.put("currentPage", heartbeat.get("page"));
+                entry.put("currentSection", heartbeat.get("sectionName"));
+                entry.put("currentQuestionIndex", heartbeat.get("questionIndex"));
+                entry.put("lastSeen", heartbeat.get("timestamp"));
+                Object liveCount = heartbeat.get("answeredCount");
+                entry.put("answeredCount", liveCount != null ? liveCount : 0);
+                entry.put("isLive", true);
+            } else {
+                // Student is NOT actively giving assessment — use DB count
+                entry.put("currentPage", null);
+                Long dbCount = assessmentAnswerRepository
                         .countByUserStudent_UserStudentIdAndAssessment_Id(
                                 us.getUserStudentId(), assessmentId);
-                entry.put("answeredCount", answered != null ? answered : 0);
-            } else {
-                entry.put("answeredCount", 0);
+                entry.put("answeredCount", dbCount != null ? dbCount : 0);
+                entry.put("isLive", false);
             }
 
             students.add(entry);

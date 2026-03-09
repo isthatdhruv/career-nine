@@ -13,6 +13,7 @@ interface StudentEntry {
   currentSection?: string | null;
   currentQuestionIndex?: number | null;
   lastSeen?: string | null;
+  isLive?: boolean;
 }
 
 interface Summary {
@@ -173,6 +174,8 @@ const LiveTrackingPage = () => {
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevDataRef = useRef<string>("");
+  // High watermark: progress should never go backwards per student
+  const progressHighWaterRef = useRef<Record<number, number>>({});
 
   // Load assessment list on mount
   useEffect(() => {
@@ -193,6 +196,23 @@ const LiveTrackingPage = () => {
     try {
       const res = await getLiveTracking(selectedId);
       const newData: TrackingData = res.data;
+
+      // High watermark: only for live (active heartbeat) students — progress never drops
+      // For non-live students, trust the DB count directly
+      const hw = progressHighWaterRef.current;
+      for (const s of newData.students) {
+        if (s.isLive) {
+          const prev = hw[s.userStudentId] ?? 0;
+          if (s.answeredCount >= prev) {
+            hw[s.userStudentId] = s.answeredCount;
+          } else {
+            s.answeredCount = prev;
+          }
+        } else {
+          // Student not active — DB count is authoritative, reset watermark
+          delete hw[s.userStudentId];
+        }
+      }
 
       // Only update state if data actually changed (prevents unnecessary re-renders)
       const serialized = JSON.stringify(newData);
@@ -251,6 +271,7 @@ const LiveTrackingPage = () => {
     setSelectedId(id || null);
     setData(null);
     prevDataRef.current = "";
+    progressHighWaterRef.current = {};
     setFilterStatus("all");
     setFilterInstitute("all");
     setSearchQuery("");
