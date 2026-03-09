@@ -93,6 +93,8 @@ const SectionQuestionPage: React.FC = () => {
   const [languages, setLanguages] = useState<QuestionnaireLanguage[]>([]);
   const [currentSection, setCurrentSection] = useState<any>(null);
   const [showWarning, setShowWarning] = useState<boolean>(false);
+  const [showConfirmSubmit, setShowConfirmSubmit] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // Track which sections have already shown their instructions (only show once)
   const [seenSectionInstructions, setSeenSectionInstructions] = useState<Set<string>>(() => {
@@ -662,8 +664,19 @@ const SectionQuestionPage: React.FC = () => {
     }
   };
 
-  const handleSubmitAssessment = async () => {
+  const handleSubmitAssessment = () => {
     if (!saveLater || areAllQuestionsAnswered()) {
+      setShowConfirmSubmit(true);
+    } else {
+      setShowWarning(true);
+    }
+  };
+
+  const confirmAndSubmit = async () => {
+    setShowConfirmSubmit(false);
+    setIsSubmitting(true);
+
+    try {
       // Flush any pending localStorage writes before submitting
       flushLocalStorage();
 
@@ -739,7 +752,6 @@ const SectionQuestionPage: React.FC = () => {
         } catch (error) {
           console.error(`Submit attempt ${attempt}/${maxRetries} failed:`, error);
           if (attempt < maxRetries) {
-            // Exponential backoff: 1s, 2s, 4s
             const delay = Math.pow(2, attempt - 1) * 1000;
             alert(`Submission failed (attempt ${attempt}/${maxRetries}). Retrying in ${delay / 1000}s...`);
             await new Promise(resolve => setTimeout(resolve, delay));
@@ -748,8 +760,8 @@ const SectionQuestionPage: React.FC = () => {
           }
         }
       }
-    } else {
-      setShowWarning(true);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1321,6 +1333,90 @@ const SectionQuestionPage: React.FC = () => {
               </div>
             )}
 
+            {/* Confirm Submission Modal */}
+            {showConfirmSubmit && (
+              <div
+                className="assessment-modal-overlay"
+                onClick={() => !isSubmitting && setShowConfirmSubmit(false)}
+              >
+                <div
+                  className="assessment-modal-content"
+                  style={{ maxWidth: "460px" }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div
+                    style={{
+                      width: "60px",
+                      height: "60px",
+                      borderRadius: "50%",
+                      background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      margin: "0 auto 16px",
+                      boxShadow: "0 8px 24px rgba(34, 197, 94, 0.4)",
+                    }}
+                  >
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  </div>
+                  <h5 style={{ fontWeight: 700, marginBottom: "12px", color: "#1a202c", fontSize: "1.2rem" }}>
+                    Submit Assessment?
+                  </h5>
+                  <p style={{ color: "#6b7280", fontSize: "0.95rem", lineHeight: 1.6, marginBottom: "24px" }}>
+                    Are you sure you want to submit your assessment? This action <strong>cannot be undone</strong>. Please make sure you have reviewed all your answers before submitting.
+                  </p>
+                  <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+                    <button
+                      onClick={() => setShowConfirmSubmit(false)}
+                      disabled={isSubmitting}
+                      style={{
+                        background: "#e2e8f0",
+                        color: "#4a5568",
+                        border: "none",
+                        borderRadius: "10px",
+                        padding: "10px 24px",
+                        fontWeight: 600,
+                        fontSize: "0.95rem",
+                        cursor: isSubmitting ? "not-allowed" : "pointer",
+                        opacity: isSubmitting ? 0.5 : 1,
+                      }}
+                    >
+                      Go Back
+                    </button>
+                    <button
+                      onClick={confirmAndSubmit}
+                      disabled={isSubmitting}
+                      style={{
+                        background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: "10px",
+                        padding: "10px 24px",
+                        fontWeight: 600,
+                        fontSize: "0.95rem",
+                        cursor: isSubmitting ? "not-allowed" : "pointer",
+                        boxShadow: "0 4px 15px rgba(34, 197, 94, 0.4)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                          Submitting...
+                        </>
+                      ) : (
+                        "Yes, Submit"
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {availableLanguages.length > 0 ? (
               <div
                 data-proctoring="question-text"
@@ -1828,6 +1924,7 @@ const SectionQuestionPage: React.FC = () => {
                 {(!saveLater || isLastQuestionOfLastSection() || areAllQuestionsAnswered()) && (
                   <button
                     onClick={handleSubmitAssessment}
+                    disabled={isSubmitting}
                     style={{
                       background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
                       color: "white",
@@ -1836,13 +1933,14 @@ const SectionQuestionPage: React.FC = () => {
                       padding: "12px 32px",
                       fontWeight: 700,
                       fontSize: "1rem",
-                      cursor: "pointer",
+                      cursor: isSubmitting ? "not-allowed" : "pointer",
                       boxShadow: "0 4px 15px rgba(34, 197, 94, 0.4)",
                       transition: "all 0.2s ease",
                       marginLeft: "auto",
+                      opacity: isSubmitting ? 0.7 : 1,
                     }}
                   >
-                    ✓ SUBMIT ASSESSMENT
+                    {isSubmitting ? "Submitting..." : "✓ SUBMIT ASSESSMENT"}
                   </button>
                 )}
               </div>
