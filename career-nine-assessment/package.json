@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "build:staging": "vite build --mode staging",
-    "build:production": "vite build --mode production",
+    "sync-cache": "bash scripts/cache-assessment.sh",
+    "build": "bash scripts/cache-assessment.sh && tsc -b && vite build",
+    "build:staging": "bash scripts/cache-assessment.sh https://staging.api.kccitm.in && vite build --mode staging",
+    "build:production": "bash scripts/cache-assessment.sh https://api.career-9.com && vite build --mode production",
     "lint": "eslint .",
     "preview": "vite preview"
   },

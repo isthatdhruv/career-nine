@@ -1,33 +1,84 @@
 #!/bin/bash
-# Fetches locked assessment JSON from backend and splits into static files
-# for the frontend build. These get served from CDN for instant loading.
+# Syncs locked assessment JSON from backend into public/assessment-cache/
+# for static serving in the frontend build.
 #
-# Usage: ./scripts/cache-assessment.sh <assessment_id> [base_url]
-# Example: ./scripts/cache-assessment.sh 5 http://localhost:8080
+# Usage:
+#   ./scripts/cache-assessment.sh [base_url]          # Sync all locked assessments
+#   ./scripts/cache-assessment.sh 5 [base_url]        # Sync specific assessment ID
+#
+# Runs automatically before build via "prebuild" npm script.
 
 set -e
 
-ASSESSMENT_ID=$1
-BASE_URL=${2:-"http://localhost:8080"}
-CACHE_DIR="public/assessment-cache/${ASSESSMENT_ID}"
+CACHE_DIR="public/assessment-cache"
 
-if [ -z "$ASSESSMENT_ID" ]; then
-  echo "Usage: $0 <assessment_id> [base_url]"
-  exit 1
+# If first arg is a number, it's a specific assessment ID
+if [[ "$1" =~ ^[0-9]+$ ]]; then
+  ASSESSMENT_ID=$1
+  BASE_URL=${2:-"http://localhost:8080"}
+else
+  ASSESSMENT_ID=""
+  BASE_URL=${1:-"http://localhost:8080"}
 fi
 
-mkdir -p "$CACHE_DIR"
+sync_assessment() {
+  local id=$1
+  local dir="${CACHE_DIR}/${id}"
+  mkdir -p "$dir"
 
-echo "Fetching assessment $ASSESSMENT_ID from $BASE_URL..."
+  curl -sf "${BASE_URL}/assessments/getby/${id}" -o "${dir}/data.json"
+  curl -sf "${BASE_URL}/assessments/getById/${id}" -o "${dir}/config.json"
+  echo "  ✓ Cached assessment ${id} (data: $(wc -c < "${dir}/data.json")B, config: $(wc -c < "${dir}/config.json")B)"
+}
 
-# Fetch questionnaire data (what getby/{id} returns)
-curl -sf "${BASE_URL}/assessments/getby/${ASSESSMENT_ID}" -o "${CACHE_DIR}/data.json"
-echo "  ✓ Saved questionnaire data → ${CACHE_DIR}/data.json ($(wc -c < "${CACHE_DIR}/data.json") bytes)"
+remove_unlocked() {
+  # Remove cache dirs for assessments no longer locked
+  local locked_ids=("$@")
+  if [ -d "$CACHE_DIR" ]; then
+    for dir in "$CACHE_DIR"/*/; do
+      [ -d "$dir" ] || continue
+      local id=$(basename "$dir")
+      local found=false
+      for lid in "${locked_ids[@]}"; do
+        if [ "$id" = "$lid" ]; then
+          found=true
+          break
+        fi
+      done
+      if [ "$found" = false ]; then
+        rm -rf "$dir"
+        echo "  ✗ Removed unlocked assessment ${id}"
+      fi
+    done
+  fi
+}
 
-# Fetch assessment config (what getById/{id} returns)
-curl -sf "${BASE_URL}/assessments/getById/${ASSESSMENT_ID}" -o "${CACHE_DIR}/config.json"
-echo "  ✓ Saved assessment config → ${CACHE_DIR}/config.json ($(wc -c < "${CACHE_DIR}/config.json") bytes)"
+echo "Syncing assessment cache from ${BASE_URL}..."
 
-echo ""
-echo "Done! Assessment $ASSESSMENT_ID cached for static serving."
-echo "Run 'npm run build' to include in production build."
+if [ -n "$ASSESSMENT_ID" ]; then
+  # Single assessment mode
+  sync_assessment "$ASSESSMENT_ID"
+else
+  # Auto-sync all locked assessments
+  LOCKED_IDS=$(curl -sf "${BASE_URL}/assessments/locked-ids")
+
+  if [ -z "$LOCKED_IDS" ] || [ "$LOCKED_IDS" = "[]" ]; then
+    echo "  No locked assessments found. Clearing cache."
+    rm -rf "$CACHE_DIR"
+    mkdir -p "$CACHE_DIR"
+    exit 0
+  fi
+
+  # Parse JSON array [1,5,12] into bash array
+  IDS=($(echo "$LOCKED_IDS" | tr -d '[]' | tr ',' ' '))
+  echo "  Locked assessments: ${IDS[*]}"
+
+  for id in "${IDS[@]}"; do
+    sync_assessment "$id"
+  done
+
+  # Clean up any assessments that were unlocked
+  remove_unlocked "${IDS[@]}"
+fi
+
+echo "Done!"

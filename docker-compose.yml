@@ -34,7 +34,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1.5g
+          memory: 3g
     networks:
       - career_shared_net
     volumes:
@@ -60,7 +60,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 3g
+          memory: 4g
     depends_on:
       mysql_db_api:
         condition: service_started
@@ -69,9 +69,27 @@ services:
     networks:
       - career_shared_net
 
+  redisinsight:
+    image: redis/redisinsight:latest
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    ports:
+      - '5540:5540'
+    networks:
+      - career_shared_net
+    depends_on:
+      redis_cache:
+        condition: service_healthy
+    volumes:
+      - redisinsight_data:/data
+
 volumes:
   mysql_data:
   redis_data:
+  redisinsight_data:
 
 networks:
   career_shared_net:

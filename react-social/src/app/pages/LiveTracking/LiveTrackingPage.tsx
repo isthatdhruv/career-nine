@@ -197,11 +197,13 @@ const LiveTrackingPage = () => {
       const res = await getLiveTracking(selectedId);
       const newData: TrackingData = res.data;
 
-      // High watermark: only for live (active heartbeat) students — progress never drops
-      // For non-live students, trust the DB count directly
+      // High watermark logic:
+      // - "ongoing" students: NEVER let progress drop (heartbeat gaps on flaky networks
+      //   would show 0 since answers are in localStorage, not DB, until submission)
+      // - "completed"/"notstarted": trust the DB count, reset watermark
       const hw = progressHighWaterRef.current;
       for (const s of newData.students) {
-        if (s.isLive) {
+        if (s.status === "ongoing") {
           const prev = hw[s.userStudentId] ?? 0;
           if (s.answeredCount >= prev) {
             hw[s.userStudentId] = s.answeredCount;
@@ -209,7 +211,7 @@ const LiveTrackingPage = () => {
             s.answeredCount = prev;
           }
         } else {
-          // Student not active — DB count is authoritative, reset watermark
+          // Student completed or not started — DB count is authoritative
           delete hw[s.userStudentId];
         }
       }

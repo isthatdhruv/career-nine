@@ -320,6 +320,9 @@ public class AssessmentTableController {
         if (requestBody.get("showTimer") != null) {
             assessment.setShowTimer((Boolean) requestBody.get("showTimer"));
         }
+        if (requestBody.get("saveLater") != null) {
+            assessment.setSaveLater((Boolean) requestBody.get("saveLater"));
+        }
 
         // Handle questionnaire - fetch existing entity by ID
         if (requestBody.get("questionnaire") != null) {
@@ -364,6 +367,7 @@ public class AssessmentTableController {
         existing.setIsActive(assessment.getIsActive());
         existing.setModeofAssessment(assessment.getModeofAssessment());
         existing.setShowTimer(assessment.getShowTimer());
+        existing.setSaveLater(assessment.getSaveLater());
         existing.setIsLocked(assessment.getIsLocked());
 
         // Only update questionnaire reference by ID, don't replace the deserialized object
@@ -400,6 +404,14 @@ public class AssessmentTableController {
         assessmentTableRepository.findAll()
                 .forEach(assessment -> assessmentIdandName.put(assessment.getId(), assessment.getAssessmentName()));
         return assessmentIdandName;
+    }
+
+    // Get all locked assessment IDs (used by frontend build to sync static cache)
+    @GetMapping("/locked-ids")
+    public ResponseEntity<List<Long>> getLockedAssessmentIds() {
+        List<Long> ids = assessmentTableRepository.findByIsLockedTrue()
+                .stream().map(AssessmentTable::getId).collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(ids);
     }
 
     // Lock an assessment — generates a JSON snapshot of the full assessment data
