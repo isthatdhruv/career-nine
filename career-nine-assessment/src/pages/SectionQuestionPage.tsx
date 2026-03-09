@@ -68,6 +68,7 @@ const SectionQuestionPage: React.FC = () => {
   const navigate = useNavigate();
   const { assessmentData, assessmentConfig } = useAssessment();
   const showTimer = assessmentConfig?.showTimer !== false;
+  const saveLater = assessmentConfig?.saveLater !== false;
   usePreventReload();
   const { scheduleWrite, flush: flushLocalStorage } = useDebouncedLocalStorage(500);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -662,7 +663,7 @@ const SectionQuestionPage: React.FC = () => {
   };
 
   const handleSubmitAssessment = async () => {
-    if (areAllQuestionsAnswered()) {
+    if (!saveLater || areAllQuestionsAnswered()) {
       // Flush any pending localStorage writes before submitting
       flushLocalStorage();
 
@@ -1784,23 +1785,25 @@ const SectionQuestionPage: React.FC = () => {
                 ← Back
               </button>
               <div className="d-flex gap-3 align-items-center">
-                <button
-                  onClick={saveForLaterFn}
-                  style={{
-                    background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
-                    color: "#78350f",
-                    border: "none",
-                    borderRadius: "12px",
-                    padding: "12px 24px",
-                    fontWeight: 600,
-                    fontSize: "0.95rem",
-                    cursor: "pointer",
-                    boxShadow: "0 4px 15px rgba(251, 191, 36, 0.4)",
-                    transition: "all 0.2s ease",
-                  }}
-                >
-                  Save for Later
-                </button>
+                {saveLater && (
+                  <button
+                    onClick={saveForLaterFn}
+                    style={{
+                      background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
+                      color: "#78350f",
+                      border: "none",
+                      borderRadius: "12px",
+                      padding: "12px 24px",
+                      fontWeight: 600,
+                      fontSize: "0.95rem",
+                      cursor: "pointer",
+                      boxShadow: "0 4px 15px rgba(251, 191, 36, 0.4)",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    Save for Later
+                  </button>
+                )}
                 {!isLastQuestionOfLastSection() && (
                   <button
                     onClick={goNext}
@@ -1822,7 +1825,7 @@ const SectionQuestionPage: React.FC = () => {
                       : "NEXT →"}
                   </button>
                 )}
-                {(isLastQuestionOfLastSection() || areAllQuestionsAnswered()) && (
+                {(!saveLater || isLastQuestionOfLastSection() || areAllQuestionsAnswered()) && (
                   <button
                     onClick={handleSubmitAssessment}
                     style={{

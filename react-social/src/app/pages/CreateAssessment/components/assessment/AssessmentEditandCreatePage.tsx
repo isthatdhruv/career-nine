@@ -34,6 +34,7 @@ const AssessmentEditPage = (props?: {
       isActive: false,
       modeofAssessment: false,
       showTimer: true,
+      saveLater: true,
       questionnaires: [
         {
           questionnaireId: 0,
@@ -117,6 +118,7 @@ const AssessmentEditPage = (props?: {
       isActive: assessmentData.isActive || false,
       modeofAssessment: assessmentData.modeofAssessment || false,
       showTimer: assessmentData.showTimer !== false,
+      saveLater: assessmentData.saveLater !== false,
       questionnaires: assessmentData.questionnaires?.map((q: any) => q.questionnaireId) || [],
     },
     validationSchema: validationSchema,
@@ -130,6 +132,7 @@ const AssessmentEditPage = (props?: {
           isActive: values.isActive,
           modeofAssessment: values.modeofAssessment,
           showTimer: values.showTimer,
+          saveLater: values.saveLater,
         };
 
         if (selectedQuestionnaireId) {
@@ -273,6 +276,20 @@ const AssessmentEditPage = (props?: {
                   />
                   <label className="form-check-label" htmlFor="showTimer">
                     Show Timer to Students
+                  </label>
+                </div>
+                <div className="form-check form-switch mt-3">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    id="saveLater"
+                    checked={formik.values.saveLater}
+                    onChange={() =>
+                      formik.setFieldValue("saveLater", !formik.values.saveLater)
+                    }
+                  />
+                  <label className="form-check-label" htmlFor="saveLater">
+                    Allow Save for Later
                   </label>
                 </div>
               </div>

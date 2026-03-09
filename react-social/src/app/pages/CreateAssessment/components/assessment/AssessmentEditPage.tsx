@@ -88,6 +88,7 @@ const AssessmentEditPage = (props?: {
       endDate: assessmentData.endDate || "",
       isActive: assessmentData.isActive || false,
       modeofAssessment: assessmentData.modeofAssessment || false,
+      saveLater: assessmentData.saveLater !== false,
       questionnaires: assessmentData.questionnaires?.map((q: any) => q.questionnaireId) || [],
     },
     validationSchema: Yup.object().shape({
@@ -103,6 +104,7 @@ const AssessmentEditPage = (props?: {
           endDate: values.endDate,
           isActive: values.isActive,
           modeofAssessment: values.modeofAssessment,
+          saveLater: values.saveLater,
         };
         if (selectedQuestionnaireId) {
           payload.questionnaire = { questionnaireId: selectedQuestionnaireId };
@@ -220,6 +222,20 @@ const AssessmentEditPage = (props?: {
                   />
                   <label className="form-check-label" htmlFor="modeofAssessment">
                     Mode of Assessment (Online)
+                  </label>
+                </div>
+                <div className="form-check form-switch mt-3">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    id="saveLater"
+                    checked={formik.values.saveLater}
+                    onChange={() =>
+                      formik.setFieldValue("saveLater", !formik.values.saveLater)
+                    }
+                  />
+                  <label className="form-check-label" htmlFor="saveLater">
+                    Allow Save for Later
                   </label>
                 </div>
               </div>

@@ -98,17 +98,9 @@ public class LiveTrackingController {
             entry.put("instituteName",
                     us.getInstitute() != null ? us.getInstitute().getInstituteName() : "");
 
-            // Answer count — only query for ongoing/completed students to save DB load
-            if ("ongoing".equals(status) || "completed".equals(status)) {
-                Long answered = assessmentAnswerRepository
-                        .countByUserStudent_UserStudentIdAndAssessment_Id(
-                                us.getUserStudentId(), assessmentId);
-                entry.put("answeredCount", answered != null ? answered : 0);
-            } else {
-                entry.put("answeredCount", 0);
-            }
-
-            // Current position from Redis heartbeat (only for ongoing students)
+            // For ongoing students: use live heartbeat data (localStorage-based count)
+            // For completed students: use DB count (final submitted answers)
+            // For notstarted: 0
             if ("ongoing".equals(status)) {
                 Map<String, Object> heartbeat = assessmentSessionService
                         .getHeartbeat(us.getUserStudentId(), assessmentId);
@@ -117,9 +109,20 @@ public class LiveTrackingController {
                     entry.put("currentSection", heartbeat.get("sectionName"));
                     entry.put("currentQuestionIndex", heartbeat.get("questionIndex"));
                     entry.put("lastSeen", heartbeat.get("timestamp"));
+                    // Live answer count from student's browser
+                    Object liveCount = heartbeat.get("answeredCount");
+                    entry.put("answeredCount", liveCount != null ? liveCount : 0);
                 } else {
                     entry.put("currentPage", null);
+                    entry.put("answeredCount", 0);
                 }
+            } else if ("completed".equals(status)) {
+                Long answered = assessmentAnswerRepository
+                        .countByUserStudent_UserStudentIdAndAssessment_Id(
+                                us.getUserStudentId(), assessmentId);
+                entry.put("answeredCount", answered != null ? answered : 0);
+            } else {
+                entry.put("answeredCount", 0);
             }
 
             students.add(entry);

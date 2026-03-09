@@ -167,6 +167,7 @@ const LiveTrackingPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterInstitute, setFilterInstitute] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isPolling, setIsPolling] = useState(true);
 
@@ -251,8 +252,18 @@ const LiveTrackingPage = () => {
     setData(null);
     prevDataRef.current = "";
     setFilterStatus("all");
+    setFilterInstitute("all");
     setSearchQuery("");
   };
+
+  // Unique institute names for filter dropdown
+  const instituteOptions = useMemo(() => {
+    if (!data) return [];
+    const names = new Set(
+      data.students.map((s) => s.instituteName).filter(Boolean)
+    );
+    return Array.from(names).sort();
+  }, [data]);
 
   // Filtered & searched students (memoized to avoid re-computation)
   const filteredStudents = useMemo(() => {
@@ -261,6 +272,10 @@ const LiveTrackingPage = () => {
 
     if (filterStatus !== "all") {
       list = list.filter((s) => s.status === filterStatus);
+    }
+
+    if (filterInstitute !== "all") {
+      list = list.filter((s) => s.instituteName === filterInstitute);
     }
 
     if (searchQuery.trim()) {
@@ -278,7 +293,7 @@ const LiveTrackingPage = () => {
     return [...list].sort(
       (a, b) => (order[a.status] ?? 1) - (order[b.status] ?? 1)
     );
-  }, [data, filterStatus, searchQuery]);
+  }, [data, filterStatus, filterInstitute, searchQuery]);
 
   return (
     <div className="card">
@@ -419,6 +434,21 @@ const LiveTrackingPage = () => {
                 <option value="notstarted">Not Started</option>
                 <option value="completed">Completed</option>
               </select>
+              {instituteOptions.length > 1 && (
+                <select
+                  className="form-select form-select-sm"
+                  value={filterInstitute}
+                  onChange={(e) => setFilterInstitute(e.target.value)}
+                  style={{ maxWidth: 240 }}
+                >
+                  <option value="all">All Institutes</option>
+                  {instituteOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              )}
               <small className="text-muted align-self-center">
                 Showing {filteredStudents.length} of {data.students.length}
               </small>
