@@ -14,7 +14,7 @@ import {
   getAllGameResults,
   getDemographicFieldsForStudent,
   getBulkDemographicData,
-  getBulkProctoringData,
+  exportProctoringExcel,
 } from "../StudentInformation/StudentInfo_APIs";
 import * as XLSX from "xlsx";
 
@@ -80,11 +80,7 @@ export default function GroupStudentPage() {
   const [bulkGameResults, setBulkGameResults] = useState<Map<string, any>>(new Map());
   const [bulkDemographicData, setBulkDemographicData] = useState<any[]>([]);
 
-  // Bulk download proctoring data state
-  const [showProctoringModal, setShowProctoringModal] = useState(false);
-  const [proctoringLoading, setProctoringLoading] = useState(false);
-  const [proctoringData, setProctoringData] = useState<any[]>([]);
-  const [proctoringError, setProctoringError] = useState<string>("");
+  // Proctoring download state
   const [proctoringDownloading, setProctoringDownloading] = useState(false);
 
   // Filter panel state
@@ -1006,20 +1002,17 @@ export default function GroupStudentPage() {
     }
   };
 
-  // ── Download All Proctoring Data ──
+  // ── Download All Proctoring Data (single backend call, no preview) ──
 
   const handleProctoringDownloadClick = async () => {
-    setShowProctoringModal(true);
-    setProctoringLoading(true);
-    setProctoringError("");
-    setProctoringData([]);
-
+    setProctoringDownloading(true);
     try {
+      // Build pairs from filtered students
       const hasAssessmentFilterApplied = appliedEnabled.has("assessment") && appliedAssessmentIds.size > 0;
       const pairs: { userStudentId: number; assessmentId: number }[] = [];
       for (const student of filteredStudents) {
         const studentAssessments = (student.assessments || []).filter(
-          (a) => hasAssessmentFilterApplied
+          (a: any) => hasAssessmentFilterApplied
             ? appliedAssessmentIds.has(Number(a.assessmentId))
             : activeAssessmentIds.has(Number(a.assessmentId))
         );
@@ -1034,263 +1027,39 @@ export default function GroupStudentPage() {
       }
 
       if (pairs.length === 0) {
-        setProctoringData([]);
-        setProctoringLoading(false);
+        alert("No student-assessment pairs to export.");
         return;
       }
 
-      const response = await getBulkProctoringData(pairs);
-      setProctoringData(Array.isArray(response.data) ? response.data : []);
-    } catch (err: any) {
-      console.error("Error fetching bulk proctoring data:", err);
-      setProctoringError("Failed to load proctoring data. Please try again.");
-    } finally {
-      setProctoringLoading(false);
-    }
-  };
+      // Single backend call — generates Excel server-side
+      const response = await exportProctoringExcel(pairs);
 
-  const proctoringColumns = [
-    "Time Spent (ms)",
-    "Mouse Clicks",
-    "Max Faces",
-    "Avg Faces",
-    "Head Away Count",
-    "Tab Switches",
-    "Screen Width",
-    "Screen Height",
-    "Created At",
-  ];
-
-  const pivotedProctoringData = useMemo(() => {
-    if (proctoringData.length === 0) return { rows: [] as any[], questionColumns: [] as string[] };
-
-    // Collect unique question headers
-    const questionColumnsSet = new Set<string>();
-    for (const row of proctoringData) {
-      const colKey = row.questionText || `Q${row.questionnaireQuestionId}`;
-      if (colKey) questionColumnsSet.add(colKey);
-    }
-    const questionColumns = Array.from(questionColumnsSet);
-
-    // Group by student + assessment — one row per student+assessment, each question's metrics as sub-columns
-    type RowData = {
-      studentName: string;
-      userStudentId: string;
-      assessmentName: string;
-      metrics: Record<string, Record<string, any>>;
-    };
-    const groupMap = new Map<string, RowData>();
-
-    for (const row of proctoringData) {
-      const key = `${row.userStudentId}_${row.assessmentId}`;
-      if (!groupMap.has(key)) {
-        groupMap.set(key, {
-          studentName: row.studentName || "",
-          userStudentId: String(row.userStudentId),
-          assessmentName: row.assessmentName || "",
-          metrics: {},
-        });
-      }
-      const colKey = row.questionText || `Q${row.questionnaireQuestionId}`;
-      // If there are multiple rows for the same question (re-submissions), keep latest
-      groupMap.get(key)!.metrics[colKey] = {
-        proctoringLogId: row.proctoringLogId ?? "",
-        questionnaireQuestionId: row.questionnaireQuestionId ?? "",
-        timeSpentMs: row.timeSpentMs ?? "",
-        questionStartTime: row.questionStartTime ?? "",
-        questionEndTime: row.questionEndTime ?? "",
-        mouseClickCount: row.mouseClickCount ?? "",
-        maxFacesDetected: row.maxFacesDetected ?? "",
-        avgFacesDetected: row.avgFacesDetected ?? "",
-        headAwayCount: row.headAwayCount ?? "",
-        tabSwitchCount: row.tabSwitchCount ?? "",
-        screenWidth: row.screenWidth ?? "",
-        screenHeight: row.screenHeight ?? "",
-        createdAt: row.createdAt ?? "",
-        questionRectJson: row.questionRectJson ?? "",
-        optionsRectJson: row.optionsRectJson ?? "",
-        gazePointsJson: row.gazePointsJson ?? "",
-        mouseClicksJson: row.mouseClicksJson ?? "",
-        eyeGazePointsJson: row.eyeGazePointsJson ?? "",
-      };
-    }
-
-    return { rows: Array.from(groupMap.values()), questionColumns };
-  }, [proctoringData]);
-
-  const handleProctoringDownloadExcel = () => {
-    if (pivotedProctoringData.rows.length === 0) return;
-
-    setProctoringDownloading(true);
-    // Declare these outside try so fallback code in catch can access them
-    let excelRows: Record<string, any>[] = [];
-    let rawJsonRows: Record<string, any>[] = [];
-    try {
-      const { rows, questionColumns } = pivotedProctoringData;
-      let sno = 1;
-      for (const row of rows) {
-        for (const qCol of questionColumns) {
-          const m = row.metrics[qCol];
-          if (!m) continue;
-          // truncate large JSON for the main sheet for stability
-          const truncated = (s: any, limit = 200) => {
-            if (!s && s !== 0) return "";
-            const str = typeof s === "string" ? s : JSON.stringify(s);
-            return str.length > limit ? str.substring(0, limit) + "..." : str;
-          };
-
-          excelRows.push({
-            "S.No": sno++,
-            "Proctoring Log ID": m.proctoringLogId,
-            "Student Name": row.studentName,
-            "User ID": row.userStudentId,
-            "Assessment": row.assessmentName,
-            "Question ID": m.questionnaireQuestionId,
-            "Question": qCol.length > 80 ? qCol.substring(0, 80) + "..." : qCol,
-            "Time Spent (ms)": m.timeSpentMs,
-            "Question Start Time": m.questionStartTime,
-            "Question End Time": m.questionEndTime,
-            "Mouse Click Count": m.mouseClickCount,
-            "Max Faces": m.maxFacesDetected,
-            "Avg Faces": m.avgFacesDetected,
-            "Head Away Count": m.headAwayCount,
-            "Tab Switches": m.tabSwitchCount,
-            "Screen Width": m.screenWidth,
-            "Screen Height": m.screenHeight,
-            "Created At": m.createdAt,
-            "Question Rect (JSON)": truncated(m.questionRectJson, 300),
-            "Options Rect (JSON)": truncated(m.optionsRectJson, 300),
-            "Gaze Points (JSON)": truncated(m.gazePointsJson, 500),
-            "Mouse Clicks (JSON)": truncated(m.mouseClicksJson, 500),
-            "Eye Gaze Points (JSON)": truncated(m.eyeGazePointsJson, 500),
-          });
-
-          // Full raw JSON row for separate sheet (untruncated JSON)
-          rawJsonRows.push({
-            "S.No": sno - 1,
-            "Proctoring Log ID": m.proctoringLogId,
-            "Student Name": row.studentName,
-            "User ID": row.userStudentId,
-            "Assessment": row.assessmentName,
-            "Question ID": m.questionnaireQuestionId,
-            "Question": qCol,
-            "Time Spent (ms)": m.timeSpentMs,
-            "Question Start Time": m.questionStartTime,
-            "Question End Time": m.questionEndTime,
-            "Question Rect (JSON)": m.questionRectJson || "",
-            "Options Rect (JSON)": m.optionsRectJson || "",
-            "Gaze Points (JSON)": m.gazePointsJson || "",
-            "Mouse Clicks (JSON)": m.mouseClicksJson || "",
-            "Eye Gaze Points (JSON)": m.eyeGazePointsJson || "",
-          });
-        }
-      }
-
-  const worksheet = XLSX.utils.json_to_sheet(excelRows);
-      worksheet["!cols"] = [
-        { wch: 8 },   // S.No
-        { wch: 18 },  // Proctoring Log ID
-        { wch: 25 },  // Student Name
-        { wch: 10 },  // User ID
-        { wch: 25 },  // Assessment
-        { wch: 14 },  // Question ID
-        { wch: 40 },  // Question
-        { wch: 15 },  // Time Spent (ms)
-        { wch: 22 },  // Question Start Time
-        { wch: 22 },  // Question End Time
-        { wch: 18 },  // Mouse Click Count
-        { wch: 12 },  // Max Faces
-        { wch: 12 },  // Avg Faces
-        { wch: 16 },  // Head Away Count
-        { wch: 14 },  // Tab Switches
-        { wch: 14 },  // Screen Width
-        { wch: 14 },  // Screen Height
-        { wch: 22 },  // Created At
-        { wch: 40 },  // Question Rect (JSON)
-        { wch: 40 },  // Options Rect (JSON)
-        { wch: 60 },  // Gaze Points (JSON)
-        { wch: 60 },  // Mouse Clicks (JSON)
-        { wch: 60 },  // Eye Gaze Points (JSON)
-      ];
-
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Proctoring Data");
-
-      // Append sheet with full raw JSON blobs (separate sheet to keep main CSV/lightweight)
-      if (rawJsonRows.length > 0) {
-        const rawSheet = XLSX.utils.json_to_sheet(rawJsonRows);
-        rawSheet["!cols"] = [
-          { wch: 8 },   // S.No
-          { wch: 18 },  // Proctoring Log ID
-          { wch: 25 },  // Student Name
-          { wch: 10 },  // User ID
-          { wch: 25 },  // Assessment
-          { wch: 14 },  // Question ID
-          { wch: 40 },  // Question
-          { wch: 15 },  // Time Spent (ms)
-          { wch: 22 },  // Question Start Time
-          { wch: 22 },  // Question End Time
-          { wch: 60 },  // Question Rect (JSON)
-          { wch: 60 },  // Options Rect (JSON)
-          { wch: 120 }, // Gaze Points (JSON)
-          { wch: 120 }, // Mouse Clicks (JSON)
-          { wch: 120 }, // Eye Gaze Points (JSON)
-        ];
-        XLSX.utils.book_append_sheet(workbook, rawSheet, "Proctoring Raw JSON");
-      }
-
+      // Download the blob as .xlsx file
       const instituteName = getSelectedInstituteName().replace(/\s+/g, "_");
-      const filename = `${instituteName}_Proctoring_Data_${Date.now()}.xlsx`;
-      XLSX.writeFile(workbook, filename);
+      const ts = Date.now();
+      const blob = new Blob([response.data], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${instituteName}_Proctoring_Data_${ts}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
 
-      alert("Download successful!");
-      setShowProctoringModal(false);
-      setProctoringData([]);
     } catch (error: any) {
-      console.error("Error downloading proctoring data:", error);
-
-      // Try a graceful fallback: write only the main (truncated) sheet and download raw JSON separately.
-      try {
-        console.warn("Attempting fallback: write only main sheet and download raw JSON separately.");
-
-  // Main workbook (without raw JSON sheet)
-  const fallbackWorkbook = XLSX.utils.book_new();
-        const instituteName = getSelectedInstituteName().replace(/\s+/g, "_");
-        const mainFilename = `${instituteName}_Proctoring_Data_${Date.now()}_summary.xlsx`;
-
-          try {
-            const fallbackSheet = XLSX.utils.json_to_sheet(excelRows);
-            XLSX.utils.book_append_sheet(fallbackWorkbook, fallbackSheet, "Proctoring Data");
-            XLSX.writeFile(fallbackWorkbook, mainFilename);
-          } catch (wfErr) {
-            console.error("Fallback: writing main workbook also failed:", wfErr);
-            // continue to attempt JSON download
-          }
-
-        if (rawJsonRows && rawJsonRows.length > 0) {
-          try {
-            const jsonContent = JSON.stringify(rawJsonRows, null, 2);
-            const blob = new Blob([jsonContent], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `${instituteName}_Proctoring_RawJSON_${Date.now()}.json`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            URL.revokeObjectURL(url);
-          } catch (jsonErr) {
-            console.error("Fallback: failed to download raw JSON file:", jsonErr);
-          }
-        }
-
-        alert(`Failed to create full XLSX in browser: ${error?.message || String(error)}. A summary XLSX and a separate JSON file were downloaded as a fallback (if available).`);
-      } catch (fallbackErr) {
-        console.error("Fallback also failed:", fallbackErr);
-        const msg = error?.message || String(error) || "unknown error";
-        const stack = (error && error.stack) ? `\nStack: ${String(error.stack).slice(0,1000)}` : "";
-        alert(`Failed to download proctoring data: ${msg}${stack}\n\nIf this persists, please open the browser console and paste the error here or consider exporting smaller batches.`);
+      console.error("Error downloading proctoring Excel:", error);
+      let msg = error?.message || String(error);
+      if (error?.response?.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text();
+          const parsed = JSON.parse(text);
+          if (parsed.error) msg = parsed.error;
+        } catch (_) {}
       }
+      alert(`Failed to download proctoring data: ${msg}`);
     } finally {
       setProctoringDownloading(false);
     }
@@ -2133,25 +1902,34 @@ export default function GroupStudentPage() {
                   <button
                     className="btn d-flex align-items-center gap-2"
                     onClick={handleProctoringDownloadClick}
-                    disabled={filteredStudents.length === 0}
+                    disabled={filteredStudents.length === 0 || proctoringDownloading}
                     style={{
-                      background: filteredStudents.length > 0
+                      background: filteredStudents.length > 0 && !proctoringDownloading
                         ? "linear-gradient(135deg, #e63946 0%, #a4133c 100%)"
                         : "#e0e0e0",
                       border: "none",
                       borderRadius: "10px",
                       padding: "0.6rem 1.2rem",
                       fontWeight: 600,
-                      color: filteredStudents.length > 0 ? "#fff" : "#9e9e9e",
-                      cursor: filteredStudents.length > 0 ? "pointer" : "not-allowed",
+                      color: filteredStudents.length > 0 && !proctoringDownloading ? "#fff" : "#9e9e9e",
+                      cursor: filteredStudents.length > 0 && !proctoringDownloading ? "pointer" : "not-allowed",
                       transition: "all 0.3s ease",
-                      boxShadow: filteredStudents.length > 0
+                      boxShadow: filteredStudents.length > 0 && !proctoringDownloading
                         ? "0 4px 15px rgba(230, 57, 70, 0.3)"
                         : "none",
                     }}
                   >
-                    <i className="bi bi-shield-exclamation"></i>
-                    Download All Data
+                    {proctoringDownloading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        Downloading...
+                      </>
+                    ) : (
+                      <>
+                        <i className="bi bi-shield-exclamation"></i>
+                        Download All Data
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -3877,274 +3655,7 @@ export default function GroupStudentPage() {
         </>
       )}
 
-      {/* Bulk Download Proctoring Data Modal */}
-      {showProctoringModal && (
-        <>
-          <div
-            className="modal-backdrop fade show"
-            onClick={() => {
-              if (!proctoringDownloading) {
-                setShowProctoringModal(false);
-                setProctoringData([]);
-                setProctoringError("");
-              }
-            }}
-            style={{ zIndex: 10040 }}
-          ></div>
-
-          <div
-            className="modal fade show"
-            style={{ display: "block", zIndex: 10050 }}
-            tabIndex={-1}
-            role="dialog"
-          >
-            <div
-              className="modal-dialog modal-dialog-centered modal-xl"
-              role="document"
-            >
-              <div
-                className="modal-content"
-                style={{
-                  borderRadius: "16px",
-                  border: "none",
-                  boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
-                }}
-              >
-                {/* Header */}
-                <div
-                  className="modal-header"
-                  style={{ borderBottom: "2px solid #f0f0f0", padding: "1.5rem" }}
-                >
-                  <h5
-                    className="modal-title"
-                    style={{ color: "#1a1a2e", fontWeight: 700 }}
-                  >
-                    <i
-                      className="bi bi-shield-exclamation me-2"
-                      style={{ color: "#e63946" }}
-                    ></i>
-                    All Students Proctoring Data
-                  </h5>
-                  <button
-                    type="button"
-                    className="btn-close"
-                    onClick={() => {
-                      setShowProctoringModal(false);
-                      setProctoringData([]);
-                      setProctoringError("");
-                    }}
-                    disabled={proctoringDownloading}
-                    aria-label="Close"
-                  ></button>
-                </div>
-
-                {/* Body */}
-                <div
-                  className="modal-body"
-                  style={{ padding: "2rem", maxHeight: "70vh", overflowY: "auto" }}
-                >
-                  {/* Summary */}
-                  <div className="mb-4">
-                    <div
-                      className="card border-0"
-                      style={{ background: "#f8f9fa", borderRadius: "12px" }}
-                    >
-                      <div className="card-body p-3">
-                        <div className="row g-3">
-                          <div className="col-md-4">
-                            <div className="d-flex align-items-center gap-2">
-                              <i className="bi bi-people-fill" style={{ color: "#e63946" }}></i>
-                              <div>
-                                <small className="text-muted d-block">Filtered Students</small>
-                                <strong style={{ color: "#1a1a2e", fontSize: "0.9rem" }}>
-                                  {filteredStudents.length}
-                                </strong>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="col-md-4">
-                            <div className="d-flex align-items-center gap-2">
-                              <i className="bi bi-clipboard-data" style={{ color: "#e63946" }}></i>
-                              <div>
-                                <small className="text-muted d-block">Data Rows</small>
-                                <strong style={{ color: "#1a1a2e", fontSize: "0.9rem" }}>
-                                  {pivotedProctoringData.rows.length} students ({proctoringData.length} records)
-                                </strong>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="col-md-4">
-                            <div className="d-flex align-items-center gap-2">
-                              <i className="bi bi-building" style={{ color: "#e63946" }}></i>
-                              <div>
-                                <small className="text-muted d-block">Institute</small>
-                                <strong style={{ color: "#1a1a2e", fontSize: "0.9rem" }}>
-                                  {getSelectedInstituteName()}
-                                </strong>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Proctoring Table */}
-                  <div className="mb-3">
-                    <h6 className="mb-3" style={{ color: "#1a1a2e", fontWeight: 600 }}>
-                      <i className="bi bi-table me-2"></i>
-                      Proctoring Data Preview
-                    </h6>
-
-                    {proctoringLoading ? (
-                      <div className="text-center py-5">
-                        <div className="spinner-border text-danger" role="status">
-                          <span className="visually-hidden">Loading...</span>
-                        </div>
-                        <p className="mt-3 text-muted">
-                          Loading proctoring data for all students... This may take a moment.
-                        </p>
-                      </div>
-                    ) : proctoringError ? (
-                      <div className="alert alert-danger" style={{ borderRadius: "10px" }}>
-                        <i className="bi bi-exclamation-triangle me-2"></i>
-                        {proctoringError}
-                      </div>
-                    ) : proctoringData.length === 0 ? (
-                      <div className="alert alert-info" style={{ borderRadius: "10px" }}>
-                        <i className="bi bi-info-circle me-2"></i>
-                        No proctoring data found for the filtered students.
-                      </div>
-                    ) : (
-                      <div
-                        className="table-responsive"
-                        style={{ borderRadius: "12px", border: "1px solid #e0e0e0" }}
-                      >
-                        <table className="table table-hover mb-0">
-                          <thead
-                            style={{
-                              background: "#f8f9fa",
-                              position: "sticky",
-                              top: 0,
-                              zIndex: 1,
-                            }}
-                          >
-                            <tr>
-                              <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", width: "60px" }}>S.No</th>
-                              <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", width: "160px" }}>Student Name</th>
-                              <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", width: "80px" }}>User ID</th>
-                              <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", width: "160px" }}>Assessment</th>
-                              <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", width: "200px" }}>Question</th>
-                              {proctoringColumns.slice(0, 4).map((col) => (
-                                <th key={col} style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", minWidth: "120px" }}>
-                                  {col}
-                                </th>
-                              ))}
-                              {proctoringColumns.length > 4 && (
-                                <th style={{ padding: "12px 16px", fontWeight: 600, color: "#999", fontStyle: "italic" }}>
-                                  +{proctoringColumns.length - 4} more
-                                </th>
-                              )}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {proctoringData.slice(0, 50).map((row, index) => (
-                              <tr key={index}>
-                                <td style={{ padding: "12px 16px" }}>
-                                  <span className="badge bg-light text-dark" style={{ fontSize: "0.85rem" }}>{index + 1}</span>
-                                </td>
-                                <td style={{ padding: "12px 16px", color: "#333", fontWeight: 500 }}>
-                                  {row.studentName || "N/A"}
-                                </td>
-                                <td style={{ padding: "12px 16px", color: "#333" }}>
-                                  #{row.userStudentId || "N/A"}
-                                </td>
-                                <td style={{ padding: "12px 16px", color: "#333" }}>
-                                  <span className="badge" style={{ background: "rgba(230, 57, 70, 0.1)", color: "#e63946", padding: "4px 8px", borderRadius: "6px", fontSize: "0.8rem" }}>
-                                    {row.assessmentName || "N/A"}
-                                  </span>
-                                </td>
-                                <td style={{ padding: "12px 16px", color: "#333", maxWidth: "200px" }} title={row.questionText}>
-                                  {row.questionText ? (row.questionText.length > 30 ? row.questionText.substring(0, 30) + "..." : row.questionText) : "N/A"}
-                                </td>
-                                <td style={{ padding: "12px 16px" }}>
-                                  <span className="badge" style={{ background: "rgba(67, 97, 238, 0.1)", color: "#4361ee", padding: "6px 12px", borderRadius: "6px", fontWeight: 500, fontSize: "0.85rem" }}>
-                                    {row.timeSpentMs ?? "-"}
-                                  </span>
-                                </td>
-                                <td style={{ padding: "12px 16px" }}>{row.mouseClickCount ?? "-"}</td>
-                                <td style={{ padding: "12px 16px" }}>{row.maxFacesDetected ?? "-"}</td>
-                                <td style={{ padding: "12px 16px" }}>{row.avgFacesDetected ?? "-"}</td>
-                                {proctoringColumns.length > 4 && (
-                                  <td style={{ padding: "12px 16px", color: "#999", fontSize: "0.8rem" }}>...</td>
-                                )}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        {proctoringData.length > 50 && (
-                          <div
-                            className="text-center py-3"
-                            style={{ background: "#f8f9fa", borderTop: "1px solid #e0e0e0", color: "#666", fontSize: "0.9rem" }}
-                          >
-                            <i className="bi bi-info-circle me-2"></i>
-                            Showing first 50 of {proctoringData.length} rows. All rows will be included in the Excel download.
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div
-                  className="modal-footer"
-                  style={{ borderTop: "2px solid #f0f0f0", padding: "1.5rem" }}
-                >
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary"
-                    onClick={() => {
-                      setShowProctoringModal(false);
-                      setProctoringData([]);
-                      setProctoringError("");
-                    }}
-                    disabled={proctoringDownloading}
-                    style={{ borderRadius: "10px", padding: "0.6rem 1.5rem", fontWeight: 600 }}
-                  >
-                    Close
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={handleProctoringDownloadExcel}
-                    disabled={proctoringDownloading || proctoringLoading || proctoringData.length === 0}
-                    style={{
-                      background: "linear-gradient(135deg, #e63946 0%, #a4133c 100%)",
-                      border: "none",
-                      borderRadius: "10px",
-                      padding: "0.6rem 1.5rem",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {proctoringDownloading ? (
-                      <>
-                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                        Downloading...
-                      </>
-                    ) : (
-                      <>
-                        <i className="bi bi-download me-2"></i>
-                        Download Excel ({proctoringData.length} records)
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      {/* Proctoring modal removed — download now handled directly by backend */}
 
       {/* Reset Confirmation Modal */}
       {showResetModal && resetStudent && resetAssessmentId && (

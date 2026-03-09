@@ -152,6 +152,13 @@ export function getBulkProctoringData(pairs: { userStudentId: number; assessment
     return axios.post<any[]>(`${API_URL}/assessment-proctoring/getBulkProctoringData`, pairs);
 }
 
+// Export proctoring data as Excel from backend (server-side generation)
+export function exportProctoringExcel(pairs: { userStudentId: number; assessmentId: number }[]) {
+    return axios.post(`${API_URL}/assessment-proctoring/export-excel`, pairs, {
+        responseType: 'blob',
+    });
+}
+
 // Game Results APIs (Firestore via backend)
 export function getAllGameResults() {
     return axios.get<any[]>(`${API_URL}/game-results/getAll`);
