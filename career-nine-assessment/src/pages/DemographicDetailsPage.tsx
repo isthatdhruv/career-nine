@@ -27,7 +27,7 @@ type DemographicField = {
 const DemographicDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const { assessmentId } = useParams<{ assessmentId: string }>();
-  const { fetchAssessmentData } = useAssessment();
+  const { fetchAssessmentData, preloadAssessmentData } = useAssessment();
   usePreventReload();
 
   const [fields, setFields] = useState<DemographicField[]>([]);
@@ -46,6 +46,7 @@ const DemographicDetailsPage: React.FC = () => {
       return;
     }
     fetchFields();
+    preloadAssessmentData(assessmentId);
   }, [assessmentId, userStudentId]);
 
   const fetchFields = async () => {
@@ -148,11 +149,13 @@ const DemographicDetailsPage: React.FC = () => {
   };
 
   const startAssessmentAndNavigate = async () => {
-    await http.post('/assessments/startAssessment', {
-      userStudentId: Number(userStudentId),
-      assessmentId: Number(assessmentId),
-    });
-    await fetchAssessmentData(String(assessmentId));
+    await Promise.all([
+      http.post('/assessments/startAssessment', {
+        userStudentId: Number(userStudentId),
+        assessmentId: Number(assessmentId),
+      }),
+      fetchAssessmentData(String(assessmentId)),
+    ]);
     navigate('/general-instructions');
   };
 

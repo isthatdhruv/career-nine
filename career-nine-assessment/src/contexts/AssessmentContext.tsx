@@ -8,6 +8,7 @@ type AssessmentContextType = {
   error: string | null;
   fetchAssessmentData: (assessmentId: string) => Promise<void>;
   prefetchAssessmentData: (userStudentId: string) => void;
+  preloadAssessmentData: (assessmentId: string) => void;
   prefetchedAssessments: any[] | null;
 };
 
@@ -36,6 +37,7 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [prefetchedAssessments, setPrefetchedAssessments] = useState<any[] | null>(null);
   const prefetchingRef = useRef(false);
   const prefetchPromiseRef = useRef<Promise<void> | null>(null);
+  const preloadPromiseRef = useRef<Promise<void> | null>(null);
   const cachedAssessmentIdRef = useRef<string | null>(null);
 
   const prefetchAssessmentData = (userStudentId: string) => {
@@ -97,10 +99,67 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     prefetchPromiseRef.current = promise;
   };
 
+  const preloadAssessmentData = (assessmentId: string) => {
+    if (assessmentData && assessmentConfig && cachedAssessmentIdRef.current === assessmentId) return;
+    if (preloadPromiseRef.current) return;
+
+    const doPreload = async () => {
+      try {
+        // If login-page prefetch is in flight, wait for it first
+        if (prefetchPromiseRef.current) {
+          await prefetchPromiseRef.current;
+          if (assessmentData && assessmentConfig && cachedAssessmentIdRef.current === assessmentId) return;
+        }
+
+        const [staticData, staticConfig] = await Promise.all([
+          tryStaticCache(assessmentId, 'data.json'),
+          tryStaticCache(assessmentId, 'config.json'),
+        ]);
+
+        let questionnaireData, configData;
+        if (staticData && staticConfig) {
+          questionnaireData = staticData;
+          configData = staticConfig;
+        } else {
+          const [questionnaireRes, configRes] = await Promise.all([
+            http.get(`/assessments/getby/${assessmentId}`),
+            http.get(`/assessments/getById/${assessmentId}`),
+          ]);
+          questionnaireData = questionnaireRes.data;
+          configData = configRes.data;
+        }
+
+        cachedAssessmentIdRef.current = assessmentId;
+        setAssessmentData(questionnaireData);
+        setAssessmentConfig(configData);
+        try {
+          sessionStorage.setItem('assessmentData', JSON.stringify(questionnaireData));
+          sessionStorage.setItem('assessmentConfig', JSON.stringify(configData));
+          sessionStorage.setItem('cachedAssessmentId', assessmentId);
+        } catch {
+          // Storage quota exceeded — non-critical
+        }
+      } catch {
+        // Preload failure is non-critical — fetchAssessmentData will retry
+      } finally {
+        preloadPromiseRef.current = null;
+      }
+    };
+
+    // Defer to idle time so we don't compete with demographics form rendering on slow CPUs
+    const schedule = typeof requestIdleCallback === 'function' ? requestIdleCallback : (cb: () => void) => setTimeout(cb, 100);
+    preloadPromiseRef.current = new Promise<void>((resolve) => {
+      schedule(() => { doPreload().then(resolve, resolve); });
+    });
+  };
+
   const fetchAssessmentData = async (assessmentId: string): Promise<void> => {
-    // Wait for any in-flight prefetch to complete first
+    // Wait for any in-flight prefetch or preload to complete first
     if (prefetchPromiseRef.current) {
       await prefetchPromiseRef.current;
+    }
+    if (preloadPromiseRef.current) {
+      await preloadPromiseRef.current;
     }
     // Only use cached data if it matches the requested assessmentId
     if (assessmentData && assessmentConfig && cachedAssessmentIdRef.current === assessmentId) {
@@ -177,7 +236,7 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   return (
     <AssessmentContext.Provider value={{
       assessmentData, assessmentConfig, loading, error,
-      fetchAssessmentData, prefetchAssessmentData, prefetchedAssessments
+      fetchAssessmentData, prefetchAssessmentData, preloadAssessmentData, prefetchedAssessments
     }}>
       {children}
     </AssessmentContext.Provider>
