@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAssessment } from '../contexts/AssessmentContext';
 import { usePreventReload } from '../hooks/usePreventReload';
+import { useHeartbeat } from '../hooks/useHeartbeat';
 import http from '../api/http';
 
 type Section = {
@@ -16,6 +17,12 @@ const SelectSectionPage: React.FC = () => {
   const navigate = useNavigate();
   const { assessmentData, loading } = useAssessment();
   usePreventReload();
+
+  useHeartbeat({
+    userStudentId: Number(localStorage.getItem('userStudentId')) || null,
+    assessmentId: Number(localStorage.getItem('assessmentId')) || null,
+    page: 'section-select',
+  });
 
   useEffect(() => {
     const checkStudentStatus = async () => {

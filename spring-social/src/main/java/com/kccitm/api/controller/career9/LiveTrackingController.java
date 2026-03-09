@@ -20,6 +20,7 @@ import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
+import com.kccitm.api.service.AssessmentSessionService;
 
 @RestController
 @RequestMapping("/assessments")
@@ -36,6 +37,9 @@ public class LiveTrackingController {
 
     @Autowired
     private QuestionnaireQuestionRepository questionnaireQuestionRepository;
+
+    @Autowired
+    private AssessmentSessionService assessmentSessionService;
 
     /**
      * Single efficient endpoint for live tracking.
@@ -102,6 +106,20 @@ public class LiveTrackingController {
                 entry.put("answeredCount", answered != null ? answered : 0);
             } else {
                 entry.put("answeredCount", 0);
+            }
+
+            // Current position from Redis heartbeat (only for ongoing students)
+            if ("ongoing".equals(status)) {
+                Map<String, Object> heartbeat = assessmentSessionService
+                        .getHeartbeat(us.getUserStudentId(), assessmentId);
+                if (heartbeat != null) {
+                    entry.put("currentPage", heartbeat.get("page"));
+                    entry.put("currentSection", heartbeat.get("sectionName"));
+                    entry.put("currentQuestionIndex", heartbeat.get("questionIndex"));
+                    entry.put("lastSeen", heartbeat.get("timestamp"));
+                } else {
+                    entry.put("currentPage", null);
+                }
             }
 
             students.add(entry);

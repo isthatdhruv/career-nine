@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAssessment } from '../contexts/AssessmentContext';
 import { usePreventReload } from '../hooks/usePreventReload';
+import { useHeartbeat } from '../hooks/useHeartbeat';
 
 type Language = {
   languageId: number;
@@ -25,6 +26,13 @@ const SectionInstructionPage: React.FC = () => {
   const navigate = useNavigate();
   const { assessmentData } = useAssessment();
   usePreventReload();
+
+  useHeartbeat({
+    userStudentId: Number(localStorage.getItem('userStudentId')) || null,
+    assessmentId: Number(localStorage.getItem('assessmentId')) || null,
+    page: 'section-instructions',
+    sectionId: sectionId,
+  });
 
   const [instructions, setInstructions] = useState<Instruction[] | null>(null);
 

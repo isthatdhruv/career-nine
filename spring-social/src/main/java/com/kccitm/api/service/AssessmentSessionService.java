@@ -29,6 +29,8 @@ public class AssessmentSessionService {
     private static final int DRAFT_TTL_HOURS = 24;
     private static final String SUBMIT_KEY_PREFIX = "career9:submit:";
     private static final int SUBMIT_TTL_HOURS = 24;
+    private static final String HEARTBEAT_KEY_PREFIX = "career9:heartbeat:";
+    private static final int HEARTBEAT_TTL_SECONDS = 60;
 
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
@@ -147,6 +149,30 @@ public class AssessmentSessionService {
         String key = DRAFT_KEY_PREFIX + studentId + ":" + assessmentId;
         redisTemplate.delete(key);
         logger.debug("Deleted draft for student={} assessment={}", studentId, assessmentId);
+    }
+
+    /**
+     * Save a heartbeat with the student's current page/question position.
+     * Auto-expires in 60s — if student stops sending, they appear stale.
+     */
+    public void saveHeartbeat(Long studentId, Long assessmentId, Map<String, Object> position) {
+        String key = HEARTBEAT_KEY_PREFIX + studentId + ":" + assessmentId;
+        position.put("timestamp", Instant.now().toString());
+        redisTemplate.opsForValue().set(key, position, HEARTBEAT_TTL_SECONDS, TimeUnit.SECONDS);
+    }
+
+    /**
+     * Get a student's last heartbeat position. Returns null if expired or never sent.
+     */
+    public Map<String, Object> getHeartbeat(Long studentId, Long assessmentId) {
+        String key = HEARTBEAT_KEY_PREFIX + studentId + ":" + assessmentId;
+        Object value = redisTemplate.opsForValue().get(key);
+        if (value instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = (Map<String, Object>) value;
+            return result;
+        }
+        return null;
     }
 
     /**

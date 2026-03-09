@@ -9,6 +9,10 @@ interface StudentEntry {
   instituteName: string;
   status: string;
   answeredCount: number;
+  currentPage?: string | null;
+  currentSection?: string | null;
+  currentQuestionIndex?: number | null;
+  lastSeen?: string | null;
 }
 
 interface Summary {
@@ -55,6 +59,44 @@ const statusBadge = (status: string) => {
         <span className="badge bg-secondary px-3 py-2">Not Started</span>
       );
   }
+};
+
+/* ─── Current position label ─── */
+const CurrentPosition = ({ student }: { student: StudentEntry }) => {
+  if (student.status !== "ongoing") return null;
+  if (!student.currentPage) {
+    return <small className="text-muted fst-italic">No signal</small>;
+  }
+
+  const pageLabels: Record<string, string> = {
+    question: "Question",
+    "section-select": "Selecting Section",
+    instructions: "Reading Instructions",
+    "section-instructions": "Section Instructions",
+    demographics: "Demographics Form",
+  };
+
+  const label = pageLabels[student.currentPage] || student.currentPage;
+
+  if (student.currentPage === "question") {
+    const qNum =
+      student.currentQuestionIndex != null
+        ? Number(student.currentQuestionIndex) + 1
+        : "?";
+    const section = student.currentSection || "";
+    return (
+      <div>
+        <small className="fw-semibold">
+          Q{qNum}
+        </small>
+        {section && (
+          <small className="text-muted ms-1">({section})</small>
+        )}
+      </div>
+    );
+  }
+
+  return <small className="text-muted">{label}</small>;
 };
 
 /* ─── Progress bar (lightweight, no chart library) ─── */
@@ -391,13 +433,14 @@ const LiveTrackingPage = () => {
                     <th>Student</th>
                     <th>Institute</th>
                     <th style={{ width: 130 }}>Status</th>
+                    <th style={{ width: 150 }}>Current Page</th>
                     <th style={{ width: 220 }}>Progress</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredStudents.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="text-center text-muted py-4">
+                      <td colSpan={6} className="text-center text-muted py-4">
                         No students match the current filter
                       </td>
                     </tr>
@@ -415,6 +458,9 @@ const LiveTrackingPage = () => {
                           <small>{s.instituteName}</small>
                         </td>
                         <td>{statusBadge(s.status)}</td>
+                        <td>
+                          <CurrentPosition student={s} />
+                        </td>
                         <td>
                           <ProgressBar
                             answered={s.answeredCount}

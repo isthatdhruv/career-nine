@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAssessment } from '../contexts/AssessmentContext';
 import { usePreventReload } from '../hooks/usePreventReload';
+import { useHeartbeat } from '../hooks/useHeartbeat';
 
 const isNA = (text: string | null | undefined): boolean => {
   if (!text) return false;
@@ -24,6 +25,12 @@ const GeneralInstructionsPage: React.FC = () => {
   const navigate = useNavigate();
   const { assessmentData, loading } = useAssessment();
   usePreventReload();
+
+  useHeartbeat({
+    userStudentId: Number(localStorage.getItem('userStudentId')) || null,
+    assessmentId: Number(localStorage.getItem('assessmentId')) || null,
+    page: 'instructions',
+  });
 
   const questionnaire = assessmentData?.[0];
   const languageInstructions: QuestionnaireLanguage[] = questionnaire?.languages?.filter(

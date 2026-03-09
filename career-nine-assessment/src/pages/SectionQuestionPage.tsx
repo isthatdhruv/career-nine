@@ -11,6 +11,7 @@ import { useMouseClickTracker } from '../hooks/useMouseClickTracker';
 import { usePerQuestionProctoring } from '../hooks/usePerQuestionProctoring';
 import { submitProctoringData } from '../api/proctoringApi';
 import type { ProctoringPayload } from '../types/proctoring';
+import { useHeartbeat } from '../hooks/useHeartbeat';
 
 type GameTable = {
   gameId: number;
@@ -99,6 +100,16 @@ const SectionQuestionPage: React.FC = () => {
   });
   const [showSectionInstruction, setShowSectionInstruction] = useState<boolean>(false);
   const [sectionInstructionTexts, setSectionInstructionTexts] = useState<Array<{text: string; language: string}>>([]);
+
+  // Heartbeat: report current page position to backend for live tracking
+  useHeartbeat({
+    userStudentId: Number(localStorage.getItem('userStudentId')) || null,
+    assessmentId: Number(localStorage.getItem('assessmentId')) || null,
+    page: 'question',
+    sectionName: currentSection?.section?.sectionName || '',
+    sectionId: sectionId,
+    questionIndex: String(currentIndex),
+  });
 
   // Game-related state
   const [isGameActive, setIsGameActive] = useState<boolean>(false);
