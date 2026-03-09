@@ -69,6 +69,7 @@ const SectionQuestionPage: React.FC = () => {
   const showTimer = assessmentConfig?.showTimer !== false;
   usePreventReload();
   const { scheduleWrite, flush: flushLocalStorage } = useDebouncedLocalStorage(500);
+  const [showSidebar, setShowSidebar] = useState(false);
 
   // Proctoring hooks — eye gaze, face counting, mouse tracking, per-question aggregation
   const faceCountRef = useRef<number>(0);
@@ -970,6 +971,18 @@ const SectionQuestionPage: React.FC = () => {
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", colorScheme: "light" }}>
+      {/* Sidebar toggle button - mobile only */}
+      <button
+        className="sidebar-toggle-btn"
+        onClick={() => setShowSidebar(!showSidebar)}
+        aria-label="Toggle question navigation"
+      >
+        {showSidebar ? '✕' : '☰'}
+      </button>
+
+      {/* Sidebar backdrop - mobile only */}
+      <div className={`sidebar-backdrop ${showSidebar ? 'show' : ''}`} onClick={() => setShowSidebar(false)} />
+
       {/* Section Instruction Popup */}
       {showSectionInstruction && (
         <div
@@ -1037,22 +1050,7 @@ const SectionQuestionPage: React.FC = () => {
       )}
 
       {/* LEFT SIDEBAR */}
-      <div
-        style={{
-          width: 280,
-          background: "#ffffff",
-          borderRight: "none",
-          display: "flex",
-          flexDirection: "column",
-          height: "100vh",
-          position: "sticky",
-          top: 0,
-          boxShadow: "4px 0 30px rgba(0,0,0,0.1)",
-          borderRadius: "0 24px 24px 0",
-          colorScheme: "light",
-          color: "#2d3748",
-        }}
-      >
+      <div className={`question-sidebar ${showSidebar ? 'show' : ''}`}>
         {/* Logo + Legend */}
         <div
           style={{
@@ -1146,11 +1144,12 @@ const SectionQuestionPage: React.FC = () => {
                 {sec.questions.map((q: any, i: number) => (
                   <div
                     key={q.questionnaireQuestionId}
-                    onClick={() =>
+                    onClick={() => {
+                      setShowSidebar(false);
                       navigate(
                         `/studentAssessment/sections/${sec.section.sectionId}/questions/${i}`
-                      )
-                    }
+                      );
+                    }}
                     style={{
                       width: 32,
                       height: 32,
@@ -1180,32 +1179,9 @@ const SectionQuestionPage: React.FC = () => {
       </div>
 
       {/* QUESTION AREA */}
-      <div
-        style={{
-          flex: 1,
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "flex-start",
-          padding: "30px 30px 30px 20px",
-          overflowY: "auto",
-        }}
-      >
-        <div
-          className="card"
-          style={{
-            width: "auto",
-            minWidth: "900px",
-            maxWidth: "1200px",
-            minHeight: "auto",
-            borderRadius: "24px",
-            border: "none",
-            boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
-            background: "#ffffff",
-            colorScheme: "light",
-            color: "#2d3748"
-          }}
-        >
-          <div className="card-body p-5">
+      <div className="question-area">
+        <div className="card question-main-card">
+          <div className="card-body p-3 p-sm-4 p-lg-5">
             {/* Section Name Badge */}
             <div className="mb-3">
               <span
@@ -1336,9 +1312,9 @@ const SectionQuestionPage: React.FC = () => {
             {availableLanguages.length > 0 ? (
               <div
                 data-proctoring="question-text"
+                className={availableLanguages.length > 1 ? 'instructions-grid instructions-grid--dual' : ''}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: availableLanguages.length > 1 ? "1fr 1px 1fr" : "1fr",
                   gap: 20,
                   marginBottom: 30,
                 }}
@@ -1588,9 +1564,9 @@ const SectionQuestionPage: React.FC = () => {
                             </div>
                             {availableLanguages.length > 0 ? (
                               <div
+                                className={availableLanguages.length > 1 ? 'instructions-grid instructions-grid--dual' : ''}
                                 style={{
                                   display: "grid",
-                                  gridTemplateColumns: availableLanguages.length > 1 ? "1fr 1px 1fr" : "1fr",
                                   gap: 15,
                                 }}
                               >
@@ -1760,7 +1736,7 @@ const SectionQuestionPage: React.FC = () => {
                   const rightColumn = options.slice(midpoint);
 
                   return (
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+                    <div className="options-grid-2col">
                       {/* Left Column */}
                       <div>
                         {leftColumn.map((opt, idx) => renderOption(opt, idx))}
@@ -1778,7 +1754,7 @@ const SectionQuestionPage: React.FC = () => {
               })()}
             </div>
 
-            <div className="d-flex justify-content-between mt-5 pt-3" style={{ borderTop: "1px solid #e2e8f0" }}>
+            <div className="d-flex flex-column flex-sm-row justify-content-between question-nav-buttons">
               <button
                 disabled={currentIndex === 0}
                 onClick={goBack}

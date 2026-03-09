@@ -12,11 +12,9 @@ const StudentLoginPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // Check if there are unsaved assessment answers before clearing
     const hasUnsavedAnswers = localStorage.getItem('assessmentAnswers');
     if (hasUnsavedAnswers) {
       console.warn('Unsaved assessment answers detected - preserving for recovery');
-      // Preserve answer keys, clear everything else
       const keysToPreserve = [
         'assessmentAnswers', 'assessmentRankingAnswers', 'assessmentTextAnswers',
         'assessmentSavedForLater', 'assessmentSkipped', 'assessmentElapsedTime',
@@ -80,7 +78,6 @@ const StudentLoginPage: React.FC = () => {
   const handleUserIdBlur = () => {
     setTouched(prev => ({ ...prev, userId: true }));
     setErrors(prev => ({ ...prev, userId: validateUserId(userId) }));
-    // Prefetch assessment data while user fills in DOB
     if (userId.trim()) {
       prefetchAssessmentData(userId.trim());
     }
@@ -138,47 +135,84 @@ const StudentLoginPage: React.FC = () => {
   };
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      minHeight: '100vh', width: '100vw', margin: 0, padding: '2rem 1rem',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      position: 'fixed', top: 0, left: 0, overflow: 'auto', colorScheme: 'light',
-    }}>
-      <div className="card shadow-lg" style={{ width: '550px', maxWidth: '95%', borderRadius: '20px', border: 'none', background: '#ffffff', colorScheme: 'light' }}>
-        <div className="card-body p-5" style={{ borderRadius: '20px', background: '#ffffff', color: '#2d3748' }}>
-          <div style={{ width: "220px", height: "80px", background: "white", borderRadius: "10%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1.5rem" }}>
-            <img src="/media/logos/kcc.jpg" alt="CAREER_9 Logo" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: "10%", padding: "8px" }} />
+    <div className="assessment-bg" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', overflow: 'auto' }}>
+      <div className="container">
+        <div className="row justify-content-center">
+          <div className="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-5">
+            <div className="assessment-card card shadow-lg">
+              <div className="card-body p-3 p-sm-4 p-md-5">
+                {/* Logo */}
+                <div className="login-logo-wrapper">
+                  <img src="/media/logos/kcc.jpg" alt="CAREER_9 Logo" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: "10%", padding: "8px" }} />
+                </div>
+
+                <h2 className="text-center assessment-heading">Assessment Login</h2>
+                <p className="text-center assessment-subheading">Sign in to continue to your assessment</p>
+
+                <form onSubmit={handleSubmit}>
+                  {/* Username field */}
+                  <div className="mb-3 mb-md-4">
+                    <label htmlFor="userId" className="form-label fw-semibold" style={{ color: '#4a5568', fontSize: '0.95rem' }}>Username</label>
+                    <div className="position-relative">
+                      <div className="position-absolute top-50 translate-middle-y" style={{ left: '1rem', color: '#a0aec0' }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+                      </div>
+                      <input
+                        type="text"
+                        className={`form-control assessment-input ${touched.userId && errors.userId ? 'is-invalid' : touched.userId && !errors.userId ? 'is-valid' : ''}`}
+                        id="userId"
+                        placeholder="Enter your User ID"
+                        value={userId}
+                        onChange={handleUserIdChange}
+                        onBlur={handleUserIdBlur}
+                      />
+                    </div>
+                    {touched.userId && errors.userId && <div style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.35rem' }}>{errors.userId}</div>}
+                  </div>
+
+                  {/* DOB field */}
+                  <div className="mb-4">
+                    <label htmlFor="dob" className="form-label fw-semibold" style={{ color: '#4a5568', fontSize: '0.95rem' }}>Date of Birth</label>
+                    <div className="position-relative">
+                      <div className="position-absolute top-50 translate-middle-y" style={{ left: '1rem', color: '#a0aec0', zIndex: 1 }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+                      </div>
+                      <div className="input-group">
+                        <input
+                          type="text"
+                          className={`form-control assessment-input ${touched.dob && errors.dob ? 'is-invalid' : touched.dob && !errors.dob ? 'is-valid' : ''}`}
+                          id="dob"
+                          placeholder="dd-mm-yyyy"
+                          maxLength={10}
+                          value={dob}
+                          onChange={handleDobChange}
+                          onBlur={handleDobBlur}
+                          style={{ borderRadius: '10px 0 0 10px', borderRight: 'none' }}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-outline-secondary"
+                          onClick={openCalendar}
+                          style={{ borderRadius: '0 10px 10px 0', borderColor: '#e2e8f0', fontSize: '1.1rem' }}
+                        >
+                          &#x1f4c5;
+                        </button>
+                        <input type="date" ref={dateInputRef} onChange={handleCalendarChange} style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }} />
+                      </div>
+                    </div>
+                    {touched.dob && errors.dob && <div style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.35rem' }}>{errors.dob}</div>}
+                  </div>
+
+                  {/* Submit button */}
+                  <button type="submit" className="btn btn-assessment-primary w-100 py-2 py-md-3" disabled={isLoading} style={{ fontSize: '1.05rem' }}>
+                    {isLoading ? (<><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Signing In...</>) : 'Sign In'}
+                  </button>
+
+                  <div className="text-center mt-3 mt-md-4" style={{ color: '#718096', fontSize: '0.85rem' }}>Need help? Contact your administrator</div>
+                </form>
+              </div>
+            </div>
           </div>
-          <h2 className="text-center mb-2" style={{ fontSize: '2.25rem', fontWeight: '700', color: '#2d3748', marginBottom: '0.5rem' }}>Assessment Login</h2>
-          <p className="text-center mb-5" style={{ color: '#718096', fontSize: '1rem', marginBottom: '2rem' }}>Sign in to continue to your assessment</p>
-          <form onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <label htmlFor="userId" className="form-label" style={{ fontSize: '0.95rem', fontWeight: '600', color: '#4a5568', marginBottom: '0.5rem' }}>Username</label>
-              <div style={{ position: 'relative' }}>
-                <div style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#a0aec0' }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
-                </div>
-                <input type="text" className={`form-control ${touched.userId && errors.userId ? 'is-invalid' : touched.userId && !errors.userId ? 'is-valid' : ''}`} id="userId" placeholder="Enter your User ID" value={userId} onChange={handleUserIdChange} onBlur={handleUserIdBlur} style={{ padding: '0.875rem 1rem 0.875rem 3rem', fontSize: '1rem', borderRadius: '10px', border: `2px solid ${touched.userId && errors.userId ? '#e53e3e' : '#e2e8f0'}`, transition: 'all 0.2s ease', backgroundColor: '#ffffff', color: '#2d3748' }} onFocus={(e) => { if (!errors.userId) { e.target.style.borderColor = '#667eea'; e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)'; } }} onBlurCapture={(e) => { if (!errors.userId) { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none'; } }} />
-              </div>
-              {touched.userId && errors.userId && <div style={{ color: '#e53e3e', fontSize: '0.875rem', marginTop: '0.5rem' }}>{errors.userId}</div>}
-            </div>
-            <div className="mb-5">
-              <label htmlFor="dob" className="form-label" style={{ fontSize: '0.95rem', fontWeight: '600', color: '#4a5568', marginBottom: '0.5rem' }}>Date of Birth</label>
-              <div style={{ position: 'relative' }}>
-                <div style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#a0aec0', zIndex: 1 }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-                </div>
-                <div className="input-group">
-                  <input type="text" className={`form-control ${touched.dob && errors.dob ? 'is-invalid' : touched.dob && !errors.dob ? 'is-valid' : ''}`} id="dob" placeholder="dd-mm-yyyy" maxLength={10} value={dob} onChange={handleDobChange} onBlur={handleDobBlur} style={{ padding: '0.875rem 1rem 0.875rem 3rem', fontSize: '1rem', borderRadius: '10px 0 0 10px', border: `2px solid ${touched.dob && errors.dob ? '#e53e3e' : '#e2e8f0'}`, borderRight: 'none', transition: 'all 0.2s ease', backgroundColor: '#ffffff', color: '#2d3748' }} onFocus={(e) => { if (!errors.dob) { e.target.style.borderColor = '#667eea'; e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)'; } }} onBlurCapture={(e) => { if (!errors.dob) { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none'; } }} />
-                  <button type="button" onClick={openCalendar} style={{ border: `2px solid ${touched.dob && errors.dob ? '#e53e3e' : '#e2e8f0'}`, borderLeft: 'none', background: 'white', borderRadius: '0 10px 10px 0', padding: '0 1rem', cursor: 'pointer', transition: 'all 0.2s ease', fontSize: '1.25rem' }} onMouseEnter={(e) => { e.currentTarget.style.background = '#f7fafc'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'white'; }}>&#x1f4c5;</button>
-                  <input type="date" ref={dateInputRef} onChange={handleCalendarChange} style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }} />
-                </div>
-              </div>
-              {touched.dob && errors.dob && <div style={{ color: '#e53e3e', fontSize: '0.875rem', marginTop: '0.5rem' }}>{errors.dob}</div>}
-            </div>
-            <button type="submit" className="btn w-100" disabled={isLoading} style={{ padding: '0.875rem', fontSize: '1.1rem', fontWeight: '600', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', border: 'none', borderRadius: '10px', boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)', transition: 'all 0.3s ease', marginTop: '1rem', opacity: isLoading ? 0.7 : 1 }} onMouseEnter={(e) => { if (!isLoading) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.5)'; } }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.4)'; }}>{isLoading ? (<><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Signing In...</>) : 'Sign In'}</button>
-            <div className="text-center mt-4" style={{ color: '#718096', fontSize: '0.9rem' }}>Need help? Contact your administrator</div>
-          </form>
         </div>
       </div>
     </div>
