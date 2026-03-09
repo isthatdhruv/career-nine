@@ -343,47 +343,46 @@ const LiveTrackingPage = () => {
 
   return (
     <div className="card">
-      <div className="card-header border-0 pt-6">
-        <div className="d-flex flex-wrap justify-content-between align-items-center w-100 gap-3">
-          <h1 className="mb-0 fs-3">Live Assessment Tracking</h1>
-          <div className="d-flex align-items-center gap-3">
-            {/* Polling indicator */}
-            <div className="d-flex align-items-center gap-2">
-              <div
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  backgroundColor: isPolling ? "#198754" : "#dc3545",
-                  animation: isPolling ? "pulse 2s infinite" : "none",
-                }}
-              />
-              <small className="text-muted">
-                {isPolling ? "Live" : "Paused"}
-              </small>
-            </div>
+      <div className="card-header border-0 pt-6" style={{ overflow: "visible" }}>
+        <div className="d-flex flex-wrap align-items-center w-100 gap-3">
+          <h1 className="mb-0 fs-3 me-auto">Live Assessment Tracking</h1>
 
-            <button
-              className={`btn btn-sm ${isPolling ? "btn-outline-secondary" : "btn-outline-success"}`}
-              onClick={() => setIsPolling(!isPolling)}
-            >
-              {isPolling ? "Pause" : "Resume"}
-            </button>
-
-            <button
-              className="btn btn-sm btn-outline-primary"
-              onClick={handleRefresh}
-              disabled={loading || !selectedId}
-            >
-              {loading ? (
-                <span
-                  className="spinner-border spinner-border-sm me-1"
-                  role="status"
-                />
-              ) : null}
-              Refresh
-            </button>
+          {/* Polling indicator */}
+          <div className="d-flex align-items-center gap-2">
+            <div
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                backgroundColor: isPolling ? "#198754" : "#dc3545",
+                animation: isPolling ? "pulse 2s infinite" : "none",
+              }}
+            />
+            <small className="text-muted">
+              {isPolling ? "Live" : "Paused"}
+            </small>
           </div>
+
+          <button
+            className={`btn btn-sm ${isPolling ? "btn-outline-secondary" : "btn-outline-success"}`}
+            onClick={() => setIsPolling(!isPolling)}
+          >
+            {isPolling ? "Pause" : "Resume"}
+          </button>
+
+          <button
+            className="btn btn-sm btn-outline-primary"
+            onClick={handleRefresh}
+            disabled={loading || !selectedId}
+          >
+            {loading ? (
+              <span
+                className="spinner-border spinner-border-sm me-1"
+                role="status"
+              />
+            ) : null}
+            Refresh
+          </button>
         </div>
       </div>
 
