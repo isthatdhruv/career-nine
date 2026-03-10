@@ -304,7 +304,7 @@ const SectionQuestionPage: React.FC = () => {
     return <div className="text-center mt-5">Loading...</div>;
   }
   else if (!questionnaire || !questions.length) {
-    return <div className="text-center mt-5">No questions found , Check your Internet and Re-Login !</div>;
+    return <div className="text-center mt-5">Loading Assessment</div>;
   }
 
   const question = questions[currentIndex];
@@ -1941,7 +1941,7 @@ const SectionQuestionPage: React.FC = () => {
                       : "NEXT →"}
                   </button>
                 )}
-                {(!saveLater || isLastQuestionOfLastSection() || areAllQuestionsAnswered()) && (
+                {isLastQuestionOfLastSection() && (
                   <button
                     onClick={handleSubmitAssessment}
                     disabled={isSubmitting}
