@@ -2434,7 +2434,7 @@ const SectionQuestionPage: React.FC = () => {
               >
                 ← Back
               </button>
-              <div className="d-flex gap-3 align-items-center">
+              {/* <div className="d-flex gap-3 align-items-center">
                 {saveLater && (
                   <button
                     onClick={saveForLaterFn}
@@ -2454,7 +2454,7 @@ const SectionQuestionPage: React.FC = () => {
                   >
                     Save for Later
                   </button>
-                )}
+                )} */}
                 {!isLastQuestionOfLastSection() && (
                   <button
                     onClick={goNext}
@@ -2505,7 +2505,7 @@ const SectionQuestionPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+    // </div>
   );
 };
 
