@@ -1,20 +1,15 @@
 {
-  "version": "mmjzojnw",
-  "generated": "2026-03-10T02:26:50.636Z",
+  "version": "mmjzy8cx",
+  "generated": "2026-03-10T02:34:22.545Z",
   "resources": [
     {
-      "url": "/assessment-cache/.DS_Store",
-      "size": 6148,
-      "priority": "assessment"
-    },
-    {
       "url": "/assessment-cache/5/config.json",
-      "size": 125288,
+      "size": 125296,
       "priority": "assessment"
     },
     {
       "url": "/assessment-cache/5/data.json",
-      "size": 125058,
+      "size": 125066,
       "priority": "assessment"
     },
     {
@@ -148,11 +143,6 @@
       "priority": "game"
     },
     {
-      "url": "/game-scenes/.DS_Store",
-      "size": 8196,
-      "priority": "game"
-    },
-    {
       "url": "/game-scenes/2nd/game-scene-2nd.webp",
       "size": 789400,
       "priority": "game"
@@ -228,32 +218,32 @@
       "priority": "deferred"
     },
     {
-      "url": "/assets/HydroTubeGame-B45H0Zzh.js",
+      "url": "/assets/HydroTubeGame-CjsrMwgd.js",
       "size": 22911,
       "priority": "critical"
     },
     {
-      "url": "/assets/JungleSpotGame-DXZHCopr.js",
+      "url": "/assets/JungleSpotGame-_m5LnZzg.js",
       "size": 22904,
       "priority": "critical"
     },
     {
-      "url": "/assets/RabbitPathGame-Bd0O0YKp.js",
+      "url": "/assets/RabbitPathGame-BrZtkaJ7.js",
       "size": 26561,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionInstructionPage-DmHMZddl.js",
+      "url": "/assets/SectionInstructionPage-BTU0lak9.js",
       "size": 4429,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionQuestionPage-DA25_7mb.js",
+      "url": "/assets/SectionQuestionPage-BvalyWQG.js",
       "size": 169114,
       "priority": "critical"
     },
     {
-      "url": "/assets/SelectSectionPage-BmsvRQ4H.js",
+      "url": "/assets/SelectSectionPage-C6OzQXFZ.js",
       "size": 4833,
       "priority": "critical"
     },
@@ -278,8 +268,8 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/index-DZzZLGsN.js",
-      "size": 276838,
+      "url": "/assets/index-D3_DY8ZP.js",
+      "size": 277253,
       "priority": "critical"
     },
     {
@@ -294,23 +284,13 @@
     },
     {
       "url": "/index.html",
-      "size": 22948,
+      "size": 23267,
       "priority": "critical"
     },
     {
       "url": "/workbox-66610c77.js",
       "size": 21445,
       "priority": "critical"
-    },
-    {
-      "url": "/.DS_Store",
-      "size": 6148,
-      "priority": "other"
-    },
-    {
-      "url": "/assets/.DS_Store",
-      "size": 8196,
-      "priority": "other"
     },
     {
       "url": "/manifest.webmanifest",
@@ -324,16 +304,16 @@
     }
   ],
   "summary": {
-    "total": 64,
-    "totalSize": 26475106,
+    "total": 60,
+    "totalSize": 26447168,
     "byPriority": {
       "assessment": {
-        "count": 21,
-        "size": 3958153
+        "count": 20,
+        "size": 3952021
       },
       "game": {
-        "count": 12,
-        "size": 2535913
+        "count": 11,
+        "size": 2527717
       },
       "deferred": {
         "count": 12,
@@ -341,11 +321,11 @@
       },
       "critical": {
         "count": 15,
-        "size": 2338608
+        "size": 2339342
       },
       "other": {
-        "count": 4,
-        "size": 666953
+        "count": 2,
+        "size": 652609
       }
     }
   }
