@@ -1,6 +1,6 @@
 {
-  "version": "mmk6szev",
-  "generated": "2026-03-10T05:46:14.983Z",
+  "version": "mmk6vhl5",
+  "generated": "2026-03-10T05:48:11.849Z",
   "resources": [
     {
       "url": "/assessment-cache/5/config.json",
@@ -13,18 +13,8 @@
       "priority": "assessment"
     },
     {
-      "url": "/assessment-cache/5/images/370.png",
-      "size": 347797,
-      "priority": "assessment"
-    },
-    {
       "url": "/assessment-cache/5/images/370.webp",
       "size": 89294,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/371.png",
-      "size": 267679,
       "priority": "assessment"
     },
     {
@@ -33,18 +23,8 @@
       "priority": "assessment"
     },
     {
-      "url": "/assessment-cache/5/images/372.png",
-      "size": 384220,
-      "priority": "assessment"
-    },
-    {
       "url": "/assessment-cache/5/images/372.webp",
       "size": 94680,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/373.png",
-      "size": 309438,
       "priority": "assessment"
     },
     {
@@ -53,18 +33,8 @@
       "priority": "assessment"
     },
     {
-      "url": "/assessment-cache/5/images/374.png",
-      "size": 342127,
-      "priority": "assessment"
-    },
-    {
       "url": "/assessment-cache/5/images/374.webp",
       "size": 134934,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/375.png",
-      "size": 388892,
       "priority": "assessment"
     },
     {
@@ -73,18 +43,8 @@
       "priority": "assessment"
     },
     {
-      "url": "/assessment-cache/5/images/376.png",
-      "size": 292611,
-      "priority": "assessment"
-    },
-    {
       "url": "/assessment-cache/5/images/376.webp",
       "size": 86604,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/377.png",
-      "size": 276699,
       "priority": "assessment"
     },
     {
@@ -304,12 +264,12 @@
     }
   ],
   "summary": {
-    "total": 60,
-    "totalSize": 26446857,
+    "total": 52,
+    "totalSize": 23837394,
     "byPriority": {
       "assessment": {
-        "count": 20,
-        "size": 3952005
+        "count": 12,
+        "size": 1342542
       },
       "game": {
         "count": 11,

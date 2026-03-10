@@ -2,18 +2,20 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { compression } from 'vite-plugin-compression2'
+import { resolve } from 'path'
+import { globSync } from 'glob'
+import { unlinkSync } from 'fs'
 
 export default defineConfig({
-  publicDir: 'public',
   plugins: [
-    // Exclude PNG files from assessment-cache in build output
+    // Remove PNG files from assessment-cache after build (webp versions are used instead)
     {
-      name: 'exclude-assessment-pngs',
-      generateBundle(_, bundle) {
-        for (const fileName of Object.keys(bundle)) {
-          if (fileName.match(/assessment-cache\/.*\.png$/)) {
-            delete bundle[fileName];
-          }
+      name: 'remove-assessment-pngs',
+      closeBundle() {
+        const pngs = globSync('dist/assessment-cache/**/*.png')
+        for (const file of pngs) {
+          unlinkSync(file)
+          console.log(`Removed from build: ${file}`)
         }
       },
     },
