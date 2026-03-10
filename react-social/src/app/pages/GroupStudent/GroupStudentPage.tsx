@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { ReadCollegeData, GetSessionsByInstituteCode } from "../College/API/College_APIs";
+import { ReadCollegeList, GetSessionsByInstituteCode } from "../College/API/College_APIs";
 import {
   getStudentsWithMappingByInstituteId,
   getAllAssessments,
@@ -513,9 +513,9 @@ export default function GroupStudentPage() {
   };
 
   useEffect(() => {
-    ReadCollegeData()
+    ReadCollegeList()
       .then((res: any) => {
-        const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
+        const list = Array.isArray(res.data) ? res.data : [];
         console.log("Fetched Institutes:", list);
         setInstitutes(list);
       })
