@@ -444,12 +444,20 @@ const SectionQuestionPage: React.FC = () => {
       ? parseInt(localStorage.getItem('assessmentId')!)
       : null;
 
-    const submissionData = {
+    // Attach demographics draft if saved from the demographics page
+    let demographics = undefined;
+    try {
+      const raw = sessionStorage.getItem('demographicsDraft');
+      if (raw) demographics = JSON.parse(raw);
+    } catch { /* ignore */ }
+
+    const submissionData: Record<string, any> = {
       userStudentId: userStudentId,
       assessmentId: assessmentId,
       status: 'completed',
-      answers: answersList
+      answers: answersList,
     };
+    if (demographics) submissionData.demographics = demographics;
 
     return submissionData;
   };
@@ -738,7 +746,8 @@ const SectionQuestionPage: React.FC = () => {
             })
             .catch((err) => console.warn("Proctoring submit failed:", err));
 
-          // Clear all assessment-related localStorage to prevent stale data
+          // Clear all assessment-related storage to prevent stale data
+          sessionStorage.removeItem('demographicsDraft');
           localStorage.removeItem('assessmentAnswers');
           localStorage.removeItem('assessmentRankingAnswers');
           localStorage.removeItem('assessmentTextAnswers');

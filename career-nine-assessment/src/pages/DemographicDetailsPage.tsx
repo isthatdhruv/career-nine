@@ -205,9 +205,10 @@ const DemographicDetailsPage: React.FC = () => {
         responses,
       };
 
-      // Save demographics to Redis draft (fast) — DB persistence happens on answer submit
+      // Stash demographics locally — sent with the final answer submission (zero extra requests)
+      sessionStorage.setItem('demographicsDraft', JSON.stringify(demographicPayload));
+
       await Promise.all([
-        http.post('/student-demographics/draft-save', demographicPayload),
         http.post('/assessments/startAssessment', {
           userStudentId: Number(userStudentId),
           assessmentId: Number(assessmentId),

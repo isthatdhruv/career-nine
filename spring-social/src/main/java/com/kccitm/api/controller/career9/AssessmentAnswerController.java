@@ -361,19 +361,18 @@ public class AssessmentAnswerController {
                 assessmentSessionService.deleteSession(userStudentId, assessmentId);
                 assessmentSessionService.deleteDraft(userStudentId, assessmentId);
 
-                // Submit deferred demographics if a draft exists in Redis
+                // Submit demographics included in the payload (sent from frontend along with answers)
                 try {
-                    Object demoData = assessmentSessionService.getDemographicsDraft(userStudentId, assessmentId);
+                    Object demoData = submissionData.get("demographics");
                     if (demoData != null && demoData instanceof Map) {
                         @SuppressWarnings("unchecked")
                         Map<String, Object> demoRequest = (Map<String, Object>) demoData;
                         demographicResponseController.submit(demoRequest);
-                        assessmentSessionService.deleteDemographicsDraft(userStudentId, assessmentId);
-                        logger.info("Deferred demographics submitted for student={} assessment={}", userStudentId, assessmentId);
+                        logger.info("Demographics submitted for student={} assessment={}", userStudentId, assessmentId);
                     }
                 } catch (Exception demoEx) {
                     // Demographics failure must not block answer submission success
-                    logger.warn("Deferred demographics submission failed for student={} assessment={}: {}",
+                    logger.warn("Demographics submission failed for student={} assessment={}: {}",
                             userStudentId, assessmentId, demoEx.getMessage());
                 }
 
