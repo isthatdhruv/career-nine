@@ -8,17 +8,26 @@ type AssessmentContextType = {
   error: string | null;
   fetchAssessmentData: (assessmentId: string) => Promise<void>;
   prefetchAssessmentData: (userStudentId: string) => void;
+  preloadAssessmentData: (assessmentId: string) => void;
   prefetchedAssessments: any[] | null;
 };
 
 /**
  * Try loading a static JSON file from the build (public/assessment-cache/{id}/).
- * These are baked into the build for locked assessments — served from CDN, zero backend latency.
- * Returns null if the file doesn't exist (404) so the caller falls back to the API.
+ * Checks the preloader's Cache API store first (instant, no network), then falls
+ * back to a normal fetch. Returns null if neither works.
  */
 async function tryStaticCache(assessmentId: string, file: string): Promise<any | null> {
+  const url = `/assessment-cache/${assessmentId}/${file}`;
   try {
-    const res = await fetch(`/assessment-cache/${assessmentId}/${file}`);
+    // Check Cache API first (populated by ResourcePreloader)
+    if ('caches' in window) {
+      const cache = await caches.open('career9-resources-v1');
+      const cached = await cache.match(url);
+      if (cached) return await cached.json();
+    }
+    // Fall back to network fetch
+    const res = await fetch(url);
     if (res.ok) return await res.json();
   } catch {
     // Static file not available — fall through to API
@@ -36,6 +45,7 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [prefetchedAssessments, setPrefetchedAssessments] = useState<any[] | null>(null);
   const prefetchingRef = useRef(false);
   const prefetchPromiseRef = useRef<Promise<void> | null>(null);
+  const preloadPromiseRef = useRef<Promise<void> | null>(null);
   const cachedAssessmentIdRef = useRef<string | null>(null);
 
   const prefetchAssessmentData = (userStudentId: string) => {
@@ -97,10 +107,62 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     prefetchPromiseRef.current = promise;
   };
 
+  const preloadAssessmentData = (assessmentId: string) => {
+    if (cachedAssessmentIdRef.current === assessmentId && assessmentData && assessmentConfig) return;
+    if (preloadPromiseRef.current) return;
+
+    const promise = (async () => {
+      try {
+        // If login-page prefetch is in flight, wait for it first
+        if (prefetchPromiseRef.current) {
+          await prefetchPromiseRef.current;
+          if (cachedAssessmentIdRef.current === assessmentId) return;
+        }
+
+        const [staticData, staticConfig] = await Promise.all([
+          tryStaticCache(assessmentId, 'data.json'),
+          tryStaticCache(assessmentId, 'config.json'),
+        ]);
+
+        let questionnaireData, configData;
+        if (staticData && staticConfig) {
+          questionnaireData = staticData;
+          configData = staticConfig;
+        } else {
+          const [questionnaireRes, configRes] = await Promise.all([
+            http.get(`/assessments/getby/${assessmentId}`),
+            http.get(`/assessments/getById/${assessmentId}`),
+          ]);
+          questionnaireData = questionnaireRes.data;
+          configData = configRes.data;
+        }
+
+        cachedAssessmentIdRef.current = assessmentId;
+        setAssessmentData(questionnaireData);
+        setAssessmentConfig(configData);
+        try {
+          sessionStorage.setItem('assessmentData', JSON.stringify(questionnaireData));
+          sessionStorage.setItem('assessmentConfig', JSON.stringify(configData));
+          sessionStorage.setItem('cachedAssessmentId', assessmentId);
+        } catch {
+          // Storage quota exceeded — non-critical
+        }
+      } catch {
+        // Preload failure is non-critical — fetchAssessmentData will retry
+      } finally {
+        preloadPromiseRef.current = null;
+      }
+    })();
+    preloadPromiseRef.current = promise;
+  };
+
   const fetchAssessmentData = async (assessmentId: string): Promise<void> => {
-    // Wait for any in-flight prefetch to complete first
+    // Wait for any in-flight prefetch or preload to complete first
     if (prefetchPromiseRef.current) {
       await prefetchPromiseRef.current;
+    }
+    if (preloadPromiseRef.current) {
+      await preloadPromiseRef.current;
     }
     // Only use cached data if it matches the requested assessmentId
     if (assessmentData && assessmentConfig && cachedAssessmentIdRef.current === assessmentId) {
@@ -177,7 +239,7 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   return (
     <AssessmentContext.Provider value={{
       assessmentData, assessmentConfig, loading, error,
-      fetchAssessmentData, prefetchAssessmentData, prefetchedAssessments
+      fetchAssessmentData, prefetchAssessmentData, preloadAssessmentData, prefetchedAssessments
     }}>
       {children}
     </AssessmentContext.Provider>

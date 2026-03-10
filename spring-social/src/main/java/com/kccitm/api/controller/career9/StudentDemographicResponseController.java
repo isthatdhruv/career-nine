@@ -30,6 +30,7 @@ import com.kccitm.api.repository.Career9.AssessmentDemographicMappingRepository;
 import com.kccitm.api.repository.Career9.StudentDemographicResponseRepository;
 import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
+import com.kccitm.api.service.AssessmentSessionService;
 
 @RestController
 @RequestMapping("/student-demographics")
@@ -46,6 +47,33 @@ public class StudentDemographicResponseController {
 
     @Autowired
     private StudentInfoRepository studentInfoRepository;
+
+    @Autowired
+    private AssessmentSessionService assessmentSessionService;
+
+    /**
+     * Save demographics to Redis for deferred DB persistence.
+     * Called from demographics page so the student can navigate immediately.
+     * The actual DB save happens when assessment answers are submitted.
+     */
+    @PostMapping("/draft-save")
+    public ResponseEntity<?> saveDraft(@RequestBody Map<String, Object> request) {
+        try {
+            Long userStudentId = Long.valueOf(request.get("userStudentId").toString());
+            Long assessmentId = Long.valueOf(request.get("assessmentId").toString());
+
+            assessmentSessionService.saveDemographicsDraft(userStudentId, assessmentId, request);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Demographics draft saved");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Failed to save demographics draft: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
 
     @GetMapping("/fields/{assessmentId}/{userStudentId}")
     public ResponseEntity<?> getFieldsForAssessment(

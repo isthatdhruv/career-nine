@@ -444,12 +444,20 @@ const SectionQuestionPage: React.FC = () => {
       ? parseInt(localStorage.getItem('assessmentId')!)
       : null;
 
-    const submissionData = {
+    // Attach demographics draft if saved from the demographics page
+    let demographics = undefined;
+    try {
+      const raw = sessionStorage.getItem('demographicsDraft');
+      if (raw) demographics = JSON.parse(raw);
+    } catch { /* ignore */ }
+
+    const submissionData: Record<string, any> = {
       userStudentId: userStudentId,
       assessmentId: assessmentId,
       status: 'completed',
-      answers: answersList
+      answers: answersList,
     };
+    if (demographics) submissionData.demographics = demographics;
 
     return submissionData;
   };
@@ -738,7 +746,8 @@ const SectionQuestionPage: React.FC = () => {
             })
             .catch((err) => console.warn("Proctoring submit failed:", err));
 
-          // Clear all assessment-related localStorage to prevent stale data
+          // Clear all assessment-related storage to prevent stale data
+          sessionStorage.removeItem('demographicsDraft');
           localStorage.removeItem('assessmentAnswers');
           localStorage.removeItem('assessmentRankingAnswers');
           localStorage.removeItem('assessmentTextAnswers');
@@ -875,13 +884,15 @@ const SectionQuestionPage: React.FC = () => {
     return !!(option.optionImageBase64 && option.optionImageBase64.trim() !== '');
   };
 
-  // Helper function to get the image source (handles both data URL and raw base64)
+  // Helper function to get the image source (handles URL path, data URL, and raw base64)
   const getOptionImageSrc = (option: Option): string => {
     if (!option.optionImageBase64) return '';
-    // If it's already a data URL, use as is; otherwise prepend the data URL prefix
-    return option.optionImageBase64.startsWith('data:')
-      ? option.optionImageBase64
-      : `data:image/png;base64,${option.optionImageBase64}`;
+    // URL path (extracted images served as separate files)
+    if (option.optionImageBase64.startsWith('/')) return option.optionImageBase64;
+    // Already a data URL
+    if (option.optionImageBase64.startsWith('data:')) return option.optionImageBase64;
+    // Raw base64 — prepend data URL prefix
+    return `data:image/png;base64,${option.optionImageBase64}`;
   };
 
   // Helper function to render option content (image or text)

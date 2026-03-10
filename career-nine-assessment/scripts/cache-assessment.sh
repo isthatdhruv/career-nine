@@ -15,10 +15,10 @@ CACHE_DIR="public/assessment-cache"
 # If first arg is a number, it's a specific assessment ID
 if [[ "$1" =~ ^[0-9]+$ ]]; then
   ASSESSMENT_ID=$1
-  BASE_URL=${2:-"http://localhost:8080"}
+  BASE_URL=${2:-"https://api.career-9.com:8080"}
 else
   ASSESSMENT_ID=""
-  BASE_URL=${1:-"http://localhost:8080"}
+  BASE_URL=${1:-"https://api.career-9.com:8080"}
 fi
 
 sync_assessment() {
@@ -28,7 +28,15 @@ sync_assessment() {
 
   curl -sf "${BASE_URL}/assessments/getby/${id}" -o "${dir}/data.json"
   curl -sf "${BASE_URL}/assessments/getById/${id}" -o "${dir}/config.json"
-  echo "  ✓ Cached assessment ${id} (data: $(wc -c < "${dir}/data.json")B, config: $(wc -c < "${dir}/config.json")B)"
+  echo "  ✓ Fetched assessment ${id} (data: $(wc -c < "${dir}/data.json")B, config: $(wc -c < "${dir}/config.json")B)"
+
+  # Extract base64 images from JSON into separate files (saves ~3.5MB per assessment with images)
+  node scripts/extract-assessment-images.cjs "$dir"
+
+  # Minify JSON (remove whitespace)
+  node -e "process.stdout.write(JSON.stringify(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'))))" "${dir}/data.json" > "${dir}/data.min.json" && mv "${dir}/data.min.json" "${dir}/data.json"
+  node -e "process.stdout.write(JSON.stringify(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'))))" "${dir}/config.json" > "${dir}/config.min.json" && mv "${dir}/config.min.json" "${dir}/config.json"
+  echo "  ✓ Optimized assessment ${id} (data: $(wc -c < "${dir}/data.json")B, config: $(wc -c < "${dir}/config.json")B)"
 }
 
 remove_unlocked() {

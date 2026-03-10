@@ -27,7 +27,7 @@ type DemographicField = {
 const DemographicDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const { assessmentId } = useParams<{ assessmentId: string }>();
-  const { fetchAssessmentData } = useAssessment();
+  const { fetchAssessmentData, preloadAssessmentData } = useAssessment();
   usePreventReload();
 
   const [fields, setFields] = useState<DemographicField[]>([]);
@@ -46,6 +46,7 @@ const DemographicDetailsPage: React.FC = () => {
       return;
     }
     fetchFields();
+    preloadAssessmentData(assessmentId);
   }, [assessmentId, userStudentId]);
 
   const fetchFields = async () => {
@@ -148,11 +149,13 @@ const DemographicDetailsPage: React.FC = () => {
   };
 
   const startAssessmentAndNavigate = async () => {
-    await http.post('/assessments/startAssessment', {
-      userStudentId: Number(userStudentId),
-      assessmentId: Number(assessmentId),
-    });
-    await fetchAssessmentData(String(assessmentId));
+    await Promise.all([
+      http.post('/assessments/startAssessment', {
+        userStudentId: Number(userStudentId),
+        assessmentId: Number(assessmentId),
+      }),
+      fetchAssessmentData(String(assessmentId)),
+    ]);
     navigate('/general-instructions');
   };
 
@@ -196,20 +199,31 @@ const DemographicDetailsPage: React.FC = () => {
             : values[field.fieldId] || '',
       }));
 
-      await http.post('/student-demographics/submit', {
+      const demographicPayload = {
         userStudentId: Number(userStudentId),
         assessmentId: Number(assessmentId),
         responses,
-      });
+      };
 
-      await startAssessmentAndNavigate();
+      // Stash demographics locally — sent with the final answer submission (zero extra requests)
+      sessionStorage.setItem('demographicsDraft', JSON.stringify(demographicPayload));
+
+      await Promise.all([
+        http.post('/assessments/startAssessment', {
+          userStudentId: Number(userStudentId),
+          assessmentId: Number(assessmentId),
+        }),
+        fetchAssessmentData(String(assessmentId)),
+      ]);
+
+      navigate('/general-instructions');
     } catch (error: any) {
       console.error('Error submitting demographics:', error);
       const errorData = error.response?.data;
       if (errorData?.validationErrors) {
         alert('Validation errors:\n' + errorData.validationErrors.join('\n'));
       } else {
-        alert(errorData?.error || 'Failed to submit demographics. Please try again.');
+        alert(errorData?.error || 'Failed to save demographics. Please try again.');
       }
     } finally {
       setIsSubmitting(false);
