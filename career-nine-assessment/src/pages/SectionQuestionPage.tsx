@@ -1,17 +1,23 @@
-import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useAssessment } from '../contexts/AssessmentContext';
-import { usePreventReload } from '../hooks/usePreventReload';
-import { AssessmentGameWrapper } from '../games/AssessmentGameWrapper';
-import { useDebouncedLocalStorage } from '../hooks/useDebouncedLocalStorage';
-import QuestionNavigationGrid from '../components/QuestionNavigationGrid';
-import { useEyeGazeTracking } from '../hooks/useFaceTracking';
-import { useFaceCounter } from '../hooks/useFaceCounter';
-import { useMouseClickTracker } from '../hooks/useMouseClickTracker';
-import { usePerQuestionProctoring } from '../hooks/usePerQuestionProctoring';
-import { submitProctoringData } from '../api/proctoringApi';
-import type { ProctoringPayload } from '../types/proctoring';
-import { useHeartbeat } from '../hooks/useHeartbeat';
+import { useAssessment } from "../contexts/AssessmentContext";
+import { usePreventReload } from "../hooks/usePreventReload";
+import { AssessmentGameWrapper } from "../games/AssessmentGameWrapper";
+import { useDebouncedLocalStorage } from "../hooks/useDebouncedLocalStorage";
+import QuestionNavigationGrid from "../components/QuestionNavigationGrid";
+import { useEyeGazeTracking } from "../hooks/useFaceTracking";
+import { useFaceCounter } from "../hooks/useFaceCounter";
+import { useMouseClickTracker } from "../hooks/useMouseClickTracker";
+import { usePerQuestionProctoring } from "../hooks/usePerQuestionProctoring";
+import { submitProctoringData } from "../api/proctoringApi";
+import type { ProctoringPayload } from "../types/proctoring";
+import { useHeartbeat } from "../hooks/useHeartbeat";
 
 type GameTable = {
   gameId: number;
@@ -70,12 +76,15 @@ const SectionQuestionPage: React.FC = () => {
   const showTimer = assessmentConfig?.showTimer !== false;
   const saveLater = assessmentConfig?.saveLater !== false;
   usePreventReload();
-  const { scheduleWrite, flush: flushLocalStorage } = useDebouncedLocalStorage(500);
+  const { scheduleWrite, flush: flushLocalStorage } =
+    useDebouncedLocalStorage(500);
   const [showSidebar, setShowSidebar] = useState(false);
 
   // Proctoring hooks — eye gaze, face counting, mouse tracking, per-question aggregation
   const faceCountRef = useRef<number>(0);
-  const { snapshots: proctoringSnapshots, videoElement } = useEyeGazeTracking({ faceCountRef });
+  const { snapshots: proctoringSnapshots, videoElement } = useEyeGazeTracking({
+    faceCountRef,
+  });
   useFaceCounter({ videoElement, faceCountRef });
   const { clicks: proctoringClicks } = useMouseClickTracker();
 
@@ -84,12 +93,15 @@ const SectionQuestionPage: React.FC = () => {
   const [currentIndex, setCurrentIndex] = useState<number>(0);
 
   // Derive current questionnaireQuestionId for proctoring (null when data not loaded)
-  const currentQuestionnaireQuestionId = questions[currentIndex]?.questionnaireQuestionId ?? null;
-  const { perQuestionData, finalizeCurrentQuestion } = usePerQuestionProctoring({
-    questionnaireQuestionId: currentQuestionnaireQuestionId,
-    proctoringSnapshots,
-    proctoringClicks,
-  });
+  const currentQuestionnaireQuestionId =
+    questions[currentIndex]?.questionnaireQuestionId ?? null;
+  const { perQuestionData, finalizeCurrentQuestion } = usePerQuestionProctoring(
+    {
+      questionnaireQuestionId: currentQuestionnaireQuestionId,
+      proctoringSnapshots,
+      proctoringClicks,
+    },
+  );
   const [languages, setLanguages] = useState<QuestionnaireLanguage[]>([]);
   const [currentSection, setCurrentSection] = useState<any>(null);
   const [showWarning, setShowWarning] = useState<boolean>(false);
@@ -97,19 +109,24 @@ const SectionQuestionPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // Track which sections have already shown their instructions (only show once)
-  const [seenSectionInstructions, setSeenSectionInstructions] = useState<Set<string>>(() => {
-    const stored = localStorage.getItem('assessmentSeenSectionInstructions');
+  const [seenSectionInstructions, setSeenSectionInstructions] = useState<
+    Set<string>
+  >(() => {
+    const stored = localStorage.getItem("assessmentSeenSectionInstructions");
     return stored ? new Set(JSON.parse(stored)) : new Set();
   });
-  const [showSectionInstruction, setShowSectionInstruction] = useState<boolean>(false);
-  const [sectionInstructionTexts, setSectionInstructionTexts] = useState<Array<{text: string; language: string}>>([]);
+  const [showSectionInstruction, setShowSectionInstruction] =
+    useState<boolean>(false);
+  const [sectionInstructionTexts, setSectionInstructionTexts] = useState<
+    Array<{ text: string; language: string }>
+  >([]);
 
   // Heartbeat: report current page position to backend for live tracking
   useHeartbeat({
-    userStudentId: Number(localStorage.getItem('userStudentId')) || null,
-    assessmentId: Number(localStorage.getItem('assessmentId')) || null,
-    page: 'question',
-    sectionName: currentSection?.section?.sectionName || '',
+    userStudentId: Number(localStorage.getItem("userStudentId")) || null,
+    assessmentId: Number(localStorage.getItem("assessmentId")) || null,
+    page: "question",
+    sectionName: currentSection?.section?.sectionName || "",
     sectionId: sectionId,
     questionIndex: String(currentIndex),
   });
@@ -119,17 +136,23 @@ const SectionQuestionPage: React.FC = () => {
   const [activeGameCode, setActiveGameCode] = useState<number | null>(null);
 
   // Load initial state from localStorage
-  const [answers, setAnswers] = useState<Record<string, Record<number, number[]>>>(() => {
-    const stored = localStorage.getItem('assessmentAnswers');
+  const [answers, setAnswers] = useState<
+    Record<string, Record<number, number[]>>
+  >(() => {
+    const stored = localStorage.getItem("assessmentAnswers");
     return stored ? JSON.parse(stored) : {};
   });
   // For ranking questions: sectionId -> questionId -> optionId -> rank
-  const [rankingAnswers, setRankingAnswers] = useState<Record<string, Record<number, Record<number, number>>>>(() => {
-    const stored = localStorage.getItem('assessmentRankingAnswers');
+  const [rankingAnswers, setRankingAnswers] = useState<
+    Record<string, Record<number, Record<number, number>>>
+  >(() => {
+    const stored = localStorage.getItem("assessmentRankingAnswers");
     return stored ? JSON.parse(stored) : {};
   });
-  const [savedForLater, setSavedForLater] = useState<Record<string, Set<number>>>(() => {
-    const stored = localStorage.getItem('assessmentSavedForLater');
+  const [savedForLater, setSavedForLater] = useState<
+    Record<string, Set<number>>
+  >(() => {
+    const stored = localStorage.getItem("assessmentSavedForLater");
     if (stored) {
       const parsed = JSON.parse(stored);
       // Convert arrays back to Sets
@@ -142,7 +165,7 @@ const SectionQuestionPage: React.FC = () => {
     return {};
   });
   const [skipped, setSkipped] = useState<Record<string, Set<number>>>(() => {
-    const stored = localStorage.getItem('assessmentSkipped');
+    const stored = localStorage.getItem("assessmentSkipped");
     if (stored) {
       const parsed = JSON.parse(stored);
       // Convert arrays back to Sets
@@ -155,24 +178,34 @@ const SectionQuestionPage: React.FC = () => {
     return {};
   });
   const [elapsedTime, setElapsedTime] = useState<number>(() => {
-    const stored = localStorage.getItem('assessmentElapsedTime');
+    const stored = localStorage.getItem("assessmentElapsedTime");
     return stored ? parseInt(stored) : 0;
   });
   // For text-type questions: sectionId -> questionId -> inputIndex -> text value
-  const [textAnswers, setTextAnswers] = useState<Record<string, Record<number, Record<number, string>>>>(() => {
-    const stored = localStorage.getItem('assessmentTextAnswers');
+  const [textAnswers, setTextAnswers] = useState<
+    Record<string, Record<number, Record<number, string>>>
+  >(() => {
+    const stored = localStorage.getItem("assessmentTextAnswers");
     return stored ? JSON.parse(stored) : {};
   });
   // Track which autocomplete dropdown is open: "questionId-inputIdx" or null
-  const [activeAutocomplete, setActiveAutocomplete] = useState<string | null>(null);
+  const [activeAutocomplete, setActiveAutocomplete] = useState<string | null>(
+    null,
+  );
   // Local text input state for debouncing - immediate UI update without triggering re-renders
-  const [localTextInputs, setLocalTextInputs] = useState<Record<string, string>>({});
-  const textDebounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const [localTextInputs, setLocalTextInputs] = useState<
+    Record<string, string>
+  >({});
+  const textDebounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>(
+    {},
+  );
   // Track completed games: gameCode -> boolean
-  const [completedGames, setCompletedGames] = useState<Record<number, boolean>>(() => {
-    const stored = localStorage.getItem('assessmentCompletedGames');
-    return stored ? JSON.parse(stored) : {};
-  });
+  const [completedGames, setCompletedGames] = useState<Record<number, boolean>>(
+    () => {
+      const stored = localStorage.getItem("assessmentCompletedGames");
+      return stored ? JSON.parse(stored) : {};
+    },
+  );
 
   useEffect(() => {
     if (assessmentData && assessmentData[0]) {
@@ -180,7 +213,7 @@ const SectionQuestionPage: React.FC = () => {
       setQuestionnaire(questionnaireData);
 
       const section = questionnaireData.sections.find(
-        (sec: any) => String(sec.section.sectionId) === String(sectionId)
+        (sec: any) => String(sec.section.sectionId) === String(sectionId),
       );
       if (!section) return;
 
@@ -194,11 +227,11 @@ const SectionQuestionPage: React.FC = () => {
 
   // Debounced localStorage writes - batches all state into single write cycles
   useEffect(() => {
-    scheduleWrite('assessmentAnswers', JSON.stringify(answers));
+    scheduleWrite("assessmentAnswers", JSON.stringify(answers));
   }, [answers, scheduleWrite]);
 
   useEffect(() => {
-    scheduleWrite('assessmentRankingAnswers', JSON.stringify(rankingAnswers));
+    scheduleWrite("assessmentRankingAnswers", JSON.stringify(rankingAnswers));
   }, [rankingAnswers, scheduleWrite]);
 
   useEffect(() => {
@@ -206,7 +239,7 @@ const SectionQuestionPage: React.FC = () => {
     for (const key in savedForLater) {
       toStore[key] = Array.from(savedForLater[key]);
     }
-    scheduleWrite('assessmentSavedForLater', JSON.stringify(toStore));
+    scheduleWrite("assessmentSavedForLater", JSON.stringify(toStore));
   }, [savedForLater, scheduleWrite]);
 
   useEffect(() => {
@@ -214,27 +247,30 @@ const SectionQuestionPage: React.FC = () => {
     for (const key in skipped) {
       toStore[key] = Array.from(skipped[key]);
     }
-    scheduleWrite('assessmentSkipped', JSON.stringify(toStore));
+    scheduleWrite("assessmentSkipped", JSON.stringify(toStore));
   }, [skipped, scheduleWrite]);
 
   // Persist elapsed time every 5 seconds (timer ticks every 1s but writes are batched)
   useEffect(() => {
     const timer = setTimeout(() => {
-      localStorage.setItem('assessmentElapsedTime', String(elapsedTime));
+      localStorage.setItem("assessmentElapsedTime", String(elapsedTime));
     }, 5000);
     return () => clearTimeout(timer);
   }, [elapsedTime]);
 
   useEffect(() => {
-    scheduleWrite('assessmentCompletedGames', JSON.stringify(completedGames));
+    scheduleWrite("assessmentCompletedGames", JSON.stringify(completedGames));
   }, [completedGames, scheduleWrite]);
 
   useEffect(() => {
-    scheduleWrite('assessmentTextAnswers', JSON.stringify(textAnswers));
+    scheduleWrite("assessmentTextAnswers", JSON.stringify(textAnswers));
   }, [textAnswers, scheduleWrite]);
 
   useEffect(() => {
-    scheduleWrite('assessmentSeenSectionInstructions', JSON.stringify(Array.from(seenSectionInstructions)));
+    scheduleWrite(
+      "assessmentSeenSectionInstructions",
+      JSON.stringify(Array.from(seenSectionInstructions)),
+    );
   }, [seenSectionInstructions, scheduleWrite]);
 
   // Show section instruction popup when entering a new section (only once per section)
@@ -245,17 +281,20 @@ const SectionQuestionPage: React.FC = () => {
     if (seenSectionInstructions.has(sectionId)) return;
 
     const section = questionnaire.sections.find(
-      (sec: any) => String(sec.section.sectionId) === String(sectionId)
+      (sec: any) => String(sec.section.sectionId) === String(sectionId),
     );
 
     if (section?.instruction && section.instruction.length > 0) {
       const isNAText = (text: string | null | undefined): boolean => {
         if (!text) return false;
         const trimmed = text.trim().toUpperCase();
-        return trimmed === 'NA' || trimmed === 'N/A';
+        return trimmed === "NA" || trimmed === "N/A";
       };
       const texts = section.instruction
-        .filter((inst: any) => inst.instructionText && !isNAText(inst.instructionText))
+        .filter(
+          (inst: any) =>
+            inst.instructionText && !isNAText(inst.instructionText),
+        )
         .map((inst: any) => ({
           text: inst.instructionText,
           language: inst.language?.languageName || "English",
@@ -286,24 +325,35 @@ const SectionQuestionPage: React.FC = () => {
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${hrs.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const getQuestionColor = useCallback((secId: string, questionId: number) => {
-    if (answers[secId]?.[questionId]?.length) return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
-    const rankingCount = Object.keys(rankingAnswers[secId]?.[questionId] || {}).length;
-    if (rankingCount > 0) return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
-    const textCount = Object.values(textAnswers[secId]?.[questionId] || {}).filter((t: string) => t.trim()).length;
-    if (textCount > 0) return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
-    if (savedForLater[secId]?.has(questionId)) return "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)";
-    if (skipped[secId]?.has(questionId)) return "linear-gradient(135deg, #f87171 0%, #dc2626 100%)";
-    return "#d1d5db";
-  }, [answers, rankingAnswers, textAnswers, savedForLater, skipped]);
+  const getQuestionColor = useCallback(
+    (secId: string, questionId: number) => {
+      if (answers[secId]?.[questionId]?.length)
+        return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+      const rankingCount = Object.keys(
+        rankingAnswers[secId]?.[questionId] || {},
+      ).length;
+      if (rankingCount > 0)
+        return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+      const textCount = Object.values(
+        textAnswers[secId]?.[questionId] || {},
+      ).filter((t: string) => t.trim()).length;
+      if (textCount > 0)
+        return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+      if (savedForLater[secId]?.has(questionId))
+        return "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)";
+      if (skipped[secId]?.has(questionId))
+        return "linear-gradient(135deg, #f87171 0%, #dc2626 100%)";
+      return "#d1d5db";
+    },
+    [answers, rankingAnswers, textAnswers, savedForLater, skipped],
+  );
 
   if (!assessmentData) {
     return <div className="text-center mt-5">Loading...</div>;
-  }
-  else if (!questionnaire || !questions.length) {
+  } else if (!questionnaire || !questions.length) {
     return <div className="text-center mt-5">Loading Assessment</div>;
   }
 
@@ -319,7 +369,7 @@ const SectionQuestionPage: React.FC = () => {
     if (lang.language.languageId === 100) return true;
     // For other languages, check if a translation actually exists for this question
     return question.question.languageQuestions?.some(
-      (lq) => lq.language.languageId === lang.language.languageId
+      (lq) => lq.language.languageId === lang.language.languageId,
     );
   });
 
@@ -327,7 +377,7 @@ const SectionQuestionPage: React.FC = () => {
   const isLastSection = () => {
     if (!questionnaire) return false;
     const currentSectionIndex = questionnaire.sections.findIndex(
-      (s: any) => String(s.section.sectionId) === String(sectionId)
+      (s: any) => String(s.section.sectionId) === String(sectionId),
     );
     return currentSectionIndex === questionnaire.sections.length - 1;
   };
@@ -347,14 +397,18 @@ const SectionQuestionPage: React.FC = () => {
 
         // Check if question is answered
         const isRankingQuestion = q.question.questionType === "ranking";
-        const isTextQuestion = q.question.questionType === "text" || q.question.isMQTtyped === true;
+        const isTextQuestion =
+          q.question.questionType === "text" || q.question.isMQTtyped === true;
         let isAnswered = false;
         if (isTextQuestion) {
           const texts = textAnswers[secId]?.[qId] || {};
-          isAnswered = Object.values(texts).some((t: string) => t.trim().length > 0);
+          isAnswered = Object.values(texts).some(
+            (t: string) => t.trim().length > 0,
+          );
         } else if (isRankingQuestion) {
           const rankings = rankingAnswers[secId]?.[qId] || {};
-          const maxAllowed = q.question.maxOptionsAllowed || q.question.options?.length || 0;
+          const maxAllowed =
+            q.question.maxOptionsAllowed || q.question.options?.length || 0;
           isAnswered = Object.keys(rankings).length >= maxAllowed;
         } else {
           isAnswered = answers[secId]?.[qId]?.length > 0;
@@ -379,7 +433,9 @@ const SectionQuestionPage: React.FC = () => {
         for (const q of section.questions) {
           const questionnaireQuestionId = q.questionnaireQuestionId;
           const isRankingQuestion = q.question.questionType === "ranking";
-          const isTextQuestion = q.question.questionType === "text" || q.question.isMQTtyped === true;
+          const isTextQuestion =
+            q.question.questionType === "text" ||
+            q.question.isMQTtyped === true;
 
           if (isTextQuestion) {
             // Handle text-type questions
@@ -389,47 +445,53 @@ const SectionQuestionPage: React.FC = () => {
               const trimmed = (text as string).trim();
               if (trimmed) {
                 // Check if text exactly matches an option (case-insensitive, ignoring extra spaces)
-                const normalised = trimmed.replace(/\s+/g, ' ').toLowerCase();
+                const normalised = trimmed.replace(/\s+/g, " ").toLowerCase();
                 const matchedOption = questionOptions.find(
-                  (opt: any) => (opt.optionText || '').trim().replace(/\s+/g, ' ').toLowerCase() === normalised
+                  (opt: any) =>
+                    (opt.optionText || "")
+                      .trim()
+                      .replace(/\s+/g, " ")
+                      .toLowerCase() === normalised,
                 );
                 if (matchedOption) {
                   // Exact match — send optionId directly (scored immediately, no mapping needed)
                   answersList.push({
                     questionnaireQuestionId: questionnaireQuestionId,
-                    optionId: matchedOption.optionId
+                    optionId: matchedOption.optionId,
                   });
                 } else {
                   // Free-text — send as textResponse (needs admin mapping later)
                   answersList.push({
                     questionnaireQuestionId: questionnaireQuestionId,
-                    textResponse: trimmed
+                    textResponse: trimmed,
                   });
                 }
               }
             }
           } else if (isRankingQuestion) {
             // Handle ranking questions
-            const rankings = rankingAnswers[secId]?.[questionnaireQuestionId] || {};
+            const rankings =
+              rankingAnswers[secId]?.[questionnaireQuestionId] || {};
 
             for (const [optionIdStr, rank] of Object.entries(rankings)) {
               const entry = {
                 questionnaireQuestionId: questionnaireQuestionId,
                 optionId: parseInt(optionIdStr),
-                rankOrder: rank
+                rankOrder: rank,
               };
               answersList.push(entry);
             }
           } else {
             // Handle regular single/multiple choice questions
-            const selectedOptionIds = answers[secId]?.[questionnaireQuestionId] || [];
+            const selectedOptionIds =
+              answers[secId]?.[questionnaireQuestionId] || [];
 
             // For each selected option, create a separate entry
             if (selectedOptionIds.length > 0) {
               for (const optionId of selectedOptionIds) {
                 const entry = {
                   questionnaireQuestionId: questionnaireQuestionId,
-                  optionId: optionId
+                  optionId: optionId,
                 };
 
                 answersList.push(entry);
@@ -441,26 +503,28 @@ const SectionQuestionPage: React.FC = () => {
     }
 
     // Get user_student_id from questionnaire data
-    const userStudentId = localStorage.getItem('userStudentId')
-      ? parseInt(localStorage.getItem('userStudentId')!)
+    const userStudentId = localStorage.getItem("userStudentId")
+      ? parseInt(localStorage.getItem("userStudentId")!)
       : null;
 
     // Get assessment_id from localStorage
-    const assessmentId = localStorage.getItem('assessmentId')
-      ? parseInt(localStorage.getItem('assessmentId')!)
+    const assessmentId = localStorage.getItem("assessmentId")
+      ? parseInt(localStorage.getItem("assessmentId")!)
       : null;
 
     // Attach demographics draft if saved from the demographics page
     let demographics = undefined;
     try {
-      const raw = sessionStorage.getItem('demographicsDraft');
+      const raw = sessionStorage.getItem("demographicsDraft");
       if (raw) demographics = JSON.parse(raw);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
     const submissionData: Record<string, any> = {
       userStudentId: userStudentId,
       assessmentId: assessmentId,
-      status: 'completed',
+      status: "completed",
       answers: answersList,
     };
     if (demographics) submissionData.demographics = demographics;
@@ -483,9 +547,10 @@ const SectionQuestionPage: React.FC = () => {
 
     // Determine if this selection will trigger auto-advance
     // Auto-advance when: adding an option (not removing), and new count equals maxAllowed
-    const willAutoAdvance = !isAlreadySelected &&
+    const willAutoAdvance =
+      !isAlreadySelected &&
       maxAllowed > 0 &&
-      (currentSelectedCount + 1) === maxAllowed;
+      currentSelectedCount + 1 === maxAllowed;
 
     setAnswers((prev) => {
       const sec = prev[sectionId!] || {};
@@ -524,9 +589,15 @@ const SectionQuestionPage: React.FC = () => {
     // Auto-advance to next unanswered question after a short delay (to let user see their selection)
     if (willAutoAdvance) {
       setTimeout(() => {
-        const nextUnanswered = findNextUnansweredQuestion(sectionId!, currentIndex, qId);
+        const nextUnanswered = findNextUnansweredQuestion(
+          sectionId!,
+          currentIndex,
+          qId,
+        );
         if (nextUnanswered) {
-          navigate(`/studentAssessment/sections/${nextUnanswered.sectionId}/questions/${nextUnanswered.questionIndex}`);
+          navigate(
+            `/studentAssessment/sections/${nextUnanswered.sectionId}/questions/${nextUnanswered.questionIndex}`,
+          );
         }
         // If all questions answered, stay on current question (user can submit)
       }, 400); // 400ms delay so user can see their selection
@@ -542,7 +613,7 @@ const SectionQuestionPage: React.FC = () => {
 
     // Will auto-advance if: setting a rank (not removing), and this will reach maxAllowed
     const isAddingRank = rank !== null && !currentRankings[optionId];
-    const willAutoAdvance = isAddingRank && (currentRankCount + 1) === maxAllowed;
+    const willAutoAdvance = isAddingRank && currentRankCount + 1 === maxAllowed;
 
     setRankingAnswers((prev) => {
       const sec = prev[sectionId!] || {};
@@ -579,9 +650,15 @@ const SectionQuestionPage: React.FC = () => {
     // Auto-advance to next unanswered question after a short delay
     if (willAutoAdvance) {
       setTimeout(() => {
-        const nextUnanswered = findNextUnansweredQuestion(sectionId!, currentIndex, qId);
+        const nextUnanswered = findNextUnansweredQuestion(
+          sectionId!,
+          currentIndex,
+          qId,
+        );
         if (nextUnanswered) {
-          navigate(`/studentAssessment/sections/${nextUnanswered.sectionId}/questions/${nextUnanswered.questionIndex}`);
+          navigate(
+            `/studentAssessment/sections/${nextUnanswered.sectionId}/questions/${nextUnanswered.questionIndex}`,
+          );
         }
         // If all questions answered, stay on current question (user can submit)
       }, 400); // 400ms delay so user can see their selection
@@ -593,7 +670,7 @@ const SectionQuestionPage: React.FC = () => {
     const usedRanks = new Set(
       Object.entries(questionRankings)
         .filter(([optId]) => parseInt(optId) !== currentOptionId)
-        .map(([, rank]) => rank)
+        .map(([, rank]) => rank),
     );
 
     const maxRanks = question.question.maxOptionsAllowed;
@@ -630,10 +707,14 @@ const SectionQuestionPage: React.FC = () => {
 
     // Navigate to the next unanswered question, skipping already-answered ones
     // Exclude the current question since we just saved it (it's not answered)
-    const nextUnanswered = findNextUnansweredQuestion(sectionId!, currentIndex, qId);
+    const nextUnanswered = findNextUnansweredQuestion(
+      sectionId!,
+      currentIndex,
+      qId,
+    );
     if (nextUnanswered) {
       navigate(
-        `/studentAssessment/sections/${nextUnanswered.sectionId}/questions/${nextUnanswered.questionIndex}`
+        `/studentAssessment/sections/${nextUnanswered.sectionId}/questions/${nextUnanswered.questionIndex}`,
       );
     }
     // If no unanswered questions remain, stay on current question
@@ -646,7 +727,7 @@ const SectionQuestionPage: React.FC = () => {
     const nextUnanswered = findNextUnansweredQuestion(sectionId!, currentIndex);
     if (nextUnanswered) {
       navigate(
-        `/studentAssessment/sections/${nextUnanswered.sectionId}/questions/${nextUnanswered.questionIndex}`
+        `/studentAssessment/sections/${nextUnanswered.sectionId}/questions/${nextUnanswered.questionIndex}`,
       );
     } else {
       // All questions answered — go to next section or completed page
@@ -659,19 +740,19 @@ const SectionQuestionPage: React.FC = () => {
       const newIndex = currentIndex - 1;
       setCurrentIndex(newIndex);
       navigate(
-        `/studentAssessment/sections/${sectionId}/questions/${newIndex}`
+        `/studentAssessment/sections/${sectionId}/questions/${newIndex}`,
       );
     }
   };
 
   const goToNextSection = () => {
     const idx = questionnaire.sections.findIndex(
-      (s: any) => String(s.section.sectionId) === String(sectionId)
+      (s: any) => String(s.section.sectionId) === String(sectionId),
     );
     const next = questionnaire.sections[idx + 1];
     if (next) {
       navigate(
-        `/studentAssessment/sections/${next.section.sectionId}/questions/0`
+        `/studentAssessment/sections/${next.section.sectionId}/questions/0`,
       );
     } else {
       navigate("/studentAssessment/completed");
@@ -710,11 +791,11 @@ const SectionQuestionPage: React.FC = () => {
       console.log(JSON.stringify(submissionJSON, null, 2));
 
       // Build proctoring payload from collected per-question data
-      const userStudentId = localStorage.getItem('userStudentId')
-        ? parseInt(localStorage.getItem('userStudentId')!)
+      const userStudentId = localStorage.getItem("userStudentId")
+        ? parseInt(localStorage.getItem("userStudentId")!)
         : 0;
-      const assessmentId = localStorage.getItem('assessmentId')
-        ? parseInt(localStorage.getItem('assessmentId')!)
+      const assessmentId = localStorage.getItem("assessmentId")
+        ? parseInt(localStorage.getItem("assessmentId")!)
         : 0;
       const proctoringPayload: ProctoringPayload = {
         userStudentId,
@@ -725,15 +806,18 @@ const SectionQuestionPage: React.FC = () => {
       const maxRetries = 3;
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          const response = await fetch(`${import.meta.env.VITE_API_URL}/assessment-answer/submit`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Accept": "application/json"
+          const response = await fetch(
+            `${import.meta.env.VITE_API_URL}/assessment-answer/submit`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+              },
+              body: JSON.stringify(submissionJSON),
+              signal: AbortSignal.timeout(30000), // 30s timeout
             },
-            body: JSON.stringify(submissionJSON),
-            signal: AbortSignal.timeout(30000), // 30s timeout
-          });
+          );
 
           if (!response.ok) {
             const errorText = await response.text();
@@ -748,30 +832,37 @@ const SectionQuestionPage: React.FC = () => {
           submitProctoringData(proctoringPayload)
             .then(() => {
               console.log("=== PROCTORING DATA SUBMITTED ===");
-              localStorage.removeItem('proctoring_per_question');
+              localStorage.removeItem("proctoring_per_question");
             })
             .catch((err) => console.warn("Proctoring submit failed:", err));
 
           // Clear all assessment-related storage to prevent stale data
-          sessionStorage.removeItem('demographicsDraft');
-          localStorage.removeItem('assessmentAnswers');
-          localStorage.removeItem('assessmentRankingAnswers');
-          localStorage.removeItem('assessmentTextAnswers');
-          localStorage.removeItem('assessmentSavedForLater');
-          localStorage.removeItem('assessmentSkipped');
-          localStorage.removeItem('assessmentElapsedTime');
-          localStorage.removeItem('assessmentCompletedGames');
+          sessionStorage.removeItem("demographicsDraft");
+          localStorage.removeItem("assessmentAnswers");
+          localStorage.removeItem("assessmentRankingAnswers");
+          localStorage.removeItem("assessmentTextAnswers");
+          localStorage.removeItem("assessmentSavedForLater");
+          localStorage.removeItem("assessmentSkipped");
+          localStorage.removeItem("assessmentElapsedTime");
+          localStorage.removeItem("assessmentCompletedGames");
 
           navigate("/studentAssessment/completed");
           return;
         } catch (error) {
-          console.error(`Submit attempt ${attempt}/${maxRetries} failed:`, error);
+          console.error(
+            `Submit attempt ${attempt}/${maxRetries} failed:`,
+            error,
+          );
           if (attempt < maxRetries) {
             const delay = Math.pow(2, attempt - 1) * 1000;
-            alert(`Submission failed (attempt ${attempt}/${maxRetries}). Retrying in ${delay / 1000}s...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
+            alert(
+              `Submission failed (attempt ${attempt}/${maxRetries}). Retrying in ${delay / 1000}s...`,
+            );
+            await new Promise((resolve) => setTimeout(resolve, delay));
           } else {
-            alert("Failed to submit assessment after 3 attempts. Your answers are saved locally. Please check your connection and try again.");
+            alert(
+              "Failed to submit assessment after 3 attempts. Your answers are saved locally. Please check your connection and try again.",
+            );
           }
         }
       }
@@ -788,7 +879,9 @@ const SectionQuestionPage: React.FC = () => {
     const firstUnanswered = findNextUnansweredQuestion(firstSectionId, -1);
     if (firstUnanswered) {
       setShowWarning(false);
-      navigate(`/studentAssessment/sections/${firstUnanswered.sectionId}/questions/${firstUnanswered.questionIndex}`);
+      navigate(
+        `/studentAssessment/sections/${firstUnanswered.sectionId}/questions/${firstUnanswered.questionIndex}`,
+      );
     }
   };
 
@@ -797,12 +890,12 @@ const SectionQuestionPage: React.FC = () => {
   const findNextUnansweredQuestion = (
     fromSectionId: string,
     fromQuestionIndex: number,
-    excludeQuestionId?: number
+    excludeQuestionId?: number,
   ): { sectionId: string; questionIndex: number } | null => {
     if (!questionnaire) return null;
     const sections = questionnaire.sections;
     const startSectionIdx = sections.findIndex(
-      (s: any) => String(s.section.sectionId) === fromSectionId
+      (s: any) => String(s.section.sectionId) === fromSectionId,
     );
     if (startSectionIdx === -1) return null;
 
@@ -819,10 +912,13 @@ const SectionQuestionPage: React.FC = () => {
         if (excludeQuestionId && questionId === excludeQuestionId) continue;
 
         const isRanking = q.question.questionType === "ranking";
-        const isText = q.question.questionType === "text" || q.question.isMQTtyped === true;
+        const isText =
+          q.question.questionType === "text" || q.question.isMQTtyped === true;
         let isAnswered = false;
         if (isText) {
-          isAnswered = Object.values(textAnswers[secId]?.[questionId] || {}).some((t: string) => t.trim().length > 0);
+          isAnswered = Object.values(
+            textAnswers[secId]?.[questionId] || {},
+          ).some((t: string) => t.trim().length > 0);
         } else if (isRanking) {
           const rankings = rankingAnswers[secId]?.[questionId] || {};
           isAnswered = Object.keys(rankings).length > 0;
@@ -840,7 +936,8 @@ const SectionQuestionPage: React.FC = () => {
     for (let sIdx = 0; sIdx <= startSectionIdx; sIdx++) {
       const sec = sections[sIdx];
       const secId = String(sec.section.sectionId);
-      const endQ = sIdx === startSectionIdx ? fromQuestionIndex : sec.questions.length;
+      const endQ =
+        sIdx === startSectionIdx ? fromQuestionIndex : sec.questions.length;
 
       for (let qIdx = 0; qIdx < endQ; qIdx++) {
         const q = sec.questions[qIdx];
@@ -849,10 +946,13 @@ const SectionQuestionPage: React.FC = () => {
         if (excludeQuestionId && questionId === excludeQuestionId) continue;
 
         const isRanking = q.question.questionType === "ranking";
-        const isText = q.question.questionType === "text" || q.question.isMQTtyped === true;
+        const isText =
+          q.question.questionType === "text" || q.question.isMQTtyped === true;
         let isAnswered = false;
         if (isText) {
-          isAnswered = Object.values(textAnswers[secId]?.[questionId] || {}).some((t: string) => t.trim().length > 0);
+          isAnswered = Object.values(
+            textAnswers[secId]?.[questionId] || {},
+          ).some((t: string) => t.trim().length > 0);
         } else if (isRanking) {
           const rankings = rankingAnswers[secId]?.[questionId] || {};
           isAnswered = Object.keys(rankings).length > 0;
@@ -872,31 +972,37 @@ const SectionQuestionPage: React.FC = () => {
   const getQuestionText = (languageId: number): string => {
     if (languageId === 100) return question.question.questionText;
     const langQuestion = question.question.languageQuestions?.find(
-      (lq) => lq.language.languageId === languageId
+      (lq) => lq.language.languageId === languageId,
     );
-    return langQuestion ? langQuestion.questionText : question.question.questionText;
+    return langQuestion
+      ? langQuestion.questionText
+      : question.question.questionText;
   };
 
   const getOptionText = (option: Option, languageId: number): string => {
     if (languageId === 100) return option.optionText;
     const langOption = option.languageOptions?.find(
-      (lo) => lo.language.languageId === languageId
+      (lo) => lo.language.languageId === languageId,
     );
     return langOption ? langOption.optionText : option.optionText;
   };
 
   // Helper function to check if option has an image
   const hasOptionImage = (option: Option): boolean => {
-    return !!(option.optionImageBase64 && option.optionImageBase64.trim() !== '');
+    return !!(
+      option.optionImageBase64 && option.optionImageBase64.trim() !== ""
+    );
   };
 
   // Helper function to get the image source (handles URL path, data URL, and raw base64)
   const getOptionImageSrc = (option: Option): string => {
-    if (!option.optionImageBase64) return '';
+    if (!option.optionImageBase64) return "";
     // URL path (extracted images served as separate files)
-    if (option.optionImageBase64.startsWith('/')) return option.optionImageBase64;
+    if (option.optionImageBase64.startsWith("/"))
+      return option.optionImageBase64;
     // Already a data URL
-    if (option.optionImageBase64.startsWith('data:')) return option.optionImageBase64;
+    if (option.optionImageBase64.startsWith("data:"))
+      return option.optionImageBase64;
     // Raw base64 — prepend data URL prefix
     return `data:image/png;base64,${option.optionImageBase64}`;
   };
@@ -907,37 +1013,41 @@ const SectionQuestionPage: React.FC = () => {
       return (
         <img
           src={getOptionImageSrc(option)}
-          alt={option.optionText || 'Option image'}
+          alt={option.optionText || "Option image"}
           style={{
-            display: 'block',
-            maxWidth: '200px',
-            maxHeight: '150px',
-            width: 'auto',
-            height: 'auto',
-            objectFit: 'contain',
-            borderRadius: '8px',
-            border: '1px solid #e0e0e0',
-            filter: 'brightness(0.85) contrast(1.15)',
+            display: "block",
+            maxWidth: "200px",
+            maxHeight: "150px",
+            width: "auto",
+            height: "auto",
+            objectFit: "contain",
+            borderRadius: "8px",
+            border: "1px solid #e0e0e0",
+            filter: "brightness(0.85) contrast(1.15)",
           }}
         />
       );
     }
     // Fall back to text
-    return languageId !== undefined ? getOptionText(option, languageId) : option.optionText;
+    return languageId !== undefined
+      ? getOptionText(option, languageId)
+      : option.optionText;
   };
 
   // Helper to render option description in light grey
   const renderOptionDescription = (opt: Option) => {
     if (!opt.optionDescription) return null;
     return (
-      <div style={{
-        fontSize: "0.85rem",
-        color: "#9ca3af",
-        marginTop: "4px",
-        lineHeight: "1.4",
-        fontWeight: 400,
-        fontStyle: "italic",
-      }}>
+      <div
+        style={{
+          fontSize: "0.85rem",
+          color: "#9ca3af",
+          marginTop: "4px",
+          lineHeight: "1.4",
+          fontWeight: 400,
+          fontStyle: "italic",
+        }}
+      >
         {opt.optionDescription}
       </div>
     );
@@ -959,7 +1069,7 @@ const SectionQuestionPage: React.FC = () => {
       }));
 
       const gameOption = question.question.options.find(
-        opt => opt.isGame && opt.game?.gameCode === activeGameCode
+        (opt) => opt.isGame && opt.game?.gameCode === activeGameCode,
       );
       if (gameOption) {
         // Directly update answers to mark this question as answered (blue)
@@ -970,7 +1080,9 @@ const SectionQuestionPage: React.FC = () => {
           // Only add if not already selected
           if (!arr.includes(gameOption.optionId)) {
             const updated = [...arr, gameOption.optionId];
-            console.log(`✅ Game completed! Marking question ${qId} as answered with option ${gameOption.optionId}`);
+            console.log(
+              `✅ Game completed! Marking question ${qId} as answered with option ${gameOption.optionId}`,
+            );
             return {
               ...prev,
               [sectionId]: { ...sec, [qId]: updated },
@@ -999,8 +1111,8 @@ const SectionQuestionPage: React.FC = () => {
 
   // Render game wrapper if active
   if (isGameActive && activeGameCode) {
-    const userStudentId = localStorage.getItem('User Student id') || '';
-    const userName = localStorage.getItem('userName') || 'Student';
+    const userStudentId = localStorage.getItem("User Student id") || "";
+    const userName = localStorage.getItem("userName") || "Student";
 
     return (
       <AssessmentGameWrapper
@@ -1014,18 +1126,28 @@ const SectionQuestionPage: React.FC = () => {
   }
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", colorScheme: "light" }}>
+    <div
+      style={{
+        display: "flex",
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        colorScheme: "light",
+      }}
+    >
       {/* Sidebar toggle button - mobile only */}
       <button
         className="sidebar-toggle-btn"
         onClick={() => setShowSidebar(!showSidebar)}
         aria-label="Toggle question navigation"
       >
-        {showSidebar ? '✕' : '☰'}
+        {showSidebar ? "✕" : "☰"}
       </button>
 
       {/* Sidebar backdrop - mobile only */}
-      <div className={`sidebar-backdrop ${showSidebar ? 'show' : ''}`} onClick={() => setShowSidebar(false)} />
+      <div
+        className={`sidebar-backdrop ${showSidebar ? "show" : ""}`}
+        onClick={() => setShowSidebar(false)}
+      />
 
       {/* Section Instruction Popup */}
       {showSectionInstruction && (
@@ -1057,17 +1179,44 @@ const SectionQuestionPage: React.FC = () => {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h5 style={{ fontWeight: 700, marginBottom: "16px", color: "#2d3748" }}>
+            <h5
+              style={{
+                fontWeight: 700,
+                marginBottom: "16px",
+                color: "#2d3748",
+              }}
+            >
               Section Instructions
             </h5>
             {sectionInstructionTexts.map((item, idx) => (
-              <div key={idx} style={{ marginBottom: idx < sectionInstructionTexts.length - 1 ? "16px" : 0 }}>
+              <div
+                key={idx}
+                style={{
+                  marginBottom:
+                    idx < sectionInstructionTexts.length - 1 ? "16px" : 0,
+                }}
+              >
                 {sectionInstructionTexts.length > 1 && (
-                  <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#667eea", marginBottom: "6px" }}>
+                  <div
+                    style={{
+                      fontSize: "0.85rem",
+                      fontWeight: 600,
+                      color: "#667eea",
+                      marginBottom: "6px",
+                    }}
+                  >
                     {item.language}
                   </div>
                 )}
-                <p style={{ whiteSpace: "pre-line", lineHeight: 1.7, margin: 0, fontSize: "1rem", color: "#4a5568" }}>
+                <p
+                  style={{
+                    whiteSpace: "pre-line",
+                    lineHeight: 1.7,
+                    margin: 0,
+                    fontSize: "1rem",
+                    color: "#4a5568",
+                  }}
+                >
                   {item.text}
                 </p>
               </div>
@@ -1076,7 +1225,8 @@ const SectionQuestionPage: React.FC = () => {
               <button
                 onClick={() => setShowSectionInstruction(false)}
                 style={{
-                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                  background:
+                    "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                   color: "#fff",
                   border: "none",
                   borderRadius: "8px",
@@ -1094,17 +1244,24 @@ const SectionQuestionPage: React.FC = () => {
       )}
 
       {/* LEFT SIDEBAR */}
-      <div className={`question-sidebar ${showSidebar ? 'show' : ''}`}>
+      <div className={`question-sidebar ${showSidebar ? "show" : ""}`}>
         {/* Logo + Legend */}
         <div
           style={{
             borderBottom: "2px solid #e2e8f0",
             padding: "16px 20px",
-            background: "linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%)",
+            background:
+              "linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%)",
           }}
         >
           {/* KCC Logo */}
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: "12px" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              marginBottom: "12px",
+            }}
+          >
             <img
               src="/media/logos/kcc.jpg"
               alt="KCC Logo"
@@ -1114,74 +1271,161 @@ const SectionQuestionPage: React.FC = () => {
               }}
             />
           </div>
-          <h6 style={{
-            fontSize: "0.85rem",
-            fontWeight: 700,
-            color: "#2d3748",
-            marginBottom: "10px",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px"
-          }}>
-            <span style={{
-              width: "6px",
-              height: "18px",
-              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-              borderRadius: "3px"
-            }} />
+          <h6
+            style={{
+              fontSize: "0.85rem",
+              fontWeight: 700,
+              color: "#2d3748",
+              marginBottom: "10px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <span
+              style={{
+                width: "6px",
+                height: "18px",
+                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                borderRadius: "3px",
+              }}
+            />
             Legend
           </h6>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 12px" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "6px 12px",
+            }}
+          >
             <div className="d-flex align-items-center gap-2">
-              <div style={{ width: 14, height: 14, borderRadius: "50%", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", flexShrink: 0, boxShadow: "0 2px 6px rgba(102, 126, 234, 0.4)" }} />
-              <span style={{ fontSize: "0.8rem", color: "#4a5568", fontWeight: 500 }}>Answered</span>
+              <div
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: "50%",
+                  background:
+                    "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                  flexShrink: 0,
+                  boxShadow: "0 2px 6px rgba(102, 126, 234, 0.4)",
+                }}
+              />
+              <span
+                style={{
+                  fontSize: "0.8rem",
+                  color: "#4a5568",
+                  fontWeight: 500,
+                }}
+              >
+                Answered
+              </span>
             </div>
             <div className="d-flex align-items-center gap-2">
-              <div style={{ width: 14, height: 14, borderRadius: "50%", background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)", flexShrink: 0, boxShadow: "0 2px 6px rgba(251, 191, 36, 0.4)" }} />
-              <span style={{ fontSize: "0.8rem", color: "#4a5568", fontWeight: 500 }}>Saved</span>
+              <div
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: "50%",
+                  background:
+                    "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
+                  flexShrink: 0,
+                  boxShadow: "0 2px 6px rgba(251, 191, 36, 0.4)",
+                }}
+              />
+              <span
+                style={{
+                  fontSize: "0.8rem",
+                  color: "#4a5568",
+                  fontWeight: 500,
+                }}
+              >
+                Saved
+              </span>
             </div>
             <div className="d-flex align-items-center gap-2">
-              <div style={{ width: 14, height: 14, borderRadius: "50%", background: "linear-gradient(135deg, #f87171 0%, #dc2626 100%)", flexShrink: 0, boxShadow: "0 2px 6px rgba(248, 113, 113, 0.4)" }} />
-              <span style={{ fontSize: "0.8rem", color: "#4a5568", fontWeight: 500 }}>Skipped</span>
+              <div
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: "50%",
+                  background:
+                    "linear-gradient(135deg, #f87171 0%, #dc2626 100%)",
+                  flexShrink: 0,
+                  boxShadow: "0 2px 6px rgba(248, 113, 113, 0.4)",
+                }}
+              />
+              <span
+                style={{
+                  fontSize: "0.8rem",
+                  color: "#4a5568",
+                  fontWeight: 500,
+                }}
+              >
+                Skipped
+              </span>
             </div>
             <div className="d-flex align-items-center gap-2">
-              <div style={{ width: 14, height: 14, borderRadius: "50%", background: "#d1d5db", flexShrink: 0, border: "2px solid #9ca3af" }} />
-              <span style={{ fontSize: "0.8rem", color: "#4a5568", fontWeight: 500 }}>Not Visited</span>
+              <div
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: "50%",
+                  background: "#d1d5db",
+                  flexShrink: 0,
+                  border: "2px solid #9ca3af",
+                }}
+              />
+              <span
+                style={{
+                  fontSize: "0.8rem",
+                  color: "#4a5568",
+                  fontWeight: 500,
+                }}
+              >
+                Not Visited
+              </span>
             </div>
           </div>
         </div>
 
         {/* Question Navigation - Scrollable area */}
         <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
-          <h6 style={{
-            fontSize: "0.95rem",
-            fontWeight: 700,
-            color: "#2d3748",
-            marginBottom: "16px",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px"
-          }}>
-            <span style={{
-              width: "6px",
-              height: "20px",
-              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-              borderRadius: "3px"
-            }} />
+          <h6
+            style={{
+              fontSize: "0.95rem",
+              fontWeight: 700,
+              color: "#2d3748",
+              marginBottom: "16px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <span
+              style={{
+                width: "6px",
+                height: "20px",
+                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                borderRadius: "3px",
+              }}
+            />
             Question Status
           </h6>
           {questionnaire.sections.map((sec: any) => (
             <div key={sec.section.sectionId} className="mb-4">
-              <div style={{
-                fontSize: "0.9rem",
-                fontWeight: 600,
-                color: "#4a5568",
-                marginBottom: "10px",
-                padding: "6px 12px",
-                background: "rgba(102, 126, 234, 0.08)",
-                borderRadius: "8px",
-                borderLeft: "3px solid #667eea"
-              }}>
+              <div
+                style={{
+                  fontSize: "0.9rem",
+                  fontWeight: 600,
+                  color: "#4a5568",
+                  marginBottom: "10px",
+                  padding: "6px 12px",
+                  background: "rgba(102, 126, 234, 0.08)",
+                  borderRadius: "8px",
+                  borderLeft: "3px solid #667eea",
+                }}
+              >
                 {sec.section.sectionName}
               </div>
               <div className="d-flex flex-wrap gap-2">
@@ -1191,7 +1435,7 @@ const SectionQuestionPage: React.FC = () => {
                     onClick={() => {
                       setShowSidebar(false);
                       navigate(
-                        `/studentAssessment/sections/${sec.section.sectionId}/questions/${i}`
+                        `/studentAssessment/sections/${sec.section.sectionId}/questions/${i}`,
                       );
                     }}
                     style={{
@@ -1200,7 +1444,7 @@ const SectionQuestionPage: React.FC = () => {
                       borderRadius: "8px",
                       background: getQuestionColor(
                         String(sec.section.sectionId),
-                        q.questionnaireQuestionId
+                        q.questionnaireQuestionId,
                       ),
                       color: "#fff",
                       fontSize: 12,
@@ -1210,7 +1454,7 @@ const SectionQuestionPage: React.FC = () => {
                       justifyContent: "center",
                       cursor: "pointer",
                       transition: "all 0.2s ease",
-                      boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                      boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
                     }}
                   >
                     {i + 1}
@@ -1230,7 +1474,8 @@ const SectionQuestionPage: React.FC = () => {
             <div className="mb-3">
               <span
                 style={{
-                  background: "linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%)",
+                  background:
+                    "linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%)",
                   color: "#667eea",
                   padding: "8px 20px",
                   borderRadius: "30px",
@@ -1245,13 +1490,21 @@ const SectionQuestionPage: React.FC = () => {
             </div>
 
             <div className="d-flex justify-content-between align-items-center mb-4">
-              <h6 style={{ color: "#2d3748", fontWeight: 700, marginBottom: 0, fontSize: "1.1rem" }}>
+              <h6
+                style={{
+                  color: "#2d3748",
+                  fontWeight: 700,
+                  marginBottom: 0,
+                  fontSize: "1.1rem",
+                }}
+              >
                 Question {currentIndex + 1} of {questions.length}
               </h6>
               {showTimer && (
                 <div
                   style={{
-                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                    background:
+                      "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                     padding: "10px 24px",
                     borderRadius: "30px",
                     fontWeight: 700,
@@ -1300,7 +1553,8 @@ const SectionQuestionPage: React.FC = () => {
                       width: "60px",
                       height: "60px",
                       borderRadius: "50%",
-                      background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
+                      background:
+                        "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -1310,13 +1564,34 @@ const SectionQuestionPage: React.FC = () => {
                   >
                     ⚠️
                   </div>
-                  <h5 style={{ fontWeight: 700, marginBottom: "12px", color: "#1a202c", fontSize: "1.2rem" }}>
+                  <h5
+                    style={{
+                      fontWeight: 700,
+                      marginBottom: "12px",
+                      color: "#1a202c",
+                      fontSize: "1.2rem",
+                    }}
+                  >
                     Mark all answers before saving
                   </h5>
-                  <p style={{ color: "#6b7280", fontSize: "0.95rem", lineHeight: 1.6, marginBottom: "24px" }}>
-                    Some questions are still unanswered, saved for later, or skipped. Please answer all questions before submitting.
+                  <p
+                    style={{
+                      color: "#6b7280",
+                      fontSize: "0.95rem",
+                      lineHeight: 1.6,
+                      marginBottom: "24px",
+                    }}
+                  >
+                    Some questions are still unanswered, saved for later, or
+                    skipped. Please answer all questions before submitting.
                   </p>
-                  <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "12px",
+                      justifyContent: "center",
+                    }}
+                  >
                     <button
                       onClick={() => setShowWarning(false)}
                       style={{
@@ -1335,7 +1610,8 @@ const SectionQuestionPage: React.FC = () => {
                     <button
                       onClick={goToFirstUnanswered}
                       style={{
-                        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                        background:
+                          "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                         color: "#fff",
                         border: "none",
                         borderRadius: "10px",
@@ -1369,7 +1645,8 @@ const SectionQuestionPage: React.FC = () => {
                       width: "60px",
                       height: "60px",
                       borderRadius: "50%",
-                      background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+                      background:
+                        "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -1377,17 +1654,46 @@ const SectionQuestionPage: React.FC = () => {
                       boxShadow: "0 8px 24px rgba(34, 197, 94, 0.4)",
                     }}
                   >
-                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+                    <svg
+                      width="30"
+                      height="30"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="white"
+                      strokeWidth="2.5"
+                    >
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
                   </div>
-                  <h5 style={{ fontWeight: 700, marginBottom: "12px", color: "#1a202c", fontSize: "1.2rem" }}>
+                  <h5
+                    style={{
+                      fontWeight: 700,
+                      marginBottom: "12px",
+                      color: "#1a202c",
+                      fontSize: "1.2rem",
+                    }}
+                  >
                     Submit Assessment?
                   </h5>
-                  <p style={{ color: "#6b7280", fontSize: "0.95rem", lineHeight: 1.6, marginBottom: "24px" }}>
-                    Are you sure you want to submit your assessment? This action <strong>cannot be undone</strong>. Please make sure you have reviewed all your answers before submitting.
+                  <p
+                    style={{
+                      color: "#6b7280",
+                      fontSize: "0.95rem",
+                      lineHeight: 1.6,
+                      marginBottom: "24px",
+                    }}
+                  >
+                    Are you sure you want to submit your assessment? This action{" "}
+                    <strong>cannot be undone</strong>. Please make sure you have
+                    reviewed all your answers before submitting.
                   </p>
-                  <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "12px",
+                      justifyContent: "center",
+                    }}
+                  >
                     <button
                       onClick={() => setShowConfirmSubmit(false)}
                       disabled={isSubmitting}
@@ -1409,7 +1715,8 @@ const SectionQuestionPage: React.FC = () => {
                       onClick={confirmAndSubmit}
                       disabled={isSubmitting}
                       style={{
-                        background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+                        background:
+                          "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
                         color: "#fff",
                         border: "none",
                         borderRadius: "10px",
@@ -1425,7 +1732,11 @@ const SectionQuestionPage: React.FC = () => {
                     >
                       {isSubmitting ? (
                         <>
-                          <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                          <span
+                            className="spinner-border spinner-border-sm"
+                            role="status"
+                            aria-hidden="true"
+                          ></span>
                           Submitting...
                         </>
                       ) : (
@@ -1440,7 +1751,11 @@ const SectionQuestionPage: React.FC = () => {
             {availableLanguages.length > 0 ? (
               <div
                 data-proctoring="question-text"
-                className={availableLanguages.length > 1 ? 'instructions-grid instructions-grid--dual' : ''}
+                className={
+                  availableLanguages.length > 1
+                    ? "instructions-grid instructions-grid--dual"
+                    : ""
+                }
                 style={{
                   display: "grid",
                   gap: 20,
@@ -1472,30 +1787,49 @@ const SectionQuestionPage: React.FC = () => {
                 ))}
               </div>
             ) : (
-              <h4 data-proctoring="question-text" className="mb-4" style={{ fontSize: "1.2rem", color: "#1a202c", fontWeight: 500 }}>{question.question.questionText}</h4>
+              <h4
+                data-proctoring="question-text"
+                className="mb-4"
+                style={{
+                  fontSize: "1.2rem",
+                  color: "#1a202c",
+                  fontWeight: 500,
+                }}
+              >
+                {question.question.questionText}
+              </h4>
             )}
 
             {/* Display maxOptionsAllowed */}
             <div className="text-muted mb-3">
-              <small style={{ fontSize: "1.1rem", color: "#4a5568", fontWeight: 500 }}>
-                {(question.question.questionType === "text" || question.question.isMQTtyped === true) ? (
+              <small
+                style={{
+                  fontSize: "1.1rem",
+                  color: "#4a5568",
+                  fontWeight: 500,
+                }}
+              >
+                {question.question.questionType === "text" ||
+                question.question.isMQTtyped === true ? (
                   <>
-                    Please type your response(s) below. You can enter up to <strong>{question.question.maxOptionsAllowed || 1}</strong> response(s).
+                    Please type your response(s) below. You can enter up to{" "}
+                    <strong>{question.question.maxOptionsAllowed || 1}</strong>{" "}
+                    response(s).
                   </>
                 ) : question.question.questionType === "ranking" ? (
                   <>
-                    Please rank <strong>{question.question.maxOptionsAllowed}</strong> option(s) in order of preference (1 = most important).
+                    Please rank{" "}
+                    <strong>{question.question.maxOptionsAllowed}</strong>{" "}
+                    option(s) in order of preference (1 = most important).
                   </>
+                ) : question.question.maxOptionsAllowed === 0 ? (
+                  <></>
                 ) : (
-                  question.question.maxOptionsAllowed === 0 ? (
-                    <>
-
-                    </>
-                  ) : (
-                    <>
-                      You can select up to <strong>{question.question.maxOptionsAllowed}</strong> option(s).
-                    </>
-                  )
+                  <>
+                    You can select up to{" "}
+                    <strong>{question.question.maxOptionsAllowed}</strong>{" "}
+                    option(s).
+                  </>
                 )}
               </small>
             </div>
@@ -1503,8 +1837,11 @@ const SectionQuestionPage: React.FC = () => {
             <div className="mt-4">
               {(() => {
                 const options = question.question.options;
-                const isRankingQuestion = question.question.questionType === "ranking";
-                const isTextQuestion = question.question.questionType === "text" || question.question.isMQTtyped === true;
+                const isRankingQuestion =
+                  question.question.questionType === "ranking";
+                const isTextQuestion =
+                  question.question.questionType === "text" ||
+                  question.question.isMQTtyped === true;
 
                 // Text-type or isMQT question: render text input boxes with autocomplete
                 if (isTextQuestion) {
@@ -1514,7 +1851,7 @@ const SectionQuestionPage: React.FC = () => {
                   const handleTextInput = (inputIdx: number, value: string) => {
                     const key = `${sectionId}-${qId}-${inputIdx}`;
                     // Immediate local update for responsive UI
-                    setLocalTextInputs(prev => ({ ...prev, [key]: value }));
+                    setLocalTextInputs((prev) => ({ ...prev, [key]: value }));
 
                     // Clear previous debounce timer
                     if (textDebounceRef.current[key]) {
@@ -1523,54 +1860,57 @@ const SectionQuestionPage: React.FC = () => {
 
                     // Debounce sync to main state (triggers localStorage write)
                     textDebounceRef.current[key] = setTimeout(() => {
-                      setTextAnswers(prev => ({
+                      setTextAnswers((prev) => ({
                         ...prev,
                         [sectionId!]: {
                           ...prev[sectionId!],
                           [qId]: {
                             ...(prev[sectionId!]?.[qId] || {}),
-                            [inputIdx]: value
-                          }
-                        }
+                            [inputIdx]: value,
+                          },
+                        },
                       }));
                       // Remove from skipped
-                      setSkipped(prev => {
+                      setSkipped((prev) => {
                         const s = new Set(prev[sectionId!] || []);
                         s.delete(qId);
                         return { ...prev, [sectionId!]: s };
                       });
                       // Clear local input once synced to main state
-                      setLocalTextInputs(prev => {
+                      setLocalTextInputs((prev) => {
                         const { [key]: _, ...rest } = prev;
                         return rest;
                       });
                     }, 300);
                   };
 
-                  const handleSelectSuggestion = (inputIdx: number, value: string) => {
+                  const handleSelectSuggestion = (
+                    inputIdx: number,
+                    value: string,
+                  ) => {
                     const key = `${sectionId}-${qId}-${inputIdx}`;
                     // Clear any pending debounce for this input
                     if (textDebounceRef.current[key]) {
                       clearTimeout(textDebounceRef.current[key]);
                     }
                     // Sync immediately for suggestion selection (no debounce needed)
-                    setTextAnswers(prev => ({
+                    setTextAnswers((prev) => ({
                       ...prev,
                       [sectionId!]: {
                         ...prev[sectionId!],
                         [qId]: {
                           ...(prev[sectionId!]?.[qId] || {}),
-                          [inputIdx]: value
-                        }
-                      }
+                          [inputIdx]: value,
+                        },
+                      },
                     }));
-                    setSkipped(prev => {
+                    setSkipped((prev) => {
                       const s = new Set(prev[sectionId!] || []);
                       s.delete(qId);
                       return { ...prev, [sectionId!]: s };
                     });
                     // Clear local input
-                    setLocalTextInputs(prev => {
+                    setLocalTextInputs((prev) => {
                       const { [key]: _, ...rest } = prev;
                       return rest;
                     });
@@ -1582,17 +1922,25 @@ const SectionQuestionPage: React.FC = () => {
                     <div>
                       {Array.from({ length: maxInputs }, (_, inputIdx) => {
                         const localKey = `${sectionId}-${qId}-${inputIdx}`;
-                        const displayValue = localTextInputs[localKey] ?? currentTexts[inputIdx] ?? '';
+                        const displayValue =
+                          localTextInputs[localKey] ??
+                          currentTexts[inputIdx] ??
+                          "";
                         const inputValue = displayValue.toLowerCase();
                         const thisBoxValue = displayValue.trim().toLowerCase();
 
                         // Filter suggestions: existing mapped options always show,
                         // typed text only filters after 4+ characters
-                        const suggestions = options.filter(opt => {
-                          const optText = opt.optionText?.toLowerCase() || '';
+                        const suggestions = options.filter((opt) => {
+                          const optText = opt.optionText?.toLowerCase() || "";
                           // Exclude if already selected in another box (not this one)
-                          const usedElsewhere = Object.entries(currentTexts)
-                            .some(([idx, v]) => Number(idx) !== inputIdx && (v as string).trim().toLowerCase() === optText);
+                          const usedElsewhere = Object.entries(
+                            currentTexts,
+                          ).some(
+                            ([idx, v]) =>
+                              Number(idx) !== inputIdx &&
+                              (v as string).trim().toLowerCase() === optText,
+                          );
                           if (usedElsewhere) return false;
                           // If less than 4 chars typed, show all mapped options
                           if (inputValue.length < 4) return true;
@@ -1600,51 +1948,87 @@ const SectionQuestionPage: React.FC = () => {
                           return optText.includes(inputValue);
                         });
 
-                        const isDropdownOpen = activeAutocomplete === `${qId}-${inputIdx}` && suggestions.length > 0;
+                        const isDropdownOpen =
+                          activeAutocomplete === `${qId}-${inputIdx}` &&
+                          suggestions.length > 0;
                         // Don't show dropdown if the current value exactly matches a suggestion
-                        const exactMatch = suggestions.length === 1 && suggestions[0].optionText?.toLowerCase() === thisBoxValue;
+                        const exactMatch =
+                          suggestions.length === 1 &&
+                          suggestions[0].optionText?.toLowerCase() ===
+                            thisBoxValue;
 
                         return (
-                          <div key={inputIdx} className="mb-3" style={{ position: "relative" }}>
-                            <label className="fw-bold mb-1" style={{ fontSize: "1rem", color: "#4a5568" }}>
+                          <div
+                            key={inputIdx}
+                            className="mb-3"
+                            style={{ position: "relative" }}
+                          >
+                            <label
+                              className="fw-bold mb-1"
+                              style={{ fontSize: "1rem", color: "#4a5568" }}
+                            >
                               Response {inputIdx + 1}:
                             </label>
                             <input
                               type="text"
                               className="form-control form-control-lg"
                               placeholder="Type your answer..."
-                              value={localTextInputs[localKey] ?? currentTexts[inputIdx] ?? ''}
+                              value={
+                                localTextInputs[localKey] ??
+                                currentTexts[inputIdx] ??
+                                ""
+                              }
                               onChange={(e) => {
                                 handleTextInput(inputIdx, e.target.value);
                                 setActiveAutocomplete(`${qId}-${inputIdx}`);
                               }}
-                              onFocus={() => setActiveAutocomplete(`${qId}-${inputIdx}`)}
-                              onBlur={() => setTimeout(() => setActiveAutocomplete(null), 200)}
+                              onFocus={() =>
+                                setActiveAutocomplete(`${qId}-${inputIdx}`)
+                              }
+                              onBlur={() =>
+                                setTimeout(
+                                  () => setActiveAutocomplete(null),
+                                  200,
+                                )
+                              }
                               autoComplete="off"
-                              style={{ fontSize: "1.1rem", padding: "12px 16px", borderColor: "#dee2e6" }}
+                              style={{
+                                fontSize: "1.1rem",
+                                padding: "12px 16px",
+                                borderColor: "#dee2e6",
+                              }}
                             />
                             {isDropdownOpen && !exactMatch && (
-                              <div style={{
-                                position: "absolute",
-                                top: "100%",
-                                left: 0,
-                                right: 0,
-                                zIndex: 1000,
-                                background: "#fff",
-                                border: "1px solid #e2e8f0",
-                                borderTop: "none",
-                                borderRadius: "0 0 8px 8px",
-                                boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                                maxHeight: "240px",
-                                overflowY: "auto",
-                              }}>
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  top: "100%",
+                                  left: 0,
+                                  right: 0,
+                                  zIndex: 1000,
+                                  background: "#fff",
+                                  border: "1px solid #e2e8f0",
+                                  borderTop: "none",
+                                  borderRadius: "0 0 8px 8px",
+                                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                                  maxHeight: "240px",
+                                  overflowY: "auto",
+                                }}
+                              >
                                 {suggestions.map((opt) => {
-                                  const optText = opt.optionText || '';
-                                  const matchIdx = optText.toLowerCase().indexOf(inputValue);
+                                  const optText = opt.optionText || "";
+                                  const matchIdx = optText
+                                    .toLowerCase()
+                                    .indexOf(inputValue);
                                   return (
                                     <div
                                       key={opt.optionId}
-                                      onMouseDown={() => handleSelectSuggestion(inputIdx, optText)}
+                                      onMouseDown={() =>
+                                        handleSelectSuggestion(
+                                          inputIdx,
+                                          optText,
+                                        )
+                                      }
                                       style={{
                                         padding: "10px 16px",
                                         cursor: "pointer",
@@ -1652,16 +2036,31 @@ const SectionQuestionPage: React.FC = () => {
                                         borderBottom: "1px solid #f1f5f9",
                                         transition: "background 0.15s",
                                       }}
-                                      onMouseEnter={(e) => (e.currentTarget.style.background = "#f7fafc")}
-                                      onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
+                                      onMouseEnter={(e) =>
+                                        (e.currentTarget.style.background =
+                                          "#f7fafc")
+                                      }
+                                      onMouseLeave={(e) =>
+                                        (e.currentTarget.style.background =
+                                          "#fff")
+                                      }
                                     >
                                       {matchIdx >= 0 ? (
                                         <>
                                           {optText.slice(0, matchIdx)}
-                                          <strong>{optText.slice(matchIdx, matchIdx + inputValue.length)}</strong>
-                                          {optText.slice(matchIdx + inputValue.length)}
+                                          <strong>
+                                            {optText.slice(
+                                              matchIdx,
+                                              matchIdx + inputValue.length,
+                                            )}
+                                          </strong>
+                                          {optText.slice(
+                                            matchIdx + inputValue.length,
+                                          )}
                                         </>
-                                      ) : optText}
+                                      ) : (
+                                        optText
+                                      )}
                                     </div>
                                   );
                                 })}
@@ -1683,57 +2082,104 @@ const SectionQuestionPage: React.FC = () => {
                         key={opt.optionId}
                         data-proctoring-option-id={opt.optionId}
                         className="rounded p-4 mb-3"
-                        style={{ border: "1px solid #dee2e6", background: "#faf5ff" }}
+                        style={{
+                          border: "1px solid #dee2e6",
+                          background: "#faf5ff",
+                        }}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
-                            <div className="font-bold text-purple-900 mb-2" style={{ fontSize: "1.1rem", color: "#2d3748" }}>
+                            <div
+                              className="font-bold text-purple-900 mb-2"
+                              style={{ fontSize: "1.1rem", color: "#2d3748" }}
+                            >
                               🎮 Game: {opt.game.gameName}
                             </div>
                             {availableLanguages.length > 0 ? (
                               <div
-                                className={availableLanguages.length > 1 ? 'instructions-grid instructions-grid--dual' : ''}
+                                className={
+                                  availableLanguages.length > 1
+                                    ? "instructions-grid instructions-grid--dual"
+                                    : ""
+                                }
                                 style={{
                                   display: "grid",
                                   gap: 15,
                                 }}
                               >
                                 {availableLanguages.map((lang, index) => (
-                                  <React.Fragment key={lang.language.languageId}>
-                                    <div style={{ fontSize: "1.2rem", lineHeight: "1.6", color: "#2d3748" }}>
-                                      {getOptionText(opt, lang.language.languageId)}
+                                  <React.Fragment
+                                    key={lang.language.languageId}
+                                  >
+                                    <div
+                                      style={{
+                                        fontSize: "1.2rem",
+                                        lineHeight: "1.6",
+                                        color: "#2d3748",
+                                      }}
+                                    >
+                                      {getOptionText(
+                                        opt,
+                                        lang.language.languageId,
+                                      )}
                                     </div>
-                                    {index === 0 && availableLanguages.length > 1 && (
-                                      <div style={{ width: 1, backgroundColor: "#dee2e6" }} />
-                                    )}
+                                    {index === 0 &&
+                                      availableLanguages.length > 1 && (
+                                        <div
+                                          style={{
+                                            width: 1,
+                                            backgroundColor: "#dee2e6",
+                                          }}
+                                        />
+                                      )}
                                   </React.Fragment>
                                 ))}
                               </div>
                             ) : (
-                              <span style={{ fontSize: "1.2rem", color: "#2d3748" }}>{opt.optionText}</span>
+                              <span
+                                style={{ fontSize: "1.2rem", color: "#2d3748" }}
+                              >
+                                {opt.optionText}
+                              </span>
                             )}
                           </div>
                           <button
                             onClick={() => handleLaunchGame(opt.game!.gameCode)}
                             style={{
-                              marginLeft: '16px',
-                              background: (selectedOptions.includes(opt.optionId) || (opt.game && completedGames[opt.game.gameCode]))
-                                ? 'linear-gradient(to right, #22c55e, #16a34a)'
-                                : 'linear-gradient(to right, #8b5cf6, #d946ef)',
-                              color: 'white',
-                              padding: '12px 24px',
-                              borderRadius: '9999px',
+                              marginLeft: "16px",
+                              background:
+                                selectedOptions.includes(opt.optionId) ||
+                                (opt.game && completedGames[opt.game.gameCode])
+                                  ? "linear-gradient(to right, #22c55e, #16a34a)"
+                                  : "linear-gradient(to right, #8b5cf6, #d946ef)",
+                              color: "white",
+                              padding: "12px 24px",
+                              borderRadius: "9999px",
                               fontWeight: 700,
-                              fontSize: '14px',
-                              border: 'none',
-                              cursor: (selectedOptions.includes(opt.optionId) || (opt.game && completedGames[opt.game.gameCode])) ? 'default' : 'pointer',
-                              boxShadow: '0 4px 15px rgba(139, 92, 246, 0.4)',
-                              transition: 'all 0.2s ease',
-                              opacity: (selectedOptions.includes(opt.optionId) || (opt.game && completedGames[opt.game.gameCode])) ? 0.8 : 1,
+                              fontSize: "14px",
+                              border: "none",
+                              cursor:
+                                selectedOptions.includes(opt.optionId) ||
+                                (opt.game && completedGames[opt.game.gameCode])
+                                  ? "default"
+                                  : "pointer",
+                              boxShadow: "0 4px 15px rgba(139, 92, 246, 0.4)",
+                              transition: "all 0.2s ease",
+                              opacity:
+                                selectedOptions.includes(opt.optionId) ||
+                                (opt.game && completedGames[opt.game.gameCode])
+                                  ? 0.8
+                                  : 1,
                             }}
-                            disabled={selectedOptions.includes(opt.optionId) || (opt.game && completedGames[opt.game.gameCode])}
+                            disabled={
+                              selectedOptions.includes(opt.optionId) ||
+                              (opt.game && completedGames[opt.game.gameCode])
+                            }
                           >
-                            {(selectedOptions.includes(opt.optionId) || (opt.game && completedGames[opt.game.gameCode])) ? '✓ Completed' : '🎮 Launch Game'}
+                            {selectedOptions.includes(opt.optionId) ||
+                            (opt.game && completedGames[opt.game.gameCode])
+                              ? "✓ Completed"
+                              : "🎮 Launch Game"}
                           </button>
                         </div>
                       </div>
@@ -1742,7 +2188,8 @@ const SectionQuestionPage: React.FC = () => {
 
                   if (isRankingQuestion) {
                     // Ranking question UI with dropdown
-                    const currentRank = rankingAnswers[sectionId!]?.[qId]?.[opt.optionId];
+                    const currentRank =
+                      rankingAnswers[sectionId!]?.[qId]?.[opt.optionId];
                     const availableRanks = getAvailableRanks(opt.optionId);
 
                     return (
@@ -1750,7 +2197,13 @@ const SectionQuestionPage: React.FC = () => {
                         key={opt.optionId}
                         data-proctoring-option-id={opt.optionId}
                         className="rounded p-3 d-block mb-2"
-                        style={{ display: "flex", alignItems: "center", gap: "15px", background: currentRank ? "#f8f9fa" : "#fff", border: "1px solid #dee2e6" }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "15px",
+                          background: currentRank ? "#f8f9fa" : "#fff",
+                          border: "1px solid #dee2e6",
+                        }}
                       >
                         <div style={{ minWidth: "120px" }}>
                           <select
@@ -1758,12 +2211,23 @@ const SectionQuestionPage: React.FC = () => {
                             value={currentRank || ""}
                             onChange={(e) => {
                               const value = e.target.value;
-                              handleRankChange(opt.optionId, value ? parseInt(value) : null);
+                              handleRankChange(
+                                opt.optionId,
+                                value ? parseInt(value) : null,
+                              );
                             }}
-                            style={{ width: "110px", fontSize: "1rem", fontWeight: 600, color: "#2d3748", background: "#fff", borderColor: "#dee2e6" }}
+                            style={{
+                              width: "110px",
+                              fontSize: "1rem",
+                              fontWeight: 600,
+                              color: "#2d3748",
+                              background: "#fff",
+                              borderColor: "#dee2e6",
+                            }}
                           >
                             <option value="">Rank</option>
-                            {currentRank && !availableRanks.includes(currentRank) ? (
+                            {currentRank &&
+                            !availableRanks.includes(currentRank) ? (
                               <option value={currentRank}>{currentRank}</option>
                             ) : null}
                             {availableRanks.map((rank) => (
@@ -1780,23 +2244,45 @@ const SectionQuestionPage: React.FC = () => {
                             <div
                               style={{
                                 display: "grid",
-                                gridTemplateColumns: availableLanguages.length > 1 ? "1fr 1px 1fr" : "1fr",
+                                gridTemplateColumns:
+                                  availableLanguages.length > 1
+                                    ? "1fr 1px 1fr"
+                                    : "1fr",
                                 gap: 15,
                               }}
                             >
                               {availableLanguages.map((lang, index) => (
                                 <React.Fragment key={lang.language.languageId}>
-                                  <div style={{ fontSize: "1.2rem", lineHeight: "1.6", color: "#2d3748" }}>
-                                    {getOptionText(opt, lang.language.languageId)}
+                                  <div
+                                    style={{
+                                      fontSize: "1.2rem",
+                                      lineHeight: "1.6",
+                                      color: "#2d3748",
+                                    }}
+                                  >
+                                    {getOptionText(
+                                      opt,
+                                      lang.language.languageId,
+                                    )}
                                   </div>
-                                  {index === 0 && availableLanguages.length > 1 && (
-                                    <div style={{ width: 1, backgroundColor: "#dee2e6" }} />
-                                  )}
+                                  {index === 0 &&
+                                    availableLanguages.length > 1 && (
+                                      <div
+                                        style={{
+                                          width: 1,
+                                          backgroundColor: "#dee2e6",
+                                        }}
+                                      />
+                                    )}
                                 </React.Fragment>
                               ))}
                             </div>
                           ) : (
-                            <span style={{ fontSize: "1.2rem", color: "#2d3748" }}>{opt.optionText}</span>
+                            <span
+                              style={{ fontSize: "1.2rem", color: "#2d3748" }}
+                            >
+                              {opt.optionText}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -1809,7 +2295,13 @@ const SectionQuestionPage: React.FC = () => {
                       key={opt.optionId}
                       data-proctoring-option-id={opt.optionId}
                       className="rounded p-3 d-block mb-2"
-                      style={{ cursor: "pointer", background: selectedOptions.includes(opt.optionId) ? "#f8f9fa" : "#fff", border: "1px solid #dee2e6" }}
+                      style={{
+                        cursor: "pointer",
+                        background: selectedOptions.includes(opt.optionId)
+                          ? "#f8f9fa"
+                          : "#fff",
+                        border: "1px solid #dee2e6",
+                      }}
                     >
                       <div className="d-flex align-items-start">
                         <input
@@ -1820,35 +2312,56 @@ const SectionQuestionPage: React.FC = () => {
                           disabled={
                             question.question.maxOptionsAllowed > 0 &&
                             !selectedOptions.includes(opt.optionId) &&
-                            selectedOptions.length >= question.question.maxOptionsAllowed
+                            selectedOptions.length >=
+                              question.question.maxOptionsAllowed
                           }
                         />
                         <div style={{ flex: 1 }}>
                           {hasOptionImage(opt) ? (
-                            <div>
-                              {renderOptionContent(opt)}
-                            </div>
+                            <div>{renderOptionContent(opt)}</div>
                           ) : availableLanguages.length > 0 ? (
                             <div
                               style={{
                                 display: "grid",
-                                gridTemplateColumns: availableLanguages.length > 1 ? "1fr 1px 1fr" : "1fr",
+                                gridTemplateColumns:
+                                  availableLanguages.length > 1
+                                    ? "1fr 1px 1fr"
+                                    : "1fr",
                                 gap: 15,
                               }}
                             >
                               {availableLanguages.map((lang, index) => (
                                 <React.Fragment key={lang.language.languageId}>
-                                  <div style={{ fontSize: "1.2rem", lineHeight: "1.6", color: "#2d3748" }}>
-                                    {getOptionText(opt, lang.language.languageId)}
+                                  <div
+                                    style={{
+                                      fontSize: "1.2rem",
+                                      lineHeight: "1.6",
+                                      color: "#2d3748",
+                                    }}
+                                  >
+                                    {getOptionText(
+                                      opt,
+                                      lang.language.languageId,
+                                    )}
                                   </div>
-                                  {index === 0 && availableLanguages.length > 1 && (
-                                    <div style={{ width: 1, backgroundColor: "#dee2e6" }} />
-                                  )}
+                                  {index === 0 &&
+                                    availableLanguages.length > 1 && (
+                                      <div
+                                        style={{
+                                          width: 1,
+                                          backgroundColor: "#dee2e6",
+                                        }}
+                                      />
+                                    )}
                                 </React.Fragment>
                               ))}
                             </div>
                           ) : (
-                            <span style={{ fontSize: "1.2rem", color: "#2d3748" }}>{opt.optionText}</span>
+                            <span
+                              style={{ fontSize: "1.2rem", color: "#2d3748" }}
+                            >
+                              {opt.optionText}
+                            </span>
                           )}
                           {renderOptionDescription(opt)}
                         </div>
@@ -1871,7 +2384,9 @@ const SectionQuestionPage: React.FC = () => {
                       </div>
                       {/* Right Column */}
                       <div>
-                        {rightColumn.map((opt, idx) => renderOption(opt, midpoint + idx))}
+                        {rightColumn.map((opt, idx) =>
+                          renderOption(opt, midpoint + idx),
+                        )}
                       </div>
                     </div>
                   );
@@ -1905,7 +2420,8 @@ const SectionQuestionPage: React.FC = () => {
                   <button
                     onClick={saveForLaterFn}
                     style={{
-                      background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
+                      background:
+                        "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
                       color: "#78350f",
                       border: "none",
                       borderRadius: "12px",
@@ -1924,7 +2440,8 @@ const SectionQuestionPage: React.FC = () => {
                   <button
                     onClick={goNext}
                     style={{
-                      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                      background:
+                        "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                       color: "white",
                       border: "none",
                       borderRadius: "12px",
@@ -1946,7 +2463,8 @@ const SectionQuestionPage: React.FC = () => {
                     onClick={handleSubmitAssessment}
                     disabled={isSubmitting}
                     style={{
-                      background: "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+                      background:
+                        "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
                       color: "white",
                       border: "none",
                       borderRadius: "12px",

@@ -9,16 +9,16 @@ import { unlinkSync } from 'fs'
 export default defineConfig({
   plugins: [
     // Remove PNG files from assessment-cache after build (webp versions are used instead)
-    {
-      name: 'remove-assessment-pngs',
-      closeBundle() {
-        const pngs = globSync('dist/assessment-cache/**/*.png')
-        for (const file of pngs) {
-          unlinkSync(file)
-          console.log(`Removed from build: ${file}`)
-        }
-      },
-    },
+    // {
+    //   name: 'remove-assessment-pngs',
+    //   closeBundle() {
+    //     const pngs = globSync('dist/assessment-cache/**/*.png')
+    //     for (const file of pngs) {
+    //       unlinkSync(file)
+    //       console.log(`Removed from build: ${file}`)
+    //     }
+    //   },
+    // },
     // Rewrite requests for mediapipe/face_mesh WASM files to /mediapipe/face_mesh/
     // WebGazer resolves these relative to the current page URL, which breaks on
     // nested routes like /studentAssessment/sections/19/questions/0
