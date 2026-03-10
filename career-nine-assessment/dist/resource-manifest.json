@@ -1,6 +1,6 @@
 {
-  "version": "mmjzdk7r",
-  "generated": "2026-03-10T02:18:18.135Z",
+  "version": "mmjzojnw",
+  "generated": "2026-03-10T02:26:50.636Z",
   "resources": [
     {
       "url": "/assessment-cache/.DS_Store",
@@ -119,12 +119,12 @@
     },
     {
       "url": "/assets/game/hydro-tube-tutorial.mp4",
-      "size": 3658996,
+      "size": 164867,
       "priority": "game"
     },
     {
       "url": "/assets/game/jungle-spot-tutorial.mp4",
-      "size": 1404761,
+      "size": 519737,
       "priority": "game"
     },
     {
@@ -134,7 +134,7 @@
     },
     {
       "url": "/assets/game/rabbit-path-tutorial.mp4",
-      "size": 11330396,
+      "size": 480347,
       "priority": "game"
     },
     {
@@ -325,7 +325,7 @@
   ],
   "summary": {
     "total": 64,
-    "totalSize": 41704308,
+    "totalSize": 26475106,
     "byPriority": {
       "assessment": {
         "count": 21,
@@ -333,7 +333,7 @@
       },
       "game": {
         "count": 12,
-        "size": 17765115
+        "size": 2535913
       },
       "deferred": {
         "count": 12,
