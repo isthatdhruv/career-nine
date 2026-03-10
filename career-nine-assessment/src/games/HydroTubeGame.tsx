@@ -204,6 +204,13 @@ export function HydroTubeGame({
     onComplete,
   ]);
 
+  const normalizeRotation = (rotation: number, pipeType: string): number => {
+    if (pipeType === "straight") {
+      return rotation % 180;
+    }
+    return rotation;
+  };
+
   const checkWin = useCallback(
     (currentRotations: Record<number, number>): boolean => {
       const playerRotations = Array.from(
@@ -213,11 +220,12 @@ export function HydroTubeGame({
       return currentPattern.solutions.some((solution) =>
         solution.every((solRot, i) => {
           const playerRotation = playerRotations[i];
-          return solRot === 0 || solRot === playerRotation;
+          const pipeType = currentPattern.tileTypes[i + 1];
+          return solRot === 0 || normalizeRotation(solRot, pipeType) === normalizeRotation(playerRotation, pipeType);
         }),
       );
     },
-    [currentPattern.solutions],
+    [currentPattern.solutions, currentPattern.tileTypes],
   );
 
   const calculateProgress = useCallback(
@@ -235,7 +243,8 @@ export function HydroTubeGame({
         let correctCount = 0;
         solution.forEach((solRot, i) => {
           const playerRotation = playerRotations[i];
-          if (solRot === 0 || solRot === playerRotation) {
+          const pipeType = currentPattern.tileTypes[i + 1];
+          if (solRot === 0 || normalizeRotation(solRot, pipeType) === normalizeRotation(playerRotation, pipeType)) {
             correctCount++;
           }
         });
@@ -246,7 +255,7 @@ export function HydroTubeGame({
 
       return { correct: bestCorrectCount, total: 16 };
     },
-    [currentPattern.solutions],
+    [currentPattern.solutions, currentPattern.tileTypes],
   );
 
   const loadNextPattern = () => {

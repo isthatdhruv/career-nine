@@ -4,7 +4,19 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { compression } from 'vite-plugin-compression2'
 
 export default defineConfig({
+  publicDir: 'public',
   plugins: [
+    // Exclude PNG files from assessment-cache in build output
+    {
+      name: 'exclude-assessment-pngs',
+      generateBundle(_, bundle) {
+        for (const fileName of Object.keys(bundle)) {
+          if (fileName.match(/assessment-cache\/.*\.png$/)) {
+            delete bundle[fileName];
+          }
+        }
+      },
+    },
     // Rewrite requests for mediapipe/face_mesh WASM files to /mediapipe/face_mesh/
     // WebGazer resolves these relative to the current page URL, which breaks on
     // nested routes like /studentAssessment/sections/19/questions/0

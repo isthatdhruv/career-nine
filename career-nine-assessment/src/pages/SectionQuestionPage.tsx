@@ -300,8 +300,11 @@ const SectionQuestionPage: React.FC = () => {
     return "#d1d5db";
   }, [answers, rankingAnswers, textAnswers, savedForLater, skipped]);
 
+  if (!assessmentData) {
+    return <div className="text-center mt-5">Loading...</div>;
+  }
   if (!questionnaire || !questions.length) {
-    return <div className="text-center mt-5">No questions found</div>;
+    return <div className="text-center mt-5">No questions found , Check your Internet and Re-Login !</div>;
   }
 
   const question = questions[currentIndex];
