@@ -35,10 +35,41 @@ async function tryStaticCache(assessmentId: string, file: string): Promise<any |
   return null;
 }
 
+/**
+ * Pre-decode all base64 option images into browser bitmap cache.
+ * Runs once after assessment data loads so images render instantly on SectionQuestionPage.
+ */
+function preDecodeOptionImages(data: any) {
+  if (!data || !Array.isArray(data)) return;
+  for (const q of data) {
+    if (!q?.sections) continue;
+    for (const sec of q.sections) {
+      if (!sec?.questions) continue;
+      for (const qq of sec.questions) {
+        const opts = qq?.question?.options;
+        if (!Array.isArray(opts)) continue;
+        for (const opt of opts) {
+          const b64 = opt?.optionImageBase64;
+          if (!b64 || typeof b64 !== 'string' || b64.trim() === '') continue;
+          const src = b64.startsWith('data:') ? b64
+            : b64.startsWith('/') ? b64
+            : `data:image/png;base64,${b64}`;
+          const img = new Image();
+          img.src = src;
+        }
+      }
+    }
+  }
+}
+
 const AssessmentContext = createContext<AssessmentContextType | undefined>(undefined);
 
 export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [assessmentData, setAssessmentData] = useState<any>(null);
+  const [assessmentData, _setAssessmentData] = useState<any>(null);
+  const setAssessmentData = (data: any) => {
+    _setAssessmentData(data);
+    preDecodeOptionImages(data);
+  };
   const [assessmentConfig, setAssessmentConfig] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
