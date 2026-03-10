@@ -36,13 +36,51 @@ async function tryStaticCache(assessmentId: string, file: string): Promise<any |
 }
 
 /**
+ * 3-tier fetch: Cache API → static build files → backend API.
+ * Shared by prefetch, preload, and fetch paths to eliminate duplication.
+ */
+async function loadAssessmentById(assessmentId: string): Promise<{ data: any; config: any }> {
+  const [staticData, staticConfig] = await Promise.all([
+    tryStaticCache(assessmentId, 'data.json'),
+    tryStaticCache(assessmentId, 'config.json'),
+  ]);
+
+  if (staticData && staticConfig) {
+    return { data: staticData, config: staticConfig };
+  }
+
+  const [questionnaireRes, configRes] = await Promise.all([
+    http.get(`/assessments/getby/${assessmentId}`),
+    http.get(`/assessments/getById/${assessmentId}`),
+  ]);
+  return { data: questionnaireRes.data, config: configRes.data };
+}
+
+/**
+ * Persist assessment data + config to sessionStorage (non-critical).
+ */
+function cacheToSession(assessmentId: string, data: any, config: any) {
+  try {
+    sessionStorage.setItem('assessmentData', JSON.stringify(data));
+    sessionStorage.setItem('assessmentConfig', JSON.stringify(config));
+    sessionStorage.setItem('cachedAssessmentId', assessmentId);
+  } catch {
+    // Storage quota exceeded — non-critical
+  }
+}
+
+/**
  * Module-level array keeps Image refs alive so the browser doesn't GC them.
  * Setting .src triggers background decode — zero manual work, Pentium-safe.
  */
 const _preDecodedImages: HTMLImageElement[] = [];
+let _lastDecodedDataRef: any = null;
 
 function preDecodeOptionImages(data: any) {
   if (!data || !Array.isArray(data)) return;
+  // Skip if we already decoded images for the exact same data reference
+  if (data === _lastDecodedDataRef) return;
+  _lastDecodedDataRef = data;
   _preDecodedImages.length = 0;
   for (const q of data) {
     if (!q?.sections) continue;
@@ -84,6 +122,14 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const preloadPromiseRef = useRef<Promise<void> | null>(null);
   const cachedAssessmentIdRef = useRef<string | null>(null);
 
+  /** Store fetched assessment data in context + sessionStorage */
+  const applyAssessmentResult = (assessmentId: string, data: any, config: any) => {
+    cachedAssessmentIdRef.current = assessmentId;
+    setAssessmentData(data);
+    setAssessmentConfig(config);
+    cacheToSession(assessmentId, data, config);
+  };
+
   const prefetchAssessmentData = (userStudentId: string) => {
     if (prefetchingRef.current || !userStudentId.trim()) return;
     prefetchingRef.current = true;
@@ -92,41 +138,12 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       .then(async ({ data }) => {
         if (data && Array.isArray(data) && data.length > 0) {
           setPrefetchedAssessments(data);
-          // Also prefetch the full questionnaire data for the first active assessment
           const firstActive = data.find((a: any) => a.isActive && a.questionnaireId);
           if (firstActive) {
             try {
               const aid = String(firstActive.assessmentId);
-              // Try static build cache first (instant, no backend call)
-              const [staticData, staticConfig] = await Promise.all([
-                tryStaticCache(aid, 'data.json'),
-                tryStaticCache(aid, 'config.json'),
-              ]);
-
-              let questionnaireData, configData;
-              if (staticData && staticConfig) {
-                questionnaireData = staticData;
-                configData = staticConfig;
-              } else {
-                // Fall back to backend API
-                const [questionnaireRes, configRes] = await Promise.all([
-                  http.get(`/assessments/getby/${aid}`),
-                  http.get(`/assessments/getById/${aid}`),
-                ]);
-                questionnaireData = questionnaireRes.data;
-                configData = configRes.data;
-              }
-
-              cachedAssessmentIdRef.current = aid;
-              try {
-                sessionStorage.setItem('assessmentData', JSON.stringify(questionnaireData));
-                sessionStorage.setItem('assessmentConfig', JSON.stringify(configData));
-                sessionStorage.setItem('cachedAssessmentId', aid);
-              } catch (e) {
-                // Storage quota exceeded - non-critical
-              }
-              setAssessmentData(questionnaireData);
-              setAssessmentConfig(configData);
+              const result = await loadAssessmentById(aid);
+              applyAssessmentResult(aid, result.data, result.config);
             } catch {
               // Prefetch failure is non-critical
             }
@@ -155,34 +172,8 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           if (cachedAssessmentIdRef.current === assessmentId) return;
         }
 
-        const [staticData, staticConfig] = await Promise.all([
-          tryStaticCache(assessmentId, 'data.json'),
-          tryStaticCache(assessmentId, 'config.json'),
-        ]);
-
-        let questionnaireData, configData;
-        if (staticData && staticConfig) {
-          questionnaireData = staticData;
-          configData = staticConfig;
-        } else {
-          const [questionnaireRes, configRes] = await Promise.all([
-            http.get(`/assessments/getby/${assessmentId}`),
-            http.get(`/assessments/getById/${assessmentId}`),
-          ]);
-          questionnaireData = questionnaireRes.data;
-          configData = configRes.data;
-        }
-
-        cachedAssessmentIdRef.current = assessmentId;
-        setAssessmentData(questionnaireData);
-        setAssessmentConfig(configData);
-        try {
-          sessionStorage.setItem('assessmentData', JSON.stringify(questionnaireData));
-          sessionStorage.setItem('assessmentConfig', JSON.stringify(configData));
-          sessionStorage.setItem('cachedAssessmentId', assessmentId);
-        } catch {
-          // Storage quota exceeded — non-critical
-        }
+        const result = await loadAssessmentById(assessmentId);
+        applyAssessmentResult(assessmentId, result.data, result.config);
       } catch {
         // Preload failure is non-critical — fetchAssessmentData will retry
       } finally {
@@ -209,36 +200,8 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setError(null);
 
     try {
-      // Try static build cache first (instant, no backend call)
-      const [staticData, staticConfig] = await Promise.all([
-        tryStaticCache(assessmentId, 'data.json'),
-        tryStaticCache(assessmentId, 'config.json'),
-      ]);
-
-      let questionnaireData, configData;
-      if (staticData && staticConfig) {
-        questionnaireData = staticData;
-        configData = staticConfig;
-      } else {
-        // Fall back to backend API
-        const [questionnaireRes, configRes] = await Promise.all([
-          http.get(`/assessments/getby/${assessmentId}`),
-          http.get(`/assessments/getById/${assessmentId}`),
-        ]);
-        questionnaireData = questionnaireRes.data;
-        configData = configRes.data;
-      }
-
-      setAssessmentData(questionnaireData);
-      setAssessmentConfig(configData);
-      cachedAssessmentIdRef.current = assessmentId;
-      try {
-        sessionStorage.setItem('assessmentData', JSON.stringify(questionnaireData));
-        sessionStorage.setItem('assessmentConfig', JSON.stringify(configData));
-        sessionStorage.setItem('cachedAssessmentId', assessmentId);
-      } catch (e) {
-        console.warn('Could not cache assessment data to storage');
-      }
+      const result = await loadAssessmentById(assessmentId);
+      applyAssessmentResult(assessmentId, result.data, result.config);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
       console.error('Error fetching assessment data:', err);

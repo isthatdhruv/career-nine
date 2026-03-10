@@ -217,9 +217,12 @@ const SectionQuestionPage: React.FC = () => {
     scheduleWrite('assessmentSkipped', JSON.stringify(toStore));
   }, [skipped, scheduleWrite]);
 
-  // Keep elapsed time as immediate write (timer accuracy matters)
+  // Persist elapsed time every 5 seconds (timer ticks every 1s but writes are batched)
   useEffect(() => {
-    localStorage.setItem('assessmentElapsedTime', String(elapsedTime));
+    const timer = setTimeout(() => {
+      localStorage.setItem('assessmentElapsedTime', String(elapsedTime));
+    }, 5000);
+    return () => clearTimeout(timer);
   }, [elapsedTime]);
 
   useEffect(() => {

@@ -162,6 +162,13 @@ export default function ResourcePreloader({ children }: { children: React.ReactN
   useEffect(() => {
     cancelledRef.current = false;
 
+    // Reset module-level state in case of remount (React strict mode, HMR, etc.)
+    pseudoPct = 0;
+    realPct = 0;
+    totalFiles = 0;
+    filesCompleted = 0;
+    if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+
     // Start the pseudo progress bar immediately — gives constant visual motion
     startPseudoProgress();
 

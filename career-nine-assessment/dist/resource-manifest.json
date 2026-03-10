@@ -1,6 +1,6 @@
 {
-  "version": "mmk1fpp5",
-  "generated": "2026-03-10T03:15:57.785Z",
+  "version": "mmk2hjs9",
+  "generated": "2026-03-10T03:45:23.049Z",
   "resources": [
     {
       "url": "/assessment-cache/5/config.json",
@@ -178,32 +178,32 @@
       "priority": "deferred"
     },
     {
-      "url": "/assets/HydroTubeGame-8aX1JztV.js",
+      "url": "/assets/HydroTubeGame-4LqrdMsn.js",
       "size": 22911,
       "priority": "critical"
     },
     {
-      "url": "/assets/JungleSpotGame-CVD0L6_Y.js",
+      "url": "/assets/JungleSpotGame-DOXd2A9c.js",
       "size": 22904,
       "priority": "critical"
     },
     {
-      "url": "/assets/RabbitPathGame-C-fCa1Fh.js",
+      "url": "/assets/RabbitPathGame-_QbNm1xJ.js",
       "size": 26561,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionInstructionPage-DMlAtjWg.js",
+      "url": "/assets/SectionInstructionPage-BgKcA9Ne.js",
       "size": 4429,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionQuestionPage-C3wesvXK.js",
-      "size": 169157,
+      "url": "/assets/SectionQuestionPage-2lIBpbIe.js",
+      "size": 169213,
       "priority": "critical"
     },
     {
-      "url": "/assets/SelectSectionPage-Bt0yr7Df.js",
+      "url": "/assets/SelectSectionPage-BGzOF_UR.js",
       "size": 4833,
       "priority": "critical"
     },
@@ -223,13 +223,13 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/index-C-jkbA6L.js",
-      "size": 277272,
+      "url": "/assets/index-CsQsu5NV.js",
+      "size": 1274010,
       "priority": "critical"
     },
     {
-      "url": "/assets/index-CsQsu5NV.js",
-      "size": 1274010,
+      "url": "/assets/index-PLx8CP4w.js",
+      "size": 276625,
       "priority": "critical"
     },
     {
@@ -265,7 +265,7 @@
   ],
   "summary": {
     "total": 52,
-    "totalSize": 23837767,
+    "totalSize": 23837176,
     "byPriority": {
       "assessment": {
         "count": 12,
@@ -281,7 +281,7 @@
       },
       "critical": {
         "count": 15,
-        "size": 2339404
+        "size": 2338813
       },
       "other": {
         "count": 2,
