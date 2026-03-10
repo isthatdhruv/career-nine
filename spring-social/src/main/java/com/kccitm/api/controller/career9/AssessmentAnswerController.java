@@ -99,9 +99,6 @@ public class AssessmentAnswerController {
     @Autowired
     private AssessmentSessionService assessmentSessionService;
 
-    @Autowired
-    private StudentDemographicResponseController demographicResponseController;
-
     @GetMapping(value = "/getByStudent/{studentId}", headers = "Accept=application/json")
     public List<AssessmentAnswer> getAssessmentAnswersByStudent(@PathVariable("studentId") Long studentId) {
         UserStudent userStudent = userStudentRepository.findById(studentId).orElse(null);
@@ -360,21 +357,6 @@ public class AssessmentAnswerController {
                 assessmentSessionService.markSubmissionComplete(userStudentId, assessmentId, result);
                 assessmentSessionService.deleteSession(userStudentId, assessmentId);
                 assessmentSessionService.deleteDraft(userStudentId, assessmentId);
-
-                // Submit demographics included in the payload (sent from frontend along with answers)
-                try {
-                    Object demoData = submissionData.get("demographics");
-                    if (demoData != null && demoData instanceof Map) {
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> demoRequest = (Map<String, Object>) demoData;
-                        demographicResponseController.submit(demoRequest);
-                        logger.info("Demographics submitted for student={} assessment={}", userStudentId, assessmentId);
-                    }
-                } catch (Exception demoEx) {
-                    // Demographics failure must not block answer submission success
-                    logger.warn("Demographics submission failed for student={} assessment={}: {}",
-                            userStudentId, assessmentId, demoEx.getMessage());
-                }
 
                 return ResponseEntity.ok(result);
 

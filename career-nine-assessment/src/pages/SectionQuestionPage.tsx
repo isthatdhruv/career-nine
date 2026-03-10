@@ -512,22 +512,12 @@ const SectionQuestionPage: React.FC = () => {
       ? parseInt(localStorage.getItem("assessmentId")!)
       : null;
 
-    // Attach demographics draft if saved from the demographics page
-    let demographics = undefined;
-    try {
-      const raw = sessionStorage.getItem("demographicsDraft");
-      if (raw) demographics = JSON.parse(raw);
-    } catch {
-      /* ignore */
-    }
-
     const submissionData: Record<string, any> = {
       userStudentId: userStudentId,
       assessmentId: assessmentId,
       status: "completed",
       answers: answersList,
     };
-    if (demographics) submissionData.demographics = demographics;
 
     return submissionData;
   };
@@ -802,6 +792,35 @@ const SectionQuestionPage: React.FC = () => {
         assessmentId,
         perQuestionData: Array.from(perQuestionData.current.values()),
       };
+
+      // Submit demographics separately (fire-and-forget — don't block assessment submission)
+      try {
+        const raw = sessionStorage.getItem("demographicsDraft");
+        if (raw) {
+          const demographicsPayload = JSON.parse(raw);
+          fetch(
+            `${import.meta.env.VITE_API_URL}/student-demographics/submit`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+              },
+              body: JSON.stringify(demographicsPayload),
+            },
+          )
+            .then((res) => {
+              if (res.ok) {
+                console.log("=== DEMOGRAPHICS SUBMITTED ===");
+              } else {
+                console.warn("Demographics submission returned non-OK status:", res.status);
+              }
+            })
+            .catch((err) => console.warn("Demographics submit failed:", err));
+        }
+      } catch {
+        /* ignore demographics parse errors */
+      }
 
       const maxRetries = 3;
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
