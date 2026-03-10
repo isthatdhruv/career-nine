@@ -875,13 +875,15 @@ const SectionQuestionPage: React.FC = () => {
     return !!(option.optionImageBase64 && option.optionImageBase64.trim() !== '');
   };
 
-  // Helper function to get the image source (handles both data URL and raw base64)
+  // Helper function to get the image source (handles URL path, data URL, and raw base64)
   const getOptionImageSrc = (option: Option): string => {
     if (!option.optionImageBase64) return '';
-    // If it's already a data URL, use as is; otherwise prepend the data URL prefix
-    return option.optionImageBase64.startsWith('data:')
-      ? option.optionImageBase64
-      : `data:image/png;base64,${option.optionImageBase64}`;
+    // URL path (extracted images served as separate files)
+    if (option.optionImageBase64.startsWith('/')) return option.optionImageBase64;
+    // Already a data URL
+    if (option.optionImageBase64.startsWith('data:')) return option.optionImageBase64;
+    // Raw base64 — prepend data URL prefix
+    return `data:image/png;base64,${option.optionImageBase64}`;
   };
 
   // Helper function to render option content (image or text)

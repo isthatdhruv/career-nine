@@ -199,20 +199,30 @@ const DemographicDetailsPage: React.FC = () => {
             : values[field.fieldId] || '',
       }));
 
-      await http.post('/student-demographics/submit', {
+      const demographicPayload = {
         userStudentId: Number(userStudentId),
         assessmentId: Number(assessmentId),
         responses,
-      });
+      };
 
-      await startAssessmentAndNavigate();
+      // Save demographics to Redis draft (fast) — DB persistence happens on answer submit
+      await Promise.all([
+        http.post('/student-demographics/draft-save', demographicPayload),
+        http.post('/assessments/startAssessment', {
+          userStudentId: Number(userStudentId),
+          assessmentId: Number(assessmentId),
+        }),
+        fetchAssessmentData(String(assessmentId)),
+      ]);
+
+      navigate('/general-instructions');
     } catch (error: any) {
       console.error('Error submitting demographics:', error);
       const errorData = error.response?.data;
       if (errorData?.validationErrors) {
         alert('Validation errors:\n' + errorData.validationErrors.join('\n'));
       } else {
-        alert(errorData?.error || 'Failed to submit demographics. Please try again.');
+        alert(errorData?.error || 'Failed to save demographics. Please try again.');
       }
     } finally {
       setIsSubmitting(false);

@@ -14,12 +14,20 @@ type AssessmentContextType = {
 
 /**
  * Try loading a static JSON file from the build (public/assessment-cache/{id}/).
- * These are baked into the build for locked assessments — served from CDN, zero backend latency.
- * Returns null if the file doesn't exist (404) so the caller falls back to the API.
+ * Checks the preloader's Cache API store first (instant, no network), then falls
+ * back to a normal fetch. Returns null if neither works.
  */
 async function tryStaticCache(assessmentId: string, file: string): Promise<any | null> {
+  const url = `/assessment-cache/${assessmentId}/${file}`;
   try {
-    const res = await fetch(`/assessment-cache/${assessmentId}/${file}`);
+    // Check Cache API first (populated by ResourcePreloader)
+    if ('caches' in window) {
+      const cache = await caches.open('career9-resources-v1');
+      const cached = await cache.match(url);
+      if (cached) return await cached.json();
+    }
+    // Fall back to network fetch
+    const res = await fetch(url);
     if (res.ok) return await res.json();
   } catch {
     // Static file not available — fall through to API
@@ -100,15 +108,15 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const preloadAssessmentData = (assessmentId: string) => {
-    if (assessmentData && assessmentConfig && cachedAssessmentIdRef.current === assessmentId) return;
+    if (cachedAssessmentIdRef.current === assessmentId && assessmentData && assessmentConfig) return;
     if (preloadPromiseRef.current) return;
 
-    const doPreload = async () => {
+    const promise = (async () => {
       try {
         // If login-page prefetch is in flight, wait for it first
         if (prefetchPromiseRef.current) {
           await prefetchPromiseRef.current;
-          if (assessmentData && assessmentConfig && cachedAssessmentIdRef.current === assessmentId) return;
+          if (cachedAssessmentIdRef.current === assessmentId) return;
         }
 
         const [staticData, staticConfig] = await Promise.all([
@@ -144,13 +152,8 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       } finally {
         preloadPromiseRef.current = null;
       }
-    };
-
-    // Defer to idle time so we don't compete with demographics form rendering on slow CPUs
-    const schedule = typeof requestIdleCallback === 'function' ? requestIdleCallback : (cb: () => void) => setTimeout(cb, 100);
-    preloadPromiseRef.current = new Promise<void>((resolve) => {
-      schedule(() => { doPreload().then(resolve, resolve); });
-    });
+    })();
+    preloadPromiseRef.current = promise;
   };
 
   const fetchAssessmentData = async (assessmentId: string): Promise<void> => {

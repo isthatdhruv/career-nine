@@ -53,10 +53,13 @@ import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.service.AssessmentSessionService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/assessment-answer")
 public class AssessmentAnswerController {
+    private static final Logger logger = LoggerFactory.getLogger(AssessmentAnswerController.class);
     @Autowired
     private AssessmentAnswerRepository assessmentAnswerRepository;
 
@@ -95,6 +98,9 @@ public class AssessmentAnswerController {
 
     @Autowired
     private AssessmentSessionService assessmentSessionService;
+
+    @Autowired
+    private StudentDemographicResponseController demographicResponseController;
 
     @GetMapping(value = "/getByStudent/{studentId}", headers = "Accept=application/json")
     public List<AssessmentAnswer> getAssessmentAnswersByStudent(@PathVariable("studentId") Long studentId) {
@@ -354,6 +360,22 @@ public class AssessmentAnswerController {
                 assessmentSessionService.markSubmissionComplete(userStudentId, assessmentId, result);
                 assessmentSessionService.deleteSession(userStudentId, assessmentId);
                 assessmentSessionService.deleteDraft(userStudentId, assessmentId);
+
+                // Submit deferred demographics if a draft exists in Redis
+                try {
+                    Object demoData = assessmentSessionService.getDemographicsDraft(userStudentId, assessmentId);
+                    if (demoData != null && demoData instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> demoRequest = (Map<String, Object>) demoData;
+                        demographicResponseController.submit(demoRequest);
+                        assessmentSessionService.deleteDemographicsDraft(userStudentId, assessmentId);
+                        logger.info("Deferred demographics submitted for student={} assessment={}", userStudentId, assessmentId);
+                    }
+                } catch (Exception demoEx) {
+                    // Demographics failure must not block answer submission success
+                    logger.warn("Deferred demographics submission failed for student={} assessment={}: {}",
+                            userStudentId, assessmentId, demoEx.getMessage());
+                }
 
                 return ResponseEntity.ok(result);
 

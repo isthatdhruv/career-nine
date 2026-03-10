@@ -28,7 +28,15 @@ sync_assessment() {
 
   curl -sf "${BASE_URL}/assessments/getby/${id}" -o "${dir}/data.json"
   curl -sf "${BASE_URL}/assessments/getById/${id}" -o "${dir}/config.json"
-  echo "  ✓ Cached assessment ${id} (data: $(wc -c < "${dir}/data.json")B, config: $(wc -c < "${dir}/config.json")B)"
+  echo "  ✓ Fetched assessment ${id} (data: $(wc -c < "${dir}/data.json")B, config: $(wc -c < "${dir}/config.json")B)"
+
+  # Extract base64 images from JSON into separate files (saves ~3.5MB per assessment with images)
+  node scripts/extract-assessment-images.cjs "$dir"
+
+  # Minify JSON (remove whitespace)
+  node -e "process.stdout.write(JSON.stringify(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'))))" "${dir}/data.json" > "${dir}/data.min.json" && mv "${dir}/data.min.json" "${dir}/data.json"
+  node -e "process.stdout.write(JSON.stringify(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'))))" "${dir}/config.json" > "${dir}/config.min.json" && mv "${dir}/config.min.json" "${dir}/config.json"
+  echo "  ✓ Optimized assessment ${id} (data: $(wc -c < "${dir}/data.json")B, config: $(wc -c < "${dir}/config.json")B)"
 }
 
 remove_unlocked() {

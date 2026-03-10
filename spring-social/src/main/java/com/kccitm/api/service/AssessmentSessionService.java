@@ -31,6 +31,8 @@ public class AssessmentSessionService {
     private static final int SUBMIT_TTL_HOURS = 24;
     private static final String HEARTBEAT_KEY_PREFIX = "career9:heartbeat:";
     private static final int HEARTBEAT_TTL_SECONDS = 60;
+    private static final String DEMOGRAPHICS_KEY_PREFIX = "career9:demographics:";
+    private static final int DEMOGRAPHICS_TTL_HOURS = 24;
 
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
@@ -173,6 +175,33 @@ public class AssessmentSessionService {
             return result;
         }
         return null;
+    }
+
+    /**
+     * Save demographic responses to Redis for deferred submission.
+     * Called from the demographics page to avoid blocking navigation.
+     */
+    public void saveDemographicsDraft(Long studentId, Long assessmentId, Object draftData) {
+        String key = DEMOGRAPHICS_KEY_PREFIX + studentId + ":" + assessmentId;
+        redisTemplate.opsForValue().set(key, draftData, DEMOGRAPHICS_TTL_HOURS, TimeUnit.HOURS);
+        logger.info("Saved demographics draft for student={} assessment={}", studentId, assessmentId);
+    }
+
+    /**
+     * Retrieve saved demographic responses for deferred submission.
+     */
+    public Object getDemographicsDraft(Long studentId, Long assessmentId) {
+        String key = DEMOGRAPHICS_KEY_PREFIX + studentId + ":" + assessmentId;
+        return redisTemplate.opsForValue().get(key);
+    }
+
+    /**
+     * Delete demographics draft after successful persistence.
+     */
+    public void deleteDemographicsDraft(Long studentId, Long assessmentId) {
+        String key = DEMOGRAPHICS_KEY_PREFIX + studentId + ":" + assessmentId;
+        redisTemplate.delete(key);
+        logger.debug("Deleted demographics draft for student={} assessment={}", studentId, assessmentId);
     }
 
     /**
