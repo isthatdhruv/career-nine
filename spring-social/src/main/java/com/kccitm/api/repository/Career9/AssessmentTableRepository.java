@@ -37,4 +37,6 @@ public interface AssessmentTableRepository extends JpaRepository<AssessmentTable
     @Query("SELECT a.id AS id, a.AssessmentName AS assessmentName, a.isActive AS isActive FROM AssessmentTable a")
     List<AssessmentSummary> findAssessmentSummaryList();
 
+    List<AssessmentTable> findByIsLockedTrue();
+
 }

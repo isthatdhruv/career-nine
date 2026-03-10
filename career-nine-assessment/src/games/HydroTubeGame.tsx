@@ -44,6 +44,8 @@ const patterns: Pattern[] = [
       [270, 0, 0, 0, 0, 0, 0, 0, 270, 90, 0, 0, 0, 270, 90, 90],
       [90, 90, 0, 0, 0, 270, 90, 90, 270, 90, 90, 180, 0, 270, 180, 90],
       [270, 90, 0, 0, 0, 270, 90, 90, 0, 0, 90, 180, 0, 270, 90, 90],
+      [90, 90, 0, 0, 0, 270, 90, 90, 270, 90, 90, 180, 0, 270, 90, 90],
+      [90, 90, 0, 0, 0, 270, 90, 90, 270, 90, 90, 180, 0, 270, 270, 90],
     ],
   },
   {
@@ -202,6 +204,13 @@ export function HydroTubeGame({
     onComplete,
   ]);
 
+  const normalizeRotation = (rotation: number, pipeType: string): number => {
+    if (pipeType === "straight") {
+      return rotation % 180;
+    }
+    return rotation;
+  };
+
   const checkWin = useCallback(
     (currentRotations: Record<number, number>): boolean => {
       const playerRotations = Array.from(
@@ -211,11 +220,12 @@ export function HydroTubeGame({
       return currentPattern.solutions.some((solution) =>
         solution.every((solRot, i) => {
           const playerRotation = playerRotations[i];
-          return solRot === 0 || solRot === playerRotation;
+          const pipeType = currentPattern.tileTypes[i + 1];
+          return solRot === 0 || normalizeRotation(solRot, pipeType) === normalizeRotation(playerRotation, pipeType);
         }),
       );
     },
-    [currentPattern.solutions],
+    [currentPattern.solutions, currentPattern.tileTypes],
   );
 
   const calculateProgress = useCallback(
@@ -233,7 +243,8 @@ export function HydroTubeGame({
         let correctCount = 0;
         solution.forEach((solRot, i) => {
           const playerRotation = playerRotations[i];
-          if (solRot === 0 || solRot === playerRotation) {
+          const pipeType = currentPattern.tileTypes[i + 1];
+          if (solRot === 0 || normalizeRotation(solRot, pipeType) === normalizeRotation(playerRotation, pipeType)) {
             correctCount++;
           }
         });
@@ -244,7 +255,7 @@ export function HydroTubeGame({
 
       return { correct: bestCorrectCount, total: 16 };
     },
-    [currentPattern.solutions],
+    [currentPattern.solutions, currentPattern.tileTypes],
   );
 
   const loadNextPattern = () => {
@@ -859,15 +870,15 @@ export function HydroTubeGame({
           background: isTrial
             ? "linear-gradient(to bottom, rgba(234, 179, 8, 0.95), rgba(202, 138, 4, 0.95))"
             : timeLeft < 30
-            ? "linear-gradient(to bottom, rgba(220, 38, 38, 0.95), rgba(185, 28, 28, 0.95))"
-            : "linear-gradient(to bottom, rgba(12, 74, 110, 0.95), rgba(7, 89, 133, 0.95))",
+              ? "linear-gradient(to bottom, rgba(220, 38, 38, 0.95), rgba(185, 28, 28, 0.95))"
+              : "linear-gradient(to bottom, rgba(12, 74, 110, 0.95), rgba(7, 89, 133, 0.95))",
           padding: "10px 24px",
           borderRadius: "14px",
           border: isTrial
             ? "2px solid rgba(253, 224, 71, 0.5)"
             : timeLeft < 30
-            ? "2px solid rgba(248, 113, 113, 0.5)"
-            : "2px solid rgba(56, 189, 248, 0.5)",
+              ? "2px solid rgba(248, 113, 113, 0.5)"
+              : "2px solid rgba(56, 189, 248, 0.5)",
           boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
         }}
       >
@@ -1385,8 +1396,8 @@ export function HydroTubeGame({
                     border: isHighlighted
                       ? "3px solid #f59e0b"
                       : isWon
-                      ? "2px solid #10b981"
-                      : "1px solid #e2e8f0",
+                        ? "2px solid #10b981"
+                        : "1px solid #e2e8f0",
                     animation: isHighlighted ? "pulse 1.5s infinite" : "none",
                   }}
                 >

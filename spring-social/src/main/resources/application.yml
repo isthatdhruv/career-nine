@@ -1,6 +1,6 @@
 spring:
   profiles:
-    active: staging
+    active: dev
     
 
 server:
@@ -21,7 +21,7 @@ server:
 spring:
   profiles: dev
   datasource:
-    url: jdbc:mysql://localhost:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3308/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     # url: jdbc:mysql://192.168.10.73:3306/kiraya-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     username: root
     password: Career-qCsfeuECc3MW
@@ -136,7 +136,7 @@ app:
     tokenSecret: 04ca023b39512e46d0c2cf4b48d5aac61d34302994c87ed4eff225dcf3b0a218739f3897051a057f9b846a69ea2927a587044164b7bae5e1306219d50b588cb1
     tokenExpirationMsec: 864000000
   cors:
-    allowedOrigins: http://localhost:5173,http://35.227.40.232:3000,http://localhost:3001,http://192.168.1.11:3000,http://35.196.122.199:3000,http://192.168.0.204:3000,http://192.168.0.204:3000,http://localhost:3000,https://localhost:3000,https://localhost:8080,https://192.168.0.204:8080,https://localhost,https://localhost:80,https://staging.student.kccitm.in/,https://student.kccitm.in/,https://erp.aktu.ac.in/,https://leetcode.com,http://192.168.0.204:8443//,http://localhost:8080
+    allowedOrigins: http://localhost:5173,http://35.227.40.232:3000,http://localhost:3001,http://192.168.1.11:3000,http://35.196.122.199:3000,http://192.168.0.204:3000,http://192.168.0.204:3000,http://localhost:3000,https://localhost:3000,https://localhost:8080,https://192.168.0.204:8080,https://localhost,https://localhost:80,https://staging.student.kccitm.in,https://student.kccitm.in,https://erp.aktu.ac.in,https://leetcode.com,http://192.168.0.204:8443,http://localhost:8080
   oauth2:
     # After successfully authenticating with the OAuth2 Provider,
     # we'll be generating an auth token for the user and sending the token to the
@@ -154,10 +154,10 @@ app:
       - http://192.168.0.204:3000
   mandrill: WXX3fC00pJTZgonjnVvkgQ
   odoo:
-    url: career-91.odoo.com
+    url: https://career-91.odoo.com
     database: career-91
     username: prasad.khake@career-9.com
-    password: 5685cadbbee4aee3f65cf0bd1bdc9112c9dc772f
+    api-key: f4374c76ccca60c223f8d3d1d5425dbf596f3e99
   gmail:
     sender-email: ${GMAIL_SENDER:notifications@career-9.net}
   firebase:
@@ -286,7 +286,7 @@ app:
     tokenSecret: 04ca023b39512e46d0c2cf4b48d5aac61d34302994c87ed4eff225dcf3b0a218739f3897051a057f9b846a69ea2927a587044164b7bae5e1306219d50b588cb1
     tokenExpirationMsec: 864000000
   cors:
-    allowedOrigins: https://dashboard.career-9.com,https://walrus-app-e2a6a.ondigitalocean.app,https://assessment.career-9.com,https://*.career-9.com
+    allowedOrigins: https://career-9.com,https://www.career-9.com,https://dashboard.career-9.com,https://walrus-app-e2a6a.ondigitalocean.app,https://assessment.career-9.com,https://*.career-9.com,http://localhost:5173
   oauth2:
     # After successfully authenticating with the OAuth2 Provider,
     # we'll be generating an auth token for the user and sending the token to the
@@ -303,10 +303,10 @@ app:
       - myiosapp://oauth2/redirect
   mandrill: WXX3fC00pJTZgonjnVvkgQ
   odoo:
-    url: ${ODOO_URL:https://your-odoo-instance.odoo.com}
-    database: ${ODOO_DATABASE:your-odoo-db}
-    username: ${ODOO_USERNAME:admin@example.com}
-    password: ${ODOO_PASSWORD:your-api-key}
+    url: ${ODOO_URL:https://career-91.odoo.com}
+    database: ${ODOO_DATABASE:career-91}
+    username: ${ODOO_USERNAME:prasad.khake@career-9.com}
+    api-key: ${ODOO_API_KEY:f4374c76ccca60c223f8d3d1d5425dbf596f3e99}
   gmail:
     sender-email: ${GMAIL_SENDER:notifications@career-9.net}
 ---
@@ -425,7 +425,7 @@ app:
     tokenSecret: 04ca023b39512e46d0c2cf4b48d5aac61d34302994c87ed4eff225dcf3b0a218739f3897051a057f9b846a69ea2927a587044164b7bae5e1306219d50b588cb1
     tokenExpirationMsec: 864000000
   cors:
-    allowedOrigins: http://localhost:3000,http://localhost:8080,http://localhost,http://localhost:80,https://staging.student.kccitm.in/,https://student.kccitm.in/
+    allowedOrigins: https://career-9.com,https://www.career-9.com,https://*.career-9.com,https://dashboard.career-9.com,https://assessment.career-9.com,http://localhost:3000,http://localhost:3001,http://localhost:8080,http://localhost,http://localhost:80,https://staging.student.kccitm.in,https://student.kccitm.in
   oauth2:
     # After successfully authenticating with the OAuth2 Provider,
     # we'll be generating an auth token for the user and sending the token to the
@@ -442,10 +442,10 @@ app:
       - myiosapp://oauth2/redirect
   mandrill: WXX3fC00pJTZgonjnVvkgQ
   odoo:
-    url: career-91.odoo.com
+    url: https://career-91.odoo.com
     database: career-91
-    username: prasad.khake@career-9.com 
-    password: 5685cadbbee4aee3f65cf0bd1bdc9112c9dc772f
+    username: prasad.khake@career-9.com
+    api-key: 5685cadbbee4aee3f65cf0bd1bdc9112c9dc772f
   gmail:
     sender-email: ${GMAIL_SENDER:notifications@career-9.net}
 

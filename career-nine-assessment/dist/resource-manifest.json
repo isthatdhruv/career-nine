@@ -1,0 +1,332 @@
+{
+  "version": "mmk8aweb",
+  "generated": "2026-03-10T06:28:10.499Z",
+  "resources": [
+    {
+      "url": "/assessment-cache/5/config.json",
+      "size": 125288,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/5/data.json",
+      "size": 125058,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/5/images/370.png",
+      "size": 347797,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/5/images/370.webp",
+      "size": 89294,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/5/images/371.png",
+      "size": 267679,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/5/images/371.webp",
+      "size": 88754,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/5/images/372.png",
+      "size": 384220,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/5/images/372.webp",
+      "size": 94680,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/5/images/373.png",
+      "size": 309438,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/5/images/373.webp",
+      "size": 72164,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/5/images/374.png",
+      "size": 342127,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/5/images/374.webp",
+      "size": 134934,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/5/images/375.png",
+      "size": 388892,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/5/images/375.webp",
+      "size": 51446,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/5/images/376.png",
+      "size": 292611,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/5/images/376.webp",
+      "size": 86604,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/5/images/377.png",
+      "size": 276699,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/5/images/377.webp",
+      "size": 47344,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/8/config.json",
+      "size": 213604,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/8/data.json",
+      "size": 213372,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assets/game/deer.webp",
+      "size": 83100,
+      "priority": "game"
+    },
+    {
+      "url": "/assets/game/elephant.webp",
+      "size": 95450,
+      "priority": "game"
+    },
+    {
+      "url": "/assets/game/hydro-tube-tutorial.mp4",
+      "size": 164867,
+      "priority": "game"
+    },
+    {
+      "url": "/assets/game/jungle-spot-tutorial.mp4",
+      "size": 519737,
+      "priority": "game"
+    },
+    {
+      "url": "/assets/game/lion.webp",
+      "size": 177336,
+      "priority": "game"
+    },
+    {
+      "url": "/assets/game/rabbit-path-tutorial.mp4",
+      "size": 480347,
+      "priority": "game"
+    },
+    {
+      "url": "/assets/game/rhino.webp",
+      "size": 73726,
+      "priority": "game"
+    },
+    {
+      "url": "/assets/game/tiger.webp",
+      "size": 87960,
+      "priority": "game"
+    },
+    {
+      "url": "/game-scenes/2nd/game-scene-2nd.webp",
+      "size": 789400,
+      "priority": "game"
+    },
+    {
+      "url": "/game-scenes/2nd/rabbit-nobg-old.webp",
+      "size": 7998,
+      "priority": "game"
+    },
+    {
+      "url": "/game-scenes/2nd/rabbit-nobg.webp",
+      "size": 47796,
+      "priority": "game"
+    },
+    {
+      "url": "/mediapipe/face_mesh/README.md",
+      "size": 389,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/face_mesh.binarypb",
+      "size": 939,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/face_mesh.js",
+      "size": 65044,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/face_mesh_solution_packed_assets.data",
+      "size": 3986256,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/face_mesh_solution_packed_assets_loader.js",
+      "size": 9126,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/face_mesh_solution_simd_wasm_bin.data",
+      "size": 0,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/face_mesh_solution_simd_wasm_bin.js",
+      "size": 330187,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/face_mesh_solution_simd_wasm_bin.wasm",
+      "size": 6161697,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/face_mesh_solution_wasm_bin.js",
+      "size": 330182,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/face_mesh_solution_wasm_bin.wasm",
+      "size": 6084312,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/index.d.ts",
+      "size": 6656,
+      "priority": "deferred"
+    },
+    {
+      "url": "/mediapipe/face_mesh/package.json",
+      "size": 691,
+      "priority": "deferred"
+    },
+    {
+      "url": "/assets/HydroTubeGame-BX-Hvayv.js",
+      "size": 23029,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/JungleSpotGame-C0OEOozS.js",
+      "size": 22904,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/RabbitPathGame-BIc_KlwT.js",
+      "size": 26561,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/SectionInstructionPage-CjSFgqP8.js",
+      "size": 4429,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/SectionQuestionPage-frx5jzHN.js",
+      "size": 169637,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/SelectSectionPage-DvxCoyYv.js",
+      "size": 4833,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/firebase-BOVtng-N.js",
+      "size": 360,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/firebase-CHGGj5-7.js",
+      "size": 222580,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/index-BGK7fJbL.css",
+      "size": 239188,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/index-CsQsu5NV.js",
+      "size": 1274010,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/index-NAuoEuCL.js",
+      "size": 276625,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/react-l0sNRNKZ.js",
+      "size": 1,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/router-BcYEr9bP.js",
+      "size": 30486,
+      "priority": "critical"
+    },
+    {
+      "url": "/index.html",
+      "size": 23267,
+      "priority": "critical"
+    },
+    {
+      "url": "/workbox-66610c77.js",
+      "size": 21445,
+      "priority": "critical"
+    },
+    {
+      "url": "/manifest.webmanifest",
+      "size": 188,
+      "priority": "other"
+    },
+    {
+      "url": "/media/logos/kcc.jpg",
+      "size": 652421,
+      "priority": "other"
+    }
+  ],
+  "summary": {
+    "total": 60,
+    "totalSize": 26447165,
+    "byPriority": {
+      "assessment": {
+        "count": 20,
+        "size": 3952005
+      },
+      "game": {
+        "count": 11,
+        "size": 2527717
+      },
+      "deferred": {
+        "count": 12,
+        "size": 16975479
+      },
+      "critical": {
+        "count": 15,
+        "size": 2339355
+      },
+      "other": {
+        "count": 2,
+        "size": 652609
+      }
+    }
+  }
+}

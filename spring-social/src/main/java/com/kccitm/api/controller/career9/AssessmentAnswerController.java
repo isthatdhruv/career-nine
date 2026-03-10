@@ -53,10 +53,13 @@ import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.service.AssessmentSessionService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/assessment-answer")
 public class AssessmentAnswerController {
+    private static final Logger logger = LoggerFactory.getLogger(AssessmentAnswerController.class);
     @Autowired
     private AssessmentAnswerRepository assessmentAnswerRepository;
 
