@@ -36,11 +36,14 @@ async function tryStaticCache(assessmentId: string, file: string): Promise<any |
 }
 
 /**
- * Pre-decode all base64 option images into browser bitmap cache.
- * Runs once after assessment data loads so images render instantly on SectionQuestionPage.
+ * Module-level array keeps Image refs alive so the browser doesn't GC them.
+ * Setting .src triggers background decode — zero manual work, Pentium-safe.
  */
+const _preDecodedImages: HTMLImageElement[] = [];
+
 function preDecodeOptionImages(data: any) {
   if (!data || !Array.isArray(data)) return;
+  _preDecodedImages.length = 0;
   for (const q of data) {
     if (!q?.sections) continue;
     for (const sec of q.sections) {
@@ -55,7 +58,9 @@ function preDecodeOptionImages(data: any) {
             : b64.startsWith('/') ? b64
             : `data:image/png;base64,${b64}`;
           const img = new Image();
+          img.decoding = 'async';
           img.src = src;
+          _preDecodedImages.push(img);
         }
       }
     }

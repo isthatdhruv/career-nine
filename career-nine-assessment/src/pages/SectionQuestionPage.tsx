@@ -903,8 +903,11 @@ const SectionQuestionPage: React.FC = () => {
           src={getOptionImageSrc(option)}
           alt={option.optionText || 'Option image'}
           style={{
+            display: 'block',
             maxWidth: '200px',
             maxHeight: '150px',
+            width: 'auto',
+            height: 'auto',
             objectFit: 'contain',
             borderRadius: '8px',
             border: '1px solid #e0e0e0',
