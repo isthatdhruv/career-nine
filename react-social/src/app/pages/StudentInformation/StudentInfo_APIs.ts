@@ -197,3 +197,16 @@ export function exportScoresByInstitute(instituteId: number, assessmentId: numbe
         responseType: 'blob'
     });
 }
+
+
+export function getContactPersonsByInstitute(instituteCode: number) {
+    return axios.get(`${API_URL}/contact-person/by-institute/${instituteCode}`);
+}
+
+export function assignStudentsToContactPerson(payload: {
+    contactPersonId: number;
+    userStudentIds: number[];
+    instituteId: number;
+}) {
+    return axios.post(`${API_URL}/contact-person/assign-students`, payload);
+}

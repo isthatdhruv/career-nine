@@ -207,7 +207,12 @@ const StudentDashboard: React.FC = () => {
           </div>
           <div>
             <h3 className="student-name">{student.name}</h3>
-            <p className="student-meta">Grade {student.grade} • {student.schoolBoard} • ID: #{student.userStudentId}</p>
+            <p className="student-meta">
+              Grade {student.grade || "N/A"}
+              {student.section ? ` • Section ${student.section}` : ""}
+              {student.schoolBoard && student.schoolBoard !== "N/A" ? ` • ${student.schoolBoard}` : ""}
+              {student.username ? ` • @${student.username}` : ` • ID: #${student.userStudentId}`}
+            </p>
           </div>
         </div>
         <div className="student-details-grid">
@@ -217,7 +222,7 @@ const StudentDashboard: React.FC = () => {
           </div>
           <div className="detail-item">
             <span className="detail-label">Siblings</span>
-            <span className="detail-value">{student.siblingsCount || 0}</span>
+            <span className="detail-value">{student.siblingsCount != null ? student.siblingsCount : "N/A"}</span>
           </div>
           <div className="detail-item">
             <span className="detail-label">Assessment</span>

@@ -54,6 +54,9 @@ import StudentsList from "../pages/StudentInformation/StudentsList";
 import GroupCreatePage from "../pages/dashboard/widgets/CreateNewGroup";
 import StudentCreatePage from "../pages/dashboard/widgets/CreateNewStudent";
 import GroupStudentPage from "../pages/GroupStudent/GroupStudentPage";
+import GroupStudentAdminPage from "../pages/GroupStudent/GroupStudentAdminPage";
+import GroupStudentSchoolPage from "../pages/GroupStudent/GroupStudentSchoolPage";
+import AssignedStudentsPage from "../pages/GroupStudent/AssignedStudentsPage";
 import StudentLoginPage from "../pages/StudentLogin/StudentLoginPage";
 import AllottedAssessmentPage from "../pages/StudentLogin/AllottedAssessmentPage";
 import GamePage from "../pages/Games/GamePage";
@@ -243,7 +246,7 @@ const PrivateRoutes = () => {
         <Route path="auth/*" element={<Navigate to="/dashboard" />} />
         <Route path="dashboard" element={<DashboardAdminPage />} />
 
-        <Route path="/school/dashboard/:id" element={
+        <Route path="/school/principal/dashboard/:id" element={
           <SuspensedView>
             <InstituteDashboard />
           </SuspensedView>
@@ -287,7 +290,7 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
-        <Route path="/school/dashboard/studentList" element={
+        <Route path="/school/principal/dashboard/studentList" element={
           <SuspensedView>
             <StudentsList />
           </SuspensedView>
@@ -316,6 +319,24 @@ const PrivateRoutes = () => {
         <Route path="/group-student" element={
           <SuspensedView>
             <GroupStudentPage />
+          </SuspensedView>
+        } />
+
+        <Route path="/admin/group-student" element={
+          <SuspensedView>
+            <GroupStudentAdminPage />
+          </SuspensedView>
+        } />
+
+        <Route path="/school/group-student" element={
+          <SuspensedView>
+            <GroupStudentSchoolPage />
+          </SuspensedView>
+        } />
+
+        <Route path="/school/assigned-students" element={
+          <SuspensedView>
+            <AssignedStudentsPage />
           </SuspensedView>
         } />
 
