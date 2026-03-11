@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getAssessmentList, getLiveTracking, getRedisPartials, flushPartialToDb } from "./API/LiveTracking_APIs";
+import { getAssessmentList, getLiveTracking, getRedisPartials, flushPartialToDb, getRedisPartialDetail, submitFromRedis } from "./API/LiveTracking_APIs";
 
 /* ─── Types ─── */
 
@@ -185,6 +185,10 @@ const LiveTrackingPage = () => {
   const [redisLoading, setRedisLoading] = useState(false);
   const [flushingIds, setFlushingIds] = useState<Set<number>>(new Set());
   const [flushingAll, setFlushingAll] = useState(false);
+  const [redisJsonModal, setRedisJsonModal] = useState<{
+    show: boolean; studentName: string; data: any;
+  }>({ show: false, studentName: "", data: null });
+  const [submittingIds, setSubmittingIds] = useState<Set<number>>(new Set());
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevDataRef = useRef<string>("");
@@ -363,6 +367,36 @@ const LiveTrackingPage = () => {
       console.error("Flush all failed", err);
     } finally {
       setFlushingAll(false);
+    }
+  };
+
+  // View raw Redis JSON for a student's partial answers
+  const handleViewRedisJson = async (entry: RedisPartialEntry) => {
+    try {
+      const res = await getRedisPartialDetail(entry.userStudentId, entry.assessmentId);
+      setRedisJsonModal({ show: true, studentName: entry.studentName, data: res.data });
+    } catch (err) {
+      console.error("Failed to fetch Redis detail", err);
+      alert("Failed to load Redis data");
+    }
+  };
+
+  // Admin submit: trigger async submission pipeline from Redis partial answers
+  const handleSubmitFromRedis = async (entry: RedisPartialEntry) => {
+    setSubmittingIds((prev) => new Set(prev).add(entry.userStudentId));
+    try {
+      await submitFromRedis(entry.userStudentId, entry.assessmentId);
+      await fetchRedisPartials();
+    } catch (err: any) {
+      console.error("Submit from Redis failed", err);
+      const msg = err?.response?.data?.error || err?.response?.data || "Submit failed";
+      alert(typeof msg === "string" ? msg : JSON.stringify(msg));
+    } finally {
+      setSubmittingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(entry.userStudentId);
+        return next;
+      });
     }
   };
 
@@ -706,7 +740,12 @@ const LiveTrackingPage = () => {
                           <small className="text-muted">ID: {entry.userStudentId}</small>
                         </td>
                         <td>
-                          <span className="badge bg-info px-3 py-2">
+                          <span
+                            className="badge bg-info px-3 py-2"
+                            style={{ cursor: "pointer" }}
+                            onClick={() => handleViewRedisJson(entry)}
+                            title="Click to view Redis JSON"
+                          >
                             {entry.answerCount}
                           </span>
                         </td>
@@ -739,6 +778,16 @@ const LiveTrackingPage = () => {
                             ) : null}
                             Save to DB
                           </button>
+                          <button
+                            className="btn btn-sm btn-outline-warning ms-2"
+                            onClick={() => handleSubmitFromRedis(entry)}
+                            disabled={submittingIds.has(entry.userStudentId)}
+                          >
+                            {submittingIds.has(entry.userStudentId) ? (
+                              <span className="spinner-border spinner-border-sm me-1" role="status" />
+                            ) : null}
+                            Submit this Data
+                          </button>
                         </td>
                       </tr>
                     ))
@@ -757,6 +806,37 @@ const LiveTrackingPage = () => {
           </div>
         )}
       </div>
+
+      {/* Redis JSON Modal */}
+      {redisJsonModal.show && (
+        <div className="modal d-block" tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+          <div className="modal-dialog modal-lg modal-dialog-scrollable">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Redis Data &mdash; {redisJsonModal.studentName}</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setRedisJsonModal({ show: false, studentName: "", data: null })}
+                />
+              </div>
+              <div className="modal-body">
+                <pre style={{ maxHeight: "60vh", overflow: "auto", fontSize: "0.85rem" }}>
+                  {JSON.stringify(redisJsonModal.data, null, 2)}
+                </pre>
+              </div>
+              <div className="modal-footer">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setRedisJsonModal({ show: false, studentName: "", data: null })}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Pulse animation for live indicator */}
       <style>{`

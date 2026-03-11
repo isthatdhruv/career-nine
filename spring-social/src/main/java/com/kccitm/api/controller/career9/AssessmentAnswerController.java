@@ -1649,6 +1649,108 @@ public class AssessmentAnswerController {
     }
 
     /**
+     * Dashboard endpoint: view the raw Redis JSON for a student's partial answers.
+     */
+    @GetMapping(value = "/redis-partial-detail")
+    public ResponseEntity<?> getRedisPartialDetail(
+            @RequestParam("userStudentId") Long userStudentId,
+            @RequestParam("assessmentId") Long assessmentId) {
+        try {
+            Map<String, Object> data = assessmentSessionService.getPartialAnswers(userStudentId, assessmentId);
+            if (data == null) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(data);
+        } catch (Exception e) {
+            logger.error("Failed to fetch Redis partial detail", e);
+            return ResponseEntity.status(500).body("Failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Dashboard endpoint: admin-triggered submit from Redis partial answers.
+     * Reads partial answers from Redis and runs them through the async submission pipeline.
+     */
+    @SuppressWarnings("unchecked")
+    @PostMapping(value = "/submit-from-redis")
+    public ResponseEntity<?> submitFromRedis(@RequestBody Map<String, Object> requestData) {
+        try {
+            if (requestData.get("userStudentId") == null || requestData.get("assessmentId") == null) {
+                return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
+            }
+            Long userStudentId = ((Number) requestData.get("userStudentId")).longValue();
+            Long assessmentId = ((Number) requestData.get("assessmentId")).longValue();
+
+            // Read partial answers from Redis
+            Map<String, Object> partial = assessmentSessionService.getPartialAnswers(userStudentId, assessmentId);
+            if (partial == null || partial.get("answers") == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No partial answers found in Redis");
+            }
+
+            List<Map<String, Object>> answers = (List<Map<String, Object>>) partial.get("answers");
+            if (answers.isEmpty()) {
+                return ResponseEntity.badRequest().body("Partial answers are empty");
+            }
+
+            // Acquire submission lock (idempotency)
+            if (!assessmentSessionService.acquireSubmissionLock(userStudentId, assessmentId)) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                        "error", "Submission already in progress or completed",
+                        "status", "duplicate"
+                ));
+            }
+
+            try {
+                UserStudent userStudent = userStudentRepository.findById(userStudentId)
+                        .orElseThrow(() -> new RuntimeException("UserStudent not found"));
+
+                AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
+                        .orElseThrow(() -> new RuntimeException("Assessment not found"));
+
+                // Find/create mapping and set status completed
+                StudentAssessmentMapping mapping;
+                try {
+                    mapping = studentAssessmentMappingRepository
+                            .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                            .orElseGet(() -> {
+                                StudentAssessmentMapping newMapping = new StudentAssessmentMapping();
+                                newMapping.setUserStudent(userStudent);
+                                newMapping.setAssessmentId(assessmentId);
+                                return studentAssessmentMappingRepository.save(newMapping);
+                            });
+                } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                    mapping = studentAssessmentMappingRepository
+                            .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                            .orElseThrow(() -> new RuntimeException("Failed to create/find assessment mapping"));
+                }
+                mapping.setStatus("completed");
+                studentAssessmentMappingRepository.save(mapping);
+
+                // Build submission payload and save to Redis for async processing
+                Map<String, Object> submissionData = new HashMap<>();
+                submissionData.put("userStudentId", userStudentId);
+                submissionData.put("assessmentId", assessmentId);
+                submissionData.put("status", "completed");
+                submissionData.put("answers", answers);
+
+                assessmentSessionService.saveSubmittedAnswers(userStudentId, assessmentId, submissionData);
+                submissionProcessorService.processSubmissionAsync(userStudentId, assessmentId);
+
+                logger.info("Admin submit-from-redis accepted for student={} assessment={}", userStudentId, assessmentId);
+                return ResponseEntity.ok(Map.of("status", "accepted"));
+
+            } catch (Exception e) {
+                assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
+                throw e;
+            }
+
+        } catch (Exception e) {
+            logger.error("Submit from Redis failed", e);
+            return ResponseEntity.status(500).body("Submit failed: " + e.getMessage());
+        }
+    }
+
+    /**
      * Dashboard endpoint: flush buffered partial answers from Redis to MySQL.
      * Accepts {userStudentId, assessmentId} for a single student,
      * or just {assessmentId} to flush all students for that assessment.
