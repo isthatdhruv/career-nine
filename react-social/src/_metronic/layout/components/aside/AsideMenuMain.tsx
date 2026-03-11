@@ -60,7 +60,7 @@ export function AsideMenuMain() {
     allowed("/assessment-questions") || allowed("/question-sections") ||
     allowed("/text-response-mapping");
 
-  const showReports = allowed("/reports");
+  const showReports = allowed("/reports") || allowed("/report-generation");
 
   const showTeacherDashboards =
     allowed("/teacher/class-dashboard") || allowed("/principal/dashboard");
@@ -391,12 +391,22 @@ export function AsideMenuMain() {
             </div>
           </div>
 
-          <AsideMenuItem
-            to="/reports"
-            icon="/media/icons/duotune/files/fil003.svg"
-            title="Reports & Exports"
-            fontIcon="bi-file-earmark-bar-graph"
-          />
+          {allowed("/reports") && (
+            <AsideMenuItem
+              to="/reports"
+              icon="/media/icons/duotune/files/fil003.svg"
+              title="Reports & Exports"
+              fontIcon="bi-file-earmark-bar-graph"
+            />
+          )}
+          {allowed("/report-generation") && (
+            <AsideMenuItem
+              to="/report-generation"
+              icon="/media/icons/duotune/general/gen005.svg"
+              title="Report Generation"
+              fontIcon="bi-file-earmark-bar-graph"
+            />
+          )}
         </>
       )}
 

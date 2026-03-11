@@ -57,6 +57,7 @@ import GroupStudentPage from "../pages/GroupStudent/GroupStudentPage";
 import GroupStudentAdminPage from "../pages/GroupStudent/GroupStudentAdminPage";
 import GroupStudentSchoolPage from "../pages/GroupStudent/GroupStudentSchoolPage";
 import AssignedStudentsPage from "../pages/GroupStudent/AssignedStudentsPage";
+import ReportGenerationPage from "../pages/ReportGeneration/ReportGenerationPage";
 import StudentLoginPage from "../pages/StudentLogin/StudentLoginPage";
 import AllottedAssessmentPage from "../pages/StudentLogin/AllottedAssessmentPage";
 import GamePage from "../pages/Games/GamePage";
@@ -337,6 +338,12 @@ const PrivateRoutes = () => {
         <Route path="/school/assigned-students" element={
           <SuspensedView>
             <AssignedStudentsPage />
+          </SuspensedView>
+        } />
+
+        <Route path="/report-generation" element={
+          <SuspensedView>
+            <ReportGenerationPage />
           </SuspensedView>
         } />
 
