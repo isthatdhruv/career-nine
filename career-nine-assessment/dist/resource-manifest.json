@@ -1,6 +1,6 @@
 {
-  "version": "mmm0isvi",
-  "generated": "2026-03-11T12:25:54.606Z",
+  "version": "mmm10xqm",
+  "generated": "2026-03-11T12:40:00.718Z",
   "resources": [
     {
       "url": "/assessment-cache/5/config.json",
@@ -178,32 +178,32 @@
       "priority": "deferred"
     },
     {
-      "url": "/assets/HydroTubeGame-CJdqft-u.js",
+      "url": "/assets/HydroTubeGame-DqECpPKH.js",
       "size": 23029,
       "priority": "critical"
     },
     {
-      "url": "/assets/JungleSpotGame-D6rGjyKG.js",
+      "url": "/assets/JungleSpotGame-D974NcEI.js",
       "size": 22904,
       "priority": "critical"
     },
     {
-      "url": "/assets/RabbitPathGame-DrvX6bxg.js",
+      "url": "/assets/RabbitPathGame-CIMiaaiX.js",
       "size": 26561,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionInstructionPage-CR0bcoef.js",
+      "url": "/assets/SectionInstructionPage-BdeWqGti.js",
       "size": 4429,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionQuestionPage-Dhro1xn6.js",
-      "size": 169057,
+      "url": "/assets/SectionQuestionPage-D8bLQwaL.js",
+      "size": 169058,
       "priority": "critical"
     },
     {
-      "url": "/assets/SelectSectionPage-2ptYii3G.js",
+      "url": "/assets/SelectSectionPage-sNXMBg3k.js",
       "size": 4833,
       "priority": "critical"
     },
@@ -218,6 +218,11 @@
       "priority": "critical"
     },
     {
+      "url": "/assets/index-5uUnCvUR.js",
+      "size": 276660,
+      "priority": "critical"
+    },
+    {
       "url": "/assets/index-BGK7fJbL.css",
       "size": 239188,
       "priority": "critical"
@@ -225,11 +230,6 @@
     {
       "url": "/assets/index-CsQsu5NV.js",
       "size": 1274010,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/index-MU0RSGdT.js",
-      "size": 276658,
       "priority": "critical"
     },
     {
@@ -261,11 +261,16 @@
       "url": "/media/logos/kcc.jpg",
       "size": 652421,
       "priority": "other"
+    },
+    {
+      "url": "/media/logos/kcc.webp",
+      "size": 274630,
+      "priority": "other"
     }
   ],
   "summary": {
-    "total": 52,
-    "totalSize": 23837152,
+    "total": 53,
+    "totalSize": 24111785,
     "byPriority": {
       "assessment": {
         "count": 12,
@@ -281,11 +286,11 @@
       },
       "critical": {
         "count": 15,
-        "size": 2338808
+        "size": 2338811
       },
       "other": {
-        "count": 2,
-        "size": 652609
+        "count": 3,
+        "size": 927239
       }
     }
   }
