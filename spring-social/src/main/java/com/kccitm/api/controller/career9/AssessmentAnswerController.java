@@ -100,6 +100,9 @@ public class AssessmentAnswerController {
     @Autowired
     private AssessmentSessionService assessmentSessionService;
 
+    @Autowired
+    private com.kccitm.api.service.PartialAnswerFlushService partialAnswerFlushService;
+
     @GetMapping(value = "/getByStudent/{studentId}", headers = "Accept=application/json")
     public List<AssessmentAnswer> getAssessmentAnswersByStudent(@PathVariable("studentId") Long studentId) {
         UserStudent userStudent = userStudentRepository.findById(studentId).orElse(null);
@@ -1826,7 +1829,6 @@ public class AssessmentAnswerController {
      * Accepts {userStudentId, assessmentId} for a single student,
      * or just {assessmentId} to flush all students for that assessment.
      */
-    @SuppressWarnings("unchecked")
     @Transactional
     @PostMapping(value = "/flush-partial-to-db")
     public ResponseEntity<?> flushPartialToDb(@RequestBody Map<String, Object> requestData) {
@@ -1840,104 +1842,21 @@ public class AssessmentAnswerController {
                 return ResponseEntity.badRequest().body("Invalid assessmentId");
             }
 
-            // Determine which students to flush
-            List<Map<String, Object>> toFlush = new ArrayList<>();
+            // Determine which students to flush and flush via service
+            int totalFlushed = 0;
             if (requestData.get("userStudentId") != null) {
-                // Single student
                 Long studentId = ((Number) requestData.get("userStudentId")).longValue();
-                Map<String, Object> partial = assessmentSessionService.getPartialAnswers(studentId, assessmentId);
-                if (partial != null) {
-                    Map<String, Object> entry = new HashMap<>();
-                    entry.put("studentId", studentId);
-                    entry.put("answers", partial.get("answers"));
-                    toFlush.add(entry);
+                if (partialAnswerFlushService.flushOneStudent(studentId, assessmentId)) {
+                    totalFlushed++;
                 }
             } else {
-                // All students for this assessment
                 List<Map<String, Object>> allEntries = assessmentSessionService.getAllPartialAnswerEntries(assessmentId);
                 for (Map<String, Object> meta : allEntries) {
                     Long studentId = ((Number) meta.get("userStudentId")).longValue();
-                    Map<String, Object> partial = assessmentSessionService.getPartialAnswers(studentId, assessmentId);
-                    if (partial != null) {
-                        Map<String, Object> entry = new HashMap<>();
-                        entry.put("studentId", studentId);
-                        entry.put("answers", partial.get("answers"));
-                        toFlush.add(entry);
+                    if (partialAnswerFlushService.flushOneStudent(studentId, assessmentId)) {
+                        totalFlushed++;
                     }
                 }
-            }
-
-            int totalFlushed = 0;
-            for (Map<String, Object> flushEntry : toFlush) {
-                Long studentId = ((Number) flushEntry.get("studentId")).longValue();
-                List<Map<String, Object>> answers = (List<Map<String, Object>>) flushEntry.get("answers");
-                if (answers == null || answers.isEmpty()) continue;
-
-                UserStudent userStudent = userStudentRepository.findById(studentId).orElse(null);
-                if (userStudent == null) continue;
-
-                // Bulk fetch questions and options
-                List<Long> questionIds = new ArrayList<>();
-                List<Long> optionIds = new ArrayList<>();
-                for (Map<String, Object> ansMap : answers) {
-                    questionIds.add(((Number) ansMap.get("questionnaireQuestionId")).longValue());
-                    if (ansMap.containsKey("optionId")) {
-                        optionIds.add(((Number) ansMap.get("optionId")).longValue());
-                    }
-                }
-
-                Map<Long, QuestionnaireQuestion> questionCache = new HashMap<>();
-                if (!questionIds.isEmpty()) {
-                    questionnaireQuestionRepository.findAllByIdIn(questionIds)
-                            .forEach(qq -> questionCache.put(qq.getQuestionnaireQuestionId(), qq));
-                }
-
-                Map<Long, AssessmentQuestionOptions> optionCache = new HashMap<>();
-                if (!optionIds.isEmpty()) {
-                    assessmentQuestionOptionsRepository.findAllById(optionIds)
-                            .forEach(opt -> optionCache.put(opt.getOptionId(), opt));
-                }
-
-                // Build answer entities
-                List<AssessmentAnswer> answersToSave = new ArrayList<>();
-                for (Map<String, Object> ansMap : answers) {
-                    Long qId = ((Number) ansMap.get("questionnaireQuestionId")).longValue();
-                    QuestionnaireQuestion question = questionCache.get(qId);
-
-                    String textResponse = ansMap.containsKey("textResponse")
-                            ? (String) ansMap.get("textResponse") : null;
-
-                    if (textResponse != null && question != null) {
-                        AssessmentAnswer ans = new AssessmentAnswer();
-                        ans.setUserStudent(userStudent);
-                        ans.setAssessment(assessment);
-                        ans.setQuestionnaireQuestion(question);
-                        ans.setTextResponse(textResponse);
-                        answersToSave.add(ans);
-                    } else if (ansMap.containsKey("optionId")) {
-                        Long oId = ((Number) ansMap.get("optionId")).longValue();
-                        Integer rankOrder = ansMap.containsKey("rankOrder")
-                                ? ((Number) ansMap.get("rankOrder")).intValue() : null;
-                        AssessmentQuestionOptions option = optionCache.get(oId);
-                        if (question == null || option == null) continue;
-
-                        AssessmentAnswer ans = new AssessmentAnswer();
-                        ans.setUserStudent(userStudent);
-                        ans.setAssessment(assessment);
-                        ans.setQuestionnaireQuestion(question);
-                        ans.setOption(option);
-                        if (rankOrder != null) ans.setRankOrder(rankOrder);
-                        answersToSave.add(ans);
-                    }
-                }
-
-                // Delete-and-replace in MySQL
-                assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(studentId, assessmentId);
-                assessmentAnswerRepository.saveAll(answersToSave);
-
-                // Clean up Redis key
-                assessmentSessionService.deletePartialAnswers(studentId, assessmentId);
-                totalFlushed++;
             }
 
             return ResponseEntity.ok(Map.of(
