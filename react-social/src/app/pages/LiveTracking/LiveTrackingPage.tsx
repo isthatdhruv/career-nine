@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getAssessmentList, getLiveTracking } from "./API/LiveTracking_APIs";
+import { getAssessmentList, getLiveTracking, getRedisPartials, flushPartialToDb } from "./API/LiveTracking_APIs";
 
 /* ─── Types ─── */
 
@@ -35,6 +35,15 @@ interface AssessmentOption {
   id: number;
   AssessmentName: string;
   isActive: boolean;
+}
+
+interface RedisPartialEntry {
+  userStudentId: number;
+  assessmentId: number;
+  studentName: string;
+  answerCount: number;
+  ttlSeconds: number;
+  savedAt: string | null;
 }
 
 /* ─── Adaptive polling config ─── */
@@ -171,6 +180,11 @@ const LiveTrackingPage = () => {
   const [filterInstitute, setFilterInstitute] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isPolling, setIsPolling] = useState(true);
+  const [activeTab, setActiveTab] = useState<"live" | "redis">("live");
+  const [redisPartials, setRedisPartials] = useState<RedisPartialEntry[]>([]);
+  const [redisLoading, setRedisLoading] = useState(false);
+  const [flushingIds, setFlushingIds] = useState<Set<number>>(new Set());
+  const [flushingAll, setFlushingAll] = useState(false);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevDataRef = useRef<string>("");
@@ -302,6 +316,64 @@ const LiveTrackingPage = () => {
     setSearchQuery("");
   };
 
+  // Fetch Redis partials when tab switches or assessment changes
+  const fetchRedisPartials = useCallback(async () => {
+    setRedisLoading(true);
+    try {
+      const res = await getRedisPartials(selectedId ?? undefined);
+      setRedisPartials(res.data || []);
+    } catch {
+      setRedisPartials([]);
+    } finally {
+      setRedisLoading(false);
+    }
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (activeTab === "redis") {
+      fetchRedisPartials();
+    }
+  }, [activeTab, selectedId, fetchRedisPartials]);
+
+  // Flush a single student's partial answers to DB
+  const handleFlushOne = async (studentId: number, assessmentId: number) => {
+    setFlushingIds((prev) => new Set(prev).add(studentId));
+    try {
+      await flushPartialToDb({ userStudentId: studentId, assessmentId });
+      await fetchRedisPartials();
+    } catch (err) {
+      console.error("Flush failed", err);
+    } finally {
+      setFlushingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(studentId);
+        return next;
+      });
+    }
+  };
+
+  // Flush all partial answers for the selected assessment
+  const handleFlushAll = async () => {
+    if (!selectedId) return;
+    setFlushingAll(true);
+    try {
+      await flushPartialToDb({ assessmentId: selectedId });
+      await fetchRedisPartials();
+    } catch (err) {
+      console.error("Flush all failed", err);
+    } finally {
+      setFlushingAll(false);
+    }
+  };
+
+  // Format TTL for display
+  const formatTtl = (seconds: number) => {
+    if (seconds < 0) return "Unknown";
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    return `${h}h ${m}m`;
+  };
+
   // Unique institute names for filter dropdown
   const instituteOptions = useMemo(() => {
     if (!data) return [];
@@ -413,6 +485,29 @@ const LiveTrackingPage = () => {
           )}
         </div>
 
+        {/* Tab toggle */}
+        <ul className="nav nav-tabs mb-4">
+          <li className="nav-item">
+            <button
+              className={`nav-link ${activeTab === "live" ? "active" : ""}`}
+              onClick={() => setActiveTab("live")}
+            >
+              Live Progress
+            </button>
+          </li>
+          <li className="nav-item">
+            <button
+              className={`nav-link ${activeTab === "redis" ? "active" : ""}`}
+              onClick={() => setActiveTab("redis")}
+            >
+              Redis Buffered Answers
+              {redisPartials.length > 0 && (
+                <span className="badge bg-info ms-2">{redisPartials.length}</span>
+              )}
+            </button>
+          </li>
+        </ul>
+
         {error && (
           <div className="alert alert-warning py-2">{error}</div>
         )}
@@ -423,7 +518,8 @@ const LiveTrackingPage = () => {
           </div>
         )}
 
-        {data && (
+        {/* ─── Live Progress Tab ─── */}
+        {activeTab === "live" && data && (
           <>
             {/* Summary cards */}
             <SummaryCards summary={data.summary} />
@@ -551,8 +647,110 @@ const LiveTrackingPage = () => {
           </>
         )}
 
+        {/* ─── Redis Buffered Answers Tab ─── */}
+        {activeTab === "redis" && (
+          <>
+            <div className="d-flex flex-wrap align-items-center gap-3 mb-3">
+              <button
+                className="btn btn-sm btn-outline-primary"
+                onClick={fetchRedisPartials}
+                disabled={redisLoading}
+              >
+                {redisLoading ? (
+                  <span className="spinner-border spinner-border-sm me-1" role="status" />
+                ) : null}
+                Refresh
+              </button>
+              {redisPartials.length > 0 && (
+                <button
+                  className="btn btn-sm btn-success"
+                  onClick={handleFlushAll}
+                  disabled={flushingAll}
+                >
+                  {flushingAll ? (
+                    <span className="spinner-border spinner-border-sm me-1" role="status" />
+                  ) : null}
+                  Save All to DB ({redisPartials.length})
+                </button>
+              )}
+              <small className="text-muted">
+                {redisPartials.length} student{redisPartials.length !== 1 ? "s" : ""} with buffered answers
+              </small>
+            </div>
+
+            <div className="table-responsive">
+              <table className="table table-hover align-middle">
+                <thead className="table-light">
+                  <tr>
+                    <th style={{ width: 60 }}>#</th>
+                    <th>Student</th>
+                    <th style={{ width: 100 }}>Answers</th>
+                    <th style={{ width: 120 }}>TTL</th>
+                    <th style={{ width: 180 }}>Last Saved</th>
+                    <th style={{ width: 140 }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {redisPartials.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center text-muted py-4">
+                        {redisLoading ? "Loading..." : "No buffered answers in Redis"}
+                      </td>
+                    </tr>
+                  ) : (
+                    redisPartials.map((entry, idx) => (
+                      <tr key={`${entry.userStudentId}-${entry.assessmentId}`}>
+                        <td className="text-muted">{idx + 1}</td>
+                        <td>
+                          <div className="fw-semibold">{entry.studentName}</div>
+                          <small className="text-muted">ID: {entry.userStudentId}</small>
+                        </td>
+                        <td>
+                          <span className="badge bg-info px-3 py-2">
+                            {entry.answerCount}
+                          </span>
+                        </td>
+                        <td>
+                          <span
+                            className={`badge px-3 py-2 ${
+                              entry.ttlSeconds < 3600
+                                ? "bg-warning text-dark"
+                                : "bg-success"
+                            }`}
+                          >
+                            {formatTtl(entry.ttlSeconds)}
+                          </span>
+                        </td>
+                        <td>
+                          <small className="text-muted">
+                            {entry.savedAt
+                              ? new Date(entry.savedAt).toLocaleTimeString()
+                              : "Unknown"}
+                          </small>
+                        </td>
+                        <td>
+                          <button
+                            className="btn btn-sm btn-outline-success"
+                            onClick={() => handleFlushOne(entry.userStudentId, entry.assessmentId)}
+                            disabled={flushingIds.has(entry.userStudentId)}
+                          >
+                            {flushingIds.has(entry.userStudentId) ? (
+                              <span className="spinner-border spinner-border-sm me-1" role="status" />
+                            ) : null}
+                            Save to DB
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
         {/* Loading skeleton for initial load */}
-        {loading && !data && selectedId && (
+        {loading && !data && selectedId && activeTab === "live" && (
           <div className="text-center py-5">
             <div className="spinner-border text-primary" role="status" />
             <div className="text-muted mt-2">Loading tracking data...</div>

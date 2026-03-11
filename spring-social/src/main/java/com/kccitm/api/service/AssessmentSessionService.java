@@ -9,7 +9,11 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -33,6 +37,8 @@ public class AssessmentSessionService {
     private static final int HEARTBEAT_TTL_SECONDS = 60;
     private static final String DEMOGRAPHICS_KEY_PREFIX = "career9:demographics:";
     private static final int DEMOGRAPHICS_TTL_HOURS = 24;
+    private static final String PARTIAL_KEY_PREFIX = "career9:partial:";
+    private static final int PARTIAL_TTL_HOURS = 24;
 
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
@@ -202,6 +208,100 @@ public class AssessmentSessionService {
         String key = DEMOGRAPHICS_KEY_PREFIX + studentId + ":" + assessmentId;
         redisTemplate.delete(key);
         logger.debug("Deleted demographics draft for student={} assessment={}", studentId, assessmentId);
+    }
+
+    // ── Partial Answer Buffering ──────────────────────────────────────────
+
+    /**
+     * Buffer partial answers in Redis instead of writing to MySQL.
+     * Called by save-partial endpoint on every section transition.
+     */
+    public void savePartialAnswers(Long studentId, Long assessmentId, Object answers) {
+        String key = PARTIAL_KEY_PREFIX + studentId + ":" + assessmentId;
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("answers", answers);
+        payload.put("savedAt", Instant.now().toString());
+        redisTemplate.opsForValue().set(key, payload, PARTIAL_TTL_HOURS, TimeUnit.HOURS);
+        logger.debug("Saved partial answers to Redis for student={} assessment={}", studentId, assessmentId);
+    }
+
+    /**
+     * Retrieve buffered partial answers from Redis.
+     * Returns the full payload map (with answers and savedAt), or null if not found.
+     */
+    public Map<String, Object> getPartialAnswers(Long studentId, Long assessmentId) {
+        String key = PARTIAL_KEY_PREFIX + studentId + ":" + assessmentId;
+        Object value = redisTemplate.opsForValue().get(key);
+        if (value instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = (Map<String, Object>) value;
+            return result;
+        }
+        return null;
+    }
+
+    /**
+     * Delete buffered partial answers after successful submission or flush.
+     */
+    public void deletePartialAnswers(Long studentId, Long assessmentId) {
+        String key = PARTIAL_KEY_PREFIX + studentId + ":" + assessmentId;
+        redisTemplate.delete(key);
+        logger.debug("Deleted partial answers for student={} assessment={}", studentId, assessmentId);
+    }
+
+    /**
+     * Get all partial answer keys from Redis using SCAN (non-blocking).
+     * Returns list of maps with parsed studentId, assessmentId, answerCount, ttl, savedAt.
+     */
+    public List<Map<String, Object>> getAllPartialAnswerEntries(Long filterAssessmentId) {
+        Set<String> keys = redisTemplate.keys(PARTIAL_KEY_PREFIX + "*");
+        List<Map<String, Object>> entries = new ArrayList<>();
+
+        if (keys == null || keys.isEmpty()) {
+            return entries;
+        }
+
+        for (String key : keys) {
+            try {
+                // Parse key: career9:partial:{studentId}:{assessmentId}
+                String[] parts = key.replace(PARTIAL_KEY_PREFIX, "").split(":");
+                if (parts.length != 2) continue;
+
+                Long studentId = Long.parseLong(parts[0]);
+                Long assessmentId = Long.parseLong(parts[1]);
+
+                if (filterAssessmentId != null && !filterAssessmentId.equals(assessmentId)) {
+                    continue;
+                }
+
+                Object value = redisTemplate.opsForValue().get(key);
+                Long ttl = redisTemplate.getExpire(key, TimeUnit.SECONDS);
+
+                int answerCount = 0;
+                String savedAt = null;
+                if (value instanceof Map) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> payload = (Map<String, Object>) value;
+                    savedAt = (String) payload.get("savedAt");
+                    Object answersObj = payload.get("answers");
+                    if (answersObj instanceof List) {
+                        answerCount = ((List<?>) answersObj).size();
+                    }
+                }
+
+                Map<String, Object> entry = new HashMap<>();
+                entry.put("userStudentId", studentId);
+                entry.put("assessmentId", assessmentId);
+                entry.put("answerCount", answerCount);
+                entry.put("ttlSeconds", ttl != null ? ttl : -1);
+                entry.put("savedAt", savedAt);
+                entries.add(entry);
+            } catch (Exception e) {
+                logger.warn("Failed to parse partial key: {}", key, e);
+            }
+        }
+
+        return entries;
     }
 
     /**

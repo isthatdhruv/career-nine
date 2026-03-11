@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.career9.AssessmentQuestionOptions;
@@ -353,10 +354,11 @@ public class AssessmentAnswerController {
                 result.put("answersSaved", answersToSave.size());
                 result.put("skippedAnswers", skippedCount);
 
-                // Cache result and clean up session
+                // Cache result and clean up session + buffered partial answers
                 assessmentSessionService.markSubmissionComplete(userStudentId, assessmentId, result);
                 assessmentSessionService.deleteSession(userStudentId, assessmentId);
                 assessmentSessionService.deleteDraft(userStudentId, assessmentId);
+                assessmentSessionService.deletePartialAnswers(userStudentId, assessmentId);
 
                 return ResponseEntity.ok(result);
 
@@ -1690,12 +1692,27 @@ public class AssessmentAnswerController {
                 // Race condition — mapping was created by another thread, that's fine
             }
 
+            @SuppressWarnings("unchecked")
             List<Map<String, Object>> answers = (List<Map<String, Object>>) submissionData.get("answers");
             if (answers == null || answers.isEmpty()) {
                 return ResponseEntity.ok(Map.of("saved", 0, "status", "no_answers"));
             }
 
-            // Bulk fetch questions and options (same pattern as /submit)
+            // Redis-first: buffer partial answers in Redis for speed
+            try {
+                assessmentSessionService.savePartialAnswers(userStudentId, assessmentId, answers);
+                return ResponseEntity.ok(Map.of(
+                        "status", "saved",
+                        "saved", answers.size(),
+                        "storage", "redis"
+                ));
+            } catch (Exception redisEx) {
+                // Redis failed — fall back to MySQL DELETE+INSERT
+                logger.warn("Redis save failed for student={} assessment={}, falling back to MySQL",
+                        userStudentId, assessmentId, redisEx);
+            }
+
+            // MySQL fallback: bulk fetch, build entities, delete-and-replace
             List<Long> questionIds = new ArrayList<>();
             List<Long> optionIds = new ArrayList<>();
             for (Map<String, Object> ansMap : answers) {
@@ -1717,7 +1734,6 @@ public class AssessmentAnswerController {
                         .forEach(opt -> optionCache.put(opt.getOptionId(), opt));
             }
 
-            // Build answer entities (NO score calculation)
             List<AssessmentAnswer> answersToSave = new ArrayList<>();
             int skippedCount = 0;
 
@@ -1760,19 +1776,178 @@ public class AssessmentAnswerController {
                 }
             }
 
-            // Delete-and-replace: remove old partial answers, then save current state
             assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
             assessmentAnswerRepository.saveAll(answersToSave);
 
             return ResponseEntity.ok(Map.of(
                     "status", "saved",
                     "saved", answersToSave.size(),
-                    "skipped", skippedCount
+                    "skipped", skippedCount,
+                    "storage", "mysql"
             ));
 
         } catch (Exception e) {
             logger.error("Partial save failed for student", e);
             return ResponseEntity.status(500).body("Partial save failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Dashboard endpoint: list all Redis-buffered partial answers.
+     * Returns lightweight metadata (no full answer payloads).
+     * Optionally filter by assessmentId.
+     */
+    @GetMapping(value = "/redis-partials")
+    public ResponseEntity<?> getRedisPartials(
+            @RequestParam(value = "assessmentId", required = false) Long assessmentId) {
+        try {
+            List<Map<String, Object>> entries = assessmentSessionService.getAllPartialAnswerEntries(assessmentId);
+
+            // Enrich with student names
+            for (Map<String, Object> entry : entries) {
+                Long studentId = ((Number) entry.get("userStudentId")).longValue();
+                UserStudent student = userStudentRepository.findById(studentId).orElse(null);
+                if (student != null) {
+                    entry.put("studentName", student.getFirstName() + " " + student.getLastName());
+                } else {
+                    entry.put("studentName", "Unknown");
+                }
+            }
+
+            return ResponseEntity.ok(entries);
+        } catch (Exception e) {
+            logger.error("Failed to fetch Redis partials", e);
+            return ResponseEntity.status(500).body("Failed to fetch Redis partials: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Dashboard endpoint: flush buffered partial answers from Redis to MySQL.
+     * Accepts {userStudentId, assessmentId} for a single student,
+     * or just {assessmentId} to flush all students for that assessment.
+     */
+    @SuppressWarnings("unchecked")
+    @Transactional
+    @PostMapping(value = "/flush-partial-to-db")
+    public ResponseEntity<?> flushPartialToDb(@RequestBody Map<String, Object> requestData) {
+        try {
+            if (requestData.get("assessmentId") == null) {
+                return ResponseEntity.badRequest().body("assessmentId is required");
+            }
+            Long assessmentId = ((Number) requestData.get("assessmentId")).longValue();
+            AssessmentTable assessment = assessmentTableRepository.findById(assessmentId).orElse(null);
+            if (assessment == null) {
+                return ResponseEntity.badRequest().body("Invalid assessmentId");
+            }
+
+            // Determine which students to flush
+            List<Map<String, Object>> toFlush = new ArrayList<>();
+            if (requestData.get("userStudentId") != null) {
+                // Single student
+                Long studentId = ((Number) requestData.get("userStudentId")).longValue();
+                Map<String, Object> partial = assessmentSessionService.getPartialAnswers(studentId, assessmentId);
+                if (partial != null) {
+                    Map<String, Object> entry = new HashMap<>();
+                    entry.put("studentId", studentId);
+                    entry.put("answers", partial.get("answers"));
+                    toFlush.add(entry);
+                }
+            } else {
+                // All students for this assessment
+                List<Map<String, Object>> allEntries = assessmentSessionService.getAllPartialAnswerEntries(assessmentId);
+                for (Map<String, Object> meta : allEntries) {
+                    Long studentId = ((Number) meta.get("userStudentId")).longValue();
+                    Map<String, Object> partial = assessmentSessionService.getPartialAnswers(studentId, assessmentId);
+                    if (partial != null) {
+                        Map<String, Object> entry = new HashMap<>();
+                        entry.put("studentId", studentId);
+                        entry.put("answers", partial.get("answers"));
+                        toFlush.add(entry);
+                    }
+                }
+            }
+
+            int totalFlushed = 0;
+            for (Map<String, Object> flushEntry : toFlush) {
+                Long studentId = ((Number) flushEntry.get("studentId")).longValue();
+                List<Map<String, Object>> answers = (List<Map<String, Object>>) flushEntry.get("answers");
+                if (answers == null || answers.isEmpty()) continue;
+
+                UserStudent userStudent = userStudentRepository.findById(studentId).orElse(null);
+                if (userStudent == null) continue;
+
+                // Bulk fetch questions and options
+                List<Long> questionIds = new ArrayList<>();
+                List<Long> optionIds = new ArrayList<>();
+                for (Map<String, Object> ansMap : answers) {
+                    questionIds.add(((Number) ansMap.get("questionnaireQuestionId")).longValue());
+                    if (ansMap.containsKey("optionId")) {
+                        optionIds.add(((Number) ansMap.get("optionId")).longValue());
+                    }
+                }
+
+                Map<Long, QuestionnaireQuestion> questionCache = new HashMap<>();
+                if (!questionIds.isEmpty()) {
+                    questionnaireQuestionRepository.findAllByIdIn(questionIds)
+                            .forEach(qq -> questionCache.put(qq.getQuestionnaireQuestionId(), qq));
+                }
+
+                Map<Long, AssessmentQuestionOptions> optionCache = new HashMap<>();
+                if (!optionIds.isEmpty()) {
+                    assessmentQuestionOptionsRepository.findAllById(optionIds)
+                            .forEach(opt -> optionCache.put(opt.getOptionId(), opt));
+                }
+
+                // Build answer entities
+                List<AssessmentAnswer> answersToSave = new ArrayList<>();
+                for (Map<String, Object> ansMap : answers) {
+                    Long qId = ((Number) ansMap.get("questionnaireQuestionId")).longValue();
+                    QuestionnaireQuestion question = questionCache.get(qId);
+
+                    String textResponse = ansMap.containsKey("textResponse")
+                            ? (String) ansMap.get("textResponse") : null;
+
+                    if (textResponse != null && question != null) {
+                        AssessmentAnswer ans = new AssessmentAnswer();
+                        ans.setUserStudent(userStudent);
+                        ans.setAssessment(assessment);
+                        ans.setQuestionnaireQuestion(question);
+                        ans.setTextResponse(textResponse);
+                        answersToSave.add(ans);
+                    } else if (ansMap.containsKey("optionId")) {
+                        Long oId = ((Number) ansMap.get("optionId")).longValue();
+                        Integer rankOrder = ansMap.containsKey("rankOrder")
+                                ? ((Number) ansMap.get("rankOrder")).intValue() : null;
+                        AssessmentQuestionOptions option = optionCache.get(oId);
+                        if (question == null || option == null) continue;
+
+                        AssessmentAnswer ans = new AssessmentAnswer();
+                        ans.setUserStudent(userStudent);
+                        ans.setAssessment(assessment);
+                        ans.setQuestionnaireQuestion(question);
+                        ans.setOption(option);
+                        if (rankOrder != null) ans.setRankOrder(rankOrder);
+                        answersToSave.add(ans);
+                    }
+                }
+
+                // Delete-and-replace in MySQL
+                assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(studentId, assessmentId);
+                assessmentAnswerRepository.saveAll(answersToSave);
+
+                // Clean up Redis key
+                assessmentSessionService.deletePartialAnswers(studentId, assessmentId);
+                totalFlushed++;
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "flushed", totalFlushed
+            ));
+
+        } catch (Exception e) {
+            logger.error("Failed to flush partial answers to DB", e);
+            return ResponseEntity.status(500).body("Flush failed: " + e.getMessage());
         }
     }
 }
