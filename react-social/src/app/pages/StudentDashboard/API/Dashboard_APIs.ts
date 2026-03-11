@@ -7,7 +7,9 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8080";
 export interface StudentInfo {
   userStudentId: number;
   name: string;
+  username?: string;
   grade?: string;
+  section?: string;
   schoolBoard?: string;
   familyType?: string;
   siblingsCount?: number;
@@ -944,22 +946,64 @@ export async function getDashboardDataFromCache(
     console.warn("Failed to fetch game results for cognitive data:", error);
   }
 
-  // Enrich student info from demographics endpoint
+  // Enrich student info from legacy demographics endpoint (reads student_info table)
+  let legacyFamily: string | null = null;
+  let legacySibling: number | null = null;
   try {
     const studentResponse = await axios.get(
       `${API_BASE_URL}/student-info/getDemographics/${studentId}`
     );
     const studentData = studentResponse.data;
+    // Prefer className from section hierarchy; fall back to studentClass integer
+    const grade = studentData.className || (studentData.studentClass != null ? studentData.studentClass.toString() : null) || "N/A";
+    const section = studentData.sectionName || null;
+    legacyFamily = studentData.family || null;
+    legacySibling = studentData.sibling != null ? studentData.sibling : null;
     dashboardData.student = {
       ...dashboardData.student,
       name: studentData.name || "Student",
-      grade: studentData.studentClass?.toString() || "N/A",
+      username: studentData.username || undefined,
+      grade,
+      section,
       schoolBoard: studentData.schoolBoard || "N/A",
-      familyType: studentData.family || "N/A",
-      siblingsCount: studentData.sibling || 0,
+      familyType: legacyFamily || "N/A",
+      siblingsCount: legacySibling ?? undefined,
     };
   } catch (error) {
     console.warn("Failed to fetch student demographics:", error);
+  }
+
+  // Also check dynamic demographics (student_demographic_response table) to fill any missing fields.
+  // This covers students who filled the dynamic assessment form instead of the legacy form.
+  if (legacyFamily === null || legacySibling === null) {
+    try {
+      const dynResponse = await axios.get(
+        `${API_BASE_URL}/student-demographics/fields/${assessmentId}/${studentId}`
+      );
+      const dynFields: any[] = dynResponse.data;
+      if (Array.isArray(dynFields)) {
+        const findValue = (key: string) =>
+          dynFields.find((f) => f.fieldName === key || f.fieldName === key.toLowerCase())?.currentValue ?? null;
+
+        if (legacyFamily === null) {
+          const dynFamily = findValue("family");
+          if (dynFamily) {
+            dashboardData.student = { ...dashboardData.student, familyType: dynFamily };
+          }
+        }
+        if (legacySibling === null) {
+          const dynSibling = findValue("sibling");
+          if (dynSibling != null && dynSibling !== "") {
+            const parsed = parseInt(dynSibling, 10);
+            if (!isNaN(parsed)) {
+              dashboardData.student = { ...dashboardData.student, siblingsCount: parsed };
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn("Failed to fetch dynamic demographics:", error);
+    }
   }
 
   return { data: dashboardData, isBetAssessment };

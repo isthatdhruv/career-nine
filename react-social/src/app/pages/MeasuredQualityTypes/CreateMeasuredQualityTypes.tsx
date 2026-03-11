@@ -1,15 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "react-bootstrap";
 import { IconContext } from "react-icons";
 import { MdQuestionAnswer } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
+import { FormControl, InputLabel, MenuItem, Select } from "@mui/material";
 import { ReadMeasuredQualityTypesData } from "./API/Measured_Quality_Types_APIs";
+import { ReadMeasuredQualitiesData } from "../MeasuredQualities/API/Measured_Qualities_APIs";
 import { MeasuredQualityTypesTable } from "./components";
 
 const MeasuredQualityTypesPage = () => {
-  const [measuredQualityTypesData, setMeasuredQualityTypesData] = useState([]);
+  const [measuredQualityTypesData, setMeasuredQualityTypesData] = useState<any[]>([]);
+  const [measuredQualities, setMeasuredQualities] = useState<any[]>([]);
+  const [selectedQualityFilter, setSelectedQualityFilter] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const [sections, setSections] = useState<any[]>([]); 
   const [pageLoading, setPageLoading] = useState(["false"]);
   const navigate = useNavigate();
 
@@ -26,19 +29,16 @@ const MeasuredQualityTypesPage = () => {
   };
 
   useEffect(() => {
-      const fetchSections = async () => {
-        setLoading(true);
-        try {
-          const response = await ReadMeasuredQualityTypesData();
-          setSections(response.data);
-        } catch (error) {
-          console.error("Error fetching sections:", error);
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchSections();
-    }, []);
+    const fetchMeasuredQualities = async () => {
+      try {
+        const response = await ReadMeasuredQualitiesData();
+        setMeasuredQualities(response.data);
+      } catch (error) {
+        console.error("Error fetching measured qualities:", error);
+      }
+    };
+    fetchMeasuredQualities();
+  }, []);
 
   useEffect(() => {
     fetchMeasuredQualityTypes();
@@ -46,8 +46,19 @@ const MeasuredQualityTypesPage = () => {
     if (pageLoading[0] === "true") {
       setPageLoading(["false"]);
     }
-  }, [pageLoading[0]]); 
+  }, [pageLoading[0]]);
 
+  const filteredData = useMemo(() => {
+    if (!selectedQualityFilter) return measuredQualityTypesData;
+    if (selectedQualityFilter === "unassigned") {
+      return measuredQualityTypesData.filter((item: any) => !item.measuredQuality);
+    }
+    return measuredQualityTypesData.filter(
+      (item: any) =>
+        item.measuredQuality &&
+        String(item.measuredQuality.measuredQualityId) === selectedQualityFilter
+    );
+  }, [measuredQualityTypesData, selectedQualityFilter]);
 
   return (
     <div className="card">
@@ -65,7 +76,28 @@ const MeasuredQualityTypesPage = () => {
           </div>
 
           <div className="card-toolbar">
-            <div className="d-flex justify-content-end">
+            <div className="d-flex justify-content-end align-items-center gap-3">
+              <FormControl sx={{ minWidth: 220 }} size="small">
+                <InputLabel id="quality-filter-label">Filter by Measured Quality</InputLabel>
+                <Select
+                  labelId="quality-filter-label"
+                  value={selectedQualityFilter}
+                  onChange={(e) => setSelectedQualityFilter(e.target.value)}
+                  label="Filter by Measured Quality"
+                >
+                  <MenuItem value="">
+                    <em>All</em>
+                  </MenuItem>
+                  <MenuItem value="unassigned">
+                    <em>Unassigned</em>
+                  </MenuItem>
+                  {measuredQualities.map((quality: any) => (
+                    <MenuItem key={quality.measuredQualityId} value={String(quality.measuredQualityId)}>
+                      {quality.measuredQualityName}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
               <Button
                 variant="primary"
                 onClick={() => {
@@ -88,7 +120,7 @@ const MeasuredQualityTypesPage = () => {
       {!loading && (
         <div className="card-body pt-5">
           <MeasuredQualityTypesTable
-            data={measuredQualityTypesData}
+            data={filteredData}
             setLoading={setLoading}
             setPageLoading={setPageLoading}
           />

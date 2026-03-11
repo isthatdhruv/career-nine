@@ -40,7 +40,7 @@ type StudentAssessmentInfo = {
   status: string;
 };
 
-export default function GroupStudentPage() {
+export default function GroupStudentAdminPage() {
   const navigate = useNavigate();
   const [institutes, setInstitutes] = useState<any[]>([]);
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
@@ -167,9 +167,6 @@ export default function GroupStudentPage() {
           item.excelquestionheader ??
           item.excel_question_header;
 
-        const optionNumber = item.optionNumber ?? item.option_number ?? 0;
-        const isImageOption = item.isImageOption ?? item.is_image_option ?? false;
-
         return {
           questionId: item.questionId ?? item.questionid ?? item.question_id,
           questionText,
@@ -177,8 +174,6 @@ export default function GroupStudentPage() {
           optionText,
           sectionName,
           excelQuestionHeader,
-          optionNumber,
-          isImageOption,
         };
       })
       .filter((item) => item.questionText || item.optionText || item.sectionName || item.excelQuestionHeader);
@@ -400,12 +395,12 @@ export default function GroupStudentPage() {
     setDownloading(true);
     try {
       // Prepare data for Excel
-      const excelData = downloadAnswers.map((answer: any, index: number) => ({
+      const excelData = downloadAnswers.map((answer, index) => ({
         "S.No": index + 1,
         "Section Name": answer.sectionName || "",
         "Excel Header": answer.excelQuestionHeader || "",
         "Question Text": answer.questionText,
-        "Opted Option Text": answer.optionText || (answer.isImageOption && answer.optionNumber ? `Option ${answer.optionNumber} (Image)` : answer.optionText || ""),
+        "Opted Option Text": answer.optionText,
       }));
 
       // Create worksheet
@@ -902,7 +897,7 @@ export default function GroupStudentPage() {
       }
       const colKey = row.excelQuestionHeader || row.questionText || "";
       if (colKey) {
-        const displayValue = row.optionText || (row.isImageOption && row.optionNumber ? `Option ${row.optionNumber} (Image)` : "");
+        const displayValue = row.optionText || "";
         const existing = groupMap.get(key)!.answers[colKey];
         // For text answers, append multiple responses with semicolons
         groupMap.get(key)!.answers[colKey] = existing ? `${existing}; ${displayValue}` : displayValue;
@@ -3059,7 +3054,7 @@ export default function GroupStudentPage() {
                                       fontSize: "0.85rem",
                                     }}
                                   >
-                                    {answer.optionText || ((answer as any).isImageOption && (answer as any).optionNumber ? `Option ${(answer as any).optionNumber} (Image)` : "")}
+                                    {answer.optionText}
                                   </span>
                                 </td>
                               </tr>

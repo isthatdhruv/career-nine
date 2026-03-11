@@ -288,7 +288,7 @@ const CollegeTable = (props: {
               variant="outline-info"
               size="sm"
               className="me-2"
-              onClick={() => navigate(`/school/dashboard/${data.instituteCode || data.id}`)}
+              onClick={() => navigate(`/school/principal/dashboard/${data.instituteCode || data.id}`)}
             >
               <IconContext.Provider value={{ style: { paddingBottom: "3px" } }}>
                 <MdOutlineDashboard />

@@ -85,6 +85,8 @@ public class StudentInfoController {
     private QuestionnaireQuestionRepository questionnaireQuestionRepository;
     @Autowired
     private com.kccitm.api.service.AssessmentSessionService assessmentSessionService;
+    @Autowired
+    private com.kccitm.api.repository.Career9.School.SchoolSectionsRepository schoolSectionsRepository;
 
     @GetMapping("/getAll")
     public List<StudentInfo> getAllStudentInfo() {
@@ -485,6 +487,20 @@ public class StudentInfoController {
             response.put("schoolBoard", studentInfo.getSchoolBoard());
             response.put("sibling", studentInfo.getSibling());
             response.put("family", studentInfo.getFamily());
+            response.put("schoolSectionId", studentInfo.getSchoolSectionId());
+            if (studentInfo.getUser() != null) {
+                response.put("username", studentInfo.getUser().getUsername());
+            }
+
+            // Look up class name and section name from schoolSectionId
+            if (studentInfo.getSchoolSectionId() != null) {
+                schoolSectionsRepository.findById(studentInfo.getSchoolSectionId()).ifPresent(section -> {
+                    response.put("sectionName", section.getSectionName());
+                    if (section.getSchoolClasses() != null) {
+                        response.put("className", section.getSchoolClasses().getClassName());
+                    }
+                });
+            }
 
             return ResponseEntity.ok(response);
 

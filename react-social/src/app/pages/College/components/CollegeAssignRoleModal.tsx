@@ -319,46 +319,15 @@ const CollegeAssignRoleModal = (props: Props) => {
       dialogClassName="college-modal-dialog"
       aria-labelledby="college-info-modal-title"
     >
-      {/* Inline styles to control modal width and prevent horizontal scroll */}
+      {/* Inline styles to control modal width */}
       <style>{`
-        /* Make the modal wider and responsive */
         .college-modal .modal-dialog {
-          max-width: 1200px;      /* increase as needed */
+          max-width: 700px;
           width: 95vw;
         }
-        /* Ensure modal body doesn't force horizontal scroll */
         .college-modal .modal-body {
           overflow-x: hidden;
         }
-
-        /* Let tables auto-layout and wrap cells instead of creating horizontal scroll */
-        .college-modal .table-responsive {
-          overflow-x: visible !important;
-        }
-        .college-modal table {
-          table-layout: auto;
-          width: 100%;
-        }
-        .college-modal th, .college-modal td {
-          white-space: normal;
-          word-wrap: break-word;
-          vertical-align: middle;
-        }
-
-        /* Make role badges wrap to next line when space is insufficient */
-        .college-modal .badge {
-          white-space: nowrap;
-          margin-bottom: 4px;
-        }
-
-        /* Ensure the per-contact dropdown doesn't push layout horizontally */
-        .college-modal .card.position-absolute {
-          left: 0;
-          right: auto;
-          max-width: 420px;
-        }
-
-        /* Small screens fallback */
         @media (max-width: 768px) {
           .college-modal .modal-dialog {
             max-width: 100%;
@@ -452,30 +421,24 @@ const CollegeAssignRoleModal = (props: Props) => {
                   )}
                 </div>
 
-                {/* ===== Table Listing Selected Contacts with roles dropdown & badges ===== */}
+                {/* ===== Selected Contacts with inline role assignment ===== */}
                 <div className="mt-4">
                   <h6 className="mb-2">Selected Contacts & Roles</h6>
 
                   {selectedContactIndexes.length === 0 ? (
                     <div className="text-muted small">No contact selected yet.</div>
                   ) : (
-                    <div className="table-responsive">
-                      <table className="table table-hover align-middle">
-                        <thead>
-                          <tr>
-                            <th style={{ width: "35%" }}>Contact</th>
-                            <th style={{ width: "50%" }}>Assigned Roles</th>
-                            <th style={{ width: "15%" }}>Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {selectedContactIndexes.map((ci) => {
-                            const contact = availableContacts[ci];
-                            const roles = contactRoles[ci] ?? [];
-                            const dropdownOpen = !!openRoleDropdowns[ci];
-                            return (
-                              <tr key={ci}>
-                                <td>
+                    <div className="d-flex flex-column gap-3">
+                      {selectedContactIndexes.map((ci) => {
+                        const contact = availableContacts[ci];
+                        const roles = contactRoles[ci] ?? [];
+                        const dropdownOpen = !!openRoleDropdowns[ci];
+                        return (
+                          <div key={ci} className="card border">
+                            <div className="card-body py-3 px-3">
+                              {/* Contact info row */}
+                              <div className="d-flex justify-content-between align-items-start mb-2">
+                                <div>
                                   <div className="fw-semibold">
                                     {contact.name ?? contact.email ?? contact.phone ?? "Unnamed"}
                                   </div>
@@ -483,136 +446,116 @@ const CollegeAssignRoleModal = (props: Props) => {
                                     {contact.designation ?? ""}
                                     {contact.email ? ` • ${contact.email}` : ""}
                                   </div>
-                                </td>
+                                </div>
+                                <div className="d-flex gap-2">
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline-primary"
+                                    onClick={() => openRoleDropdownFor(ci)}
+                                  >
+                                    {dropdownOpen ? "Close" : "Edit Roles"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline-danger"
+                                    onClick={() => toggleContactSelection(ci)}
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              </div>
 
-                                <td>
-                                  {/* badges for selected roles */}
-                                  <div className="d-flex flex-wrap gap-2">
-                                    {roles.length === 0 ? (
-                                      <span className="small text-muted">No roles assigned</span>
-                                    ) : (
-                                      roles.map((r) => (
-                                        <span
-                                          key={r}
-                                          className="badge bg-light text-dark border d-inline-flex align-items-center"
-                                          style={{ padding: "0.45rem 0.6rem" }}
-                                        >
-                                          <span className="me-2 small">{r}</span>
-                                          <button
-                                            type="button"
-                                            aria-label={`Remove ${r}`}
-                                            className="btn btn-sm btn-icon btn-light btn-xs"
-                                            onClick={() => removeRoleFromContact(ci, r)}
-                                            style={{
-                                              border: "none",
-                                              padding: "0",
-                                              margin: "0",
-                                              lineHeight: 1,
-                                              cursor: "pointer",
-                                            }}
-                                          >
-                                            <span style={{ fontSize: 14, marginLeft: 4 }}>×</span>
-                                          </button>
-                                        </span>
-                                      ))
-                                    )}
-                                  </div>
-
-                                  {/* role dropdown (checkbox list) */}
-                                  <div className="position-relative mt-2">
-                                    {dropdownOpen && (
-                                      <div
-                                        className="card shadow-sm position-absolute"
-                                        style={{
-                                          zIndex: 1200,
-                                          left: 0,
-                                          top: 0,
-                                          minWidth: 260,
-                                          padding: 12,
-                                        }}
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        <div className="fw-semibold mb-2">Select Roles</div>
-
-                                        {rolesLoading ? (
-                                          <div className="small text-muted">Loading roles...</div>
-                                        ) : (
-                                          <div className="roles-list" style={{ maxHeight: 220, overflow: "auto" }}>
-                                            {roleOptions.map((role) => {
-                                              const checked = (contactRoles[ci] ?? []).includes(role);
-                                              return (
-                                                <div key={role} className="form-check mb-1">
-                                                  <input
-                                                    className="form-check-input"
-                                                    type="checkbox"
-                                                    id={`contact-${ci}-role-${role}`}
-                                                    checked={checked}
-                                                    onChange={(ev) =>
-                                                      setRoleForContact(ci, role, ev.target.checked)
-                                                    }
-                                                  />
-                                                  <label
-                                                    className="form-check-label ms-2"
-                                                    htmlFor={`contact-${ci}-role-${role}`}
-                                                    style={{ cursor: "pointer" }}
-                                                  >
-                                                    {role}
-                                                  </label>
-                                                </div>
-                                              );
-                                            })}
-                                          </div>
-                                        )}
-
-                                        <div className="d-flex justify-content-end mt-2">
-                                          <button
-                                            type="button"
-                                            className="btn btn-sm btn-secondary me-2"
-                                            onClick={() =>
-                                              setOpenRoleDropdowns((prev) => ({ ...prev, [ci]: false }))
-                                            }
-                                          >
-                                            Done
-                                          </button>
-                                          <button
-                                            type="button"
-                                            className="btn btn-sm btn-outline-danger"
-                                            onClick={() =>
-                                              setContactRoles((prev) => ({ ...prev, [ci]: [] }))
-                                            }
-                                          >
-                                            Clear
-                                          </button>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                </td>
-
-                                <td>
-                                  <div className="d-flex gap-2">
-                                    <button
-                                      type="button"
-                                      className="btn btn-sm btn-outline-primary"
-                                      onClick={() => openRoleDropdownFor(ci)}
+                              {/* Role badges */}
+                              <div className="d-flex flex-wrap gap-2">
+                                {roles.length === 0 ? (
+                                  <span className="small text-muted">No roles assigned</span>
+                                ) : (
+                                  roles.map((r) => (
+                                    <span
+                                      key={r}
+                                      className="badge bg-light text-dark border d-inline-flex align-items-center"
+                                      style={{ padding: "0.4rem 0.6rem" }}
                                     >
-                                      {dropdownOpen ? "Close" : "Edit"}
-                                    </button>
+                                      <span className="me-1 small">{r}</span>
+                                      <button
+                                        type="button"
+                                        aria-label={`Remove ${r}`}
+                                        className="btn-close btn-close-sm ms-1"
+                                        style={{ fontSize: "0.5rem" }}
+                                        onClick={() => removeRoleFromContact(ci, r)}
+                                      />
+                                    </span>
+                                  ))
+                                )}
+                              </div>
 
+                              {/* Inline role selector (expands below, no absolute positioning) */}
+                              {dropdownOpen && (
+                                <div className="mt-3 p-3 bg-light rounded border">
+                                  <div className="fw-semibold mb-2 small">Select Roles</div>
+
+                                  {rolesLoading ? (
+                                    <div className="d-flex align-items-center gap-2 text-muted small">
+                                      <span className="spinner-border spinner-border-sm" />
+                                      Loading roles...
+                                    </div>
+                                  ) : (
+                                    <div
+                                      className="d-flex flex-wrap gap-2"
+                                      style={{ maxHeight: 200, overflowY: "auto" }}
+                                    >
+                                      {roleOptions.map((role) => {
+                                        const checked = (contactRoles[ci] ?? []).includes(role);
+                                        return (
+                                          <div key={role} className="form-check">
+                                            <input
+                                              className="form-check-input"
+                                              type="checkbox"
+                                              id={`contact-${ci}-role-${role}`}
+                                              checked={checked}
+                                              onChange={(ev) =>
+                                                setRoleForContact(ci, role, ev.target.checked)
+                                              }
+                                            />
+                                            <label
+                                              className="form-check-label"
+                                              htmlFor={`contact-${ci}-role-${role}`}
+                                              style={{ cursor: "pointer" }}
+                                            >
+                                              {role}
+                                            </label>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+
+                                  <div className="d-flex justify-content-end mt-2 gap-2">
                                     <button
                                       type="button"
                                       className="btn btn-sm btn-outline-danger"
-                                      onClick={() => toggleContactSelection(ci)}
+                                      onClick={() =>
+                                        setContactRoles((prev) => ({ ...prev, [ci]: [] }))
+                                      }
                                     >
-                                      Remove
+                                      Clear All
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-primary"
+                                      onClick={() =>
+                                        setOpenRoleDropdowns((prev) => ({ ...prev, [ci]: false }))
+                                      }
+                                    >
+                                      Done
                                     </button>
                                   </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

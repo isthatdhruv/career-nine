@@ -39,6 +39,7 @@ type Props = {
 
 const CollegeInfoModal = (props: Props) => {
   const [loading, setLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(false);
 
   const [availableContacts, setAvailableContacts] = useState<ContactPerson[]>([]);
   const [selectedContactIndexes, setSelectedContactIndexes] = useState<number[]>([]);
@@ -58,6 +59,7 @@ const CollegeInfoModal = (props: Props) => {
 
     // Fetch all contacts, all boards, and existing mappings in parallel
     const fetchData = async () => {
+      setDataLoading(true);
       try {
         const [contactsRes, boardsRes, mappingsRes] = await Promise.all([
           ReadContactInformationData(),
@@ -124,6 +126,8 @@ const CollegeInfoModal = (props: Props) => {
         setAvailableBoards([]);
         setSelectedContactIndexes([]);
         setSelectedBoardIndexes([]);
+      } finally {
+        setDataLoading(false);
       }
     };
 
@@ -272,13 +276,23 @@ const CollegeInfoModal = (props: Props) => {
                     type="button"
                     className="btn btn-outline-success dropdown-toggle d-flex align-items-center px-3 py-2"
                     onClick={() => setContactDropdownOpen((o) => !o)}
+                    disabled={dataLoading}
                   >
-                    <span className="me-2">👤</span>
-                    <span>
-                      {selectedContactIndexes.length > 0
-                        ? "Edit selected contact person(s)"
-                        : "Select contact person(s)"}
-                    </span>
+                    {dataLoading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" />
+                        <span>Loading contact persons...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="me-2">👤</span>
+                        <span>
+                          {selectedContactIndexes.length > 0
+                            ? "Edit selected contact person(s)"
+                            : "Select contact person(s)"}
+                        </span>
+                      </>
+                    )}
                   </button>
 
                   <div
@@ -291,7 +305,12 @@ const CollegeInfoModal = (props: Props) => {
                       minWidth: "320px",
                     }}
                   >
-                    {availableContacts.length === 0 ? (
+                    {dataLoading ? (
+                      <div className="dropdown-item-text text-muted d-flex align-items-center gap-2">
+                        <span className="spinner-border spinner-border-sm" />
+                        Loading contact persons...
+                      </div>
+                    ) : availableContacts.length === 0 ? (
                       <span className="dropdown-item-text text-muted fst-italic">
                         No contact persons found.
                       </span>
@@ -417,14 +436,23 @@ const CollegeInfoModal = (props: Props) => {
                       if (!isStep2Enabled) return;
                       setBoardDropdownOpen((o) => !o);
                     }}
-                    disabled={!isStep2Enabled}
+                    disabled={!isStep2Enabled || dataLoading}
                   >
-                    <span className="me-2">📋</span>
-                    <span>
-                      {selectedBoardIndexes.length > 0
-                        ? "Edit selected board(s)"
-                        : "Select board(s)"}
-                    </span>
+                    {dataLoading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" />
+                        <span>Loading boards...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="me-2">📋</span>
+                        <span>
+                          {selectedBoardIndexes.length > 0
+                            ? "Edit selected board(s)"
+                            : "Select board(s)"}
+                        </span>
+                      </>
+                    )}
                   </button>
 
                   <div
@@ -441,6 +469,11 @@ const CollegeInfoModal = (props: Props) => {
                       <span className="dropdown-item-text text-muted fst-italic">
                         Please select contact person(s) in Step 1 first.
                       </span>
+                    ) : dataLoading ? (
+                      <div className="dropdown-item-text text-muted d-flex align-items-center gap-2">
+                        <span className="spinner-border spinner-border-sm" />
+                        Loading boards...
+                      </div>
                     ) : availableBoards.length === 0 ? (
                       <span className="dropdown-item-text text-muted fst-italic">
                         No boards found.
