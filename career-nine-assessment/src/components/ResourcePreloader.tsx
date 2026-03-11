@@ -176,9 +176,8 @@ export default function ResourcePreloader({ children }: { children: React.ReactN
       try {
         if (!('caches' in window)) return;
 
-        // Clear all previous caches + session data so every visit starts fresh
-        const cacheNames = await caches.keys();
-        await Promise.all(cacheNames.map(name => caches.delete(name)));
+        // Clear our resource cache + session data so every visit starts fresh
+        await caches.delete(CACHE_NAME);
         sessionStorage.clear();
 
         const manifest = await fetchManifest();
