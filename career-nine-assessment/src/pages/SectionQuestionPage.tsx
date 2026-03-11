@@ -858,7 +858,7 @@ const SectionQuestionPage: React.FC = () => {
                 Accept: "application/json",
               },
               body: JSON.stringify(submissionJSON),
-              signal: AbortSignal.timeout(30000), // 30s timeout
+              signal: AbortSignal.timeout(10000), // 10s timeout (async processing)
             },
           );
 

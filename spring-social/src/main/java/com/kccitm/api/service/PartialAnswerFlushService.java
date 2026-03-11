@@ -119,8 +119,7 @@ public class PartialAnswerFlushService {
         assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(studentId, assessmentId);
         assessmentAnswerRepository.saveAll(answersToSave);
 
-        // ONLY delete from Redis after MySQL success
-        assessmentSessionService.deletePartialAnswers(studentId, assessmentId);
+        // Do NOT delete from Redis — let 24h TTL handle cleanup
         logger.info("Flushed {} answers for student={} assessment={}", answersToSave.size(), studentId, assessmentId);
         return true;
     }
@@ -135,6 +134,10 @@ public class PartialAnswerFlushService {
             try {
                 Long studentId = ((Number) entry.get("userStudentId")).longValue();
                 Long assessmentId = ((Number) entry.get("assessmentId")).longValue();
+                // Skip if student already submitted — async processor handles it
+                if (assessmentSessionService.hasSubmissionLock(studentId, assessmentId)) {
+                    continue;
+                }
                 if (flushOneStudent(studentId, assessmentId)) success++;
             } catch (Exception e) {
                 failed++;
