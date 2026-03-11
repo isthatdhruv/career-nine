@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import http from '../api/http';
+import { getActiveCacheName } from '../components/ResourcePreloader';
 
 type AssessmentContextType = {
   assessmentData: any;
@@ -21,8 +22,9 @@ async function tryStaticCache(assessmentId: string, file: string): Promise<any |
   const url = `/assessment-cache/${assessmentId}/${file}`;
   try {
     // Check Cache API first (populated by ResourcePreloader)
-    if ('caches' in window) {
-      const cache = await caches.open('career9-resources-v1');
+    const cacheName = getActiveCacheName();
+    if ('caches' in window && cacheName) {
+      const cache = await caches.open(cacheName);
       const cached = await cache.match(url);
       if (cached) return await cached.json();
     }

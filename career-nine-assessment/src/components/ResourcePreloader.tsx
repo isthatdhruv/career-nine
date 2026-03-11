@@ -1,11 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 
-const CACHE_NAME = 'career9-resources-v1';
+const CACHE_PREFIX = 'career9-resources-';
 const MANIFEST_URL = '/resource-manifest.json';
 const MAX_CONCURRENCY = 3;
 const MANIFEST_TIMEOUT_MS = 5000;
 
 const PREFETCH_PRIORITIES = new Set(['assessment', 'game']);
+
+/** Active cache name for this build, set after manifest is fetched. */
+let _activeCacheName: string | null = null;
+export function getActiveCacheName(): string | null {
+  return _activeCacheName;
+}
 
 interface Resource {
   url: string;
@@ -107,10 +113,10 @@ async function fetchManifest(): Promise<Manifest | null> {
   }
 }
 
-async function getUncachedResources(resources: Resource[]): Promise<Resource[]> {
+async function getUncachedResources(cacheName: string, resources: Resource[]): Promise<Resource[]> {
   if (!('caches' in window)) return [];
   try {
-    const cache = await caches.open(CACHE_NAME);
+    const cache = await caches.open(cacheName);
     const uncached: Resource[] = [];
     for (const r of resources) {
       if (!(await cache.match(r.url))) uncached.push(r);
@@ -176,15 +182,22 @@ export default function ResourcePreloader({ children }: { children: React.ReactN
       try {
         if (!('caches' in window)) return;
 
-        // Clear our resource cache + session data so every visit starts fresh
-        await caches.delete(CACHE_NAME);
-        sessionStorage.clear();
-
         const manifest = await fetchManifest();
         if (!manifest || cancelledRef.current) return;
 
+        const cacheName = `${CACHE_PREFIX}${manifest.version}`;
+        _activeCacheName = cacheName;
+
+        // Delete old versioned caches from previous builds
+        const allCaches = await caches.keys();
+        await Promise.all(
+          allCaches
+            .filter(n => n.startsWith(CACHE_PREFIX) && n !== cacheName)
+            .map(n => caches.delete(n))
+        );
+
         const prefetchable = manifest.resources.filter(r => PREFETCH_PRIORITIES.has(r.priority));
-        const uncached = await getUncachedResources(prefetchable);
+        const uncached = await getUncachedResources(cacheName, prefetchable);
         if (cancelledRef.current || uncached.length === 0) return;
 
         const totalBytes = uncached.reduce((s, r) => s + (r.size || 1), 0);
@@ -195,7 +208,7 @@ export default function ResourcePreloader({ children }: { children: React.ReactN
         totalFiles = total;
         pushRealProgress(0, 0, total);
 
-        const cache = await caches.open(CACHE_NAME);
+        const cache = await caches.open(cacheName);
         let idx = 0;
 
         async function worker(): Promise<void> {

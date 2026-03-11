@@ -31,15 +31,6 @@ const StudentLoginPage: React.FC = () => {
       localStorage.clear();
     }
     sessionStorage.clear();
-    if ('caches' in window) {
-      // Preserve preloaded resources and Workbox precache
-      const PRESERVE = ['career9-resources-v1'];
-      caches.keys().then(names =>
-        names
-          .filter(n => !PRESERVE.includes(n) && !n.startsWith('workbox-'))
-          .forEach(n => caches.delete(n))
-      );
-    }
   }, []);
   const [errors, setErrors] = useState({ userId: '', dob: '' });
   const [touched, setTouched] = useState({ userId: false, dob: false });
