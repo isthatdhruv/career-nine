@@ -1926,6 +1926,7 @@ export default function GroupStudentSchoolPage() {
                         <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", borderBottom: "2px solid #e0e0e0" }}>Student Name</th>
                         {showPhoneCol && <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", borderBottom: "2px solid #e0e0e0" }}>Phone Number</th>}
                         {showDobCol && <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", borderBottom: "2px solid #e0e0e0" }}>DOB</th>}
+                        <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", borderBottom: "2px solid #e0e0e0" }}>Allotted Assessment</th>
                         <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", borderBottom: "2px solid #e0e0e0", width: "130px" }}>
                           Actions
                         </th>
@@ -1997,6 +1998,24 @@ export default function GroupStudentSchoolPage() {
                               )}
                             </td>
                           )}
+                          <td style={{ padding: "12px 16px", borderBottom: "1px solid #f0f0f0" }}>
+                            <button
+                              className="btn btn-sm d-flex align-items-center gap-1"
+                              onClick={() => handleViewAssessments(student)}
+                              style={{
+                                background: "rgba(67, 97, 238, 0.1)",
+                                color: "#4361ee",
+                                border: "1px solid rgba(67, 97, 238, 0.3)",
+                                padding: "6px 12px",
+                                borderRadius: "8px",
+                                fontWeight: 500,
+                                fontSize: "0.85rem",
+                              }}
+                            >
+                              <i className="bi bi-list-ul"></i>
+                              View ({new Set((student.assessments || []).filter(a => activeAssessmentIds.has(Number(a.assessmentId))).map(a => Number(a.assessmentId))).size})
+                            </button>
+                          </td>
                           <td
                             style={{
                               padding: "12px 16px",
@@ -2266,73 +2285,6 @@ export default function GroupStudentSchoolPage() {
                             ID: {assessment.assessmentId}
                           </span>
                         </div>
-                      </div>
-                      <div className="d-flex gap-2 flex-wrap">
-                        <button
-                          className="btn btn-outline-info btn-sm d-flex align-items-center gap-1"
-                          onClick={() =>
-                            handleViewDemographics(
-                              modalStudent,
-                              assessment.assessmentId,
-                              assessment.assessmentName
-                            )
-                          }
-                          style={{
-                            borderRadius: "8px",
-                            padding: "6px 12px",
-                            fontWeight: 500,
-                            fontSize: "0.8rem",
-                            transition: "all 0.2s",
-                          }}
-                        >
-                          <i className="bi bi-person-lines-fill"></i>
-                          Demographics
-                        </button>
-                        <button
-                          className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1"
-                          onClick={() =>
-                            handleDownloadClick(
-                              modalStudent,
-                              assessment.assessmentId
-                            )
-                          }
-                          style={{
-                            borderRadius: "8px",
-                            padding: "6px 12px",
-                            fontWeight: 500,
-                            fontSize: "0.8rem",
-                            transition: "all 0.2s",
-                          }}
-                        >
-                          <i className="bi bi-download"></i>
-                          Download
-                        </button>
-                        <button
-                          className="btn btn-outline-warning btn-sm d-flex align-items-center gap-1"
-                          onClick={() =>
-                            handleResetClick(
-                              modalStudent,
-                              assessment.assessmentId,
-                              assessment.assessmentName
-                            )
-                          }
-                          disabled={assessment.status === "notstarted"}
-                          title={
-                            assessment.status === "notstarted"
-                              ? "Already not started"
-                              : "Reset this assessment"
-                          }
-                          style={{
-                            borderRadius: "8px",
-                            padding: "6px 12px",
-                            fontWeight: 500,
-                            fontSize: "0.8rem",
-                            transition: "all 0.2s",
-                          }}
-                        >
-                          <i className="bi bi-arrow-counterclockwise"></i>
-                          Reset
-                        </button>
                       </div>
                     </div>
                   ))}
