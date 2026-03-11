@@ -40,7 +40,7 @@ type StudentAssessmentInfo = {
   status: string;
 };
 
-export default function GroupStudentPage() {
+export default function GroupStudentAdminPage() {
   const navigate = useNavigate();
   const [institutes, setInstitutes] = useState<any[]>([]);
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");

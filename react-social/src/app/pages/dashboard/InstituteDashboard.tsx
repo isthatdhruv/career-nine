@@ -644,6 +644,9 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
   const [selectedStudent, setSelectedStudent] = useState<StudentWithMapping | null>(null);
   const [teacherSearch, setTeacherSearch] = useState("");
   const [studentSearch, setStudentSearch] = useState("");
+  const [studentSearchMode, setStudentSearchMode] = useState<"none" | "name" | "class">("none");
+  const [studentGradeFilter, setStudentGradeFilter] = useState<string>("");
+  const [studentSectionFilter, setStudentSectionFilter] = useState<number | null>(null);
   const teacherDropdownRef = useRef<HTMLDivElement>(null);
   const studentDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -732,8 +735,9 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
     for (const session of hierarchyData) {
       for (const cls of session.schoolClasses || []) {
         for (const sec of cls.schoolSections || []) {
-          if (!seen.has(sec.sectionName)) {
-            seen.add(sec.sectionName);
+          const key = `${cls.className}:${sec.id}`;
+          if (!seen.has(key)) {
+            seen.add(key);
             sections.push({ id: sec.id, sectionName: sec.sectionName, className: cls.className });
           }
         }
@@ -828,18 +832,22 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
   }, [hierarchyData]);
 
   const filteredStudentsList = useMemo(() => {
-    if (!studentSearch.trim()) return students;
-    const q = studentSearch.toLowerCase();
-    return students.filter((s) => {
-      const grade = s.schoolSectionId != null ? sectionToGradeMap.get(s.schoolSectionId) || "" : "";
-      const section = s.schoolSectionId != null ? sectionToSectionNameMap.get(s.schoolSectionId) || "" : "";
-      return (
-        s.name?.toLowerCase().includes(q) ||
-        grade.toLowerCase().includes(q) ||
-        section.toLowerCase().includes(q)
-      );
-    });
-  }, [students, studentSearch, sectionToGradeMap, sectionToSectionNameMap]);
+    if (studentSearchMode === "name") {
+      if (!studentSearch.trim()) return [];
+      const q = studentSearch.toLowerCase();
+      return students.filter((s) => s.name?.toLowerCase().includes(q));
+    }
+    if (studentSearchMode === "class") {
+      if (!studentGradeFilter) return [];
+      return students.filter((s) => {
+        const grade = s.schoolSectionId != null ? sectionToGradeMap.get(s.schoolSectionId) || "" : "";
+        if (grade !== studentGradeFilter) return false;
+        if (studentSectionFilter != null) return s.schoolSectionId === studentSectionFilter;
+        return true;
+      });
+    }
+    return [];
+  }, [students, studentSearchMode, studentSearch, studentGradeFilter, studentSectionFilter, sectionToGradeMap]);
 
   // Compute real grade distribution from students + hierarchy
   const realGradeDistribution = useMemo(() => {
@@ -1196,7 +1204,7 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
       return;
     }
 
-    navigate("/school/dashboard/studentList");
+    navigate("/school/principal/dashboard/studentList");
   };
 
   return (
@@ -1320,6 +1328,9 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
                       setShowStudentDropdown(!showStudentDropdown);
                       setShowTeacherDropdown(false);
                       setStudentSearch("");
+                      setStudentSearchMode("none");
+                      setStudentGradeFilter("");
+                      setStudentSectionFilter(null);
                     }}
                   >
                     {role === "student" && selectedStudent ? selectedStudent.name : "Student"}
@@ -1328,58 +1339,128 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
                   {showStudentDropdown && (
                     <div
                       className="position-absolute bg-white shadow rounded border mt-1"
-                      style={{ zIndex: 1050, minWidth: "250px", maxHeight: "300px", right: 0 }}
+                      style={{ zIndex: 1050, minWidth: "280px", right: 0 }}
                     >
+                      {/* Radio options — always visible */}
                       <div className="p-2 border-bottom">
-                        <input
-                          type="text"
-                          className="form-control form-control-sm"
-                          placeholder="Search by name, class, section..."
-                          value={studentSearch}
-                          onChange={(e) => setStudentSearch(e.target.value)}
-                          autoFocus
-                        />
+                        <div className="text-muted fs-8 px-1 pb-1 fw-semibold">Search students by</div>
+                        <label className="d-flex align-items-center gap-2 px-2 py-1 rounded bg-hover-light mb-1" style={{ cursor: "pointer" }}>
+                          <input
+                            type="radio"
+                            name="studentSearchMode"
+                            className="form-check-input mt-0"
+                            checked={studentSearchMode === "name"}
+                            onChange={() => { setStudentSearchMode("name"); setStudentGradeFilter(""); setStudentSectionFilter(null); }}
+                          />
+                          <i className="bi bi-person-search text-primary fs-6"></i>
+                          <span className="fs-7 fw-semibold">Name</span>
+                        </label>
+                        <label className="d-flex align-items-center gap-2 px-2 py-1 rounded bg-hover-light mb-0" style={{ cursor: "pointer" }}>
+                          <input
+                            type="radio"
+                            name="studentSearchMode"
+                            className="form-check-input mt-0"
+                            checked={studentSearchMode === "class"}
+                            onChange={() => { setStudentSearchMode("class"); setStudentSearch(""); }}
+                          />
+                          <i className="bi bi-mortarboard text-primary fs-6"></i>
+                          <span className="fs-7 fw-semibold">Class / Section</span>
+                        </label>
                       </div>
-                      <div style={{ maxHeight: "240px", overflowY: "auto" }}>
-                        {filteredStudentsList.length === 0 ? (
+
+                      {/* Name search input */}
+                      {studentSearchMode === "name" && (
+                        <div className="p-2 border-bottom">
+                          <input
+                            type="text"
+                            className="form-control form-control-sm"
+                            placeholder="Type student name..."
+                            value={studentSearch}
+                            onChange={(e) => setStudentSearch(e.target.value)}
+                            autoFocus
+                          />
+                        </div>
+                      )}
+
+                      {/* Class / Section selects */}
+                      {studentSearchMode === "class" && (
+                        <div className="p-2 border-bottom">
+                          <select
+                            className="form-select form-select-sm mb-2"
+                            value={studentGradeFilter}
+                            onChange={(e) => { setStudentGradeFilter(e.target.value); setStudentSectionFilter(null); }}
+                            autoFocus
+                          >
+                            <option value="">— Select class —</option>
+                            {allGrades.map((g) => (
+                              <option key={g.id} value={g.className}>{g.className}</option>
+                            ))}
+                          </select>
+                          {studentGradeFilter && (
+                            <select
+                              className="form-select form-select-sm"
+                              value={studentSectionFilter ?? ""}
+                              onChange={(e) => setStudentSectionFilter(e.target.value ? Number(e.target.value) : null)}
+                            >
+                              <option value="">— All sections —</option>
+                              {allSectionsFlat.filter((s) => s.className === studentGradeFilter).map((sec) => (
+                                <option key={sec.id} value={sec.id}>{sec.sectionName}</option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Student list */}
+                      <div style={{ maxHeight: "260px", overflowY: "auto" }}>
+                        {studentSearchMode === "none" ? (
+                          <div className="p-3 text-muted text-center fs-7">Select a search option above</div>
+                        ) : studentSearchMode === "name" && !studentSearch.trim() ? (
+                          <div className="p-3 text-muted text-center fs-7">Start typing to search</div>
+                        ) : studentSearchMode === "class" && !studentGradeFilter ? (
+                          <div className="p-3 text-muted text-center fs-7">Select a class above</div>
+                        ) : filteredStudentsList.length === 0 ? (
                           <div className="p-3 text-muted text-center fs-7">No students found</div>
                         ) : (
-                          filteredStudentsList.slice(0, 50).map((student) => (
-                            <div
-                              key={student.userStudentId}
-                              className={`px-3 py-2 cursor-pointer d-flex align-items-center gap-2 ${
-                                selectedStudent?.userStudentId === student.userStudentId ? "bg-light-primary" : "bg-hover-light"
-                              }`}
-                              style={{ cursor: "pointer" }}
-                              onClick={() => {
-                                setShowStudentDropdown(false);
-                                navigate(`/student-dashboard/${student.userStudentId}`);
-                              }}
-                            >
-                              <div className="symbol symbol-25px">
-                                <div className="symbol-label bg-light-info text-info fw-bold fs-8">
-                                  {student.name?.charAt(0)?.toUpperCase() || "S"}
+                          <>
+                            {filteredStudentsList.slice(0, 50).map((student) => (
+                              <div
+                                key={student.userStudentId}
+                                className={`px-3 py-2 d-flex align-items-center gap-2 ${
+                                  selectedStudent?.userStudentId === student.userStudentId ? "bg-light-primary" : "bg-hover-light"
+                                }`}
+                                style={{ cursor: "pointer" }}
+                                onClick={() => {
+                                  setShowStudentDropdown(false);
+                                  setStudentSearchMode("none");
+                                  navigate(`/student-dashboard/${student.userStudentId}`);
+                                }}
+                              >
+                                <div className="symbol symbol-25px">
+                                  <div className="symbol-label bg-light-info text-info fw-bold fs-8">
+                                    {student.name?.charAt(0)?.toUpperCase() || "S"}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="fw-semibold text-gray-800 fs-7">{student.name}</div>
+                                  <div className="text-muted fs-8">
+                                    {student.schoolSectionId != null && sectionToGradeMap.get(student.schoolSectionId)
+                                      ? sectionToGradeMap.get(student.schoolSectionId)
+                                      : ""}
+                                    {student.schoolSectionId != null && sectionToSectionNameMap.get(student.schoolSectionId)
+                                      ? ` - ${sectionToSectionNameMap.get(student.schoolSectionId)}`
+                                      : ""}
+                                    {!(student.schoolSectionId != null && sectionToGradeMap.get(student.schoolSectionId)) && "Unassigned"}
+                                  </div>
                                 </div>
                               </div>
-                              <div>
-                                <div className="fw-semibold text-gray-800 fs-7">{student.name}</div>
-                                <div className="text-muted fs-8">
-                                  {student.schoolSectionId != null && sectionToGradeMap.get(student.schoolSectionId)
-                                    ? `${sectionToGradeMap.get(student.schoolSectionId)}`
-                                    : ""}
-                                  {student.schoolSectionId != null && sectionToSectionNameMap.get(student.schoolSectionId)
-                                    ? ` - ${sectionToSectionNameMap.get(student.schoolSectionId)}`
-                                    : ""}
-                                  {!(student.schoolSectionId != null && sectionToGradeMap.get(student.schoolSectionId)) && "Unassigned"}
-                                </div>
+                            ))}
+                            {filteredStudentsList.length > 50 && (
+                              <div className="p-2 text-center text-muted fs-8 border-top">
+                                Showing 50 of {filteredStudentsList.length} — refine to narrow down
                               </div>
-                            </div>
-                          ))
-                        )}
-                        {filteredStudentsList.length > 50 && (
-                          <div className="p-2 text-center text-muted fs-8 border-top">
-                            Showing 50 of {filteredStudentsList.length} — use search to narrow down
-                          </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
-import { ReadCollegeList, GetSessionsByInstituteCode } from "../College/API/College_APIs";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { ReadCollegeList, GetSessionsByInstituteCode, GetInstituteMappings } from "../College/API/College_APIs";
 import {
   getStudentsWithMappingByInstituteId,
   getAllAssessments,
@@ -15,6 +15,7 @@ import {
   getDemographicFieldsForStudent,
   getBulkDemographicData,
   exportProctoringExcel,
+  assignStudentsToContactPerson,
 } from "../StudentInformation/StudentInfo_APIs";
 import * as XLSX from "xlsx";
 
@@ -40,10 +41,14 @@ type StudentAssessmentInfo = {
   status: string;
 };
 
-export default function GroupStudentPage() {
+export default function GroupStudentSchoolPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [institutes, setInstitutes] = useState<any[]>([]);
-  const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
+  const instituteIdParam = searchParams.get("instituteId");
+  const [selectedInstitute, setSelectedInstitute] = useState<number | "">(
+    instituteIdParam ? Number(instituteIdParam) : ""
+  );
   const [students, setStudents] = useState<Student[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -113,6 +118,14 @@ export default function GroupStudentPage() {
   const [resetAssessmentName, setResetAssessmentName] = useState<string>("");
   const [resetting, setResetting] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  // Group Together modal state
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [contactPersons, setContactPersons] = useState<any[]>([]);
+  const [contactPersonsLoading, setContactPersonsLoading] = useState(false);
+  const [selectedContactPersonId, setSelectedContactPersonId] = useState<number | "">("");
+  const [groupAssigning, setGroupAssigning] = useState(false);
+  const [groupSuccessMsg, setGroupSuccessMsg] = useState("");
 
   // Demographics modal state
   const [showDemographicsModal, setShowDemographicsModal] = useState(false);
@@ -649,6 +662,13 @@ export default function GroupStudentPage() {
       return matchesQuery && matchesSection && matchesAssessment && matchesStatus;
     });
   }, [students, query, filteredSectionIds, hasAssessmentFilter, appliedAssessmentIds, hasStatusFilter, appliedStatuses, activeAssessmentIds]);
+
+  // Column visibility: show only if at least one student has data
+  const showUsernameCol = useMemo(() => filteredStudents.some(s => !!s.username), [filteredStudents]);
+  const showRollNumberCol = useMemo(() => filteredStudents.some(s => !!s.schoolRollNumber), [filteredStudents]);
+  const showControlNumberCol = useMemo(() => filteredStudents.some(s => s.controlNumber != null), [filteredStudents]);
+  const showPhoneCol = useMemo(() => filteredStudents.some(s => !!s.phoneNumber), [filteredStudents]);
+  const showDobCol = useMemo(() => filteredStudents.some(s => !!s.studentDob), [filteredStudents]);
 
   const getSelectedInstituteName = () => {
     const institute = institutes.find(
@@ -1207,39 +1227,7 @@ export default function GroupStudentPage() {
       `}</style>
 
       {/* Institute Dropdown - Always visible at top left */}
-      <div className="institute-dropdown-container">
-        <label
-          className="form-label mb-2 d-flex align-items-center gap-2"
-          style={{ fontWeight: 600, color: "#1a1a2e", fontSize: "0.95rem" }}
-        >
-          <i className="bi bi-building" style={{ color: "#4361ee" }}></i>
-          Select Institute
-        </label>
-        <select
-          className="form-select-custom"
-          value={selectedInstitute}
-          onChange={(e) => {
-            console.log("Selected value:", e.target.value);
-            const newValue = e.target.value ? Number(e.target.value) : "";
-            setSelectedInstitute(newValue);
-            if (!newValue) {
-              setStudents([]);
-              setQuery("");
-              setSelectedStudents(new Set());
-              setHasChanges(false);
-            }
-          }}
-        >
-          <option value="">🏫 Select Institute</option>
-          {institutes.map((inst) => (
-            <option key={inst.instituteCode} value={inst.instituteCode}>
-              {inst.instituteName}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Students List Section - Only shown when institute is selected */}
+      {/* Students List Section */}
       {selectedInstitute && (
         <>
           {/* Header Card */}
@@ -1837,100 +1825,46 @@ export default function GroupStudentPage() {
                     {filteredStudents.length} Students
                   </span>
                   {selectedStudents.size > 0 && (
-                    <span
-                      className="badge bg-success px-3 py-2"
-                      style={{ borderRadius: "20px", fontSize: "0.9rem" }}
-                    >
-                      {selectedStudents.size} Selected
-                    </span>
+                    <>
+                      <span
+                        className="badge bg-success px-3 py-2"
+                        style={{ borderRadius: "20px", fontSize: "0.9rem" }}
+                      >
+                        {selectedStudents.size} Selected
+                      </span>
+                      <button
+                        className="btn btn-sm d-flex align-items-center gap-2"
+                        onClick={() => {
+                          setGroupSuccessMsg("");
+                          setSelectedContactPersonId("");
+                          setShowGroupModal(true);
+                          if (selectedInstitute) {
+                            setContactPersonsLoading(true);
+                            GetInstituteMappings(Number(selectedInstitute))
+                              .then((res: any) => {
+                                const contacts = res.data?.contactPersons;
+                                setContactPersons(Array.isArray(contacts) ? contacts : []);
+                              })
+                              .catch(() => setContactPersons([]))
+                              .finally(() => setContactPersonsLoading(false));
+                          }
+                        }}
+                        style={{
+                          background: "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: "10px",
+                          padding: "8px 18px",
+                          fontWeight: 600,
+                          fontSize: "0.88rem",
+                          boxShadow: "0 4px 12px rgba(67, 97, 238, 0.3)",
+                        }}
+                      >
+                        <i className="bi bi-people-fill"></i>
+                        Group Together
+                      </button>
+                    </>
                   )}
-                  {hasChanges && (
-                    <span
-                      className="badge bg-warning text-dark px-3 py-2"
-                      style={{ borderRadius: "20px", fontSize: "0.9rem" }}
-                    >
-                      <i className="bi bi-exclamation-circle me-1"></i>
-                      Unsaved Changes
-                    </span>
-                  )}
-                  <button
-                    className="btn btn-success d-flex align-items-center gap-2"
-                    onClick={handleDownloadStudentList}
-                    disabled={filteredStudents.length === 0}
-                    style={{
-                      background: filteredStudents.length > 0
-                        ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
-                        : "#e0e0e0",
-                      border: "none",
-                      borderRadius: "10px",
-                      padding: "0.6rem 1.2rem",
-                      fontWeight: 600,
-                      color: filteredStudents.length > 0 ? "#fff" : "#9e9e9e",
-                      cursor: filteredStudents.length > 0 ? "pointer" : "not-allowed",
-                      transition: "all 0.3s ease",
-                      boxShadow: filteredStudents.length > 0
-                        ? "0 4px 15px rgba(16, 185, 129, 0.3)"
-                        : "none",
-                    }}
-                  >
-                    <i className="bi bi-download"></i>
-                    Download List
-                  </button>
-                  <button
-                    className="btn d-flex align-items-center gap-2"
-                    onClick={handleBulkDownloadClick}
-                    disabled={filteredStudents.length === 0}
-                    style={{
-                      background: filteredStudents.length > 0
-                        ? "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)"
-                        : "#e0e0e0",
-                      border: "none",
-                      borderRadius: "10px",
-                      padding: "0.6rem 1.2rem",
-                      fontWeight: 600,
-                      color: filteredStudents.length > 0 ? "#fff" : "#9e9e9e",
-                      cursor: filteredStudents.length > 0 ? "pointer" : "not-allowed",
-                      transition: "all 0.3s ease",
-                      boxShadow: filteredStudents.length > 0
-                        ? "0 4px 15px rgba(67, 97, 238, 0.3)"
-                        : "none",
-                    }}
-                  >
-                    <i className="bi bi-file-earmark-spreadsheet"></i>
-                    Download All Answers
-                  </button>
-                  <button
-                    className="btn d-flex align-items-center gap-2"
-                    onClick={handleProctoringDownloadClick}
-                    disabled={filteredStudents.length === 0 || proctoringDownloading}
-                    style={{
-                      background: filteredStudents.length > 0 && !proctoringDownloading
-                        ? "linear-gradient(135deg, #e63946 0%, #a4133c 100%)"
-                        : "#e0e0e0",
-                      border: "none",
-                      borderRadius: "10px",
-                      padding: "0.6rem 1.2rem",
-                      fontWeight: 600,
-                      color: filteredStudents.length > 0 && !proctoringDownloading ? "#fff" : "#9e9e9e",
-                      cursor: filteredStudents.length > 0 && !proctoringDownloading ? "pointer" : "not-allowed",
-                      transition: "all 0.3s ease",
-                      boxShadow: filteredStudents.length > 0 && !proctoringDownloading
-                        ? "0 4px 15px rgba(230, 57, 70, 0.3)"
-                        : "none",
-                    }}
-                  >
-                    {proctoringDownloading ? (
-                      <>
-                        <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                        Downloading...
-                      </>
-                    ) : (
-                      <>
-                        <i className="bi bi-shield-exclamation"></i>
-                        Download All Data
-                      </>
-                    )}
-                  </button>
                 </div>
               </div>
             </div>
@@ -1974,108 +1908,25 @@ export default function GroupStudentPage() {
                   </p>
                 </div>
               ) : (
-                <div className="table-responsive" style={{ overflowX: "auto" }}>
-                  <table className="table align-middle mb-0" style={{ minWidth: "1400px" }}>
+                <div>
+                  <table className="table align-middle mb-0" style={{ width: "100%", tableLayout: "fixed" }}>
                     <thead>
                       <tr style={{ background: "#f8f9fa" }}>
-                        <th
-                          style={{
-                            padding: "16px 24px",
-                            fontWeight: 600,
-                            color: "#1a1a2e",
-                            borderBottom: "2px solid #e0e0e0",
-                          }}
-                        >
-                          User ID
+                        <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", borderBottom: "2px solid #e0e0e0", width: "48px" }}>
+                          <input
+                            type="checkbox"
+                            className="custom-checkbox"
+                            checked={filteredStudents.length > 0 && filteredStudents.every(s => selectedStudents.has(s.userStudentId))}
+                            onChange={handleSelectAll}
+                          />
                         </th>
-                        <th
-                          style={{
-                            padding: "16px 24px",
-                            fontWeight: 600,
-                            color: "#1a1a2e",
-                            borderBottom: "2px solid #e0e0e0",
-                          }}
-                        >
-                          Username
-                        </th>
-                        <th
-                          style={{
-                            padding: "16px 24px",
-                            fontWeight: 600,
-                            color: "#1a1a2e",
-                            borderBottom: "2px solid #e0e0e0",
-                          }}
-                        >
-                          Roll Number
-                        </th>
-                        <th
-                          style={{
-                            padding: "16px 24px",
-                            fontWeight: 600,
-                            color: "#1a1a2e",
-                            borderBottom: "2px solid #e0e0e0",
-                          }}
-                        >
-                          Control Number
-                        </th>
-                        <th
-                          style={{
-                            padding: "16px 24px",
-                            fontWeight: 600,
-                            color: "#1a1a2e",
-                            borderBottom: "2px solid #e0e0e0",
-                          }}
-                        >
-                          Student Name
-                        </th>
-                        <th
-                          style={{
-                            padding: "16px 24px",
-                            fontWeight: 600,
-                            color: "#1a1a2e",
-                            borderBottom: "2px solid #e0e0e0",
-                          }}
-                        >
-                          Allotted Assessment
-                        </th>
-                        <th
-                          style={{
-                            padding: "16px 24px",
-                            fontWeight: 600,
-                            color: "#1a1a2e",
-                            borderBottom: "2px solid #e0e0e0",
-                          }}
-                        >
-                          Phone Number
-                        </th>
-                        <th
-                          style={{
-                            padding: "16px 24px",
-                            fontWeight: 600,
-                            color: "#1a1a2e",
-                            borderBottom: "2px solid #e0e0e0",
-                          }}
-                        >
-                          DOB
-                        </th>
-                        <th
-                          style={{
-                            padding: "16px 24px",
-                            fontWeight: 600,
-                            color: "#1a1a2e",
-                            borderBottom: "2px solid #e0e0e0",
-                          }}
-                        >
-                          Assessments
-                        </th>
-                        <th
-                          style={{
-                            padding: "16px 24px",
-                            fontWeight: 600,
-                            color: "#1a1a2e",
-                            borderBottom: "2px solid #e0e0e0",
-                          }}
-                        >
+                        {showUsernameCol && <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", borderBottom: "2px solid #e0e0e0" }}>Username</th>}
+                        {showRollNumberCol && <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", borderBottom: "2px solid #e0e0e0" }}>Roll Number</th>}
+                        {showControlNumberCol && <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", borderBottom: "2px solid #e0e0e0" }}>Control Number</th>}
+                        <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", borderBottom: "2px solid #e0e0e0" }}>Student Name</th>
+                        {showPhoneCol && <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", borderBottom: "2px solid #e0e0e0" }}>Phone Number</th>}
+                        {showDobCol && <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", borderBottom: "2px solid #e0e0e0" }}>DOB</th>}
+                        <th style={{ padding: "12px 16px", fontWeight: 600, color: "#1a1a2e", borderBottom: "2px solid #e0e0e0", width: "130px" }}>
                           Actions
                         </th>
                       </tr>
@@ -2089,201 +1940,66 @@ export default function GroupStudentPage() {
                             transition: "background 0.2s",
                           }}
                         >
-                          <td
-                            style={{
-                              padding: "16px 24px",
-                              borderBottom: "1px solid #f0f0f0",
-                            }}
-                          >
-                            <span
-                              className="badge"
-                              style={{
-                                background: "rgba(67, 97, 238, 0.1)",
-                                color: "#4361ee",
-                                padding: "6px 12px",
-                                borderRadius: "8px",
-                                fontWeight: 600,
-                                fontSize: "0.85rem",
+                          <td style={{ padding: "12px 16px", borderBottom: "1px solid #f0f0f0" }}>
+                            <input
+                              type="checkbox"
+                              className="custom-checkbox"
+                              checked={selectedStudents.has(student.userStudentId)}
+                              onChange={() => {
+                                setSelectedStudents(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(student.userStudentId)) next.delete(student.userStudentId);
+                                  else next.add(student.userStudentId);
+                                  return next;
+                                });
                               }}
-                            >
-                              #{student.userStudentId}
-                            </span>
+                            />
                           </td>
+                          {showUsernameCol && (
+                            <td style={{ padding: "12px 16px", borderBottom: "1px solid #f0f0f0" }}>
+                              <span className="fw-semibold" style={{ color: "#1a1a2e" }}>{student.username}</span>
+                            </td>
+                          )}
+                          {showRollNumberCol && (
+                            <td style={{ padding: "12px 16px", borderBottom: "1px solid #f0f0f0" }}>
+                              <span style={{ fontWeight: 500, color: "#555" }}>{student.schoolRollNumber || "-"}</span>
+                            </td>
+                          )}
+                          {showControlNumberCol && (
+                            <td style={{ padding: "12px 16px", borderBottom: "1px solid #f0f0f0" }}>
+                              <span style={{ fontWeight: 500, color: "#555" }}>{student.controlNumber ?? "-"}</span>
+                            </td>
+                          )}
+                          <td style={{ padding: "12px 16px", borderBottom: "1px solid #f0f0f0" }}>
+                            <span className="fw-semibold" style={{ color: "#1a1a2e" }}>{student.name}</span>
+                          </td>
+                          {showPhoneCol && (
+                            <td style={{ padding: "12px 16px", borderBottom: "1px solid #f0f0f0" }}>
+                              {student.phoneNumber ? (
+                                <div className="d-flex align-items-center gap-2">
+                                  <i className="bi bi-telephone-fill" style={{ color: "#4361ee" }}></i>
+                                  <span style={{ fontWeight: 500, color: "#555" }}>{student.phoneNumber}</span>
+                                </div>
+                              ) : (
+                                <span className="text-muted"><i className="bi bi-dash-circle me-1"></i>Not Available</span>
+                              )}
+                            </td>
+                          )}
+                          {showDobCol && (
+                            <td style={{ padding: "12px 16px", borderBottom: "1px solid #f0f0f0" }}>
+                              {student.studentDob ? (
+                                <div className="d-flex align-items-center gap-2">
+                                  <i className="bi bi-calendar-event-fill" style={{ color: "#4361ee" }}></i>
+                                  <span style={{ fontWeight: 500, color: "#555" }}>{formatDate(student.studentDob)}</span>
+                                </div>
+                              ) : (
+                                <span className="text-muted"><i className="bi bi-dash-circle me-1"></i>Not Available</span>
+                              )}
+                            </td>
+                          )}
                           <td
                             style={{
-                              padding: "16px 24px",
-                              borderBottom: "1px solid #f0f0f0",
-                            }}
-                          >
-                            <span
-                              className="fw-semibold"
-                              style={{ color: "#1a1a2e" }}
-                            >
-                              {student.username}
-                            </span>
-                          </td>
-                          <td
-                            style={{
-                              padding: "16px 24px",
-                              borderBottom: "1px solid #f0f0f0",
-                            }}
-                          >
-                            <span style={{ fontWeight: 500, color: "#555" }}>
-                              {student.schoolRollNumber || "-"}
-                            </span>
-                          </td>
-                          <td
-                            style={{
-                              padding: "16px 24px",
-                              borderBottom: "1px solid #f0f0f0",
-                            }}
-                          >
-                            <span style={{ fontWeight: 500, color: "#555" }}>
-                              {student.controlNumber ?? "-"}
-                            </span>
-                          </td>
-                          <td
-                            style={{
-                              padding: "16px 24px",
-                              borderBottom: "1px solid #f0f0f0",
-                            }}
-                          >
-                            <span
-                              className="fw-semibold"
-                              style={{ color: "#1a1a2e" }}
-                            >
-                              {student.name}
-                            </span>
-                          </td>
-                          <td
-                            style={{
-                              padding: "16px 24px",
-                              borderBottom: "1px solid #f0f0f0",
-                            }}
-                          >
-                            <button
-                              className="btn btn-sm d-flex align-items-center gap-1"
-                              onClick={() => handleViewAssessments(student)}
-                              style={{
-                                background: "rgba(67, 97, 238, 0.1)",
-                                color: "#4361ee",
-                                border: "1px solid rgba(67, 97, 238, 0.3)",
-                                padding: "6px 12px",
-                                borderRadius: "8px",
-                                fontWeight: 500,
-                                fontSize: "0.85rem",
-                                transition: "all 0.2s",
-                              }}
-                            >
-                              <i className="bi bi-list-ul"></i>
-                              View ({new Set((student.assessments || []).filter(a => activeAssessmentIds.has(Number(a.assessmentId))).map(a => Number(a.assessmentId))).size})
-                            </button>
-                          </td>
-                          <td
-                            style={{
-                              padding: "16px 24px",
-                              borderBottom: "1px solid #f0f0f0",
-                            }}
-                          >
-                            {student.phoneNumber ? (
-                              <div className="d-flex align-items-center gap-2">
-                                <i
-                                  className="bi bi-telephone-fill"
-                                  style={{ color: "#4361ee" }}
-                                ></i>
-                                <span
-                                  style={{ fontWeight: 500, color: "#555" }}
-                                >
-                                  {student.phoneNumber}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-muted">
-                                <i className="bi bi-dash-circle me-1"></i>
-                                Not Available
-                              </span>
-                            )}
-                          </td>
-                          <td
-                            style={{
-                              padding: "16px 24px",
-                              borderBottom: "1px solid #f0f0f0",
-                            }}
-                          >
-                            {student.studentDob ? (
-                              <div className="d-flex align-items-center gap-2">
-                                <i
-                                  className="bi bi-calendar-event-fill"
-                                  style={{ color: "#4361ee" }}
-                                ></i>
-                                <span
-                                  style={{ fontWeight: 500, color: "#555" }}
-                                >
-                                  {formatDate(student.studentDob)}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-muted">
-                                <i className="bi bi-dash-circle me-1"></i>
-                                Not Available
-                              </span>
-                            )}
-                          </td>
-                          <td
-                            style={{
-                              padding: "16px 24px",
-                              borderBottom: "1px solid #f0f0f0",
-                            }}
-                          >
-                            <select
-                              value={student.selectedAssessment}
-                              onChange={(e) =>
-                                handleAssessmentChange(
-                                  student.id,
-                                  e.target.value
-                                )
-                              }
-                              style={{
-                                width: "100%",
-                                minWidth: "200px",
-                                padding: "10px 12px",
-                                borderRadius: "8px",
-                                border: "2px solid #e0e0e0",
-                                background: student.selectedAssessment
-                                  ? "rgba(67, 97, 238, 0.05)"
-                                  : "#fff",
-                                cursor: "pointer",
-                                fontWeight: 500,
-                                fontSize: "0.9rem",
-                              }}
-                            >
-                              <option value="">-- Select Assessment --</option>
-                              {assessments.map((assessment) => {
-                                const isAlreadyAssigned =
-                                  student.assignedAssessmentIds.includes(
-                                    assessment.id
-                                  );
-                                return (
-                                  <option
-                                    key={assessment.id}
-                                    value={assessment.id}
-                                    disabled={isAlreadyAssigned}
-                                    style={{
-                                      color: isAlreadyAssigned
-                                        ? "#999"
-                                        : "#333",
-                                    }}
-                                  >
-                                    {assessment.assessmentName}
-                                    {isAlreadyAssigned ? " (Assigned)" : ""}
-                                  </option>
-                                );
-                              })}
-                            </select>
-                          </td>
-                          <td
-                            style={{
-                              padding: "16px 24px",
+                              padding: "12px 16px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2314,96 +2030,129 @@ export default function GroupStudentPage() {
               )}
             </div>
 
-            {/* Save Button Footer */}
-            {!loading && filteredStudents.length > 0 && (
-              <div
-                className="card-footer bg-white border-top p-4"
-                style={{ borderRadius: "0 0 16px 16px" }}
-              >
-                <div className="d-flex justify-content-between align-items-center">
-                  <span className="text-muted">
-                    <i className="bi bi-info-circle me-2"></i>
-                    Select assessments for students and click save to apply
-                    changes
-                  </span>
-                  <button
-                    className="btn btn-lg d-flex align-items-center gap-2"
-                    onClick={handleSave}
-                    disabled={!hasChanges || saving}
-                    style={{
-                      background:
-                        hasChanges && !saving
-                          ? "linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)"
-                          : "#e0e0e0",
-                      color: hasChanges && !saving ? "#fff" : "#9e9e9e",
-                      border: "none",
-                      borderRadius: "12px",
-                      padding: "0.8rem 2rem",
-                      fontWeight: 600,
-                      boxShadow:
-                        hasChanges && !saving
-                          ? "0 8px 20px rgba(76, 175, 80, 0.3)"
-                          : "none",
-                      transition: "all 0.3s ease",
-                      cursor: hasChanges && !saving ? "pointer" : "not-allowed",
-                    }}
-                  >
-                    {saving ? (
-                      <>
-                        <span
-                          className="spinner-border spinner-border-sm"
-                          role="status"
-                          aria-hidden="true"
-                        ></span>
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <i className="bi bi-check2-circle"></i>
-                        Save Changes
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </>
       )}
 
-      {/* No Institute Selected Message */}
-      {!selectedInstitute && (
+
+      {/* Group Together Modal */}
+      {showGroupModal && (
         <div
-          className="card border-0 shadow-sm"
-          style={{ borderRadius: "16px" }}
+          style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}
+          onClick={() => setShowGroupModal(false)}
         >
-          <div className="card-body text-center py-5">
-            <div
-              className="mx-auto mb-4"
-              style={{
-                width: "80px",
-                height: "80px",
-                borderRadius: "50%",
-                background:
-                  "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                boxShadow: "0 10px 30px rgba(67, 97, 238, 0.3)",
-              }}
-            >
-              <i
-                className="bi bi-buildings-fill text-white"
-                style={{ fontSize: "2.5rem" }}
-              ></i>
+          <div
+            style={{ backgroundColor: "white", borderRadius: "20px", maxWidth: "520px", width: "90%", maxHeight: "85vh", overflow: "hidden", boxShadow: "0 25px 50px rgba(0,0,0,0.15)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ background: "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)", padding: "1.25rem 1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <h5 className="mb-0 text-white fw-bold"><i className="bi bi-people-fill me-2"></i>Group Together</h5>
+                <p className="mb-0 text-white mt-1" style={{ fontSize: "0.85rem", opacity: 0.9 }}>{selectedStudents.size} student(s) selected</p>
+              </div>
+              <button type="button" className="btn-close btn-close-white" onClick={() => setShowGroupModal(false)}></button>
             </div>
-            <h4 className="mb-3 fw-semibold" style={{ color: "#1a1a2e" }}>
-              Select an Institute
-            </h4>
-            <p className="text-muted mb-0">
-              Please select an institute from the dropdown above to view
-              students
-            </p>
+
+            {/* Body */}
+            <div style={{ padding: "1.25rem 1.5rem", overflowY: "auto", maxHeight: "60vh" }}>
+              {groupSuccessMsg ? (
+                <div className="alert alert-success d-flex align-items-center gap-2">
+                  <i className="bi bi-check-circle-fill"></i>
+                  {groupSuccessMsg}
+                </div>
+              ) : (
+                <>
+                  {/* Selected students list */}
+                  <div className="mb-4">
+                    <p className="fw-semibold mb-2" style={{ color: "#1a1a2e" }}>Selected Students:</p>
+                    <div style={{ maxHeight: "180px", overflowY: "auto", border: "1px solid #e0e0e0", borderRadius: "10px", padding: "8px" }}>
+                      {Array.from(selectedStudents).map(id => {
+                        const s = students.find(st => st.userStudentId === id);
+                        return (
+                          <div key={id} style={{ padding: "6px 10px", borderRadius: "6px", marginBottom: "4px", background: "#f8f9fa", fontSize: "0.9rem" }}>
+                            <i className="bi bi-person me-2" style={{ color: "#4361ee" }}></i>
+                            {s ? s.name : `Student #${id}`}
+                            {s?.username && <span className="text-muted ms-2" style={{ fontSize: "0.8rem" }}>@{s.username}</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Contact person selector */}
+                  <div>
+                    <label className="fw-semibold mb-2 d-block" style={{ color: "#1a1a2e" }}>Assign Contact Person (Admin):</label>
+                    {contactPersonsLoading ? (
+                      <div className="text-center py-3"><div className="spinner-border spinner-border-sm text-primary"></div></div>
+                    ) : contactPersons.length === 0 ? (
+                      <div className="alert alert-warning py-2">No contact persons found for this school.</div>
+                    ) : (
+                      <select
+                        className="form-select"
+                        value={selectedContactPersonId}
+                        onChange={(e) => setSelectedContactPersonId(e.target.value ? Number(e.target.value) : "")}
+                        style={{ borderRadius: "10px", border: "2px solid #e0e0e0", padding: "10px 12px" }}
+                      >
+                        <option value="">-- Select Contact Person --</option>
+                        {contactPersons.map((cp: any) => (
+                          <option key={cp.id} value={cp.id}>
+                            {cp.name}{cp.designation ? ` (${cp.designation})` : ""}{cp.email ? ` — ${cp.email}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {selectedContactPersonId !== "" && (() => {
+                      const cp = contactPersons.find((c: any) => c.id === selectedContactPersonId);
+                      return cp?.email ? (
+                        <p className="text-muted mt-2 mb-0" style={{ fontSize: "0.82rem" }}>
+                          <i className="bi bi-envelope me-1"></i>A notification email will be sent to <strong>{cp.email}</strong>
+                        </p>
+                      ) : null;
+                    })()}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            {!groupSuccessMsg && (
+              <div style={{ borderTop: "1px solid #e0e0e0", padding: "1rem 1.5rem", display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+                <button className="btn btn-sm" onClick={() => setShowGroupModal(false)} style={{ borderRadius: "8px", padding: "8px 20px" }}>Cancel</button>
+                <button
+                  className="btn btn-sm"
+                  disabled={!selectedContactPersonId || groupAssigning}
+                  onClick={async () => {
+                    if (!selectedContactPersonId) return;
+                    setGroupAssigning(true);
+                    try {
+                      const res: any = await assignStudentsToContactPerson({
+                        contactPersonId: Number(selectedContactPersonId),
+                        userStudentIds: Array.from(selectedStudents),
+                        instituteId: Number(selectedInstitute),
+                      });
+                      setGroupSuccessMsg(`${res.data.assignedCount} student(s) assigned to ${res.data.contactPersonName}. A notification email has been sent.`);
+                      setSelectedStudents(new Set());
+                    } catch (err: any) {
+                      const msg = err?.response?.data?.message || err?.response?.data || err?.message || "Unknown error";
+                      alert("Failed to assign students: " + msg);
+                    } finally {
+                      setGroupAssigning(false);
+                    }
+                  }}
+                  style={{
+                    background: selectedContactPersonId ? "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)" : "#e0e0e0",
+                    color: selectedContactPersonId ? "#fff" : "#999",
+                    border: "none",
+                    borderRadius: "8px",
+                    padding: "8px 24px",
+                    fontWeight: 600,
+                  }}
+                >
+                  {groupAssigning ? <><span className="spinner-border spinner-border-sm me-2"></span>Assigning...</> : <><i className="bi bi-check2-circle me-1"></i>Confirm & Assign</>}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
