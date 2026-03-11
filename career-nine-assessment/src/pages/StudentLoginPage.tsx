@@ -149,7 +149,7 @@ const StudentLoginPage: React.FC = () => {
               <div className="card-body p-3 p-sm-4 p-md-5">
                 {/* Logo */}
                 <div className="login-logo-wrapper">
-                  <img src="/media/logos/kcc.jpg" alt="CAREER_9 Logo" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: "10%", padding: "8px" }} />
+                  <img src="/media/logos/kcc.webp" alt="CAREER_9 Logo" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: "10%", padding: "8px" }} />
                 </div>
 
                 <h2 className="text-center assessment-heading">Assessment Login</h2>

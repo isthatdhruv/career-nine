@@ -191,7 +191,7 @@ const StudentLoginPage: React.FC = () => {
               margin: "0 auto 1.5rem",
             }}
           >
-            <img src="/media/logos/kcc.jpg" alt="CAREER_9 Logo" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: "10%", padding: "8px" }} />
+            <img src="/media/logos/kcc.webp" alt="CAREER_9 Logo" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: "10%", padding: "8px" }} />
           </div>
 
           <h2

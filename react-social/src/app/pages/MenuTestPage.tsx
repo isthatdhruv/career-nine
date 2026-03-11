@@ -53,7 +53,7 @@ const MenuTestPage: FC = () => {
                       <span className="menu-link py-3">
                         <span className="menu-icon">
                           <span className="svg-icon">
-                            <SVG src={toAbsoluteUrl("/media/logos/kcc.jpg")} />
+                            <SVG src={toAbsoluteUrl("/media/logos/kcc.webp")} />
                           </span>
                         </span>
                         <span className="menu-title">Profile</span>
@@ -102,7 +102,7 @@ const MenuTestPage: FC = () => {
                             <span className="menu-icon">
                               <span className="svg-icon">
                                 <SVG
-                                  src={toAbsoluteUrl("/media/logos/kcc.jpg")}
+                                  src={toAbsoluteUrl("/media/logos/kcc.webp")}
                                 />
                               </span>
                             </span>
@@ -220,7 +220,7 @@ const MenuTestPage: FC = () => {
                             <span className="menu-icon">
                               <span className="svg-icon">
                                 <SVG
-                                  src={toAbsoluteUrl("/media/logos/kcc.jpg")}
+                                  src={toAbsoluteUrl("/media/logos/kcc.webp")}
                                 />
                               </span>
                             </span>
@@ -339,7 +339,7 @@ const MenuTestPage: FC = () => {
                       <span className="menu-link py-3">
                         <span className="menu-icon">
                           <span className="svg-icon">
-                            <SVG src={toAbsoluteUrl("/media/logos/kcc.jpg")} />
+                            <SVG src={toAbsoluteUrl("/media/logos/kcc.webp")} />
                           </span>
                         </span>
                         <span className="menu-title">Projects</span>
@@ -418,7 +418,7 @@ const MenuTestPage: FC = () => {
                       <span className="menu-link py-3">
                         <span className="menu-icon">
                           <span className="svg-icon">
-                            <SVG src={toAbsoluteUrl("/media/logos/kcc.jpg")} />
+                            <SVG src={toAbsoluteUrl("/media/logos/kcc.webp")} />
                           </span>
                         </span>
                         <span className="menu-title">Wizards</span>
@@ -455,7 +455,7 @@ const MenuTestPage: FC = () => {
                       <span className="menu-link py-3">
                         <span className="menu-icon">
                           <span className="svg-icon">
-                            <SVG src={toAbsoluteUrl("/media/logos/kcc.jpg")} />
+                            <SVG src={toAbsoluteUrl("/media/logos/kcc.webp")} />
                           </span>
                         </span>
                         <span className="menu-title">Search</span>
@@ -510,7 +510,7 @@ const MenuTestPage: FC = () => {
                       >
                         <span className="menu-icon">
                           <span className="svg-icon svg-icon-1">
-                            <SVG src={toAbsoluteUrl("/media/logos/kcc.jpg")} />
+                            <SVG src={toAbsoluteUrl("/media/logos/kcc.webp")} />
                           </span>
                         </span>
                         <span className="menu-title">Documentation</span>
@@ -523,7 +523,7 @@ const MenuTestPage: FC = () => {
                       >
                         <span className="menu-icon">
                           <span className="svg-icon svg-icon-1">
-                            <SVG src={toAbsoluteUrl("/media/logos/kcc.jpg")} />
+                            <SVG src={toAbsoluteUrl("/media/logos/kcc.webp")} />
                           </span>
                         </span>
                         <span className="menu-title">Layout Builder</span>
@@ -536,7 +536,7 @@ const MenuTestPage: FC = () => {
                       >
                         <span className="menu-icon">
                           <span className="svg-icon svg-icon-1">
-                            <SVG src={toAbsoluteUrl("/media/logos/kcc.jpg")} />
+                            <SVG src={toAbsoluteUrl("/media/logos/kcc.webp")} />
                           </span>
                         </span>
                         <span className="menu-title">Changelog</span>
@@ -671,7 +671,7 @@ const MenuTestPage: FC = () => {
             >
               <div className="btn btn-icon btn-active-light-primary w-30px h-30px w-lg-40px h-lg-40px">
                 <span className="svg-icon svg-icon-2 svg-icon-lg-1">
-                  <SVG src={toAbsoluteUrl("/media/logos/kcc.jpg")} />
+                  <SVG src={toAbsoluteUrl("/media/logos/kcc.webp")} />
                 </span>
               </div>
             </div>
@@ -698,7 +698,7 @@ const MenuTestPage: FC = () => {
               >
                 <div className="position-relative">
                   <span className="svg-icon svg-icon-1 svg-icon-gray-500 position-absolute top-50 translate-middle-y ms-0">
-                    <SVG src={toAbsoluteUrl("/media/logos/kcc.jpg")} />
+                    <SVG src={toAbsoluteUrl("/media/logos/kcc.webp")} />
                   </span>
                   <input
                     type="text"
@@ -720,7 +720,7 @@ const MenuTestPage: FC = () => {
                     id="kt_header_search_clear"
                   >
                     <span className="svg-icon svg-icon-1 me-0">
-                      <SVG src={toAbsoluteUrl("/media/logos/kcc.jpg")} />
+                      <SVG src={toAbsoluteUrl("/media/logos/kcc.webp")} />
                     </span>
                   </span>
                 </div>
@@ -746,7 +746,7 @@ const MenuTestPage: FC = () => {
                 >
                   <span className="menu-icon">
                     <span className="svg-icon svg-icon-1">
-                      <SVG src={toAbsoluteUrl("/media/logos/kcc.jpg")} />
+                      <SVG src={toAbsoluteUrl("/media/logos/kcc.webp")} />
                     </span>
                   </span>
                   <span className="menu-title">Dashboard</span>
@@ -763,7 +763,7 @@ const MenuTestPage: FC = () => {
                 <span className="menu-link">
                   <span className="menu-icon">
                     <span className="svg-icon svg-icon-1">
-                      <SVG src={toAbsoluteUrl("/media/logos/kcc.jpg")} />
+                      <SVG src={toAbsoluteUrl("/media/logos/kcc.webp")} />
                     </span>
                   </span>
                   <span className="menu-title">Pages</span>
@@ -1020,7 +1020,7 @@ const MenuTestPage: FC = () => {
                 >
                   <span className="menu-icon">
                     <span className="svg-icon svg-icon-1">
-                      <SVG src={toAbsoluteUrl("/media/logos/kcc.jpg")} />
+                      <SVG src={toAbsoluteUrl("/media/logos/kcc.webp")} />
                     </span>
                   </span>
                   <span className="menu-title">Documentation</span>
@@ -1033,7 +1033,7 @@ const MenuTestPage: FC = () => {
                 >
                   <span className="menu-icon">
                     <span className="svg-icon svg-icon-1">
-                      <SVG src={toAbsoluteUrl("/media/logos/kcc.jpg")} />
+                      <SVG src={toAbsoluteUrl("/media/logos/kcc.webp")} />
                     </span>{" "}
                   </span>
                   <span className="menu-title">Layout Builder</span>
@@ -1046,7 +1046,7 @@ const MenuTestPage: FC = () => {
                 >
                   <span className="menu-icon">
                     <span className="svg-icon svg-icon-1">
-                      <SVG src={toAbsoluteUrl("/media/logos/kcc.jpg")} />
+                      <SVG src={toAbsoluteUrl("/media/logos/kcc.webp")} />
                     </span>
                   </span>
                   <span className="menu-title">Changelog</span>

@@ -1295,7 +1295,7 @@ const SectionQuestionPage: React.FC = () => {
             }}
           >
             <img
-              src="/media/logos/kcc.jpg"
+              src="/media/logos/kcc.webp"
               alt="KCC Logo"
               style={{
                 height: "48px",

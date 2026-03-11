@@ -52,7 +52,7 @@ const ThankYouPage: React.FC = () => {
                                 </div>
 
                                 <img
-                                    src="/media/logos/kcc.jpg"
+                                    src="/media/logos/kcc.webp"
                                     alt="Career-9 Logo"
                                     style={{
                                         width: '80px',
