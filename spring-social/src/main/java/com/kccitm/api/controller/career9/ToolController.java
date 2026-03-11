@@ -39,7 +39,7 @@ public class ToolController {
 
     @PostMapping(value = "/create" , headers = "Accept=application/json")
     public Tool createTool(@RequestBody Tool tool) {
-        if (tool.isFree()) {
+        if (tool.getIsFree()) {
             tool.setPrice(0.0);
         }
         
@@ -50,7 +50,7 @@ public class ToolController {
     public Tool updateTool(@PathVariable Long id, @RequestBody Tool tool) {
         tool.setToolId(id);
         
-        if (tool.isFree()) {
+        if (tool.getIsFree()) {
             tool.setPrice(0.0);
         }
         
