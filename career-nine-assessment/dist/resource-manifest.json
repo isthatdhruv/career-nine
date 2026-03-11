@@ -1,15 +1,15 @@
 {
-  "version": "mmlzj2wa",
-  "generated": "2026-03-11T11:58:07.978Z",
+  "version": "mmlzzdp5",
+  "generated": "2026-03-11T12:10:48.473Z",
   "resources": [
     {
       "url": "/assessment-cache/5/config.json",
-      "size": 125325,
+      "size": 125313,
       "priority": "assessment"
     },
     {
       "url": "/assessment-cache/5/data.json",
-      "size": 125066,
+      "size": 125054,
       "priority": "assessment"
     },
     {
@@ -54,12 +54,12 @@
     },
     {
       "url": "/assessment-cache/8/config.json",
-      "size": 213604,
+      "size": 213592,
       "priority": "assessment"
     },
     {
       "url": "/assessment-cache/8/data.json",
-      "size": 213372,
+      "size": 213360,
       "priority": "assessment"
     },
     {
@@ -265,11 +265,11 @@
   ],
   "summary": {
     "total": 52,
-    "totalSize": 23837153,
+    "totalSize": 23837105,
     "byPriority": {
       "assessment": {
         "count": 12,
-        "size": 1342587
+        "size": 1342539
       },
       "game": {
         "count": 11,
