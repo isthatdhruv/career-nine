@@ -63,10 +63,6 @@ public class Tool implements Serializable {
         this.price = price;
     }
 
-    public boolean isFree() {
-        return isFree;
-    }
-    
     public boolean getIsFree() {
         return isFree;
     }

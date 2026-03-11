@@ -240,10 +240,10 @@ public class AssessmentTableController {
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     @Cacheable(value = "questionnaireQuestions", key = "#id")
     @GetMapping("/getby/{id}")
-    public ResponseEntity<?> getQuestionnaireById(@PathVariable Long id) {
+    public Object getQuestionnaireById(@PathVariable Long id) {
         Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
         if (assessmentOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
+            throw new com.kccitm.api.exception.ResourceNotFoundException("Assessment", "id", id);
         }
 
         AssessmentTable assessment = assessmentOpt.get();
@@ -253,16 +253,16 @@ public class AssessmentTableController {
             HashMap<String, Object> snapshot = readLockedSnapshot(id);
             if (snapshot != null && snapshot.containsKey("questionnaire")) {
                 logger.debug("Serving questionnaire for assessment #{} from locked snapshot", id);
-                return ResponseEntity.ok(snapshot.get("questionnaire"));
+                return snapshot.get("questionnaire");
             }
         }
 
         // Fall back to DB query
         if (assessment.getQuestionnaire() == null) {
-            return ResponseEntity.ok(java.util.Collections.emptyList());
+            return java.util.Collections.emptyList();
         }
         Long questionnaireId = assessment.getQuestionnaire().getQuestionnaireId();
-        return ResponseEntity.ok(questionnaireRepository.findAllByQuestionnaireId(questionnaireId));
+        return questionnaireRepository.findAllByQuestionnaireId(questionnaireId);
     }
 
     /**
@@ -273,10 +273,10 @@ public class AssessmentTableController {
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     @Cacheable(value = "assessmentDetails", key = "#id")
     @GetMapping("/getById/{id}")
-    public ResponseEntity<?> getAssessmentDetailsById(@PathVariable Long id) {
+    public Object getAssessmentDetailsById(@PathVariable Long id) {
         Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
         if (assessmentOpt.isEmpty()) {
-            return ResponseEntity.notFound().build();
+            throw new com.kccitm.api.exception.ResourceNotFoundException("Assessment", "id", id);
         }
 
         AssessmentTable assessment = assessmentOpt.get();
@@ -286,12 +286,12 @@ public class AssessmentTableController {
             HashMap<String, Object> snapshot = readLockedSnapshot(id);
             if (snapshot != null && snapshot.containsKey("config")) {
                 logger.debug("Serving config for assessment #{} from locked snapshot", id);
-                return ResponseEntity.ok(snapshot.get("config"));
+                return snapshot.get("config");
             }
         }
 
         // Fall back to DB query
-        return ResponseEntity.ok(assessment);
+        return assessment;
     }
 
     @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true) })
@@ -549,13 +549,13 @@ public class AssessmentTableController {
      */
     @Cacheable(value = "assessmentDetails", key = "'prefetch-' + #userStudentId")
     @GetMapping("/prefetch/{userStudentId}")
-    public ResponseEntity<?> prefetchAssessmentData(@PathVariable Long userStudentId) {
+    public Object prefetchAssessmentData(@PathVariable Long userStudentId) {
         try {
             List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
                     .findByUserStudentUserStudentId(userStudentId);
 
             if (mappings.isEmpty()) {
-                return ResponseEntity.ok(java.util.Collections.emptyList());
+                return java.util.Collections.emptyList();
             }
 
             // Batch fetch all assessments in one query instead of N+1
@@ -589,10 +589,10 @@ public class AssessmentTableController {
                 result.add(assessmentInfo);
             }
 
-            return ResponseEntity.ok(result);
+            return result;
         } catch (Exception e) {
             logger.error("Error prefetching assessment data for student {}", userStudentId, e);
-            return ResponseEntity.ok(java.util.Collections.emptyList());
+            return java.util.Collections.emptyList();
         }
     }
 

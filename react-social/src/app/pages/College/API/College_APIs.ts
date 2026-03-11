@@ -29,6 +29,10 @@ export function ReadCollegeData() {
   return axios.get(readCollege);
 }
 
+export function ReadCollegeList() {
+  return axios.get(`${API_URL}/instituteDetail/get/list`);
+}
+
 export function ReadCollegeByIdData(id: any) {
   return axios.get(readCollegeById + id);
 }

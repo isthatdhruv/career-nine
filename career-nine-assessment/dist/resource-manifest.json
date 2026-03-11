@@ -1,20 +1,15 @@
 {
-  "version": "mmkag694",
-  "generated": "2026-03-10T07:28:15.784Z",
+  "version": "mmlzj2wa",
+  "generated": "2026-03-11T11:58:07.978Z",
   "resources": [
     {
       "url": "/assessment-cache/5/config.json",
-      "size": 125287,
+      "size": 125325,
       "priority": "assessment"
     },
     {
       "url": "/assessment-cache/5/data.json",
-      "size": 125058,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/370.png",
-      "size": 347797,
+      "size": 125066,
       "priority": "assessment"
     },
     {
@@ -23,18 +18,8 @@
       "priority": "assessment"
     },
     {
-      "url": "/assessment-cache/5/images/371.png",
-      "size": 267679,
-      "priority": "assessment"
-    },
-    {
       "url": "/assessment-cache/5/images/371.webp",
       "size": 88754,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/372.png",
-      "size": 384220,
       "priority": "assessment"
     },
     {
@@ -43,18 +28,8 @@
       "priority": "assessment"
     },
     {
-      "url": "/assessment-cache/5/images/373.png",
-      "size": 309438,
-      "priority": "assessment"
-    },
-    {
       "url": "/assessment-cache/5/images/373.webp",
       "size": 72164,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/374.png",
-      "size": 342127,
       "priority": "assessment"
     },
     {
@@ -63,28 +38,13 @@
       "priority": "assessment"
     },
     {
-      "url": "/assessment-cache/5/images/375.png",
-      "size": 388892,
-      "priority": "assessment"
-    },
-    {
       "url": "/assessment-cache/5/images/375.webp",
       "size": 51446,
       "priority": "assessment"
     },
     {
-      "url": "/assessment-cache/5/images/376.png",
-      "size": 292611,
-      "priority": "assessment"
-    },
-    {
       "url": "/assessment-cache/5/images/376.webp",
       "size": 86604,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/377.png",
-      "size": 276699,
       "priority": "assessment"
     },
     {
@@ -218,32 +178,32 @@
       "priority": "deferred"
     },
     {
-      "url": "/assets/HydroTubeGame-_9SsjqyM.js",
+      "url": "/assets/HydroTubeGame-BK_YKoPf.js",
       "size": 23029,
       "priority": "critical"
     },
     {
-      "url": "/assets/JungleSpotGame-CVOiZtVO.js",
+      "url": "/assets/JungleSpotGame-Bc39pSwl.js",
       "size": 22904,
       "priority": "critical"
     },
     {
-      "url": "/assets/RabbitPathGame-QPJCQWbD.js",
+      "url": "/assets/RabbitPathGame-B20IRMpJ.js",
       "size": 26561,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionInstructionPage-9lGuET-l.js",
+      "url": "/assets/SectionInstructionPage-DgoM-zHJ.js",
       "size": 4429,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionQuestionPage-BfARECFn.js",
-      "size": 168951,
+      "url": "/assets/SectionQuestionPage-DGyy1l-2.js",
+      "size": 169057,
       "priority": "critical"
     },
     {
-      "url": "/assets/SelectSectionPage-ce8OW2Tr.js",
+      "url": "/assets/SelectSectionPage-Dwl-z7JC.js",
       "size": 4833,
       "priority": "critical"
     },
@@ -263,13 +223,13 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/index-CsQsu5NV.js",
-      "size": 1274010,
+      "url": "/assets/index-BmXaKZsF.js",
+      "size": 276611,
       "priority": "critical"
     },
     {
-      "url": "/assets/index-WsQTSQMz.js",
-      "size": 276625,
+      "url": "/assets/index-CsQsu5NV.js",
+      "size": 1274010,
       "priority": "critical"
     },
     {
@@ -304,12 +264,12 @@
     }
   ],
   "summary": {
-    "total": 60,
-    "totalSize": 26446478,
+    "total": 52,
+    "totalSize": 23837153,
     "byPriority": {
       "assessment": {
-        "count": 20,
-        "size": 3952004
+        "count": 12,
+        "size": 1342587
       },
       "game": {
         "count": 11,
@@ -321,7 +281,7 @@
       },
       "critical": {
         "count": 15,
-        "size": 2338669
+        "size": 2338761
       },
       "other": {
         "count": 2,

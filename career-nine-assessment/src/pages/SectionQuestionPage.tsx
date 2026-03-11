@@ -208,6 +208,24 @@ const SectionQuestionPage: React.FC = () => {
     },
   );
 
+  // Derive set of questionnaireQuestionIds whose game options are completed
+  // Used by getQuestionColor and areAllQuestionsAnswered as fallback when
+  // handleGameComplete fails to store the answer in `answers` state
+  const completedGameQuestionIds = useMemo(() => {
+    const ids = new Set<number>();
+    if (!questionnaire?.sections) return ids;
+    for (const section of questionnaire.sections) {
+      for (const q of section.questions) {
+        for (const opt of (q.question.options || [])) {
+          if (opt.isGame && opt.game && completedGames[opt.game.gameCode]) {
+            ids.add(q.questionnaireQuestionId);
+          }
+        }
+      }
+    }
+    return ids;
+  }, [questionnaire, completedGames]);
+
   useEffect(() => {
     if (assessmentData && assessmentData[0]) {
       const questionnaireData = assessmentData[0];
@@ -356,13 +374,15 @@ const SectionQuestionPage: React.FC = () => {
       ).filter((t: string) => t.trim()).length;
       if (textCount > 0)
         return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+      if (completedGameQuestionIds.has(questionId))
+        return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
       if (savedForLater[secId]?.has(questionId))
         return "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)";
       if (skipped[secId]?.has(questionId))
         return "linear-gradient(135deg, #f87171 0%, #dc2626 100%)";
       return "#d1d5db";
     },
-    [answers, rankingAnswers, textAnswers, savedForLater, skipped],
+    [answers, rankingAnswers, textAnswers, savedForLater, skipped, completedGameQuestionIds],
   );
 
   if (!assessmentData) {
@@ -421,11 +441,15 @@ const SectionQuestionPage: React.FC = () => {
           );
         } else if (isRankingQuestion) {
           const rankings = rankingAnswers[secId]?.[qId] || {};
-          const maxAllowed =
-            q.question.maxOptionsAllowed || q.question.options?.length || 0;
-          isAnswered = Object.keys(rankings).length >= maxAllowed;
+          isAnswered = Object.keys(rankings).length > 0;
         } else {
           isAnswered = answers[secId]?.[qId]?.length > 0;
+        }
+
+        // Fallback: treat completed game questions as answered even if
+        // the answer wasn't stored in `answers` state
+        if (!isAnswered && completedGameQuestionIds.has(qId)) {
+          isAnswered = true;
         }
 
         if (!isAnswered) {
@@ -807,35 +831,6 @@ const SectionQuestionPage: React.FC = () => {
         perQuestionData: Array.from(perQuestionData.current.values()),
       };
 
-      // Submit demographics separately (fire-and-forget — don't block assessment submission)
-      try {
-        const raw = sessionStorage.getItem("demographicsDraft");
-        if (raw) {
-          const demographicsPayload = JSON.parse(raw);
-          fetch(
-            `${import.meta.env.VITE_API_URL}/student-demographics/submit`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-              },
-              body: JSON.stringify(demographicsPayload),
-            },
-          )
-            .then((res) => {
-              if (res.ok) {
-                console.log("=== DEMOGRAPHICS SUBMITTED ===");
-              } else {
-                console.warn("Demographics submission returned non-OK status:", res.status);
-              }
-            })
-            .catch((err) => console.warn("Demographics submit failed:", err));
-        }
-      } catch {
-        /* ignore demographics parse errors */
-      }
-
       const maxRetries = 3;
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
@@ -870,7 +865,6 @@ const SectionQuestionPage: React.FC = () => {
             .catch((err) => console.warn("Proctoring submit failed:", err));
 
           // Clear all assessment-related storage to prevent stale data
-          sessionStorage.removeItem("demographicsDraft");
           localStorage.removeItem("assessmentAnswers");
           localStorage.removeItem("assessmentRankingAnswers");
           localStorage.removeItem("assessmentTextAnswers");
@@ -1124,8 +1118,13 @@ const SectionQuestionPage: React.FC = () => {
           return prev;
         });
 
-        // Remove from skipped if it was there
+        // Remove from skipped and savedForLater
         setSkipped((prev) => {
+          const s = new Set(prev[sectionId] || []);
+          s.delete(qId);
+          return { ...prev, [sectionId]: s };
+        });
+        setSavedForLater((prev) => {
           const s = new Set(prev[sectionId] || []);
           s.delete(qId);
           return { ...prev, [sectionId]: s };

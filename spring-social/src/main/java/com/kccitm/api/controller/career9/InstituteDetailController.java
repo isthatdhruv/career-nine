@@ -3,6 +3,7 @@ package com.kccitm.api.controller.career9;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -58,6 +59,11 @@ public class InstituteDetailController {
 
 	@Autowired
 	private BoardNameRepository boardNameRepository;
+
+	@GetMapping("/get/list")
+	public List<Map<String, Object>> getInstituteList() {
+		return instituteDetailRepository.findAllIdAndName();
+	}
 
 	@GetMapping(value = "/get", headers = "Accept=application/json")
 	public List<InstituteDetail> getallInstituteDetail() {

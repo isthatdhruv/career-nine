@@ -1,5 +1,6 @@
 /* eslint-disable react/jsx-no-target-blank */
 import { useIntl } from "react-intl";
+import { useLocation } from "react-router-dom";
 import { useAuth } from "../../../../app/modules/auth";
 import { AsideMenuItem } from "./AsideMenuItem";
 import { AsideMenuItemWithSub } from "./AsideMenuItemWithSub";
@@ -22,8 +23,17 @@ function isUrlAllowed(path: string, authorityUrls: string[]): boolean {
 
 export function AsideMenuMain() {
   const intl = useIntl();
+  const { pathname, search } = useLocation();
   const { currentUser } = useAuth();
   const authorityUrls: string[] = currentUser?.authorityUrls ?? [];
+  const isInstituteDashboard = pathname.startsWith("/school/principal/dashboard/");
+  const isSchoolPage = pathname.startsWith("/school/");
+  const showSchoolGroupStudent = isSchoolPage;
+  const showAssignedStudents = isSchoolPage;
+  // Resolve institute ID: from path segment on dashboard, from query param on other school pages
+  const schoolGroupStudentInstituteId = isInstituteDashboard
+    ? (pathname.split('/')[4] || "")
+    : (new URLSearchParams(search).get("instituteId") || "");
   const allowed = (path: string) => {
     const normalized = path.startsWith("/") ? path : "/" + path;
     return isUrlAllowed(normalized, authorityUrls);
@@ -32,6 +42,8 @@ export function AsideMenuMain() {
   // Section visibility: show section header + submenu only if at least one child is allowed
   const showInstitute =
     allowed("/college") || allowed("/contact-person") || allowed("/group-student") ||
+    allowed("/admin/group-student") || allowed("/school/group-student") ||
+    allowed("/school/assigned-students") ||
     allowed("/board") || allowed("/upload-excel") || allowed("/studentlist");
 
   const showQuestionnaire =
@@ -48,7 +60,7 @@ export function AsideMenuMain() {
     allowed("/assessment-questions") || allowed("/question-sections") ||
     allowed("/text-response-mapping") || allowed("/live-tracking");
 
-  const showReports = allowed("/reports");
+  const showReports = allowed("/reports") || allowed("/report-generation");
 
   const showTeacherDashboards =
     allowed("/teacher/class-dashboard") || allowed("/principal/dashboard");
@@ -110,7 +122,31 @@ export function AsideMenuMain() {
               <AsideMenuItem
                 to="/group-student"
                 icon="/media/icons/duotune/general/gen044.svg"
-                title="Group Student Information"
+                title="Data Download"
+                fontIcon="bi-app-indicator"
+              />
+            )}
+            {allowed("/admin/group-student") && (
+              <AsideMenuItem
+                to="/admin/group-student"
+                icon="/media/icons/duotune/general/gen044.svg"
+                title="Group Student Information Admin"
+                fontIcon="bi-app-indicator"
+              />
+            )}
+            {showSchoolGroupStudent && allowed("/school/group-student") && (
+              <AsideMenuItem
+                to={`/school/group-student?instituteId=${schoolGroupStudentInstituteId}`}
+                icon="/media/icons/duotune/general/gen044.svg"
+                title="Group Student Information School"
+                fontIcon="bi-app-indicator"
+              />
+            )}
+            {showAssignedStudents && allowed("/school/assigned-students") && (
+              <AsideMenuItem
+                to={`/school/assigned-students?instituteId=${schoolGroupStudentInstituteId}`}
+                icon="/media/icons/duotune/communication/com006.svg"
+                title="Assigned Students"
                 fontIcon="bi-app-indicator"
               />
             )}
@@ -363,12 +399,22 @@ export function AsideMenuMain() {
             </div>
           </div>
 
-          <AsideMenuItem
-            to="/reports"
-            icon="/media/icons/duotune/files/fil003.svg"
-            title="Reports & Exports"
-            fontIcon="bi-file-earmark-bar-graph"
-          />
+          {allowed("/reports") && (
+            <AsideMenuItem
+              to="/reports"
+              icon="/media/icons/duotune/files/fil003.svg"
+              title="Reports & Exports"
+              fontIcon="bi-file-earmark-bar-graph"
+            />
+          )}
+          {allowed("/report-generation") && (
+            <AsideMenuItem
+              to="/report-generation"
+              icon="/media/icons/duotune/general/gen005.svg"
+              title="Report Generation"
+              fontIcon="bi-file-earmark-bar-graph"
+            />
+          )}
         </>
       )}
 

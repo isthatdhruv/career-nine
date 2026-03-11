@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useState } from "react";
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { useNavigate, useParams } from "react-router-dom";
 import Chart from "react-apexcharts";
@@ -8,7 +8,7 @@ import { getCSSVariableValue } from "../../../_metronic/assets/ts/_utils";
 import { toAbsoluteUrl } from "../../../_metronic/helpers";
 import { useThemeMode } from "../../../_metronic/partials/layout/theme-mode/ThemeModeProvider";
 import { getStudentsWithMappingByInstituteId, StudentWithMapping, getAllAssessments, Assessment } from "../StudentInformation/StudentInfo_APIs";
-import { GetSessionsByInstituteCode } from "../College/API/College_APIs";
+import { GetSessionsByInstituteCode, GetInstituteMappings } from "../College/API/College_APIs";
 
 type DashboardRole = "principal" | "teacher" | "student";
 
@@ -636,6 +636,51 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
 
+  // Teacher/Student dropdown state
+  const [teachers, setTeachers] = useState<any[]>([]);
+  const [showTeacherDropdown, setShowTeacherDropdown] = useState(false);
+  const [showStudentDropdown, setShowStudentDropdown] = useState(false);
+  const [selectedTeacher, setSelectedTeacher] = useState<any>(null);
+  const [selectedStudent, setSelectedStudent] = useState<StudentWithMapping | null>(null);
+  const [teacherSearch, setTeacherSearch] = useState("");
+  const [studentSearch, setStudentSearch] = useState("");
+  const [studentSearchMode, setStudentSearchMode] = useState<"none" | "name" | "class">("none");
+  const [studentGradeFilter, setStudentGradeFilter] = useState<string>("");
+  const [studentSectionFilter, setStudentSectionFilter] = useState<number | null>(null);
+  const teacherDropdownRef = useRef<HTMLDivElement>(null);
+  const studentDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Fetch teachers (contact persons) for this institute
+  useEffect(() => {
+    if (instituteId) {
+      GetInstituteMappings(instituteId)
+        .then((res: any) => {
+          setTeachers(res.data?.contactPersons || []);
+        })
+        .catch(() => setTeachers([]));
+    }
+  }, [instituteId]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (teacherDropdownRef.current && !teacherDropdownRef.current.contains(e.target as Node)) {
+        setShowTeacherDropdown(false);
+      }
+      if (studentDropdownRef.current && !studentDropdownRef.current.contains(e.target as Node)) {
+        setShowStudentDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredTeachers = useMemo(() => {
+    if (!teacherSearch.trim()) return teachers;
+    const q = teacherSearch.toLowerCase();
+    return teachers.filter((t: any) => t.name?.toLowerCase().includes(q));
+  }, [teachers, teacherSearch]);
+
   // Filter panel state
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [hierarchyData, setHierarchyData] = useState<any[]>([]);
@@ -690,8 +735,9 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
     for (const session of hierarchyData) {
       for (const cls of session.schoolClasses || []) {
         for (const sec of cls.schoolSections || []) {
-          if (!seen.has(sec.sectionName)) {
-            seen.add(sec.sectionName);
+          const key = `${cls.className}:${sec.id}`;
+          if (!seen.has(key)) {
+            seen.add(key);
             sections.push({ id: sec.id, sectionName: sec.sectionName, className: cls.className });
           }
         }
@@ -769,6 +815,66 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
       return true;
     });
   };
+
+  // Build sectionId → className and sectionId → sectionName mappings from hierarchy data
+  const { sectionToGradeMap, sectionToSectionNameMap } = useMemo(() => {
+    const gradeMap = new Map<number, string>();
+    const sectionNameMap = new Map<number, string>();
+    for (const session of hierarchyData) {
+      for (const cls of session.schoolClasses || []) {
+        for (const sec of cls.schoolSections || []) {
+          gradeMap.set(sec.id, cls.className);
+          sectionNameMap.set(sec.id, sec.sectionName);
+        }
+      }
+    }
+    return { sectionToGradeMap: gradeMap, sectionToSectionNameMap: sectionNameMap };
+  }, [hierarchyData]);
+
+  const filteredStudentsList = useMemo(() => {
+    if (studentSearchMode === "name") {
+      if (!studentSearch.trim()) return [];
+      const q = studentSearch.toLowerCase();
+      return students.filter((s) => s.name?.toLowerCase().includes(q));
+    }
+    if (studentSearchMode === "class") {
+      if (!studentGradeFilter) return [];
+      return students.filter((s) => {
+        const grade = s.schoolSectionId != null ? sectionToGradeMap.get(s.schoolSectionId) || "" : "";
+        if (grade !== studentGradeFilter) return false;
+        if (studentSectionFilter != null) return s.schoolSectionId === studentSectionFilter;
+        return true;
+      });
+    }
+    return [];
+  }, [students, studentSearchMode, studentSearch, studentGradeFilter, studentSectionFilter, sectionToGradeMap]);
+
+  // Compute real grade distribution from students + hierarchy
+  const realGradeDistribution = useMemo(() => {
+    const gradeCounts = new Map<string, number>();
+    const baseStudents = sectionFilteredStudents;
+
+    for (const student of baseStudents) {
+      const grade = student.schoolSectionId != null
+        ? sectionToGradeMap.get(student.schoolSectionId) || "Unassigned"
+        : "Unassigned";
+      gradeCounts.set(grade, (gradeCounts.get(grade) || 0) + 1);
+    }
+
+    // Sort grades naturally (e.g., "1" before "10", "Grade 8" before "Grade 12")
+    const sortedGrades = Array.from(gradeCounts.entries()).sort((a, b) => {
+      const numA = parseInt(a[0].replace(/\D/g, '')) || 0;
+      const numB = parseInt(b[0].replace(/\D/g, '')) || 0;
+      return numA - numB || a[0].localeCompare(b[0]);
+    });
+
+    return {
+      labels: sortedGrades.map(([grade]) => grade),
+      series: sortedGrades.map(([, count]) => count),
+      note: (appliedAssessmentIds.size > 0 || appliedSessions.size > 0 || appliedGrades.size > 0 || appliedSections.size > 0)
+        ? "Filtered view" : "Current enrollment",
+    };
+  }, [sectionFilteredStudents, sectionToGradeMap, appliedAssessmentIds, appliedSessions, appliedGrades, appliedSections]);
 
   // Whether assessment filter is active
   const hasAssessmentFilter = appliedEnabled.has("assessment") && appliedAssessmentIds.size > 0;
@@ -906,10 +1012,15 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
         helper: isFiltered ? "Not started (filtered)" : "Assessment not started",
         tone: "danger",
       };
+
+      // Override grade distribution with real data from backend
+      if (!isLoading && realGradeDistribution.labels.length > 0) {
+        roleData.gradeDistribution = realGradeDistribution;
+      }
     }
 
     return roleData;
-  }, [role, isLoading, studentStats, isFiltered, activeFilterLabel]);
+  }, [role, isLoading, studentStats, isFiltered, activeFilterLabel, realGradeDistribution]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30000);
@@ -945,10 +1056,20 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
         palette.info,
         palette.warning,
         palette.danger,
+        '#6f42c1',
+        '#20c997',
+        '#fd7e14',
+        '#0dcaf0',
+        '#d63384',
+        '#198754',
+        '#6610f2',
       ],
       stroke: { width: 0 },
       dataLabels: {
         enabled: true,
+        formatter: (val: number, opts: any) => {
+          return opts.w.config.series[opts.seriesIndex];
+        },
         style: { colors: ["#fff"], fontSize: "12px" },
         dropShadow: { enabled: false },
       },
@@ -1083,7 +1204,7 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
       return;
     }
 
-    navigate("/school/dashboard/studentList");
+    navigate("/school/principal/dashboard/studentList");
   };
 
   return (
@@ -1105,17 +1226,12 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
                   <span className="fw-bold fs-2 text-gray-800">Career-9 Insight Center</span>
                   <span className="badge badge-light-primary fw-semibold text-uppercase">
                     {role === "principal" && "Principal view"}
-                    {role === "teacher" && "Teacher view"}
-                    {role === "student" && "Student view"}
+                    {role === "teacher" && (selectedTeacher ? `Teacher: ${selectedTeacher.name}` : "Teacher view")}
+                    {role === "student" && (selectedStudent ? `Student: ${selectedStudent.name}` : "Student view")}
                   </span>
                 </div>
                 <div className="text-muted fw-semibold">
                   {data.subtitle}
-                </div>
-                <div className="d-flex flex-wrap gap-2 mt-3">
-                  <span className="badge badge-light-primary">Class code 1: Insight Navigator</span>
-                  <span className="badge badge-light-info">Class code 2: Stream Navigator</span>
-                  <span className="badge badge-light-success">Class code 3: Career Navigator</span>
                 </div>
               </div>
             </div>
@@ -1125,25 +1241,231 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
                 <div className="fw-bold fs-4 text-gray-800">{dateDisplay}</div>
                 <div className="fw-semibold text-primary">{timeDisplay}</div>
               </div>
-              <div className="btn-group" role="group" aria-label="Select dashboard view">
+              <div className="d-flex align-items-center gap-1">
                 <button
                   className={`btn btn-sm ${role === "principal" ? "btn-primary" : "btn-light-primary"}`}
-                  onClick={() => setRole("principal")}
+                  onClick={() => {
+                    setRole("principal");
+                    setSelectedTeacher(null);
+                    setSelectedStudent(null);
+                    setShowTeacherDropdown(false);
+                    setShowStudentDropdown(false);
+                  }}
                 >
                   Principal
                 </button>
-                <button
-                  className={`btn btn-sm ${role === "teacher" ? "btn-primary" : "btn-light-primary"}`}
-                  onClick={() => setRole("teacher")}
-                >
-                  Teacher
-                </button>
-                <button
-                  className={`btn btn-sm ${role === "student" ? "btn-primary" : "btn-light-primary"}`}
-                  onClick={() => setRole("student")}
-                >
-                  Student
-                </button>
+
+                {/* Teacher button with dropdown */}
+                <div className="position-relative" ref={teacherDropdownRef}>
+                  <button
+                    className={`btn btn-sm d-flex align-items-center gap-1 ${role === "teacher" ? "btn-primary" : "btn-light-primary"}`}
+                    onClick={() => {
+                      setShowTeacherDropdown(!showTeacherDropdown);
+                      setShowStudentDropdown(false);
+                      setTeacherSearch("");
+                    }}
+                  >
+                    {role === "teacher" && selectedTeacher ? selectedTeacher.name : "Teacher"}
+                    <i className="bi bi-chevron-down fs-9"></i>
+                  </button>
+                  {showTeacherDropdown && (
+                    <div
+                      className="position-absolute bg-white shadow rounded border mt-1"
+                      style={{ zIndex: 1050, minWidth: "220px", maxHeight: "300px", right: 0 }}
+                    >
+                      <div className="p-2 border-bottom">
+                        <input
+                          type="text"
+                          className="form-control form-control-sm"
+                          placeholder="Search teacher..."
+                          value={teacherSearch}
+                          onChange={(e) => setTeacherSearch(e.target.value)}
+                          autoFocus
+                        />
+                      </div>
+                      <div style={{ maxHeight: "240px", overflowY: "auto" }}>
+                        {filteredTeachers.length === 0 ? (
+                          <div className="p-3 text-muted text-center fs-7">No teachers found</div>
+                        ) : (
+                          filteredTeachers.map((teacher: any) => (
+                            <div
+                              key={teacher.id}
+                              className={`px-3 py-2 cursor-pointer d-flex align-items-center gap-2 ${
+                                selectedTeacher?.id === teacher.id ? "bg-light-primary" : "bg-hover-light"
+                              }`}
+                              style={{ cursor: "pointer" }}
+                              onClick={() => {
+                                setSelectedTeacher(teacher);
+                                setRole("teacher");
+                                setShowTeacherDropdown(false);
+                                setSelectedStudent(null);
+                              }}
+                            >
+                              <div className="symbol symbol-25px">
+                                <div className="symbol-label bg-light-primary text-primary fw-bold fs-8">
+                                  {teacher.name?.charAt(0)?.toUpperCase() || "T"}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="fw-semibold text-gray-800 fs-7">{teacher.name}</div>
+                                {teacher.designation && (
+                                  <div className="text-muted fs-8">{teacher.designation}</div>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Student button with dropdown */}
+                <div className="position-relative" ref={studentDropdownRef}>
+                  <button
+                    className={`btn btn-sm d-flex align-items-center gap-1 ${role === "student" ? "btn-primary" : "btn-light-primary"}`}
+                    onClick={() => {
+                      setShowStudentDropdown(!showStudentDropdown);
+                      setShowTeacherDropdown(false);
+                      setStudentSearch("");
+                      setStudentSearchMode("none");
+                      setStudentGradeFilter("");
+                      setStudentSectionFilter(null);
+                    }}
+                  >
+                    {role === "student" && selectedStudent ? selectedStudent.name : "Student"}
+                    <i className="bi bi-chevron-down fs-9"></i>
+                  </button>
+                  {showStudentDropdown && (
+                    <div
+                      className="position-absolute bg-white shadow rounded border mt-1"
+                      style={{ zIndex: 1050, minWidth: "280px", right: 0 }}
+                    >
+                      {/* Radio options — always visible */}
+                      <div className="p-2 border-bottom">
+                        <div className="text-muted fs-8 px-1 pb-1 fw-semibold">Search students by</div>
+                        <label className="d-flex align-items-center gap-2 px-2 py-1 rounded bg-hover-light mb-1" style={{ cursor: "pointer" }}>
+                          <input
+                            type="radio"
+                            name="studentSearchMode"
+                            className="form-check-input mt-0"
+                            checked={studentSearchMode === "name"}
+                            onChange={() => { setStudentSearchMode("name"); setStudentGradeFilter(""); setStudentSectionFilter(null); }}
+                          />
+                          <i className="bi bi-person-search text-primary fs-6"></i>
+                          <span className="fs-7 fw-semibold">Name</span>
+                        </label>
+                        <label className="d-flex align-items-center gap-2 px-2 py-1 rounded bg-hover-light mb-0" style={{ cursor: "pointer" }}>
+                          <input
+                            type="radio"
+                            name="studentSearchMode"
+                            className="form-check-input mt-0"
+                            checked={studentSearchMode === "class"}
+                            onChange={() => { setStudentSearchMode("class"); setStudentSearch(""); }}
+                          />
+                          <i className="bi bi-mortarboard text-primary fs-6"></i>
+                          <span className="fs-7 fw-semibold">Class / Section</span>
+                        </label>
+                      </div>
+
+                      {/* Name search input */}
+                      {studentSearchMode === "name" && (
+                        <div className="p-2 border-bottom">
+                          <input
+                            type="text"
+                            className="form-control form-control-sm"
+                            placeholder="Type student name..."
+                            value={studentSearch}
+                            onChange={(e) => setStudentSearch(e.target.value)}
+                            autoFocus
+                          />
+                        </div>
+                      )}
+
+                      {/* Class / Section selects */}
+                      {studentSearchMode === "class" && (
+                        <div className="p-2 border-bottom">
+                          <select
+                            className="form-select form-select-sm mb-2"
+                            value={studentGradeFilter}
+                            onChange={(e) => { setStudentGradeFilter(e.target.value); setStudentSectionFilter(null); }}
+                            autoFocus
+                          >
+                            <option value="">— Select class —</option>
+                            {allGrades.map((g) => (
+                              <option key={g.id} value={g.className}>{g.className}</option>
+                            ))}
+                          </select>
+                          {studentGradeFilter && (
+                            <select
+                              className="form-select form-select-sm"
+                              value={studentSectionFilter ?? ""}
+                              onChange={(e) => setStudentSectionFilter(e.target.value ? Number(e.target.value) : null)}
+                            >
+                              <option value="">— All sections —</option>
+                              {allSectionsFlat.filter((s) => s.className === studentGradeFilter).map((sec) => (
+                                <option key={sec.id} value={sec.id}>{sec.sectionName}</option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Student list */}
+                      <div style={{ maxHeight: "260px", overflowY: "auto" }}>
+                        {studentSearchMode === "none" ? (
+                          <div className="p-3 text-muted text-center fs-7">Select a search option above</div>
+                        ) : studentSearchMode === "name" && !studentSearch.trim() ? (
+                          <div className="p-3 text-muted text-center fs-7">Start typing to search</div>
+                        ) : studentSearchMode === "class" && !studentGradeFilter ? (
+                          <div className="p-3 text-muted text-center fs-7">Select a class above</div>
+                        ) : filteredStudentsList.length === 0 ? (
+                          <div className="p-3 text-muted text-center fs-7">No students found</div>
+                        ) : (
+                          <>
+                            {filteredStudentsList.slice(0, 50).map((student) => (
+                              <div
+                                key={student.userStudentId}
+                                className={`px-3 py-2 d-flex align-items-center gap-2 ${
+                                  selectedStudent?.userStudentId === student.userStudentId ? "bg-light-primary" : "bg-hover-light"
+                                }`}
+                                style={{ cursor: "pointer" }}
+                                onClick={() => {
+                                  setShowStudentDropdown(false);
+                                  setStudentSearchMode("none");
+                                  navigate(`/student-dashboard/${student.userStudentId}`);
+                                }}
+                              >
+                                <div className="symbol symbol-25px">
+                                  <div className="symbol-label bg-light-info text-info fw-bold fs-8">
+                                    {student.name?.charAt(0)?.toUpperCase() || "S"}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="fw-semibold text-gray-800 fs-7">{student.name}</div>
+                                  <div className="text-muted fs-8">
+                                    {student.schoolSectionId != null && sectionToGradeMap.get(student.schoolSectionId)
+                                      ? sectionToGradeMap.get(student.schoolSectionId)
+                                      : ""}
+                                    {student.schoolSectionId != null && sectionToSectionNameMap.get(student.schoolSectionId)
+                                      ? ` - ${sectionToSectionNameMap.get(student.schoolSectionId)}`
+                                      : ""}
+                                    {!(student.schoolSectionId != null && sectionToGradeMap.get(student.schoolSectionId)) && "Unassigned"}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            {filteredStudentsList.length > 50 && (
+                              <div className="p-2 text-center text-muted fs-8 border-top">
+                                Showing 50 of {filteredStudentsList.length} — refine to narrow down
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1507,39 +1829,59 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
             const isClickable = role === "principal";
             // Order: 0=total, 1=ongoing, 2=completed, 3=notstarted
             const modalType: ModalType = index === 0 ? 'total' : index === 1 ? 'ongoing' : index === 2 ? 'completed' : index === 3 ? 'notstarted' : null;
+            const showLoading = isLoading && role === "principal";
 
             return (
               <div className="col" key={stat.title}>
                 <div
-                  className={`card shadow-sm h-100 ${isClickable ? 'cursor-pointer' : ''}`}
-                  onClick={isClickable ? () => setActiveModal(modalType) : undefined}
-                  style={isClickable ? { cursor: 'pointer' } : undefined}
+                  className={`card shadow-sm h-100 ${isClickable && !showLoading ? 'cursor-pointer' : ''}`}
+                  onClick={isClickable && !showLoading ? () => setActiveModal(modalType) : undefined}
+                  style={isClickable && !showLoading ? { cursor: 'pointer' } : undefined}
                 >
                   <div className="card-body py-4 d-flex flex-column gap-3">
                     <div className="d-flex align-items-center justify-content-between">
                       <span className="text-gray-600 fw-semibold text-uppercase fs-8">
                         {stat.title}
                       </span>
-                      <span className={`badge badge-light-${stat.tone}`}>{stat.helper}</span>
+                      {showLoading ? (
+                        <span
+                          className="rounded"
+                          style={{
+                            width: 100,
+                            height: 20,
+                            background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
+                            backgroundSize: '200% 100%',
+                            animation: 'shimmer 1.5s infinite',
+                          }}
+                        />
+                      ) : (
+                        <span className={`badge badge-light-${stat.tone}`}>{stat.helper}</span>
+                      )}
                     </div>
                     <div className="d-flex align-items-end justify-content-between">
-                      {isLoading && role === "principal" ? (
-                        <div className="d-flex align-items-center gap-2">
-                          <span className="spinner-border spinner-border-sm text-primary" role="status">
-                            <span className="visually-hidden">Loading...</span>
-                          </span>
-                          <span className="text-muted fs-6">Loading...</span>
+                      {showLoading ? (
+                        <div className="d-flex flex-column gap-2 w-100">
+                          <span
+                            className="rounded"
+                            style={{
+                              width: 80,
+                              height: 32,
+                              background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
+                              backgroundSize: '200% 100%',
+                              animation: 'shimmer 1.5s infinite',
+                            }}
+                          />
                         </div>
                       ) : (
                         <span className="fw-bolder fs-2 text-gray-800">{stat.value}</span>
                       )}
-                      {isClickable && !isLoading && (
+                      {isClickable && !showLoading && (
                         <span className="text-muted fs-8">
                           <i className="bi bi-eye-fill me-1"></i>View
                         </span>
                       )}
                     </div>
-                    {index === 0 && role === "principal" && (
+                    {index === 0 && role === "principal" && !showLoading && (
                       <button
                         className="btn btn-sm btn-primary mt-2"
                         onClick={(e) => {
@@ -1554,12 +1896,30 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
                         List of Students
                       </button>
                     )}
+                    {showLoading && index === 0 && (
+                      <span
+                        className="rounded"
+                        style={{
+                          width: 120,
+                          height: 30,
+                          background: 'linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)',
+                          backgroundSize: '200% 100%',
+                          animation: 'shimmer 1.5s infinite',
+                        }}
+                      />
+                    )}
                   </div>
                 </div>
               </div>
             );
           })}
         </div>
+        <style>{`
+          @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+          }
+        `}</style>
 
         <div className="row g-5">
           <div className="col-12 col-xl-4">
@@ -1571,19 +1931,36 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
                 </div>
               </div>
               <div className="card-body pt-0">
-                <Chart
-                  options={gradeDistributionOptions}
-                  series={data.gradeDistribution.series}
-                  type="donut"
-                  height={320}
-                />
+                {isLoading && role === "principal" ? (
+                  <div className="d-flex flex-column align-items-center justify-content-center" style={{ height: 320 }}>
+                    <span className="spinner-border spinner-border-lg text-primary mb-3" role="status">
+                      <span className="visually-hidden">Loading...</span>
+                    </span>
+                    <span className="text-muted fs-7">Loading grade data...</span>
+                  </div>
+                ) : data.gradeDistribution.series.length === 0 ? (
+                  <div className="d-flex flex-column align-items-center justify-content-center text-muted" style={{ height: 320 }}>
+                    <i className="bi bi-bar-chart fs-2x text-gray-400 mb-3"></i>
+                    <span>No grade data available</span>
+                  </div>
+                ) : (
+                  <Chart
+                    key={`grade-dist-${data.gradeDistribution.labels.join(',')}`}
+                    options={gradeDistributionOptions}
+                    series={data.gradeDistribution.series}
+                    type="donut"
+                    height={320}
+                  />
+                )}
                 <div className="mt-4 p-3 rounded border" style={{ borderColor: palette.border }}>
                   <div className="d-flex justify-content-between fw-semibold text-gray-700">
                     <span>Student distribution by grade</span>
-                    <span className="text-primary">{data.gradeDistribution.series.reduce((a, b) => a + b, 0)} total</span>
+                    <span className="text-primary">
+                      {isLoading && role === "principal" ? "..." : data.gradeDistribution.series.reduce((a, b) => a + b, 0)} total
+                    </span>
                   </div>
                   <div className="text-muted fs-7 mt-2">
-                    Insight Navigator keeps the view current as new students complete their profiles.
+                    Real-time enrollment data from your institute.
                   </div>
                 </div>
               </div>
