@@ -14,11 +14,11 @@ server:
 spring:
   profiles: dev
   datasource:
-    url: jdbc:mysql://localhost:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3306/career-nine?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     # url: jdbc:mysql://192.168.10.73:3306/kiraya-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     username: root
-    password: Career-qCsfeuECc3MW
-    # password: MyStrongPass@123
+    # password: Career-qCsfeuECc3MW
+    password: MyStrongPass@123
   jpa:
     show-sql: true
     hibernate:
@@ -108,7 +108,8 @@ app:
     url: https://career-91.odoo.com
     database: career-91
     username: prasad.khake@career-9.com
-    api-key: f4374c76ccca60c223f8d3d1d5425dbf596f3e99
+    api-key: cb97253d5f1d2002ab797dcb28bfef6ddaa58f38
+
   gmail:
     sender-email: ${GMAIL_SENDER:notifications@career-9.net}
   firebase:
@@ -222,7 +223,7 @@ app:
     url: ${ODOO_URL:https://career-91.odoo.com}
     database: ${ODOO_DATABASE:career-91}
     username: ${ODOO_USERNAME:prasad.khake@career-9.com}
-    api-key: ${ODOO_API_KEY:f4374c76ccca60c223f8d3d1d5425dbf596f3e99}
+    api-key: ${ODOO_API_KEY:cb97253d5f1d2002ab797dcb28bfef6ddaa58f38}
   gmail:
     sender-email: ${GMAIL_SENDER:notifications@career-9.net}
 ---
@@ -321,7 +322,8 @@ app:
     url: https://career-91.odoo.com
     database: career-91
     username: prasad.khake@career-9.com
-    api-key: 5685cadbbee4aee3f65cf0bd1bdc9112c9dc772f
+    api-key: cb97253d5f1d2002ab797dcb28bfef6ddaa58f38
+
   gmail:
     sender-email: ${GMAIL_SENDER:notifications@career-9.net}
 
