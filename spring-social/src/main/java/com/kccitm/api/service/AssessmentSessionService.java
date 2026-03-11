@@ -41,6 +41,8 @@ public class AssessmentSessionService {
     private static final int PARTIAL_TTL_HOURS = 24;
     private static final String SUBMITTED_KEY_PREFIX = "career9:submitted:";
     private static final int SUBMITTED_TTL_HOURS = 48;
+    private static final String PROCTORING_KEY_PREFIX = "career9:proctoring:";
+    private static final int PROCTORING_TTL_HOURS = 48;
 
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
@@ -395,6 +397,93 @@ public class AssessmentSessionService {
                 entries.add(entry);
             } catch (Exception e) {
                 logger.warn("Failed to parse submitted key: {}", key, e);
+            }
+        }
+
+        return entries;
+    }
+
+    // ── Proctoring Data Buffering (async save) ─────────────────────────────
+
+    /**
+     * Save proctoring payload to Redis for async processing.
+     * Called by /assessment-proctoring/save to return fast.
+     */
+    public void saveProctoringData(Long studentId, Long assessmentId, Map<String, Object> payload) {
+        String key = PROCTORING_KEY_PREFIX + studentId + ":" + assessmentId;
+        Map<String, Object> data = new HashMap<>(payload);
+        data.put("processingStatus", "pending");
+        data.put("submittedAt", Instant.now().toString());
+        data.put("retryCount", 0);
+        redisTemplate.opsForValue().set(key, data, PROCTORING_TTL_HOURS, TimeUnit.HOURS);
+        logger.info("Saved proctoring data to Redis for student={} assessment={}", studentId, assessmentId);
+    }
+
+    /**
+     * Retrieve proctoring payload from Redis.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getProctoringData(Long studentId, Long assessmentId) {
+        String key = PROCTORING_KEY_PREFIX + studentId + ":" + assessmentId;
+        Object value = redisTemplate.opsForValue().get(key);
+        if (value instanceof Map) {
+            return (Map<String, Object>) value;
+        }
+        return null;
+    }
+
+    /**
+     * Update the processing status of a proctoring entry.
+     */
+    @SuppressWarnings("unchecked")
+    public void updateProctoringStatus(Long studentId, Long assessmentId, String status) {
+        String key = PROCTORING_KEY_PREFIX + studentId + ":" + assessmentId;
+        Object value = redisTemplate.opsForValue().get(key);
+        if (value instanceof Map) {
+            Map<String, Object> payload = (Map<String, Object>) value;
+            payload.put("processingStatus", status);
+            Long ttl = redisTemplate.getExpire(key, TimeUnit.SECONDS);
+            if (ttl != null && ttl > 0) {
+                redisTemplate.opsForValue().set(key, payload, ttl, TimeUnit.SECONDS);
+            } else {
+                redisTemplate.opsForValue().set(key, payload, PROCTORING_TTL_HOURS, TimeUnit.HOURS);
+            }
+        }
+    }
+
+    /**
+     * Get all proctoring entries from Redis for retry scheduling.
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> getAllProctoringEntries() {
+        Set<String> keys = redisTemplate.keys(PROCTORING_KEY_PREFIX + "*");
+        List<Map<String, Object>> entries = new ArrayList<>();
+
+        if (keys == null || keys.isEmpty()) {
+            return entries;
+        }
+
+        for (String key : keys) {
+            try {
+                String[] parts = key.replace(PROCTORING_KEY_PREFIX, "").split(":");
+                if (parts.length != 2) continue;
+
+                Long studentId = Long.parseLong(parts[0]);
+                Long assessmentId = Long.parseLong(parts[1]);
+
+                Object value = redisTemplate.opsForValue().get(key);
+                if (!(value instanceof Map)) continue;
+
+                Map<String, Object> payload = (Map<String, Object>) value;
+                Map<String, Object> entry = new HashMap<>();
+                entry.put("userStudentId", studentId);
+                entry.put("assessmentId", assessmentId);
+                entry.put("processingStatus", payload.get("processingStatus"));
+                entry.put("submittedAt", payload.get("submittedAt"));
+                entry.put("retryCount", payload.get("retryCount"));
+                entries.add(entry);
+            } catch (Exception e) {
+                logger.warn("Failed to parse proctoring key: {}", key, e);
             }
         }
 
