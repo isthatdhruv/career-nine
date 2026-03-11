@@ -1808,7 +1808,7 @@ public class AssessmentAnswerController {
                 Long studentId = ((Number) entry.get("userStudentId")).longValue();
                 UserStudent student = userStudentRepository.findById(studentId).orElse(null);
                 if (student != null) {
-                    entry.put("studentName", student.getFirstName() + " " + student.getLastName());
+                    entry.put("studentName", student.getStudentInfo().getName() + " " + student.getStudentInfo().getFamily());
                 } else {
                     entry.put("studentName", "Unknown");
                 }
