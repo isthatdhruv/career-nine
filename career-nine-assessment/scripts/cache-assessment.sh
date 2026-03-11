@@ -26,8 +26,14 @@ sync_assessment() {
   local dir="${CACHE_DIR}/${id}"
   mkdir -p "$dir"
 
-  curl -sf "${BASE_URL}/assessments/getby/${id}" -o "${dir}/data.json"
-  curl -sf "${BASE_URL}/assessments/getById/${id}" -o "${dir}/config.json"
+  if ! curl -sf --connect-timeout 10 --max-time 60 "${BASE_URL}/assessments/getby/${id}" -o "${dir}/data.json"; then
+    echo "  ⚠ Failed to fetch data.json for assessment ${id}, keeping existing if available"
+    return 0
+  fi
+  if ! curl -sf --connect-timeout 10 --max-time 60 "${BASE_URL}/assessments/getById/${id}" -o "${dir}/config.json"; then
+    echo "  ⚠ Failed to fetch config.json for assessment ${id}, keeping existing if available"
+    return 0
+  fi
   echo "  ✓ Fetched assessment ${id} (data: $(wc -c < "${dir}/data.json")B, config: $(wc -c < "${dir}/config.json")B)"
 
   # Extract base64 images from JSON into separate files (saves ~3.5MB per assessment with images)
@@ -68,11 +74,15 @@ if [ -n "$ASSESSMENT_ID" ]; then
   sync_assessment "$ASSESSMENT_ID"
 else
   # Auto-sync all locked assessments
-  LOCKED_IDS=$(curl -sf "${BASE_URL}/assessments/locked-ids")
+  LOCKED_IDS=$(curl -sf --connect-timeout 10 --max-time 30 "${BASE_URL}/assessments/locked-ids" 2>/dev/null || true)
 
   if [ -z "$LOCKED_IDS" ] || [ "$LOCKED_IDS" = "[]" ]; then
-    echo "  No locked assessments found. Clearing cache."
-    rm -rf "$CACHE_DIR"
+    # If cache already exists (e.g. committed to git), keep it as-is
+    if [ -d "$CACHE_DIR" ] && [ "$(ls -A "$CACHE_DIR" 2>/dev/null)" ]; then
+      echo "  ⚠ API unreachable or no locked assessments. Keeping existing cache."
+      exit 0
+    fi
+    echo "  No locked assessments found and no existing cache."
     mkdir -p "$CACHE_DIR"
     exit 0
   fi
