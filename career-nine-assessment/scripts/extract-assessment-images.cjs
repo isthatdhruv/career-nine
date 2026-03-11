@@ -51,8 +51,29 @@ async function processFile(jsonFile) {
 
   for (const option of options) {
     if (!option.optionImageBase64 || option.optionImageBase64.trim() === '') continue;
-    // Skip if already extracted (URL path instead of base64)
-    if (option.optionImageBase64.startsWith('/')) continue;
+
+    // If already extracted as a URL path, check if we can upgrade .png → .webp
+    if (option.optionImageBase64.startsWith('/')) {
+      if (sharp && option.optionImageBase64.endsWith('.png')) {
+        const filename = path.basename(option.optionImageBase64);
+        const pngPath = path.join(imagesDir, filename);
+        const webpFilename = filename.replace(/\.png$/, '.webp');
+        const webpPath = path.join(imagesDir, webpFilename);
+
+        // Convert existing PNG file to WebP if not already done
+        if (fs.existsSync(pngPath) && !fs.existsSync(webpPath)) {
+          const pngBuffer = fs.readFileSync(pngPath);
+          const webpBuffer = await sharp(pngBuffer).webp({ quality: 80 }).toBuffer();
+          fs.writeFileSync(webpPath, webpBuffer);
+        }
+
+        if (fs.existsSync(webpPath)) {
+          option.optionImageBase64 = `/assessment-cache/${assessmentId}/images/${webpFilename}`;
+          extractedCount++;
+        }
+      }
+      continue;
+    }
 
     const optionId = option.optionId;
     const base64Str = option.optionImageBase64.replace(/^data:image\/\w+;base64,/, '');
@@ -94,6 +115,24 @@ async function extractImages() {
   const dataCount = await processFile(path.join(cacheDir, 'data.json'));
   const configCount = await processFile(path.join(cacheDir, 'config.json'));
   const total = dataCount + configCount;
+
+  // Clean up PNG files that have WebP replacements
+  if (sharp && fs.existsSync(imagesDir)) {
+    const files = fs.readdirSync(imagesDir);
+    let removedCount = 0;
+    for (const file of files) {
+      if (file.endsWith('.png')) {
+        const webpFile = file.replace(/\.png$/, '.webp');
+        if (files.includes(webpFile)) {
+          fs.unlinkSync(path.join(imagesDir, file));
+          removedCount++;
+        }
+      }
+    }
+    if (removedCount > 0) {
+      console.log(`  ✓ Cleaned up ${removedCount} PNG files (WebP replacements exist)`);
+    }
+  }
 
   if (total > 0) {
     console.log(`  ✓ Extracted images from assessment ${assessmentId} (data: ${dataCount}, config: ${configCount})`);
