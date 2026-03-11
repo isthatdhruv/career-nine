@@ -16,6 +16,7 @@ import { useFaceCounter } from "../hooks/useFaceCounter";
 import { useMouseClickTracker } from "../hooks/useMouseClickTracker";
 import { usePerQuestionProctoring } from "../hooks/usePerQuestionProctoring";
 import { submitProctoringData } from "../api/proctoringApi";
+import { savePartialAnswers } from "../api/assessmentApi";
 import type { ProctoringPayload } from "../types/proctoring";
 import { useHeartbeat } from "../hooks/useHeartbeat";
 
@@ -224,6 +225,19 @@ const SectionQuestionPage: React.FC = () => {
       setLanguages(questionnaireData.languages || []);
     }
   }, [sectionId, questionIndex, assessmentData]);
+
+  // Save answers to DB in background on every section transition (safety net)
+  const prevSectionIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevSectionIdRef.current && prevSectionIdRef.current !== sectionId) {
+      // Section changed — fire-and-forget save of ALL current answers to DB
+      const submission = generateSubmissionJSON();
+      if (submission.answers.length > 0) {
+        savePartialAnswers(submission);
+      }
+    }
+    prevSectionIdRef.current = sectionId!;
+  }, [sectionId]);
 
   // Debounced localStorage writes - batches all state into single write cycles
   useEffect(() => {
