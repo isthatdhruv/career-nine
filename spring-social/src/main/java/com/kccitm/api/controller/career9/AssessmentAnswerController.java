@@ -1652,4 +1652,127 @@ public class AssessmentAnswerController {
             ));
         }
     }
+
+    /**
+     * Lightweight partial save of student answers to DB on section change.
+     * Uses delete-and-replace strategy: deletes all existing answers for this
+     * student+assessment, then inserts all current answers.
+     * Does NOT calculate scores or change assessment status.
+     * Frontend calls this fire-and-forget on every section transition.
+     */
+    @Transactional
+    @PostMapping(value = "/save-partial", headers = "Accept=application/json")
+    public ResponseEntity<?> savePartialAnswers(@RequestBody Map<String, Object> submissionData) {
+        try {
+            if (submissionData.get("userStudentId") == null || submissionData.get("assessmentId") == null) {
+                return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
+            }
+            Long userStudentId = ((Number) submissionData.get("userStudentId")).longValue();
+            Long assessmentId = ((Number) submissionData.get("assessmentId")).longValue();
+
+            UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
+            AssessmentTable assessment = assessmentTableRepository.findById(assessmentId).orElse(null);
+            if (userStudent == null || assessment == null) {
+                return ResponseEntity.badRequest().body("Invalid userStudentId or assessmentId");
+            }
+
+            // Ensure mapping exists (find or create), do NOT change status
+            try {
+                studentAssessmentMappingRepository
+                        .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                        .orElseGet(() -> {
+                            StudentAssessmentMapping newMapping = new StudentAssessmentMapping();
+                            newMapping.setUserStudent(userStudent);
+                            newMapping.setAssessmentId(assessmentId);
+                            return studentAssessmentMappingRepository.save(newMapping);
+                        });
+            } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                // Race condition — mapping was created by another thread, that's fine
+            }
+
+            List<Map<String, Object>> answers = (List<Map<String, Object>>) submissionData.get("answers");
+            if (answers == null || answers.isEmpty()) {
+                return ResponseEntity.ok(Map.of("saved", 0, "status", "no_answers"));
+            }
+
+            // Bulk fetch questions and options (same pattern as /submit)
+            List<Long> questionIds = new ArrayList<>();
+            List<Long> optionIds = new ArrayList<>();
+            for (Map<String, Object> ansMap : answers) {
+                questionIds.add(((Number) ansMap.get("questionnaireQuestionId")).longValue());
+                if (ansMap.containsKey("optionId")) {
+                    optionIds.add(((Number) ansMap.get("optionId")).longValue());
+                }
+            }
+
+            Map<Long, QuestionnaireQuestion> questionCache = new HashMap<>();
+            if (!questionIds.isEmpty()) {
+                questionnaireQuestionRepository.findAllByIdIn(questionIds)
+                        .forEach(qq -> questionCache.put(qq.getQuestionnaireQuestionId(), qq));
+            }
+
+            Map<Long, AssessmentQuestionOptions> optionCache = new HashMap<>();
+            if (!optionIds.isEmpty()) {
+                assessmentQuestionOptionsRepository.findAllById(optionIds)
+                        .forEach(opt -> optionCache.put(opt.getOptionId(), opt));
+            }
+
+            // Build answer entities (NO score calculation)
+            List<AssessmentAnswer> answersToSave = new ArrayList<>();
+            int skippedCount = 0;
+
+            for (Map<String, Object> ansMap : answers) {
+                Long qId = ((Number) ansMap.get("questionnaireQuestionId")).longValue();
+                QuestionnaireQuestion question = questionCache.get(qId);
+
+                String textResponse = ansMap.containsKey("textResponse")
+                        ? (String) ansMap.get("textResponse")
+                        : null;
+
+                if (textResponse != null && question != null) {
+                    AssessmentAnswer ans = new AssessmentAnswer();
+                    ans.setUserStudent(userStudent);
+                    ans.setAssessment(assessment);
+                    ans.setQuestionnaireQuestion(question);
+                    ans.setTextResponse(textResponse);
+                    answersToSave.add(ans);
+                } else if (ansMap.containsKey("optionId")) {
+                    Long oId = ((Number) ansMap.get("optionId")).longValue();
+                    Integer rankOrder = ansMap.containsKey("rankOrder")
+                            ? ((Number) ansMap.get("rankOrder")).intValue()
+                            : null;
+
+                    AssessmentQuestionOptions option = optionCache.get(oId);
+                    if (question == null || option == null) {
+                        skippedCount++;
+                        continue;
+                    }
+
+                    AssessmentAnswer ans = new AssessmentAnswer();
+                    ans.setUserStudent(userStudent);
+                    ans.setAssessment(assessment);
+                    ans.setQuestionnaireQuestion(question);
+                    ans.setOption(option);
+                    if (rankOrder != null) {
+                        ans.setRankOrder(rankOrder);
+                    }
+                    answersToSave.add(ans);
+                }
+            }
+
+            // Delete-and-replace: remove old partial answers, then save current state
+            assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
+            assessmentAnswerRepository.saveAll(answersToSave);
+
+            return ResponseEntity.ok(Map.of(
+                    "status", "saved",
+                    "saved", answersToSave.size(),
+                    "skipped", skippedCount
+            ));
+
+        } catch (Exception e) {
+            logger.error("Partial save failed for student", e);
+            return ResponseEntity.status(500).body("Partial save failed: " + e.getMessage());
+        }
+    }
 }
