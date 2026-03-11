@@ -205,8 +205,7 @@ const DemographicDetailsPage: React.FC = () => {
         responses,
       };
 
-      // Stash demographics locally — sent with the final answer submission (zero extra requests)
-      sessionStorage.setItem('demographicsDraft', JSON.stringify(demographicPayload));
+      await http.post('/student-demographics/submit', demographicPayload);
 
       await Promise.all([
         http.post('/assessments/startAssessment', {
