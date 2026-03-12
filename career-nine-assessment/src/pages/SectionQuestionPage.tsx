@@ -244,14 +244,19 @@ const SectionQuestionPage: React.FC = () => {
     }
   }, [sectionId, questionIndex, assessmentData]);
 
-  // Save answers to DB in background on every section transition (safety net)
+  // Save answers to DB in background on section transitions (safety net)
+  // Only sends if answers have actually changed since last save.
   const prevSectionIdRef = useRef<string | null>(null);
+  const lastSavedAnswersRef = useRef<string>("");
   useEffect(() => {
     if (prevSectionIdRef.current && prevSectionIdRef.current !== sectionId) {
-      // Section changed — fire-and-forget save of ALL current answers to DB
       const submission = generateSubmissionJSON();
       if (submission.answers.length > 0) {
-        savePartialAnswers(submission);
+        const snapshot = JSON.stringify(submission.answers);
+        if (snapshot !== lastSavedAnswersRef.current) {
+          lastSavedAnswersRef.current = snapshot;
+          savePartialAnswers(submission);
+        }
       }
     }
     prevSectionIdRef.current = sectionId!;
@@ -774,6 +779,16 @@ const SectionQuestionPage: React.FC = () => {
   };
 
   const goToNextSection = () => {
+    // Save partial answers before leaving the current section
+    const submission = generateSubmissionJSON();
+    if (submission.answers.length > 0) {
+      const snapshot = JSON.stringify(submission.answers);
+      if (snapshot !== lastSavedAnswersRef.current) {
+        lastSavedAnswersRef.current = snapshot;
+        savePartialAnswers(submission);
+      }
+    }
+
     const idx = questionnaire.sections.findIndex(
       (s: any) => String(s.section.sectionId) === String(sectionId),
     );
@@ -843,7 +858,7 @@ const SectionQuestionPage: React.FC = () => {
                 Accept: "application/json",
               },
               body: JSON.stringify(submissionJSON),
-              signal: AbortSignal.timeout(30000), // 30s timeout
+              signal: AbortSignal.timeout(10000), // 10s timeout (async processing)
             },
           );
 
