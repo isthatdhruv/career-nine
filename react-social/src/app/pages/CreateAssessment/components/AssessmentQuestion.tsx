@@ -4,7 +4,7 @@ import { IconContext } from "react-icons";
 import { MdQuestionAnswer } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
-import { ReadQuestionsData, ReadQuestionsDataList } from "../../AssesmentQuestions/API/Question_APIs";
+import { ReadQuestionsDataList } from "../../AssesmentQuestions/API/Question_APIs";
 import { QuestionTable } from "../../AssesmentQuestions/components";
 import QuestionCreateModal from "../../AssesmentQuestions/components/QuestionCreateModal"; // Import modal
 

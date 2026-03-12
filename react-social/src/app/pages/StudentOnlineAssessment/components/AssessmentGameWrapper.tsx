@@ -21,15 +21,10 @@ export function AssessmentGameWrapper({
   const { saveAnimalReaction, saveRabbitPath, saveHydroTube } = useGameData();
 
   const handleGameComplete = useCallback(async (data: any) => {
-    console.log("=== Game Complete Handler Called ===");
-    console.log("Received data:", data);
-    console.log("Game code:", gameCode);
-
     try {
       // Save to Firestore via DataContext based on game type
       switch (gameCode) {
         case 101: // Jungle-Spot (Animal Reaction)
-          console.log("Saving Jungle-Spot via DataContext...");
           await saveAnimalReaction({
             totalTrials: data.totalTrials,
             trialMs: data.trialMs,
@@ -40,22 +35,18 @@ export function AssessmentGameWrapper({
             falsePositives: data.falsePositives,
             hitRTsMs: data.hitRTsMs || [],
           }, userStudentId);
-          console.log("✅ Jungle-Spot results saved via DataContext!");
           break;
 
         case 102: // Rabbit-Path
-          console.log("Saving Rabbit-Path via DataContext...");
           await saveRabbitPath({
             score: data.score,
             totalRounds: data.totalRounds,
             roundsPlayed: data.roundsPlayed,
             history: data.history,
           }, userStudentId);
-          console.log("✅ Rabbit-Path results saved via DataContext!");
           break;
 
         case 103: // Hydro-Tube
-          console.log("Saving Hydro-Tube via DataContext...");
           await saveHydroTube({
             patternsCompleted: data.patternsCompleted,
             totalPatterns: data.totalPatterns,
@@ -65,11 +56,10 @@ export function AssessmentGameWrapper({
             totalTiles: data.totalTiles,
             timeSpentSeconds: data.timeSpentSeconds,
           }, userStudentId);
-          console.log("✅ Hydro-Tube results saved via DataContext!");
           break;
 
         default:
-          console.warn("Unknown game code:", gameCode);
+          break;
       }
     } catch (error: any) {
       console.error("❌ Failed to save game results:", error);

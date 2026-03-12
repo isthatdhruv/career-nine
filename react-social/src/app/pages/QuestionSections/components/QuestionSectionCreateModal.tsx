@@ -1,6 +1,6 @@
 import clsx from "clsx";
 import { useFormik } from "formik";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Modal, Button } from "react-bootstrap";
 import * as Yup from "yup";
 import { CreateQuestionSectionData } from "../API/Question_Section_APIs";

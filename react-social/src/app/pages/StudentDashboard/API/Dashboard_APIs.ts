@@ -509,7 +509,6 @@ export async function fetchGameResults(studentId: number): Promise<RawGameResult
     const response = await axios.get(`${API_BASE_URL}/game-results/get/${studentId}`);
     return response.data;
   } catch (error) {
-    console.warn("Failed to fetch game results:", error);
     return null;
   }
 }
@@ -595,7 +594,6 @@ export async function getStudentAssessments(studentId: number): Promise<any[]> {
     const response = await axios.get(`${API_BASE_URL}/assessments/student/${studentId}`);
     return response.data;
   } catch (error) {
-    console.warn("Failed to fetch student assessments:", error);
     return [];
   }
 }
@@ -943,7 +941,6 @@ export async function getDashboardDataFromCache(
       dashboardData.cognitive = processGameResults(gameResults);
     }
   } catch (error) {
-    console.warn("Failed to fetch game results for cognitive data:", error);
   }
 
   // Enrich student info from legacy demographics endpoint (reads student_info table)
@@ -970,7 +967,6 @@ export async function getDashboardDataFromCache(
       siblingsCount: legacySibling ?? undefined,
     };
   } catch (error) {
-    console.warn("Failed to fetch student demographics:", error);
   }
 
   // Also check dynamic demographics (student_demographic_response table) to fill any missing fields.
@@ -1002,7 +998,6 @@ export async function getDashboardDataFromCache(
         }
       }
     } catch (error) {
-      console.warn("Failed to fetch dynamic demographics:", error);
     }
   }
 
@@ -1023,8 +1018,6 @@ export async function getDashboardData(studentId: number, assessmentId?: number 
       const studentResponse = await axios.get(`${API_BASE_URL}/student-info/getDemographics/${studentId}`);
       const studentData = studentResponse.data;
 
-      console.log("Student demographics fetched:", studentData);
-
       studentInfo = {
         userStudentId: studentId,
         name: studentData.name || "Student",
@@ -1037,7 +1030,6 @@ export async function getDashboardData(studentId: number, assessmentId?: number 
         schoolLogo: undefined,
       };
     } catch (error) {
-      console.warn("Failed to fetch student demographics, using fallback:", error);
       // Fallback student info if API fails
       studentInfo = {
         userStudentId: studentId,
@@ -1060,9 +1052,7 @@ export async function getDashboardData(studentId: number, assessmentId?: number 
     try {
       const cognitiveResponse = await axios.get(`${API_BASE_URL}/dashboard/game-results/${studentId}`, { params });
       cognitiveRaw = cognitiveResponse.data;
-      console.log("Cognitive data fetched:", cognitiveRaw);
     } catch (error) {
-      console.warn("Failed to fetch cognitive data, using demo data:", error);
       // Use demo data if API fails or no data available
       cognitiveRaw = {
         attention: {
@@ -1146,9 +1136,7 @@ export async function getDashboardData(studentId: number, assessmentId?: number 
     try {
       const socialResponse = await axios.get(`${API_BASE_URL}/dashboard/assessment-scores/${studentId}`, { params });
       socialRaw = socialResponse.data;
-      console.log("Social data fetched:", socialRaw);
     } catch (error) {
-      console.warn("Failed to fetch social data, using demo data:", error);
       // Use demo data if API fails or no data available
       socialRaw = {
         socialInsight: {
@@ -1234,9 +1222,7 @@ export async function getDashboardData(studentId: number, assessmentId?: number 
     try {
       const selfManagementResponse = await axios.get(`${API_BASE_URL}/dashboard/self-management/${studentId}`, { params });
       selfManagementRaw = selfManagementResponse.data;
-      console.log("Self-management data fetched:", selfManagementRaw);
     } catch (error) {
-      console.warn("Failed to fetch self-management data, using demo data:", error);
       // Use demo data if API fails or no data available
       selfManagementRaw = {
         selfEfficacy: {

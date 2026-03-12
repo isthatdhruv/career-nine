@@ -598,9 +598,6 @@ const SectionQuestionPage: React.FC = () => {
       try {
         // Generate the submission JSON
         const submissionJSON = generateSubmissionJSON();
-        console.log("=== ASSESSMENT SUBMISSION DATA ===");
-        console.log(JSON.stringify(submissionJSON, null, 2));
-        console.log("=== END OF SUBMISSION DATA ===");
 
         // Send POST request to backend
         const response = await fetch(`${process.env.REACT_APP_API_URL}/assessment-answer/submit`, {
@@ -618,8 +615,6 @@ const SectionQuestionPage: React.FC = () => {
         }
 
         const result = await response.json();
-        console.log("=== SUBMISSION SUCCESSFUL ===");
-        console.log("Saved answers:", result);
 
         // Submit proctoring data (non-blocking - failure does not prevent completion)
         try {
@@ -639,7 +634,6 @@ const SectionQuestionPage: React.FC = () => {
           };
 
           await submitProctoringData(proctoringPayload);
-          console.log("=== PROCTORING DATA SUBMITTED ===");
 
           // Clear proctoring localStorage
           localStorage.removeItem('proctoring_per_question');
@@ -862,7 +856,6 @@ const SectionQuestionPage: React.FC = () => {
           // Only add if not already selected
           if (!arr.includes(gameOption.optionId)) {
             const updated = [...arr, gameOption.optionId];
-            console.log(`✅ Game completed! Marking question ${qId} as answered with option ${gameOption.optionId}`);
             return {
               ...prev,
               [sectionId]: { ...sec, [qId]: updated },

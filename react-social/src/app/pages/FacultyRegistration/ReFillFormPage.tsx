@@ -233,7 +233,6 @@ const FacultyDetails = () => {
     facingMode: "user",
   };
   function validate() {
-    // console.log(formik.errors);
     var ret = "";
     return formik.errors;
   }

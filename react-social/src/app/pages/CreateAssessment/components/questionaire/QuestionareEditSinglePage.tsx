@@ -94,7 +94,6 @@ const QuestionareEditSinglePage: React.FC = () => {
     try {
       setLoadingStates(prev => ({ ...prev, questionnaire: true }));
       const response = await ReadQuestionaireById(id);
-      console.log("Fetched questionnaire data:", response.data);
       setQuestionnaireData(response.data);
     } catch (error) {
       console.error("Error fetching questionnaire:", error);
@@ -267,9 +266,6 @@ const QuestionareEditSinglePage: React.FC = () => {
       };
     }
 
-    console.log("=== INITIALIZING EDIT FORM ===");
-    console.log("Questionnaire Data:", questionnaireData);
-
     // Extract languages from questionnaire data - always include English
     const extractedLanguages = (questionnaireData.languages || []).map((l: any) =>
       l.language?.languageName || l.languageName || ""
@@ -293,8 +289,6 @@ const QuestionareEditSinglePage: React.FC = () => {
     if (!instructions["English"]) {
       instructions["English"] = "";
     }
-
-    console.log("Initialized instructions:", instructions);
 
     // Extract section IDs
     const sectionIds = (questionnaireData.sections || []).map((s: any) =>
@@ -340,8 +334,6 @@ const QuestionareEditSinglePage: React.FC = () => {
       }
     });
 
-    console.log("Initialized section instructions:", sectionInstructions);
-
     // Extract tool ID - handle all possible field name variations
     const extractedToolId = String(
       questionnaireData.tool?.toolId ||
@@ -350,8 +342,6 @@ const QuestionareEditSinglePage: React.FC = () => {
       questionnaireData.toolId ||
       ""
     );
-
-    console.log("Extracted tool ID:", extractedToolId);
 
     return {
       name: questionnaireData.name || "",
@@ -399,7 +389,6 @@ const QuestionareEditSinglePage: React.FC = () => {
 
           // Language object must be valid
           if (!langObj || !langObj.languageId) {
-            console.warn(`Language not found for general instructions: ${langName}`);
             return null;
           }
 
@@ -413,8 +402,6 @@ const QuestionareEditSinglePage: React.FC = () => {
           };
         })
         .filter((lang: any) => lang !== null);
-
-      console.log("Languages payload (with instructions):", languagesPayload);
 
       // Build the sections array with questions and instructions
       const sectionsPayload = (values.sectionIds || []).map((sectionId: string, sectionIdx: number) => {
@@ -491,7 +478,6 @@ const QuestionareEditSinglePage: React.FC = () => {
 
             // Language object must be valid
             if (!langObj || !langObj.languageId) {
-              console.warn(`Language not found for: ${langName}`);
               return null;
             }
 
@@ -505,8 +491,6 @@ const QuestionareEditSinglePage: React.FC = () => {
             };
           })
           .filter((inst: any) => inst !== null); // Remove null entries
-
-        console.log(`Section ${sectionId} instructions payload:`, instructionPayload);
 
         return {
           questionnaireSectionId: existingSection?.questionnaireSectionId || null,
@@ -531,9 +515,6 @@ const QuestionareEditSinglePage: React.FC = () => {
         sections: sectionsPayload,
         createdAt: questionnaireData?.createdAt || ""
       };
-      
-      console.log("=== UPDATE QUESTIONNAIRE PAYLOAD ===");
-      console.log(JSON.stringify(completePayload, null, 2));
       
       const response = await UpdateQuestionaire(String(id), completePayload); // change it to complete payload afterwards
       if (response.status === 200 || response.status === 201) {
@@ -657,8 +638,6 @@ const QuestionareEditSinglePage: React.FC = () => {
           onSubmit={handleSubmit}
         >
           {({ errors, touched, values, setFieldValue }) => {
-            // Debug log to verify values are being set
-            console.log("=== FORMIK VALUES ===", values);
             return (
             <>
               <Form className="form w-100 fv-plugins-bootstrap5 fv-plugins-framework">

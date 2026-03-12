@@ -5,7 +5,7 @@ import { MdQuestionAnswer } from "react-icons/md";
 import { FaRecycle } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { ReadQuestionSectionData } from "../QuestionSections/API/Question_Section_APIs";
-import { ReadQuestionsData, ReadQuestionsDataList } from "./API/Question_APIs";
+import { ReadQuestionsDataList } from "./API/Question_APIs";
 import { QuestionTable } from "./components";
 import QuestionRecycleBinModal from "./components/QuestionRecycleBinModal";
 

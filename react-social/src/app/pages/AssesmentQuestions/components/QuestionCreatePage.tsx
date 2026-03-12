@@ -258,7 +258,6 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
             e.preventDefault();
             setLoading(true);
             try {
-              console.log("Submitting form. optionMeasuredQualities state:", optionMeasuredQualities);
               // Build options array with optionScores
               let options: any[] = [];
               
@@ -321,7 +320,6 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                 flag: useMQTAsOptions ? 1 : 0
               };
 
-              console.log("Payload to submit:", payload);
               await CreateQuestionData(payload);
               setFormikValues(initialValues);
               setOptionMeasuredQualities({});

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import { Spinner, Button, Form, Badge, Alert } from "react-bootstrap";
 import * as XLSX from "xlsx";
-import { ReadCollegeData, GetSessionsByInstituteCode } from "../College/API/College_APIs";
+import { ReadCollegeData } from "../College/API/College_APIs";
 import { getAssessmentMappingsByInstitute, getAssessmentSummaryList } from "../AssessmentMapping/API/AssessmentMapping_APIs";
 import { getOfflineMapping, bulkSubmitByRollNumber } from "./API/OfflineUpload_APIs";
 

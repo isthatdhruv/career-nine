@@ -40,7 +40,7 @@ const CareerTable = (props: { data: any; setLoading: any; setPageLoading: any; }
         } catch (error) {
           // Handle 404 errors gracefully (career might have been deleted)
           if ((error as any)?.response?.status === 404) {
-            console.log(`Career ${career.career_id} not found, skipping...`);
+            // Career not found, skipping
           } else {
             console.error(`Error loading quality types for career ${career.career_id}:`, error);
           }
@@ -63,7 +63,6 @@ const CareerTable = (props: { data: any; setLoading: any; setPageLoading: any; }
     const deselected = currentValue.filter(typeId => !newValue.includes(typeId));
     try {
       for (const typeId of newlySelected) {
-        console.log('Assigning type to career_id:', career_id);
         await AssignMeasuredQualityTypeToCareer(typeId, career_id);
       }
       for (const typeId of deselected) {

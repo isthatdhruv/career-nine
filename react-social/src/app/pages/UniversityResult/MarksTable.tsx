@@ -1,10 +1,7 @@
-import { useState } from "react";
-import { Dropdown1 } from "../../../_metronic/partials";
 // var _ = require('underscore');
 
 const MarksTable = (props: { sem: any; result: any }) => {
   // var [data2, setData2] = useState();
-  // console.log(props.result, "hi")
 
   return (
     <>

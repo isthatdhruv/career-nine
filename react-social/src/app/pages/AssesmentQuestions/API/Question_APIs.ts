@@ -60,7 +60,6 @@ export function CreateQuestionData(values: any) {
   // };
   // delete requestData.sectionId; // Remove the flat sectionId
   // delete requestData.questionOptions; // Remove the original field
-  // console.log("Sending to backend:", requestData);
   return axios.post(createQuestion, values);
 }
 
@@ -134,7 +133,6 @@ export async function ExportQuestionsToExcel() {
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
 
-    console.log('Excel file downloaded successfully');
   } catch (error) {
     console.error('Error downloading Excel file:', error);
     throw error; // Re-throw so calling component can handle it

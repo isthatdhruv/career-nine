@@ -234,8 +234,6 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
         section: { sectionId: Number(formikValues.sectionId) },
         flag : useMQTAsOptions ? 1 : 0
       };
-      console.log(payload);
-
       await CreateQuestionData(payload);
       setFormikValues(initialValues);
       setOptionMeasuredQualities({});

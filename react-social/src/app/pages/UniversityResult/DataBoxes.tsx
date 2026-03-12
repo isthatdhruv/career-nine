@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 
 export default function DataBoxes(props: { data }) {
-  // console.log(props.data)
   return (
     <>
       <div className="col-xl-4">

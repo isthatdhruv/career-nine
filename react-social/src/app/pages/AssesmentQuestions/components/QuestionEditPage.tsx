@@ -6,7 +6,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
-import { ReadQuestionSectionData, ReadQuestionSectionDataList } from "../../QuestionSections/API/Question_Section_APIs";
+import { ReadQuestionSectionDataList } from "../../QuestionSections/API/Question_Section_APIs";
 import { CreateQuestionData, UpdateQuestionData, ReadMeasuredQualityTypes, ReadQuestionByIdData } from "../API/Question_APIs";
 import { ListGamesData } from "../../Games/components/API/GAME_APIs";
 import { CheckLockedByQuestion } from "../../CreateAssessment/API/Create_Assessment_APIs";
@@ -239,7 +239,6 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
         if (id) {
           try {
             const questionResponse = await ReadQuestionByIdData(id);
-            console.log("Fetched question data:", questionResponse.data);
             const fetchedQuestion = questionResponse.data;
 
             questionDataResult = {
@@ -253,7 +252,6 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                 ? fetchedQuestion.options.map((option: any) => option.optionText || option)
                 : [{ optionText: "", optionDescription: "", correct: false, sequence: 1 }],
             };
-            // console.log("Processed data with section:", questionDataResult.section);
           } catch (error) {
             console.error("Error fetching question:", error);
             const locationData = (locationStateRef.current as any)?.data;
@@ -296,7 +294,6 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
         let sectionsResult: any[] = [];
         try {
           const response = await ReadQuestionSectionDataList();
-          console.log("Fetched sections for edit:", response.data);
           sectionsResult = response.data;
         } catch (error) {
           console.error("Error fetching sections:", error);
@@ -307,7 +304,6 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
         let mqtResult: any[] = [];
         try {
           const response = await ReadMeasuredQualityTypes();
-          console.log("Fetched measured quality types:", response.data);
           mqtResult = response.data;
         } catch (error) {
           console.error("Error fetching measured quality types:", error);
@@ -383,7 +379,6 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
     },
     // validationSchema: validationSchema,
     onSubmit: async (values) => {
-      console.log("Submitting form with values:", values);
       setLoading(true);
       try {
         // Sort options by sequence before processing
@@ -445,7 +440,6 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
           section: { sectionId: values.section.sectionId },
         };
 
-        console.log("Submitting payload:", payload);
         const questionId = values.questionId || values.id;
         if (questionId) {
           await UpdateQuestionData(questionId, payload);
@@ -476,12 +470,6 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
     },
   });
 
-  // Debug effect to log formik values
-  // useEffect(() => {
-  //   console.log("Current questionData:", questionData);
-  //   console.log("Current formik section:", formik.values.section);
-  //   console.log("Available sections:", sections);
-  // }, [questionData, formik.values.section, sections]);
 
   if (loading) {
     return (
@@ -557,9 +545,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
   const updateOptionDescription = (sequence: number, value: string) => {
     const currentOptions = [...formik.values.options];
     const optionIndex = currentOptions.findIndex(opt => opt.sequence === sequence);
-    console.log("Updating description for option index:", optionIndex, "with value:", value);
     if (optionIndex !== -1) {
-          console.log("Before update:", currentOptions[optionIndex]);
 
       currentOptions[optionIndex].optionDescription = value;
       formik.setFieldValue("options", currentOptions);
@@ -684,7 +670,6 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                 onChange={e => {
                   const selectedSectionId = e.target.value;
                   formik.setFieldValue("section", { sectionId: selectedSectionId });
-                  console.log("Selected section ID:", selectedSectionId);
                 }}
                 className={clsx(
                   "form-control form-control-lg form-control-solid",

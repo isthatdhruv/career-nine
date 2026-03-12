@@ -22,7 +22,6 @@ export const translateOption = async (text: string, targetLanguage: string, sour
       targetLanguage,
       sourceLanguage
     });
-    console.log(response);
     return response.data.translated;
   } catch (error) {
     console.error("Error translating option:", error);

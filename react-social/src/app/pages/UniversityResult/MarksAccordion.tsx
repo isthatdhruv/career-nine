@@ -2,7 +2,6 @@ import Accordion from "react-bootstrap/Accordion";
 import MarksTable from "./MarksTable";
 
 const MarksAccordion = (props: { sem: any; result: any }) => {
-  // console.log(props.sem)
   return (
     <>
       <Accordion defaultActiveKey="0">

@@ -73,7 +73,6 @@ const QuestionSectionEditPage = (props?: {
           ...values,
           sectionId: values.sectionId || id
         };
-        console.log("Updating question section with values:", updateData);
         await UpdateQuestionSectionData(updateData);
         navigate("/question-sections"); // Navigate to question sections list
         if (props?.setPageLoading) {

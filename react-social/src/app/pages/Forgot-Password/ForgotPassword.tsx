@@ -24,7 +24,6 @@ const ForgotPassword = () => {
     validationSchema: serchSchema,
 
     onSubmit: (data, { setStatus, setSubmitting }) => {
-      // console.log(data.searchname);
       setLoading(true);
       try {
         findemail(data.searchname).then((data1) => {
@@ -40,9 +39,7 @@ const ForgotPassword = () => {
                 return;
               }
             });
-            // console.log(emailsfound)
             setListEmail(emailsfound);
-            // console.log(namesfound)
             setName(namesfound);
           });
           setLoading(false);

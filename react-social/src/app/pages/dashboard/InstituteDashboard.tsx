@@ -1,4 +1,4 @@
-import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FC, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { useNavigate, useParams } from "react-router-dom";
 import Chart from "react-apexcharts";
@@ -2162,15 +2162,13 @@ const InstituteDashboard: FC = () => {
   useEffect(() => {
     if (id) {
       localStorage.setItem('instituteId', id);
-      localStorage.setItem('instituteName', ''); // Placeholder for institute name
-      console.log('Institute ID saved to localStorage:', id);
+      localStorage.setItem('instituteName', '');
 
       setIsLoading(true);
       // Fetch students with full data
       getStudentsWithMappingByInstituteId(Number(id))
         .then(response => {
           setStudents(response.data);
-          console.log('Students fetched:', response.data.length);
         })
         .catch(error => {
           console.error('Error fetching students:', error);

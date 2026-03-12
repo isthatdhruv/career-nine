@@ -4,7 +4,6 @@ export {};
 // import { average, median, mode, range } from "statistics.ts";
 
 // export var student_data = (data, filter) => {
-//   console.log("Student Data");
 
 //   data = filter_new(data, filter);
 
@@ -88,7 +87,6 @@ export {};
 //       insert_col_heading_total
 //     );
 //   });
-//   console.log(data);
 
 //   return { data: data, col_data: col };
 // };
@@ -144,12 +142,10 @@ export {};
 //     return list;
 //   });
 // };
-// // //console.log(names[0].result);
 
 // export var courses = (data) => {
 //   return _.unique(
 //     _.map(data, (list) => {
-//       // //console.log(list);
 //       return list.course;
 //     })
 //   );
@@ -158,7 +154,6 @@ export {};
 // export var branches = (data) => {
 //   var data = _.unique(
 //     _.map(data, (list) => {
-//       // //console.log(list);
 //       return list.branch;
 //     })
 //   );
@@ -195,9 +190,7 @@ export {};
 //     )
 //   );
 // };
-// // //console.log(semesters)
 // export var data_end = (courses1, branch1, session1, semester1) => {
-//   // //console.log(courses1, branch1, session1, semester1)
 //   return _.map(courses1, (course) => {
 //     return {
 //       name: course,
@@ -219,12 +212,9 @@ export {};
 //     };
 //   });
 // };
-// //   //console.log(_where(_.where(data, {"course": "(04) B.TECH"},{"rw"})))
-// // //console.log(_.map(data,(list)=>{return list.result}))
 
 // export var filter_new = (data, filer) => {
 //   data = names(data);
-//   // //console.log(data);
 //   var te = _.flatten(
 //     _.map(data, (list) => {
 //       return list.result;
@@ -243,14 +233,13 @@ export {};
 //     sem_result = _.where(te, filer);
 //   }
 //   var total_students = sem_result.length;
-//   var studnetData = []; // //console.log(pass_percent(0));\
+//   var studnetData = [];
 
 //   return sem_result;
 // };
 
 // export var filter = (data, filer, cp) => {
 //   data = names(data);
-//   // //console.log(data);
 //   var te = _.flatten(
 //     _.map(data, (list) => {
 //       return list.result;
@@ -295,12 +284,11 @@ export {};
 // //   return carryPaper;
 // // }, {});
 
-// console.log(carry_paper);
 
 //   // global_carry_paper=carry_paper;
 
 //   var total_students = sem_result.length;
-//   var studnetData = []; // //console.log(pass_percent(0));\
+//   var studnetData = [];
 
 //   // // Box Data
 //   //  var all_cleared_percent=(carry_paper[0]/total_students)*100;
@@ -324,18 +312,13 @@ export {};
 // // var global_carry_paper;
 // export var boxes_data = (data, filer1) => {
 //   data = names(data);
-//   // //console.log(data);
 //   var te = _.flatten(
 //     _.map(data, (list) => {
 //       return list.result;
 //     })
 //   );
 //   var sem_result: any[] = [];
-//   console.log("box_data")
-//   console.log("Here it is supposed to be filer 2")
-//   console.log(filer1)
 //   if (filer1.branch_many && filer1.branch_many.length > 0) {
-//     console.log("I am here")
 //     var temp = filer1.branch_many
 //     _.each(temp, (data) => {
 //      delete filer1.branch_many;
@@ -370,8 +353,6 @@ export {};
 //   }, [0, 0, 0, 0, 0, 0, 0]);
 
 //   // global_carry_paper=carry_paper;
-//   console.log('sem result');
-//   console.log(sem_result);
 //   var total_students = sem_result.length;
 //   var means = sum / total_students;
 //   var mean = means.toFixed(2);
@@ -392,15 +373,12 @@ export {};
 //   var sem_result_sorted_sgpa = _.sortBy(sem_result, (data) => {
 //     return sgpa;
 //   });
-//   console.log("sem_result_sorted_sgpa");
 
-//   console.log(sem_result_sorted_sgpa)
 //   var lowest_name = sem_result_sorted_sgpa[0].name;
 //   var highest_name = sem_result_sorted_sgpa[sem_result_sorted_sgpa.length - 1].name;
 
 //   sgpa.shift();
 
-//   //console.log('sort',)
 //   if (sgpa.length == 0) median1 = 0.0;
 //   else if (sgpa.length <= 2) median1 = sgpa[0];
 //   else {
@@ -528,7 +506,6 @@ export {};
 //       name: dataSubject,
 //     });
 
-//     // console.log()
 
 //     var studnets_fail = _.filter(subjectMarksRawData, (data) => {
 //       return data.grade == "F";
@@ -558,9 +535,6 @@ export {};
 //     var sgpa_sorted = _.sortBy(subjectMarksRawData, function (sgpa) {
 //       return sgpa;
 //     });
-//     // console.log(dataSubject)
-//     // console.log(subjectMarksRawData)
-//     // console.log( "external_marks_array",external_marks_array);
 //     var boxSubjects = {};
 //     // _.each(subjectMarksRawData, (data1) => {
 //     boxSubjects = {
@@ -661,7 +635,6 @@ export {};
 
 //     // })
 //   });
-//   //console.log(boxsubject)
 
 //   return {
 //     boxs_data: boxsubject,
@@ -684,7 +657,6 @@ export {};
 //       name: dataSubject,
 //     });
 
-//     // console.log()
 
 //     var studnets_fail = _.filter(subjectMarksRawData, (data) => {
 //       return data.grade == "F";
@@ -708,9 +680,6 @@ export {};
 //         return external;
 //       }
 //     );
-//     // console.log(dataSubject)
-//     // console.log(subjectMarksRawData)
-//     // console.log( "external_marks_array",external_marks_array);
 //     // var boxSubjects = {};
 //     // _.each(subjectMarksRawData, (data1) => {
 //     var boxSubjects = {
@@ -777,7 +746,6 @@ export {};
 //           import { average, median, mode, range } from "statistics.ts";
           
 //           export var student_data = (data, filter) => {
-//             console.log("Student Data");
           
 //             data = filter_new(data, filter);
           
@@ -861,7 +829,6 @@ export {};
 //                 insert_col_heading_total
 //               );
 //             });
-//             console.log(data);
           
 //             return { data: data, col_data: col };
 //           };
@@ -917,12 +884,10 @@ export {};
 //               return list;
 //             });
 //           };
-//           // //console.log(names[0].result);
           
 //           export var courses = (data) => {
 //             return _.unique(
 //               _.map(data, (list) => {
-//                 // //console.log(list);
 //                 return list.course;
 //               })
 //             );
@@ -931,7 +896,6 @@ export {};
 //           export var branches = (data) => {
 //             var data = _.unique(
 //               _.map(data, (list) => {
-//                 // //console.log(list);
 //                 return list.branch;
 //               })
 //             );
@@ -968,9 +932,7 @@ export {};
 //               )
 //             );
 //           };
-//           // //console.log(semesters)
 //           export var data_end = (courses1, branch1, session1, semester1) => {
-//             // //console.log(courses1, branch1, session1, semester1)
 //             return _.map(courses1, (course) => {
 //               return {
 //                 name: course,
@@ -992,12 +954,9 @@ export {};
 //               };
 //             });
 //           };
-//           //   //console.log(_where(_.where(data, {"course": "(04) B.TECH"},{"rw"})))
-//           // //console.log(_.map(data,(list)=>{return list.result}))
           
 //           export var filter_new = (data, filer) => {
 //             data = names(data);
-//             // //console.log(data);
 //             var te = _.flatten(
 //               _.map(data, (list) => {
 //                 return list.result;
@@ -1016,14 +975,13 @@ export {};
 //               sem_result = _.where(te, filer);
 //             }
 //             var total_students = sem_result.length;
-//             var studnetData = []; // //console.log(pass_percent(0));\
+//             var studnetData = [];
           
 //             return sem_result;
 //           };
           
 //           export var filter = (data, filer, cp) => {
 //             data = names(data);
-//             // //console.log(data);
 //             var te = _.flatten(
 //               _.map(data, (list) => {
 //                 return list.result;
@@ -1068,12 +1026,11 @@ export {};
 //           //   return carryPaper;
 //           // }, {});
           
-//           console.log(carry_paper);
           
 //             // global_carry_paper=carry_paper;
           
 //             var total_students = sem_result.length;
-//             var studnetData = []; // //console.log(pass_percent(0));\
+//             var studnetData = [];
           
 //             // // Box Data
 //             //  var all_cleared_percent=(carry_paper[0]/total_students)*100;
@@ -1097,18 +1054,13 @@ export {};
 //           // var global_carry_paper;
 //           export var boxes_data = (data, filer1) => {
 //             data = names(data);
-//             // //console.log(data);
 //             var te = _.flatten(
 //               _.map(data, (list) => {
 //                 return list.result;
 //               })
 //             );
 //             var sem_result: any[] = [];
-//             console.log("box_data")
-//             console.log("Here it is supposed to be filer 2")
-//             console.log(filer1)
 //             if (filer1.branch_many && filer1.branch_many.length > 0) {
-//               console.log("I am here")
 //               var temp = filer1.branch_many
 //               _.each(temp, (data) => {
 //                delete filer1.branch_many;
@@ -1143,8 +1095,6 @@ export {};
 //             }, [0, 0, 0, 0, 0, 0, 0]);
           
 //             // global_carry_paper=carry_paper;
-//             console.log('sem result');
-//             console.log(sem_result);
 //             var total_students = sem_result.length;
 //             var means = sum / total_students;
 //             var mean = means.toFixed(2);
@@ -1165,15 +1115,12 @@ export {};
 //             var sem_result_sorted_sgpa = _.sortBy(sem_result, (data) => {
 //               return sgpa;
 //             });
-//             console.log("sem_result_sorted_sgpa");
           
-//             console.log(sem_result_sorted_sgpa)
 //             var lowest_name = sem_result_sorted_sgpa[0].name;
 //             var highest_name = sem_result_sorted_sgpa[sem_result_sorted_sgpa.length - 1].name;
           
 //             sgpa.shift();
           
-//             //console.log('sort',)
 //             if (sgpa.length == 0) median1 = 0.0;
 //             else if (sgpa.length <= 2) median1 = sgpa[0];
 //             else {
@@ -1301,7 +1248,6 @@ export {};
 //                 name: dataSubject,
 //               });
           
-//               // console.log()
           
 //               var studnets_fail = _.filter(subjectMarksRawData, (data) => {
 //                 return data.grade == "F";
@@ -1331,9 +1277,6 @@ export {};
 //               var sgpa_sorted = _.sortBy(subjectMarksRawData, function (sgpa) {
 //                 return sgpa;
 //               });
-//               // console.log(dataSubject)
-//               // console.log(subjectMarksRawData)
-//               // console.log( "external_marks_array",external_marks_array);
 //               var boxSubjects = {};
 //               // _.each(subjectMarksRawData, (data1) => {
 //               boxSubjects = {
@@ -1434,7 +1377,6 @@ export {};
           
 //               // })
 //             });
-//             //console.log(boxsubject)
           
 //             return {
 //               boxs_data: boxsubject,
@@ -1457,7 +1399,6 @@ export {};
 //                 name: dataSubject,
 //               });
           
-//               // console.log()
           
 //               var studnets_fail = _.filter(subjectMarksRawData, (data) => {
 //                 return data.grade == "F";
@@ -1481,9 +1422,6 @@ export {};
 //                   return external;
 //                 }
 //               );
-//               // console.log(dataSubject)
-//               // console.log(subjectMarksRawData)
-//               // console.log( "external_marks_array",external_marks_array);
 //               // var boxSubjects = {};
 //               // _.each(subjectMarksRawData, (data1) => {
 //               var boxSubjects = {

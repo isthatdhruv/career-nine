@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import MUIDataTable from "mui-datatables";
-import _ from "underscore";
 export default function AllStudnetUniversityResultTable(props: {
   tableData: any,tableCol:any
 }) {

@@ -7,7 +7,6 @@ import { MasterLayout } from "../../_metronic/layout/MasterLayout";
 import { useAuth } from "../modules/auth";
 import CareerPage from "../pages/Career/CareerPage";
 import { CareerCreatePage, CareerEditPage } from "../pages/Career/components";
-import { DashboardWrapper } from "../pages/dashboard/DashboardWrapper";
 import FacultyRegistrationDetails from "../pages/FacultyRegistration/FacultyRegistrationDetails";
 import FacultyRegistrationForm from "../pages/FacultyRegistration/FacultyRegistrationForm";
 import { MeasuredQualitiesEditPage } from "../pages/MeasuredQualities/components";
@@ -31,7 +30,6 @@ import AssessmentUploadFile from "../pages/CreateAssessment/components/Assessmen
 import AssessmentSection from "../pages/CreateAssessment/components/AssessmentSection";
 import AssessmentQuestion from "../pages/CreateAssessment/components/AssessmentQuestion";
 import ContactPersonCreatePage from "../pages/ContactPerson/components/ContactPersonCreatePage";
-import { ContactPersonEditPage } from "../pages/ContactPerson/components";
 import ContactPersonPage from "../pages/ContactPerson/ContactPersonPage";
 import LoginPage from "../pages/Login/components/LoginPage";
 import LoginEnterEmail from "../pages/Login/components/LoginEnterEmail";
@@ -42,12 +40,7 @@ import UserRegistration from "../pages/Users/components/UserRegistration";
 import ListCreatePage from "../pages/List/components/ListCreatePage";
 import ListEditPage from "../pages/List/components/ListEditPage";
 import ListPage from "../pages/List/CreateList";
-import Assessment from "../pages/StudentOnlineAssessment/components/SelectSectionPage";
-import SelectSectionPage from "../pages/StudentOnlineAssessment/components/SelectSectionPage";
-import SectionInstructionPage from "../pages/StudentOnlineAssessment/components/SectionInstructionPage";
 import { SchoolDashboardPage } from "../pages/dashboard/SchoolDashboardPage";
-import SectionQuestionPage from "../pages/StudentOnlineAssessment/components/SectionQuestionPage";
-import studentsList from "../pages/StudentInformation/StudentsList";
 // import QuestionaireList from "../pages/CreateAssessment/components/questionaire/QuestionaireListPage";
 import QuestionaireListPage from "../pages/CreateAssessment/components/questionaire/QuestionaireListPage";
 import StudentsList from "../pages/StudentInformation/StudentsList";
@@ -58,17 +51,12 @@ import GroupStudentAdminPage from "../pages/GroupStudent/GroupStudentAdminPage";
 import GroupStudentSchoolPage from "../pages/GroupStudent/GroupStudentSchoolPage";
 import AssignedStudentsPage from "../pages/GroupStudent/AssignedStudentsPage";
 import ReportGenerationPage from "../pages/ReportGeneration/ReportGenerationPage";
-import StudentLoginPage from "../pages/StudentLogin/StudentLoginPage";
-import AllottedAssessmentPage from "../pages/StudentLogin/AllottedAssessmentPage";
 import GamePage from "../pages/Games/GamePage";
 import DemographicFieldsPage from "../pages/DemographicFields/DemographicFieldsPage";
 import DemographicFieldCreatePage from "../pages/DemographicFields/components/DemographicFieldCreatePage";
 import DemographicFieldEditPage from "../pages/DemographicFields/components/DemographicFieldEditPage";
 // import QuestionareEditSinglePage from "../pages/CreateAssessment/components/questionaire/QuestionareEditSinglePage";
 import DashboardAdminPage from "../pages/demo-dashboard-v2/dashboard-admin";
-import DemographicDetailsPage from "../pages/StudentLogin/DemographicDetailsPage";
-import ThankYouPage from "../pages/StudentOnlineAssessment/components/ThankYouPage";
-import GeneralInstructionsPage from "../pages/StudentOnlineAssessment/components/GeneralInstructionsPage";
 import InstituteDashboard from "../pages/dashboard/InstituteDashboard";
 import ActivityLogPage from "../pages/ActivityLog/ActivityLogPage";
 import LeadsPage from "../pages/Leads/LeadsPage";
@@ -76,7 +64,6 @@ import ReportsPage from "../pages/Reports/ReportsPage";
 import StudentDashboard from "../pages/StudentDashboard/StudentDashboard";
 import ClassTeacherDashboard from "../pages/ClassTeacherDashboard/ClassTeacherDashboard";
 import { Error401 } from "../modules/errors/components/Error401";
-import _ from "lodash";
 
 // Paths that every logged-in user can access without role check
 const ALWAYS_ALLOWED = [
@@ -101,7 +88,6 @@ const AuthorizedLayout = () => {
 
   if (!isAlwaysAllowed) {
     const authorityUrls: string[] = currentUser?.authorityUrls ?? [];
-    console.log("User's authority URLs:", authorityUrls);
 
     const isAuthorized = authorityUrls.some((pattern) => {
       // If pattern contains *, convert to regex
@@ -181,13 +167,9 @@ const PrivateRoutes = () => {
     () => import("../pages/MeasuredQualities/MeasuredQualities")
   );
   const Tools = lazy(() => import("../pages/Tool/CreateTool"));
-  const List = lazy(() => import("../pages/List/CreateList"));
   const College = lazy(() => import("../pages/College/CollegePage"));
   // Update the import path below to the correct location if the file exists elsewhere
   const CollegeCreatePage = lazy(() => import("../pages/College/CollegePage"));
-  const CollegeEditPage = lazy(
-    () => import("../pages/College/components/CollegeEditModal")
-  );
   const AssessmentQuestions = lazy(
     () => import("../pages/AssesmentQuestions/CreateQuestion")
   );
