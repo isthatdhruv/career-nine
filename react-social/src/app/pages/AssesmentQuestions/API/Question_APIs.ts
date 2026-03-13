@@ -67,6 +67,28 @@ export function UpdateQuestionData(id: any, values: any) {
   return axios.put(`${updateQuestion}/${id}`, values);
 }
 
+/**
+ * Upload question media (image/video) to DigitalOcean Spaces via backend.
+ * @param base64Data - The base64-encoded data URL (e.g. "data:image/webp;base64,...")
+ * @param mediaType - "image" or "video"
+ * @returns Promise with { url: string } - the CDN URL of the uploaded file
+ */
+export async function UploadQuestionMedia(base64Data: string, mediaType: 'image' | 'video') {
+  const response = await axios.post(`${API_URL}/question-media/upload`, {
+    base64Data,
+    mediaType,
+  });
+  return response.data as { url: string };
+}
+
+/**
+ * Delete question media from DigitalOcean Spaces.
+ * @param url - The full CDN URL of the file to delete
+ */
+export async function DeleteQuestionMedia(url: string) {
+  return axios.delete(`${API_URL}/question-media/delete`, { params: { url } });
+}
+
 export function DeleteQuestionData(id: any) {
   return axios.delete(deleteQuestion + id);
 }

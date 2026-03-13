@@ -1303,6 +1303,24 @@ const QuestionareEditSinglePage: React.FC = () => {
                                 return (
                                   <li key={questionId} className="list-group-item px-0">
                                     <p className="fw-bold mb-2">{index + 1}. {question ? question.questionText : `Question not found`}</p>
+                                    {question && question.questionImageUrl && (
+                                      <div className="mb-2 ps-4">
+                                        <img
+                                          src={question.questionImageUrl}
+                                          alt="Question"
+                                          style={{ maxWidth: "100%", maxHeight: 300, borderRadius: 8, objectFit: "contain" }}
+                                        />
+                                      </div>
+                                    )}
+                                    {question && question.questionVideoUrl && (
+                                      <div className="mb-2 ps-4">
+                                        <video
+                                          src={question.questionVideoUrl}
+                                          controls
+                                          style={{ maxWidth: "100%", maxHeight: 300, borderRadius: 8 }}
+                                        />
+                                      </div>
+                                    )}
                                     {question && question.options && question.options.length > 0 ? (
                                       <ul className="list-unstyled ps-4">
                                         {question.options.map((opt: any, optIndex: number) => (

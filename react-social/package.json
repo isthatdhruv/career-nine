@@ -6,6 +6,8 @@
   "dependencies": {
     "@devbookhq/splitter": "^1.4.0",
     "@emotion/styled": "^11.10.5",
+    "@ffmpeg/ffmpeg": "^0.12.10",
+    "@ffmpeg/util": "^0.12.1",
     "@formatjs/intl-pluralrules": "4.3.3",
     "@formatjs/intl-relativetimeformat": "10.0.1",
     "@fortawesome/fontawesome-free": "6.1.1",
