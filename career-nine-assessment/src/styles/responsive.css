@@ -2,19 +2,49 @@
 
 /* Gradient background container used across all pages */
 .assessment-bg {
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2rem 1rem;
   color-scheme: light;
+  overflow: hidden;
 }
 
 .assessment-bg--full {
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color-scheme: light;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Hide scrollbars globally while keeping scroll functionality */
+.assessment-card .card-body,
+.assessment-scroll-container,
+.thank-you-card,
+.register-card form,
+.question-area {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+.assessment-card .card-body::-webkit-scrollbar,
+.assessment-scroll-container::-webkit-scrollbar,
+.thank-you-card::-webkit-scrollbar,
+.register-card form::-webkit-scrollbar,
+.question-area::-webkit-scrollbar {
+  display: none; /* Chrome/Safari/Opera */
+}
+
+/* Scrollable content wrapper for full-page layouts (e.g. AllottedAssessmentPage) */
+.assessment-scroll-container {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 /* Card container */
@@ -25,12 +55,20 @@
   background: #ffffff;
   color-scheme: light;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  max-height: calc(100vh - 4rem);
+  max-height: calc(100dvh - 4rem);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .assessment-card .card-body {
   background: #ffffff;
   color: #2d3748;
   border-radius: 20px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 /* Heading sizes - scale down on smaller screens */
@@ -38,13 +76,13 @@
   font-size: 2rem;
   font-weight: 700;
   color: #2d3748;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
 .assessment-subheading {
   color: #718096;
   font-size: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 /* Icon circles */
@@ -55,7 +93,7 @@
   border-radius: 50%;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-  margin: 0 auto 1.5rem;
+  margin: 0 auto 0.75rem;
 }
 
 .assessment-icon-circle--sm {
@@ -240,6 +278,11 @@
     padding: 1.5rem 0.75rem;
   }
 
+  .assessment-card {
+    max-height: calc(100vh - 3rem);
+    max-height: calc(100dvh - 3rem);
+  }
+
   .assessment-heading {
     font-size: 1.5rem;
   }
@@ -307,8 +350,23 @@
     align-items: flex-start;
   }
 
+  .assessment-card {
+    max-height: calc(100vh - 2rem);
+    max-height: calc(100dvh - 2rem);
+  }
+
   .assessment-card .card-body {
     padding: 1.25rem !important;
+  }
+
+  .register-card {
+    max-height: calc(100vh - 2rem);
+    max-height: calc(100dvh - 2rem);
+  }
+
+  .thank-you-card {
+    max-height: calc(100vh - 2rem);
+    max-height: calc(100dvh - 2rem);
   }
 
   .assessment-heading {
@@ -591,6 +649,9 @@
   width: 100%;
   position: relative;
   z-index: 1;
+  max-height: calc(100vh - 3rem);
+  max-height: calc(100dvh - 3rem);
+  overflow-y: auto;
 }
 
 @media (max-width: 575.98px) {
@@ -622,6 +683,16 @@
   border-radius: 12px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
   overflow: hidden;
+  max-height: calc(100vh - 4rem);
+  max-height: calc(100dvh - 4rem);
+  display: flex;
+  flex-direction: column;
+}
+
+.register-card form {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 @media (max-width: 575.98px) {
@@ -646,6 +717,7 @@
   align-items: flex-start;
   padding: 1.5rem;
   overflow-y: auto;
+  min-height: 0;
 }
 
 @media (min-width: 992px) {

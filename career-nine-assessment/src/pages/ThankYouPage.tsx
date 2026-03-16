@@ -22,7 +22,7 @@ const ThankYouPage: React.FC = () => {
 
     return (
         <>
-            <div className="assessment-bg" style={{ flexDirection: 'column', position: 'relative', overflow: 'hidden', padding: '1.5rem' }}>
+            <div className="assessment-bg" style={{ flexDirection: 'column', position: 'relative', padding: '1.5rem' }}>
                 {/* Decorative floating elements - hidden on mobile via CSS */}
                 <div className="thank-you-decoration" style={{ top: '10%', left: '5%', width: '120px', height: '120px', animation: 'float 6s ease-in-out infinite' }} />
                 <div className="thank-you-decoration" style={{ bottom: '15%', right: '8%', width: '80px', height: '80px', background: 'rgba(255,255,255,0.08)', animation: 'float 8s ease-in-out infinite reverse' }} />

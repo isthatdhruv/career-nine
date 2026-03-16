@@ -83,22 +83,14 @@ const SelectSectionPage: React.FC = () => {
   };
 
   return (
-    <div className="assessment-bg" style={{ overflowY: "auto" }}>
+    <div className="assessment-bg">
       <div className="container">
         <div className="row justify-content-center">
           <div className="col-12 col-md-10 col-lg-8 col-xl-7">
             <div className="assessment-card card shadow-lg">
-              <div className="card-body p-3 p-sm-4 p-md-5">
-                {/* Header Icon */}
-                <div className="assessment-icon-circle--lg mx-auto">
-                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-                  </svg>
-                </div>
-
-                <h2 className="text-center assessment-heading">Select Section</h2>
-                <p className="text-center assessment-subheading mb-4">
+              <div className="card-body p-3 p-sm-3 p-md-4" style={{ paddingTop: '1.25rem' }}>
+                <h2 className="text-center assessment-heading" style={{ fontSize: '1.5rem' }}>Select Section</h2>
+                <p className="text-center assessment-subheading" style={{ marginBottom: '0.75rem' }}>
                   Choose a section to begin your assessment
                 </p>
 

@@ -384,7 +384,7 @@ const SectionQuestionPage: React.FC = () => {
       if (savedForLater[secId]?.has(questionId))
         return "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)";
       if (skipped[secId]?.has(questionId))
-        return "linear-gradient(135deg, #f87171 0%, #dc2626 100%)";
+        return "linear-gradient(135deg, #fb923c 0%, #ea580c 100%)";
       return "#d1d5db";
     },
     [answers, rankingAnswers, textAnswers, savedForLater, skipped, completedGameQuestionIds],
@@ -1176,9 +1176,11 @@ const SectionQuestionPage: React.FC = () => {
     <div
       style={{
         display: "flex",
-        minHeight: "100vh",
+        height: "100vh",
+        height: "100dvh",
         background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
         colorScheme: "light",
+        overflow: "hidden",
       }}
     >
       {/* Sidebar toggle button - mobile only */}
@@ -1397,9 +1399,9 @@ const SectionQuestionPage: React.FC = () => {
                   height: 14,
                   borderRadius: "50%",
                   background:
-                    "linear-gradient(135deg, #f87171 0%, #dc2626 100%)",
+                    "linear-gradient(135deg, #fb923c 0%, #ea580c 100%)",
                   flexShrink: 0,
-                  boxShadow: "0 2px 6px rgba(248, 113, 113, 0.4)",
+                  boxShadow: "0 2px 6px rgba(251, 146, 60, 0.4)",
                 }}
               />
               <span
@@ -1536,7 +1538,7 @@ const SectionQuestionPage: React.FC = () => {
               </span>
             </div>
 
-            <div className="d-flex justify-content-between align-items-center mb-4">
+            <div className="d-flex justify-content-between align-items-center mb-4" style={{ gap: '12px', flexWrap: 'wrap' }}>
               <h6
                 style={{
                   color: "#2d3748",
@@ -1547,22 +1549,47 @@ const SectionQuestionPage: React.FC = () => {
               >
                 Question {currentIndex + 1} of {questions.length}
               </h6>
-              {showTimer && (
-                <div
-                  style={{
-                    background:
-                      "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                    padding: "10px 24px",
-                    borderRadius: "30px",
-                    fontWeight: 700,
-                    fontSize: "1rem",
-                    color: "white",
-                    boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)",
-                  }}
-                >
-                  ⏱️ {formatTime(elapsedTime)}
-                </div>
-              )}
+              <div className="d-flex align-items-center" style={{ gap: '10px', marginLeft: 'auto' }}>
+                {showTimer && (
+                  <div
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                      padding: "8px 18px",
+                      borderRadius: "30px",
+                      fontWeight: 700,
+                      fontSize: "0.9rem",
+                      color: "white",
+                      boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)",
+                    }}
+                  >
+                    ⏱️ {formatTime(elapsedTime)}
+                  </div>
+                )}
+                {isLastQuestionOfLastSection() && (
+                  <button
+                    onClick={handleSubmitAssessment}
+                    disabled={isSubmitting}
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "30px",
+                      padding: "8px 20px",
+                      fontWeight: 700,
+                      fontSize: "0.9rem",
+                      cursor: isSubmitting ? "not-allowed" : "pointer",
+                      boxShadow: "0 4px 15px rgba(34, 197, 94, 0.4)",
+                      transition: "all 0.2s ease",
+                      opacity: isSubmitting ? 0.7 : 1,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {isSubmitting ? "Submitting..." : "✓ Submit"}
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Submit Warning Popup */}
@@ -2484,51 +2511,30 @@ const SectionQuestionPage: React.FC = () => {
                   </button>
                 )} */}
                 {!isLastQuestionOfLastSection() && (
-                  <button
-                    onClick={goNext}
-                    style={{
-                      background:
-                        "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "12px",
-                      padding: "12px 32px",
-                      fontWeight: 600,
-                      fontSize: "0.95rem",
-                      cursor: "pointer",
-                      boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)",
-                      transition: "all 0.2s ease",
-                    }}
-                  >
-                    {currentIndex === questions.length - 1
-                      ? "NEXT SECTION →"
-                      : "NEXT →"}
-                  </button>
+                <button
+                  onClick={goNext}
+                  style={{
+                    background: currentIndex === questions.length - 1
+                      ? "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)"
+                      : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "12px",
+                    padding: "12px 32px",
+                    fontWeight: 600,
+                    fontSize: "0.95rem",
+                    cursor: "pointer",
+                    boxShadow: currentIndex === questions.length - 1
+                      ? "0 4px 15px rgba(14, 165, 233, 0.4)"
+                      : "0 4px 15px rgba(102, 126, 234, 0.4)",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  {currentIndex === questions.length - 1
+                    ? "NEXT SECTION →"
+                    : "NEXT →"}
+                </button>
                 )}
-                {isLastQuestionOfLastSection() && (
-                  <button
-                    onClick={handleSubmitAssessment}
-                    disabled={isSubmitting}
-                    style={{
-                      background:
-                        "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "12px",
-                      padding: "12px 32px",
-                      fontWeight: 700,
-                      fontSize: "1rem",
-                      cursor: isSubmitting ? "not-allowed" : "pointer",
-                      boxShadow: "0 4px 15px rgba(34, 197, 94, 0.4)",
-                      transition: "all 0.2s ease",
-                      marginLeft: "auto",
-                      opacity: isSubmitting ? 0.7 : 1,
-                    }}
-                  >
-                    {isSubmitting ? "Submitting..." : "✓ SUBMIT ASSESSMENT"}
-                  </button>
-                )}
-              </div>
             </div>
           </div>
         </div>

@@ -491,6 +491,16 @@ public class AssessmentSessionService {
     }
 
     /**
+     * Delete submitted answers from Redis for a student+assessment pair.
+     * Called during admin reset to prevent retry scheduler from re-processing old submissions.
+     */
+    public void deleteSubmittedAnswers(Long studentId, Long assessmentId) {
+        String key = SUBMITTED_KEY_PREFIX + studentId + ":" + assessmentId;
+        redisTemplate.delete(key);
+        logger.info("Deleted submitted answers from Redis for student={} assessment={}", studentId, assessmentId);
+    }
+
+    /**
      * Convert a Redis-deserialized value to AssessmentSession.
      * GenericJackson2JsonRedisSerializer may return a LinkedHashMap instead of the typed object.
      */
