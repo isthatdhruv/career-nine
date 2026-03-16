@@ -78,8 +78,6 @@ export function Registration() {
           organisation: values.organisation,
           designation: values.designation,
         };
-        console.log("Submitting registration with payload:", payload);
-
         const res = await fetch(`${API_URL}/auth/signup`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

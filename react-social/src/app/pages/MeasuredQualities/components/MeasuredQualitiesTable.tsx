@@ -42,7 +42,7 @@ const MeasuredQualitiesTable = (props: {
         } catch (error) {
           // Handle 404 errors gracefully (quality might have been deleted)
           if ((error as any)?.response?.status === 404) {
-            console.log(`MeasuredQuality ${quality.measuredQualityId} not found, skipping...`);
+            // MeasuredQuality not found, skipping
           } else {
             console.error(`Error loading tools for quality ${quality.measuredQualityId}:`, error);
           }
@@ -75,13 +75,11 @@ const MeasuredQualitiesTable = (props: {
       // Assign new tools
       for (const toolId of newlySelected) {
         await AssignToolToQuality(toolId, qualityId);
-        console.log(`Tool ${toolId} assigned to quality ${qualityId}`);
       }
       
       // Remove deselected tools
       for (const toolId of deselected) {
         await RemoveToolFromQuality(toolId, qualityId);
-        console.log(`Tool ${toolId} removed from quality ${qualityId}`);
       }
       
       // Update state only after successful API calls
@@ -101,15 +99,6 @@ const MeasuredQualitiesTable = (props: {
       }));
     }
   };
-
-  // const assignToolToQuality = async (toolId: number, qualityId: number) => {
-  //   try {
-  //     const response = await AssignToolToQuality(toolId, qualityId);
-  //     console.log('Tool assigned successfully:', response.data);
-  //   } catch (error) {
-  //     console.error('Error assigning tool:', error);
-  //   }
-  // };
 
   const datatable = {
     columns: [
@@ -181,7 +170,6 @@ const MeasuredQualitiesTable = (props: {
             onClick={async () => {
               props.setLoading(true);
               try {
-                console.log(data);
                 // Remove the quality from local state immediately to prevent API calls
                 setSelectedToolsByQuality(prev => {
                   const newState = {...prev};

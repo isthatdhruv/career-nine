@@ -80,7 +80,6 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
             setLoading(true);
             try {
               for (const person of values.contactPersons) {
-                console.log(person);
                 await CreateContactInformationData(person);
               }
 

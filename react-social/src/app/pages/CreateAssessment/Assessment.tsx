@@ -22,7 +22,6 @@ const AssessmentPage = () => {
       setIsDataLoading(true);
       try {
         const response = await ReadAssessmentList();
-        console.log("Fetched assessment data:", response.data);
         const activeOnly = (response.data || []).filter((a: any) => a.isActive !== false);
         setAssessmentData(activeOnly);
       } catch (error) {
@@ -42,7 +41,6 @@ const AssessmentPage = () => {
         setIsDataLoading(true);
         try {
           const response = await ReadAssessmentList();
-          console.log("Refreshed assessment data:", response.data);
           const activeOnly = (response.data || []).filter((a: any) => a.isActive !== false);
           setAssessmentData(activeOnly);
         } catch (error) {

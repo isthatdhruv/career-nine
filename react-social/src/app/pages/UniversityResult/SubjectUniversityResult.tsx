@@ -1,10 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import MUIDataTable from "mui-datatables";
-import _ from "underscore";
 export default function SubjectUniversityResultTable(props: {
   tableData: any;
 }) {
-  console.log(props.tableData);
   const options = {
     filterType: "checkbox",
     setRowProps: (rowData) => {

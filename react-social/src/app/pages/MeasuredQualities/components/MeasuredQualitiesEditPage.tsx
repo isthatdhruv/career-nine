@@ -44,10 +44,6 @@ const MeasuredQualitiesEditPage = (props?: { setPageLoading?: any }) => {
     onSubmit: async (values) => {
       setLoading(true);
       try {
-        console.log("Attempting to update Measured Quality:");
-        console.log("Quality ID:", values.measuredQualityId);
-        console.log("Values being sent:", values);
-
         if (!values.measuredQualityId) {
           alert(
             "No question ID found. Please try navigating back and selecting the question again."
@@ -62,9 +58,7 @@ const MeasuredQualitiesEditPage = (props?: { setPageLoading?: any }) => {
           // Explicitly exclude tools field to prevent relationship reset
         };
 
-        console.log("Values being sent:", updatePayload);
-        const response = await UpdateMeasuredQualitiesData(values.measuredQualityId, updatePayload);
-        console.log("Update successful:", response);
+        await UpdateMeasuredQualitiesData(values.measuredQualityId, updatePayload);
         navigate("/measured-qualities");
 
         if (props?.setPageLoading) {

@@ -20,8 +20,6 @@ import { ThankYouPage } from "../pages/StudentRegistration/ThankYou";
 import { UniRollNoUpdate } from "../pages/StudentRegistration/UniRollNoUpdate";
 import { PrivateRoutes } from "./PrivateRoutes";
 // import CompilerPageEdit from "../pages/Compiler/compilerEdit";
-import {SchoolDashboardPage} from "../pages/dashboard/SchoolDashboardPage";
-import QuestionaireListPage from "../pages/CreateAssessment/components/questionaire/QuestionaireListPage";
 import StudentLoginPage from "../pages/StudentLogin/StudentLoginPage";
 import DemographicDetailsPage from "../pages/StudentLogin/DemographicDetailsPage";
 import DynamicDemographicForm from "../pages/StudentLogin/DynamicDemographicForm";

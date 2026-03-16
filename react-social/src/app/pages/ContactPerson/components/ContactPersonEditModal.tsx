@@ -5,7 +5,6 @@ import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
 import {
-  ReadContactInformationByIdData,
   UpdateContactInformationData,
 } from "../API/Contact_Person_APIs";
 import { Modal } from "react-bootstrap";

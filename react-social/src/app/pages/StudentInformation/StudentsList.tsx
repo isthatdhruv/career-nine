@@ -1,6 +1,5 @@
 // StudentsList.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { getStudentsWithMappingByInstituteId, getAllAssessments, bulkAlotAssessment, Assessment } from "./StudentInfo_APIs";
 import StudentAnswerExcelModal from "./StudentAnswerExcelModal";
 import ResetAssessmentModal from "./ResetAssessmentModal";
@@ -17,7 +16,6 @@ export type Student = {
 };
 
 export default function StudentsList() {
-  const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [studentsLoading, setStudentsLoading] = useState(true);
@@ -49,7 +47,6 @@ export default function StudentsList() {
       .then(response => {
         const activeOnly = (response.data || []).filter((a: any) => a.isActive !== false);
         setAssessments(activeOnly);
-        console.log("Loaded assessments:", activeOnly); // Debug log
       })
       .catch(error => {
         console.error("Error fetching assessments:", error);
@@ -78,7 +75,6 @@ export default function StudentsList() {
               assignedAssessmentIds: assignedIds,
             };
           });
-          console.log("Loaded students:", studentData); // Debug log
           setStudents(studentData);
         })
         .catch(error => {
@@ -162,9 +158,6 @@ export default function StudentsList() {
   };
 
   const handleDownloadClick = (student: Student) => {
-    console.log("Download clicked for student:", student); // Debug log
-    console.log("User Student ID:", student.userStudentId); // Debug log
-    console.log("Assessment ID:", student.selectedAssessment); // Debug log
     setSelectedStudent(student);
     setShowModal(true);
   };
