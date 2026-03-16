@@ -60,12 +60,33 @@ export function CreateQuestionData(values: any) {
   // };
   // delete requestData.sectionId; // Remove the flat sectionId
   // delete requestData.questionOptions; // Remove the original field
-  // console.log("Sending to backend:", requestData);
   return axios.post(createQuestion, values);
 }
 
 export function UpdateQuestionData(id: any, values: any) {
   return axios.put(`${updateQuestion}/${id}`, values);
+}
+
+/**
+ * Upload question media (image/video) to DigitalOcean Spaces via backend.
+ * @param base64Data - The base64-encoded data URL (e.g. "data:image/webp;base64,...")
+ * @param mediaType - "image" or "video"
+ * @returns Promise with { url: string } - the CDN URL of the uploaded file
+ */
+export async function UploadQuestionMedia(base64Data: string, mediaType: 'image' | 'video') {
+  const response = await axios.post(`${API_URL}/question-media/upload`, {
+    base64Data,
+    mediaType,
+  });
+  return response.data as { url: string };
+}
+
+/**
+ * Delete question media from DigitalOcean Spaces.
+ * @param url - The full CDN URL of the file to delete
+ */
+export async function DeleteQuestionMedia(url: string) {
+  return axios.delete(`${API_URL}/question-media/delete`, { params: { url } });
 }
 
 export function DeleteQuestionData(id: any) {
@@ -134,7 +155,6 @@ export async function ExportQuestionsToExcel() {
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
 
-    console.log('Excel file downloaded successfully');
   } catch (error) {
     console.error('Error downloading Excel file:', error);
     throw error; // Re-throw so calling component can handle it

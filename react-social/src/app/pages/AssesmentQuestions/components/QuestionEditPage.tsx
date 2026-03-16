@@ -6,10 +6,11 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
-import { ReadQuestionSectionData, ReadQuestionSectionDataList } from "../../QuestionSections/API/Question_Section_APIs";
-import { CreateQuestionData, UpdateQuestionData, ReadMeasuredQualityTypes, ReadQuestionByIdData } from "../API/Question_APIs";
+import { ReadQuestionSectionDataList } from "../../QuestionSections/API/Question_Section_APIs";
+import { CreateQuestionData, UpdateQuestionData, ReadMeasuredQualityTypes, ReadQuestionByIdData, UploadQuestionMedia } from "../API/Question_APIs";
 import { ListGamesData } from "../../Games/components/API/GAME_APIs";
 import { CheckLockedByQuestion } from "../../CreateAssessment/API/Create_Assessment_APIs";
+import { convertImageToWebP, generateVideoThumbnail, compressVideo } from "../../../utils/imageUtils";
 
 const validationSchema = Yup.object().shape({
   questionText: Yup.string().required("Question text is required"),
@@ -58,6 +59,49 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
   const [useGameAsOption, setUseGameAsOption] = useState(false);
   const [games, setGames] = useState<any[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string>("");
+
+  // Question media type: 'text' | 'image' | 'video'
+  const [questionMediaType, setQuestionMediaType] = useState<'text' | 'image' | 'video'>('text');
+  const [questionMediaBase64, setQuestionMediaBase64] = useState<string>("");
+  const [questionMediaProcessing, setQuestionMediaProcessing] = useState(false);
+  const [questionVideoThumbnail, setQuestionVideoThumbnail] = useState<string>("");
+  const [videoCompressProgress, setVideoCompressProgress] = useState<number>(0);
+
+  // Handle question image upload — convert to webp and compress
+  const handleQuestionImageSelect = async (file: File | null) => {
+    if (!file) { setQuestionMediaBase64(""); return; }
+    setQuestionMediaProcessing(true);
+    try {
+      const result = await convertImageToWebP(file, 0.8, 1920, 1080);
+      setQuestionMediaBase64(result.base64);
+    } catch (error) {
+      console.error("Error converting image to WebP:", error);
+      alert("Failed to process image. Please try a different file.");
+    } finally {
+      setQuestionMediaProcessing(false);
+    }
+  };
+
+  // Handle question video upload — compress with FFmpeg.wasm
+  const handleQuestionVideoSelect = async (file: File | null) => {
+    if (!file) { setQuestionMediaBase64(""); setQuestionVideoThumbnail(""); return; }
+    setQuestionMediaProcessing(true);
+    setVideoCompressProgress(0);
+    try {
+      const [compressed, thumbnail] = await Promise.all([
+        compressVideo(file, (p) => setVideoCompressProgress(p)),
+        generateVideoThumbnail(file),
+      ]);
+      setQuestionMediaBase64(compressed.base64);
+      setQuestionVideoThumbnail(thumbnail);
+    } catch (error) {
+      console.error("Error compressing video:", error);
+      alert("Failed to compress video. Please try a different file.");
+    } finally {
+      setQuestionMediaProcessing(false);
+      setVideoCompressProgress(0);
+    }
+  };
 
   // Search state for each option's measured quality dropdown
   const [qualitySearchTerms, setQualitySearchTerms] = useState<{ [key: number]: string }>({});
@@ -112,6 +156,23 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
         setUseGameAsOption(true);
         setSelectedGameId(foundGameId);
       }
+    }
+
+    // Load question media type and data from URLs
+    if (data.questionMediaType) {
+      setQuestionMediaType(data.questionMediaType);
+    } else if (data.questionImageUrl) {
+      setQuestionMediaType('image');
+    } else if (data.questionVideoUrl) {
+      setQuestionMediaType('video');
+    } else {
+      setQuestionMediaType('text');
+    }
+
+    if (data.questionImageUrl) {
+      setQuestionMediaBase64(data.questionImageUrl);
+    } else if (data.questionVideoUrl) {
+      setQuestionMediaBase64(data.questionVideoUrl);
     }
   };
 
@@ -239,7 +300,6 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
         if (id) {
           try {
             const questionResponse = await ReadQuestionByIdData(id);
-            console.log("Fetched question data:", questionResponse.data);
             const fetchedQuestion = questionResponse.data;
 
             questionDataResult = {
@@ -253,7 +313,6 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                 ? fetchedQuestion.options.map((option: any) => option.optionText || option)
                 : [{ optionText: "", optionDescription: "", correct: false, sequence: 1 }],
             };
-            // console.log("Processed data with section:", questionDataResult.section);
           } catch (error) {
             console.error("Error fetching question:", error);
             const locationData = (locationStateRef.current as any)?.data;
@@ -296,7 +355,6 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
         let sectionsResult: any[] = [];
         try {
           const response = await ReadQuestionSectionDataList();
-          console.log("Fetched sections for edit:", response.data);
           sectionsResult = response.data;
         } catch (error) {
           console.error("Error fetching sections:", error);
@@ -307,7 +365,6 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
         let mqtResult: any[] = [];
         try {
           const response = await ReadMeasuredQualityTypes();
-          console.log("Fetched measured quality types:", response.data);
           mqtResult = response.data;
         } catch (error) {
           console.error("Error fetching measured quality types:", error);
@@ -383,7 +440,6 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
     },
     // validationSchema: validationSchema,
     onSubmit: async (values) => {
-      console.log("Submitting form with values:", values);
       setLoading(true);
       try {
         // Sort options by sequence before processing
@@ -433,11 +489,43 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
           });
         }
 
-        const payload = {
+        // Upload media to DO Spaces if it's new base64 data (not already a URL)
+        let questionImageUrl = "";
+        let questionVideoUrl = "";
+        if (questionMediaType === 'image' && questionMediaBase64) {
+          if (questionMediaBase64.startsWith('data:')) {
+            try {
+              const uploadResult = await UploadQuestionMedia(questionMediaBase64, 'image');
+              questionImageUrl = uploadResult.url;
+            } catch (uploadErr) {
+              console.error("Media upload failed:", uploadErr);
+              alert("Image upload failed. Question will be saved without the image.");
+            }
+          } else {
+            questionImageUrl = questionMediaBase64;
+          }
+        } else if (questionMediaType === 'video' && questionMediaBase64) {
+          if (questionMediaBase64.startsWith('data:')) {
+            try {
+              const uploadResult = await UploadQuestionMedia(questionMediaBase64, 'video');
+              questionVideoUrl = uploadResult.url;
+            } catch (uploadErr) {
+              console.error("Media upload failed:", uploadErr);
+              alert("Video upload failed. Question will be saved without the video.");
+            }
+          } else {
+            questionVideoUrl = questionMediaBase64;
+          }
+        }
+
+        const payload: any = {
           id: values.id,
           questionId: values.questionId,
           questionText: values.questionText,
           questionType: values.questionType,
+          questionMediaType: questionMediaType,
+          questionImageUrl: questionImageUrl || null,
+          questionVideoUrl: questionVideoUrl || null,
           maxOptionsAllowed: Number(values.maxOptionsAllowed) || 0,
           isMQT: values.isMQT,
           isMQTtyped: values.isMQTtyped,
@@ -445,7 +533,6 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
           section: { sectionId: values.section.sectionId },
         };
 
-        console.log("Submitting payload:", payload);
         const questionId = values.questionId || values.id;
         if (questionId) {
           await UpdateQuestionData(questionId, payload);
@@ -476,12 +563,6 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
     },
   });
 
-  // Debug effect to log formik values
-  // useEffect(() => {
-  //   console.log("Current questionData:", questionData);
-  //   console.log("Current formik section:", formik.values.section);
-  //   console.log("Available sections:", sections);
-  // }, [questionData, formik.values.section, sections]);
 
   if (loading) {
     return (
@@ -557,9 +638,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
   const updateOptionDescription = (sequence: number, value: string) => {
     const currentOptions = [...formik.values.options];
     const optionIndex = currentOptions.findIndex(opt => opt.sequence === sequence);
-    console.log("Updating description for option index:", optionIndex, "with value:", value);
     if (optionIndex !== -1) {
-          console.log("Before update:", currentOptions[optionIndex]);
 
       currentOptions[optionIndex].optionDescription = value;
       formik.setFieldValue("options", currentOptions);
@@ -610,28 +689,57 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
         >
           <div className="card-body">
 
+            {/* Question Content Type Selector */}
+            <div className="fv-row mb-4">
+              <label className="fs-6 fw-bold mb-2">Question Content Type:</label>
+              <div className="d-flex gap-3">
+                {(['text', 'image', 'video'] as const).map((type) => (
+                  <label key={type} className={clsx(
+                    "btn btn-sm",
+                    questionMediaType === type ? "btn-primary" : "btn-outline-secondary"
+                  )}>
+                    <input
+                      type="radio"
+                      name="questionMediaTypeEdit"
+                      value={type}
+                      checked={questionMediaType === type}
+                      onChange={() => {
+                        setQuestionMediaType(type);
+                        setQuestionMediaBase64("");
+                        setQuestionVideoThumbnail("");
+                      }}
+                      className="d-none"
+                    />
+                    {type === 'text' && 'Text'}
+                    {type === 'image' && 'Image'}
+                    {type === 'video' && 'Video'}
+                  </label>
+                ))}
+              </div>
+            </div>
+
             {/* Question Text */}
             <div className="fv-row mb-7">
-              <label className="required fs-6 fw-bold mb-2">
-                Question Text:
+              <label className={clsx("fs-6 fw-bold mb-2", { "required": questionMediaType === 'text' })}>
+                {questionMediaType === 'text' ? 'Question Text:' : 'Question Text (optional caption/alt-text):'}
               </label>
               <textarea
                 placeholder="Enter Question Text"
-                rows={4}
+                rows={questionMediaType === 'text' ? 4 : 2}
                 {...formik.getFieldProps("questionText")}
                 className={clsx(
                   "form-control form-control-lg form-control-solid",
-                  {
+                  questionMediaType === 'text' && {
                     "is-invalid text-danger":
                       formik.touched.questionText && formik.errors.questionText,
                   },
-                  {
+                  questionMediaType === 'text' && {
                     "is-valid":
                       formik.touched.questionText && !formik.errors.questionText,
                   }
                 )}
               />
-              {formik.touched.questionText && formik.errors.questionText && (
+              {questionMediaType === 'text' && formik.touched.questionText && formik.errors.questionText && (
                 <div className="fv-plugins-message-container">
                   <div className="fv-help-block text-danger">
                     <span role="alert">{String(formik.errors.questionText)}</span>
@@ -639,6 +747,91 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                 </div>
               )}
             </div>
+
+            {/* Question Image Upload */}
+            {questionMediaType === 'image' && (
+              <div className="fv-row mb-7">
+                <label className="required fs-6 fw-bold mb-2">Question Image:</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleQuestionImageSelect(e.target.files?.[0] || null)}
+                  className="form-control form-control-lg form-control-solid mb-2"
+                />
+                <small className="text-muted d-block mb-2">
+                  Image will be automatically converted to WebP format and compressed.
+                </small>
+                {questionMediaProcessing && (
+                  <div className="d-flex align-items-center gap-2 text-primary mb-2">
+                    <span className="spinner-border spinner-border-sm"></span>
+                    <span>Processing image...</span>
+                  </div>
+                )}
+                {questionMediaBase64 && !questionMediaProcessing && (
+                  <div className="position-relative d-inline-block">
+                    <img
+                      src={questionMediaBase64}
+                      alt="Question"
+                      style={{ maxWidth: 400, maxHeight: 300, objectFit: 'contain', borderRadius: 8, border: '1px solid #ddd' }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-danger position-absolute"
+                      style={{ top: -8, right: -8, padding: '4px 10px', fontSize: 12 }}
+                      onClick={() => setQuestionMediaBase64("")}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Question Video Upload */}
+            {questionMediaType === 'video' && (
+              <div className="fv-row mb-7">
+                <label className="required fs-6 fw-bold mb-2">Question Video:</label>
+                <input
+                  type="file"
+                  accept="video/*"
+                  onChange={(e) => handleQuestionVideoSelect(e.target.files?.[0] || null)}
+                  className="form-control form-control-lg form-control-solid mb-2"
+                />
+                <small className="text-muted d-block mb-2">
+                  Supported formats: MP4, WebM, OGG. Video will be compressed automatically.
+                </small>
+                {questionMediaProcessing && (
+                  <div className="mb-2">
+                    <div className="d-flex align-items-center gap-2 text-primary mb-1">
+                      <span className="spinner-border spinner-border-sm"></span>
+                      <span>Compressing video... {videoCompressProgress > 0 ? `${videoCompressProgress}%` : ''}</span>
+                    </div>
+                    {videoCompressProgress > 0 && (
+                      <div className="progress" style={{ height: 6 }}>
+                        <div className="progress-bar" role="progressbar" style={{ width: `${videoCompressProgress}%` }} />
+                      </div>
+                    )}
+                  </div>
+                )}
+                {questionMediaBase64 && !questionMediaProcessing && (
+                  <div className="position-relative d-inline-block">
+                    <video
+                      src={questionMediaBase64}
+                      controls
+                      style={{ maxWidth: 400, maxHeight: 300, borderRadius: 8, border: '1px solid #ddd' }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-danger position-absolute"
+                      style={{ top: -8, right: -8, padding: '4px 10px', fontSize: 12 }}
+                      onClick={() => { setQuestionMediaBase64(""); setQuestionVideoThumbnail(""); }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Question Type */}
             <div className="fv-row mb-7">
@@ -684,7 +877,6 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
                 onChange={e => {
                   const selectedSectionId = e.target.value;
                   formik.setFieldValue("section", { sectionId: selectedSectionId });
-                  console.log("Selected section ID:", selectedSectionId);
                 }}
                 className={clsx(
                   "form-control form-control-lg form-control-solid",

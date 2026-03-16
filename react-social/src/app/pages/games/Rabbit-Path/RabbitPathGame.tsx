@@ -563,7 +563,6 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
         timestamp: new Date().toISOString(),
         gameType: 'rabbit-path'
       };
-      console.log("Rabbit Path game completed:", gameData);
       onComplete(gameData);
     }
   }, [phase, score, round, history, userStudentId, playerName, onComplete]);

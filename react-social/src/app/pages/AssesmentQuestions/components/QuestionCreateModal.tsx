@@ -4,9 +4,10 @@ import { Modal, Dropdown, Button } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
 import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
-import { CreateQuestionData, ReadMeasuredQualityTypes } from "../API/Question_APIs";
+import { CreateQuestionData, ReadMeasuredQualityTypes, UploadQuestionMedia } from "../API/Question_APIs";
 import { MQT } from "./MeasuredQualityTypesAsOptionComponent";
 import { ListGamesData } from "../../Games/components/API/GAME_APIs";
+import { convertImageToWebP, generateVideoThumbnail, compressVideo } from "../../../utils/imageUtils";
 
 const validationSchema = Yup.object().shape({
   questionText: Yup.string().required("Question text is required"),
@@ -38,6 +39,49 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
   const [useGameAsOption, setUseGameAsOption] = useState(false);
   const [games, setGames] = useState<any[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<string>("");
+
+  // Question media type: 'text' | 'image' | 'video'
+  const [questionMediaType, setQuestionMediaType] = useState<'text' | 'image' | 'video'>('text');
+  const [questionMediaBase64, setQuestionMediaBase64] = useState<string>("");
+  const [questionMediaProcessing, setQuestionMediaProcessing] = useState(false);
+  const [questionVideoThumbnail, setQuestionVideoThumbnail] = useState<string>("");
+  const [videoCompressProgress, setVideoCompressProgress] = useState<number>(0);
+
+  // Handle question image upload — convert to webp and compress
+  const handleQuestionImageSelect = async (file: File | null) => {
+    if (!file) { setQuestionMediaBase64(""); return; }
+    setQuestionMediaProcessing(true);
+    try {
+      const result = await convertImageToWebP(file, 0.8, 1920, 1080);
+      setQuestionMediaBase64(result.base64);
+    } catch (error) {
+      console.error("Error converting image to WebP:", error);
+      alert("Failed to process image. Please try a different file.");
+    } finally {
+      setQuestionMediaProcessing(false);
+    }
+  };
+
+  // Handle question video upload — compress with FFmpeg.wasm
+  const handleQuestionVideoSelect = async (file: File | null) => {
+    if (!file) { setQuestionMediaBase64(""); setQuestionVideoThumbnail(""); return; }
+    setQuestionMediaProcessing(true);
+    setVideoCompressProgress(0);
+    try {
+      const [compressed, thumbnail] = await Promise.all([
+        compressVideo(file, (p) => setVideoCompressProgress(p)),
+        generateVideoThumbnail(file),
+      ]);
+      setQuestionMediaBase64(compressed.base64);
+      setQuestionVideoThumbnail(thumbnail);
+    } catch (error) {
+      console.error("Error compressing video:", error);
+      alert("Failed to compress video. Please try a different file.");
+    } finally {
+      setQuestionMediaProcessing(false);
+      setVideoCompressProgress(0);
+    }
+  };
 
   const initialValues = {
     questionText: "",
@@ -226,15 +270,38 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
         });
       }
 
-      const payload = {
+      // Upload media to DO Spaces if present
+      let questionImageUrl = "";
+      let questionVideoUrl = "";
+      if (questionMediaType === 'image' && questionMediaBase64) {
+        try {
+          const uploadResult = await UploadQuestionMedia(questionMediaBase64, 'image');
+          questionImageUrl = uploadResult.url;
+        } catch (uploadErr) {
+          console.error("Media upload failed:", uploadErr);
+          alert("Image upload failed. Question will be created without the image.");
+        }
+      } else if (questionMediaType === 'video' && questionMediaBase64) {
+        try {
+          const uploadResult = await UploadQuestionMedia(questionMediaBase64, 'video');
+          questionVideoUrl = uploadResult.url;
+        } catch (uploadErr) {
+          console.error("Media upload failed:", uploadErr);
+          alert("Video upload failed. Question will be created without the video.");
+        }
+      }
+
+      const payload: any = {
         questionText: formikValues.questionText,
         questionType: formikValues.questionType,
+        questionMediaType: questionMediaType,
+        questionImageUrl: questionImageUrl || null,
+        questionVideoUrl: questionVideoUrl || null,
         maxOptionsAllowed: Number(formikValues.maxOptionsAllowed) || 0,
         options,
         section: { sectionId: Number(formikValues.sectionId) },
         flag : useMQTAsOptions ? 1 : 0
       };
-      console.log(payload);
 
       await CreateQuestionData(payload);
       setFormikValues(initialValues);
@@ -243,11 +310,15 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
       setOptionImages({});
       setSelectedGameId("");
       setUseGameAsOption(false);
+      setQuestionMediaType('text');
+      setQuestionMediaBase64("");
+      setQuestionVideoThumbnail("");
       onHide();
       navigate("/assessment-questions");
-    } catch (error) {
-      console.error(error);
-      // window.location.replace("/error");
+    } catch (error: any) {
+      console.error("Error creating question:", error);
+      const msg = error?.response?.data?.message || error?.message || "Unknown error";
+      alert("Failed to create question: " + msg);
     } finally {
       setLoading(false);
     }
@@ -260,12 +331,43 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
       </Modal.Header>
       <form onSubmit={handleSubmit}>
         <Modal.Body>
+          {/* Question Content Type Selector */}
+          <div className="mb-3">
+            <label className="form-label fw-bold">Question Content Type:</label>
+            <div className="d-flex gap-2">
+              {(['text', 'image', 'video'] as const).map((type) => (
+                <label key={type} className={clsx(
+                  "btn btn-sm",
+                  questionMediaType === type ? "btn-primary" : "btn-outline-secondary"
+                )}>
+                  <input
+                    type="radio"
+                    name="questionMediaTypeModal"
+                    value={type}
+                    checked={questionMediaType === type}
+                    onChange={() => {
+                      setQuestionMediaType(type);
+                      setQuestionMediaBase64("");
+                      setQuestionVideoThumbnail("");
+                    }}
+                    className="d-none"
+                  />
+                  {type === 'text' && 'Text'}
+                  {type === 'image' && 'Image'}
+                  {type === 'video' && 'Video'}
+                </label>
+              ))}
+            </div>
+          </div>
+
           {/* Question Text */}
           <div className="mb-3">
-            <label className="form-label fw-bold">Question Text:</label>
+            <label className="form-label fw-bold">
+              {questionMediaType === 'text' ? 'Question Text:' : 'Question Text (optional caption):'}
+            </label>
             <textarea
-              rows={4}
-              className={clsx("form-control", {
+              rows={questionMediaType === 'text' ? 4 : 2}
+              className={clsx("form-control", questionMediaType === 'text' && {
                 "is-invalid": !formikValues.questionText,
                 "is-valid": !!formikValues.questionText,
               })}
@@ -273,6 +375,69 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
               onChange={e => setFormikValues(v => ({ ...v, questionText: e.target.value }))}
             />
           </div>
+
+          {/* Question Image Upload */}
+          {questionMediaType === 'image' && (
+            <div className="mb-3">
+              <label className="form-label fw-bold">Question Image:</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleQuestionImageSelect(e.target.files?.[0] || null)}
+                className="form-control form-control-sm mb-2"
+              />
+              <small className="text-muted">Auto-converted to WebP and compressed.</small>
+              {questionMediaProcessing && (
+                <div className="d-flex align-items-center gap-2 text-primary mt-2">
+                  <span className="spinner-border spinner-border-sm"></span>
+                  <span>Processing...</span>
+                </div>
+              )}
+              {questionMediaBase64 && !questionMediaProcessing && (
+                <div className="position-relative d-inline-block mt-2">
+                  <img src={questionMediaBase64} alt="Question" style={{ maxWidth: 300, maxHeight: 200, objectFit: 'contain', borderRadius: 6, border: '1px solid #ddd' }} />
+                  <button type="button" className="btn btn-sm btn-danger position-absolute" style={{ top: -6, right: -6, padding: '2px 8px', fontSize: 11 }} onClick={() => setQuestionMediaBase64("")}>
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Question Video Upload */}
+          {questionMediaType === 'video' && (
+            <div className="mb-3">
+              <label className="form-label fw-bold">Question Video:</label>
+              <input
+                type="file"
+                accept="video/*"
+                onChange={(e) => handleQuestionVideoSelect(e.target.files?.[0] || null)}
+                className="form-control form-control-sm mb-2"
+              />
+              <small className="text-muted">Supported: MP4, WebM, OGG. Video will be compressed automatically.</small>
+              {questionMediaProcessing && (
+                <div className="mt-2">
+                  <div className="d-flex align-items-center gap-2 text-primary mb-1">
+                    <span className="spinner-border spinner-border-sm"></span>
+                    <span>Compressing video... {videoCompressProgress > 0 ? `${videoCompressProgress}%` : ''}</span>
+                  </div>
+                  {videoCompressProgress > 0 && (
+                    <div className="progress" style={{ height: 5 }}>
+                      <div className="progress-bar" role="progressbar" style={{ width: `${videoCompressProgress}%` }} />
+                    </div>
+                  )}
+                </div>
+              )}
+              {questionMediaBase64 && !questionMediaProcessing && (
+                <div className="position-relative d-inline-block mt-2">
+                  <video src={questionMediaBase64} controls style={{ maxWidth: 300, maxHeight: 200, borderRadius: 6, border: '1px solid #ddd' }} />
+                  <button type="button" className="btn btn-sm btn-danger position-absolute" style={{ top: -6, right: -6, padding: '2px 8px', fontSize: 11 }} onClick={() => { setQuestionMediaBase64(""); setQuestionVideoThumbnail(""); }}>
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Question Type */}
           <div className="mb-3">

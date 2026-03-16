@@ -46,6 +46,15 @@ public class AssessmentQuestions implements Serializable {
     @Column(name = "max_options_allowed")
     private int maxOptionsAllowed;
 
+    @Column(name = "question_media_type")
+    private String questionMediaType;
+
+    @Column(name = "question_image_url", length = 1024)
+    private String questionImageUrl;
+
+    @Column(name = "question_video_url", length = 1024)
+    private String questionVideoUrl;
+
     // 1 Question to Many Options
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
@@ -182,5 +191,29 @@ public class AssessmentQuestions implements Serializable {
 
     public void setIsMQTtyped(Boolean isMQTtyped) {
         this.isMQTtyped = isMQTtyped;
+    }
+
+    public String getQuestionMediaType() {
+        return questionMediaType;
+    }
+
+    public void setQuestionMediaType(String questionMediaType) {
+        this.questionMediaType = questionMediaType;
+    }
+
+    public String getQuestionImageUrl() {
+        return questionImageUrl;
+    }
+
+    public void setQuestionImageUrl(String questionImageUrl) {
+        this.questionImageUrl = questionImageUrl;
+    }
+
+    public String getQuestionVideoUrl() {
+        return questionVideoUrl;
+    }
+
+    public void setQuestionVideoUrl(String questionVideoUrl) {
+        this.questionVideoUrl = questionVideoUrl;
     }
 }

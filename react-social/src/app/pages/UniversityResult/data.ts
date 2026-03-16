@@ -1,8 +1,7 @@
-import { average, median, mode } from "statistics.ts";
+import { average } from "statistics.ts";
 import * as _ from "underscore";
 
 export var data_end = (courses1, branch1, session1, semester1) => {
-  // //console.log(courses1, branch1, session1, semester1)
   return _.map(courses1, (course) => {
     return {
       name: course,
@@ -28,7 +27,6 @@ export var data_end = (courses1, branch1, session1, semester1) => {
 export var courses = (data) => {
   return _.unique(
     _.map(data, (list) => {
-      // //console.log(list);
       return list.course;
     })
   );
@@ -37,7 +35,6 @@ export var courses = (data) => {
 export var branches = (data: any[]) => {
   var data = _.unique(
     _.map(data, (list) => {
-      // //console.log(list);
       return list.branch;
     })
   );

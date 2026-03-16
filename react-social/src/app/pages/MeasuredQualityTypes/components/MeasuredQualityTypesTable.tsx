@@ -34,19 +34,14 @@ const MeasuredQualityTypesTable = (props: {
     const loadExistingSelections = async () => {
       const newSelections: { [key: number]: any } = {};
 
-      // Debug: Log the actual data structure
-      console.log('MeasuredQualityTypes data:', props.data);
-
       for (const type of props.data) {
         // Extract the linked measured quality ID from the measuredQuality object
         let linkedId = '';
         if (type.measuredQuality && typeof type.measuredQuality === 'object') {
-          console.log('Found measuredQuality for type:', type.measuredQualityTypeId, type.measuredQuality);
           // Try both camelCase (from Jackson serialization) and snake_case
           linkedId = type.measuredQuality.measuredQualityId ||
                      type.measuredQuality.measured_quality_id || '';
         }
-        console.log(`Type ${type.measuredQualityTypeId} -> Quality ${linkedId}`);
         newSelections[type.measuredQualityTypeId] = linkedId;
       }
       setSelectedQualityByType(newSelections);
@@ -61,11 +56,9 @@ const MeasuredQualityTypesTable = (props: {
       if (qualityId) {
         // Assign the type to a quality
         await AssignMeasuredQualityTypeToQuality(typeId, qualityId);
-        console.log(`Assigned type ${typeId} to quality ${qualityId}`);
       } else {
         // Remove the type from quality (set foreign key to null)
         await RemoveMeasuredQualityTypeFromQuality(typeId);
-        console.log(`Removed type ${typeId} from its assigned quality`);
       }
 
       setSelectedQualityByType(prev => ({ ...prev, [typeId]: qualityId }));

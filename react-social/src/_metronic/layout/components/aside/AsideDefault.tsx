@@ -6,7 +6,6 @@ import clsx from "clsx";
 import { useLayout } from "../../core";
 import { KTSVG, toAbsoluteUrl } from "../../../helpers";
 import { AsideMenu } from "./AsideMenu";
-import { colorDarken } from "../../../assets/ts/_utils";
 
 const AsideDefault: FC = () => {
   const { config, classes } = useLayout();

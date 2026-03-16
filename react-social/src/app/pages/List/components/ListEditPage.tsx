@@ -40,7 +40,6 @@ const ListEditPage = (props?: {
         try {
           setLoading(true);
           const response = await ReadListByIdData(id);
-          console.log("Fetched list data:", response.data);
           const transformedData = {
             id: response.data.list_id || response.data.listId,
             listName: response.data.name || response.data.listName,
@@ -84,10 +83,6 @@ const ListEditPage = (props?: {
     onSubmit: async (values) => {
       setLoading(true);
       try {
-        console.log("Attempting to update list:");
-        console.log("List ID:", values.id);
-        console.log("Values being sent:", values);
-
         if (!values.id) {
           alert("No list ID found. Please try navigating back and selecting the list again.");
           return;
@@ -100,10 +95,7 @@ const ListEditPage = (props?: {
           price: values.listPrice === "FREE" ? 0 : Number(values.priceAmount)
         };
 
-        console.log("Payload being sent:", payload);
-
-        const response = await UpdateListData(values.id, payload);
-        console.log("Update successful:", response);
+        await UpdateListData(values.id, payload);
 
         navigate("/lists");
 

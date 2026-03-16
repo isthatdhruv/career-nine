@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Button, Modal, Alert, Spinner, ProgressBar } from "react-bootstrap";
+import { Button, Spinner, ProgressBar } from "react-bootstrap";
 import { MDBDataTableV5 } from "mdbreact";
 import * as XLSX from "xlsx";
 import { setData } from "./StudentDataComputationExcel";
@@ -73,7 +73,6 @@ export default function UploadExcelFile() {
     ReadCollegeData()
       .then((res: any) => {
         const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
-        console.log("Fetched Institutes:", list);
         setInstitutes(list);
       })
       .catch((err: any) => console.error("Failed to fetch institutes", err));
@@ -82,7 +81,6 @@ export default function UploadExcelFile() {
       .then((res) => {
         const activeOnly = (res.data || []).filter((a: any) => a.isActive !== false);
         setAssessments(activeOnly);
-        console.log("Fetched Assessments:", activeOnly);
       })
       .catch((err) => console.error("Failed to fetch assessments", err));
   }, []);
@@ -382,7 +380,6 @@ export default function UploadExcelFile() {
                   }}
                   value={selectedInstitute}
                   onChange={(e) => {
-                    console.log("Selected value:", e.target.value);
                     setSelectedInstitute(e.target.value ? Number(e.target.value) : "");
                   }}
                 >
@@ -407,7 +404,6 @@ export default function UploadExcelFile() {
                   }}
                   value={selectedAssessment}
                   onChange={(e) => {
-                    console.log("Selected assessment:", e.target.value);
                     setSelectedAssessment(e.target.value ? Number(e.target.value) : "");
                   }}
                 >

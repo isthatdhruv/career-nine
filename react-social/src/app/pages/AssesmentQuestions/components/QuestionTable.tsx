@@ -6,13 +6,9 @@ import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import {
-  AssignMeasuredQualityTypeToQuestion,
   DeleteQuestionData,
-  GetMeasuredQualityTypesForQuestion,
   ReadMeasuredQualityTypes,
-  RemoveMeasuredQualityTypeFromQuestion,
   ExportQuestionsToExcel, // Import the new export function
-  ImportQuestionsFromExcel
 } from "../API/Question_APIs";
 import QuestionLanguageModal from "./QuestionLanguageModal";  // ✅ import modal
 import QuestionBulkUploadModal from "./QuestionBulkUploadModal";
@@ -56,24 +52,24 @@ const QuestionTable = (props: {
   // useEffect(() => {
   //   const loadExistingSelections = async () => {
   //     const newSelections: {[key: number]: any[]} = {};
-      
+
   //     for (const question of props.data) {
   //       try {
   //         const response = await GetMeasuredQualityTypesForQuestion(question.id);
   //         newSelections[question.id] = response.data.map((type: any) => type.measuredQualityTypeId);
   //       } catch (error) {
   //         if ((error as any)?.response?.status === 404) {
-  //           console.log(`Question ${question.id} not found, skipping...`);
+  //           // Question not found, skipping
   //         } else {
   //           console.error(`Error loading quality types for question ${question.id}:`, error);
   //         }
   //         newSelections[question.id] = [];
   //       }
   //     }
-      
+
   //     setSelectedMeasuredQualityTypesByQuestion(newSelections);
   //   };
-    
+
   //   if (props.data && props.data.length > 0) {
   //     loadExistingSelections();
   //   } else {

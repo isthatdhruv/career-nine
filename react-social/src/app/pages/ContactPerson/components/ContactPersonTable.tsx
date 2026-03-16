@@ -1,8 +1,7 @@
 // ContactPersonTable.tsx
-import React, { useState } from "react";
+import { useState } from "react";
 import { MDBDataTableV5 } from "mdbreact";
 import { AiFillEdit } from "react-icons/ai";
-import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { DeleteContactInformationData } from "../API/Contact_Person_APIs";
@@ -23,7 +22,6 @@ const ContactPersonTable = (props: {
   setLoading: (v: boolean) => void;
   setPageLoading: (v: any) => void;
 }) => {
-  const navigate = useNavigate();
   const [modalShowEdit, setModalShowEdit] = useState(false);
   const [editModalData, setEditModalData] = useState<ContactRow>({
     id: undefined,

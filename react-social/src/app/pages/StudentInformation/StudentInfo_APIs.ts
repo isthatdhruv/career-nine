@@ -109,17 +109,11 @@ export function bulkRemoveAssessment(removals: BulkAssessmentAssignment[]) {
 
 // New API to get student answers with question and option details
 export function getStudentAnswersWithDetails(userStudentId: number, assessmentId: number) {
-    console.log("API Call - Endpoint:", `${STUDENT_INFO_BASE}/getStudentAnswersWithDetails`);
-    console.log("API Call - Params:", { userStudentId, assessmentId });
-
     return axios.get<StudentAnswerDetail[]>(`${STUDENT_INFO_BASE}/getStudentAnswersWithDetails`, {
         params: {
             userStudentId,
             assessmentId
         }
-    }).then(response => {
-        console.log("API Success:", response);
-        return response;
     }).catch(error => {
         console.error("API Error:", error.response?.data || error.message);
         throw error;

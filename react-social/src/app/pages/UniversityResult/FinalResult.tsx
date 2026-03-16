@@ -29,11 +29,9 @@ const FinalResult: React.FC = () => {
       })
       .then((responseJSON: any) => {
         setData1(responseJSON);
-        // console.log(responseJSON.result, "semester")
         setSemester(
           _.pluck(_.sortBy(responseJSON.result, "semester"), "semester")
         );
-        // console.log(_.pluck(_.sortBy(responseJSON.result, "semester"),"semester"))
       })
 
       .catch((error) => {

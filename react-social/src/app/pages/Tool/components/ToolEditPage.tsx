@@ -40,7 +40,6 @@ const ToolEditPage = (props?: {
         try {
           setLoading(true);
           const response = await ReadToolByIdData(id);
-          console.log("Fetched tool data:", response.data);
           const transformedData = {
             id: response.data.tool_id || response.data.toolId,
             toolName: response.data.name || response.data.toolName,
@@ -84,10 +83,6 @@ const ToolEditPage = (props?: {
     onSubmit: async (values) => {
       setLoading(true);
       try {
-        console.log("Attempting to update tool:");
-        console.log("Tool ID:", values.id);
-        console.log("Values being sent:", values);
-
         if (!values.id) {
           alert("No tool ID found. Please try navigating back and selecting the tool again.");
           return;
@@ -100,10 +95,7 @@ const ToolEditPage = (props?: {
           price: values.toolPrice === "FREE" ? 0 : Number(values.priceAmount)
         };
 
-        console.log("Payload being sent:", payload);
-
-        const response = await UpdateToolData(values.id, payload);
-        console.log("Update successful:", response);
+        await UpdateToolData(values.id, payload);
 
         navigate("/tools");
 

@@ -1,5 +1,5 @@
 // CollegeSectionSessionGradeModal.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Modal, Button } from "react-bootstrap-v5";
 import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
@@ -136,18 +136,14 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
 
   const fetchExistingData = async (instituteCode: string | number) => {
     if (!instituteCode) {
-      console.log("No institute code provided, skipping fetch");
       return;
     }
 
-    console.log("Fetching data for institute code:", instituteCode);
     setFetchLoading(true);
     setError(null);
     try {
       const response = await GetSessionsByInstituteCode(instituteCode);
-      console.log("API Response:", response.data);
       const transformedData = transformBackendToLocal(response.data);
-      console.log("Transformed Data:", transformedData);
       setExistingData(transformedData);
     } catch (err: any) {
       console.error("Error fetching existing data:", err);
@@ -161,8 +157,6 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
   // Reset and fetch when modal opens
   useEffect(() => {
     if (props.show) {
-      console.log("Modal opened with data:", props.data);
-
       // Reset new data states
       setNewSessionsData([]);
       setNewSessionInput("");
@@ -187,8 +181,6 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
       const instituteCode = props.data?.instituteCode;
       if (instituteCode && instituteCode !== "") {
         fetchExistingData(instituteCode);
-      } else {
-        console.log("No valid institute code in props.data:", props.data);
       }
     }
   }, [props.show, props.data?.instituteCode]);
