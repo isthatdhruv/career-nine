@@ -10,16 +10,14 @@ server:
     min-response-size: 1024
     mime-types: application/json,application/xml,text/html,text/xml,text/plain,application/javascript,text/css
   tomcat:
+    max-http-form-content-size: 50MB
+    max-swallow-size: 50MB
     threads:
       max: 300
       min-spare: 50
     accept-count: 100
     connection-timeout: 60000
-=========
-  tomcat:
-    max-http-form-content-size: 50MB
-    max-swallow-size: 50MB
->>>>>>>>> Temporary merge branch 2
+    
   # ssl:
   #   enabled: true
   #   key-store: classpath:keystore.p12
