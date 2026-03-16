@@ -49,6 +49,10 @@ const ReportGenerationPage: React.FC = () => {
   // Selection
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<number>>(new Set());
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
   // Step 3 — filter panel
   const [activeFilterItem, setActiveFilterItem] = useState<FilterKey>("grade");
   const [filterEnabled, setFilterEnabled] = useState<Set<FilterKey>>(new Set());
@@ -119,6 +123,7 @@ const ReportGenerationPage: React.FC = () => {
     setSelectedSection("");
     setSelectedStatus(new Set<string>());
     setSelectedStudentIds(new Set());
+    setCurrentPage(1);
   }, [selectedInstitute, selectedAssessment]);
 
   // Filtered students for the selected assessment
@@ -189,6 +194,19 @@ const ReportGenerationPage: React.FC = () => {
     selectedGrade, selectedSection, sectionLookup,
     selectedStatus, selectedAssessment,
   ]);
+
+  // Pagination computed values
+  const totalPages = Math.max(1, Math.ceil(displayedStudents.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedStudents = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return displayedStudents.slice(start, start + pageSize);
+  }, [displayedStudents, safeCurrentPage, pageSize]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [nameQuery, selectedGrade, selectedSection, selectedStatus, filterEnabled]);
 
   const toggleFilter = (key: FilterKey, checked: boolean) => {
     setFilterEnabled((prev) => {
@@ -609,17 +627,19 @@ const ReportGenerationPage: React.FC = () => {
                               <input
                                 type="checkbox"
                                 checked={
-                                  displayedStudents.length > 0 &&
-                                  displayedStudents.every((s) => selectedStudentIds.has(s.userStudentId))
+                                  paginatedStudents.length > 0 &&
+                                  paginatedStudents.every((s) => selectedStudentIds.has(s.userStudentId))
                                 }
                                 onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedStudentIds(
-                                      new Set(displayedStudents.map((s) => s.userStudentId))
-                                    );
-                                  } else {
-                                    setSelectedStudentIds(new Set());
-                                  }
+                                  setSelectedStudentIds((prev) => {
+                                    const next = new Set(prev);
+                                    if (e.target.checked) {
+                                      paginatedStudents.forEach((s) => next.add(s.userStudentId));
+                                    } else {
+                                      paginatedStudents.forEach((s) => next.delete(s.userStudentId));
+                                    }
+                                    return next;
+                                  });
                                 }}
                               />
                             </th>
@@ -634,7 +654,8 @@ const ReportGenerationPage: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {displayedStudents.map((s, idx) => {
+                          {paginatedStudents.map((s, idx) => {
+                            const globalIdx = (safeCurrentPage - 1) * pageSize + idx;
                             const secInfo = s.schoolSectionId
                               ? sectionLookup.get(s.schoolSectionId)
                               : undefined;
@@ -650,7 +671,7 @@ const ReportGenerationPage: React.FC = () => {
                             const sc = statusColors[status] || statusColors.notstarted;
                             const isChecked = selectedStudentIds.has(s.userStudentId);
                             return (
-                              <tr key={s.userStudentId} style={{ background: idx % 2 === 0 ? "#fff" : "#fafbfc" }}>
+                              <tr key={s.userStudentId} style={{ background: globalIdx % 2 === 0 ? "#fff" : "#fafbfc" }}>
                                 <td style={tdStyle}>
                                   <input
                                     type="checkbox"
@@ -665,7 +686,7 @@ const ReportGenerationPage: React.FC = () => {
                                     }}
                                   />
                                 </td>
-                                <td style={tdStyle}>{idx + 1}</td>
+                                <td style={tdStyle}>{globalIdx + 1}</td>
                                 <td style={tdStyle}><span className="fw-semibold">{s.name || "-"}</span></td>
                                 <td style={tdStyle}>{s.username || "-"}</td>
                                 <td style={tdStyle}>{s.schoolRollNumber || "-"}</td>
@@ -693,6 +714,124 @@ const ReportGenerationPage: React.FC = () => {
                         </tbody>
                       </table>
                     </div>
+
+                    {/* Pagination controls */}
+                    {displayedStudents.length > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          flexWrap: "wrap",
+                          gap: 12,
+                          marginTop: 16,
+                          padding: "12px 0",
+                          borderTop: "1px solid #f0f0f0",
+                        }}
+                      >
+                        {/* Left: showing info + page size */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                          <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
+                            Showing {(safeCurrentPage - 1) * pageSize + 1}–
+                            {Math.min(safeCurrentPage * pageSize, displayedStudents.length)} of{" "}
+                            {displayedStudents.length}
+                          </span>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <span style={{ fontSize: "0.8rem", color: "#9ca3af" }}>Rows:</span>
+                            <select
+                              className="form-select form-select-sm form-select-solid"
+                              style={{ width: 72, fontSize: "0.8rem" }}
+                              value={pageSize}
+                              onChange={(e) => {
+                                setPageSize(Number(e.target.value));
+                                setCurrentPage(1);
+                              }}
+                            >
+                              {[25, 50, 100].map((size) => (
+                                <option key={size} value={size}>
+                                  {size}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Right: page navigation */}
+                        {totalPages > 1 && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <button
+                              className="btn btn-sm btn-light"
+                              disabled={safeCurrentPage <= 1}
+                              onClick={() => setCurrentPage(1)}
+                              style={{ padding: "4px 8px", fontSize: "0.8rem" }}
+                            >
+                              First
+                            </button>
+                            <button
+                              className="btn btn-sm btn-light"
+                              disabled={safeCurrentPage <= 1}
+                              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                              style={{ padding: "4px 10px", fontSize: "0.85rem" }}
+                            >
+                              &lsaquo; Prev
+                            </button>
+
+                            {/* Page numbers */}
+                            {(() => {
+                              const pages: (number | string)[] = [];
+                              const maxVisible = 5;
+                              let start = Math.max(1, safeCurrentPage - Math.floor(maxVisible / 2));
+                              let end = Math.min(totalPages, start + maxVisible - 1);
+                              if (end - start + 1 < maxVisible) {
+                                start = Math.max(1, end - maxVisible + 1);
+                              }
+                              if (start > 1) {
+                                pages.push(1);
+                                if (start > 2) pages.push("...");
+                              }
+                              for (let i = start; i <= end; i++) pages.push(i);
+                              if (end < totalPages) {
+                                if (end < totalPages - 1) pages.push("...");
+                                pages.push(totalPages);
+                              }
+                              return pages.map((p, i) =>
+                                typeof p === "string" ? (
+                                  <span key={`ellipsis-${i}`} style={{ padding: "4px 6px", color: "#9ca3af" }}>
+                                    ...
+                                  </span>
+                                ) : (
+                                  <button
+                                    key={p}
+                                    className={`btn btn-sm ${p === safeCurrentPage ? "btn-primary" : "btn-light"}`}
+                                    onClick={() => setCurrentPage(p)}
+                                    style={{ padding: "4px 10px", fontSize: "0.85rem", minWidth: 34 }}
+                                  >
+                                    {p}
+                                  </button>
+                                )
+                              );
+                            })()}
+
+                            <button
+                              className="btn btn-sm btn-light"
+                              disabled={safeCurrentPage >= totalPages}
+                              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                              style={{ padding: "4px 10px", fontSize: "0.85rem" }}
+                            >
+                              Next &rsaquo;
+                            </button>
+                            <button
+                              className="btn btn-sm btn-light"
+                              disabled={safeCurrentPage >= totalPages}
+                              onClick={() => setCurrentPage(totalPages)}
+                              style={{ padding: "4px 8px", fontSize: "0.8rem" }}
+                            >
+                              Last
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
               </>
