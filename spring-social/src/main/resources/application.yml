@@ -236,7 +236,7 @@ spring:
             clientId: 101961828065-ak601ssij07ugrffovuns8v2adrqvtqd.apps.googleusercontent.com
             clientSecret: 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
             # redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
-            redirectUri: "https://staging.api.kccitm.in/oauth2/callback/{registrationId}"
+            redirectUri: "https://api.career-9.com/oauth2/callback/{registrationId}"
 
             scope:
               - email
@@ -298,9 +298,12 @@ app:
     # redirectUri mentioned by the client in the /oauth2/authorize request.
     # We're not using cookies because they won't work well in mobile clients.
     authorizedRedirectUris:
+      - https://dashboard.career-9.com/oauth2/redirect
+      - https://career-9.com/oauth2/redirect
+      - https://www.career-9.com/oauth2/redirect
+      - https://assessment.career-9.com/oauth2/redirect
       - https://student.kccitm.in/oauth2/redirect
       - https://staging.student.kccitm.in/oauth2/redirect
-      - https://student.kccitm.in/oauth2/redirect
       - http://localhost:3000/oauth2/redirect
       - myandroidapp://oauth2/redirect
       - http://localhost/oauth2/redirect

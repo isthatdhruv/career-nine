@@ -23,6 +23,7 @@ import com.kccitm.api.repository.Career9.AssessmentQuestionOptionsRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
+import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 
 @Service
 public class PartialAnswerFlushService {
@@ -46,6 +47,9 @@ public class PartialAnswerFlushService {
 
     @Autowired
     private AssessmentQuestionOptionsRepository assessmentQuestionOptionsRepository;
+
+    @Autowired
+    private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
 
     @SuppressWarnings("unchecked")
     @Transactional
@@ -136,6 +140,18 @@ public class PartialAnswerFlushService {
                 Long assessmentId = ((Number) entry.get("assessmentId")).longValue();
                 // Skip if student already submitted — async processor handles it
                 if (assessmentSessionService.hasSubmissionLock(studentId, assessmentId)) {
+                    continue;
+                }
+                // Skip if assessment is completed — don't overwrite scored answers with raw partials.
+                // This is defense-in-depth: the reset endpoint clears Redis, but a race window exists
+                // if reset fires while this scheduler already fetched the entry list.
+                String mappingStatus = studentAssessmentMappingRepository
+                        .findFirstByUserStudentUserStudentIdAndAssessmentId(studentId, assessmentId)
+                        .map(m -> m.getStatus())
+                        .orElse(null);
+                if ("completed".equals(mappingStatus)) {
+                    // Stale partial key — clean it up proactively
+                    assessmentSessionService.deletePartialAnswers(studentId, assessmentId);
                     continue;
                 }
                 if (flushOneStudent(studentId, assessmentId)) success++;

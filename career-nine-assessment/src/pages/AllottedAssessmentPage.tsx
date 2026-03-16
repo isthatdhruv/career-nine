@@ -99,7 +99,8 @@ export default function AllottedAssessmentPage() {
   };
 
   return (
-    <div className="assessment-bg--full" style={{ padding: '2rem 1rem' }}>
+    <div className="assessment-bg--full">
+      <div className="assessment-scroll-container" style={{ padding: '2rem 1rem' }}>
       <div className="container-lg">
         {/* Header Section */}
         <header className="allotted-header text-center mb-4 mb-md-5">
@@ -350,6 +351,7 @@ export default function AllottedAssessmentPage() {
             })}
           </div>
         )}
+      </div>
       </div>
 
       {/* Ongoing Assessment Modal */}
