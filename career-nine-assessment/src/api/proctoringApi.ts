@@ -10,6 +10,6 @@ export async function submitProctoringData(payload: ProctoringPayload): Promise<
       'Accept': 'application/json',
     },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(30000),
+    signal: AbortSignal.timeout(10000),
   });
 }

@@ -68,24 +68,15 @@ const GeneralInstructionsPage: React.FC = () => {
         <div className="row justify-content-center">
           <div className={`col-12 ${languageInstructions.length > 1 ? 'col-xl-10' : 'col-lg-8 col-xl-7'}`}>
             <div className="assessment-card card shadow-lg">
-              <div className="card-body p-3 p-sm-4 p-md-5">
-                {/* Header Icon */}
-                <div className="assessment-icon-circle--lg mx-auto">
-                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="16" x2="12" y2="12" />
-                    <line x1="12" y1="8" x2="12.01" y2="8" />
-                  </svg>
-                </div>
-
-                <h2 className="text-center assessment-heading">General Instructions</h2>
-                <p className="text-center assessment-subheading mb-4">
+              <div className="card-body p-3 p-sm-3 p-md-4" style={{ paddingTop: '1.25rem' }}>
+                <h2 className="text-center assessment-heading" style={{ fontSize: '1.5rem' }}>General Instructions</h2>
+                <p className="text-center assessment-subheading" style={{ marginBottom: '0.75rem' }}>
                   Please read the instructions carefully before proceeding
                 </p>
 
                 {/* Instructions from DB */}
                 {languageInstructions.length > 0 ? (
-                  <div className={`instructions-grid ${languageInstructions.length > 1 ? 'instructions-grid--dual' : 'instructions-grid--single'}`} style={{ marginBottom: '2rem' }}>
+                  <div className={`instructions-grid ${languageInstructions.length > 1 ? 'instructions-grid--dual' : 'instructions-grid--single'}`} style={{ marginBottom: '1rem' }}>
                     {languageInstructions.map((lang, index) => (
                       <React.Fragment key={lang.id}>
                         <div>

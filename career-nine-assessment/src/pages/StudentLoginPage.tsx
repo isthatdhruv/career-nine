@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePreventReload } from '../hooks/usePreventReload';
 import http from '../api/http';
@@ -8,7 +8,9 @@ const StudentLoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { prefetchAssessmentData } = useAssessment();
   const [userId, setUserId] = useState('');
-  const [dob, setDob] = useState('');
+  const [dobDay, setDobDay] = useState('');
+  const [dobMonth, setDobMonth] = useState('');
+  const [dobYear, setDobYear] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -31,36 +33,23 @@ const StudentLoginPage: React.FC = () => {
       localStorage.clear();
     }
     sessionStorage.clear();
-    if ('caches' in window) {
-      // Preserve preloaded resources and Workbox precache
-      const PRESERVE = ['career9-resources-v1'];
-      caches.keys().then(names =>
-        names
-          .filter(n => !PRESERVE.includes(n) && !n.startsWith('workbox-'))
-          .forEach(n => caches.delete(n))
-      );
-    }
   }, []);
   const [errors, setErrors] = useState({ userId: '', dob: '' });
   const [touched, setTouched] = useState({ userId: false, dob: false });
-  const dateInputRef = useRef<HTMLInputElement>(null);
 
-  usePreventReload(userId.length > 0 || dob.length > 0);
+  const dob = dobDay && dobMonth && dobYear
+    ? `${dobDay.padStart(2, '0')}-${dobMonth.padStart(2, '0')}-${dobYear}`
+    : '';
+
+  usePreventReload(userId.length > 0 || dobDay.length > 0 || dobMonth.length > 0 || dobYear.length > 0);
 
   const validateUserId = (id: string): string => {
     if (!id) return 'User ID is required';
     return '';
   };
 
-  const validateDob = (date: string): string => {
-    if (!date) return 'Date of Birth is required';
-    const regex = /^(\d{2})-(\d{2})-(\d{4})$/;
-    const match = date.match(regex);
-    if (!match) return 'Please enter date in dd-mm-yyyy format';
-    const day = parseInt(match[1], 10);
-    const month = parseInt(match[2], 10);
-    if (month < 1 || month > 12) return 'Invalid month';
-    if (day < 1 || day > 31) return 'Invalid day';
+  const validateDob = (day: string, month: string, year: string): string => {
+    if (!day || !month || !year) return 'Please select day, month, and year';
     return '';
   };
 
@@ -68,17 +57,6 @@ const StudentLoginPage: React.FC = () => {
     const value = e.target.value;
     setUserId(value);
     if (touched.userId) setErrors(prev => ({ ...prev, userId: validateUserId(value) }));
-  };
-
-  const handleDobChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value;
-    value = value.replace(/[^\d-]/g, '');
-    const digits = value.replace(/-/g, '');
-    if (digits.length <= 2) value = digits;
-    else if (digits.length <= 4) value = `${digits.slice(0, 2)}-${digits.slice(2)}`;
-    else value = `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4, 8)}`;
-    setDob(value);
-    if (touched.dob) setErrors(prev => ({ ...prev, dob: validateDob(value) }));
   };
 
   const handleUserIdBlur = () => {
@@ -89,30 +67,49 @@ const StudentLoginPage: React.FC = () => {
     }
   };
 
-  const handleDobBlur = () => {
-    setTouched(prev => ({ ...prev, dob: true }));
-    setErrors(prev => ({ ...prev, dob: validateDob(dob) }));
-  };
+  const [openDropdown, setOpenDropdown] = useState<'day' | 'month' | 'year' | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const handleCalendarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const dateValue = e.target.value;
-    if (dateValue) {
-      const [year, month, day] = dateValue.split('-');
-      const formattedDate = `${day}-${month}-${year}`;
-      setDob(formattedDate);
-      if (touched.dob) setErrors(prev => ({ ...prev, dob: validateDob(formattedDate) }));
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpenDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleDobSelect = (field: 'day' | 'month' | 'year', value: string) => {
+    if (field === 'day') setDobDay(value);
+    else if (field === 'month') setDobMonth(value);
+    else setDobYear(value);
+    setOpenDropdown(null);
+    if (touched.dob) {
+      const d = field === 'day' ? value : dobDay;
+      const m = field === 'month' ? value : dobMonth;
+      const y = field === 'year' ? value : dobYear;
+      setErrors(prev => ({ ...prev, dob: validateDob(d, m, y) }));
     }
   };
 
-  const openCalendar = () => {
-    (dateInputRef.current as any)?.showPicker?.() || dateInputRef.current?.click();
-  };
+  const months = [
+    { value: '01', label: 'Jan' }, { value: '02', label: 'Feb' },
+    { value: '03', label: 'Mar' }, { value: '04', label: 'Apr' },
+    { value: '05', label: 'May' }, { value: '06', label: 'Jun' },
+    { value: '07', label: 'Jul' }, { value: '08', label: 'Aug' },
+    { value: '09', label: 'Sep' }, { value: '10', label: 'Oct' },
+    { value: '11', label: 'Nov' }, { value: '12', label: 'Dec' },
+  ];
+
+  const years = Array.from({ length: 31 }, (_, i) => String(2015 - i));
+  const days = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0'));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setTouched({ userId: true, dob: true });
     const userIdError = validateUserId(userId);
-    const dobError = validateDob(dob);
+    const dobError = validateDob(dobDay, dobMonth, dobYear);
     setErrors({ userId: userIdError, dob: dobError });
 
     if (!userIdError && !dobError) {
@@ -141,7 +138,7 @@ const StudentLoginPage: React.FC = () => {
   };
 
   return (
-    <div className="assessment-bg" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', overflow: 'auto' }}>
+    <div className="assessment-bg">
       <div className="container">
         <div className="row justify-content-center">
           <div className="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-5">
@@ -149,7 +146,7 @@ const StudentLoginPage: React.FC = () => {
               <div className="card-body p-3 p-sm-4 p-md-5">
                 {/* Logo */}
                 <div className="login-logo-wrapper">
-                  <img src="/media/logos/kcc.jpg" alt="CAREER_9 Logo" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: "10%", padding: "8px" }} />
+                  <img src="/media/logos/kcc.webp" alt="CAREER_9 Logo" style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: "10%", padding: "8px" }} />
                 </div>
 
                 <h2 className="text-center assessment-heading">Assessment Login</h2>
@@ -176,34 +173,99 @@ const StudentLoginPage: React.FC = () => {
                     {touched.userId && errors.userId && <div style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.35rem' }}>{errors.userId}</div>}
                   </div>
 
-                  {/* DOB field */}
+                  {/* DOB field - 3 custom dropdowns */}
                   <div className="mb-4">
-                    <label htmlFor="dob" className="form-label fw-semibold" style={{ color: '#4a5568', fontSize: '0.95rem' }}>Date of Birth</label>
-                    <div className="position-relative">
-                      <div className="position-absolute top-50 translate-middle-y" style={{ left: '1rem', color: '#a0aec0', zIndex: 1 }}>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-                      </div>
-                      <div className="input-group">
-                        <input
-                          type="text"
-                          className={`form-control assessment-input ${touched.dob && errors.dob ? 'is-invalid' : touched.dob && !errors.dob ? 'is-valid' : ''}`}
-                          id="dob"
-                          placeholder="dd-mm-yyyy"
-                          maxLength={10}
-                          value={dob}
-                          onChange={handleDobChange}
-                          onBlur={handleDobBlur}
-                          style={{ borderRadius: '10px 0 0 10px', borderRight: 'none' }}
-                        />
-                        <button
-                          type="button"
-                          className="btn btn-outline-secondary"
-                          onClick={openCalendar}
-                          style={{ borderRadius: '0 10px 10px 0', borderColor: '#e2e8f0', fontSize: '1.1rem' }}
+                    <label className="form-label fw-semibold" style={{ color: '#4a5568', fontSize: '0.95rem' }}>Date of Birth</label>
+                    <div className="d-flex gap-2" ref={dropdownRef}>
+                      {/* Day */}
+                      <div style={{ flex: 1, position: 'relative' }}>
+                        <div
+                          onClick={() => setOpenDropdown(openDropdown === 'day' ? null : 'day')}
+                          style={{
+                            borderRadius: '10px', padding: '10px 12px', fontSize: '0.95rem',
+                            border: `1px solid ${touched.dob && errors.dob ? '#dc3545' : '#e2e8f0'}`,
+                            color: '#2d3748', cursor: 'pointer', background: '#fff',
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          }}
                         >
-                          &#x1f4c5;
-                        </button>
-                        <input type="date" ref={dateInputRef} onChange={handleCalendarChange} style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }} />
+                          <span>{dobDay || 'Day'}</span>
+                          <span style={{ fontSize: '0.7rem', color: '#a0aec0' }}>&#9662;</span>
+                        </div>
+                        {openDropdown === 'day' && (
+                          <div style={{
+                            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+                            background: '#fff', border: '1px solid #e2e8f0', borderRadius: '0 0 10px 10px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxHeight: '150px', overflowY: 'auto',
+                          }}>
+                            {days.map(d => (
+                              <div key={d} onClick={() => handleDobSelect('day', d)}
+                                style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.95rem', color: '#2d3748', background: dobDay === d ? 'rgba(102,126,234,0.1)' : '#fff' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(102,126,234,0.08)'}
+                                onMouseLeave={e => e.currentTarget.style.background = dobDay === d ? 'rgba(102,126,234,0.1)' : '#fff'}
+                              >{d}</div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {/* Month */}
+                      <div style={{ flex: 1.2, position: 'relative' }}>
+                        <div
+                          onClick={() => setOpenDropdown(openDropdown === 'month' ? null : 'month')}
+                          style={{
+                            borderRadius: '10px', padding: '10px 12px', fontSize: '0.95rem',
+                            border: `1px solid ${touched.dob && errors.dob ? '#dc3545' : '#e2e8f0'}`,
+                            color: '#2d3748', cursor: 'pointer', background: '#fff',
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          }}
+                        >
+                          <span>{dobMonth ? months.find(m => m.value === dobMonth)?.label : 'Month'}</span>
+                          <span style={{ fontSize: '0.7rem', color: '#a0aec0' }}>&#9662;</span>
+                        </div>
+                        {openDropdown === 'month' && (
+                          <div style={{
+                            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+                            background: '#fff', border: '1px solid #e2e8f0', borderRadius: '0 0 10px 10px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxHeight: '150px', overflowY: 'auto',
+                          }}>
+                            {months.map(m => (
+                              <div key={m.value} onClick={() => handleDobSelect('month', m.value)}
+                                style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.95rem', color: '#2d3748', background: dobMonth === m.value ? 'rgba(102,126,234,0.1)' : '#fff' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(102,126,234,0.08)'}
+                                onMouseLeave={e => e.currentTarget.style.background = dobMonth === m.value ? 'rgba(102,126,234,0.1)' : '#fff'}
+                              >{m.label}</div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {/* Year */}
+                      <div style={{ flex: 1.3, position: 'relative' }}>
+                        <div
+                          onClick={() => setOpenDropdown(openDropdown === 'year' ? null : 'year')}
+                          style={{
+                            borderRadius: '10px', padding: '10px 12px', fontSize: '0.95rem',
+                            border: `1px solid ${touched.dob && errors.dob ? '#dc3545' : '#e2e8f0'}`,
+                            color: '#2d3748', cursor: 'pointer', background: '#fff',
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          }}
+                        >
+                          <span>{dobYear || 'Year'}</span>
+                          <span style={{ fontSize: '0.7rem', color: '#a0aec0' }}>&#9662;</span>
+                        </div>
+                        {openDropdown === 'year' && (
+                          <div style={{
+                            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+                            background: '#fff', border: '1px solid #e2e8f0', borderRadius: '0 0 10px 10px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxHeight: '150px', overflowY: 'auto',
+                          }}>
+                            {years.map(y => (
+                              <div key={y} onClick={() => handleDobSelect('year', y)}
+                                style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.95rem', color: '#2d3748', background: dobYear === y ? 'rgba(102,126,234,0.1)' : '#fff' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(102,126,234,0.08)'}
+                                onMouseLeave={e => e.currentTarget.style.background = dobYear === y ? 'rgba(102,126,234,0.1)' : '#fff'}
+                              >{y}</div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                     {touched.dob && errors.dob && <div style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.35rem' }}>{errors.dob}</div>}

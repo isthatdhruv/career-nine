@@ -612,9 +612,13 @@ public class StudentInfoController {
             assessmentProctoringQuestionLogRepository.deleteByUserStudentUserStudentIdAndAssessmentId(
                     userStudentId, assessmentId);
 
-            // Clear Redis submission lock and session
+            // Clear all Redis state for this student+assessment to prevent:
+            // 1. Auto-flush writing stale partial answers back to MySQL
+            // 2. Retry scheduler re-processing old submitted answers
             assessmentSessionService.deleteSession(userStudentId, assessmentId);
             assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
+            assessmentSessionService.deletePartialAnswers(userStudentId, assessmentId);
+            assessmentSessionService.deleteSubmittedAnswers(userStudentId, assessmentId);
 
             // Reset status to 'notstarted'
             mapping.setStatus("notstarted");

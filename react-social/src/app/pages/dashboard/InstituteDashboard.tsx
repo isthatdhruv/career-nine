@@ -1216,7 +1216,7 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
             <div className="d-flex align-items-center gap-4 flex-wrap">
               <div className="d-flex align-items-center gap-3">
                 <img
-                  src={toAbsoluteUrl("/media/logos/kcc.jpg")}
+                  src={toAbsoluteUrl("/media/logos/kcc.webp")}
                   alt="School logo"
                   className="h-60px rounded shadow-sm"
                 />

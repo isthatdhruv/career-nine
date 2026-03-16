@@ -488,17 +488,11 @@ const DemographicDetailsPage: React.FC = () => {
           <div className="row justify-content-center">
             <div className="col-12 col-md-10 col-lg-8 col-xl-7">
               <div className="assessment-card card shadow-lg">
-                <div className="card-body p-3 p-sm-4 p-md-5">
+                <div className="card-body p-3 p-sm-3 p-md-4" style={{ paddingTop: '1.25rem' }}>
                   {/* Header */}
-                  <div className="text-center mb-3 mb-md-4">
-                    <div className="assessment-icon-circle--md mx-auto">
-                      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                      </svg>
-                    </div>
-                    <h2 className="assessment-heading">Demographic Details</h2>
-                    <p className="assessment-subheading">Please provide your information to continue</p>
+                  <div className="text-center mb-2">
+                    <h2 className="assessment-heading" style={{ fontSize: '1.5rem' }}>Demographic Details</h2>
+                    <p className="assessment-subheading" style={{ marginBottom: '0.5rem' }}>Please provide your information to continue</p>
                   </div>
 
                   <form onSubmit={handleSubmit} noValidate>
