@@ -187,7 +187,6 @@ export function HydroTubeGame({
       gameType: "hydro-tube",
     };
 
-    console.log("Hydro tube game data:", gameData);
     onComplete(gameData);
   }, [
     gameEnded,

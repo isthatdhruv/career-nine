@@ -25,7 +25,6 @@ import _ from "lodash";
 import moment from "moment";
 import { Button } from "react-bootstrap";
 import Webcam from "react-webcam";
-import { time } from "console";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -329,12 +328,10 @@ const StudentDetails = () => {
   const [inputOTP, setInputOTP] = useState("");
 
   const handleChange = (event) => {
-    // console.log("Target value =", event.target.value);
     setInputOTP(event.target.value);
   };
 
   useEffect(() => {
-    // console.log("verify button removed");
   }, [verifyRemove]);
 
   const [time, setTime] = useState(120);
@@ -370,7 +367,6 @@ const StudentDetails = () => {
         if (formikCheck(values.check)) values.generate = "RR";
         else values.generate = "RA";
       }
-      console.log(values);
       try {
         upsertStudentData(values)
           .then(() => {
@@ -393,7 +389,6 @@ const StudentDetails = () => {
 
   // function Partial_Save(values: any) {
   //   try {
-  //     console.log(values)
   //     upsertStudentData(values).then(() => {
   // alert("Please wait. Don't close the tab")
   //     });
@@ -466,7 +461,6 @@ const StudentDetails = () => {
             // setlistofDocument(list_of_Document);
 
             setloading(false);
-            // console.log(formik.errors);
           })
           .catch((error) => {
             console.error(error);
@@ -632,7 +626,6 @@ const StudentDetails = () => {
     facingMode: "user",
   };
   function validate() {
-    // console.log(formik.errors);
     var ret = "";
     return formik.errors;
   }
@@ -1431,10 +1424,6 @@ const StudentDetails = () => {
                               formik.values.otp
                             )
                               .then((response) => {
-                                // console.log(
-                                //   "OTP verification success:",
-                                //   response.data
-                                // );
                                 if (!response.data) {
                                   <h4>Incorrect OTP</h4>;
                                 }

@@ -1,7 +1,7 @@
 import { MDBDataTableV5 } from "mdbreact";
 import { useState } from "react";
 import { AiFillEdit } from "react-icons/ai";
-import { Link } from "react-router-dom";
+
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import BoardEditModal from "./BoardEditModal";

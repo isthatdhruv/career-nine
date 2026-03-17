@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from "react";
-import axios from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ReadCollegeList, GetSessionsByInstituteCode, GetInstituteMappings } from "../College/API/College_APIs";
 import {
@@ -379,19 +378,12 @@ export default function GroupStudentSchoolPage() {
     setDownloadError("");
 
     try {
-      console.log("Fetching answers for:", {
-        userStudentId: student.userStudentId,
-        assessmentId: assessmentId,
-      });
-
       const response = await getStudentAnswersWithDetails(
         student.userStudentId,
         assessmentId
       );
 
-      console.log("API Response:", response);
       const normalized = normalizeAnswers(response.data);
-      console.log("Normalized answers count:", normalized.length);
       setDownloadAnswers(normalized);
     } catch (err: any) {
       console.error("Error fetching answers:", err);
@@ -529,7 +521,6 @@ export default function GroupStudentSchoolPage() {
     ReadCollegeList()
       .then((res: any) => {
         const list = Array.isArray(res.data) ? res.data : [];
-        console.log("Fetched Institutes:", list);
         setInstitutes(list);
       })
       .catch((err: any) => console.error("Failed to fetch institutes", err));
@@ -602,7 +593,6 @@ export default function GroupStudentSchoolPage() {
               assignedAssessmentIds: assignedIds,
             };
           });
-          console.log("Loaded students:", studentData);
           setStudents(studentData);
         })
         .catch((error) => {

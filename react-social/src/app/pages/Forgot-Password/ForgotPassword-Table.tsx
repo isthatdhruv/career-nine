@@ -4,10 +4,6 @@ import { Button } from "react-bootstrap";
 import ForgotpasswordCreateModal from "./ForgotpasswordCreateModal";
 
 const EmaillistTable = (props: { email: any; name: any }) => {
-  // var [data2, setData2] = useState();
-  // console.log(props.result, "hi")
-  // console.log(props.email)
-
   const [modalShowCreate, setModalShowCreate] = useState(false);
   const [editModalData, setEditModalData] = useState({
     officialEmailAddress: "",

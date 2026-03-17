@@ -85,7 +85,6 @@ export default function Basic() {
         return response.json();
       })
       .then((responseJSON) => {
-        console.log(responseJSON);
         setData1(responseJSON);
         setDatatable({
           ...datatable,

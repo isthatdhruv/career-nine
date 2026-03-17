@@ -483,11 +483,9 @@ const StudentDetails = () => {
     onSubmit: (values, { setStatus, setSubmitting }) => {
       // try {
       //   upsertStudentData(values).then((data) => {
-      //     console.log(data);
       //     window.location.replace("/thankyou");z
       //   });
       // } catch (error) {
-      //   console.log("error");
       //   window.location.replace("/error");
       // }
 

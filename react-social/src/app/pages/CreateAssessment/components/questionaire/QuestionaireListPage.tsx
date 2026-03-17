@@ -59,8 +59,7 @@ const QuestionaireListPage: React.FC = () => {
       setLoading(true);
       const response = await ReadQuestionaireDataList();
       const data = response.data || [];
-      console.log("Fetched questionnaire data:", data);
-      
+
       setQuestionaireList(data);
 
       const formattedRows = data.map((item: any) => ({

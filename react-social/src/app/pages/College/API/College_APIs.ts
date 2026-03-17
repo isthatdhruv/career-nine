@@ -62,7 +62,6 @@ export function GetInstituteMappings(instituteCode: number | string) {
 // ============ SESSION FUNCTIONS ============
 
 export function CreateSessionData(values: any) {
-  console.log("API Call - CreateSessionData with values:", values);
   return axios.post(createSession, values);
 }
 

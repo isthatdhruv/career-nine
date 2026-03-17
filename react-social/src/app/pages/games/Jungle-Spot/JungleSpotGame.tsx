@@ -374,12 +374,10 @@ export function JungleSpotGame({ userStudentId, playerName, onComplete, onExit }
       gameType: 'jungle-spot'
     };
 
-    console.log("Jungle Spot game completed:", gameResultsRef.current);
   }, [gameOver, trials, userStudentId, playerName]);
 
   const handleContinue = useCallback(() => {
     if (gameResultsRef.current) {
-      console.log("Saving game results to Firestore...");
       onComplete(gameResultsRef.current);
     } else {
       onComplete({ error: "No game results available" });

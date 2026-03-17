@@ -10,11 +10,14 @@ server:
     min-response-size: 1024
     mime-types: application/json,application/xml,text/html,text/xml,text/plain,application/javascript,text/css
   tomcat:
+    max-http-form-content-size: 50MB
+    max-swallow-size: 50MB
     threads:
       max: 300
       min-spare: 50
     accept-count: 100
     connection-timeout: 60000
+    
   # ssl:
   #   enabled: true
   #   key-store: classpath:keystore.p12
@@ -24,6 +27,10 @@ server:
 ---
 spring:
   profiles: dev
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
   datasource:
     url: jdbc:mysql://localhost:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     # url: jdbc:mysql://192.168.10.73:3306/kiraya-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
@@ -168,6 +175,11 @@ app:
   firebase:
     project-id: career-9-assessment
     service-account-file: firebase-service-account.json
+  digitalocean:
+    spaces:
+      bucket: storage-c9
+      region: sgp1
+      cdn-url: https://storage-c9.sgp1.digitaloceanspaces.com
 
 ---
 spring:

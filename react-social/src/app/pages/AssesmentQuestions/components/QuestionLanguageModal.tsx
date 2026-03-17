@@ -175,12 +175,9 @@ const QuestionLanguageModal = ({
               return;
             }
             
-            console.log("Translating question:", questionData.questionText, "to", selectedLanguage.languageName);
-            
             try {
               setTranslatingQuestion(true);
               const translatedText = await translateQuestion(questionData.questionText, selectedLanguage.languageName);
-              console.log("Question translation result:", translatedText);
               
               setFieldValue("translatedQuestion", translatedText);
               
@@ -199,12 +196,9 @@ const QuestionLanguageModal = ({
               return;
             }
             
-            console.log(`Translating option ${index}:`, optionText, "to", targetLanguage);
-            
             try {
               setTranslatingOptions(prev => ({ ...prev, [index]: true }));
               const translatedText = await translateOption(optionText, targetLanguage);
-              console.log(`Translation result for option ${index}:`, translatedText);
               
               setFieldValue(`translatedOptions.${index}.translatedText`, translatedText);
               
@@ -229,12 +223,6 @@ const QuestionLanguageModal = ({
 
             const optionTexts = questionData.options.map((opt: any) => opt.optionText);
             
-            console.log("Translating all:", {
-              question: questionData.questionText,
-              options: optionTexts,
-              targetLanguage: selectedLanguage.languageName
-            });
-            
             try {
               setTranslatingAll(true);
               
@@ -243,8 +231,6 @@ const QuestionLanguageModal = ({
                 optionTexts,
                 selectedLanguage.languageName
               );
-              
-              console.log("Translate all result:", result);
               
               // Set translated question
               setFieldValue("translatedQuestion", result.translated.question);

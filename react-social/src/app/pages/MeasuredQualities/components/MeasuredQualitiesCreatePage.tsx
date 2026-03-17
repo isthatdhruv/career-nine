@@ -45,7 +45,6 @@ const MeasuredQualitiesCreatePage = ({
             
             setLoading(true);
             try {
-              console.log(values);
               await CreateMeasuredQualitiesData(values);
               resetForm();
               navigate("/measured-qualities");

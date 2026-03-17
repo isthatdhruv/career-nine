@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Button } from "react-bootstrap";
 import { IconContext } from "react-icons";
 import { MdSchool } from "react-icons/md";
-import { MdPersonAdd } from "react-icons/md";
 import { ReadCollegeData } from "./API/College_APIs";
 import CollegeCreateModal from "./components/CollegeCreateModal";
 import CollegeTable from "./components/CollegeTable";
@@ -16,7 +14,6 @@ const CollegePage = () => {
   const [pageLoading, setPageLoading] = useState(["false"]);
   const [showStudentUpload, setShowStudentUpload] = useState(false);
   const [selectedCollegeForUpload, setSelectedCollegeForUpload] = useState<any>(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     setLoading(true);

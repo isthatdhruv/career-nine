@@ -4,14 +4,11 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import _ from "underscore";
 import {
-  ReadBatchByIdData,
-  ReadBranchByIdData,
   readStudentData,
   sendStudnetIdEmail,
   getAllBatchDataFromStudnet,
   getAllBranchDataFromStudnet,
   sendStudnetIdEmailExisting,
-  getGoogleEmailStatus,
   updateGoogleMailCheck,
 } from "./Student_APIs";
 import { Button } from "react-bootstrap";
@@ -132,7 +129,6 @@ export default function Basic() {
     try {
       readStudentData()
         .then(async (data) => {
-          console.log(data);
           var course = _.unique(
             _.map(data.data, (data) => {
               return data.course;
@@ -164,14 +160,12 @@ export default function Basic() {
           );
 
           _.each(data.data, (data) => {
-            // console.log(results_batch);
             data.batchData = _.find(results_batch, (data_batch) => {
               if (data_batch.batchId == data.batch_id) return data_batch;
             }).batchEnd;
             data.branchData = _.find(results_branch, (data_branch) => {
               if (data_branch.branchId == data.branch_id) return data_branch;
             }).branchName;
-            // console.log(data.officialEmailAddress);
           });
 
           setStudentData(data.data);
@@ -322,7 +316,6 @@ export default function Basic() {
                         (item) => item !== data.collegeEnrollmentNumber
                       );
                       setMailButtonLoadingId(newArray);
-                      console.log(mailButtonLoadingId);
                     }
                   );
                 }}
@@ -350,7 +343,6 @@ export default function Basic() {
                         (item) => item !== data.collegeEnrollmentNumber
                       );
                       setMailButtonLoadingId(newArray);
-                      console.log(mailButtonLoadingId);
                     }
                   );
                 }}
@@ -412,7 +404,7 @@ export default function Basic() {
   //     .then((response) => {
   //       return response.json();
   //     }).then((responseJSON) => {
-  //       console.log(responseJSON, "hey data")
+  //
   //       setData1(responseJSON)
   //       setDatatable({
   //         ...datatable, rows: _.map(responseJSON, (d1: any) => {
@@ -430,7 +422,7 @@ export default function Basic() {
   //     })
 
   //     .catch((err) => {
-  //       console.log(err)
+  //
   //     })
   // },
   //  [])
@@ -447,8 +439,7 @@ export default function Basic() {
       )}
       <Button
         onClick={() => {
-          updateGoogleMailCheck().then((data) => {
-            console.log(data);
+          updateGoogleMailCheck().then(() => {
           });
         }}
       >

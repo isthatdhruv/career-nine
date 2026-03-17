@@ -179,6 +179,9 @@ public class AssessmentQuestionController {
         existingQuestion.setQuestionType(assessmentQuestions.getQuestionType());
         existingQuestion.setMaxOptionsAllowed(assessmentQuestions.getMaxOptionsAllowed());
         existingQuestion.setIsMQT(assessmentQuestions.getIsMQT());
+        existingQuestion.setQuestionMediaType(assessmentQuestions.getQuestionMediaType());
+        existingQuestion.setQuestionImageUrl(assessmentQuestions.getQuestionImageUrl());
+        existingQuestion.setQuestionVideoUrl(assessmentQuestions.getQuestionVideoUrl());
 
         // Step 3: Update section relationship (validate section exists first)
         if (assessmentQuestions.getSection() != null && assessmentQuestions.getSection().getSectionId() != null) {

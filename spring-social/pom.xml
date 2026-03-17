@@ -224,6 +224,13 @@
 			<version>9.1.20</version>
 		</dependency>
 
+		<!-- AWS S3 SDK for DigitalOcean Spaces -->
+		<dependency>
+			<groupId>com.amazonaws</groupId>
+			<artifactId>aws-java-sdk-s3</artifactId>
+			<version>1.12.261</version>
+		</dependency>
+
 		<!-- Apache POI for Excel generation and parsing -->
 		<dependency>
 			<groupId>org.apache.poi</groupId>

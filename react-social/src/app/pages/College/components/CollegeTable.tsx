@@ -7,7 +7,7 @@ import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { Button, Dropdown } from "react-bootstrap";
 import { IconContext } from "react-icons";
-import { MdEdit, MdDelete, MdSchool, MdOutlineDashboard } from "react-icons/md";
+import { MdSchool, MdOutlineDashboard } from "react-icons/md";
 
 import { DeleteCollegeData } from "../API/College_APIs";
 import CollegeEditModal from "./CollegeEditModal";
@@ -151,9 +151,6 @@ const CollegeTable = (props: {
               onClick={async () => {
                 try {
                   const deleteId = data.id ?? data.instituteCode;
-
-                  console.log("Attempting to delete college. Row:", data);
-                  console.log("Using deleteId:", deleteId);
 
                   if (!deleteId) {
                     console.error(

@@ -42,17 +42,12 @@ const MeasuredQualityTypesEditPage = (props?: {
     onSubmit: async (values) => {
       setLoading(true);
       try {
-        console.log("Attempting to update question:");
-        console.log("Question ID:", values.measuredQualityTypeId);
-        console.log("Values being sent:", values);
-
         if (!values.measuredQualityTypeId) {
           alert("No question ID found. Please try navigating back and selecting the question again.");
           return;
         }
 
-        const response = await UpdateMeasuredQualityTypesData(values.measuredQualityTypeId, values);
-        console.log("Update successful:", response);
+        await UpdateMeasuredQualityTypesData(values.measuredQualityTypeId, values);
 
         navigate("/measured-quality-types");
 

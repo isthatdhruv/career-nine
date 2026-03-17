@@ -42,9 +42,7 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
         const fetchCollege = async () => {
             setCollegeLoading(true);
             try {
-                console.log('Fetching colleges...'); // Debug log
                 const response = await ReadCollegeData();
-                console.log('College response:', response); // Debug log
                 
                 // Handle different response structures
                 if (response?.data) {
@@ -52,7 +50,6 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
                 } else if (Array.isArray(response)) {
                     setCollege(response);
                 } else {
-                    console.warn('Unexpected college response format:', response);
                     setCollege([]);
                 }
             } catch (error) {
@@ -72,7 +69,6 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
         if (prevShowCollegeModalRef.current && !showCollegeModal && show) {
             (async () => {
                 try {
-                    console.log('Re-fetching colleges after create...'); // Debug log
                     const response = await ReadCollegeData();
                     if (response?.data) {
                         setCollege(response.data);
@@ -108,8 +104,6 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
                             schoolContactIds: values.schoolContactIds,
                             career9ContactIds: values.career9ContactIds,
                         };
-                        
-                        console.log('Submitting assessment payload:', payload); // Debug log
                         
                         // Store data for next step
                         localStorage.setItem('assessmentStep2', JSON.stringify(payload));

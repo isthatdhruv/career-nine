@@ -169,20 +169,22 @@ public class SchoolSessionController {
     // ============ CLASS CRUD ENDPOINTS ============
 
     @PostMapping("/class/create")
-    public ResponseEntity<SchoolClasses> createClass(@RequestBody SchoolClasses schoolClass) {
-        // Wire up session relationship if sessionId is provided
-        if (schoolClass.getSchoolSession() != null && schoolClass.getSchoolSession().getId() != null) {
-            Optional<SchoolSession> sessionOpt = schoolSessionRepository.findById(schoolClass.getSchoolSession().getId());
+    public ResponseEntity<SchoolClasses> createClass(@RequestBody Map<String, Object> payload) {
+        SchoolClasses schoolClass = new SchoolClasses();
+        schoolClass.setClassName((String) payload.get("className"));
+
+        // Extract sessionId from nested schoolSession object (since @JsonIgnore blocks deserialization)
+        Map<String, Object> sessionObj = (Map<String, Object>) payload.get("schoolSession");
+        if (sessionObj != null && sessionObj.get("id") != null) {
+            Integer sessionId = Integer.valueOf(sessionObj.get("id").toString());
+            Optional<SchoolSession> sessionOpt = schoolSessionRepository.findById(sessionId);
             if (sessionOpt.isPresent()) {
                 schoolClass.setSchoolSession(sessionOpt.get());
+            } else {
+                return ResponseEntity.badRequest().build();
             }
-        }
-
-        // Wire up section relationships
-        if (schoolClass.getSchoolSections() != null) {
-            for (SchoolSections section : schoolClass.getSchoolSections()) {
-                section.setSchoolClass(schoolClass);
-            }
+        } else {
+            return ResponseEntity.badRequest().build();
         }
 
         SchoolClasses saved = schoolClassesRepository.save(schoolClass);
@@ -215,13 +217,22 @@ public class SchoolSessionController {
     // ============ SECTION CRUD ENDPOINTS ============
 
     @PostMapping("/section/create")
-    public ResponseEntity<SchoolSections> createSection(@RequestBody SchoolSections section) {
-        // Wire up class relationship if classId is provided
-        if (section.getSchoolClasses() != null && section.getSchoolClasses().getId() != null) {
-            Optional<SchoolClasses> classOpt = schoolClassesRepository.findById(section.getSchoolClasses().getId());
+    public ResponseEntity<SchoolSections> createSection(@RequestBody Map<String, Object> payload) {
+        SchoolSections section = new SchoolSections();
+        section.setSectionName((String) payload.get("sectionName"));
+
+        // Extract classId from nested schoolClasses object (since @JsonIgnore blocks deserialization)
+        Map<String, Object> classObj = (Map<String, Object>) payload.get("schoolClasses");
+        if (classObj != null && classObj.get("id") != null) {
+            Integer classId = Integer.valueOf(classObj.get("id").toString());
+            Optional<SchoolClasses> classOpt = schoolClassesRepository.findById(classId);
             if (classOpt.isPresent()) {
                 section.setSchoolClass(classOpt.get());
+            } else {
+                return ResponseEntity.badRequest().build();
             }
+        } else {
+            return ResponseEntity.badRequest().build();
         }
 
         SchoolSections saved = schoolSectionsRepository.save(section);

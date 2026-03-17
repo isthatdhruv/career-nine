@@ -108,8 +108,6 @@ const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, o
             schoolSectionId: Number(selectedSectionId),
         };
 
-        console.log("Submitting Payload:", payload);
-
         await addStudentInfo(payload);
 
         alert("Student added successfully!");

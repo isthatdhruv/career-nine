@@ -11,7 +11,6 @@ import { ReadCollegeData } from "../../../College/API/College_APIs";
 import { ReadQuestionSectionData } from "../../../QuestionSections/API/Question_Section_APIs";
 import { ReadToolData } from "../../../Tool/API/Tool_APIs";
 import { ReadQuestionsDataList, ReadQuestionByIdData } from "../../../AssesmentQuestions/API/Question_APIs";
-import { CreateAssessmentData } from "../../API/Create_Assessment_APIs";
 import { ReadLanguageData } from "../../API/Create_Assessment_APIs";
 
 // Component imports
@@ -20,9 +19,7 @@ import QuestionSectionCreateModal from "../../../QuestionSections/components/Que
 import ToolCreateModal from "../../../Tool/components/ToolCreateModal";
 import QuestionCreateModal from "../../../AssesmentQuestions/components/QuestionCreateModal";
 import QuestionLanguageModal from "../../../AssesmentQuestions/components/QuestionLanguageModal";
-import { QuestionTable } from "../../../AssesmentQuestions/components";
 import SectionQuestionSelector from "../SectionQuestionSelector";
-import { time } from "console";
 import { CreateQuestionaire} from "../../API/Create_Questionaire_APIs";
 
 const validationSchema = Yup.object().shape({
@@ -118,7 +115,6 @@ const QuestionareCreateSinglePage: React.FC = () => {
         // navigate('/questionares');
       }
     } else {
-      console.log("Adista is cool but fool")
       // Redirect back if no data
       // navigate('/questionares/create');
     }
@@ -343,7 +339,6 @@ const QuestionareCreateSinglePage: React.FC = () => {
 
           // Language object must be valid
           if (!langObj || !langObj.languageId) {
-            console.warn(`Language not found for general instructions: ${langName}`);
             return null;
           }
 
@@ -357,8 +352,6 @@ const QuestionareCreateSinglePage: React.FC = () => {
           };
         })
         .filter((lang: any) => lang !== null);
-
-      console.log("Languages payload (with instructions):", languagesPayload);
 
       // Build the sections array with questions and instructions
       const sectionsPayload = (values.sectionIds || []).map((sectionId: string, sectionIdx: number) => {
@@ -423,7 +416,6 @@ const QuestionareCreateSinglePage: React.FC = () => {
 
             // Language object must be valid
             if (!langObj || !langObj.languageId) {
-              console.warn(`Language not found for: ${langName}`);
               return null;
             }
 
@@ -437,8 +429,6 @@ const QuestionareCreateSinglePage: React.FC = () => {
             };
           })
           .filter((inst: any) => inst !== null); // Remove null entries
-
-        console.log(`Section ${sectionId} instructions payload:`, instructionPayload);
 
         return {
           questionnaireSectionId: null, // New entry
@@ -463,9 +453,6 @@ const QuestionareCreateSinglePage: React.FC = () => {
         sections: sectionsPayload,
         createdAt: ""
       };
-      
-      console.log("=== COMPLETE ASSESSMENT PAYLOAD ===");
-      console.log(JSON.stringify(completePayload, null, 2));
       
       // Show alert with summary
       const totalQuestions = sectionsPayload.reduce((acc: number, s: any) => acc + (s.questions?.length || 0), 0);
@@ -1287,6 +1274,24 @@ const QuestionareCreateSinglePage: React.FC = () => {
                                 return (
                                   <li key={questionId} className="list-group-item px-0">
                                     <p className="fw-bold mb-2">{index + 1}. {question ? question.questionText : `Question not found`}</p>
+                                    {question && question.questionImageUrl && (
+                                      <div className="mb-2 ps-4">
+                                        <img
+                                          src={question.questionImageUrl}
+                                          alt="Question"
+                                          style={{ maxWidth: "100%", maxHeight: 300, borderRadius: 8, objectFit: "contain" }}
+                                        />
+                                      </div>
+                                    )}
+                                    {question && question.questionVideoUrl && (
+                                      <div className="mb-2 ps-4">
+                                        <video
+                                          src={question.questionVideoUrl}
+                                          controls
+                                          style={{ maxWidth: "100%", maxHeight: 300, borderRadius: 8 }}
+                                        />
+                                      </div>
+                                    )}
                                     {question && question.options && question.options.length > 0 ? (
                                       <ul className="list-unstyled ps-4">
                                         {question.options.map((opt: any, optIndex: number) => (

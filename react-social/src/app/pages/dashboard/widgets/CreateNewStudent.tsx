@@ -67,7 +67,6 @@ const StudentCreatePage = () => {
                 groupName: values.groupName,
               };
 
-              console.log("FINAL STUDENT PAYLOAD 👉", payload);
               // await CreateStudent(payload);
 
               resetForm();

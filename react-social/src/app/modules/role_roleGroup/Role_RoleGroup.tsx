@@ -36,7 +36,6 @@ const Role_RoleGroupPage = () => {
     // if (_.contains(currentUser!.authorityUrls!, location.pathname)) {
     //   setAutorized(true);
     // }
-    // console.log(currentUser?.authorityUrls?.includes(location.pathname));
     setloading(true);
     try {
       readRoleData().then((data) => {

@@ -170,8 +170,6 @@ const FacultyDetails = () => {
         else values.generate = "RA";
       }
 
-      console.log(values);
-
       try {
         upsertFacultyData(values)
           .then(() => {
@@ -204,7 +202,6 @@ const FacultyDetails = () => {
           else setGenerate(true);
         });
       }
-      console.log(data.data);
       formik.setValues(data.data);
       setloading(false);
     });
@@ -265,7 +262,6 @@ const FacultyDetails = () => {
     facingMode: "user",
   };
   function validate() {
-    // console.log(formik.errors);
     var ret = "";
     return formik.errors;
   }
