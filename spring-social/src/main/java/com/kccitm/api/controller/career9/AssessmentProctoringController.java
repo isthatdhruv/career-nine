@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.Set;
 
 import javax.servlet.http.HttpServletResponse;
-import javax.transaction.Transactional;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -36,6 +35,8 @@ import com.kccitm.api.repository.Career9.AssessmentProctoringQuestionLogReposito
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
+import com.kccitm.api.service.AssessmentSessionService;
+import com.kccitm.api.service.ProctoringProcessorService;
 
 @RestController
 @RequestMapping("/assessment-proctoring")
@@ -59,19 +60,18 @@ public class AssessmentProctoringController {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private AssessmentSessionService assessmentSessionService;
+
+    @Autowired
+    private ProctoringProcessorService proctoringProcessorService;
+
     @SuppressWarnings("unchecked")
-    @Transactional
     @PostMapping(value = "/save", headers = "Accept=application/json")
     public ResponseEntity<?> saveProctoringData(@RequestBody Map<String, Object> payload) {
         try {
             Long userStudentId = ((Number) payload.get("userStudentId")).longValue();
             Long assessmentId = ((Number) payload.get("assessmentId")).longValue();
-
-            UserStudent userStudent = userStudentRepository.findById(userStudentId)
-                    .orElseThrow(() -> new RuntimeException("UserStudent not found"));
-
-            AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
-                    .orElseThrow(() -> new RuntimeException("Assessment not found"));
 
             List<Map<String, Object>> perQuestionData =
                     (List<Map<String, Object>>) payload.get("perQuestionData");
@@ -80,43 +80,11 @@ public class AssessmentProctoringController {
                 return ResponseEntity.badRequest().body("No per-question data provided");
             }
 
-            for (Map<String, Object> qData : perQuestionData) {
-                Long qqId = ((Number) qData.get("questionnaireQuestionId")).longValue();
+            // Save to Redis and process async
+            assessmentSessionService.saveProctoringData(userStudentId, assessmentId, payload);
+            proctoringProcessorService.processAsync(userStudentId, assessmentId);
 
-                QuestionnaireQuestion qq = questionnaireQuestionRepository.findById(qqId)
-                        .orElse(null);
-                if (qq == null) continue;
-
-                AssessmentProctoringQuestionLog qLog = new AssessmentProctoringQuestionLog();
-                qLog.setUserStudent(userStudent);
-                qLog.setAssessment(assessment);
-                qLog.setQuestionnaireQuestion(qq);
-
-                qLog.setScreenWidth(((Number) qData.get("screenWidth")).intValue());
-                qLog.setScreenHeight(((Number) qData.get("screenHeight")).intValue());
-                qLog.setQuestionRectJson(objectMapper.writeValueAsString(qData.get("questionRect")));
-                qLog.setOptionsRectJson(objectMapper.writeValueAsString(qData.get("optionsRect")));
-                qLog.setGazePointsJson(objectMapper.writeValueAsString(qData.get("gazePoints")));
-                qLog.setTimeSpentMs(((Number) qData.get("timeSpentMs")).longValue());
-                qLog.setQuestionStartTime(((Number) qData.get("questionStartTime")).longValue());
-                qLog.setQuestionEndTime(((Number) qData.get("questionEndTime")).longValue());
-                qLog.setMouseClickCount(((Number) qData.get("mouseClickCount")).intValue());
-                qLog.setMouseClicksJson(objectMapper.writeValueAsString(qData.get("mouseClicks")));
-                qLog.setMaxFacesDetected(((Number) qData.get("maxFacesDetected")).intValue());
-                qLog.setAvgFacesDetected(((Number) qData.get("avgFacesDetected")).doubleValue());
-                qLog.setHeadAwayCount(((Number) qData.get("headAwayCount")).intValue());
-                qLog.setTabSwitchCount(((Number) qData.get("tabSwitchCount")).intValue());
-
-                // New WebGazer eye-tracking fields (nullable for backward compat)
-                Object eyeGazePoints = qData.get("eyeGazePoints");
-                if (eyeGazePoints != null) {
-                    qLog.setEyeGazePointsJson(objectMapper.writeValueAsString(eyeGazePoints));
-                }
-
-                questionLogRepository.save(qLog);
-            }
-
-            return ResponseEntity.ok(Map.of("status", "success", "questionsSaved", perQuestionData.size()));
+            return ResponseEntity.ok(Map.of("status", "accepted"));
 
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Error saving proctoring data: " + e.getMessage());

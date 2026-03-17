@@ -1,5 +1,6 @@
 // AssessmentContext.tsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import assessmentApi from './API/assessmentApi';
 
 type AssessmentContextType = {
   assessmentData: any;
@@ -22,19 +23,18 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setError(null);
 
     try {
-      const API_URL = process.env.REACT_APP_API_URL;
-
       // Fetch both questionnaire data and assessment config in parallel
-      const [questionnaireResponse, configResponse] = await Promise.all([
-        fetch(`${API_URL}/assessments/getby/${assessmentId}`),
-        fetch(`${API_URL}/assessments/getById/${assessmentId}`),
+      // assessmentApi automatically injects session headers (X-Assessment-Session, etc.)
+      const [questionnaireResponse, configResponse] = await Promise.allSettled([
+        assessmentApi.get(`/assessments/getby/${assessmentId}`),
+        assessmentApi.get(`/assessments/getById/${assessmentId}`),
       ]);
 
-      if (!questionnaireResponse.ok) {
+      if (questionnaireResponse.status === 'rejected') {
         throw new Error('Failed to fetch assessment data');
       }
 
-      const data = await questionnaireResponse.json();
+      const data = questionnaireResponse.value.data;
       setAssessmentData(data);
       try {
         sessionStorage.setItem('assessmentData', JSON.stringify(data));
@@ -42,8 +42,8 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         console.warn('Could not cache assessmentData to storage');
       }
 
-      if (configResponse.ok) {
-        const configData = await configResponse.json();
+      if (configResponse.status === 'fulfilled') {
+        const configData = configResponse.value.data;
         setAssessmentConfig(configData);
         try {
           sessionStorage.setItem('assessmentConfig', JSON.stringify(configData));

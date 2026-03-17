@@ -119,7 +119,7 @@ const ClassTeacherDashboard: React.FC = () => {
       {/* Dashboard Header */}
       <div className="dashboard-header">
         <div className="header-left">
-          <img src="/media/logos/kcc.jpg" alt="Career-9" className="header-logo" />
+          <img src="/media/logos/kcc.webp" alt="Career-9" className="header-logo" />
           <div className="header-text">
             <h1 className="dashboard-title">Class Teacher Dashboard</h1>
             <p className="dashboard-subtitle">{overview.className} - {overview.teacherName}</p>

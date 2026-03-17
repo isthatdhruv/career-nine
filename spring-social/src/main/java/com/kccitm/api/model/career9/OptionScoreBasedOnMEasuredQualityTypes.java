@@ -8,13 +8,18 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
+import javax.persistence.Index;
 import javax.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Entity
-@Table(name = "score_based_on_measured_quality_types")
+@Table(name = "score_based_on_measured_quality_types",
+       indexes = {
+           @Index(name = "idx_score_option", columnList = "fk_assessment_questions_option"),
+           @Index(name = "idx_score_quality_type", columnList = "fk_quality_type")
+       })
 public class OptionScoreBasedOnMEasuredQualityTypes implements Serializable {
     private static final long serialVersionUID = 1L;
 

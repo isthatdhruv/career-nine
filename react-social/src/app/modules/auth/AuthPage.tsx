@@ -29,7 +29,7 @@ const AuthLayout = () => {
         {/* <a href="#" className="mb-12">
           <img
             alt="Logo"
-            src={toAbsoluteUrl("/media/logos/kcc.jpg")}
+            src={toAbsoluteUrl("/media/logos/kcc.webp")}
             style={{ borderRadius: "8px" }}
             // className="h-120px"
           />

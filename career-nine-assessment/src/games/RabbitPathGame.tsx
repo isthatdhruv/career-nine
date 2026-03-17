@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 
 // Asset Paths
-const SCENE_SRC = "/game-scenes/2nd/game-scene-2nd.png";
-const RABBIT_FORWARD_SRC = "/game-scenes/2nd/rabbit-nobg-old.png";
-const RABBIT_REVERSE_SRC = "/game-scenes/2nd/rabbit-nobg.png";
+const SCENE_SRC = "/game-scenes/2nd/game-scene-2nd.webp";
+const RABBIT_FORWARD_SRC = "/game-scenes/2nd/rabbit-nobg-old.webp";
+const RABBIT_REVERSE_SRC = "/game-scenes/2nd/rabbit-nobg.webp";
 
 // How to play video path - place video at: public/assets/game/rabbit-path-tutorial.mp4
 const HOW_TO_PLAY_VIDEO_PATH = "/assets/game/rabbit-path-tutorial.mp4";

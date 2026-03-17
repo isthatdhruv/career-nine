@@ -1,6 +1,10 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
-import { doc, setDoc } from "firebase/firestore";
-import { db } from "../firebase";
+// Firebase is lazy-loaded only when game data needs to be saved
+async function getFirestore() {
+  const { doc, setDoc } = await import("firebase/firestore");
+  const { db } = await import("../firebase");
+  return { doc, setDoc, db };
+}
 
 export type AnimalReactionData = {
   totalTrials: number;
@@ -90,6 +94,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         animal_reaction: { ...data, timestamp: new Date().toISOString() },
         lastUpdated: new Date().toISOString(),
       };
+      const { doc, setDoc, db } = await getFirestore();
       await setDoc(doc(db, "game_results", docId), saveData, { merge: true });
     } catch (e: any) {
       console.error("Failed to save Animal Reaction:", e?.message || e);
@@ -112,6 +117,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         rabbit_path: { ...data, timestamp: new Date().toISOString() },
         lastUpdated: new Date().toISOString(),
       };
+      const { doc, setDoc, db } = await getFirestore();
       await setDoc(doc(db, "game_results", docId), saveData, { merge: true });
     } catch (e: any) {
       console.error("Failed to save Rabbit Path:", e?.message || e);
@@ -134,6 +140,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         hydro_tube: { ...data, timestamp: new Date().toISOString() },
         lastUpdated: new Date().toISOString(),
       };
+      const { doc, setDoc, db } = await getFirestore();
       await setDoc(doc(db, "game_results", docId), saveData, { merge: true });
     } catch (e: any) {
       console.error("Failed to save Hydro Tube:", e?.message || e);

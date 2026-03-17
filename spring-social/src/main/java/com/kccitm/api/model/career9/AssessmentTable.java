@@ -48,6 +48,9 @@ public class AssessmentTable implements java.io.Serializable {
     @Column(name = "is_locked", columnDefinition = "BOOLEAN DEFAULT FALSE")
     private Boolean isLocked = false;
 
+    @Column(name = "save_later", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    private Boolean saveLater = true;
+
 
     public Long getId() {
         return id;
@@ -130,6 +133,14 @@ public class AssessmentTable implements java.io.Serializable {
 
     public void setIsLocked(Boolean isLocked) {
         this.isLocked = isLocked;
+    }
+
+    public Boolean getSaveLater() {
+        return saveLater;
+    }
+
+    public void setSaveLater(Boolean saveLater) {
+        this.saveLater = saveLater;
     }
 
 }

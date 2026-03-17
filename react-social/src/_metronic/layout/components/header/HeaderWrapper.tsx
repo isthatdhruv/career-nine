@@ -52,7 +52,7 @@ export function HeaderWrapper() {
             <Link to="/dashboard" className="d-lg-none">
               <img
                 alt="Logo"
-                src={toAbsoluteUrl("/media/logos/kcc.jpg")}
+                src={toAbsoluteUrl("/media/logos/kcc.webp")}
                 className="h-30px"
               />
             </Link>
@@ -65,7 +65,7 @@ export function HeaderWrapper() {
             <Link to="/" className="d-lg-none">
               <img
                 alt="Logo"
-                src={toAbsoluteUrl("/media/logos/kcc.jpg")}
+                src={toAbsoluteUrl("/media/logos/kcc.webp")}
                 className="h-30px"
               />
             </Link>

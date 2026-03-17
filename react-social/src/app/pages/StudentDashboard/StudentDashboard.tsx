@@ -142,7 +142,7 @@ const StudentDashboard: React.FC = () => {
       <div className="dashboard-header-modern">
         <div className="header-content">
           <div className="header-left">
-            <img src="/media/logos/kcc.jpg" alt="Career-9" className="header-logo bg-white px-5 py-2" />
+            <img src="/media/logos/kcc.webp" alt="Career-9" className="header-logo bg-white px-5 py-2" />
             <div className="header-text">
               <h1 className="dashboard-title text-white">Student Insight Dashboard</h1>
               <p className="dashboard-subtitle">Comprehensive performance and development tracking</p>

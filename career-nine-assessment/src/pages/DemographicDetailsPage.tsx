@@ -27,7 +27,7 @@ type DemographicField = {
 const DemographicDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const { assessmentId } = useParams<{ assessmentId: string }>();
-  const { fetchAssessmentData } = useAssessment();
+  const { fetchAssessmentData, preloadAssessmentData } = useAssessment();
   usePreventReload();
 
   const [fields, setFields] = useState<DemographicField[]>([]);
@@ -46,6 +46,7 @@ const DemographicDetailsPage: React.FC = () => {
       return;
     }
     fetchFields();
+    preloadAssessmentData(assessmentId);
   }, [assessmentId, userStudentId]);
 
   const fetchFields = async () => {
@@ -56,7 +57,6 @@ const DemographicDetailsPage: React.FC = () => {
       const fieldData: DemographicField[] = response.data;
       setFields(fieldData);
 
-      // Pre-fill values
       const initialValues: Record<number, string> = {};
       const initialMulti: Record<number, string[]> = {};
       for (const field of fieldData) {
@@ -149,23 +149,23 @@ const DemographicDetailsPage: React.FC = () => {
   };
 
   const startAssessmentAndNavigate = async () => {
-    await http.post('/assessments/startAssessment', {
-      userStudentId: Number(userStudentId),
-      assessmentId: Number(assessmentId),
-    });
-    await fetchAssessmentData(String(assessmentId));
+    await Promise.all([
+      http.post('/assessments/startAssessment', {
+        userStudentId: Number(userStudentId),
+        assessmentId: Number(assessmentId),
+      }),
+      fetchAssessmentData(String(assessmentId)),
+    ]);
     navigate('/general-instructions');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Mark all as touched
     const allTouched: Record<number, boolean> = {};
     fields.forEach((f) => (allTouched[f.fieldId] = true));
     setTouched(allTouched);
 
-    // Validate all
     const newErrors: Record<number, string> = {};
     let hasError = false;
     for (const field of fields) {
@@ -199,20 +199,30 @@ const DemographicDetailsPage: React.FC = () => {
             : values[field.fieldId] || '',
       }));
 
-      await http.post('/student-demographics/submit', {
+      const demographicPayload = {
         userStudentId: Number(userStudentId),
         assessmentId: Number(assessmentId),
         responses,
-      });
+      };
 
-      await startAssessmentAndNavigate();
+      await http.post('/student-demographics/submit', demographicPayload);
+
+      await Promise.all([
+        http.post('/assessments/startAssessment', {
+          userStudentId: Number(userStudentId),
+          assessmentId: Number(assessmentId),
+        }),
+        fetchAssessmentData(String(assessmentId)),
+      ]);
+
+      navigate('/general-instructions');
     } catch (error: any) {
       console.error('Error submitting demographics:', error);
       const errorData = error.response?.data;
       if (errorData?.validationErrors) {
         alert('Validation errors:\n' + errorData.validationErrors.join('\n'));
       } else {
-        alert(errorData?.error || 'Failed to submit demographics. Please try again.');
+        alert(errorData?.error || 'Failed to save demographics. Please try again.');
       }
     } finally {
       setIsSubmitting(false);
@@ -248,9 +258,7 @@ const DemographicDetailsPage: React.FC = () => {
               }}
             />
             {error && isTouched && (
-              <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                {error}
-              </div>
+              <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{error}</div>
             )}
           </div>
         );
@@ -280,9 +288,7 @@ const DemographicDetailsPage: React.FC = () => {
               }}
             />
             {error && isTouched && (
-              <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                {error}
-              </div>
+              <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{error}</div>
             )}
           </div>
         );
@@ -309,9 +315,7 @@ const DemographicDetailsPage: React.FC = () => {
               }}
             />
             {error && isTouched && (
-              <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                {error}
-              </div>
+              <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{error}</div>
             )}
           </div>
         );
@@ -323,13 +327,13 @@ const DemographicDetailsPage: React.FC = () => {
               <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
                 {label} {field.isMandatory && <span style={{ color: '#e53e3e' }}>*</span>}
               </label>
-              <div className="d-flex gap-3 flex-wrap">
+              <div className="d-flex gap-2 gap-md-3 flex-wrap">
                 {field.options.map((option) => (
                   <label
                     key={option.optionId}
                     style={{
                       flex: field.options.length <= 2 ? 1 : undefined,
-                      padding: '0.75rem 1rem',
+                      padding: '0.6rem 0.85rem',
                       border: `2px solid ${
                         error && isTouched
                           ? '#e53e3e'
@@ -353,24 +357,14 @@ const DemographicDetailsPage: React.FC = () => {
                       checked={values[field.fieldId] === option.optionValue}
                       onChange={(e) => handleChange(field.fieldId, e.target.value)}
                       onBlur={() => handleBlur(field.fieldId)}
-                      style={{
-                        width: '20px',
-                        height: '20px',
-                        marginRight: '0.75rem',
-                        cursor: 'pointer',
-                        accentColor: '#667eea',
-                      }}
+                      style={{ width: '18px', height: '18px', marginRight: '0.5rem', cursor: 'pointer', accentColor: '#667eea' }}
                     />
-                    <span style={{ fontSize: '0.95rem', color: '#2d3748' }}>
-                      {option.optionLabel}
-                    </span>
+                    <span style={{ fontSize: '0.9rem', color: '#2d3748' }}>{option.optionLabel}</span>
                   </label>
                 ))}
               </div>
               {error && isTouched && (
-                <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                  {error}
-                </div>
+                <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{error}</div>
               )}
             </div>
           );
@@ -396,15 +390,11 @@ const DemographicDetailsPage: React.FC = () => {
             >
               <option value="">Select an option</option>
               {field.options.map((option) => (
-                <option key={option.optionId} value={option.optionValue}>
-                  {option.optionLabel}
-                </option>
+                <option key={option.optionId} value={option.optionValue}>{option.optionLabel}</option>
               ))}
             </select>
             {error && isTouched && (
-              <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                {error}
-              </div>
+              <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{error}</div>
             )}
           </div>
         );
@@ -422,7 +412,7 @@ const DemographicDetailsPage: React.FC = () => {
                   <label
                     key={option.optionId}
                     style={{
-                      padding: '0.5rem 1rem',
+                      padding: '0.4rem 0.85rem',
                       border: `2px solid ${isChecked ? '#667eea' : '#e2e8f0'}`,
                       borderRadius: '10px',
                       cursor: 'pointer',
@@ -435,29 +425,17 @@ const DemographicDetailsPage: React.FC = () => {
                     <input
                       type="checkbox"
                       checked={isChecked}
-                      onChange={(e) =>
-                        handleMultiChange(field.fieldId, option.optionValue, e.target.checked)
-                      }
+                      onChange={(e) => handleMultiChange(field.fieldId, option.optionValue, e.target.checked)}
                       onBlur={() => handleBlur(field.fieldId)}
-                      style={{
-                        width: '18px',
-                        height: '18px',
-                        marginRight: '0.5rem',
-                        cursor: 'pointer',
-                        accentColor: '#667eea',
-                      }}
+                      style={{ width: '16px', height: '16px', marginRight: '0.5rem', cursor: 'pointer', accentColor: '#667eea' }}
                     />
-                    <span style={{ fontSize: '0.95rem', color: '#2d3748' }}>
-                      {option.optionLabel}
-                    </span>
+                    <span style={{ fontSize: '0.9rem', color: '#2d3748' }}>{option.optionLabel}</span>
                   </label>
                 );
               })}
             </div>
             {error && isTouched && (
-              <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                {error}
-              </div>
+              <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{error}</div>
             )}
           </div>
         );
@@ -468,17 +446,7 @@ const DemographicDetailsPage: React.FC = () => {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "2rem 1rem",
-        colorScheme: "light",
-      }}
-    >
+    <div className="assessment-bg">
       {isLoading ? (
         <div className="text-center">
           <div className="spinner-border text-light" role="status" style={{ width: "3rem", height: "3rem" }}>
@@ -487,140 +455,68 @@ const DemographicDetailsPage: React.FC = () => {
           <p className="mt-3 text-white fw-semibold">Loading your information...</p>
         </div>
       ) : fields.length === 0 ? (
-        <div
-          className="card shadow-lg"
-          style={{
-            width: "100%",
-            maxWidth: "650px",
-            borderRadius: "20px",
-            border: "none",
-            background: "#ffffff",
-          }}
-        >
-          <div className="card-body p-5 text-center">
-            <p className="text-muted">No demographic fields configured for this assessment.</p>
-            <button
-              className="btn"
-              onClick={async () => {
-                setIsSubmitting(true);
-                try {
-                  await startAssessmentAndNavigate();
-                } catch (error) {
-                  console.error('Error starting assessment:', error);
-                  alert('Failed to start assessment. Please try again.');
-                } finally {
-                  setIsSubmitting(false);
-                }
-              }}
-              disabled={isSubmitting}
-              style={{
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                color: "white",
-                padding: "0.875rem 2rem",
-                borderRadius: "10px",
-                fontSize: "1.05rem",
-                fontWeight: 600,
-                border: "none",
-                boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)",
-              }}
-            >
-              {isSubmitting ? 'Loading...' : 'Continue to Assessment'}
-            </button>
+        <div className="container">
+          <div className="row justify-content-center">
+            <div className="col-12 col-md-8 col-lg-6">
+              <div className="assessment-card card shadow-lg">
+                <div className="card-body p-3 p-sm-4 p-md-5 text-center">
+                  <p className="text-muted">No demographic fields configured for this assessment.</p>
+                  <button
+                    className="btn btn-assessment-primary"
+                    onClick={async () => {
+                      setIsSubmitting(true);
+                      try {
+                        await startAssessmentAndNavigate();
+                      } catch (error) {
+                        console.error('Error starting assessment:', error);
+                        alert('Failed to start assessment. Please try again.');
+                      } finally {
+                        setIsSubmitting(false);
+                      }
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? 'Loading...' : 'Continue to Assessment'}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       ) : (
-        <div
-          className="card shadow-lg"
-          style={{
-            width: "100%",
-            maxWidth: "650px",
-            borderRadius: "20px",
-            border: "none",
-            background: "#ffffff",
-            colorScheme: "light",
-          }}
-        >
-          <div className="card-body p-5" style={{ background: "#ffffff", color: "#2d3748", borderRadius: "20px" }}>
-            {/* Header */}
-            <div className="text-center mb-4">
-              <div
-                style={{
-                  width: "70px",
-                  height: "70px",
-                  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                  borderRadius: "50%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  margin: "0 auto 1rem",
-                  boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)",
-                }}
-              >
-                <svg width="35" height="35" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
+        <div className="container">
+          <div className="row justify-content-center">
+            <div className="col-12 col-md-10 col-lg-8 col-xl-7">
+              <div className="assessment-card card shadow-lg">
+                <div className="card-body p-3 p-sm-3 p-md-4" style={{ paddingTop: '1.25rem' }}>
+                  {/* Header */}
+                  <div className="text-center mb-2">
+                    <h2 className="assessment-heading" style={{ fontSize: '1.5rem' }}>Demographic Details</h2>
+                    <p className="assessment-subheading" style={{ marginBottom: '0.5rem' }}>Please provide your information to continue</p>
+                  </div>
+
+                  <form onSubmit={handleSubmit} noValidate>
+                    {fields.map((field) => renderField(field))}
+
+                    <button
+                      type="submit"
+                      className="btn btn-assessment-primary w-100 mt-3 py-2 py-md-3"
+                      disabled={isSubmitting}
+                      style={{ fontSize: '1rem', cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                          Saving...
+                        </>
+                      ) : (
+                        "Save and Continue to Assessment"
+                      )}
+                    </button>
+                  </form>
+                </div>
               </div>
-              <h2
-                style={{
-                  fontSize: "2rem",
-                  fontWeight: 700,
-                  color: "#2d3748",
-                  marginBottom: "0.5rem",
-                }}
-              >
-                Demographic Details
-              </h2>
-              <p style={{ color: "#718096", fontSize: "1rem" }}>
-                Please provide your information to continue
-              </p>
             </div>
-
-            <form onSubmit={handleSubmit} noValidate>
-              {fields.map((field) => renderField(field))}
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                className="btn w-100 mt-3"
-                disabled={isSubmitting}
-                style={{
-                  background: isSubmitting
-                    ? "#a0aec0"
-                    : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                  color: "white",
-                  padding: "0.875rem",
-                  borderRadius: "10px",
-                  fontSize: "1.05rem",
-                  fontWeight: 600,
-                  border: "none",
-                  boxShadow: isSubmitting ? "none" : "0 4px 15px rgba(102, 126, 234, 0.4)",
-                  transition: "all 0.3s ease",
-                  cursor: isSubmitting ? "not-allowed" : "pointer",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSubmitting) {
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                    e.currentTarget.style.boxShadow = "0 6px 20px rgba(102, 126, 234, 0.5)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isSubmitting) {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "0 4px 15px rgba(102, 126, 234, 0.4)";
-                  }
-                }}
-              >
-                {isSubmitting ? (
-                  <>
-                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                    Saving...
-                  </>
-                ) : (
-                  "Save and Continue to Assessment"
-                )}
-              </button>
-            </form>
           </div>
         </div>
       )}

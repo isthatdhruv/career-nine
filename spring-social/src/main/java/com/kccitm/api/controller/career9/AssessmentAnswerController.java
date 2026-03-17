@@ -8,10 +8,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import javax.transaction.Transactional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.career9.AssessmentQuestionOptions;
@@ -50,10 +53,14 @@ import com.kccitm.api.model.User;
 import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
+import com.kccitm.api.service.AssessmentSessionService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/assessment-answer")
 public class AssessmentAnswerController {
+    private static final Logger logger = LoggerFactory.getLogger(AssessmentAnswerController.class);
     @Autowired
     private AssessmentAnswerRepository assessmentAnswerRepository;
 
@@ -90,6 +97,15 @@ public class AssessmentAnswerController {
     @Autowired
     private com.kccitm.api.service.CareerNineRollNumberService rollNumberService;
 
+    @Autowired
+    private AssessmentSessionService assessmentSessionService;
+
+    @Autowired
+    private com.kccitm.api.service.PartialAnswerFlushService partialAnswerFlushService;
+
+    @Autowired
+    private com.kccitm.api.service.AssessmentSubmissionProcessorService submissionProcessorService;
+
     @GetMapping(value = "/getByStudent/{studentId}", headers = "Accept=application/json")
     public List<AssessmentAnswer> getAssessmentAnswersByStudent(@PathVariable("studentId") Long studentId) {
         UserStudent userStudent = userStudentRepository.findById(studentId).orElse(null);
@@ -101,147 +117,128 @@ public class AssessmentAnswerController {
         return assessmentAnswerRepository.findAll();
     }
 
-    @Transactional
     @PostMapping(value = "/submit", headers = "Accept=application/json")
     public ResponseEntity<?> submitAssessmentAnswers(@RequestBody Map<String, Object> submissionData) {
         try {
             // 1. Basic Extraction & Validation
+            if (submissionData.get("userStudentId") == null || submissionData.get("assessmentId") == null) {
+                return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
+            }
             Long userStudentId = ((Number) submissionData.get("userStudentId")).longValue();
             Long assessmentId = ((Number) submissionData.get("assessmentId")).longValue();
 
-            UserStudent userStudent = userStudentRepository.findById(userStudentId)
-                    .orElseThrow(() -> new RuntimeException("UserStudent not found"));
-
-            AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
-                    .orElseThrow(() -> new RuntimeException("Assessment not found"));
-
-            // 2. Extract status if provided
-            String status = submissionData.containsKey("status")
-                    ? (String) submissionData.get("status")
-                    : null;
-
-            // 3. Manage Mapping (Required for AssessmentRawScore)
-            StudentAssessmentMapping mapping = studentAssessmentMappingRepository
-                    .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
-                    .orElseGet(() -> {
-                        StudentAssessmentMapping newMapping = new StudentAssessmentMapping();
-                        newMapping.setUserStudent(userStudent);
-                        newMapping.setAssessmentId(assessmentId);
-                        return studentAssessmentMappingRepository.save(newMapping);
-                    });
-
-            // Update status if provided
-            if (status != null) {
-                mapping.setStatus(status);
-                studentAssessmentMappingRepository.save(mapping);
+            // Idempotency check — SET NX prevents duplicate processing
+            if (!assessmentSessionService.acquireSubmissionLock(userStudentId, assessmentId)) {
+                Object cachedResult = assessmentSessionService.getSubmissionResult(userStudentId, assessmentId);
+                if (cachedResult != null && !"processing".equals(cachedResult)) {
+                    return ResponseEntity.ok(cachedResult);
+                }
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                        "error", "Submission already in progress or completed",
+                        "status", "duplicate"
+                ));
             }
 
-            List<Map<String, Object>> answers = (List<Map<String, Object>>) submissionData.get("answers");
+            try {
+                UserStudent userStudent = userStudentRepository.findById(userStudentId)
+                        .orElseThrow(() -> new RuntimeException("UserStudent not found"));
 
-            // Data structures for score calculation
-            Map<Long, Integer> qualityTypeScores = new HashMap<>();
-            Map<Long, MeasuredQualityTypes> qualityTypeCache = new HashMap<>();
+                AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
+                        .orElseThrow(() -> new RuntimeException("Assessment not found"));
 
-            // 3. Process Answers
-            for (Map<String, Object> ansMap : answers) {
-                Long qId = ((Number) ansMap.get("questionnaireQuestionId")).longValue();
-                QuestionnaireQuestion question = questionnaireQuestionRepository.findById(qId).orElse(null);
-
-                // Check if this is a text-type answer
-                String textResponse = ansMap.containsKey("textResponse")
-                        ? (String) ansMap.get("textResponse")
+                // 2. Extract status if provided
+                String status = submissionData.containsKey("status")
+                        ? (String) submissionData.get("status")
                         : null;
 
-                if (textResponse != null && question != null) {
-                    // Check if this exact text was previously mapped for the same question
-                    var previousMapping = assessmentAnswerRepository
-                            .findFirstByQuestionnaireQuestion_QuestionnaireQuestionIdAndTextResponseAndMappedOptionIsNotNull(
-                                    qId, textResponse);
-                    if (previousMapping.isPresent()) {
-                        // Previously mapped — save as a standard option answer (not text)
-                        AssessmentQuestionOptions mappedOpt = previousMapping.get().getMappedOption();
-                        AssessmentAnswer ans = new AssessmentAnswer();
-                        ans.setUserStudent(userStudent);
-                        ans.setAssessment(assessment);
-                        ans.setQuestionnaireQuestion(question);
-                        ans.setOption(mappedOpt);
-                        assessmentAnswerRepository.save(ans);
-
-                        // Accumulate scores from the mapped option
-                        List<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository
-                                .findByOptionId(mappedOpt.getOptionId());
-                        for (OptionScoreBasedOnMEasuredQualityTypes s : scores) {
-                            MeasuredQualityTypes type = s.getMeasuredQualityType();
-                            Long typeId = type.getMeasuredQualityTypeId();
-                            qualityTypeScores.merge(typeId, s.getScore(), Integer::sum);
-                            qualityTypeCache.putIfAbsent(typeId, type);
-                        }
-                    } else {
-                        // New unmapped text — save as text response for admin mapping later
-                        AssessmentAnswer ans = new AssessmentAnswer();
-                        ans.setUserStudent(userStudent);
-                        ans.setAssessment(assessment);
-                        ans.setQuestionnaireQuestion(question);
-                        ans.setTextResponse(textResponse);
-                        assessmentAnswerRepository.save(ans);
-                    }
-                } else if (ansMap.containsKey("optionId")) {
-                    // Standard option-based answer
-                    Long oId = ((Number) ansMap.get("optionId")).longValue();
-                    Integer rankOrder = ansMap.containsKey("rankOrder")
-                            ? ((Number) ansMap.get("rankOrder")).intValue()
-                            : null;
-
-                    AssessmentQuestionOptions option = assessmentQuestionOptionsRepository.findById(oId).orElse(null);
-
-                    if (question != null && option != null) {
-                        AssessmentAnswer ans = new AssessmentAnswer();
-                        ans.setUserStudent(userStudent);
-                        ans.setAssessment(assessment);
-                        ans.setQuestionnaireQuestion(question);
-                        ans.setOption(option);
-
-                        if (rankOrder != null) {
-                            ans.setRankOrder(rankOrder);
-                        }
-
-                        assessmentAnswerRepository.save(ans);
-
-                        // Accumulate Scores for RawScore table
-                        List<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository.findByOptionId(oId);
-                        for (OptionScoreBasedOnMEasuredQualityTypes s : scores) {
-                            MeasuredQualityTypes type = s.getMeasuredQualityType();
-                            Long typeId = type.getMeasuredQualityTypeId();
-
-                            qualityTypeScores.merge(typeId, s.getScore(), Integer::sum);
-                            qualityTypeCache.putIfAbsent(typeId, type);
-                        }
-                    }
+                // 3. Manage Mapping with race condition fix
+                StudentAssessmentMapping mapping;
+                try {
+                    mapping = studentAssessmentMappingRepository
+                            .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                            .orElseGet(() -> {
+                                StudentAssessmentMapping newMapping = new StudentAssessmentMapping();
+                                newMapping.setUserStudent(userStudent);
+                                newMapping.setAssessmentId(assessmentId);
+                                return studentAssessmentMappingRepository.save(newMapping);
+                            });
+                } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                    mapping = studentAssessmentMappingRepository
+                            .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                            .orElseThrow(() -> new RuntimeException("Failed to create/find assessment mapping"));
                 }
+
+                // Update status if provided
+                if (status != null) {
+                    mapping.setStatus(status);
+                    studentAssessmentMappingRepository.save(mapping);
+                }
+
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> answers = (List<Map<String, Object>>) submissionData.get("answers");
+                if (answers == null || answers.isEmpty()) {
+                    assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
+                    return ResponseEntity.badRequest().body("No answers provided");
+                }
+
+                // 4. Save full submission to Redis for async processing
+                assessmentSessionService.saveSubmittedAnswers(userStudentId, assessmentId, submissionData);
+
+                // 5. Fire async processing (non-blocking)
+                submissionProcessorService.processSubmissionAsync(userStudentId, assessmentId);
+
+                logger.info("Submission accepted for async processing: student={} assessment={}", userStudentId, assessmentId);
+                return ResponseEntity.ok(Map.of("status", "accepted"));
+
+            } catch (Exception e) {
+                assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
+                throw e;
             }
-
-            // 4. Update Raw Scores (Delete old, Save new)
-            assessmentRawScoreRepository
-                    .deleteByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId());
-
-            List<AssessmentRawScore> finalScores = new ArrayList<>();
-            for (Map.Entry<Long, Integer> entry : qualityTypeScores.entrySet()) {
-                MeasuredQualityTypes mqt = qualityTypeCache.get(entry.getKey());
-
-                AssessmentRawScore ars = new AssessmentRawScore();
-                ars.setStudentAssessmentMapping(mapping);
-                ars.setMeasuredQualityType(mqt);
-                // Crucial: Also link the parent 'MeasuredQuality' from the type
-                ars.setMeasuredQuality(mqt.getMeasuredQuality());
-                ars.setRawScore(entry.getValue());
-
-                finalScores.add(assessmentRawScoreRepository.save(ars));
-            }
-
-            return ResponseEntity.ok(Map.of("status", "success", "scoresSaved", finalScores.size()));
 
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Save a draft of student's current answer state to Redis.
+     * Called periodically (every 30s) by the frontend to back up localStorage.
+     * Accepts a JSON blob with userStudentId, assessmentId, and answer state.
+     */
+    @PostMapping(value = "/draft-save", headers = "Accept=application/json")
+    public ResponseEntity<?> saveDraft(@RequestBody Map<String, Object> draftData) {
+        try {
+            Long studentId = ((Number) draftData.get("userStudentId")).longValue();
+            Long assessmentId = ((Number) draftData.get("assessmentId")).longValue();
+
+            assessmentSessionService.saveDraft(studentId, assessmentId, draftData);
+
+            Map<String, String> response = new HashMap<>();
+            response.put("status", "saved");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Draft save failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Restore a saved draft for a student+assessment pair.
+     * Called by the frontend on page load to recover answers after browser crash.
+     * Returns 404 if no draft exists.
+     */
+    @GetMapping(value = "/draft-restore/{studentId}/{assessmentId}", headers = "Accept=application/json")
+    public ResponseEntity<?> restoreDraft(@PathVariable Long studentId, @PathVariable Long assessmentId) {
+        try {
+            Object draft = assessmentSessionService.getDraft(studentId, assessmentId);
+
+            if (draft == null) {
+                Map<String, String> response = new HashMap<>();
+                response.put("status", "no_draft");
+                return ResponseEntity.status(404).body(response);
+            }
+            return ResponseEntity.ok(draft);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Draft restore failed: " + e.getMessage());
         }
     }
 
@@ -400,15 +397,20 @@ public class AssessmentAnswerController {
                     mapping.setStatus("completed");
                     studentAssessmentMappingRepository.save(mapping);
 
-                    // Delete old answers for re-upload support
-                    assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(
-                            userStudentId, assessmentId);
+                    // SAFE: Collect existing IDs before any writes
+                    List<Long> existingAnswerIds = assessmentAnswerRepository
+                        .findByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId)
+                        .stream()
+                        .map(AssessmentAnswer::getAssessmentAnswerId)
+                        .collect(Collectors.toList());
 
-                    // Delete old raw scores
-                    assessmentRawScoreRepository
-                            .deleteByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId());
+                    List<Long> existingScoreIds = assessmentRawScoreRepository
+                        .findByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId())
+                        .stream()
+                        .map(AssessmentRawScore::getAssessmentRawScoreId)
+                        .collect(Collectors.toList());
 
-                    // Process answers
+                    // Process and save new answers
                     List<Map<String, Object>> answers = (List<Map<String, Object>>) studentData.get("answers");
                     Map<Long, Integer> qualityTypeScores = new HashMap<>();
                     Map<Long, MeasuredQualityTypes> qualityTypeCache = new HashMap<>();
@@ -427,21 +429,34 @@ public class AssessmentAnswerController {
                             ans.setAssessment(assessment);
                             ans.setQuestionnaireQuestion(question);
                             ans.setOption(option);
+
+                            Integer rankOrder = ansMap.containsKey("rankOrder")
+                                    ? ((Number) ansMap.get("rankOrder")).intValue()
+                                    : null;
+                            if (rankOrder != null) {
+                                ans.setRankOrder(rankOrder);
+                            }
+
                             assessmentAnswerRepository.save(ans);
 
-                            // Accumulate scores
+                            // Accumulate scores (deduplicate by MQT type per option)
                             List<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository
                                     .findByOptionId(oId);
+                            Map<Long, OptionScoreBasedOnMEasuredQualityTypes> dedupedScores = new java.util.LinkedHashMap<>();
                             for (OptionScoreBasedOnMEasuredQualityTypes s : scores) {
+                                dedupedScores.putIfAbsent(s.getMeasuredQualityType().getMeasuredQualityTypeId(), s);
+                            }
+                            for (OptionScoreBasedOnMEasuredQualityTypes s : dedupedScores.values()) {
                                 MeasuredQualityTypes type = s.getMeasuredQualityType();
                                 Long typeId = type.getMeasuredQualityTypeId();
-                                qualityTypeScores.merge(typeId, s.getScore(), Integer::sum);
+                                int effectiveScore = (rankOrder != null) ? s.getScore() * rankOrder : s.getScore();
+                                qualityTypeScores.merge(typeId, effectiveScore, Integer::sum);
                                 qualityTypeCache.putIfAbsent(typeId, type);
                             }
                         }
                     }
 
-                    // Save raw scores
+                    // Save new raw scores
                     for (Map.Entry<Long, Integer> entry : qualityTypeScores.entrySet()) {
                         MeasuredQualityTypes mqt = qualityTypeCache.get(entry.getKey());
                         AssessmentRawScore ars = new AssessmentRawScore();
@@ -450,6 +465,14 @@ public class AssessmentAnswerController {
                         ars.setMeasuredQuality(mqt.getMeasuredQuality());
                         ars.setRawScore(entry.getValue());
                         assessmentRawScoreRepository.save(ars);
+                    }
+
+                    // Delete old records by specific IDs
+                    if (!existingAnswerIds.isEmpty()) {
+                        assessmentAnswerRepository.deleteAllById(existingAnswerIds);
+                    }
+                    if (!existingScoreIds.isEmpty()) {
+                        assessmentRawScoreRepository.deleteAllById(existingScoreIds);
                     }
 
                     successCount++;
@@ -623,15 +646,20 @@ public class AssessmentAnswerController {
                     mapping.setStatus("completed");
                     studentAssessmentMappingRepository.save(mapping);
 
-                    // Delete old answers for re-upload support
-                    assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(
-                            userStudentId, assessmentId);
+                    // SAFE: Collect existing IDs before any writes
+                    List<Long> existingAnswerIds = assessmentAnswerRepository
+                        .findByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId)
+                        .stream()
+                        .map(AssessmentAnswer::getAssessmentAnswerId)
+                        .collect(Collectors.toList());
 
-                    // Delete old raw scores
-                    assessmentRawScoreRepository
-                            .deleteByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId());
+                    List<Long> existingScoreIds = assessmentRawScoreRepository
+                        .findByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId())
+                        .stream()
+                        .map(AssessmentRawScore::getAssessmentRawScoreId)
+                        .collect(Collectors.toList());
 
-                    // Process answers
+                    // Process and save new answers
                     List<Map<String, Object>> answers = (List<Map<String, Object>>) studentData.get("answers");
                     Map<Long, Integer> qualityTypeScores = new HashMap<>();
                     Map<Long, MeasuredQualityTypes> qualityTypeCache = new HashMap<>();
@@ -652,22 +680,35 @@ public class AssessmentAnswerController {
                                 ans.setAssessment(assessment);
                                 ans.setQuestionnaireQuestion(question);
                                 ans.setOption(option);
+
+                                Integer rankOrder = ansMap.containsKey("rankOrder")
+                                        ? ((Number) ansMap.get("rankOrder")).intValue()
+                                        : null;
+                                if (rankOrder != null) {
+                                    ans.setRankOrder(rankOrder);
+                                }
+
                                 assessmentAnswerRepository.save(ans);
 
-                                // Accumulate scores
+                                // Accumulate scores (deduplicate by MQT type per option)
                                 List<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository
                                         .findByOptionId(oId);
+                                Map<Long, OptionScoreBasedOnMEasuredQualityTypes> dedupedScores = new java.util.LinkedHashMap<>();
                                 for (OptionScoreBasedOnMEasuredQualityTypes s : scores) {
+                                    dedupedScores.putIfAbsent(s.getMeasuredQualityType().getMeasuredQualityTypeId(), s);
+                                }
+                                for (OptionScoreBasedOnMEasuredQualityTypes s : dedupedScores.values()) {
                                     MeasuredQualityTypes type = s.getMeasuredQualityType();
                                     Long typeId = type.getMeasuredQualityTypeId();
-                                    qualityTypeScores.merge(typeId, s.getScore(), Integer::sum);
+                                    int effectiveScore = (rankOrder != null) ? s.getScore() * rankOrder : s.getScore();
+                                    qualityTypeScores.merge(typeId, effectiveScore, Integer::sum);
                                     qualityTypeCache.putIfAbsent(typeId, type);
                                 }
                             }
                         }
                     }
 
-                    // Save raw scores
+                    // Save new raw scores
                     for (Map.Entry<Long, Integer> entry : qualityTypeScores.entrySet()) {
                         MeasuredQualityTypes mqt = qualityTypeCache.get(entry.getKey());
                         AssessmentRawScore ars = new AssessmentRawScore();
@@ -676,6 +717,14 @@ public class AssessmentAnswerController {
                         ars.setMeasuredQuality(mqt.getMeasuredQuality());
                         ars.setRawScore(entry.getValue());
                         assessmentRawScoreRepository.save(ars);
+                    }
+
+                    // Delete old records by specific IDs
+                    if (!existingAnswerIds.isEmpty()) {
+                        assessmentAnswerRepository.deleteAllById(existingAnswerIds);
+                    }
+                    if (!existingScoreIds.isEmpty()) {
+                        assessmentRawScoreRepository.deleteAllById(existingScoreIds);
                     }
 
                     successCount++;
@@ -780,15 +829,20 @@ public class AssessmentAnswerController {
                     mapping.setStatus("completed");
                     studentAssessmentMappingRepository.save(mapping);
 
-                    // Delete old answers for re-upload support
-                    assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(
-                            userStudentId, assessmentId);
+                    // SAFE: Collect existing IDs before any writes
+                    List<Long> existingAnswerIds = assessmentAnswerRepository
+                        .findByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId)
+                        .stream()
+                        .map(AssessmentAnswer::getAssessmentAnswerId)
+                        .collect(Collectors.toList());
 
-                    // Delete old raw scores
-                    assessmentRawScoreRepository
-                            .deleteByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId());
+                    List<Long> existingScoreIds = assessmentRawScoreRepository
+                        .findByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId())
+                        .stream()
+                        .map(AssessmentRawScore::getAssessmentRawScoreId)
+                        .collect(Collectors.toList());
 
-                    // Process answers
+                    // Process and save new answers
                     List<Map<String, Object>> answers = (List<Map<String, Object>>) studentData.get("answers");
                     Map<Long, Integer> qualityTypeScores = new HashMap<>();
                     Map<Long, MeasuredQualityTypes> qualityTypeCache = new HashMap<>();
@@ -809,22 +863,35 @@ public class AssessmentAnswerController {
                                 ans.setAssessment(assessment);
                                 ans.setQuestionnaireQuestion(question);
                                 ans.setOption(option);
+
+                                Integer rankOrder = ansMap.containsKey("rankOrder")
+                                        ? ((Number) ansMap.get("rankOrder")).intValue()
+                                        : null;
+                                if (rankOrder != null) {
+                                    ans.setRankOrder(rankOrder);
+                                }
+
                                 assessmentAnswerRepository.save(ans);
 
-                                // Accumulate scores
+                                // Accumulate scores (deduplicate by MQT type per option)
                                 List<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository
                                         .findByOptionId(oId);
+                                Map<Long, OptionScoreBasedOnMEasuredQualityTypes> dedupedScores = new java.util.LinkedHashMap<>();
                                 for (OptionScoreBasedOnMEasuredQualityTypes s : scores) {
+                                    dedupedScores.putIfAbsent(s.getMeasuredQualityType().getMeasuredQualityTypeId(), s);
+                                }
+                                for (OptionScoreBasedOnMEasuredQualityTypes s : dedupedScores.values()) {
                                     MeasuredQualityTypes type = s.getMeasuredQualityType();
                                     Long typeId = type.getMeasuredQualityTypeId();
-                                    qualityTypeScores.merge(typeId, s.getScore(), Integer::sum);
+                                    int effectiveScore = (rankOrder != null) ? s.getScore() * rankOrder : s.getScore();
+                                    qualityTypeScores.merge(typeId, effectiveScore, Integer::sum);
                                     qualityTypeCache.putIfAbsent(typeId, type);
                                 }
                             }
                         }
                     }
 
-                    // Save raw scores
+                    // Save new raw scores
                     for (Map.Entry<Long, Integer> entry : qualityTypeScores.entrySet()) {
                         MeasuredQualityTypes mqt = qualityTypeCache.get(entry.getKey());
                         AssessmentRawScore ars = new AssessmentRawScore();
@@ -833,6 +900,14 @@ public class AssessmentAnswerController {
                         ars.setMeasuredQuality(mqt.getMeasuredQuality());
                         ars.setRawScore(entry.getValue());
                         assessmentRawScoreRepository.save(ars);
+                    }
+
+                    // Delete old records by specific IDs
+                    if (!existingAnswerIds.isEmpty()) {
+                        assessmentAnswerRepository.deleteAllById(existingAnswerIds);
+                    }
+                    if (!existingScoreIds.isEmpty()) {
+                        assessmentRawScoreRepository.deleteAllById(existingScoreIds);
                     }
 
                     successCount++;
@@ -1022,8 +1097,20 @@ public class AssessmentAnswerController {
                 Long userStudentId = mapping.getUserStudent().getUserStudentId();
 
                 // Get all answers for this student + assessment
-                List<AssessmentAnswer> answers = assessmentAnswerRepository
+                List<AssessmentAnswer> allAnswers = assessmentAnswerRepository
                         .findByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
+
+                // Deduplicate answers by question + option to handle re-submissions
+                Map<String, AssessmentAnswer> uniqueAnswerMap = new java.util.LinkedHashMap<>();
+                for (AssessmentAnswer a : allAnswers) {
+                    Long qqId = a.getQuestionnaireQuestion() != null
+                            ? a.getQuestionnaireQuestion().getQuestionnaireQuestionId() : 0L;
+                    Long optId = a.getOption() != null ? a.getOption().getOptionId()
+                            : (a.getMappedOption() != null ? a.getMappedOption().getOptionId() : 0L);
+                    String key = qqId + "_" + optId;
+                    uniqueAnswerMap.putIfAbsent(key, a);
+                }
+                List<AssessmentAnswer> answers = new ArrayList<>(uniqueAnswerMap.values());
 
                 Map<Long, Integer> qualityTypeScores = new HashMap<>();
                 Map<Long, MeasuredQualityTypes> qualityTypeCache = new HashMap<>();
@@ -1039,12 +1126,18 @@ public class AssessmentAnswerController {
                     }
 
                     if (scoringOption != null) {
+                        Integer rankOrder = answer.getRankOrder();
                         List<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository
                                 .findByOptionId(scoringOption.getOptionId());
+                        Map<Long, OptionScoreBasedOnMEasuredQualityTypes> dedupedScores = new java.util.LinkedHashMap<>();
                         for (OptionScoreBasedOnMEasuredQualityTypes s : scores) {
+                            dedupedScores.putIfAbsent(s.getMeasuredQualityType().getMeasuredQualityTypeId(), s);
+                        }
+                        for (OptionScoreBasedOnMEasuredQualityTypes s : dedupedScores.values()) {
                             MeasuredQualityTypes type = s.getMeasuredQualityType();
                             Long typeId = type.getMeasuredQualityTypeId();
-                            qualityTypeScores.merge(typeId, s.getScore(), Integer::sum);
+                            int effectiveScore = (rankOrder != null) ? s.getScore() * rankOrder : s.getScore();
+                            qualityTypeScores.merge(typeId, effectiveScore, Integer::sum);
                             qualityTypeCache.putIfAbsent(typeId, type);
                         }
                     }
@@ -1068,6 +1161,98 @@ public class AssessmentAnswerController {
             }
 
             return ResponseEntity.ok(Map.of("status", "success", "studentsProcessed", studentsProcessed));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Recalculate raw scores for ALL students across ALL assessments.
+     * Uses the corrected ranking logic: mqtScore * rankOrder for ranked answers.
+     */
+    @Transactional
+    @PostMapping(value = "/recalculate-all-scores", headers = "Accept=application/json")
+    public ResponseEntity<?> recalculateAllScores() {
+        try {
+            List<StudentAssessmentMapping> allMappings = studentAssessmentMappingRepository.findAll();
+            int studentsProcessed = 0;
+            int errors = 0;
+
+            for (StudentAssessmentMapping mapping : allMappings) {
+                try {
+                    Long userStudentId = mapping.getUserStudent().getUserStudentId();
+                    Long assessmentId = mapping.getAssessmentId();
+
+                    List<AssessmentAnswer> allAnswers = assessmentAnswerRepository
+                            .findByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
+
+                    // Deduplicate answers by question + option to handle re-submissions
+                    Map<String, AssessmentAnswer> uniqueAnswerMap = new java.util.LinkedHashMap<>();
+                    for (AssessmentAnswer a : allAnswers) {
+                        Long qqId = a.getQuestionnaireQuestion() != null
+                                ? a.getQuestionnaireQuestion().getQuestionnaireQuestionId() : 0L;
+                        Long optId = a.getOption() != null ? a.getOption().getOptionId()
+                                : (a.getMappedOption() != null ? a.getMappedOption().getOptionId() : 0L);
+                        String key = qqId + "_" + optId;
+                        uniqueAnswerMap.putIfAbsent(key, a);
+                    }
+                    List<AssessmentAnswer> answers = new ArrayList<>(uniqueAnswerMap.values());
+
+                    Map<Long, Integer> qualityTypeScores = new HashMap<>();
+                    Map<Long, MeasuredQualityTypes> qualityTypeCache = new HashMap<>();
+
+                    for (AssessmentAnswer answer : answers) {
+                        AssessmentQuestionOptions scoringOption = null;
+                        if (answer.getOption() != null) {
+                            scoringOption = answer.getOption();
+                        } else if (answer.getMappedOption() != null) {
+                            scoringOption = answer.getMappedOption();
+                        }
+
+                        if (scoringOption != null) {
+                            Integer rankOrder = answer.getRankOrder();
+                            List<OptionScoreBasedOnMEasuredQualityTypes> scores = optionScoreRepository
+                                    .findByOptionId(scoringOption.getOptionId());
+                            Map<Long, OptionScoreBasedOnMEasuredQualityTypes> dedupedScores = new java.util.LinkedHashMap<>();
+                            for (OptionScoreBasedOnMEasuredQualityTypes s : scores) {
+                                dedupedScores.putIfAbsent(s.getMeasuredQualityType().getMeasuredQualityTypeId(), s);
+                            }
+                            for (OptionScoreBasedOnMEasuredQualityTypes s : dedupedScores.values()) {
+                                MeasuredQualityTypes type = s.getMeasuredQualityType();
+                                Long typeId = type.getMeasuredQualityTypeId();
+                                int baseScore = s.getScore() != null ? s.getScore() : 0;
+                                int effectiveScore = (rankOrder != null) ? baseScore * rankOrder : baseScore;
+                                qualityTypeScores.merge(typeId, effectiveScore, Integer::sum);
+                                qualityTypeCache.putIfAbsent(typeId, type);
+                            }
+                        }
+                    }
+
+                    // Delete old raw scores and save new ones
+                    assessmentRawScoreRepository
+                            .deleteByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId());
+
+                    for (Map.Entry<Long, Integer> entry : qualityTypeScores.entrySet()) {
+                        MeasuredQualityTypes mqt = qualityTypeCache.get(entry.getKey());
+                        AssessmentRawScore ars = new AssessmentRawScore();
+                        ars.setStudentAssessmentMapping(mapping);
+                        ars.setMeasuredQualityType(mqt);
+                        ars.setMeasuredQuality(mqt.getMeasuredQuality());
+                        ars.setRawScore(entry.getValue());
+                        assessmentRawScoreRepository.save(ars);
+                    }
+
+                    studentsProcessed++;
+                } catch (Exception e) {
+                    errors++;
+                }
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "totalMappings", allMappings.size(),
+                    "studentsProcessed", studentsProcessed,
+                    "errors", errors));
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Error: " + e.getMessage());
         }
@@ -1294,6 +1479,320 @@ public class AssessmentAnswerController {
                 "error", "Failed to fetch student dashboard data",
                 "message", e.getMessage()
             ));
+        }
+    }
+
+    /**
+     * Lightweight partial save of student answers to DB on section change.
+     * Uses delete-and-replace strategy: deletes all existing answers for this
+     * student+assessment, then inserts all current answers.
+     * Does NOT calculate scores or change assessment status.
+     * Frontend calls this fire-and-forget on every section transition.
+     */
+    @Transactional
+    @PostMapping(value = "/save-partial", headers = "Accept=application/json")
+    public ResponseEntity<?> savePartialAnswers(@RequestBody Map<String, Object> submissionData) {
+        try {
+            if (submissionData.get("userStudentId") == null || submissionData.get("assessmentId") == null) {
+                return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
+            }
+            Long userStudentId = ((Number) submissionData.get("userStudentId")).longValue();
+            Long assessmentId = ((Number) submissionData.get("assessmentId")).longValue();
+
+            UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
+            AssessmentTable assessment = assessmentTableRepository.findById(assessmentId).orElse(null);
+            if (userStudent == null || assessment == null) {
+                return ResponseEntity.badRequest().body("Invalid userStudentId or assessmentId");
+            }
+
+            // Ensure mapping exists (find or create), do NOT change status
+            try {
+                studentAssessmentMappingRepository
+                        .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                        .orElseGet(() -> {
+                            StudentAssessmentMapping newMapping = new StudentAssessmentMapping();
+                            newMapping.setUserStudent(userStudent);
+                            newMapping.setAssessmentId(assessmentId);
+                            return studentAssessmentMappingRepository.save(newMapping);
+                        });
+            } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                // Race condition — mapping was created by another thread, that's fine
+            }
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> answers = (List<Map<String, Object>>) submissionData.get("answers");
+            if (answers == null || answers.isEmpty()) {
+                return ResponseEntity.ok(Map.of("saved", 0, "status", "no_answers"));
+            }
+
+            // Redis-first: buffer partial answers in Redis for speed
+            try {
+                assessmentSessionService.savePartialAnswers(userStudentId, assessmentId, answers);
+                return ResponseEntity.ok(Map.of(
+                        "status", "saved",
+                        "saved", answers.size(),
+                        "storage", "redis"
+                ));
+            } catch (Exception redisEx) {
+                // Redis failed — fall back to MySQL DELETE+INSERT
+                logger.warn("Redis save failed for student={} assessment={}, falling back to MySQL",
+                        userStudentId, assessmentId, redisEx);
+            }
+
+            // MySQL fallback: bulk fetch, build entities, delete-and-replace
+            List<Long> questionIds = new ArrayList<>();
+            List<Long> optionIds = new ArrayList<>();
+            for (Map<String, Object> ansMap : answers) {
+                questionIds.add(((Number) ansMap.get("questionnaireQuestionId")).longValue());
+                if (ansMap.containsKey("optionId")) {
+                    optionIds.add(((Number) ansMap.get("optionId")).longValue());
+                }
+            }
+
+            Map<Long, QuestionnaireQuestion> questionCache = new HashMap<>();
+            if (!questionIds.isEmpty()) {
+                questionnaireQuestionRepository.findAllByIdIn(questionIds)
+                        .forEach(qq -> questionCache.put(qq.getQuestionnaireQuestionId(), qq));
+            }
+
+            Map<Long, AssessmentQuestionOptions> optionCache = new HashMap<>();
+            if (!optionIds.isEmpty()) {
+                assessmentQuestionOptionsRepository.findAllById(optionIds)
+                        .forEach(opt -> optionCache.put(opt.getOptionId(), opt));
+            }
+
+            List<AssessmentAnswer> answersToSave = new ArrayList<>();
+            int skippedCount = 0;
+
+            for (Map<String, Object> ansMap : answers) {
+                Long qId = ((Number) ansMap.get("questionnaireQuestionId")).longValue();
+                QuestionnaireQuestion question = questionCache.get(qId);
+
+                String textResponse = ansMap.containsKey("textResponse")
+                        ? (String) ansMap.get("textResponse")
+                        : null;
+
+                if (textResponse != null && question != null) {
+                    AssessmentAnswer ans = new AssessmentAnswer();
+                    ans.setUserStudent(userStudent);
+                    ans.setAssessment(assessment);
+                    ans.setQuestionnaireQuestion(question);
+                    ans.setTextResponse(textResponse);
+                    answersToSave.add(ans);
+                } else if (ansMap.containsKey("optionId")) {
+                    Long oId = ((Number) ansMap.get("optionId")).longValue();
+                    Integer rankOrder = ansMap.containsKey("rankOrder")
+                            ? ((Number) ansMap.get("rankOrder")).intValue()
+                            : null;
+
+                    AssessmentQuestionOptions option = optionCache.get(oId);
+                    if (question == null || option == null) {
+                        skippedCount++;
+                        continue;
+                    }
+
+                    AssessmentAnswer ans = new AssessmentAnswer();
+                    ans.setUserStudent(userStudent);
+                    ans.setAssessment(assessment);
+                    ans.setQuestionnaireQuestion(question);
+                    ans.setOption(option);
+                    if (rankOrder != null) {
+                        ans.setRankOrder(rankOrder);
+                    }
+                    answersToSave.add(ans);
+                }
+            }
+
+            assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
+            assessmentAnswerRepository.saveAll(answersToSave);
+
+            return ResponseEntity.ok(Map.of(
+                    "status", "saved",
+                    "saved", answersToSave.size(),
+                    "skipped", skippedCount,
+                    "storage", "mysql"
+            ));
+
+        } catch (Exception e) {
+            logger.error("Partial save failed for student", e);
+            return ResponseEntity.status(500).body("Partial save failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Dashboard endpoint: list all Redis-buffered partial answers.
+     * Returns lightweight metadata (no full answer payloads).
+     * Optionally filter by assessmentId.
+     */
+    @GetMapping(value = "/redis-partials")
+    public ResponseEntity<?> getRedisPartials(
+            @RequestParam(value = "assessmentId", required = false) Long assessmentId) {
+        try {
+            List<Map<String, Object>> entries = assessmentSessionService.getAllPartialAnswerEntries(assessmentId);
+
+            // Enrich with student names
+            for (Map<String, Object> entry : entries) {
+                Long studentId = ((Number) entry.get("userStudentId")).longValue();
+                UserStudent student = userStudentRepository.findById(studentId).orElse(null);
+                if (student != null) {
+                    entry.put("studentName", student.getStudentInfo().getName() + " " + student.getStudentInfo().getFamily());
+                } else {
+                    entry.put("studentName", "Unknown");
+                }
+            }
+
+            return ResponseEntity.ok(entries);
+        } catch (Exception e) {
+            logger.error("Failed to fetch Redis partials", e);
+            return ResponseEntity.status(500).body("Failed to fetch Redis partials: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Dashboard endpoint: view the raw Redis JSON for a student's partial answers.
+     */
+    @GetMapping(value = "/redis-partial-detail")
+    public ResponseEntity<?> getRedisPartialDetail(
+            @RequestParam("userStudentId") Long userStudentId,
+            @RequestParam("assessmentId") Long assessmentId) {
+        try {
+            Map<String, Object> data = assessmentSessionService.getPartialAnswers(userStudentId, assessmentId);
+            if (data == null) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(data);
+        } catch (Exception e) {
+            logger.error("Failed to fetch Redis partial detail", e);
+            return ResponseEntity.status(500).body("Failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Dashboard endpoint: admin-triggered submit from Redis partial answers.
+     * Reads partial answers from Redis and runs them through the async submission pipeline.
+     */
+    @SuppressWarnings("unchecked")
+    @PostMapping(value = "/submit-from-redis")
+    public ResponseEntity<?> submitFromRedis(@RequestBody Map<String, Object> requestData) {
+        try {
+            if (requestData.get("userStudentId") == null || requestData.get("assessmentId") == null) {
+                return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
+            }
+            Long userStudentId = ((Number) requestData.get("userStudentId")).longValue();
+            Long assessmentId = ((Number) requestData.get("assessmentId")).longValue();
+
+            // Read partial answers from Redis
+            Map<String, Object> partial = assessmentSessionService.getPartialAnswers(userStudentId, assessmentId);
+            if (partial == null || partial.get("answers") == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No partial answers found in Redis");
+            }
+
+            List<Map<String, Object>> answers = (List<Map<String, Object>>) partial.get("answers");
+            if (answers.isEmpty()) {
+                return ResponseEntity.badRequest().body("Partial answers are empty");
+            }
+
+            // Acquire submission lock (idempotency)
+            if (!assessmentSessionService.acquireSubmissionLock(userStudentId, assessmentId)) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                        "error", "Submission already in progress or completed",
+                        "status", "duplicate"
+                ));
+            }
+
+            try {
+                UserStudent userStudent = userStudentRepository.findById(userStudentId)
+                        .orElseThrow(() -> new RuntimeException("UserStudent not found"));
+
+                AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
+                        .orElseThrow(() -> new RuntimeException("Assessment not found"));
+
+                // Find/create mapping and set status completed
+                StudentAssessmentMapping mapping;
+                try {
+                    mapping = studentAssessmentMappingRepository
+                            .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                            .orElseGet(() -> {
+                                StudentAssessmentMapping newMapping = new StudentAssessmentMapping();
+                                newMapping.setUserStudent(userStudent);
+                                newMapping.setAssessmentId(assessmentId);
+                                return studentAssessmentMappingRepository.save(newMapping);
+                            });
+                } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                    mapping = studentAssessmentMappingRepository
+                            .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                            .orElseThrow(() -> new RuntimeException("Failed to create/find assessment mapping"));
+                }
+                mapping.setStatus("completed");
+                studentAssessmentMappingRepository.save(mapping);
+
+                // Build submission payload and save to Redis for async processing
+                Map<String, Object> submissionData = new HashMap<>();
+                submissionData.put("userStudentId", userStudentId);
+                submissionData.put("assessmentId", assessmentId);
+                submissionData.put("status", "completed");
+                submissionData.put("answers", answers);
+
+                assessmentSessionService.saveSubmittedAnswers(userStudentId, assessmentId, submissionData);
+                submissionProcessorService.processSubmissionAsync(userStudentId, assessmentId);
+
+                logger.info("Admin submit-from-redis accepted for student={} assessment={}", userStudentId, assessmentId);
+                return ResponseEntity.ok(Map.of("status", "accepted"));
+
+            } catch (Exception e) {
+                assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
+                throw e;
+            }
+
+        } catch (Exception e) {
+            logger.error("Submit from Redis failed", e);
+            return ResponseEntity.status(500).body("Submit failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Dashboard endpoint: flush buffered partial answers from Redis to MySQL.
+     * Accepts {userStudentId, assessmentId} for a single student,
+     * or just {assessmentId} to flush all students for that assessment.
+     */
+    @Transactional
+    @PostMapping(value = "/flush-partial-to-db")
+    public ResponseEntity<?> flushPartialToDb(@RequestBody Map<String, Object> requestData) {
+        try {
+            if (requestData.get("assessmentId") == null) {
+                return ResponseEntity.badRequest().body("assessmentId is required");
+            }
+            Long assessmentId = ((Number) requestData.get("assessmentId")).longValue();
+            AssessmentTable assessment = assessmentTableRepository.findById(assessmentId).orElse(null);
+            if (assessment == null) {
+                return ResponseEntity.badRequest().body("Invalid assessmentId");
+            }
+
+            // Determine which students to flush and flush via service
+            int totalFlushed = 0;
+            if (requestData.get("userStudentId") != null) {
+                Long studentId = ((Number) requestData.get("userStudentId")).longValue();
+                if (partialAnswerFlushService.flushOneStudent(studentId, assessmentId)) {
+                    totalFlushed++;
+                }
+            } else {
+                List<Map<String, Object>> allEntries = assessmentSessionService.getAllPartialAnswerEntries(assessmentId);
+                for (Map<String, Object> meta : allEntries) {
+                    Long studentId = ((Number) meta.get("userStudentId")).longValue();
+                    if (partialAnswerFlushService.flushOneStudent(studentId, assessmentId)) {
+                        totalFlushed++;
+                    }
+                }
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "flushed", totalFlushed
+            ));
+
+        } catch (Exception e) {
+            logger.error("Failed to flush partial answers to DB", e);
+            return ResponseEntity.status(500).body("Flush failed: " + e.getMessage());
         }
     }
 }

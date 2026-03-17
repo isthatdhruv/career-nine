@@ -18,6 +18,8 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.firewall.HttpFirewall;
+import org.springframework.security.web.firewall.StrictHttpFirewall;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -57,6 +59,15 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     @Bean
     public TokenAuthenticationFilter tokenAuthenticationFilter() {
         return new TokenAuthenticationFilter();
+    }
+
+    @Bean
+    public HttpFirewall allowedHttpMethods() {
+        StrictHttpFirewall firewall = new StrictHttpFirewall();
+        firewall.setUnsafeAllowAnyHttpMethod(true);
+        firewall.setAllowUrlEncodedDoubleSlash(true);
+        firewall.setAllowSemicolon(true);
+        return firewall;
     }
 
     /*
@@ -132,7 +143,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                         "/**/*.css",
                         "/**/*.js")
                 .permitAll()
-.antMatchers("/assessment-mapping/public/**", "/leads/capture",
+.antMatchers("/assessment-mapping/public/**", "/assessments/prefetch/**", "/leads/capture",
                         "/user/*/*","/user/*","/assessment-section-instructions/**", "/language-question/create-with-options",
                         "/**/**/**", "/**/**/**/**","/dashboard/game-results/*",
                         "/languages/**","/game-results/*",

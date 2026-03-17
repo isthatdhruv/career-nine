@@ -1,10 +1,20 @@
 package com.kccitm.api.controller.career9;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,9 +25,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kccitm.api.model.career9.AssessmentQuestions;
+import com.kccitm.api.model.career9.AssessmentSession;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
+import com.kccitm.api.service.AssessmentSessionService;
 import com.kccitm.api.model.career9.Questionaire.Questionnaire;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.Career9.AssessmentQuestionRepository;
@@ -27,6 +40,11 @@ import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireRepository;
 @RestController
 @RequestMapping("/assessments")
 public class AssessmentTableController {
+
+    private static final Logger logger = LoggerFactory.getLogger(AssessmentTableController.class);
+
+    /** Directory where locked assessment JSON snapshots are stored */
+    private static final String LOCKED_CACHE_DIR = "assessment-cache";
 
     @Autowired
     private AssessmentTableRepository assessmentTableRepository;
@@ -40,8 +58,93 @@ public class AssessmentTableController {
     @Autowired
     private AssessmentQuestionRepository assessmentQuestionRepository;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private AssessmentSessionService assessmentSessionService;
+
+    // ─── Locked assessment JSON snapshot helpers ───
+
+    private Path getLockedCacheDir() {
+        Path dir = Paths.get(LOCKED_CACHE_DIR);
+        if (!Files.exists(dir)) {
+            try {
+                Files.createDirectories(dir);
+            } catch (IOException e) {
+                logger.error("Failed to create assessment cache directory: {}", dir, e);
+            }
+        }
+        return dir;
+    }
+
+    private Path getSnapshotPath(Long assessmentId) {
+        return getLockedCacheDir().resolve(assessmentId + ".json");
+    }
+
+    /**
+     * Generate and write a JSON snapshot for a locked assessment.
+     * Contains both the questionnaire data and the assessment config.
+     */
+    private void generateLockedSnapshot(AssessmentTable assessment) {
+        try {
+            HashMap<String, Object> bundle = new HashMap<>();
+            bundle.put("assessmentId", assessment.getId());
+            bundle.put("isLocked", true);
+            bundle.put("config", assessment);
+
+            if (assessment.getQuestionnaire() != null) {
+                Long questionnaireId = assessment.getQuestionnaire().getQuestionnaireId();
+                List<Questionnaire> questionnaireData = questionnaireRepository
+                        .findAllByQuestionnaireId(questionnaireId);
+                bundle.put("questionnaire", questionnaireData);
+            } else {
+                bundle.put("questionnaire", java.util.Collections.emptyList());
+            }
+
+            Path snapshotPath = getSnapshotPath(assessment.getId());
+            objectMapper.writeValue(snapshotPath.toFile(), bundle);
+            logger.info("Generated locked snapshot for assessment #{} at {}", assessment.getId(), snapshotPath);
+        } catch (IOException e) {
+            logger.error("Failed to write locked snapshot for assessment #{}", assessment.getId(), e);
+        }
+    }
+
+    /**
+     * Delete the JSON snapshot for an assessment (called on unlock).
+     */
+    private void deleteLockedSnapshot(Long assessmentId) {
+        try {
+            Path snapshotPath = getSnapshotPath(assessmentId);
+            if (Files.deleteIfExists(snapshotPath)) {
+                logger.info("Deleted locked snapshot for assessment #{}", assessmentId);
+            }
+        } catch (IOException e) {
+            logger.error("Failed to delete locked snapshot for assessment #{}", assessmentId, e);
+        }
+    }
+
+    /**
+     * Read the cached snapshot and extract a specific key as raw JSON string.
+     * Returns null if the snapshot doesn't exist or can't be read.
+     */
+    @SuppressWarnings("unchecked")
+    private HashMap<String, Object> readLockedSnapshot(Long assessmentId) {
+        Path snapshotPath = getSnapshotPath(assessmentId);
+        if (!Files.exists(snapshotPath)) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(snapshotPath.toFile(), HashMap.class);
+        } catch (IOException e) {
+            logger.error("Failed to read locked snapshot for assessment #{}", assessmentId, e);
+            return null;
+        }
+    }
+
+    // ─── Endpoints ───
+
     @GetMapping("/getAll")
-    // @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public ResponseEntity<List<AssessmentTable>> getAllAssessments() {
         List<AssessmentTable> assessments = assessmentTableRepository.findAll();
         return ResponseEntity.ok(assessments);
@@ -49,7 +152,6 @@ public class AssessmentTableController {
 
     @GetMapping("/get/list")
     public List<AssessmentTable> getAllAssessment() {
-        // return assessmentTableRepository.findAssessmentList();
         return assessmentTableRepository.findAll();
     }
 
@@ -89,9 +191,20 @@ public class AssessmentTableController {
     @GetMapping("/student/{userStudentId}")
     public ResponseEntity<List<HashMap<String, Object>>> getAssessmentsForStudent(
             @PathVariable Long userStudentId) {
-        // Get all assessment mappings for this student
         List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
                 .findByUserStudentUserStudentId(userStudentId);
+
+        if (mappings.isEmpty()) {
+            return ResponseEntity.ok(java.util.Collections.emptyList());
+        }
+
+        // Batch fetch all assessments in one query
+        List<Long> assessmentIds = mappings.stream()
+                .map(StudentAssessmentMapping::getAssessmentId)
+                .collect(java.util.stream.Collectors.toList());
+        java.util.Map<Long, AssessmentTable> assessmentMap = new HashMap<>();
+        assessmentTableRepository.findAllByIdInWithQuestionnaire(assessmentIds)
+                .forEach(a -> assessmentMap.put(a.getId(), a));
 
         java.util.ArrayList<HashMap<String, Object>> result = new java.util.ArrayList<>();
 
@@ -100,13 +213,11 @@ public class AssessmentTableController {
             assessmentInfo.put("assessmentId", mapping.getAssessmentId());
             assessmentInfo.put("status", mapping.getStatus());
 
-            // Get assessment name
-            Optional<AssessmentTable> assessment = assessmentTableRepository.findById(mapping.getAssessmentId());
-            if (assessment.isPresent()) {
-                assessmentInfo.put("assessmentName", assessment.get().getAssessmentName());
-                // Add questionnaire type (true = bet-assessment, false/null = general)
-                if (assessment.get().getQuestionnaire() != null) {
-                    assessmentInfo.put("questionnaireType", assessment.get().getQuestionnaire().getType());
+            AssessmentTable assessment = assessmentMap.get(mapping.getAssessmentId());
+            if (assessment != null) {
+                assessmentInfo.put("assessmentName", assessment.getAssessmentName());
+                if (assessment.getQuestionnaire() != null) {
+                    assessmentInfo.put("questionnaireType", assessment.getQuestionnaire().getType());
                 } else {
                     assessmentInfo.put("questionnaireType", null);
                 }
@@ -121,20 +232,69 @@ public class AssessmentTableController {
         return ResponseEntity.ok(result);
     }
 
+    /**
+     * Get questionnaire data for an assessment.
+     * If the assessment is locked and a snapshot exists, serves from the cached JSON file
+     * instead of querying the database. Cached in Caffeine for 10 minutes.
+     */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    @Cacheable(value = "questionnaireQuestions", key = "#id")
     @GetMapping("/getby/{id}")
-    public List<Questionnaire> getQuestionnaireById(@PathVariable Long id) {
+    public Object getQuestionnaireById(@PathVariable Long id) {
+        Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
+        if (assessmentOpt.isEmpty()) {
+            throw new com.kccitm.api.exception.ResourceNotFoundException("Assessment", "id", id);
+        }
 
-        Long questionnaireId = assessmentTableRepository.findById(id).get().getQuestionnaire().getQuestionnaireId();
+        AssessmentTable assessment = assessmentOpt.get();
 
+        // If locked, try serving from cached snapshot
+        if (Boolean.TRUE.equals(assessment.getIsLocked())) {
+            HashMap<String, Object> snapshot = readLockedSnapshot(id);
+            if (snapshot != null && snapshot.containsKey("questionnaire")) {
+                logger.debug("Serving questionnaire for assessment #{} from locked snapshot", id);
+                return snapshot.get("questionnaire");
+            }
+        }
+
+        // Fall back to DB query
+        if (assessment.getQuestionnaire() == null) {
+            return java.util.Collections.emptyList();
+        }
+        Long questionnaireId = assessment.getQuestionnaire().getQuestionnaireId();
         return questionnaireRepository.findAllByQuestionnaireId(questionnaireId);
     }
 
+    /**
+     * Get assessment config/details by ID.
+     * If the assessment is locked and a snapshot exists, serves from the cached JSON file
+     * instead of querying the database.
+     */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    @Cacheable(value = "assessmentDetails", key = "#id")
     @GetMapping("/getById/{id}")
-    public ResponseEntity<AssessmentTable> getAssessmentDetailsById(@PathVariable Long id) {
-        Optional<AssessmentTable> assessment = assessmentTableRepository.findById(id);
-        return assessment.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    public Object getAssessmentDetailsById(@PathVariable Long id) {
+        Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
+        if (assessmentOpt.isEmpty()) {
+            throw new com.kccitm.api.exception.ResourceNotFoundException("Assessment", "id", id);
+        }
+
+        AssessmentTable assessment = assessmentOpt.get();
+
+        // If locked, try serving from cached snapshot
+        if (Boolean.TRUE.equals(assessment.getIsLocked())) {
+            HashMap<String, Object> snapshot = readLockedSnapshot(id);
+            if (snapshot != null && snapshot.containsKey("config")) {
+                logger.debug("Serving config for assessment #{} from locked snapshot", id);
+                return snapshot.get("config");
+            }
+        }
+
+        // Fall back to DB query
+        return assessment;
     }
 
+    @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true) })
     @PostMapping("/create")
     public ResponseEntity<AssessmentTable> createAssessment(@RequestBody java.util.Map<String, Object> requestBody) {
         AssessmentTable assessment = new AssessmentTable();
@@ -159,6 +319,9 @@ public class AssessmentTableController {
         // Timer visibility flag
         if (requestBody.get("showTimer") != null) {
             assessment.setShowTimer((Boolean) requestBody.get("showTimer"));
+        }
+        if (requestBody.get("saveLater") != null) {
+            assessment.setSaveLater((Boolean) requestBody.get("saveLater"));
         }
 
         // Handle questionnaire - fetch existing entity by ID
@@ -189,24 +352,44 @@ public class AssessmentTableController {
         return ResponseEntity.ok(savedAssessment);
     }
 
+    @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true) })
     @PutMapping("/update/{id}")
     public ResponseEntity<AssessmentTable> updateAssessment(@PathVariable Long id,
             @RequestBody AssessmentTable assessment) {
-        if (!assessmentTableRepository.existsById(id)) {
+        Optional<AssessmentTable> existingOpt = assessmentTableRepository.findById(id);
+        if (existingOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        assessment.setId(id);
-        assessment.setAssessmentName(assessment.getAssessmentName());
-        AssessmentTable updatedAssessment = assessmentTableRepository.save(assessment);
+        AssessmentTable existing = existingOpt.get();
+        existing.setAssessmentName(assessment.getAssessmentName());
+        existing.setStarDate(assessment.getStarDate());
+        existing.setEndDate(assessment.getEndDate());
+        existing.setIsActive(assessment.getIsActive());
+        existing.setModeofAssessment(assessment.getModeofAssessment());
+        existing.setShowTimer(assessment.getShowTimer());
+        existing.setSaveLater(assessment.getSaveLater());
+        existing.setIsLocked(assessment.getIsLocked());
+
+        // Only update questionnaire reference by ID, don't replace the deserialized object
+        if (assessment.getQuestionnaire() != null && assessment.getQuestionnaire().getQuestionnaireId() != null) {
+            Optional<Questionnaire> q = questionnaireRepository.findById(assessment.getQuestionnaire().getQuestionnaireId());
+            q.ifPresent(existing::setQuestionnaire);
+        } else {
+            existing.setQuestionnaire(null);
+        }
+
+        AssessmentTable updatedAssessment = assessmentTableRepository.save(existing);
         return ResponseEntity.ok(updatedAssessment);
     }
 
+    @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true) })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteAssessment(@PathVariable Long id) {
         if (!assessmentTableRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
         assessmentTableRepository.deleteById(id);
+        deleteLockedSnapshot(id);
         return ResponseEntity.noContent().build();
     }
 
@@ -223,7 +406,16 @@ public class AssessmentTableController {
         return assessmentIdandName;
     }
 
-    // Lock an assessment
+    // Get all locked assessment IDs (used by frontend build to sync static cache)
+    @GetMapping("/locked-ids")
+    public ResponseEntity<List<Long>> getLockedAssessmentIds() {
+        List<Long> ids = assessmentTableRepository.findByIsLockedTrue()
+                .stream().map(AssessmentTable::getId).collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(ids);
+    }
+
+    // Lock an assessment — generates a JSON snapshot of the full assessment data
+    @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true) })
     @PutMapping("/{id}/lock")
     public ResponseEntity<AssessmentTable> lockAssessment(@PathVariable Long id) {
         Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
@@ -232,10 +424,16 @@ public class AssessmentTableController {
         }
         AssessmentTable assessment = assessmentOpt.get();
         assessment.setIsLocked(true);
-        return ResponseEntity.ok(assessmentTableRepository.save(assessment));
+        AssessmentTable saved = assessmentTableRepository.save(assessment);
+
+        // Generate the JSON snapshot with all questionnaire data
+        generateLockedSnapshot(saved);
+
+        return ResponseEntity.ok(saved);
     }
 
-    // Unlock an assessment
+    // Unlock an assessment — deletes the JSON snapshot
+    @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true) })
     @PutMapping("/{id}/unlock")
     public ResponseEntity<AssessmentTable> unlockAssessment(@PathVariable Long id) {
         Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
@@ -244,7 +442,12 @@ public class AssessmentTableController {
         }
         AssessmentTable assessment = assessmentOpt.get();
         assessment.setIsLocked(false);
-        return ResponseEntity.ok(assessmentTableRepository.save(assessment));
+        AssessmentTable saved = assessmentTableRepository.save(assessment);
+
+        // Delete the cached snapshot
+        deleteLockedSnapshot(id);
+
+        return ResponseEntity.ok(saved);
     }
 
     // Check if an assessment is locked by questionnaire ID
@@ -324,9 +527,121 @@ public class AssessmentTableController {
             studentAssessmentMappingRepository.save(mapping);
         }
 
+        // Create a Redis-backed session and return the token
+        AssessmentSession session = assessmentSessionService.createSession(userStudentId, assessmentId);
+
+        // Clear any stale submission lock from a previous attempt
+        // This allows re-assessment after admin resets the student's status
+        assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
+
+        response.put("sessionToken", session.getSessionToken());
+
         response.put("success", true);
         response.put("status", mapping.getStatus());
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Public prefetch endpoint - returns assessment data for a student before auth.
+     * Called when student types their ID on login page to pre-load assessment data.
+     * Benefits from Redis cache - first request warms cache, rest are instant.
+     * Uses "assessmentDetails" cache with prefixed key to share eviction with mutation endpoints.
+     */
+    @Cacheable(value = "assessmentDetails", key = "'prefetch-' + #userStudentId")
+    @GetMapping("/prefetch/{userStudentId}")
+    public Object prefetchAssessmentData(@PathVariable Long userStudentId) {
+        try {
+            List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
+                    .findByUserStudentUserStudentId(userStudentId);
+
+            if (mappings.isEmpty()) {
+                return java.util.Collections.emptyList();
+            }
+
+            // Batch fetch all assessments in one query instead of N+1
+            List<Long> assessmentIds = mappings.stream()
+                    .map(StudentAssessmentMapping::getAssessmentId)
+                    .collect(java.util.stream.Collectors.toList());
+            java.util.Map<Long, AssessmentTable> assessmentMap = new HashMap<>();
+            assessmentTableRepository.findAllByIdInWithQuestionnaire(assessmentIds)
+                    .forEach(a -> assessmentMap.put(a.getId(), a));
+
+            java.util.ArrayList<HashMap<String, Object>> result = new java.util.ArrayList<>();
+
+            for (StudentAssessmentMapping mapping : mappings) {
+                HashMap<String, Object> assessmentInfo = new HashMap<>();
+                assessmentInfo.put("assessmentId", mapping.getAssessmentId());
+                assessmentInfo.put("status", mapping.getStatus());
+
+                AssessmentTable assessment = assessmentMap.get(mapping.getAssessmentId());
+                if (assessment != null) {
+                    assessmentInfo.put("assessmentName", assessment.getAssessmentName());
+                    assessmentInfo.put("isActive", assessment.getIsActive());
+                    assessmentInfo.put("showTimer", assessment.getShowTimer());
+                    assessmentInfo.put("isLocked", assessment.getIsLocked());
+
+                    if (assessment.getQuestionnaire() != null) {
+                        assessmentInfo.put("questionnaireType", assessment.getQuestionnaire().getType());
+                        assessmentInfo.put("questionnaireId", assessment.getQuestionnaire().getQuestionnaireId());
+                    }
+                }
+
+                result.add(assessmentInfo);
+            }
+
+            return result;
+        } catch (Exception e) {
+            logger.error("Error prefetching assessment data for student {}", userStudentId, e);
+            return java.util.Collections.emptyList();
+        }
+    }
+
+    /**
+     * Export a locked assessment's full data bundle (questionnaire + config) as JSON.
+     */
+    @GetMapping("/{id}/export")
+    public ResponseEntity<?> exportAssessmentBundle(@PathVariable Long id) {
+        Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
+        if (assessmentOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        AssessmentTable assessment = assessmentOpt.get();
+
+        if (!Boolean.TRUE.equals(assessment.getIsLocked())) {
+            HashMap<String, Object> error = new HashMap<>();
+            error.put("error", "Assessment is not locked. Only locked assessments can be exported.");
+            return ResponseEntity.badRequest().body(error);
+        }
+
+        // Try reading from the cached snapshot first
+        HashMap<String, Object> snapshot = readLockedSnapshot(id);
+        if (snapshot != null) {
+            return ResponseEntity.ok(snapshot);
+        }
+
+        // Snapshot missing — regenerate it
+        generateLockedSnapshot(assessment);
+        snapshot = readLockedSnapshot(id);
+        if (snapshot != null) {
+            return ResponseEntity.ok(snapshot);
+        }
+
+        // Fallback: build in-memory
+        HashMap<String, Object> bundle = new HashMap<>();
+        bundle.put("assessmentId", assessment.getId());
+        bundle.put("isLocked", true);
+        bundle.put("config", assessment);
+
+        if (assessment.getQuestionnaire() != null) {
+            Long questionnaireId = assessment.getQuestionnaire().getQuestionnaireId();
+            List<Questionnaire> questionnaireData = questionnaireRepository.findAllByQuestionnaireId(questionnaireId);
+            bundle.put("questionnaire", questionnaireData);
+        } else {
+            bundle.put("questionnaire", java.util.Collections.emptyList());
+        }
+
+        return ResponseEntity.ok(bundle);
     }
 
 }

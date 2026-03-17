@@ -1,6 +1,7 @@
 package com.kccitm.api.repository.Career9;
 
 import java.util.List;
+import java.util.Collection;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -13,6 +14,12 @@ import com.kccitm.api.model.career9.AssessmentTable;
 public interface AssessmentTableRepository extends JpaRepository<AssessmentTable, Long> {
 
     List<AssessmentTable> findByQuestionnaireQuestionnaireId(Long questionnaireId);
+
+    /**
+     * Batch fetch assessments by IDs - eliminates N+1 queries in prefetch/login.
+     */
+    @Query("SELECT a FROM AssessmentTable a LEFT JOIN FETCH a.questionnaire WHERE a.id IN :ids")
+    List<AssessmentTable> findAllByIdInWithQuestionnaire(@Param("ids") Collection<Long> ids);
 
     @Query("SELECT a FROM AssessmentTable a JOIN a.questionnaire q JOIN q.section qs WHERE qs.section.sectionId = :sectionId")
     List<AssessmentTable> findByQuestionSectionId(@Param("sectionId") Long sectionId);
@@ -29,5 +36,7 @@ public interface AssessmentTableRepository extends JpaRepository<AssessmentTable
 
     @Query("SELECT a.id AS id, a.AssessmentName AS assessmentName, a.isActive AS isActive FROM AssessmentTable a")
     List<AssessmentSummary> findAssessmentSummaryList();
+
+    List<AssessmentTable> findByIsLockedTrue();
 
 }

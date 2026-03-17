@@ -33,7 +33,7 @@ const ThankYouPage = () => {
                 <div className="mb-7">
                   <img
                     alt="Logo"
-                    src="/media/logos/kcc.jpg"
+                    src="/media/logos/kcc.webp"
                     className="h-80px"
                   />
                 </div>

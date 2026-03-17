@@ -90,11 +90,24 @@ public class AssessmentQuestionOptions implements Serializable {
         this.optionImage = optionImage;
     }
 
-    // Base64 getter for JSON serialization - returns image as Base64 string
+    // Base64 getter for JSON serialization - returns image as Base64 string.
+    // Fixes UTF-8 charset corruption from MySQL JDBC reading LONGBLOB through
+    // character encoding: bytes >= 0x80 get prefixed with 0xC2/0xC3.
+    // We reverse this by decoding as UTF-8 then extracting raw Latin-1 bytes.
     @JsonProperty("optionImageBase64")
     public String getOptionImageBase64() {
         if (optionImage != null && optionImage.length > 0) {
-            return Base64.getEncoder().encodeToString(optionImage);
+            byte[] cleanBytes = optionImage;
+            // Detect UTF-8 corruption: PNG starts with 0x89, corrupted starts with 0xC2 0x89
+            if (optionImage.length > 1 && (optionImage[0] & 0xFF) == 0xC2) {
+                try {
+                    String asUtf8 = new String(optionImage, java.nio.charset.StandardCharsets.UTF_8);
+                    cleanBytes = asUtf8.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
+                } catch (Exception e) {
+                    cleanBytes = optionImage;
+                }
+            }
+            return Base64.getEncoder().encodeToString(cleanBytes);
         }
         return null;
     }

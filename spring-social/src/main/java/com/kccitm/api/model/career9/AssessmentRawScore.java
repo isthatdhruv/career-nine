@@ -10,12 +10,17 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
+import javax.persistence.Index;
 import javax.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
-@Table(name = "assessment_raw_score")
+@Table(name = "assessment_raw_score",
+       indexes = {
+           @Index(name = "idx_raw_score_mapping", columnList = "student_assessment_id"),
+           @Index(name = "idx_raw_score_mqt", columnList = "measured_quality_type_id")
+       })
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class AssessmentRawScore implements Serializable {
 

@@ -157,6 +157,38 @@ public class DigitalOceanSpacesService {
     }
 
     /**
+     * Upload raw bytes to DigitalOcean Spaces.
+     *
+     * @param fileBytes   The file content as bytes
+     * @param contentType The MIME type (e.g., "text/html")
+     * @param folder      The folder path within the bucket
+     * @param fileName    The file name (with extension)
+     * @return The public CDN URL of the uploaded file
+     */
+    public String uploadBytes(byte[] fileBytes, String contentType, String folder, String fileName) {
+        if (s3Client == null) {
+            throw new IllegalStateException("DigitalOcean Spaces is not configured.");
+        }
+
+        String objectKey = folder + "/" + fileName;
+
+        ObjectMetadata metadata = new ObjectMetadata();
+        metadata.setContentType(contentType);
+        metadata.setContentLength(fileBytes.length);
+
+        PutObjectRequest putRequest = new PutObjectRequest(
+                bucket,
+                objectKey,
+                new ByteArrayInputStream(fileBytes),
+                metadata
+        ).withCannedAcl(CannedAccessControlList.PublicRead);
+
+        s3Client.putObject(putRequest);
+
+        return cdnUrl + "/" + objectKey;
+    }
+
+    /**
      * Delete a file from DigitalOcean Spaces by its full URL.
      */
     public void deleteFileByUrl(String fileUrl) {

@@ -58,7 +58,7 @@ export function AsideMenuMain() {
   const showAssessment =
     allowed("/assessments") || allowed("/assessment-sections") ||
     allowed("/assessment-questions") || allowed("/question-sections") ||
-    allowed("/text-response-mapping");
+    allowed("/text-response-mapping") || allowed("/live-tracking");
 
   const showReports = allowed("/reports") || allowed("/report-generation");
 
@@ -384,6 +384,14 @@ export function AsideMenuMain() {
                 icon="/media/icons/duotune/general/gen005.svg"
                 title="Text Response Mapping"
                 fontIcon="bi-card-text"
+              />
+            )}
+            {allowed("/live-tracking") && (
+              <AsideMenuItem
+                to="/live-tracking"
+                icon="/media/icons/duotune/general/gen019.svg"
+                title="Live Tracking"
+                fontIcon="bi-broadcast"
               />
             )}
           </AsideMenuItemWithSub>

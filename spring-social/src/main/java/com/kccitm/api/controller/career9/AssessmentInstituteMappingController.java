@@ -281,10 +281,10 @@ public class AssessmentInstituteMappingController {
                 return handleExistingStudent(byEmail.get(0), assessmentId, instituteCode);
             }
 
-            // 5. Duplicate check by DOB + institute + class
+            // 5. Duplicate check by DOB + institute + class + name
             if (studentClass != null) {
                 List<StudentInfo> byDob = studentInfoRepository
-                        .findByStudentDobAndInstituteIdAndStudentClass(dob, instituteCode, studentClass);
+                        .findByStudentDobAndInstituteIdAndStudentClassAndNameIgnoreCase(dob, instituteCode, studentClass, name);
                 if (!byDob.isEmpty()) {
                     return handleExistingStudent(byDob.get(0), assessmentId, instituteCode);
                 }

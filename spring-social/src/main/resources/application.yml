@@ -1,12 +1,23 @@
 spring:
   profiles:
-    active: dev
+    active: staging
+    
 
 server:
   port: 8080
+  compression:
+    enabled: true
+    min-response-size: 1024
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain,application/javascript,text/css
   tomcat:
     max-http-form-content-size: 50MB
     max-swallow-size: 50MB
+    threads:
+      max: 300
+      min-spare: 50
+    accept-count: 100
+    connection-timeout: 60000
+    
   # ssl:
   #   enabled: true
   #   key-store: classpath:keystore.p12
@@ -21,11 +32,17 @@ spring:
       max-file-size: 50MB
       max-request-size: 50MB
   datasource:
-    url: jdbc:mysql://localhost:3306/career-nine?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     # url: jdbc:mysql://192.168.10.73:3306/kiraya-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     username: root
-    # password: Career-qCsfeuECc3MW
-    password: MyStrongPass@123
+    password: Career-qCsfeuECc3MW
+    # password: MyStrongPass@123
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 20
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
   jpa:
     show-sql: true
     hibernate:
@@ -34,6 +51,29 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+        default_batch_fetch_size: 30
+        jdbc:
+          batch_size: 30
+        order_inserts: true
+        order_updates: true
+  cache:
+    type: redis
+    cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
+    redis:
+      time-to-live: 86400000
+      key-prefix: "career9:"
+      use-key-prefix: true
+  redis:
+    host: localhost
+    port: 6379
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 2
+        max-wait: 5000ms
+      shutdown-timeout: 200ms
   mail:
     host: smtp.gmail.com
     port: 587
@@ -85,6 +125,19 @@ spring:
             tokenUri: https://graph.facebook.com/v3.0/oauth/access_token
             userInfoUri: https://graph.facebook.com/v3.0/me?fields=id,first_name,middle_name,last_name,name,email,verified,is_verified,picture.width(250).height(250)
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,caches
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  health:
+    redis:
+      enabled: true
+
 app:
   protocol: http
   name: localhost:3000
@@ -94,7 +147,7 @@ app:
     tokenSecret: 04ca023b39512e46d0c2cf4b48d5aac61d34302994c87ed4eff225dcf3b0a218739f3897051a057f9b846a69ea2927a587044164b7bae5e1306219d50b588cb1
     tokenExpirationMsec: 864000000
   cors:
-    allowedOrigins: http://localhost:5173,http://35.227.40.232:3000,http://localhost:3001,http://192.168.1.11:3000,http://35.196.122.199:3000,http://192.168.0.204:3000,http://192.168.0.204:3000,http://localhost:3000,https://localhost:3000,https://localhost:8080,https://192.168.0.204:8080,https://localhost,https://localhost:80,https://staging.student.kccitm.in/,https://student.kccitm.in/,https://erp.aktu.ac.in/,https://leetcode.com,http://192.168.0.204:8443//,http://localhost:8080
+    allowedOrigins: http://localhost:5173,http://35.227.40.232:3000,http://localhost:3001,http://192.168.1.11:3000,http://35.196.122.199:3000,http://192.168.0.204:3000,http://192.168.0.204:3000,http://localhost:3000,https://localhost:3000,https://localhost:8080,https://192.168.0.204:8080,https://localhost,https://localhost:80,https://staging.student.kccitm.in,https://student.kccitm.in,https://erp.aktu.ac.in,https://leetcode.com,http://192.168.0.204:8443,http://localhost:8080
   oauth2:
     # After successfully authenticating with the OAuth2 Provider,
     # we'll be generating an auth token for the user and sending the token to the
@@ -132,7 +185,7 @@ app:
 spring:
   profiles: staging
   datasource:
-    url: jdbc:mysql://mysql_db_api:3306/career-9-staging?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://mysql_db_api:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
     username: root
     password: Career-qCsfeuECc3MW # password: Google.com1
     hikari:
@@ -149,6 +202,29 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+        default_batch_fetch_size: 30
+        jdbc:
+          batch_size: 30
+        order_inserts: true
+        order_updates: true
+  cache:
+    type: redis
+    cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
+    redis:
+      time-to-live: 86400000
+      key-prefix: "career9:"
+      use-key-prefix: true
+  redis:
+    host: redis_cache
+    port: 6379
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 50
+        max-idle: 20
+        min-idle: 5
+        max-wait: 5000ms
+      shutdown-timeout: 200ms
   mail:
     host: smtp.gmail.com
     port: 587
@@ -172,7 +248,7 @@ spring:
             clientId: 101961828065-ak601ssij07ugrffovuns8v2adrqvtqd.apps.googleusercontent.com
             clientSecret: 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
             # redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
-            redirectUri: "https://staging.api.kccitm.in/oauth2/callback/{registrationId}"
+            redirectUri: "https://api.career-9.com/oauth2/callback/{registrationId}"
 
             scope:
               - email
@@ -199,6 +275,18 @@ spring:
             authorizationUri: https://www.facebook.com/v3.0/dialog/oauth
             tokenUri: https://graph.facebook.com/v3.0/oauth/access_token
             userInfoUri: https://graph.facebook.com/v3.0/me?fields=id,first_name,middle_name,last_name,name,email,verified,is_verified,picture.width(250).height(250)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,caches
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  health:
+    redis:
+      enabled: true
 server:
   tomcat:
     threads:
@@ -215,16 +303,19 @@ app:
     tokenSecret: 04ca023b39512e46d0c2cf4b48d5aac61d34302994c87ed4eff225dcf3b0a218739f3897051a057f9b846a69ea2927a587044164b7bae5e1306219d50b588cb1
     tokenExpirationMsec: 864000000
   cors:
-    allowedOrigins: https://career-9.com,https://www.career-9.com,https://dashboard.career-9.com,https://walrus-app-e2a6a.ondigitalocean.app,https://assessment.career-9.com,https://*.career-9.com
+    allowedOrigins: https://career-9.com,https://www.career-9.com,https://dashboard.career-9.com,https://walrus-app-e2a6a.ondigitalocean.app,https://assessment.career-9.com,https://*.career-9.com,http://localhost:5173
   oauth2:
     # After successfully authenticating with the OAuth2 Provider,
     # we'll be generating an auth token for the user and sending the token to the
     # redirectUri mentioned by the client in the /oauth2/authorize request.
     # We're not using cookies because they won't work well in mobile clients.
     authorizedRedirectUris:
+      - https://dashboard.career-9.com/oauth2/redirect
+      - https://career-9.com/oauth2/redirect
+      - https://www.career-9.com/oauth2/redirect
+      - https://assessment.career-9.com/oauth2/redirect
       - https://student.kccitm.in/oauth2/redirect
       - https://staging.student.kccitm.in/oauth2/redirect
-      - https://student.kccitm.in/oauth2/redirect
       - http://localhost:3000/oauth2/redirect
       - myandroidapp://oauth2/redirect
       - http://localhost/oauth2/redirect
@@ -246,15 +337,43 @@ spring:
     username: root
     password: qCsfeuECc3MW
     # password: Google.com1
-
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 20
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
   jpa:
-    show-sql: true
+    show-sql: false
     hibernate:
       naming-strategy: org.hibernate.cfg.EJB3NamingStrategy
       ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+        default_batch_fetch_size: 30
+        jdbc:
+          batch_size: 30
+        order_inserts: true
+        order_updates: true
+  cache:
+    type: redis
+    cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
+    redis:
+      time-to-live: 86400000
+      key-prefix: "career9:"
+      use-key-prefix: true
+  redis:
+    host: redis_cache
+    port: 6379
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 50
+        max-idle: 20
+        min-idle: 5
+        max-wait: 5000ms
+      shutdown-timeout: 200ms
   mail:
     host: smtp.gmail.com
     port: 587
@@ -305,6 +424,18 @@ spring:
             authorizationUri: https://www.facebook.com/v3.0/dialog/oauth
             tokenUri: https://graph.facebook.com/v3.0/oauth/access_token
             userInfoUri: https://graph.facebook.com/v3.0/me?fields=id,first_name,middle_name,last_name,name,email,verified,is_verified,picture.width(250).height(250)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,caches
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  health:
+    redis:
+      enabled: true
 app:
   protocol: http
   name: student.kccitm.in
@@ -314,7 +445,7 @@ app:
     tokenSecret: 04ca023b39512e46d0c2cf4b48d5aac61d34302994c87ed4eff225dcf3b0a218739f3897051a057f9b846a69ea2927a587044164b7bae5e1306219d50b588cb1
     tokenExpirationMsec: 864000000
   cors:
-    allowedOrigins: https://career-9.com,https://www.career-9.com,https://*.career-9.com,https://dashboard.career-9.com,https://assessment.career-9.com,http://localhost:3000,http://localhost:3001,http://localhost:8080,http://localhost,http://localhost:80,https://staging.student.kccitm.in/,https://student.kccitm.in/
+    allowedOrigins: https://career-9.com,https://www.career-9.com,https://*.career-9.com,https://dashboard.career-9.com,https://assessment.career-9.com,http://localhost:3000,http://localhost:3001,http://localhost:8080,http://localhost,http://localhost:80,https://staging.student.kccitm.in,https://student.kccitm.in
   oauth2:
     # After successfully authenticating with the OAuth2 Provider,
     # we'll be generating an auth token for the user and sending the token to the
