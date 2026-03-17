@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { MDBDataTableV5 } from "mdbreact";
 import { AiFillEdit } from "react-icons/ai";
-import { FaLock, FaLockOpen, FaFileDownload } from "react-icons/fa";
+import { FaLock, FaLockOpen, FaFileDownload, FaFilePdf } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { DeactivateAssessment, LockAssessment, UnlockAssessment } from "../../API/Create_Assessment_APIs";
 import { generateOMRSheet } from "../../utils/generateOMRSheet";
+import { generateQuestionnairePDF } from "../../utils/generateQuestionnairePDF";
 
 const AssessmentTable = (props: {
   data: any;
@@ -16,6 +17,21 @@ const AssessmentTable = (props: {
   const navigate = useNavigate();
   const [showLockedModal, setShowLockedModal] = useState(false);
   const [omrLoading, setOmrLoading] = useState<number | null>(null);
+  const [pdfLoading, setPdfLoading] = useState<number | null>(null);
+
+  const handleDownloadQuestionnaire = async (data: any) => {
+    const id = data.id || data.assessmentId;
+    const name = data.AssessmentName || data.assessmentName || "Assessment";
+    setPdfLoading(id);
+    try {
+      await generateQuestionnairePDF(id, name);
+    } catch (error) {
+      console.error("Questionnaire PDF generation failed:", error);
+      alert("Failed to generate questionnaire PDF. Please try again.");
+    } finally {
+      setPdfLoading(null);
+    }
+  };
 
   const handleDownloadOMR = async (data: any) => {
     const id = data.id || data.assessmentId;
@@ -132,6 +148,18 @@ const AssessmentTable = (props: {
               size={22}
               strokeColor={"#EFF8FE"}
             />
+          </button>
+          <button
+            onClick={() => handleDownloadQuestionnaire(data)}
+            className="btn btn-icon btn-success btn-sm me-3"
+            title="Download Questionnaire PDF"
+            disabled={pdfLoading === (data.id || data.assessmentId)}
+          >
+            {pdfLoading === (data.id || data.assessmentId) ? (
+              <span className="spinner-border spinner-border-sm" />
+            ) : (
+              <FaFilePdf size={14} />
+            )}
           </button>
           <button
             onClick={() => handleDownloadOMR(data)}

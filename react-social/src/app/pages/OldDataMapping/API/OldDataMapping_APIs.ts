@@ -56,3 +56,43 @@ export function createClass(payload: any) {
 export function createSection(payload: any) {
   return axios.post(`${API_URL}/schoolSession/section/create`, payload);
 }
+
+// ========================== PHASE 2-4: Student Data Import ==========================
+
+// Fetch full user data from Firebase (personal, educational, scores, responses)
+export function fetchFirebaseUserData() {
+  return axios.get(`${API_URL}/firebase-mapping/fetch-user-data`);
+}
+
+// Fetch unique questions from Firebase responses
+export function fetchUniqueQuestions() {
+  return axios.get(`${API_URL}/firebase-mapping/fetch-unique-questions`);
+}
+
+// Bulk import students (creates User + StudentInfo + UserStudent)
+export function importStudents(payload: any) {
+  return axios.post(`${API_URL}/firebase-mapping/import-students`, payload);
+}
+
+// Import assessment raw scores
+export function importScores(payload: any) {
+  return axios.post(`${API_URL}/firebase-mapping/import-scores`, payload);
+}
+
+// Import extra data (career aspirations, subjects, values)
+export function importExtraData(payload: any) {
+  return axios.post(`${API_URL}/firebase-mapping/import-extra-data`, payload);
+}
+
+// Existing assessment endpoints (reuse)
+export function getAllAssessments() {
+  return axios.get(`${API_URL}/assessments/get/list`);
+}
+
+export function getAllMeasuredQualityTypes() {
+  return axios.get(`${API_URL}/measured-quality-types/getAll`);
+}
+
+export function getAllAssessmentQuestions() {
+  return axios.get(`${API_URL}/assessment-questions/getAll`);
+}
