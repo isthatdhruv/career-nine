@@ -57,6 +57,18 @@ export function createSection(payload: any) {
   return axios.post(`${API_URL}/schoolSession/section/create`, payload);
 }
 
+// Delete a school mapping and its children (sessions, grades, sections)
+export function deleteMappingByName(firebaseName: string, type: string) {
+  return axios.delete(`${API_URL}/firebase-mapping/deleteByFirebaseNameAndType`, {
+    params: { firebaseName, type },
+  });
+}
+
+// Get students by institute (from DB) with firebase docIds
+export function getStudentsByInstitute(instituteCode: number) {
+  return axios.get(`${API_URL}/firebase-mapping/students-by-institute/${instituteCode}`);
+}
+
 // ========================== PHASE 2-4: Student Data Import ==========================
 
 // Fetch full user data from Firebase (personal, educational, scores, responses)

@@ -8,7 +8,15 @@ import {
   saveBatchMappings,
   getMappingsByType,
   createSession,
+  deleteMappingByName,
 } from "../API/OldDataMapping_APIs";
+
+export interface DetailedResponse {
+  question: string;
+  selectedOption?: string;
+  selectedAnswer?: string;
+  [key: string]: any;
+}
 
 export interface StudentAssignment {
   firebaseDocId: string;
@@ -26,6 +34,9 @@ export interface StudentAssignment {
   abilityScores?: Record<string, number>;
   multipleIntelligenceScores?: Record<string, number>;
   personalityScores?: Record<string, number>;
+  abilityDetailedResponses?: DetailedResponse[];
+  multipleIntelligenceResponses?: DetailedResponse[];
+  personalityDetailedResponses?: DetailedResponse[];
   careerAspirations?: string[];
   subjectsOfInterest?: string[];
   values?: string[];
@@ -49,6 +60,9 @@ interface FirebaseUser {
   abilityScores?: Record<string, number>;
   multipleIntelligenceScores?: Record<string, number>;
   personalityScores?: Record<string, number>;
+  abilityDetailedResponses?: DetailedResponse[];
+  multipleIntelligenceResponses?: DetailedResponse[];
+  personalityDetailedResponses?: DetailedResponse[];
   careerAspirations?: string[];
   subjectsOfInterest?: string[];
   values?: string[];
@@ -123,6 +137,10 @@ const AssessmentMappingStep = ({
   const [alreadyMappedSchools, setAlreadyMappedSchools] = useState<Set<string>>(new Set());
   // Firebase school name (lowercase) → system institute code
   const [schoolToInstituteMap, setSchoolToInstituteMap] = useState<Map<string, number>>(new Map());
+  // Raw school mappings from DB for the mapping summary card
+  const [rawSchoolMappings, setRawSchoolMappings] = useState<{ firebaseName: string; newEntityId: number; newEntityName: string }[]>([]);
+  const [showMappingSummary, setShowMappingSummary] = useState(false);
+  const [unmapping, setUnmapping] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -183,7 +201,7 @@ const AssessmentMappingStep = ({
         setInstitutes(
           instList
             .map((i: any) => ({
-              instituteCode: i.instituteCode ?? i.id,
+              instituteCode: Number(i.instituteCode ?? i.id),
               instituteName: i.instituteName ?? i.name ?? "",
             }))
             .sort((a: Institute, b: Institute) => a.instituteName.localeCompare(b.instituteName))
@@ -192,14 +210,20 @@ const AssessmentMappingStep = ({
         // Track already-mapped firebase school names + which system school they map to
         const mapped = new Set<string>();
         const s2i = new Map<string, number>();
+        const rawMappings: { firebaseName: string; newEntityId: number; newEntityName: string }[] = [];
         (mappedRes.data || []).forEach((m: any) => {
           const entityId = Number(m.newEntityId);
           if (m.firebaseName) {
             const key = m.firebaseName.toLowerCase().trim();
             mapped.add(key);
             if (entityId) s2i.set(key, entityId);
+            rawMappings.push({
+              firebaseName: m.firebaseName,
+              newEntityId: entityId,
+              newEntityName: m.newEntityName || "",
+            });
           }
-          if (m.firebaseId) {
+          if (m.firebaseId && m.firebaseId !== m.firebaseName) {
             const key = m.firebaseId.toLowerCase().trim();
             mapped.add(key);
             if (entityId) s2i.set(key, entityId);
@@ -207,6 +231,7 @@ const AssessmentMappingStep = ({
         });
         setAlreadyMappedSchools(mapped);
         setSchoolToInstituteMap(s2i);
+        setRawSchoolMappings(rawMappings);
       })
       .catch(() => setError("Failed to load data"))
       .finally(() => setLoading(false));
@@ -323,6 +348,9 @@ const AssessmentMappingStep = ({
 
   // Filtered students
   const filteredUsers = useMemo(() => {
+    if (filterSystemSchools.size > 0) {
+      console.log("System school filter active:", Array.from(filterSystemSchools), "schoolToInstituteMap size:", schoolToInstituteMap.size);
+    }
     return firebaseUsers.filter((u) => {
       const name = (u.personal?.name || "").toLowerCase();
       const grade = parseGrade(u.educational?.studentClass);
@@ -332,53 +360,14 @@ const AssessmentMappingStep = ({
       if (filterGrades.size > 0 && !filterGrades.has(grade)) return false;
       if (filterSchools.size > 0 && !filterSchools.has(school)) return false;
 
-      // System school filter: show students whose firebase school maps to selected system school,
-      // OR students already assigned to that system school,
-      // OR firebase school name matches the system school name (for unmapped schools)
+      // System school filter: show students whose firebase school is mapped to selected system school,
+      // OR students already assigned to that system school in this session
       if (filterSystemSchools.size > 0) {
         const assignedInst = assignments.get(u.docId)?.instituteCode;
-        // Try exact key lookup first, then fuzzy match against all mapping keys
-        let mappedInst = schoolToInstituteMap.get(school.toLowerCase().trim());
-        if (mappedInst === undefined && school) {
-          const fbLower = school.toLowerCase().trim();
-          const mapEntries = Array.from(schoolToInstituteMap.entries());
-          for (let mi = 0; mi < mapEntries.length; mi++) {
-            if (fbLower.includes(mapEntries[mi][0]) || mapEntries[mi][0].includes(fbLower)) {
-              mappedInst = mapEntries[mi][1];
-              break;
-            }
-          }
-        }
-        const matchesAssigned = assignedInst !== undefined && filterSystemSchools.has(assignedInst);
-        const matchesMapped = mappedInst !== undefined && filterSystemSchools.has(mappedInst);
-
-        // Also match by name: firebase school name matches system school name
-        // Uses word-based matching — if all significant words of one appear in the other
-        let matchesByName = false;
-        if (school) {
-          const fbLower = school.toLowerCase().trim();
-          const sysCodes = Array.from(filterSystemSchools);
-          for (let si = 0; si < sysCodes.length; si++) {
-            const inst = institutes.find((i) => i.instituteCode === sysCodes[si]);
-            if (inst) {
-              const instLower = inst.instituteName.toLowerCase().trim();
-              if (fbLower === instLower || fbLower.includes(instLower) || instLower.includes(fbLower)) {
-                matchesByName = true;
-                break;
-              }
-              const fbWords = fbLower.split(/\s+/).filter((w) => w.length > 1);
-              const instWords = instLower.split(/\s+/).filter((w) => w.length > 1);
-              const shorter = fbWords.length <= instWords.length ? fbWords : instWords;
-              const longer = fbWords.length <= instWords.length ? instLower : fbLower;
-              if (shorter.length > 0 && shorter.every((w) => longer.includes(w))) {
-                matchesByName = true;
-                break;
-              }
-            }
-          }
-        }
-
-        if (!matchesAssigned && !matchesMapped && !matchesByName) return false;
+        const mappedInst = schoolToInstituteMap.get(school.toLowerCase().trim());
+        const matchesAssigned = assignedInst !== undefined && filterSystemSchools.has(Number(assignedInst));
+        const matchesMapped = mappedInst !== undefined && filterSystemSchools.has(Number(mappedInst));
+        if (!matchesAssigned && !matchesMapped) return false;
       }
 
       return true;
@@ -605,6 +594,14 @@ const AssessmentMappingStep = ({
           unmappedFbSchoolNames.forEach((n) => next.set(n.toLowerCase(), selectedInstitute.instituteCode));
           return next;
         });
+        setRawSchoolMappings((prev) => [
+          ...prev,
+          ...unmappedFbSchoolNames.map((n) => ({
+            firebaseName: n,
+            newEntityId: selectedInstitute.instituteCode,
+            newEntityName: selectedInstitute.instituteName,
+          })),
+        ]);
       }
 
       // Assign students
@@ -630,6 +627,9 @@ const AssessmentMappingStep = ({
           abilityScores: user.abilityScores,
           multipleIntelligenceScores: user.multipleIntelligenceScores,
           personalityScores: user.personalityScores,
+          abilityDetailedResponses: user.abilityDetailedResponses,
+          multipleIntelligenceResponses: user.multipleIntelligenceResponses,
+          personalityDetailedResponses: user.personalityDetailedResponses,
           careerAspirations: user.careerAspirations,
           subjectsOfInterest: user.subjectsOfInterest,
           values: user.values,
@@ -689,6 +689,108 @@ const AssessmentMappingStep = ({
       </div>
 
       {error && <div className="alert alert-danger py-2 mb-4">{error}</div>}
+
+      {/* School Mapping Summary Card */}
+      {rawSchoolMappings.length > 0 && (
+        <div className="card border border-dashed mb-4">
+          <div
+            className="card-header bg-light py-3 d-flex align-items-center justify-content-between"
+            style={{ cursor: "pointer" }}
+            onClick={() => setShowMappingSummary(!showMappingSummary)}
+          >
+            <h6 className="fw-bold mb-0 fs-7">
+              <i className="bi bi-diagram-3 me-2 text-primary"></i>
+              School Mapping Summary
+              <span className="badge badge-light-primary ms-2 fs-9">
+                {(() => {
+                  const grouped: Record<number, string[]> = {};
+                  rawSchoolMappings.forEach((m) => {
+                    if (!grouped[m.newEntityId]) grouped[m.newEntityId] = [];
+                    grouped[m.newEntityId].push(m.firebaseName);
+                  });
+                  return Object.keys(grouped).length;
+                })()} system school{Object.keys(
+                  rawSchoolMappings.reduce<Record<number, boolean>>((acc, m) => { acc[m.newEntityId] = true; return acc; }, {})
+                ).length !== 1 ? "s" : ""}
+              </span>
+            </h6>
+            <i className={`bi ${showMappingSummary ? "bi-chevron-up" : "bi-chevron-down"} fs-7 text-muted`}></i>
+          </div>
+          {showMappingSummary && (
+            <div className="card-body p-0">
+              <div style={{ maxHeight: 300, overflowY: "auto" }}>
+                {(() => {
+                  // Group firebase schools by system school
+                  const grouped: Record<string, { instituteCode: number; instituteName: string; fbSchools: string[] }> = {};
+                  rawSchoolMappings.forEach((m) => {
+                    const key = String(m.newEntityId);
+                    if (!grouped[key]) {
+                      grouped[key] = {
+                        instituteCode: m.newEntityId,
+                        instituteName: m.newEntityName,
+                        fbSchools: [],
+                      };
+                    }
+                    if (!grouped[key].fbSchools.includes(m.firebaseName)) {
+                      grouped[key].fbSchools.push(m.firebaseName);
+                    }
+                  });
+                  return Object.values(grouped).map((group) => (
+                    <div key={group.instituteCode} className="border-bottom px-4 py-3">
+                      <div className="d-flex align-items-center mb-2">
+                        <i className="bi bi-building text-primary me-2"></i>
+                        <span className="fw-bold fs-7">{group.instituteName}</span>
+                        <span className="badge badge-light fs-9 ms-2">#{group.instituteCode}</span>
+                        <span className="badge badge-light-success fs-9 ms-2">
+                          {group.fbSchools.length} firebase school{group.fbSchools.length !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                      <div className="d-flex flex-wrap gap-2 ms-4">
+                        {group.fbSchools.map((fb) => (
+                          <span key={fb} className="badge badge-light fs-9 py-1 px-2 d-inline-flex align-items-center gap-1">
+                            {fb}
+                            <i
+                              className="bi bi-x-circle text-danger"
+                              style={{ cursor: "pointer", fontSize: 11 }}
+                              title={`Unmap "${fb}"`}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (unmapping) return;
+                                setUnmapping(fb);
+                                try {
+                                  await deleteMappingByName(fb, "SCHOOL");
+                                  // Remove from local state
+                                  setRawSchoolMappings((prev) => prev.filter((m) => m.firebaseName !== fb));
+                                  setAlreadyMappedSchools((prev) => {
+                                    const next = new Set(prev);
+                                    next.delete(fb.toLowerCase());
+                                    return next;
+                                  });
+                                  setSchoolToInstituteMap((prev) => {
+                                    const next = new Map(prev);
+                                    next.delete(fb.toLowerCase());
+                                    return next;
+                                  });
+                                } catch (err) {
+                                  console.error("Unmap failed:", err);
+                                  setError("Failed to unmap school: " + fb);
+                                } finally {
+                                  setUnmapping(null);
+                                }
+                              }}
+                            ></i>
+                            {unmapping === fb && <span className="spinner-border spinner-border-sm" style={{ width: 10, height: 10 }}></span>}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Bulk Assignment Panel */}
       <div className="card border border-primary mb-4">

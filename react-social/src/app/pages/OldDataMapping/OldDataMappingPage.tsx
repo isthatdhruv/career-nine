@@ -1,11 +1,16 @@
 import { useState } from "react";
 import StudentImportWizard from "./StudentImportWizard";
+import QuestionMappingWizard from "./QuestionMappingWizard";
 
 const OldDataMappingPage = () => {
-  const [mode, setMode] = useState<"select" | "student-import">("select");
+  const [mode, setMode] = useState<"select" | "student-import" | "question-mapping">("select");
 
   if (mode === "student-import") {
     return <StudentImportWizard onBack={() => setMode("select")} />;
+  }
+
+  if (mode === "question-mapping") {
+    return <QuestionMappingWizard onBack={() => setMode("select")} />;
   }
 
   return (
@@ -22,8 +27,8 @@ const OldDataMappingPage = () => {
           </div>
 
           <div className="row g-6 justify-content-center">
-            {/* Student & Score Import (includes school mapping) */}
-            <div className="col-12 col-md-5">
+            {/* Student & Score Import */}
+            <div className="col-12 col-md-4">
               <div
                 className="card card-hover border border-success border-2 h-100"
                 style={{ cursor: "pointer" }}
@@ -45,8 +50,31 @@ const OldDataMappingPage = () => {
               </div>
             </div>
 
+            {/* Question & Response Mapping */}
+            <div className="col-12 col-md-4">
+              <div
+                className="card card-hover border border-primary border-2 h-100"
+                style={{ cursor: "pointer" }}
+                onClick={() => setMode("question-mapping")}
+              >
+                <div className="card-body p-6 d-flex flex-column align-items-center text-center">
+                  <div className="symbol symbol-60px mb-4 bg-light-primary rounded">
+                    <span className="symbol-label">
+                      <i className="bi bi-chat-left-text fs-2x text-primary"></i>
+                    </span>
+                  </div>
+                  <h4 className="fw-bold text-dark mb-2">Question & Response Mapping</h4>
+                  <p className="text-muted fs-7">
+                    Select a student, view their Firebase responses, and map questions &amp; answers
+                    to system assessment questions.
+                  </p>
+                  <button className="btn btn-primary mt-auto">Start Mapping</button>
+                </div>
+              </div>
+            </div>
+
             {/* Offline (Coming Soon) */}
-            <div className="col-12 col-md-5">
+            <div className="col-12 col-md-4">
               <div className="card h-100 border border-secondary border-2" style={{ opacity: 0.6 }}>
                 <div className="card-body p-6 d-flex flex-column align-items-center text-center">
                   <div className="symbol symbol-60px mb-4 bg-light-secondary rounded">

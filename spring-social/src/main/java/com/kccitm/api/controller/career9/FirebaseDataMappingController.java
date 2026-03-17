@@ -17,9 +17,11 @@ import java.util.concurrent.ExecutionException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -93,6 +95,86 @@ public class FirebaseDataMappingController {
     @GetMapping("/getByParent/{parentId}")
     public List<FirebaseDataMapping> getByParent(@PathVariable("parentId") Long parentId) {
         return firebaseDataMappingRepository.findByParentMappingId(parentId);
+    }
+
+    @GetMapping("/students-by-institute/{instituteCode}")
+    public ResponseEntity<?> getStudentsByInstitute(@PathVariable("instituteCode") Integer instituteCode) {
+        List<UserStudent> students = userStudentRepository.findByInstituteInstituteCode(instituteCode);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (UserStudent us : students) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("userStudentId", us.getUserStudentId());
+            map.put("name", us.getStudentInfo() != null ? us.getStudentInfo().getName() : "");
+            map.put("email", us.getStudentInfo() != null ? us.getStudentInfo().getEmail() : "");
+            map.put("phone", us.getStudentInfo() != null ? us.getStudentInfo().getPhoneNumber() : "");
+            map.put("grade", us.getStudentInfo() != null ? us.getStudentInfo().getStudentClass() : "");
+
+            // Find firebase docId from STUDENT mapping
+            List<FirebaseDataMapping> studentMappings = firebaseDataMappingRepository.findByFirebaseType("STUDENT");
+            String firebaseDocId = null;
+            for (FirebaseDataMapping m : studentMappings) {
+                if (m.getNewEntityId() != null && m.getNewEntityId().equals(Long.valueOf(us.getUserStudentId()))) {
+                    firebaseDocId = m.getFirebaseId();
+                    break;
+                }
+            }
+            map.put("firebaseDocId", firebaseDocId);
+            result.add(map);
+        }
+        return ResponseEntity.ok(result);
+    }
+
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity<?> deleteMapping(@PathVariable("id") Long id) {
+        Optional<FirebaseDataMapping> opt = firebaseDataMappingRepository.findById(id);
+        if (!opt.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+        // Delete child mappings (sessions, grades, sections that reference this as parent)
+        List<FirebaseDataMapping> children = firebaseDataMappingRepository.findByParentMappingId(id);
+        if (!children.isEmpty()) {
+            // Also delete grandchildren (children of children)
+            for (FirebaseDataMapping child : children) {
+                List<FirebaseDataMapping> grandchildren = firebaseDataMappingRepository.findByParentMappingId(child.getId());
+                if (!grandchildren.isEmpty()) {
+                    firebaseDataMappingRepository.deleteAll(grandchildren);
+                }
+            }
+            firebaseDataMappingRepository.deleteAll(children);
+        }
+        firebaseDataMappingRepository.deleteById(id);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/deleteByFirebaseNameAndType")
+    public ResponseEntity<?> deleteByFirebaseNameAndType(
+            @RequestParam("firebaseName") String firebaseName,
+            @RequestParam("type") String type) {
+        List<FirebaseDataMapping> all = firebaseDataMappingRepository.findByFirebaseType(type.toUpperCase());
+        List<FirebaseDataMapping> matching = new java.util.ArrayList<>();
+        for (FirebaseDataMapping m : all) {
+            if (m.getFirebaseName() != null && m.getFirebaseName().equalsIgnoreCase(firebaseName)) {
+                matching.add(m);
+            }
+            if (m.getFirebaseId() != null && m.getFirebaseId().equalsIgnoreCase(firebaseName)) {
+                matching.add(m);
+            }
+        }
+        // Delete children of each matching mapping
+        for (FirebaseDataMapping m : matching) {
+            List<FirebaseDataMapping> children = firebaseDataMappingRepository.findByParentMappingId(m.getId());
+            for (FirebaseDataMapping child : children) {
+                List<FirebaseDataMapping> grandchildren = firebaseDataMappingRepository.findByParentMappingId(child.getId());
+                if (!grandchildren.isEmpty()) {
+                    firebaseDataMappingRepository.deleteAll(grandchildren);
+                }
+            }
+            if (!children.isEmpty()) {
+                firebaseDataMappingRepository.deleteAll(children);
+            }
+        }
+        firebaseDataMappingRepository.deleteAll(matching);
+        return ResponseEntity.ok().body(matching.size() + " mapping(s) deleted");
     }
 
     @PostMapping("/save")

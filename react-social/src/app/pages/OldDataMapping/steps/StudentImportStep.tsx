@@ -57,6 +57,9 @@ const StudentImportStep = ({
     let scoresImported = 0;
     let extraDataImported = 0;
     const errors: string[] = [];
+    const importedStudentDetails: { name: string; email: string; grade: string; school: string; firebaseDocId: string }[] = [];
+    const importedScoreDetails: { studentName: string; category: string; scoreCount: number }[] = [];
+    const importedExtraDetails: { studentName: string; type: string; value: string }[] = [];
 
     try {
       // Step 1: Import Students
@@ -84,6 +87,16 @@ const StudentImportStep = ({
           resData.results.forEach((r: any) => {
             if (r.userStudentId && r.firebaseDocId) {
               studentResultsMap[r.firebaseDocId] = r.userStudentId;
+              const sa = studentAssignments.find((s) => s.firebaseDocId === r.firebaseDocId);
+              if (sa) {
+                importedStudentDetails.push({
+                  name: sa.name,
+                  email: sa.email,
+                  grade: sa.grade,
+                  school: sa.instituteName,
+                  firebaseDocId: sa.firebaseDocId,
+                });
+              }
             }
           });
         }
@@ -136,6 +149,11 @@ const StudentImportStep = ({
 
           if (Object.keys(scoreMap).length > 0) {
             scorePayloads.push({ userStudentId, assessmentId, scoreMap });
+            importedScoreDetails.push({
+              studentName: sa.name,
+              category: cat,
+              scoreCount: Object.keys(scoreMap).length,
+            });
           }
         });
       });
@@ -171,6 +189,7 @@ const StudentImportStep = ({
             dataType: "CAREER_ASPIRATION",
             dataValue: val,
           });
+          importedExtraDetails.push({ studentName: sa.name, type: "Career Aspiration", value: val });
         });
         (sa.subjectsOfInterest || []).forEach((val: string) => {
           extraDataItems.push({
@@ -179,6 +198,7 @@ const StudentImportStep = ({
             dataType: "SUBJECT_OF_INTEREST",
             dataValue: val,
           });
+          importedExtraDetails.push({ studentName: sa.name, type: "Subject of Interest", value: val });
         });
         (sa.values || []).forEach((val: string) => {
           extraDataItems.push({
@@ -187,6 +207,7 @@ const StudentImportStep = ({
             dataType: "VALUE",
             dataValue: val,
           });
+          importedExtraDetails.push({ studentName: sa.name, type: "Value", value: val });
         });
       });
 
@@ -213,6 +234,9 @@ const StudentImportStep = ({
         extraDataImported,
         totalUsers: studentAssignments.length,
         errors,
+        studentDetails: importedStudentDetails,
+        scoreDetails: importedScoreDetails,
+        extraDetails: importedExtraDetails,
       };
 
       setImportResults(results);
