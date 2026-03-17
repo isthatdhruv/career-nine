@@ -28,7 +28,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.AuthProvider;
 import com.kccitm.api.model.User;
+import com.kccitm.api.model.career9.AssessmentQuestionOptions;
 import com.kccitm.api.model.career9.AssessmentRawScore;
+import com.kccitm.api.model.career9.AssessmentTable;
+import com.kccitm.api.model.career9.Questionaire.AssessmentAnswer;
+import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
+import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.model.career9.MeasuredQualities;
 import com.kccitm.api.model.career9.MeasuredQualityTypes;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
@@ -38,6 +43,9 @@ import com.kccitm.api.model.career9.school.FirebaseDataMapping;
 import com.kccitm.api.model.career9.school.FirebaseStudentExtraData;
 import com.kccitm.api.model.career9.school.InstituteDetail;
 import com.kccitm.api.repository.AssessmentRawScoreRepository;
+import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
+import com.kccitm.api.repository.Career9.AssessmentTableRepository;
+import com.kccitm.api.repository.Career9.AssessmentQuestionOptionsRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
@@ -82,6 +90,18 @@ public class FirebaseDataMappingController {
     @Autowired
     private MeasuredQualityTypesRepository measuredQualityTypesRepository;
 
+    @Autowired
+    private AssessmentAnswerRepository assessmentAnswerRepository;
+
+    @Autowired
+    private AssessmentTableRepository assessmentTableRepository;
+
+    @Autowired
+    private AssessmentQuestionOptionsRepository assessmentQuestionOptionsRepository;
+
+    @Autowired
+    private QuestionnaireQuestionRepository questionnaireQuestionRepository;
+
     @GetMapping("/getAll")
     public List<FirebaseDataMapping> getAll() {
         return firebaseDataMappingRepository.findAll();
@@ -119,9 +139,93 @@ public class FirebaseDataMappingController {
                 }
             }
             map.put("firebaseDocId", firebaseDocId);
+
+            // Find assessment mappings for this student
+            List<StudentAssessmentMapping> samList = studentAssessmentMappingRepository.findByUserStudentUserStudentId(us.getUserStudentId());
+            List<Map<String, Object>> assessmentMappings = new ArrayList<>();
+            for (StudentAssessmentMapping sam : samList) {
+                Map<String, Object> amMap = new LinkedHashMap<>();
+                amMap.put("assessmentId", sam.getAssessmentId());
+                amMap.put("status", sam.getStatus());
+                assessmentMappings.add(amMap);
+            }
+            map.put("assessmentMappings", assessmentMappings);
+
             result.add(map);
         }
         return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/import-mapped-answers")
+    public ResponseEntity<?> importMappedAnswers(@RequestBody Map<String, Object> payload) {
+        try {
+            Long userStudentId = getLong(payload, "userStudentId");
+            Long assessmentId = getLong(payload, "assessmentId");
+
+            if (userStudentId == null || assessmentId == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "userStudentId and assessmentId are required"));
+            }
+
+            Optional<UserStudent> usOpt = userStudentRepository.findById(userStudentId);
+            if (!usOpt.isPresent()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "UserStudent not found: " + userStudentId));
+            }
+            UserStudent userStudent = usOpt.get();
+
+            Optional<AssessmentTable> atOpt = assessmentTableRepository.findById(assessmentId);
+            if (!atOpt.isPresent()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Assessment not found: " + assessmentId));
+            }
+            AssessmentTable assessment = atOpt.get();
+
+            // Delete existing answers for this student + assessment to avoid duplicates
+            assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
+
+            List<Map<String, Object>> answers = (List<Map<String, Object>>) payload.get("answers");
+            if (answers == null || answers.isEmpty()) {
+                return ResponseEntity.ok(Map.of("saved", 0, "message", "No answers to save"));
+            }
+
+            int saved = 0;
+            int skipped = 0;
+            for (Map<String, Object> ans : answers) {
+                Long optionId = getLong(ans, "optionId");
+                Long questionId = getLong(ans, "questionId");
+                String textResponse = (String) ans.get("textResponse");
+
+                AssessmentAnswer answer = new AssessmentAnswer();
+                answer.setUserStudent(userStudent);
+                answer.setAssessment(assessment);
+                answer.setTextResponse(textResponse);
+
+                // Set the QuestionnaireQuestion by finding it via the linked AssessmentQuestions ID
+                if (questionId != null) {
+                    List<QuestionnaireQuestion> qqList = questionnaireQuestionRepository.findByQuestion_QuestionId(questionId);
+                    if (!qqList.isEmpty()) {
+                        answer.setQuestionnaireQuestion(qqList.get(0));
+                    }
+                }
+
+                if (optionId != null) {
+                    Optional<AssessmentQuestionOptions> optOpt = assessmentQuestionOptionsRepository.findById(optionId);
+                    if (optOpt.isPresent()) {
+                        answer.setOption(optOpt.get());
+                    }
+                }
+
+                assessmentAnswerRepository.save(answer);
+                saved++;
+            }
+
+            return ResponseEntity.ok(Map.of(
+                "saved", saved,
+                "skipped", skipped,
+                "message", "Answers imported successfully"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", e.getMessage()));
+        }
     }
 
     @DeleteMapping("/delete/{id}")

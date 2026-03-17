@@ -4,6 +4,8 @@ import {
   getStudentsByInstitute,
   fetchFirebaseUserData,
   getAllAssessmentQuestions,
+  getAllAssessments,
+  importMappedAnswers,
 } from "./API/OldDataMapping_APIs";
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -15,6 +17,7 @@ interface DBStudent {
   phone: string;
   grade: string;
   firebaseDocId: string | null;
+  assessmentMappings?: { assessmentId: number; status: string }[];
 }
 
 interface FirebaseResponse {
@@ -89,20 +92,28 @@ const QuestionMappingWizard = ({ onBack }: Props) => {
   const [activeCategory, setActiveCategory] = useState<string>("ability");
   const [questionSearchSystem, setQuestionSearchSystem] = useState("");
 
+  // Save state
+  const [saving, setSaving] = useState(false);
+  const [saveResult, setSaveResult] = useState<{ saved: number; error?: string } | null>(null);
+  const [selectedAssessmentId, setSelectedAssessmentId] = useState<number | null>(null);
+  const [allAssessments, setAllAssessments] = useState<any[]>([]);
+
   // Fetch institutes + system questions on mount
   useEffect(() => {
     setLoading(true);
     Promise.all([
       getAllInstitutes(),
       getAllAssessmentQuestions(),
+      getAllAssessments(),
     ])
-      .then(([instRes, questionsRes]) => {
+      .then(([instRes, questionsRes, assessRes]) => {
         const instList = (instRes.data || []).map((i: any) => ({
           instituteCode: Number(i.instituteCode ?? i.id),
           instituteName: i.instituteName ?? i.name ?? "",
         })).sort((a: Institute, b: Institute) => a.instituteName.localeCompare(b.instituteName));
         setInstitutes(instList);
         setSystemQuestions(questionsRes.data || []);
+        setAllAssessments(assessRes.data || []);
       })
       .catch(() => setError("Failed to load data"))
       .finally(() => setLoading(false));
@@ -185,6 +196,18 @@ const QuestionMappingWizard = ({ onBack }: Props) => {
 
       setMappings(newMappings);
       setActiveCategory(newMappings.length > 0 ? newMappings[0].category : "ability");
+
+      // Clear previous save result
+      setSaveResult(null);
+
+      // Auto-select assessment from student's assessment mappings
+      const am = student.assessmentMappings;
+      if (am && am.length > 0) {
+        setSelectedAssessmentId(am[0].assessmentId);
+      } else {
+        setSelectedAssessmentId(null);
+      }
+
       setStep("map-questions");
     } catch (err) {
       setError("Failed to fetch Firebase data.");
@@ -222,6 +245,138 @@ const QuestionMappingWizard = ({ onBack }: Props) => {
     });
     return counts;
   }, [mappings]);
+
+  // ── Auto-map helpers ──────────────────────────────────────────────────
+
+  const textSimilarity = (a: string, b: string): number => {
+    const al = a.toLowerCase().trim();
+    const bl = b.toLowerCase().trim();
+    if (al === bl) return 1;
+    if (al.includes(bl) || bl.includes(al)) return 0.9;
+    const aWords = al.split(/\s+/).filter(Boolean);
+    const bWords = bl.split(/\s+/).filter(Boolean);
+    const common = aWords.filter((w) => bWords.includes(w)).length;
+    const total = Math.max(aWords.length, bWords.length);
+    return total > 0 ? common / total : 0;
+  };
+
+  const findBestSystemQuestion = (fbQuestion: string): SystemQuestion | null => {
+    if (!fbQuestion) return null;
+    let best: SystemQuestion | null = null;
+    let bestScore = 0;
+    for (const sq of systemQuestions) {
+      const score = textSimilarity(fbQuestion, sq.questionText || "");
+      if (score > bestScore) {
+        bestScore = score;
+        best = sq;
+      }
+    }
+    return bestScore >= 0.7 ? best : null;
+  };
+
+  const findBestOption = (answerText: string, options: SystemOption[]): SystemOption | null => {
+    if (!answerText || !options?.length) return null;
+    const al = answerText.toLowerCase().trim();
+    // Exact match first
+    const exact = options.find((o) => (o.optionText || "").toLowerCase().trim() === al);
+    if (exact) return exact;
+    // Contains match
+    const contains = options.find((o) => {
+      const ol = (o.optionText || "").toLowerCase().trim();
+      return ol.includes(al) || al.includes(ol);
+    });
+    return contains || null;
+  };
+
+  const handleMapAll = () => {
+    setMappings((prev) => {
+      return prev.map((m) => {
+        if (m.systemQuestionId) return m; // already mapped
+        const bestQ = findBestSystemQuestion(m.firebaseQuestion);
+        if (!bestQ) return m;
+        const bestOpt = findBestOption(m.firebaseAnswer, bestQ.options || []);
+        return {
+          ...m,
+          systemQuestionId: bestQ.questionId,
+          systemQuestionText: bestQ.questionText,
+          systemOptionId: bestOpt?.optionId ?? null,
+          systemOptionText: bestOpt?.optionText ?? "",
+        };
+      });
+    });
+  };
+
+  const handleMapAllCategory = () => {
+    setMappings((prev) => {
+      return prev.map((m) => {
+        if (m.category !== activeCategory || m.systemQuestionId) return m;
+        const bestQ = findBestSystemQuestion(m.firebaseQuestion);
+        if (!bestQ) return m;
+        const bestOpt = findBestOption(m.firebaseAnswer, bestQ.options || []);
+        return {
+          ...m,
+          systemQuestionId: bestQ.questionId,
+          systemQuestionText: bestQ.questionText,
+          systemOptionId: bestOpt?.optionId ?? null,
+          systemOptionText: bestOpt?.optionText ?? "",
+        };
+      });
+    });
+  };
+
+  const handleClearAllCategory = () => {
+    setMappings((prev) => {
+      return prev.map((m) => {
+        if (m.category !== activeCategory) return m;
+        return { ...m, systemQuestionId: null, systemQuestionText: "", systemOptionId: null, systemOptionText: "" };
+      });
+    });
+  };
+
+  // Save mapped answers to DB
+  const handleSaveMappings = async () => {
+    if (!selectedStudent) return;
+
+    if (!selectedAssessmentId) {
+      setError("Please select an assessment before saving.");
+      return;
+    }
+    const assessmentId = selectedAssessmentId;
+
+    const mappedAnswers = mappings
+      .filter((m) => m.systemQuestionId !== null)
+      .map((m) => ({
+        questionId: m.systemQuestionId,
+        optionId: m.systemOptionId,
+        textResponse: m.firebaseAnswer || "",
+      }));
+
+    if (mappedAnswers.length === 0) {
+      setError("No mapped questions to save. Map at least one question first.");
+      return;
+    }
+
+    setSaving(true);
+    setSaveResult(null);
+    setError("");
+
+    try {
+      const res = await importMappedAnswers({
+        userStudentId: selectedStudent.userStudentId,
+        assessmentId,
+        answers: mappedAnswers,
+      });
+      setSaveResult({ saved: res.data?.saved || 0 });
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || "Unknown error";
+      setSaveResult({ saved: 0, error: msg });
+      setError("Save failed: " + msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const totalMapped = useMemo(() => mappings.filter((m) => m.systemQuestionId).length, [mappings]);
 
   // Map handlers
   const handleMapQuestion = (fbIndex: number, sysQuestion: SystemQuestion) => {
@@ -463,24 +618,51 @@ const QuestionMappingWizard = ({ onBack }: Props) => {
             <div>
               {/* Student info bar */}
               <div className="card shadow-sm mb-4">
-                <div className="card-body py-3 d-flex align-items-center gap-4">
-                  <div className="symbol symbol-45px bg-light-primary rounded-circle">
-                    <span className="symbol-label fw-bold text-primary fs-5">
-                      {(selectedStudent.name || "?")[0].toUpperCase()}
-                    </span>
-                  </div>
-                  <div>
-                    <div className="fw-bold fs-6">{selectedStudent.name || "Unnamed"}</div>
-                    <div className="text-muted fs-8">
-                      {selectedStudent.email || "—"} | Grade {selectedStudent.grade || "?"} | ID #{selectedStudent.userStudentId}
+                <div className="card-body py-3">
+                  <div className="d-flex align-items-center gap-4">
+                    <div className="symbol symbol-45px bg-light-primary rounded-circle">
+                      <span className="symbol-label fw-bold text-primary fs-5">
+                        {(selectedStudent.name || "?")[0].toUpperCase()}
+                      </span>
+                    </div>
+                    <div>
+                      <div className="fw-bold fs-6">{selectedStudent.name || "Unnamed"}</div>
+                      <div className="text-muted fs-8">
+                        {selectedStudent.email || "—"} | Grade {selectedStudent.grade || "?"} | ID #{selectedStudent.userStudentId}
+                      </div>
+                    </div>
+                    <div className="ms-auto d-flex gap-2">
+                      {Object.entries(categoryCounts).map(([cat, counts]) => (
+                        <span key={cat} className="badge badge-light fs-9">
+                          {categoryLabels[cat] || cat}: {counts.mapped}/{counts.total}
+                        </span>
+                      ))}
                     </div>
                   </div>
-                  <div className="ms-auto d-flex gap-2">
-                    {Object.entries(categoryCounts).map(([cat, counts]) => (
-                      <span key={cat} className="badge badge-light fs-9">
-                        {categoryLabels[cat] || cat}: {counts.mapped}/{counts.total}
+                  {/* Assessment selector */}
+                  <div className="d-flex align-items-center gap-3 mt-3 pt-3 border-top">
+                    <span className="fw-semibold fs-7">Save to Assessment:</span>
+                    <select
+                      className="form-select form-select-sm"
+                      style={{ maxWidth: 300 }}
+                      value={selectedAssessmentId ?? ""}
+                      onChange={(e) => {
+                        setSelectedAssessmentId(e.target.value ? Number(e.target.value) : null);
+                        setError("");
+                      }}
+                    >
+                      <option value="">-- Select Assessment --</option>
+                      {allAssessments.map((a: any) => (
+                        <option key={a.id} value={a.id}>
+                          {a.AssessmentName} (ID: {a.id})
+                        </option>
+                      ))}
+                    </select>
+                    {selectedAssessmentId && (
+                      <span className="badge badge-light-success fs-9">
+                        <i className="bi bi-check-circle me-1"></i>Assessment selected
                       </span>
-                    ))}
+                    )}
                   </div>
                 </div>
               </div>
@@ -503,6 +685,41 @@ const QuestionMappingWizard = ({ onBack }: Props) => {
                     </button>
                   );
                 })}
+              </div>
+
+              {/* Action buttons */}
+              <div className="d-flex gap-2 mb-4 align-items-center">
+                <button className="btn btn-sm btn-success" onClick={handleMapAll} title="Auto-map all unmapped questions across all categories">
+                  <i className="bi bi-magic me-1"></i>Map All (Auto)
+                </button>
+                <button className="btn btn-sm btn-light-success" onClick={handleMapAllCategory} title={`Auto-map unmapped questions in ${categoryLabels[activeCategory]}`}>
+                  <i className="bi bi-magic me-1"></i>Map {categoryLabels[activeCategory]} (Auto)
+                </button>
+                <button className="btn btn-sm btn-light-danger" onClick={handleClearAllCategory} title={`Clear all mappings in ${categoryLabels[activeCategory]}`}>
+                  <i className="bi bi-x-circle me-1"></i>Clear {categoryLabels[activeCategory]}
+                </button>
+                <div className="ms-auto d-flex align-items-center gap-2">
+                  {saveResult && !saveResult.error && (
+                    <span className="badge badge-light-success fs-8">
+                      <i className="bi bi-check-circle me-1"></i>{saveResult.saved} answers saved
+                    </span>
+                  )}
+                  {saveResult?.error && (
+                    <span className="badge badge-light-danger fs-8">{saveResult.error}</span>
+                  )}
+                  <button
+                    className="btn btn-sm btn-primary"
+                    onClick={handleSaveMappings}
+                    disabled={saving || totalMapped === 0}
+                    title={totalMapped === 0 ? "Map at least one question first" : `Save ${totalMapped} mapped answers to database`}
+                  >
+                    {saving ? (
+                      <><span className="spinner-border spinner-border-sm me-1"></span>Saving...</>
+                    ) : (
+                      <><i className="bi bi-cloud-upload me-1"></i>Save Mappings ({totalMapped})</>
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* Mapping cards */}

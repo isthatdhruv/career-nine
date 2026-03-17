@@ -96,6 +96,11 @@ export function importExtraData(payload: any) {
   return axios.post(`${API_URL}/firebase-mapping/import-extra-data`, payload);
 }
 
+// Import mapped question-answer pairs as AssessmentAnswer records
+export function importMappedAnswers(payload: { userStudentId: number; assessmentId: number; answers: { questionId: number | null; optionId: number | null; textResponse: string }[] }) {
+  return axios.post(`${API_URL}/firebase-mapping/import-mapped-answers`, payload);
+}
+
 // Existing assessment endpoints (reuse)
 export function getAllAssessments() {
   return axios.get(`${API_URL}/assessments/get/list`);
