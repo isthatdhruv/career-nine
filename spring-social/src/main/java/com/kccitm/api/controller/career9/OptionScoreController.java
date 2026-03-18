@@ -1,10 +1,16 @@
 package com.kccitm.api.controller.career9;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -47,6 +53,9 @@ public class OptionScoreController {
 
     @PostMapping("/create")
     public ResponseEntity<?> createOptionScores(@RequestBody List<OptionScoreBasedOnMEasuredQualityTypes> scores) {
+        int skipped = 0;
+        List<OptionScoreBasedOnMEasuredQualityTypes> toSave = new ArrayList<>();
+
         for (OptionScoreBasedOnMEasuredQualityTypes score : scores) {
             // Set option entity
             if (score.getQuestion_option() != null && score.getQuestion_option().getOptionId() != null) {
@@ -62,9 +71,19 @@ public class OptionScoreController {
             } else {
                 return ResponseEntity.badRequest().body("Missing measuredQualityTypeId for a score entry");
             }
+
+            // Dedup guard: skip if this (option, mqt) pair already exists
+            Long optId = score.getQuestion_option().getOptionId();
+            Long mqtId = score.getMeasuredQualityType().getMeasuredQualityTypeId();
+            List<OptionScoreBasedOnMEasuredQualityTypes> existing = optionScoreRepository.findByOptionIdAndMqtId(optId, mqtId);
+            if (!existing.isEmpty()) {
+                skipped++;
+                continue;
+            }
+            toSave.add(score);
         }
-        optionScoreRepository.saveAll(scores);
-        return ResponseEntity.ok("Saved all option scores");
+        optionScoreRepository.saveAll(toSave);
+        return ResponseEntity.ok(Map.of("saved", toSave.size(), "skippedDuplicates", skipped));
     }
 
     @PutMapping("/update/{id}")
@@ -128,9 +147,47 @@ public class OptionScoreController {
     //     return ResponseEntity.ok(score);
     // }
 
-    // Removed redundant batch-create endpoint. Use /create for batch creation.
+    /**
+     * POST /option-scores/cleanup-duplicates
+     *
+     * Scans all option scores, finds (option_id, mqt_id) pairs with duplicates,
+     * keeps the first row (lowest scoreId) and deletes the rest.
+     */
+    @PostMapping("/cleanup-duplicates")
+    @Transactional
+    public ResponseEntity<?> cleanupDuplicates() {
+        List<OptionScoreBasedOnMEasuredQualityTypes> all = optionScoreRepository.findAll();
 
-    
+        // Group by (optionId, mqtId)
+        Map<String, List<OptionScoreBasedOnMEasuredQualityTypes>> grouped = new HashMap<>();
+        for (OptionScoreBasedOnMEasuredQualityTypes os : all) {
+            if (os.getQuestion_option() == null || os.getMeasuredQualityType() == null) continue;
+            String key = os.getQuestion_option().getOptionId() + "_" + os.getMeasuredQualityType().getMeasuredQualityTypeId();
+            grouped.computeIfAbsent(key, k -> new ArrayList<>()).add(os);
+        }
 
-   
+        int duplicatePairs = 0;
+        int deletedRows = 0;
+        List<Long> deletedIds = new ArrayList<>();
+
+        for (Map.Entry<String, List<OptionScoreBasedOnMEasuredQualityTypes>> entry : grouped.entrySet()) {
+            List<OptionScoreBasedOnMEasuredQualityTypes> rows = entry.getValue();
+            if (rows.size() <= 1) continue;
+
+            duplicatePairs++;
+            // Sort by scoreId descending — keep newest (highest scoreId), delete older ones
+            rows.sort((a, b) -> Long.compare(b.getScoreId(), a.getScoreId()));
+            for (int i = 1; i < rows.size(); i++) {
+                deletedIds.add(rows.get(i).getScoreId());
+                optionScoreRepository.delete(rows.get(i));
+                deletedRows++;
+            }
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "duplicatePairs", duplicatePairs,
+                "deletedRows", deletedRows,
+                "kept", "newest scoreId per (option, mqt) pair"
+        ));
+    }
 }

@@ -125,17 +125,22 @@ public class AssessmentQuestionController {
                 // Wire the back-reference from option to question
                 option.setQuestion(assessmentQuestions);
 
-                // Wire up measured quality type scores for each option
+                // Wire up measured quality type scores for each option (dedup by MQT ID)
                 if (option.getOptionScores() != null) {
-                    for (OptionScoreBasedOnMEasuredQualityTypes score : option.getOptionScores()) {
-                        // Set the back-reference from score to option
+                    java.util.Set<Long> seenMqtIds = new java.util.HashSet<>();
+                    java.util.Iterator<OptionScoreBasedOnMEasuredQualityTypes> it = option.getOptionScores().iterator();
+                    while (it.hasNext()) {
+                        OptionScoreBasedOnMEasuredQualityTypes score = it.next();
                         score.setQuestion_option(option);
 
-                        // Use ID-only reference for MeasuredQualityType
                         if (score.getMeasuredQualityType() != null
                                 && score.getMeasuredQualityType().getMeasuredQualityTypeId() != null) {
-                            score.setMeasuredQualityType(new MeasuredQualityTypes(
-                                    score.getMeasuredQualityType().getMeasuredQualityTypeId()));
+                            Long mqtId = score.getMeasuredQualityType().getMeasuredQualityTypeId();
+                            if (!seenMqtIds.add(mqtId)) {
+                                it.remove(); // duplicate MQT for this option — skip
+                                continue;
+                            }
+                            score.setMeasuredQualityType(new MeasuredQualityTypes(mqtId));
                         }
                     }
                 }
@@ -204,14 +209,22 @@ public class AssessmentQuestionController {
             for (AssessmentQuestionOptions option : assessmentQuestions.getOptions()) {
                 option.setQuestion(existingQuestion);
 
+                // Dedup scores by MQT ID within each option
                 if (option.getOptionScores() != null) {
-                    for (OptionScoreBasedOnMEasuredQualityTypes score : option.getOptionScores()) {
+                    java.util.Set<Long> seenMqtIds = new java.util.HashSet<>();
+                    java.util.Iterator<OptionScoreBasedOnMEasuredQualityTypes> it = option.getOptionScores().iterator();
+                    while (it.hasNext()) {
+                        OptionScoreBasedOnMEasuredQualityTypes score = it.next();
                         score.setQuestion_option(option);
 
                         if (score.getMeasuredQualityType() != null
                                 && score.getMeasuredQualityType().getMeasuredQualityTypeId() != null) {
-                            score.setMeasuredQualityType(new MeasuredQualityTypes(
-                                    score.getMeasuredQualityType().getMeasuredQualityTypeId()));
+                            Long mqtId = score.getMeasuredQualityType().getMeasuredQualityTypeId();
+                            if (!seenMqtIds.add(mqtId)) {
+                                it.remove(); // duplicate MQT for this option — skip
+                                continue;
+                            }
+                            score.setMeasuredQualityType(new MeasuredQualityTypes(mqtId));
                         }
                     }
                 }

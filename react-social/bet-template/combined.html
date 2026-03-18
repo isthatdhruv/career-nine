@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&family=M PLUS 1 Code:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ============================================================
+   reset.css
+   ============================================================ */
+
+      ::before,
+      ::after {
+        --tw-content: "";
+      }
+
+      html,
+      career-nine :host {
+        line-height: 1.5;
+        -webkit-text-size-adjust: 100%;
+        -moz-tab-size: 4;
+        tab-size: 4;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      body {
+        margin: 0;
+        line-height: inherit;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      hr {
+        height: 0;
+        color: inherit;
+        border-top-width: 1px;
+      }
+
+      abbr:where([title]) {
+        text-decoration: underline dotted;
+      }
+
+      h1,
+      h2,
+      h3,
+      h4,
+      h5,
+      h6 {
+        font-size: inherit;
+        font-weight: inherit;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: inherit;
+      }
+
+      b,
+      strong {
+        font-weight: bolder;
+      }
+
+      code,
+      kbd,
+      samp,
+      pre {
+        font-size: 1em;
+      }
+
+      small {
+        font-size: 80%;
+      }
+
+      sub,
+      sup {
+        font-size: 75%;
+        line-height: 0;
+        position: relative;
+        vertical-align: baseline;
+      }
+
+      sub {
+        bottom: -0.25em;
+      }
+      sup {
+        top: -0.5em;
+      }
+
+      table {
+        text-indent: 0;
+        border-color: inherit;
+        border-collapse: collapse;
+      }
+
+      button,
+      input,
+      optgroup,
+      select,
+      textarea {
+        font-family: inherit;
+        font-feature-settings: inherit;
+        font-variation-settings: inherit;
+        font-size: 100%;
+        font-weight: inherit;
+        line-height: inherit;
+        color: inherit;
+        margin: 0;
+        padding: 0;
+        border: 0;
+      }
+
+      button,
+      select {
+        text-transform: none;
+      }
+
+      button,
+      [type="button"],
+      [type="reset"],
+      [type="submit"] {
+        -webkit-appearance: button;
+        background-color: transparent;
+        background-image: none;
+      }
+
+      :-moz-focusring {
+        outline: auto;
+      }
+      :-moz-ui-invalid {
+        box-shadow: none;
+      }
+
+      progress {
+        vertical-align: baseline;
+      }
+
+      ::-webkit-inner-spin-button,
+      ::-webkit-outer-spin-button {
+        height: auto;
+      }
+
+      [type="search"] {
+        -webkit-appearance: textfield;
+        outline-offset: -2px;
+      }
+
+      ::-webkit-search-decoration {
+        -webkit-appearance: none;
+      }
+
+      ::-webkit-file-upload-button {
+        -webkit-appearance: button;
+        font: inherit;
+      }
+
+      summary {
+        display: list-item;
+      }
+
+      blockquote,
+      dl,
+      dd,
+      h1,
+      h2,
+      h3,
+      h4,
+      h5,
+      h6,
+      hr,
+      figure,
+      p,
+      pre {
+        margin: 0;
+      }
+
+      fieldset {
+        margin: 0;
+        padding: 0;
+      }
+      legend {
+        padding: 0;
+      }
+
+      ol,
+      ul,
+      menu {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      dialog {
+        padding: 0;
+      }
+      textarea {
+        resize: vertical;
+      }
+
+      button,
+      [role="button"] {
+        cursor: pointer;
+      }
+      :disabled {
+        cursor: default;
+      }
+
+      img,
+      svg,
+      video,
+      canvas,
+      audio,
+      iframe,
+      embed,
+      object {
+        display: block;
+        vertical-align: middle;
+      }
+
+      img,
+      video {
+        max-width: 100%;
+        height: auto;
+      }
+
+      [hidden] {
+        display: none;
+      }
+
+      * {
+        text-underline-offset: 0.134em;
+      }
+
+      /* ============================================================
+   fonts.css
+   ============================================================ */
+
+      @font-face {
+        font-family: "Calibri";
+        font-style: normal;
+        font-weight: 400;
+        src: url(fonts/calibri.ttf);
+      }
+
+      /* ============================================================
+   global.css
+   ============================================================ */
+
+      @page {
+        size: A4;
+        margin: 0;
+      }
+
+      :root {
+        --margin-sm: 16px;
+        --margin-md: 32px;
+        --page-width: 210mm;
+        --page-height: 297mm;
+      }
+
+      * {
+        --min-screen-size: 430;
+        --max-screen-size: 595;
+        --interpolate-diff: calc(var(--max-font-size) - var(--min-font-size));
+        --interpolate: clamp(
+          calc(var(--min-font-size) * 1px),
+          calc(
+            (var(--min-font-size) * 1px) + var(--interpolate-diff) *
+              (
+                (100vw - calc(var(--min-screen-size) * 1px)) /
+                  (var(--max-screen-size) - var(--min-screen-size))
+              )
+          ),
+          calc(var(--max-font-size) * 1px)
+        );
+      }
+
+      html {
+        height: 100%;
+        font-size: 16px;
+      }
+
+      body {
+        min-height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        font-family: "Calibri";
+        font-weight: 400;
+        line-height: normal;
+        letter-spacing: 0px;
+        background-color: #e0e0e0;
+        overflow: auto;
+        gap: 20px;
+        padding: 20px 0;
+      }
+
+      @media print {
+        body {
+          background-color: #fff;
+          gap: 0;
+          padding: 0;
+        }
+      }
+
+      .text-dark {
+        color: #282828;
+        font-size: 12px;
+        font-family: "Calibri";
+        font-weight: 400;
+        line-height: normal;
+        letter-spacing: 0px;
+      }
+
+      .text-black {
+        color: #000;
+        font-size: 16px;
+      }
+
+      .text-b {
+        text-transform: uppercase;
+      }
+
+      .graphic {
+        width: 7px;
+        height: 10px;
+        flex-shrink: 0;
+        align-self: start;
+      }
+
+      .column-b {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+        flex-shrink: 0;
+        text-align: left;
+      }
+
+      .column-text3 {
+        color: #000;
+        font-size: 16px;
+      }
+
+      .column-text4 {
+        align-self: stretch;
+        color: #282828;
+        font-size: 12px;
+      }
+
+      .rect {
+        margin-top: 30px;
+        width: 31px;
+        height: 137px;
+        flex-shrink: 0;
+        background-color: #efc8a1;
+      }
+
+      /* ============================================================
+   Page wrapper
+   ============================================================ */
+
+      .page {
+        width: var(--page-width);
+        min-height: var(--page-height);
+        max-height: var(--page-height);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background-color: #fff;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        flex-shrink: 0;
+        page-break-after: always;
+        break-after: page;
+      }
+
+      .page:last-child {
+        page-break-after: auto;
+        break-after: auto;
+      }
+
+      @media print {
+        .page {
+          box-shadow: none;
+          margin: 0;
+        }
+      }
+
+      /* ============================================================
+   cover.css  (scoped to .page-cover)
+   ============================================================ */
+
+      .page-cover {
+        position: relative;
+        gap: 16px;
+        color: #000;
+        background-color: #ede7db;
+        padding: 40px 40px 40px 40px;
+        /* justify-content: center; */
+      }
+
+      .page-cover .column-a {
+        width: 100%;
+        max-width: 680px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        align-self: center;
+      }
+
+      .page-cover .column-text1 {
+        padding-top: 25px;
+        font-size: 22px;
+        font-family: "Montserrat";
+        text-align: left;
+      }
+
+      .page-cover .column-text2 {
+        font-size: 15px;
+        font-family: "Calibri";
+        text-align: justify;
+        line-height: 1.4;
+      }
+
+      .page-cover .img {
+        position: absolute;
+        z-index: 1;
+        top: 10px;
+        right: 20px;
+        width: 140px;
+      }
+
+      .page-cover .row {
+        position: relative;
+        width: 100%;
+        max-width: 700px;
+        min-height: 520px;
+        flex-shrink: 0;
+        align-self: center;
+      }
+
+      .page-cover .col1 {
+        position: absolute;
+        top: -25px;
+        left: -40px;
+        right: -40px;
+        display: flex;
+        flex-direction: column;
+        font-family: "Montserrat";
+        font-weight: 700;
+        text-align: center;
+        background: url(assets/cover/col.png) center / cover no-repeat;
+        padding: 170px 30px 90px 30px;
+      }
+
+      .page-cover .text-a {
+        font-size: 18px;
+      }
+
+      .page-cover .title-bet-report {
+        font-size: 56px;
+        font-weight: 400;
+      }
+
+      .page-cover .text1 {
+        margin-top: -2px;
+      }
+
+      .page-cover .subtitle-adinath-chitale {
+        margin-top: 50px;
+        font-size: 32px;
+      }
+
+      .page-cover .text-std-3-i-jan {
+        margin-top: 170px;
+      }
+
+      .page-cover .line-bottom {
+        margin-left: -5px;
+        margin-top: 40px;
+        width: calc(100% - 29px);
+        height: 0;
+        max-width: 880px;
+        flex-shrink: 0;
+        align-self: center;
+        border-top: 1px solid #000;
+      }
+
+      .page-cover .career {
+        position: absolute;
+        top: -4px;
+        left: -6px;
+        width: 150px;
+        font-size: 10px;
+        font-family: "M PLUS 1 Code";
+        font-weight: 400;
+        letter-spacing: -0.16px;
+        text-align: left;
+        background: url(assets/cover/career.png) center / cover no-repeat;
+        padding: 50px 52px 9px 52px;
+      }
+
+      @media screen and (max-width: 576px) {
+        .page-cover .row {
+          margin-inline: 0;
+        }
+        .page-cover .line-bottom {
+          margin-inline: 0;
+        }
+      }
+
+      /* ============================================================
+   report-details.css  (scoped to .page-report-details)
+   ============================================================ */
+
+      .page-report-details {
+        padding: 17px 32px 18px 0;
+      }
+
+      .page-report-details .col1 {
+        position: relative;
+        width: 100%;
+        max-width: 930px;
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+        padding-top: 61px;
+        padding-bottom: 51px;
+      }
+
+      .page-report-details .graphic1 {
+        position: absolute;
+        top: 0;
+        left: 40px;
+        width: 27px;
+        height: 807px;
+      }
+
+      .page-report-details .col-top {
+        container: col-top / inline-size;
+        position: relative;
+        z-index: 2;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .page-report-details .row1 {
+        display: flex;
+        align-items: flex-start;
+        gap: 25px;
+      }
+
+      .page-report-details .row-left {
+        display: flex;
+        align-items: flex-start;
+        color: #000;
+        font-size: 16px;
+      }
+
+      .page-report-details .rect-left1 {
+        margin-top: 30px;
+        width: 31px;
+        height: 137px;
+        flex-shrink: 0;
+        background-color: #efc8a1;
+      }
+
+      .page-report-details .col2 {
+        width: 186px;
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+        text-align: center;
+      }
+
+      .page-report-details .card1 {
+        box-shadow: -2px 4px 4px 0px rgba(0, 0, 0, 0.25);
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        background-color: #efc8a1;
+        padding: 19px 35px 13px 31px;
+        border-radius: 24px 0;
+      }
+
+      .page-report-details .card-img1 {
+        margin-left: 2px;
+        width: 105px;
+        flex-shrink: 0;
+        align-self: center;
+      }
+
+      .page-report-details .card2 {
+        display: flex;
+        align-items: flex-start;
+        gap: 2px;
+        flex-grow: 1;
+        background-color: #ede7db;
+        padding: 17px 21px 16px 0;
+        border-radius: 24px 0;
+      }
+
+      .page-report-details .card-img2 {
+        width: 77px;
+        flex-shrink: 0;
+      }
+
+      .page-report-details .col3 {
+        width: 220px;
+      }
+
+      .page-report-details .col3 .column-text3 {
+        margin-left: 18px;
+        width: 184px;
+      }
+
+      .page-report-details .row-bottom1 {
+        display: flex;
+        align-items: flex-start;
+        gap: 25px;
+        align-self: end;
+      }
+
+      .page-report-details .card-left1 {
+        margin-top: 9px;
+        width: 124px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        flex-shrink: 0;
+        color: #000;
+        font-size: 16px;
+        text-align: left;
+        background-color: #ede7db;
+        padding: 5px 29px 13px 29px;
+        border-radius: 24px 0;
+      }
+
+      .page-report-details .card-left-img {
+        width: 64px;
+        flex-shrink: 0;
+      }
+
+      .page-report-details .card-left-text {
+        align-self: stretch;
+      }
+
+      .page-report-details .card3 {
+        display: flex;
+        align-items: flex-start;
+        gap: 2px;
+        background-color: #ede7db;
+        padding: 1px 18px 1px 15px;
+        border-radius: 24px 0;
+      }
+
+      .page-report-details .card-img3 {
+        width: 59px;
+        flex-shrink: 0;
+      }
+
+      .page-report-details .col4 {
+        margin-top: 9px;
+        width: 226px;
+      }
+
+      .page-report-details .col4 .column-text3 {
+        width: 190px;
+        align-self: center;
+      }
+
+      .page-report-details .col-bottom {
+        container: col-bottom / inline-size;
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .page-report-details .row2 {
+        display: flex;
+        align-items: flex-start;
+      }
+
+      .page-report-details .col5 {
+        width: 179px;
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+        color: #000;
+        font-size: 16px;
+        text-align: center;
+      }
+
+      .page-report-details .card4 {
+        box-shadow: -2px 4px 4px 0px rgba(0, 0, 0, 0.25);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        background-color: #efc8a1;
+        padding: 12px 30px 11px 31px;
+        border-bottom-right-radius: 24px;
+      }
+
+      .page-report-details .card-img4 {
+        margin-left: 6px;
+        margin-right: 4px;
+        flex-shrink: 0;
+      }
+
+      .page-report-details .card-text4 {
+        text-transform: uppercase;
+      }
+
+      .page-report-details .card5 {
+        display: flex;
+        align-items: flex-start;
+        gap: 2px;
+        flex-grow: 1;
+        text-align: left;
+        background-color: #ede7db;
+        padding: 17px 21px 16px ;
+        border-radius: 24px 0;
+        margin-left: 20px;
+      }
+
+      .page-report-details .row-bottom2 {
+        display: flex;
+        align-items: flex-start;
+        gap: 25px;
+        align-self: end;
+      }
+
+      .page-report-details .card {
+        min-height: 134px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex-shrink: 0;
+        text-align: left;
+        background-color: #ede7db;
+        padding: 24px 24px 0 24px;
+        border-radius: 24px 0;
+      }
+
+      .page-report-details .card-text1 {
+        color: #000;
+        font-size: 16px;
+      }
+
+      .page-report-details .card-text2 {
+        color: #282828;
+        font-size: 12px;
+      }
+
+      .page-report-details .card-left2 {
+        width: 214px;
+        padding-bottom: 11px;
+      }
+
+      .page-report-details .card-left2 .card-text2 {
+        margin-right: 15px;
+      }
+
+      .page-report-details .card-right {
+        width: 232px;
+        padding-bottom: 24px;
+      }
+
+      .page-report-details .card-right .card-text2 {
+        margin-right: 10px;
+      }
+
+      @media screen and (max-width: 576px) {
+        .page-report-details .card5 {
+          padding-inline: var(--margin-sm);
+          margin-inline: 0;
+        }
+      }
+
+      @container col-top (width < 562px) {
+        .row1 {
+          flex-direction: column;
+          align-items: center;
+          gap: 21px;
+        }
+        .row1 > * {
+          margin-right: unset !important;
+          text-align: center;
+        }
+        .row1 > .card2 {
+          width: 100%;
+        }
+      }
+
+      @container col-top (width < 469px) {
+        .row-bottom1 {
+          flex-direction: column;
+          align-items: center;
+          gap: 18px;
+        }
+        .row-bottom1 > * {
+          margin-right: unset !important;
+          margin-top: unset !important;
+          text-align: center;
+        }
+        .row-bottom1 > .card-left1 {
+          align-items: center;
+        }
+      }
+
+      @container col-bottom (width < 470px) {
+        .row-bottom2 {
+          flex-direction: column;
+          align-items: center;
+          gap: 20px;
+        }
+        .row-bottom2 > * {
+          text-align: center;
+        }
+      }
+
+      /* ============================================================
+   closing.css  (scoped to .page-closing)
+   ============================================================ */
+
+      .page-closing {
+        align-items: stretch;
+        padding-top: 17px;
+        flex: 1;
+        justify-content: stretch;
+      }
+
+      .page-closing .col1 {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        flex: 1;
+      }
+
+      .page-closing .col1 > .footer {
+        margin-top: auto;
+      }
+
+      .page-closing .col2 {
+        container: col2 / inline-size;
+        position: relative;
+        margin-left: -32px;
+        width: calc(100% - 32px);
+        max-width: 930px;
+        display: flex;
+        flex-direction: column;
+        align-self: center;
+        padding-top: 61px;
+        padding-bottom: 88px;
+      }
+
+      .page-closing .graphic1 {
+        position: absolute;
+        top: 0;
+        left: 40px;
+        width: 27px;
+        height: 521px;
+      }
+
+      .page-closing .row-top {
+        container: row-top / inline-size;
+        position: relative;
+        z-index: 3;
+        display: flex;
+        align-items: flex-start;
+        line-height: normal;
+      }
+
+      .page-closing .col3 {
+        width: 184px;
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+        color: #000;
+        font-size: 16px;
+        text-align: center;
+      }
+
+      .page-closing .card1 {
+        position: relative;
+        z-index: 2;
+        box-shadow: -2px 4px 4px 0px rgba(0, 0, 0, 0.25);
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        background-color: #efc8a1;
+        padding: 13px 22px 13px 17px;
+        border-radius: 24px 0;
+      }
+
+      .page-closing .card-group {
+        position: relative;
+        padding-right: 2px;
+        padding-bottom: 14px;
+      }
+
+      .page-closing .card-img1 {
+        position: absolute;
+        top: 6px;
+        left: 5px;
+        right: 0;
+        width: calc(100% - 5px);
+      }
+
+      .page-closing .card-graphic {
+        position: relative;
+        z-index: 1;
+        height: 75px;
+      }
+
+      .page-closing .card-text3 {
+        margin-left: 2px;
+        width: 118px;
+        align-self: center;
+      }
+
+      .page-closing .card2 {
+        margin-left: 25px;
+        display: flex;
+        align-items: flex-start;
+        gap: 11px;
+        background-color: #ede7db;
+        padding: 24px;
+        border-radius: 24px 0;
+      }
+
+      .page-closing .card-img2 {
+        width: 75px;
+        flex-shrink: 0;
+      }
+
+      .page-closing .col4 {
+        width: 189px;
+        align-items: stretch;
+      }
+
+      .page-closing .col4 .column-text4 {
+        margin-right: 10px;
+        align-self: unset;
+      }
+
+      .page-closing .row-bottom {
+        container: row-bottom / inline-size;
+        position: relative;
+        z-index: 4;
+        margin-left: 92px;
+        margin-top: -11px;
+        display: flex;
+        align-items: flex-start;
+        gap: 25px;
+      }
+
+      .page-closing .card-left {
+        width: 123px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+        color: #000;
+        text-align: center;
+        background-color: #ede7db;
+        padding: 8px 4px;
+        border-radius: 24px 0;
+      }
+
+      .page-closing .card-left-group {
+        position: relative;
+        width: 116px;
+        height: 108px;
+        flex-shrink: 0;
+        background: url(assets/closing/card-left-group.png) top left / cover
+          no-repeat;
+      }
+
+      .page-closing .card-left-img {
+        position: absolute;
+        top: 59px;
+        left: 0;
+        right: 0;
+        width: 100%;
+      }
+
+      .page-closing .card-left-text {
+        width: 75px;
+        color: unset;
+      }
+
+      .page-closing .card-left-text-bottom {
+        width: 95px;
+        font-size: 16px;
+        line-height: 1.125;
+      }
+
+      .page-closing .card3 {
+        margin-top: 33px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-grow: 1;
+        line-height: normal;
+        background-color: #ede7db;
+        padding: 30px 16px;
+        border-radius: 24px 0;
+      }
+
+      .page-closing .card-img3 {
+        width: 67px;
+        flex-shrink: 0;
+      }
+
+      .page-closing .card-col {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex-grow: 1;
+        text-align: left;
+      }
+
+      .page-closing .footer {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        align-self: stretch;
+        color: #000;
+        font-size: 12px;
+        line-height: normal;
+        background-color: #ede7db;
+        padding: 41px 36px 74px 28px;
+      }
+
+      .page-closing .footer-col {
+        width: 100%;
+        max-width: 880px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .page-closing .footer-text-top {
+        font-size: 16px;
+        font-family: "Montserrat";
+      }
+
+      @media screen and (max-width: 576px) {
+        .page-closing .col2 {
+          margin-inline: 0;
+        }
+        .page-closing .row-bottom {
+          margin-inline: var(--margin-md);
+        }
+        .page-closing .footer {
+          padding-inline: var(--margin-sm);
+        }
+      }
+
+      @media screen and (max-width: 480px) {
+        .page-closing .row-bottom {
+          margin-inline: var(--margin-sm);
+        }
+      }
+
+      @container row-top (width < 347px) {
+        .card2 {
+          margin-left: 0;
+          flex-direction: column;
+          align-items: center;
+          gap: 19px;
+        }
+        .card2 > * {
+          text-align: center;
+        }
+      }
+
+      @container col2 (width < 562px) {
+        .row-bottom {
+          margin-left: 0;
+          margin-right: 0;
+          flex-direction: column;
+          align-items: center;
+          gap: 23px;
+        }
+        .row-bottom > * {
+          margin-top: unset !important;
+          text-align: center;
+        }
+        .row-bottom > .card3 {
+          width: 100%;
+        }
+      }
+
+      @container row-bottom (width < 322px) {
+        .card3 {
+          flex-direction: column;
+          align-items: center;
+          gap: 16px;
+        }
+        .card3 > * {
+          text-align: center;
+        }
+        .card3 > .card-col {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ============================================================
+       Page 1: Cover
+       ============================================================ -->
+    <div class="page page-cover">
+      <img src="assets/cover/img.png" class="img" />
+
+      <div class="row">
+        <div class="col1">
+          <h1 class="title-bet-report">BET Report</h1>
+          <p class="text-a text1">Discover- Connect - Resolve - Lead</p>
+          <h2 class="subtitle-adinath-chitale">{{studentName}}</h2>
+          <p class="text-a text-std-3-i-jan">Grade {{studentGrade}}</p>
+          <div class="line-bottom"></div>
+        </div>
+
+        <div class="career">CAREER</div>
+      </div>
+      <div class="column-a">
+        <p class="column-text1">About the tool</p>
+        <p class="column-text2">
+          At Career-9, our mission is to lead students from confusion to clarity
+          through comprehensive, 360-degree handholding. We believe that an
+          early start is essential, which is why we focus on students in 3rd to
+          5th grade through our preventive and predictive segments. BET:
+          Discover is a scientifically valid system designed to measure what
+          truly matters—focus, emotion, collaboration, and
+          responsibility—alongside academic progress.<br />
+          As a parent, the results of this tool will guide you to nurture your
+          child's unique cognitive strengths, support their social-emotional
+          growth with data-backed insights, and create a supportive home
+          environment that fosters the 21st-century readiness they need to
+          flourish.<br />
+          <br />
+        </p>
+      </div>
+
+      <div class="column-a">
+        <p class="column-text1">Disclaimer:</p>
+        <p class="column-text2">
+          This report provides a snapshot of your child's current cognitive
+          behavioral readiness, including social insights and self-management
+          skills.<br />
+          Developmental Context: Children between 8 and 11 years old develop at
+          different speeds; these results reflect a single point in time.<br />
+          Guidance Only: This report is intended for career and educational
+          guidance. It should not be used as a medical or psychological
+          diagnosis.
+        </p>
+      </div>
+    </div>
+
+    <!-- ============================================================
+       Page 2: Report Details
+       ============================================================ -->
+    <div class="page page-report-details">
+      <div class="col1">
+        <object
+          data="assets/report-details/graphic1.svg"
+          class="graphic1"
+          type="image/svg+xml"
+        ></object>
+
+        <div class="col-top">
+          <div class="row1">
+            <div class="row-left">
+              <div class="rect-left1"></div>
+
+              <div class="col2">
+                <div class="card1">
+                  <img
+                    src="assets/report-details/card-img1.png"
+                    class="card-img1"
+                  />
+                  <p class="text-b card-text3">Cognitive Development</p>
+                </div>
+
+                <object
+                  data="assets/report-details/graphic2.svg"
+                  class="graphic"
+                  type="image/svg+xml"
+                ></object>
+              </div>
+            </div>
+
+            <div class="card2">
+              <img
+                src="assets/report-details/card-img2.png"
+                class="card-img2"
+              />
+
+              <div class="column-b col3">
+                <p class="column-text3">{{cognitive_1}}</p>
+                <p class="column-text4">
+                  {{cognitive_1_description}}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="row-bottom1">
+            <div class="card-left1">
+              <img
+                src="assets/report-details/card-left-img.png"
+                class="card-left-img"
+              />
+              <p class="card-left-text">Attentive</p>
+            </div>
+
+            <div class="card3">
+              <img
+                src="assets/report-details/card-img3.png"
+                class="card-img3"
+              />
+
+              <div class="column-b col4">
+                <p class="column-text3">{{cognitive_2}}</p>
+                <p class="column-text4">
+                  {{cognitive_2_description}}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-bottom">
+          <div class="row2">
+            <div class="rect"></div>
+
+            <div class="col5">
+              <div class="card4">
+                <img
+                  src="assets/report-details/card-img4.png"
+                  class="card-img4"
+                />
+                <p class="card-text4">SElf Management</p>
+              </div>
+
+              <object
+                data="assets/graphic.svg"
+                class="graphic"
+                type="image/svg+xml"
+              ></object>
+            </div>
+
+            <div class="card5">
+              <div class="column-b">
+                <p class="column-text3">{{self_management_1}}</p>
+                <p class="column-text4">
+                  {{self_management_1_description}}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="row-bottom2">
+            <div class="card card-left2">
+              <p class="card-text1">{{self_management_2}}</p>
+              <p class="card-text2">
+                {{self_management_2_description}}
+              </p>
+            </div>
+
+            <div class="card card-right">
+              <p class="card-text1">{{self_management_3}}</p>
+              <p class="card-text2">
+                {{self_management_3_description}}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+       Page 3: Closing
+       ============================================================ -->
+    <div class="page page-closing">
+      <div class="col1">
+        <div class="col2">
+          <object
+            data="assets/closing/graphic.svg"
+            class="graphic1"
+            type="image/svg+xml"
+          ></object>
+
+          <div class="row-top">
+            <div class="rect"></div>
+
+            <div class="col3">
+              <div class="card1">
+                <div class="card-group">
+                  <img src="assets/closing/card-img1.png" class="card-img1" />
+                  <object
+                    data="assets/closing/card-graphic.svg"
+                    class="card-graphic"
+                    type="image/svg+xml"
+                  ></object>
+                </div>
+
+                <p class="text-b card-text3">Social Development</p>
+              </div>
+
+              <object
+                data="assets/graphic.svg"
+                class="graphic"
+                type="image/svg+xml"
+              ></object>
+            </div>
+
+            <div class="card2">
+              <img src="assets/closing/card-img2.png" class="card-img2" />
+
+              <div class="column-b col4">
+                <p class="column-text3">Social Insight</p>
+                <p class="column-text4">
+                  In our cultural context, social "politeness" often involves
+                  indirect speech. We use these results to help your child
+                  navigate these subtle social rules with confidence. Your child
+                  is the " Mind Reader." He/She picks up on subtle hints and
+                  complex social layers.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="row-bottom">
+            <div class="card-left">
+              <div class="card-left-group">
+                <img
+                  src="assets/closing/card-left-img.png"
+                  class="card-left-img"
+                />
+              </div>
+
+              <p class="card-left-text text-dark">36 %</p>
+              <p class="card-left-text-bottom">Environmental Awareness</p>
+            </div>
+
+            <div class="card3">
+              <img src="assets/closing/card-img3.png" class="card-img3" />
+
+              <div class="card-col">
+                <p class="text-black">Values</p>
+                <p class="text-dark">
+                  [Value 1], [Value 2], and [Value 3]. <br />
+                  As primary motivators, supporting these specific values
+                  nurtures your child's confidence, emotional growth, and
+                  ability to build empathetic connections.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <footer class="footer">
+          <div class="footer-col">
+            <p class="footer-text-top">Contact Us</p>
+            <p class="footer-text">
+              We recommend discussing these results with your child's School
+              Counsellor/Career-9 Certified Counsellor to create a supportive
+              environment for their growth.
+            </p>
+            <p class="footer-text">Find us at: www.Career-9.com</p>
+          </div>
+        </footer>
+      </div>
+    </div>
+  </body>
+</html>
