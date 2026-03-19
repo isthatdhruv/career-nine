@@ -76,6 +76,12 @@ public class BetReportData implements Serializable {
     @Column(name = "social_insight", columnDefinition = "TEXT")
     private String socialInsight;
 
+    @Column(name = "report_status", nullable = false)
+    private String reportStatus = "notGenerated";
+
+    @Column(name = "report_url")
+    private String reportUrl;
+
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "created_at", updatable = false)
     private Date createdAt;
@@ -233,6 +239,22 @@ public class BetReportData implements Serializable {
         this.socialInsight = socialInsight;
     }
 
+    public String getReportStatus() {
+        return reportStatus;
+    }
+
+    public void setReportStatus(String reportStatus) {
+        this.reportStatus = reportStatus;
+    }
+
+    public String getReportUrl() {
+        return reportUrl;
+    }
+
+    public void setReportUrl(String reportUrl) {
+        this.reportUrl = reportUrl;
+    }
+
     public Date getCreatedAt() {
         return createdAt;
     }
@@ -240,7 +262,5 @@ public class BetReportData implements Serializable {
     public void setCreatedAt(Date createdAt) {
         this.createdAt = createdAt;
     }
-
-    
 
 }

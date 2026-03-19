@@ -231,6 +231,11 @@ const ReportGenerationPage: React.FC = () => {
 
   const ready = selectedInstitute !== "" && selectedAssessment !== "";
 
+  const visibleSelectedCount = useMemo(() => {
+    const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
+    return Array.from(selectedStudentIds).filter((id) => visibleIds.has(id)).length;
+  }, [selectedStudentIds, displayedStudents]);
+
   // ═══════════════════════ STYLES ═══════════════════════
 
   const thStyle: React.CSSProperties = {
@@ -462,17 +467,19 @@ const ReportGenerationPage: React.FC = () => {
               }}>
                 <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
                   {displayedStudents.length} student(s)
-                  {selectedStudentIds.size > 0 && (
+                  {visibleSelectedCount > 0 && (
                     <span style={{ fontWeight: 600, color: "#4361ee", marginLeft: 8 }}>
-                      ({selectedStudentIds.size} selected)
+                      ({visibleSelectedCount} selected)
                     </span>
                   )}
                 </span>
                 <button
                   className="btn btn-sm btn-primary"
                   onClick={async () => {
-                    const ids = selectedStudentIds.size > 0
-                      ? Array.from(selectedStudentIds)
+                    const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
+                    const selectedVisible = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
+                    const ids = selectedVisible.length > 0
+                      ? selectedVisible
                       : displayedStudents.map((s) => s.userStudentId);
                     setGenerating(true);
                     try {
@@ -494,8 +501,8 @@ const ReportGenerationPage: React.FC = () => {
                   {generating ? "Generating..." : (
                     <>
                       Generate Report Data & Save
-                      {selectedStudentIds.size > 0
-                        ? ` (${selectedStudentIds.size} selected)`
+                      {visibleSelectedCount > 0
+                        ? ` (${visibleSelectedCount} selected)`
                         : ` (All ${displayedStudents.length})`}
                     </>
                   )}

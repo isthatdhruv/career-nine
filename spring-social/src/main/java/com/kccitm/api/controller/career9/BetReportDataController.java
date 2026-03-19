@@ -1,6 +1,7 @@
 package com.kccitm.api.controller.career9;
 
 import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -27,22 +28,29 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.model.career9.AssessmentQuestionOptions;
 import com.kccitm.api.model.career9.AssessmentRawScore;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.BetReportData;
+import com.kccitm.api.model.career9.MeasuredQualityTypes;
 import com.kccitm.api.model.career9.OptionScoreBasedOnMEasuredQualityTypes;
 import com.kccitm.api.model.career9.Questionaire.AssessmentAnswer;
+import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.school.SchoolSections;
 import com.kccitm.api.repository.AssessmentRawScoreRepository;
 import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
+import com.kccitm.api.repository.Career9.AssessmentQuestionOptionsRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.BetReportDataRepository;
+import com.kccitm.api.repository.Career9.MeasuredQualityTypesRepository;
+import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.Career9.School.SchoolSectionsRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
+import com.kccitm.api.service.DigitalOceanSpacesService;
 import com.kccitm.api.service.FirebaseService;
 
 @RestController
@@ -64,7 +72,11 @@ public class BetReportDataController {
     @Autowired private AssessmentAnswerRepository assessmentAnswerRepository;
     @Autowired private AssessmentRawScoreRepository assessmentRawScoreRepository;
     @Autowired private SchoolSectionsRepository schoolSectionsRepository;
+    @Autowired private MeasuredQualityTypesRepository measuredQualityTypesRepository;
+    @Autowired private AssessmentQuestionOptionsRepository assessmentQuestionOptionsRepository;
+    @Autowired private QuestionnaireQuestionRepository questionnaireQuestionRepository;
     @Autowired private FirebaseService firebaseService;
+    @Autowired private DigitalOceanSpacesService digitalOceanSpacesService;
 
     // ═══════════════════════ CRUD ═══════════════════════
 
@@ -368,8 +380,7 @@ public class BetReportDataController {
         String[] cognitive = computeCognitive(userStudentId);
 
         // Upsert
-        betReportDataRepository.findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
-                .ifPresent(existing -> betReportDataRepository.delete(existing));
+        betReportDataRepository.deleteByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
 
         BetReportData report = new BetReportData();
         report.setUserStudent(us);
@@ -397,34 +408,476 @@ public class BetReportDataController {
 
     private String computeSelfEfficacyLive(Map<Long, Integer> scores) {
         int score = scores.getOrDefault(MQT_ID_SELF_EFFICACY, 0);
-        if (score < 11) return "";
-        else if (score <= 14) return "Your child often doubts their abilities and may want to give up quickly because they worry they aren't \"naturally good\" at a task.";
+        // Fallback to lowest tier if below threshold (no blanks)
+        if (score <= 14) return "Your child often doubts their abilities and may want to give up quickly because they worry they aren't \"naturally good\" at a task.";
         else if (score <= 18) return "Your child feels confident with things they already know but might need a little extra encouragement to try something brand new or difficult.";
         else return "Your child has a \"can-do\" attitude, seeing mistakes as a natural part of learning and staying determined even when a task gets tough";
     }
 
     private String computeSelfRegulationLive(Map<Long, Integer> scores) {
         int score = scores.getOrDefault(MQT_ID_SELF_MANAGEMENT, 0);
-        if (score < 9) return "";
-        else if (score <= 11) return "Your child finds it difficult to manage impulses or stay quiet when asked, often needing an adult's help to stay organized and finish tasks.";
+        if (score <= 11) return "Your child finds it difficult to manage impulses or stay quiet when asked, often needing an adult's help to stay organized and finish tasks.";
         else if (score <= 15) return "Your child generally follows rules well but can get distracted or impulsive when they are very excited or in a noisy environment.";
         else return "Your child shows great independence, staying focused on their work even if it's a bit boring and waiting patiently for their turn.";
     }
 
     private String computeEmotionRegulationLive(Map<Long, Integer> scores) {
         int score = scores.getOrDefault(MQT_ID_EMOTION_REGULATION, 0);
-        if (score < 7) return "";
-        else if (score <= 9) return "Your child often feels overwhelmed by \"big\" feelings like anger or worry and may find it hard to explain exactly why they are upset.";
+        if (score <= 9) return "Your child often feels overwhelmed by \"big\" feelings like anger or worry and may find it hard to explain exactly why they are upset.";
         else if (score <= 12) return "Your child handles daily emotions well but may struggle to stay calm during high-pressure moments, like a big school test or a lost game.";
         else return "Your child is very aware of their emotions, knows how to cheer themselves up when sad, and shows a kind understanding of why friends might be upset.";
     }
 
     private String computeSocialInsightLive(Map<Long, Integer> scores) {
         int score = scores.getOrDefault(MQT_ID_SOCIAL_INSIGHT, 0);
-        if (score < 0) return "";
-        else if (score <= 6) return "In our cultural context, social \"politeness\" often involves indirect speech. We use these results to help your child navigate these subtle social rules with confidence. Your child is the \"Literal Thinker.\" He/She may find sarcasm or \"polite lies\" confusing.";
+        if (score <= 6) return "In our cultural context, social \"politeness\" often involves indirect speech. We use these results to help your child navigate these subtle social rules with confidence. Your child is the \"Literal Thinker.\" He/She may find sarcasm or \"polite lies\" confusing.";
         else if (score <= 12) return "In our cultural context, social \"politeness\" often involves indirect speech. We use these results to help your child navigate these subtle social rules with confidence. Your child is the \"Social Detective.\" He/She can tell the difference between mistakes and mean intent.";
         else return "In our cultural context, social \"politeness\" often involves indirect speech. We use these results to help your child navigate these subtle social rules with confidence. Your child is the \"Mind Reader.\" He/She picks up on subtle hints and complex social layers.";
+    }
+
+    // ═══════════════════════ GENERATE HTML REPORTS ═══════════════════════
+
+    /**
+     * POST /bet-report-data/generate-reports
+     * Body: { "assessmentId": 123, "userStudentIds": [1, 2, 3] }
+     *
+     * For each student: reads bet_report_data, fills the combined.html template,
+     * uploads to DigitalOcean Spaces, and updates reportStatus/reportUrl.
+     */
+    @PostMapping("/generate-reports")
+    @Transactional
+    public ResponseEntity<?> generateHtmlReports(@RequestBody Map<String, Object> request) {
+        try {
+            if (!request.containsKey("assessmentId") || !request.containsKey("userStudentIds")) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "assessmentId and userStudentIds are required"));
+            }
+            Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+            @SuppressWarnings("unchecked")
+            List<Number> idList = (List<Number>) request.get("userStudentIds");
+
+            // Read the HTML template
+            String template = loadHtmlTemplate();
+            if (template == null) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(Map.of("error", "Could not load HTML template"));
+            }
+
+            List<Map<String, Object>> results = new ArrayList<>();
+            List<Map<String, Object>> errors = new ArrayList<>();
+
+            for (Number idNum : idList) {
+                Long userStudentId = idNum.longValue();
+                try {
+                    Optional<BetReportData> reportOpt = betReportDataRepository
+                            .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+                    if (reportOpt.isEmpty()) {
+                        errors.add(Map.of("userStudentId", userStudentId,
+                                "reason", "No report data found. Generate report data first."));
+                        continue;
+                    }
+
+                    BetReportData report = reportOpt.get();
+
+                    // Fill template with report data
+                    String filledHtml = fillTemplate(template, report);
+
+                    // Upload to DigitalOcean Spaces
+                    String safeName = (report.getStudentName() != null ? report.getStudentName() : "student")
+                            .replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
+                    String fileName = safeName + "_" + userStudentId + "_bet_report.html";
+                    String folder = "bet-reports/assessment-" + assessmentId;
+
+                    String reportUrl = digitalOceanSpacesService.uploadBytes(
+                            filledHtml.getBytes(StandardCharsets.UTF_8),
+                            "text/html",
+                            folder,
+                            fileName
+                    );
+
+                    // Update report status
+                    report.setReportStatus("generated");
+                    report.setReportUrl(reportUrl);
+                    betReportDataRepository.save(report);
+
+                    results.add(Map.of(
+                            "userStudentId", userStudentId,
+                            "studentName", safe(report.getStudentName()),
+                            "reportUrl", reportUrl
+                    ));
+                } catch (Exception e) {
+                    errors.add(Map.of("userStudentId", userStudentId,
+                            "reason", e.getMessage()));
+                }
+            }
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("generated", results.size());
+            response.put("errors", errors);
+            response.put("reports", results);
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to generate reports: " + e.getMessage()));
+        }
+    }
+
+    // ═══════════════════════ UPLOAD TEMPLATE ASSETS TO DO SPACES ═══════════════════════
+
+    /**
+     * POST /bet-report-data/upload-template-assets
+     *
+     * One-time operation: reads all template assets from classpath (bet-template/assets/*)
+     * and uploads them to DigitalOcean Spaces under bet-template-assets/.
+     */
+    @PostMapping("/upload-template-assets")
+    public ResponseEntity<?> uploadTemplateAssets() {
+        try {
+            String[] assetPaths = {
+                "assets/cover/img.png",
+                "assets/cover/col.png",
+                "assets/cover/career.png",
+                "assets/report-details/card-img1.png",
+                "assets/report-details/card-img2.png",
+                "assets/report-details/card-img3.png",
+                "assets/report-details/card-img4.png",
+                "assets/report-details/card-left-img.png",
+                "assets/report-details/graphic1.svg",
+                "assets/report-details/graphic2.svg",
+                "assets/closing/card-img1.png",
+                "assets/closing/card-img2.png",
+                "assets/closing/card-img3.png",
+                "assets/closing/card-left-img.png",
+                "assets/closing/card-left-group.png",
+                "assets/closing/graphic.svg",
+                "assets/closing/card-graphic.svg",
+                "assets/graphic.svg",
+                "assets/cog-2-assets/attentive.png",
+                "assets/cog-2-assets/distracted.png",
+                "assets/cog-2-assets/inattentive.png",
+                "assets/cog-2-assets/inconsistent.png",
+                "assets/cog-2-assets/detached.png",
+                "assets/cog-2-assets/vigilant.png",
+            };
+
+            List<String> uploaded = new ArrayList<>();
+            List<String> failed = new ArrayList<>();
+
+            for (String assetPath : assetPaths) {
+                try {
+                    var is = getClass().getClassLoader()
+                            .getResourceAsStream("bet-template/" + assetPath);
+                    if (is == null) {
+                        failed.add(assetPath + " (not found in classpath)");
+                        continue;
+                    }
+                    byte[] bytes = is.readAllBytes();
+                    is.close();
+
+                    String contentType = guessContentType(assetPath);
+                    String fileName = assetPath.substring(assetPath.lastIndexOf('/') + 1);
+                    String folder = "bet-template-assets/" + assetPath.substring(0, assetPath.lastIndexOf('/'));
+
+                    digitalOceanSpacesService.uploadBytes(bytes, contentType, folder, fileName);
+                    uploaded.add(assetPath);
+                } catch (Exception e) {
+                    failed.add(assetPath + " (" + e.getMessage() + ")");
+                }
+            }
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("uploaded", uploaded.size());
+            response.put("failed", failed);
+            response.put("uploadedFiles", uploaded);
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Asset upload failed: " + e.getMessage()));
+        }
+    }
+
+    private String guessContentType(String path) {
+        if (path.endsWith(".png")) return "image/png";
+        if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg";
+        if (path.endsWith(".svg")) return "image/svg+xml";
+        if (path.endsWith(".gif")) return "image/gif";
+        if (path.endsWith(".ttf")) return "font/ttf";
+        if (path.endsWith(".woff")) return "font/woff";
+        if (path.endsWith(".woff2")) return "font/woff2";
+        return "application/octet-stream";
+    }
+
+    // ═══════════════════════ TEMPLATE HELPERS ═══════════════════════
+
+    private String loadHtmlTemplate() {
+        try {
+            var is = getClass().getClassLoader().getResourceAsStream("bet-template/combined.html");
+            if (is != null) {
+                String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                is.close();
+                return content;
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to read template from classpath: " + e.getMessage());
+        }
+        return null;
+    }
+
+    private String fillTemplate(String template, BetReportData r) {
+        // Asset base URL on DO Spaces (uploaded separately)
+        String assetBase = "https://storage-c9.sgp1.digitaloceanspaces.com/bet-template-assets";
+
+        String html = template;
+
+        // Replace student info
+        html = html.replace("{{studentName}}", safe(r.getStudentName()));
+        html = html.replace("{{studentGrade}}", safe(r.getStudentGrade()));
+
+        // Cognitive fields
+        // cog1 contains the full flexibility description
+        html = html.replace("{{cog1}}", safe(r.getCog1()));
+
+        // cog2 is the attention category (e.g., "Attentive", "Distracted")
+        // The image src uses {{cog2}}.png pattern — build absolute URL directly
+        String attentionCategory = safe(r.getCog2()).toLowerCase();
+        html = html.replace("{{cog2}}.png", assetBase + "/assets/cog-2-assets/" + attentionCategory + ".png");
+        html = html.replace("{{cog_2_label}}", safe(r.getCog2()));
+
+        // cog3 is working memory category, cog3Description is the interpretation
+        html = html.replace("{{cog_3}}", safe(r.getCog3()));
+        html = html.replace("{{cognitive_3_description}}", safe(r.getCog3Description()));
+
+        // Self management
+        html = html.replace("{{self_management_1}}", safe(r.getSelfManagement1()));
+        html = html.replace("{{self_management_2}}", safe(r.getSelfManagement2()));
+        html = html.replace("{{self_management_3}}", safe(r.getSelfManagement3()));
+
+        // Social insight
+        html = html.replace("{{social_insight}}", safe(r.getSocialInsight()));
+
+        // Environment
+        html = html.replace("{{environment}}", safe(r.getEnvironment()));
+
+        // Values
+        html = html.replace("{{value_overview}}", safe(r.getValueOverview()));
+
+        // Replace relative asset paths with absolute DO Spaces URLs
+        html = html.replace("src=\"assets/", "src=\"" + assetBase + "/assets/");
+        html = html.replace("data=\"assets/", "data=\"" + assetBase + "/assets/");
+        html = html.replace("url(assets/", "url(" + assetBase + "/assets/");
+        html = html.replace("url(fonts/", "url(" + assetBase + "/fonts/");
+
+        return html;
+    }
+
+    // ═══════════════════════ FILL MISSING RANKING ANSWERS ═══════════════════════
+
+    /**
+     * POST /bet-report-data/fill-missing-ranks
+     * Body: { "assessmentId": 5, "questionnaireQuestionId": 40, "valueOptionIds": [272,...,280], "maxRanks": 3 }
+     *
+     * For each completed student in this assessment who has entries in assessment_answer:
+     * - Checks which ranks (1..maxRanks) they already have for this question
+     * - For missing ranks, randomly picks from unused value options and inserts answers
+     */
+    @PostMapping("/fill-missing-ranks")
+    @Transactional
+    public ResponseEntity<?> fillMissingRanks(@RequestBody Map<String, Object> request) {
+        try {
+            Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+            Long qqId = ((Number) request.get("questionnaireQuestionId")).longValue();
+            @SuppressWarnings("unchecked")
+            List<Number> optIdNums = (List<Number>) request.get("valueOptionIds");
+            int maxRanks = request.containsKey("maxRanks") ? ((Number) request.get("maxRanks")).intValue() : 3;
+
+            List<Long> allValueOptionIds = new ArrayList<>();
+            for (Number n : optIdNums) allValueOptionIds.add(n.longValue());
+
+            // Load entities once
+            AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
+                    .orElseThrow(() -> new RuntimeException("Assessment not found"));
+            QuestionnaireQuestion qq = questionnaireQuestionRepository.findById(qqId)
+                    .orElseThrow(() -> new RuntimeException("QuestionnaireQuestion not found"));
+
+            Map<Long, AssessmentQuestionOptions> optionCache = new HashMap<>();
+            for (Long optId : allValueOptionIds) {
+                assessmentQuestionOptionsRepository.findById(optId)
+                        .ifPresent(opt -> optionCache.put(optId, opt));
+            }
+
+            // Get all completed mappings
+            List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
+                    .findAllByAssessmentId(assessmentId);
+
+            int studentsProcessed = 0;
+            int answersInserted = 0;
+            List<Map<String, Object>> details = new ArrayList<>();
+
+            for (StudentAssessmentMapping mapping : mappings) {
+                if (!"completed".equals(mapping.getStatus())) continue;
+
+                Long userStudentId = mapping.getUserStudent().getUserStudentId();
+                UserStudent us = mapping.getUserStudent();
+
+                // Check this student has ANY answers (only process those with entries)
+                var allAnswers = assessmentAnswerRepository
+                        .findByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
+                if (allAnswers == null || allAnswers.isEmpty()) continue;
+
+                // Find existing ranking answers for this question
+                java.util.Set<Integer> existingRanks = new java.util.HashSet<>();
+                java.util.Set<Long> usedOptionIds = new java.util.HashSet<>();
+                for (var aa : allAnswers) {
+                    if (aa.getRankOrder() != null && aa.getQuestionnaireQuestion() != null
+                            && aa.getQuestionnaireQuestion().getQuestionnaireQuestionId().equals(qqId)) {
+                        existingRanks.add(aa.getRankOrder());
+                        var opt = aa.getOption() != null ? aa.getOption() : aa.getMappedOption();
+                        if (opt != null) usedOptionIds.add(opt.getOptionId());
+                    }
+                }
+
+                // Find missing ranks
+                List<Integer> missingRanks = new ArrayList<>();
+                for (int r = 1; r <= maxRanks; r++) {
+                    if (!existingRanks.contains(r)) missingRanks.add(r);
+                }
+                if (missingRanks.isEmpty()) continue;
+
+                // Available options (not already used by this student)
+                List<Long> available = new ArrayList<>();
+                for (Long optId : allValueOptionIds) {
+                    if (!usedOptionIds.contains(optId)) available.add(optId);
+                }
+                java.util.Collections.shuffle(available);
+
+                int filled = 0;
+                for (int i = 0; i < missingRanks.size() && i < available.size(); i++) {
+                    Long optId = available.get(i);
+                    AssessmentQuestionOptions opt = optionCache.get(optId);
+                    if (opt == null) continue;
+
+                    AssessmentAnswer newAnswer = new AssessmentAnswer();
+                    newAnswer.setUserStudent(us);
+                    newAnswer.setAssessment(assessment);
+                    newAnswer.setQuestionnaireQuestion(qq);
+                    newAnswer.setOption(opt);
+                    newAnswer.setRankOrder(missingRanks.get(i));
+                    assessmentAnswerRepository.save(newAnswer);
+                    filled++;
+                    answersInserted++;
+                }
+
+                studentsProcessed++;
+                details.add(Map.of(
+                        "userStudentId", userStudentId,
+                        "existingRanks", existingRanks.toString(),
+                        "filledRanks", missingRanks.subList(0, Math.min(filled, missingRanks.size())).toString()
+                ));
+            }
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("studentsProcessed", studentsProcessed);
+            response.put("answersInserted", answersInserted);
+            response.put("details", details);
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Fill missing ranks failed: " + e.getMessage()));
+        }
+    }
+
+    // ═══════════════════════ RECALCULATE RAW SCORES ═══════════════════════
+
+    /**
+     * POST /bet-report-data/recalculate-raw-scores
+     * Body: { "assessmentId": 123 }
+     *
+     * For every completed student mapping in this assessment:
+     * - Fetches answers with option scores
+     * - Recalculates raw score per MQT (deduped: first score per MQT per answer)
+     * - Deletes old assessment_raw_score rows and saves fresh ones
+     */
+    @PostMapping("/recalculate-raw-scores")
+    @Transactional
+    public ResponseEntity<?> recalculateRawScores(@RequestBody Map<String, Object> request) {
+        try {
+            if (!request.containsKey("assessmentId")) {
+                return ResponseEntity.badRequest().body(Map.of("error", "assessmentId is required"));
+            }
+            Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+
+            List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
+                    .findAllByAssessmentId(assessmentId);
+
+            int updated = 0;
+            List<Map<String, Object>> errors = new ArrayList<>();
+
+            for (StudentAssessmentMapping mapping : mappings) {
+                if (!"completed".equals(mapping.getStatus())) continue;
+
+                Long userStudentId = mapping.getUserStudent().getUserStudentId();
+                Long mappingId = mapping.getStudentAssessmentId();
+
+                try {
+                    // Fetch answers with full option score details
+                    var answers = assessmentAnswerRepository
+                            .findByUserStudentIdAndAssessmentIdWithDetails(userStudentId, assessmentId);
+
+                    // Calculate live raw scores: dedup per MQT per answer
+                    Map<Long, Integer> liveScores = new HashMap<>();
+                    for (AssessmentAnswer aa : answers) {
+                        var option = aa.getOption() != null ? aa.getOption() : aa.getMappedOption();
+                        if (option == null || option.getOptionScores() == null) continue;
+
+                        java.util.Set<Long> seenMqts = new java.util.HashSet<>();
+                        for (OptionScoreBasedOnMEasuredQualityTypes os : option.getOptionScores()) {
+                            if (os.getMeasuredQualityType() != null && os.getScore() != null) {
+                                long mqtId = os.getMeasuredQualityType().getMeasuredQualityTypeId();
+                                if (seenMqts.add(mqtId)) {
+                                    liveScores.merge(mqtId, os.getScore(), Integer::sum);
+                                }
+                            }
+                        }
+                    }
+
+                    // Delete old raw scores for this mapping
+                    assessmentRawScoreRepository.deleteByStudentAssessmentMappingStudentAssessmentId(mappingId);
+
+                    // Save fresh raw scores
+                    for (Map.Entry<Long, Integer> entry : liveScores.entrySet()) {
+                        Long mqtId = entry.getKey();
+                        Integer score = entry.getValue();
+
+                        MeasuredQualityTypes mqt = measuredQualityTypesRepository.findById(mqtId).orElse(null);
+                        if (mqt == null) continue;
+
+                        AssessmentRawScore rawScore = new AssessmentRawScore();
+                        rawScore.setStudentAssessmentMapping(mapping);
+                        rawScore.setMeasuredQualityType(mqt);
+                        rawScore.setMeasuredQuality(mqt.getMeasuredQuality());
+                        rawScore.setRawScore(score);
+                        assessmentRawScoreRepository.save(rawScore);
+                    }
+
+                    updated++;
+                } catch (Exception e) {
+                    errors.add(Map.of("userStudentId", userStudentId, "reason", e.getMessage()));
+                }
+            }
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("updated", updated);
+            response.put("totalMappings", mappings.size());
+            response.put("errors", errors);
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Recalculation failed: " + e.getMessage()));
+        }
     }
 
     // ═══════════════════════ CORE LOGIC ═══════════════════════
@@ -480,8 +933,7 @@ public class BetReportDataController {
         String[] cognitive = computeCognitive(userStudentId);
 
         // 10. Upsert: delete existing then save new
-        betReportDataRepository.findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
-                .ifPresent(existing -> betReportDataRepository.delete(existing));
+        betReportDataRepository.deleteByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
 
         BetReportData report = new BetReportData();
         report.setUserStudent(us);
@@ -518,33 +970,29 @@ public class BetReportDataController {
 
     private String computeSelfEfficacy(List<AssessmentRawScore> rawScores) {
         int score = findRawScore(rawScores, MQT_ID_SELF_EFFICACY);
-        if(score<11) return "";
-        else if (score>=11 && score<=14) return "Your child often doubts their abilities and may want to give up quickly because they worry they aren't \"naturally good\" at a task.";
-        else if (score>=15 && score<=18) return "Your child feels confident with things they already know but might need a little extra encouragement to try something brand new or difficult.";
+        if (score <= 14) return "Your child often doubts their abilities and may want to give up quickly because they worry they aren’t \"naturally good\" at a task.";
+        else if (score <= 18) return "Your child feels confident with things they already know but might need a little extra encouragement to try something brand new or difficult.";
         else return "Your child has a \"can-do\" attitude, seeing mistakes as a natural part of learning and staying determined even when a task gets tough";
     }
 
     private String computeSelfRegulation(List<AssessmentRawScore> rawScores) {
         int score = findRawScore(rawScores, MQT_ID_SELF_MANAGEMENT);
-        if (score < 9) return "";
-        else if (score >= 9 && score <= 11) return "Your child finds it difficult to manage impulses or stay quiet when asked, often needing an adult’s help to stay organized and finish tasks.";
-        else if (score >= 12 && score <= 15) return "Your child generally follows rules well but can get distracted or impulsive when they are very excited or in a noisy environment.";
+        if (score <= 11) return "Your child finds it difficult to manage impulses or stay quiet when asked, often needing an adult’s help to stay organized and finish tasks.";
+        else if (score <= 15) return "Your child generally follows rules well but can get distracted or impulsive when they are very excited or in a noisy environment.";
         else return "Your child shows great independence, staying focused on their work even if it’s a bit boring and waiting patiently for their turn.";
     }
 
     private String computeEmotionRegulation(List<AssessmentRawScore> rawScores) {
         int score = findRawScore(rawScores, MQT_ID_EMOTION_REGULATION);
-        if (score < 7) return "";
-        else if (score >= 7 && score <= 9) return "Your child often feels overwhelmed by \"big\" feelings like anger or worry and may find it hard to explain exactly why they are upset.";
-        else if (score >= 10 && score <= 12) return "Your child handles daily emotions well but may struggle to stay calm during high-pressure moments, like a big school test or a lost game.";
+        if (score <= 9) return "Your child often feels overwhelmed by \"big\" feelings like anger or worry and may find it hard to explain exactly why they are upset.";
+        else if (score <= 12) return "Your child handles daily emotions well but may struggle to stay calm during high-pressure moments, like a big school test or a lost game.";
         else return "Your child is very aware of their emotions, knows how to cheer themselves up when sad, and shows a kind understanding of why friends might be upset.";
     }
 
     private String computeSocialInsight(List<AssessmentRawScore> rawScores) {
         int score = findRawScore(rawScores, MQT_ID_SOCIAL_INSIGHT);
-        if (score < 0) return "";
-        else if (score >= 0 && score <= 6) return "In our cultural context, social \"politeness\" often involves indirect speech. We use these results to help your child navigate these subtle social rules with confidence. Your child is the \"Literal Thinker.\" He/She may find sarcasm or \"polite lies\" confusing.";
-        else if (score >= 7 && score <= 12) return "In our cultural context, social \"politeness\" often involves indirect speech. We use these results to help your child navigate these subtle social rules with confidence. Your child is the \"Social Detective.\" He/She can tell the difference between mistakes and mean intent.";
+        if (score <= 6) return "In our cultural context, social \"politeness\" often involves indirect speech. We use these results to help your child navigate these subtle social rules with confidence. Your child is the \"Literal Thinker.\" He/She may find sarcasm or \"polite lies\" confusing.";
+        else if (score <= 12) return "In our cultural context, social \"politeness\" often involves indirect speech. We use these results to help your child navigate these subtle social rules with confidence. Your child is the \"Social Detective.\" He/She can tell the difference between mistakes and mean intent.";
         else return "In our cultural context, social \"politeness\" often involves indirect speech. We use these results to help your child navigate these subtle social rules with confidence. Your child is the \"Mind Reader.\" He/She picks up on subtle hints and complex social layers.";
     }
 
@@ -610,7 +1058,13 @@ public class BetReportDataController {
     private String[] computeCognitive(Long userStudentId) {
         // cog1 = cognitive flexibility style, cog2 = attention category,
         // cog3 = working memory category, cog3_desc = working memory interpretation
-        String[] result = {"", "", "", ""};
+        // Defaults: lowest-tier interpretations if no game data
+        String[] result = {
+            "Trial-and-Error Learning: Your child is highly persistent but may be feeling overwhelmed. They use physical action (tapping) to solve what they can't yet visualize.\n Visual Mapping: Teach them to 'scratchpad' a problem. Drawing out the puzzle on paper helps move thinking from impulsive tapping to visual planning.",
+            "Distracted",
+            "Unitary",
+            "You are a 'Careful Processor.' You take your time to make sure things are right, but because your 'mental post-it note' is a bit small, you might feel overwhelmed if too much info comes at once.\n Chunk it up. Ask teachers to give you instructions one step at a time. Instead of trying to remember a whole paragraph, focus on one sentence, finish it, and then move to the next."
+        };
         try {
             Map<String, Object> gameData = firebaseService.getDocument("game_results",
                     String.valueOf(userStudentId));
@@ -677,9 +1131,9 @@ public class BetReportDataController {
     // ── Cognitive classification functions (mirror frontend logic) ──
 
     private String getCognitiveFlexibilityStyle(double time, double aimlessClicks) {
-        if (time < 75 && aimlessClicks <= 2) return "High Mental Efficiency: Your child quickly visualizes the solution and executes it with precision. They have strong working memory.\n Challenge Them: Provide multi- step projects like robotics, coding, or strategy games (Chess) that require long-term planning.";
-        if (time < 75 && aimlessClicks >= 2) return "Impulsive Agility: Your child has a quick mind but acts before a plan is formed. They rely on speed rather than strategy, leading to 'hurried' logic.\n The 'Pause' Rule: Ask them to 'explain the first two moves' out loud before they touch the screen. This builds the habit of thinking before acting.";
-        if (time >= 75 && aimlessClicks <= 2) return "Careful Accuracy: Your child prioritizes being 'correct' over 'fast.' They are internalizing the logic and double-checking their mental map.\n Build Fluency: Use timed 'fun' challenges with low stakes (like 'Beat the Clock' math) to reduce perfectionism and build confidence in quick thinking.";
+        if (time < 90 && aimlessClicks < 2) return "High Mental Efficiency: Your child quickly visualizes the solution and executes it with precision. They have strong working memory.\n Challenge Them: Provide multi- step projects like robotics, coding, or strategy games (Chess) that require long-term planning.";
+        if (time < 90 && aimlessClicks >= 2) return "Impulsive Agility: Your child has a quick mind but acts before a plan is formed. They rely on speed rather than strategy, leading to 'hurried' logic.\n The 'Pause' Rule: Ask them to 'explain the first two moves' out loud before they touch the screen. This builds the habit of thinking before acting.";
+        if (time >= 90 && aimlessClicks < 2) return "Careful Accuracy: Your child prioritizes being 'correct' over 'fast.' They are internalizing the logic and double-checking their mental map.\n Build Fluency: Use timed 'fun' challenges with low stakes (like 'Beat the Clock' math) to reduce perfectionism and build confidence in quick thinking.";
         return "Trial-and-Error Learning: Your child is highly persistent but may be feeling overwhelmed. They use physical action (tapping) to solve what they can't yet visualize.\n Visual Mapping: Teach them to 'scratchpad' a problem. Drawing out the puzzle on paper helps move thinking from impulsive tapping to visual planning.";
     }
 

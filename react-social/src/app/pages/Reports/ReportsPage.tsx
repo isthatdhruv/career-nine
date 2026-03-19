@@ -1,520 +1,777 @@
-import React, { useState, useEffect } from "react";
-import { ReadCollegeData } from "../College/API/College_APIs";
-import { getAllAssessments, getBetReport, BetReportResponse, exportScoresByInstitute } from "../StudentInformation/StudentInfo_APIs";
+import React, { useState, useEffect, useMemo } from "react";
+import { ReadCollegeList, GetSessionsByInstituteCode } from "../College/API/College_APIs";
+import {
+  getAllAssessments,
+  getStudentsWithMappingByInstituteId,
+  Assessment,
+} from "../StudentInformation/StudentInfo_APIs";
+import {
+  getBetReportDataByAssessment,
+  generateHtmlReports,
+  BetReportData,
+} from "../ReportGeneration/API/BetReportData_APIs";
 
-interface Institute {
-  instituteCode: number;
-  instituteName: string;
-}
+type StudentRow = {
+  userStudentId: number;
+  name: string;
+  username?: string;
+  schoolRollNumber?: string;
+  controlNumber?: number;
+  phoneNumber?: string;
+  studentDob?: string;
+  schoolSectionId?: number;
+  assessments?: { assessmentId: number; assessmentName: string; status: string }[];
+  assignedAssessmentIds?: number[];
+};
 
-interface AssessmentFull {
-  id: number;
-  assessmentName: string;
-  isActive?: boolean;
-  questionnaire?: {
-    questionnaireId: number;
-    name: string;
-    type: boolean | null;
-  };
-}
+type SectionInfo = { className: string; sectionName: string };
+type FilterKey = "name" | "grade" | "section" | "status";
+
+const FILTER_ITEMS: { key: FilterKey; label: string }[] = [
+  { key: "grade", label: "Grade / Class" },
+  { key: "section", label: "Section" },
+  { key: "status", label: "Report Status" },
+  { key: "name", label: "Name" },
+];
 
 const ReportsPage: React.FC = () => {
-  const [institutes, setInstitutes] = useState<Institute[]>([]);
-  const [betAssessments, setBetAssessments] = useState<AssessmentFull[]>([]);
+  // ── Core selections ──
+  const [institutes, setInstitutes] = useState<any[]>([]);
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
+  const [institutesLoading, setInstitutesLoading] = useState(false);
+
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [selectedAssessment, setSelectedAssessment] = useState<number | "">("");
-  const [reportData, setReportData] = useState<BetReportResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [downloading, setDownloading] = useState(false);
-  const [error, setError] = useState<string>("");
+  const [assessmentsLoading, setAssessmentsLoading] = useState(false);
 
-  // Fetch institutes and assessments on mount
+  const [students, setStudents] = useState<StudentRow[]>([]);
+  const [sectionLookup, setSectionLookup] = useState<Map<number, SectionInfo>>(new Map());
+  const [studentsLoading, setStudentsLoading] = useState(false);
+
+  // ── Report data from bet_report_data table ──
+  const [reportDataMap, setReportDataMap] = useState<Map<number, BetReportData>>(new Map());
+  const [reportDataLoading, setReportDataLoading] = useState(false);
+
+  // ── Student selection ──
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<number>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  // ── Filters ──
+  const [filterEnabled, setFilterEnabled] = useState<Set<FilterKey>>(new Set());
+  const [nameQuery, setNameQuery] = useState("");
+  const [selectedGrade, setSelectedGrade] = useState("");
+  const [selectedSection, setSelectedSection] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState<Set<string>>(new Set());
+
+  // ── Generate ──
+  const [generating, setGenerating] = useState(false);
+
+  // ═══════════════════════ DATA LOADING ═══════════════════════
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [instituteRes, assessmentRes] = await Promise.all([
-          ReadCollegeData(),
-          getAllAssessments()
-        ]);
-
-        const instituteList = Array.isArray(instituteRes.data)
-          ? instituteRes.data
-          : instituteRes.data?.data || [];
-        setInstitutes(instituteList);
-
-        // Filter to only BET assessments (questionnaire.type === true)
-        const allAssessments = assessmentRes.data || [];
-        const betOnly = allAssessments.filter(
-          (a: any) => a.questionnaire?.type === true
-        );
-        setBetAssessments(betOnly);
-      } catch (err) {
-        console.error("Error fetching data:", err);
-        setError("Failed to load institutes or assessments.");
-      }
-    };
-
-    fetchData();
+    setInstitutesLoading(true);
+    ReadCollegeList()
+      .then((res) => setInstitutes(res.data || []))
+      .catch(() => setInstitutes([]))
+      .finally(() => setInstitutesLoading(false));
   }, []);
 
-  // Fetch report data when both selections are made
   useEffect(() => {
-    if (!selectedInstitute || !selectedAssessment) {
-      setReportData(null);
+    setAssessmentsLoading(true);
+    getAllAssessments()
+      .then((res) => setAssessments(res.data || []))
+      .catch(() => setAssessments([]))
+      .finally(() => setAssessmentsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (selectedInstitute === "") {
+      setStudents([]);
+      setSectionLookup(new Map());
+      return;
+    }
+    setStudentsLoading(true);
+    Promise.all([
+      getStudentsWithMappingByInstituteId(Number(selectedInstitute)),
+      GetSessionsByInstituteCode(selectedInstitute),
+    ])
+      .then(([studentsRes, sessionsRes]) => {
+        setStudents(studentsRes.data || []);
+        const lookup = new Map<number, SectionInfo>();
+        for (const session of sessionsRes.data || []) {
+          for (const cls of session.schoolClasses || []) {
+            for (const sec of cls.schoolSections || []) {
+              if (!lookup.has(sec.id)) {
+                lookup.set(sec.id, { className: cls.className, sectionName: sec.sectionName });
+              }
+            }
+          }
+        }
+        setSectionLookup(lookup);
+      })
+      .catch(() => {
+        setStudents([]);
+        setSectionLookup(new Map());
+      })
+      .finally(() => setStudentsLoading(false));
+  }, [selectedInstitute]);
+
+  // Fetch report data when assessment is selected
+  useEffect(() => {
+    if (selectedAssessment === "") {
+      setReportDataMap(new Map());
+      return;
+    }
+    setReportDataLoading(true);
+    getBetReportDataByAssessment(Number(selectedAssessment))
+      .then((res) => {
+        const map = new Map<number, BetReportData>();
+        for (const r of res.data || []) {
+          if (r.userStudent?.userStudentId) {
+            map.set(r.userStudent.userStudentId, r);
+          }
+        }
+        setReportDataMap(map);
+      })
+      .catch(() => setReportDataMap(new Map()))
+      .finally(() => setReportDataLoading(false));
+  }, [selectedAssessment]);
+
+  // Reset on selection change
+  useEffect(() => {
+    setFilterEnabled(new Set());
+    setNameQuery("");
+    setSelectedGrade("");
+    setSelectedSection("");
+    setSelectedStatus(new Set<string>());
+    setSelectedStudentIds(new Set());
+    setCurrentPage(1);
+  }, [selectedInstitute, selectedAssessment]);
+
+  // ═══════════════════════ FILTERED STUDENTS ═══════════════════════
+
+  const assessmentStudents = useMemo(() => {
+    if (selectedAssessment === "") return [];
+    return students.filter((s) =>
+      (s.assignedAssessmentIds || []).includes(Number(selectedAssessment))
+    );
+  }, [students, selectedAssessment]);
+
+  const uniqueGrades = useMemo(() => {
+    const grades = new Set<string>();
+    for (const s of assessmentStudents) {
+      const info = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
+      if (info?.className) grades.add(info.className);
+    }
+    return Array.from(grades).sort();
+  }, [assessmentStudents, sectionLookup]);
+
+  const uniqueSections = useMemo(() => {
+    const sections = new Set<string>();
+    for (const s of assessmentStudents) {
+      const info = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
+      if (info?.sectionName) sections.add(info.sectionName);
+    }
+    return Array.from(sections).sort();
+  }, [assessmentStudents, sectionLookup]);
+
+  const displayedStudents = useMemo(() => {
+    let result = assessmentStudents;
+    if (filterEnabled.has("name") && nameQuery.trim()) {
+      const q = nameQuery.toLowerCase();
+      result = result.filter(
+        (s) =>
+          s.name.toLowerCase().includes(q) ||
+          (s.username || "").toLowerCase().includes(q) ||
+          (s.schoolRollNumber || "").toLowerCase().includes(q)
+      );
+    }
+    if (filterEnabled.has("grade") && selectedGrade) {
+      result = result.filter((s) => {
+        const info = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
+        return info?.className === selectedGrade;
+      });
+    }
+    if (filterEnabled.has("section") && selectedSection) {
+      result = result.filter((s) => {
+        const info = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
+        return info?.sectionName === selectedSection;
+      });
+    }
+    if (filterEnabled.has("status") && selectedStatus.size > 0) {
+      result = result.filter((s) => {
+        const rd = reportDataMap.get(s.userStudentId);
+        const status = rd?.reportStatus || "notGenerated";
+        return selectedStatus.has(status);
+      });
+    }
+    return result;
+  }, [
+    assessmentStudents, filterEnabled, nameQuery,
+    selectedGrade, selectedSection, sectionLookup,
+    selectedStatus, reportDataMap,
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(displayedStudents.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedStudents = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return displayedStudents.slice(start, start + pageSize);
+  }, [displayedStudents, safeCurrentPage, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [nameQuery, selectedGrade, selectedSection, selectedStatus, filterEnabled]);
+
+  // ═══════════════════════ ACTIONS ═══════════════════════
+
+  const toggleFilter = (key: FilterKey, checked: boolean) => {
+    setFilterEnabled((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(key);
+      else {
+        next.delete(key);
+        if (key === "name") setNameQuery("");
+        if (key === "grade") setSelectedGrade("");
+        if (key === "section") setSelectedSection("");
+        if (key === "status") setSelectedStatus(new Set());
+      }
+      return next;
+    });
+  };
+
+  const resetFilters = () => {
+    setFilterEnabled(new Set());
+    setNameQuery("");
+    setSelectedGrade("");
+    setSelectedSection("");
+    setSelectedStatus(new Set<string>());
+  };
+
+  const handleGenerateReports = async () => {
+    const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
+    const selectedVisible = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
+    const ids = selectedVisible.length > 0
+      ? selectedVisible
+      : displayedStudents.map((s) => s.userStudentId);
+
+    // Only include students that have report data
+    const idsWithData = ids.filter((id) => reportDataMap.has(id));
+    if (idsWithData.length === 0) {
+      alert("No students with generated report data found. Generate report data first from the Report Generation page.");
       return;
     }
 
-    const fetchReport = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const response = await getBetReport(
-          Number(selectedInstitute),
-          Number(selectedAssessment)
-        );
-        setReportData(response.data);
-      } catch (err: any) {
-        console.error("Error fetching BET report:", err);
-        setError(
-          err.response?.data?.error || "Failed to fetch report data."
-        );
-        setReportData(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchReport();
-  }, [selectedInstitute, selectedAssessment]);
-
-  const handleInstituteChange = (value: string) => {
-    setSelectedInstitute(value ? Number(value) : "");
-    setSelectedAssessment("");
-    setReportData(null);
-  };
-
-  const handleAssessmentChange = (value: string) => {
-    setSelectedAssessment(value ? Number(value) : "");
-    setReportData(null);
-  };
-
-  const handleDownloadRawScores = async () => {
-    if (!selectedInstitute || !selectedAssessment) return;
-
-    setDownloading(true);
-    setError("");
+    setGenerating(true);
     try {
-      const response = await exportScoresByInstitute(
-        Number(selectedInstitute),
-        Number(selectedAssessment)
-      );
+      const res = await generateHtmlReports(Number(selectedAssessment), idsWithData);
+      const { generated, errors } = res.data;
+      let msg = `Generated ${generated} report(s).`;
+      if (errors.length > 0) {
+        msg += `\n${errors.length} failed: ${errors.map((e) => e.reason).join(", ")}`;
+      }
+      alert(msg);
 
-      const blob = new Blob([response.data], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-
-      const instituteName =
-        institutes.find((i) => i.instituteCode === selectedInstitute)
-          ?.instituteName || "institute";
-      const assessmentName =
-        betAssessments.find((a) => a.id === selectedAssessment)
-          ?.assessmentName || "assessment";
-      link.download = `${instituteName.replace(/\s+/g, "_")}_${assessmentName.replace(/\s+/g, "_")}_raw_scores.xlsx`;
-
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      // Refresh report data
+      const refreshRes = await getBetReportDataByAssessment(Number(selectedAssessment));
+      const map = new Map<number, BetReportData>();
+      for (const r of refreshRes.data || []) {
+        if (r.userStudent?.userStudentId) {
+          map.set(r.userStudent.userStudentId, r);
+        }
+      }
+      setReportDataMap(map);
     } catch (err: any) {
-      console.error("Error downloading raw scores:", err);
-      setError(
-        err.response?.data?.error || "Failed to download raw scores."
-      );
+      alert("Failed: " + (err?.response?.data?.error || err.message));
     } finally {
-      setDownloading(false);
+      setGenerating(false);
     }
   };
 
+  // ═══════════════════════ DERIVED ═══════════════════════
+
+  const selectedInstituteName =
+    institutes.find((i) => i.instituteCode === selectedInstitute)?.instituteName || "";
+  const selectedAssessmentName =
+    assessments.find((a) => a.id === selectedAssessment)?.assessmentName || "";
+
+  const ready = selectedInstitute !== "" && selectedAssessment !== "";
+
+  const visibleSelectedCount = useMemo(() => {
+    const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
+    return Array.from(selectedStudentIds).filter((id) => visibleIds.has(id)).length;
+  }, [selectedStudentIds, displayedStudents]);
+
+  // Stats
+  const reportStats = useMemo(() => {
+    let generated = 0;
+    let notGenerated = 0;
+    let hasData = 0;
+    for (const s of displayedStudents) {
+      const rd = reportDataMap.get(s.userStudentId);
+      if (rd) {
+        hasData++;
+        if (rd.reportStatus === "generated") generated++;
+        else notGenerated++;
+      } else {
+        notGenerated++;
+      }
+    }
+    return { generated, notGenerated, hasData };
+  }, [displayedStudents, reportDataMap]);
+
+  // ═══════════════════════ STYLES ═══════════════════════
+
+  const thStyle: React.CSSProperties = {
+    padding: "10px 14px", fontWeight: 600, color: "#1a1a2e",
+    borderBottom: "2px solid #e0e0e0", whiteSpace: "nowrap", fontSize: "0.85rem",
+  };
+  const tdStyle: React.CSSProperties = {
+    padding: "10px 14px", borderBottom: "1px solid #f0f0f0", whiteSpace: "nowrap", fontSize: "0.85rem",
+  };
+
+  // ═══════════════════════ RENDER ═══════════════════════
+
   return (
-    <div
-      className="min-vh-100"
-      style={{
-        background: "linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%)",
-        padding: "2rem",
-      }}
-    >
+    <div style={{ padding: "24px 32px", maxWidth: 1400, margin: "0 auto" }}>
       {/* Header */}
-      <div
-        className="card border-0 shadow-sm mb-4"
-        style={{ borderRadius: "16px", overflow: "hidden" }}
-      >
-        <div className="card-body p-4">
-          <h2 className="mb-1 fw-bold" style={{ color: "#1a1a2e" }}>
-            <i
-              className="bi bi-file-earmark-bar-graph me-2"
-              style={{ color: "#4361ee" }}
-            ></i>
-            BET Assessment Reports
-          </h2>
-          <p className="text-muted mb-0">
-            View student answers for BET assessments by institute
-          </p>
-        </div>
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ fontWeight: 800, fontSize: "1.5rem", color: "#1a1a2e", margin: 0 }}>
+          Report Export & Preview
+        </h2>
+        <p style={{ color: "#6b7280", fontSize: "0.9rem", margin: "4px 0 0" }}>
+          Generate HTML reports from BET report data and export to storage
+        </p>
       </div>
 
-      {/* Error Alert */}
-      {error && (
-        <div
-          className="alert alert-danger alert-dismissible fade show mb-4"
-          style={{ borderRadius: "12px" }}
-        >
-          <i className="bi bi-exclamation-triangle me-2"></i>
-          {error}
-          <button
-            type="button"
-            className="btn-close"
-            onClick={() => setError("")}
-          ></button>
-        </div>
-      )}
-
-      {/* Filter Card */}
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: "16px" }}>
-        <div className="card-body p-4">
-          <div className="row g-4">
-            {/* Institute Selection */}
-            <div className="col-md-6">
-              <label
-                className="form-label fw-semibold"
-                style={{ color: "#1a1a2e" }}
-              >
-                <i
-                  className="bi bi-building me-2"
-                  style={{ color: "#4361ee" }}
-                ></i>
-                Select Institute
-              </label>
-              <select
-                className="form-select"
-                style={{
-                  borderRadius: "10px",
-                  border: "2px solid #e0e0e0",
-                  padding: "0.75rem 1rem",
-                  fontWeight: 500,
-                }}
-                value={selectedInstitute}
-                onChange={(e) => handleInstituteChange(e.target.value)}
-              >
-                <option value="">-- Select Institute --</option>
-                {institutes.map((inst) => (
-                  <option key={inst.instituteCode} value={inst.instituteCode}>
-                    {inst.instituteName}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Assessment Selection (BET only) */}
-            <div className="col-md-6">
-              <label
-                className="form-label fw-semibold"
-                style={{ color: "#1a1a2e" }}
-              >
-                <i
-                  className="bi bi-clipboard-check me-2"
-                  style={{ color: "#4361ee" }}
-                ></i>
-                Select BET Assessment
-              </label>
-              <select
-                className="form-select"
-                style={{
-                  borderRadius: "10px",
-                  border: "2px solid #e0e0e0",
-                  padding: "0.75rem 1rem",
-                  fontWeight: 500,
-                }}
-                value={selectedAssessment}
-                onChange={(e) => handleAssessmentChange(e.target.value)}
-              >
-                <option value="">-- Select Assessment --</option>
-                {betAssessments.map((assessment) => (
-                  <option key={assessment.id} value={assessment.id}>
-                    {assessment.assessmentName}
-                  </option>
-                ))}
-              </select>
-              {betAssessments.length === 0 && (
-                <p className="text-muted mt-2 mb-0 small">
-                  <i className="bi bi-info-circle me-1"></i>
-                  No BET assessments found.
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Info bar */}
-          {selectedInstitute && selectedAssessment && reportData && (
-            <div
-              className="mt-4 p-3 rounded-3"
-              style={{ background: "#f8f9fa", border: "1px solid #e0e0e0" }}
+      {/* Selection Row */}
+      <div style={{
+        display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24,
+        background: "#fff", padding: 20, borderRadius: 12,
+        border: "1px solid #e5e7eb", boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+      }}>
+        <div>
+          <label style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151", marginBottom: 6, display: "block" }}>
+            School / Institute
+          </label>
+          {institutesLoading ? (
+            <div style={{ color: "#9ca3af", padding: "8px 0" }}>Loading...</div>
+          ) : (
+            <select
+              className="form-select form-select-solid"
+              value={selectedInstitute}
+              onChange={(e) => {
+                setSelectedInstitute(e.target.value === "" ? "" : Number(e.target.value));
+                setSelectedAssessment("");
+              }}
             >
-              <div className="d-flex align-items-center gap-3">
-                <div
-                  className="d-flex align-items-center justify-content-center"
-                  style={{
-                    width: "48px",
-                    height: "48px",
-                    borderRadius: "12px",
-                    background: "rgba(67, 97, 238, 0.1)",
-                  }}
-                >
-                  <i
-                    className="bi bi-people-fill"
-                    style={{ color: "#4361ee", fontSize: "1.25rem" }}
-                  ></i>
-                </div>
-                <div>
-                  <p className="mb-0 text-muted small">
-                    Completed Students
-                  </p>
-                  <h4 className="mb-0 fw-bold" style={{ color: "#1a1a2e" }}>
-                    {reportData.rows.length}
-                  </h4>
-                </div>
-                <div className="ms-4">
-                  <p className="mb-0 text-muted small">Dynamic Columns</p>
-                  <h4 className="mb-0 fw-bold" style={{ color: "#1a1a2e" }}>
-                    {reportData.columns.length}
-                  </h4>
-                </div>
-                <div className="ms-auto">
-                  <button
-                    className="btn"
-                    onClick={handleDownloadRawScores}
-                    disabled={downloading}
-                    style={{
-                      background: downloading
-                        ? "#6c757d"
-                        : "linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)",
-                      border: "none",
-                      borderRadius: "10px",
-                      padding: "0.6rem 1.5rem",
-                      fontWeight: 600,
-                      color: "white",
-                      boxShadow: downloading
-                        ? "none"
-                        : "0 4px 12px rgba(76, 175, 80, 0.3)",
-                    }}
-                  >
-                    {downloading ? (
-                      <>
-                        <span
-                          className="spinner-border spinner-border-sm me-2"
-                          role="status"
-                        ></span>
-                        Downloading...
-                      </>
-                    ) : (
-                      <>
-                        <i className="bi bi-file-earmark-excel me-2"></i>
-                        Download Raw Scores
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
+              <option value="">-- Select a school --</option>
+              {institutes.map((inst) => (
+                <option key={inst.instituteCode} value={inst.instituteCode}>
+                  {inst.instituteName}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div>
+          <label style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151", marginBottom: 6, display: "block" }}>
+            Assessment
+          </label>
+          {assessmentsLoading ? (
+            <div style={{ color: "#9ca3af", padding: "8px 0" }}>Loading...</div>
+          ) : (
+            <select
+              className="form-select form-select-solid"
+              value={selectedAssessment}
+              onChange={(e) =>
+                setSelectedAssessment(e.target.value === "" ? "" : Number(e.target.value))
+              }
+              disabled={selectedInstitute === ""}
+            >
+              <option value="">-- Select an assessment --</option>
+              {assessments.map((a) => (
+                <option key={a.id} value={a.id}>{a.assessmentName}</option>
+              ))}
+            </select>
           )}
         </div>
       </div>
 
-      {/* Loading */}
-      {loading && (
-        <div className="text-center py-5">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
-          <p className="text-muted mt-3">Loading report data...</p>
+      {!ready && (
+        <div style={{
+          padding: 48, textAlign: "center", color: "#9ca3af",
+          border: "2px dashed #e5e7eb", borderRadius: 12, background: "#fff",
+        }}>
+          <div style={{ fontSize: "2rem", marginBottom: 8, opacity: 0.4 }}>&#x1F4C4;</div>
+          <div>Select a school and assessment to manage reports</div>
         </div>
       )}
 
-      {/* Data Table */}
-      {!loading && reportData && (
-        <div
-          className="card border-0 shadow-sm"
-          style={{ borderRadius: "16px" }}
-        >
-          <div className="card-header bg-white border-0 p-4 pb-0">
-            <h4 className="mb-1 fw-bold" style={{ color: "#1a1a2e" }}>
-              <i
-                className="bi bi-table me-2"
-                style={{ color: "#4361ee" }}
-              ></i>
-              Student Answers
-            </h4>
-            <p className="text-muted mb-0">
-              {reportData.rows.length > 0
-                ? `Showing ${reportData.rows.length} student(s) who completed the assessment`
-                : "No students have completed this assessment for the selected institute"}
-            </p>
+      {ready && (
+        <div style={{
+          background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.04)", padding: 24,
+        }}>
+          {/* Summary */}
+          <div style={{
+            padding: "12px 20px", background: "#f0f4ff", borderRadius: 10,
+            display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap",
+          }}>
+            <span style={{ fontWeight: 700, color: "#4361ee" }}>{selectedInstituteName}</span>
+            <span style={{ color: "#cbd5e1" }}>/</span>
+            <span style={{ fontWeight: 600, color: "#1e293b" }}>{selectedAssessmentName}</span>
+            <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+              <span style={{
+                background: "#4361ee", color: "#fff",
+                padding: "4px 12px", borderRadius: 16, fontSize: "0.8rem", fontWeight: 600,
+              }}>
+                {assessmentStudents.length} students
+              </span>
+              <span style={{
+                background: "#059669", color: "#fff",
+                padding: "4px 12px", borderRadius: 16, fontSize: "0.8rem", fontWeight: 600,
+              }}>
+                {reportStats.generated} reports
+              </span>
+              <span style={{
+                background: reportDataLoading ? "#9ca3af" : "#6b7280", color: "#fff",
+                padding: "4px 12px", borderRadius: 16, fontSize: "0.8rem", fontWeight: 600,
+              }}>
+                {reportStats.hasData} with data
+              </span>
+            </div>
           </div>
 
-          <div className="card-body p-4">
-            {reportData.rows.length === 0 ? (
-              <div className="text-center py-5">
-                <i
-                  className="bi bi-inbox"
-                  style={{ fontSize: "3rem", color: "#ccc" }}
-                ></i>
-                <p className="text-muted mt-3">
-                  No completed assessments found for this institute.
-                </p>
-              </div>
-            ) : (
-              <div
-                className="table-responsive"
-                style={{ maxHeight: "70vh", overflow: "auto" }}
-              >
-                <table className="table table-bordered table-hover table-sm mb-0">
-                  <thead
-                    style={{
-                      position: "sticky",
-                      top: 0,
-                      zIndex: 2,
-                    }}
-                  >
-                    <tr>
-                      <th
-                        style={{
-                          position: "sticky",
-                          left: 0,
-                          zIndex: 3,
-                          background: "#f0f2f5",
-                          fontWeight: 600,
-                          color: "#1a1a2e",
-                          minWidth: "150px",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        Name
-                      </th>
-                      <th
-                        style={{
-                          position: "sticky",
-                          left: "150px",
-                          zIndex: 3,
-                          background: "#f0f2f5",
-                          fontWeight: 600,
-                          color: "#1a1a2e",
-                          minWidth: "150px",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        Institute
-                      </th>
-                      {reportData.columns.map((col) => (
-                        <th
-                          key={col.key}
-                          style={{
-                            background: col.isMQT ? "#e8edf5" : "#f0f2f5",
-                            fontWeight: 600,
-                            color: col.isMQT ? "#4361ee" : "#1a1a2e",
-                            whiteSpace: "nowrap",
-                            fontSize: "0.8rem",
-                            minWidth: "100px",
+          {/* Students */}
+          {studentsLoading || reportDataLoading ? (
+            <div style={{ color: "#9ca3af", padding: 24 }}>Loading...</div>
+          ) : (
+            <>
+              {/* Compact filter row */}
+              <div style={{
+                display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap", alignItems: "flex-end",
+              }}>
+                {FILTER_ITEMS.map((item) => {
+                  if (item.key === "name") {
+                    return (
+                      <div key={item.key} style={{ flex: "1 1 200px", minWidth: 180 }}>
+                        <label style={{ fontSize: "0.75rem", color: "#6b7280", fontWeight: 500 }}>Search</label>
+                        <input
+                          className="form-control form-control-sm form-control-solid"
+                          placeholder="Name, roll no..."
+                          value={nameQuery}
+                          onChange={(e) => {
+                            setNameQuery(e.target.value);
+                            if (e.target.value && !filterEnabled.has("name")) toggleFilter("name", true);
+                          }}
+                        />
+                      </div>
+                    );
+                  }
+                  if (item.key === "grade") {
+                    return (
+                      <div key={item.key} style={{ minWidth: 140 }}>
+                        <label style={{ fontSize: "0.75rem", color: "#6b7280", fontWeight: 500 }}>{item.label}</label>
+                        <select
+                          className="form-select form-select-sm form-select-solid"
+                          value={selectedGrade}
+                          onChange={(e) => {
+                            setSelectedGrade(e.target.value);
+                            if (e.target.value) toggleFilter("grade", true);
+                            else toggleFilter("grade", false);
                           }}
                         >
-                          {col.header}
-                        </th>
-                      ))}
+                          <option value="">All</option>
+                          {uniqueGrades.map((g) => <option key={g} value={g}>{g}</option>)}
+                        </select>
+                      </div>
+                    );
+                  }
+                  if (item.key === "section") {
+                    return (
+                      <div key={item.key} style={{ minWidth: 140 }}>
+                        <label style={{ fontSize: "0.75rem", color: "#6b7280", fontWeight: 500 }}>{item.label}</label>
+                        <select
+                          className="form-select form-select-sm form-select-solid"
+                          value={selectedSection}
+                          onChange={(e) => {
+                            setSelectedSection(e.target.value);
+                            if (e.target.value) toggleFilter("section", true);
+                            else toggleFilter("section", false);
+                          }}
+                        >
+                          <option value="">All</option>
+                          {uniqueSections.map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                    );
+                  }
+                  if (item.key === "status") {
+                    return (
+                      <div key={item.key} style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
+                        {[
+                          { value: "generated", label: "Generated", color: "#059669" },
+                          { value: "notGenerated", label: "Not Generated", color: "#d97706" },
+                        ].map((opt) => {
+                          const checked = selectedStatus.has(opt.value);
+                          return (
+                            <button
+                              key={opt.value}
+                              onClick={() => {
+                                const next = new Set(selectedStatus);
+                                if (checked) next.delete(opt.value);
+                                else next.add(opt.value);
+                                setSelectedStatus(next);
+                                if (next.size > 0) toggleFilter("status", true);
+                                else toggleFilter("status", false);
+                              }}
+                              style={{
+                                padding: "4px 10px", borderRadius: 6, fontSize: "0.75rem",
+                                fontWeight: 600, cursor: "pointer",
+                                border: `1.5px solid ${checked ? opt.color : "#e5e7eb"}`,
+                                background: checked ? opt.color + "18" : "#fff",
+                                color: checked ? opt.color : "#6b7280",
+                              }}
+                            >
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  }
+                  return null;
+                })}
+                {filterEnabled.size > 0 && (
+                  <button
+                    onClick={resetFilters}
+                    style={{
+                      padding: "4px 12px", borderRadius: 6, fontSize: "0.75rem",
+                      fontWeight: 600, cursor: "pointer", border: "1.5px solid #e5e7eb",
+                      background: "#fff", color: "#ef4444", alignSelf: "flex-end",
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              {/* Action bar */}
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                marginBottom: 12, flexWrap: "wrap", gap: 8,
+              }}>
+                <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
+                  {displayedStudents.length} student(s)
+                  {visibleSelectedCount > 0 && (
+                    <span style={{ fontWeight: 600, color: "#4361ee", marginLeft: 8 }}>
+                      ({visibleSelectedCount} selected)
+                    </span>
+                  )}
+                </span>
+                <button
+                  className="btn btn-sm"
+                  onClick={handleGenerateReports}
+                  disabled={displayedStudents.length === 0 || generating}
+                  style={{
+                    background: generating
+                      ? "#6c757d"
+                      : "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
+                    border: "none", borderRadius: 8, padding: "8px 20px",
+                    fontWeight: 600, color: "white", fontSize: "0.85rem",
+                    boxShadow: generating ? "none" : "0 4px 12px rgba(67, 97, 238, 0.3)",
+                  }}
+                >
+                  {generating ? "Generating..." : (
+                    <>
+                      Generate Reports
+                      {visibleSelectedCount > 0
+                        ? ` (${visibleSelectedCount} selected)`
+                        : ` (All ${displayedStudents.length})`}
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Table */}
+              <div style={{ overflowX: "auto", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ background: "#f8fafc" }}>
+                      <th style={{ ...thStyle, width: 40 }}>
+                        <input
+                          type="checkbox"
+                          checked={
+                            paginatedStudents.length > 0 &&
+                            paginatedStudents.every((s) => selectedStudentIds.has(s.userStudentId))
+                          }
+                          onChange={(e) => {
+                            setSelectedStudentIds((prev) => {
+                              const next = new Set(prev);
+                              if (e.target.checked) paginatedStudents.forEach((s) => next.add(s.userStudentId));
+                              else paginatedStudents.forEach((s) => next.delete(s.userStudentId));
+                              return next;
+                            });
+                          }}
+                        />
+                      </th>
+                      <th style={{ ...thStyle, width: 44 }}>#</th>
+                      <th style={thStyle}>Name</th>
+                      <th style={thStyle}>Roll No.</th>
+                      <th style={thStyle}>Grade</th>
+                      <th style={thStyle}>Section</th>
+                      <th style={thStyle}>Data</th>
+                      <th style={thStyle}>Report Status</th>
+                      <th style={thStyle}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {reportData.rows.map((row, idx) => (
-                      <tr key={idx}>
-                        <td
-                          style={{
-                            position: "sticky",
-                            left: 0,
-                            background: "#fff",
-                            fontWeight: 500,
-                            whiteSpace: "nowrap",
-                            zIndex: 1,
-                          }}
-                        >
-                          {row.name}
-                        </td>
-                        <td
-                          style={{
-                            position: "sticky",
-                            left: "150px",
-                            background: "#fff",
-                            whiteSpace: "nowrap",
-                            zIndex: 1,
-                          }}
-                        >
-                          {row.institute}
-                        </td>
-                        {reportData.columns.map((col) => (
-                          <td
-                            key={col.key}
-                            style={{
-                              whiteSpace: "nowrap",
-                              fontSize: "0.85rem",
-                              textAlign: col.isMQT ? "center" : "left",
-                            }}
-                          >
-                            {col.isMQT ? (
-                              row[col.key] !== "" && row[col.key] !== undefined ? (
-                                <span className="badge bg-primary">
-                                  {row[col.key]}
-                                </span>
-                              ) : (
-                                <span className="text-muted">-</span>
-                              )
+                    {paginatedStudents.map((s, idx) => {
+                      const globalIdx = (safeCurrentPage - 1) * pageSize + idx;
+                      const secInfo = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
+                      const rd = reportDataMap.get(s.userStudentId);
+                      const hasData = !!rd;
+                      const reportStatus = rd?.reportStatus || "notGenerated";
+                      const reportUrl = rd?.reportUrl || null;
+
+                      const statusColors: Record<string, { bg: string; color: string }> = {
+                        generated: { bg: "#dcfce7", color: "#059669" },
+                        notGenerated: { bg: "#fef3c7", color: "#d97706" },
+                      };
+                      const colors = statusColors[reportStatus] || statusColors.notGenerated;
+                      const isChecked = selectedStudentIds.has(s.userStudentId);
+
+                      return (
+                        <tr key={s.userStudentId} style={{ background: globalIdx % 2 === 0 ? "#fff" : "#f9fafb" }}>
+                          <td style={tdStyle}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                setSelectedStudentIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (e.target.checked) next.add(s.userStudentId);
+                                  else next.delete(s.userStudentId);
+                                  return next;
+                                });
+                              }}
+                            />
+                          </td>
+                          <td style={tdStyle}>{globalIdx + 1}</td>
+                          <td style={tdStyle}><span style={{ fontWeight: 600 }}>{s.name || "-"}</span></td>
+                          <td style={tdStyle}>{s.schoolRollNumber || "-"}</td>
+                          <td style={tdStyle}>{secInfo?.className || "-"}</td>
+                          <td style={tdStyle}>{secInfo?.sectionName || "-"}</td>
+                          <td style={tdStyle}>
+                            <span style={{
+                              background: hasData ? "#dcfce7" : "#fee2e2",
+                              color: hasData ? "#059669" : "#dc2626",
+                              padding: "3px 10px", borderRadius: 6,
+                              fontWeight: 600, fontSize: "0.75rem",
+                            }}>
+                              {hasData ? "Yes" : "No"}
+                            </span>
+                          </td>
+                          <td style={tdStyle}>
+                            <span style={{
+                              background: colors.bg, color: colors.color,
+                              padding: "3px 10px", borderRadius: 6,
+                              fontWeight: 600, fontSize: "0.75rem",
+                            }}>
+                              {reportStatus === "generated" ? "Generated" : "Not Generated"}
+                            </span>
+                          </td>
+                          <td style={tdStyle}>
+                            {reportUrl ? (
+                              <div style={{ display: "flex", gap: 6 }}>
+                                <a
+                                  href={reportUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{
+                                    padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem",
+                                    fontWeight: 600, background: "#dbeafe", color: "#2563eb",
+                                    textDecoration: "none",
+                                  }}
+                                >
+                                  Preview
+                                </a>
+                                <a
+                                  href={reportUrl}
+                                  download
+                                  style={{
+                                    padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem",
+                                    fontWeight: 600, background: "#f0fdf4", color: "#059669",
+                                    textDecoration: "none",
+                                  }}
+                                >
+                                  Download
+                                </a>
+                              </div>
                             ) : (
-                              row[col.key] || (
-                                <span className="text-muted">-</span>
-                              )
+                              <span style={{ color: "#9ca3af", fontSize: "0.75rem" }}>-</span>
                             )}
                           </td>
-                        ))}
-                      </tr>
-                    ))}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
-            )}
-          </div>
-        </div>
-      )}
 
-      {/* Prompt to select */}
-      {!loading && !reportData && selectedInstitute && selectedAssessment && !error && (
-        <div className="text-center py-5">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
-        </div>
-      )}
-      {!loading && !reportData && (!selectedInstitute || !selectedAssessment) && (
-        <div
-          className="card border-0 shadow-sm"
-          style={{ borderRadius: "16px" }}
-        >
-          <div className="card-body p-5 text-center">
-            <i
-              className="bi bi-arrow-up-circle"
-              style={{ fontSize: "3rem", color: "#ccc" }}
-            ></i>
-            <p className="text-muted mt-3 mb-0">
-              Select both an institute and a BET assessment to view the report.
-            </p>
-          </div>
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  marginTop: 12, flexWrap: "wrap", gap: 8,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
+                      {(safeCurrentPage - 1) * pageSize + 1}-{Math.min(safeCurrentPage * pageSize, displayedStudents.length)} of {displayedStudents.length}
+                    </span>
+                    <select
+                      className="form-select form-select-sm form-select-solid"
+                      style={{ width: 68, fontSize: "0.8rem" }}
+                      value={pageSize}
+                      onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                    >
+                      {[25, 50, 100].map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <button className="btn btn-sm btn-light" disabled={safeCurrentPage <= 1}
+                      onClick={() => setCurrentPage(1)} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>First</button>
+                    <button className="btn btn-sm btn-light" disabled={safeCurrentPage <= 1}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>Prev</button>
+                    {(() => {
+                      const pages: (number | string)[] = [];
+                      const maxV = 5;
+                      let start = Math.max(1, safeCurrentPage - Math.floor(maxV / 2));
+                      let end = Math.min(totalPages, start + maxV - 1);
+                      if (end - start + 1 < maxV) start = Math.max(1, end - maxV + 1);
+                      if (start > 1) { pages.push(1); if (start > 2) pages.push("..."); }
+                      for (let i = start; i <= end; i++) pages.push(i);
+                      if (end < totalPages) { if (end < totalPages - 1) pages.push("..."); pages.push(totalPages); }
+                      return pages.map((p, i) =>
+                        typeof p === "string" ? (
+                          <span key={`e-${i}`} style={{ padding: "4px 4px", color: "#9ca3af", fontSize: "0.8rem" }}>...</span>
+                        ) : (
+                          <button key={p} className={`btn btn-sm ${p === safeCurrentPage ? "btn-primary" : "btn-light"}`}
+                            onClick={() => setCurrentPage(p)} style={{ padding: "4px 10px", fontSize: "0.8rem", minWidth: 32 }}>{p}</button>
+                        )
+                      );
+                    })()}
+                    <button className="btn btn-sm btn-light" disabled={safeCurrentPage >= totalPages}
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>Next</button>
+                    <button className="btn btn-sm btn-light" disabled={safeCurrentPage >= totalPages}
+                      onClick={() => setCurrentPage(totalPages)} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>Last</button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>

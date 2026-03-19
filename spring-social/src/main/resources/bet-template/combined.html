@@ -602,10 +602,10 @@
       .page-report-details .card2 {
         display: flex;
         align-items: flex-start;
-        gap: 2px;
+        gap: 11px;
         flex-grow: 1;
         background-color: #ede7db;
-        padding: 17px 21px 16px 0;
+        padding: 17px 21px 16px 15px;
         border-radius: 24px 0;
       }
 
@@ -619,7 +619,6 @@
       }
 
       .page-report-details .col3 .column-text3 {
-        margin-left: 18px;
         width: 184px;
       }
 
@@ -635,19 +634,16 @@
         width: 124px;
         display: flex;
         flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
+        align-items: center;
+        justify-content: center;
         flex-shrink: 0;
-        color: #000;
-        font-size: 16px;
-        text-align: left;
         background-color: #ede7db;
-        padding: 5px 29px 13px 29px;
+        padding: 10px;
         border-radius: 24px 0;
       }
 
       .page-report-details .card-left-img {
-        width: 64px;
+        width: 100px;
         flex-shrink: 0;
       }
 
@@ -658,9 +654,9 @@
       .page-report-details .card3 {
         display: flex;
         align-items: flex-start;
-        gap: 2px;
+        gap: 11px;
         background-color: #ede7db;
-        padding: 1px 18px 1px 15px;
+        padding: 17px 18px 16px 15px;
         border-radius: 24px 0;
       }
 
@@ -676,7 +672,6 @@
 
       .page-report-details .col4 .column-text3 {
         width: 190px;
-        align-self: center;
       }
 
       .page-report-details .col-bottom {
@@ -685,7 +680,7 @@
         z-index: 1;
         display: flex;
         flex-direction: column;
-        gap: 14px;
+        gap: 10px;
       }
 
       .page-report-details .row2 {
@@ -726,13 +721,30 @@
       .page-report-details .card5 {
         display: flex;
         align-items: flex-start;
-        gap: 2px;
         flex-grow: 1;
+        min-width: 0;
         text-align: left;
         background-color: #ede7db;
-        padding: 17px 21px 16px ;
+        padding: 14px 18px;
         border-radius: 24px 0;
         margin-left: 20px;
+      }
+
+      .page-report-details .card5 .column-b {
+        min-width: 0;
+        flex-shrink: 1;
+        width: 100%;
+        overflow-wrap: break-word;
+        word-wrap: break-word;
+      }
+
+      .page-report-details .card5 .column-text3 {
+        font-size: 14px;
+      }
+
+      .page-report-details .card5 .column-text4 {
+        font-size: 10px;
+        line-height: 1.3;
       }
 
       .page-report-details .row-bottom2 {
@@ -743,30 +755,30 @@
       }
 
       .page-report-details .card {
-        min-height: 134px;
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: 3px;
         flex-shrink: 0;
         text-align: left;
         background-color: #ede7db;
-        padding: 24px 24px 0 24px;
+        padding: 14px 18px 10px 18px;
         border-radius: 24px 0;
       }
 
       .page-report-details .card-text1 {
         color: #000;
-        font-size: 16px;
+        font-size: 14px;
       }
 
       .page-report-details .card-text2 {
         color: #282828;
-        font-size: 12px;
+        font-size: 10px;
+        line-height: 1.3;
       }
 
       .page-report-details .card-left2 {
         width: 214px;
-        padding-bottom: 11px;
+        padding-bottom: 20px;
       }
 
       .page-report-details .card-left2 .card-text2 {
@@ -775,11 +787,23 @@
 
       .page-report-details .card-right {
         width: 232px;
-        padding-bottom: 24px;
+        padding-bottom: 20px;
       }
 
       .page-report-details .card-right .card-text2 {
         margin-right: 10px;
+      }
+
+      .page-report-details .column-text4 ul,
+      .page-report-details .card-text2 ul {
+        list-style: disc;
+        padding-left: 16px;
+        margin: 4px 0;
+      }
+
+      .page-report-details .column-text4 li,
+      .page-report-details .card-text2 li {
+        margin-bottom: 4px;
       }
 
       @media screen and (max-width: 576px) {
@@ -1213,9 +1237,9 @@
               />
 
               <div class="column-b col3">
-                <p class="column-text3">{{cognitive_1}}</p>
+                <p class="column-text3">Problem Solving</p>
                 <p class="column-text4">
-                  {{cognitive_1_description}}
+                  {{cog1}}
                 </p>
               </div>
             </div>
@@ -1224,10 +1248,9 @@
           <div class="row-bottom1">
             <div class="card-left1">
               <img
-                src="assets/report-details/card-left-img.png"
+                src="{{cog2}}.png"
                 class="card-left-img"
               />
-              <p class="card-left-text">Attentive</p>
             </div>
 
             <div class="card3">
@@ -1237,9 +1260,9 @@
               />
 
               <div class="column-b col4">
-                <p class="column-text3">{{cognitive_2}}</p>
+                <p class="column-text3">{{cog_3}}</p>
                 <p class="column-text4">
-                  {{cognitive_2_description}}
+                  {{cognitive_3_description}}
                 </p>
               </div>
             </div>
@@ -1256,7 +1279,7 @@
                   src="assets/report-details/card-img4.png"
                   class="card-img4"
                 />
-                <p class="card-text4">SElf Management</p>
+                <p class="card-text4">Self Management</p>
               </div>
 
               <object
@@ -1268,9 +1291,9 @@
 
             <div class="card5">
               <div class="column-b">
-                <p class="column-text3">{{self_management_1}}</p>
+                <p class="column-text3">Self Efficacy</p>
                 <p class="column-text4">
-                  {{self_management_1_description}}
+                  {{self_management_1}}
                 </p>
               </div>
             </div>
@@ -1278,16 +1301,16 @@
 
           <div class="row-bottom2">
             <div class="card card-left2">
-              <p class="card-text1">{{self_management_2}}</p>
+              <p class="card-text1">Self Regulation</p>
               <p class="card-text2">
-                {{self_management_2_description}}
+                {{self_management_2}}
               </p>
             </div>
 
             <div class="card card-right">
-              <p class="card-text1">{{self_management_3}}</p>
+              <p class="card-text1">Emotional Regulation</p>
               <p class="card-text2">
-                {{self_management_3_description}}
+                {{self_management_3}}
               </p>
             </div>
           </div>
@@ -1337,11 +1360,7 @@
               <div class="column-b col4">
                 <p class="column-text3">Social Insight</p>
                 <p class="column-text4">
-                  In our cultural context, social "politeness" often involves
-                  indirect speech. We use these results to help your child
-                  navigate these subtle social rules with confidence. Your child
-                  is the " Mind Reader." He/She picks up on subtle hints and
-                  complex social layers.
+                  {{social_insight}}
                 </p>
               </div>
             </div>
@@ -1356,7 +1375,7 @@
                 />
               </div>
 
-              <p class="card-left-text text-dark">36 %</p>
+              <p class="card-left-text text-dark">{{environment}}</p>
               <p class="card-left-text-bottom">Environmental Awareness</p>
             </div>
 
@@ -1366,10 +1385,7 @@
               <div class="card-col">
                 <p class="text-black">Values</p>
                 <p class="text-dark">
-                  [Value 1], [Value 2], and [Value 3]. <br />
-                  As primary motivators, supporting these specific values
-                  nurtures your child's confidence, emotional growth, and
-                  ability to build empathetic connections.
+                  {{value_overview}}
                 </p>
               </div>
             </div>

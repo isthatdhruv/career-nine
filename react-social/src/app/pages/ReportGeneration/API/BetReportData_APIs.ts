@@ -21,6 +21,8 @@ export interface BetReportData {
   value2: string;
   value3: string;
   socialInsight: string;
+  reportStatus: string;
+  reportUrl: string | null;
   createdAt: string;
 }
 
@@ -48,5 +50,18 @@ export function getBetReportDataByStudent(userStudentId: number) {
 export function exportBetReportExcel(assessmentId: number) {
   return axios.get(`${BASE}/export-excel/${assessmentId}`, {
     responseType: 'blob',
+  });
+}
+
+export interface GenerateReportsResponse {
+  generated: number;
+  errors: { userStudentId: number; reason: string }[];
+  reports: { userStudentId: number; studentName: string; reportUrl: string }[];
+}
+
+export function generateHtmlReports(assessmentId: number, userStudentIds: number[]) {
+  return axios.post<GenerateReportsResponse>(`${BASE}/generate-reports`, {
+    assessmentId,
+    userStudentIds,
   });
 }
