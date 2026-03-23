@@ -370,6 +370,14 @@ export function AsideMenuMain() {
                 fontIcon="bi-cloud-upload"
               />
             )}
+            {allowed("/omr-data-upload") && (
+              <AsideMenuItem
+                to="/omr-data-upload"
+                icon="/media/icons/duotune/general/gen044.svg"
+                title="OMR Data Upload"
+                fontIcon="bi-upc-scan"
+              />
+            )}
             {allowed("/text-response-mapping") && (
               <AsideMenuItem
                 to="/text-response-mapping"

@@ -183,6 +183,9 @@ const PrivateRoutes = () => {
   const OfflineAssessmentUpload = lazy(
     () => import("../pages/OfflineAssessmentUpload/OfflineAssessmentUploadPage")
   );
+  const OMRDataUpload = lazy(
+    () => import("../pages/OfflineAssessmentUpload/OMRDataUploadPage")
+  );
   const TextResponseMapping = lazy(
     () => import("../pages/TextResponseMapping/TextResponseMappingPage")
   );
@@ -605,6 +608,14 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <OfflineAssessmentUpload />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/omr-data-upload"
+          element={
+            <SuspensedView>
+              <OMRDataUpload />
             </SuspensedView>
           }
         />
