@@ -39,4 +39,11 @@ public interface AssessmentTableRepository extends JpaRepository<AssessmentTable
 
     List<AssessmentTable> findByIsLockedTrue();
 
+    List<AssessmentTable> findByIsDeletedFalseOrIsDeletedIsNull();
+
+    List<AssessmentTable> findByIsDeletedTrue();
+
+    @Query("SELECT a.id AS id, a.AssessmentName AS assessmentName, a.isActive AS isActive FROM AssessmentTable a WHERE a.isDeleted = false OR a.isDeleted IS NULL")
+    List<AssessmentSummary> findAssessmentSummaryListNotDeleted();
+
 }
