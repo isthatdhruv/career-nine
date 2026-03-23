@@ -698,17 +698,31 @@ const ReportsPage: React.FC = () => {
                                 >
                                   Preview
                                 </a>
-                                <a
-                                  href={reportUrl}
-                                  download
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      const res = await fetch(reportUrl);
+                                      const blob = await res.blob();
+                                      const url = window.URL.createObjectURL(blob);
+                                      const a = document.createElement("a");
+                                      a.href = url;
+                                      a.download = `${s.name || "report"}_bet_report.html`;
+                                      document.body.appendChild(a);
+                                      a.click();
+                                      document.body.removeChild(a);
+                                      window.URL.revokeObjectURL(url);
+                                    } catch (e) {
+                                      console.error("Download failed", e);
+                                    }
+                                  }}
                                   style={{
                                     padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem",
                                     fontWeight: 600, background: "#f0fdf4", color: "#059669",
-                                    textDecoration: "none",
+                                    border: "none", cursor: "pointer",
                                   }}
                                 >
                                   Download
-                                </a>
+                                </button>
                               </div>
                             ) : (
                               <span style={{ color: "#9ca3af", fontSize: "0.75rem" }}>-</span>
