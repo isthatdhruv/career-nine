@@ -75,14 +75,17 @@ const StudentImportStep = ({
         phone: sa.phone,
         instituteCode: sa.instituteCode,
         studentClass: sa.grade,
+        assessmentId: sa.assessmentId,
       }));
 
       let studentResultsMap: Record<string, number> = {};
+      let apiResults: any[] = [];
 
       try {
         const studentRes = await importStudents({ students: studentList });
         const resData = studentRes.data;
         studentsImported = resData?.created ?? 0;
+        apiResults = resData?.results || [];
         if (resData?.results) {
           resData.results.forEach((r: any) => {
             if (r.userStudentId && r.firebaseDocId) {
@@ -234,6 +237,7 @@ const StudentImportStep = ({
         extraDataImported,
         totalUsers: studentAssignments.length,
         errors,
+        results: apiResults,
         studentDetails: importedStudentDetails,
         scoreDetails: importedScoreDetails,
         extraDetails: importedExtraDetails,
@@ -340,6 +344,63 @@ const StudentImportStep = ({
           )}
         </div>
       )}
+
+      {/* Retry skipped students */}
+      {importComplete && importResults && (() => {
+        const skippedResults = (importResults.results || []).filter(
+          (r: any) => r.status === "skipped" || r.status === "error"
+        );
+        if (skippedResults.length === 0) return null;
+        return (
+          <div className="card border border-warning mb-4">
+            <div className="card-header bg-light-warning py-3 d-flex align-items-center justify-content-between">
+              <h6 className="fw-bold mb-0">
+                <i className="bi bi-exclamation-triangle me-2"></i>
+                {skippedResults.length} Student{skippedResults.length !== 1 ? "s" : ""} Skipped
+              </h6>
+              <button
+                className="btn btn-sm btn-warning"
+                onClick={handleImport}
+                disabled={importing}
+              >
+                <i className="bi bi-arrow-repeat me-1"></i>
+                Retry All ({skippedResults.length})
+              </button>
+            </div>
+            <div className="card-body p-0">
+              <div style={{ maxHeight: 250, overflowY: "auto" }}>
+                <table className="table table-row-bordered mb-0">
+                  <thead className="bg-light">
+                    <tr className="fw-semibold text-muted fs-8">
+                      <th className="ps-4 py-2">#</th>
+                      <th className="py-2">Name</th>
+                      <th className="py-2">Email</th>
+                      <th className="py-2 pe-4">Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {skippedResults.map((r: any, i: number) => {
+                      const sa = studentAssignments.find((s) => s.firebaseDocId === r.firebaseDocId);
+                      return (
+                        <tr key={r.firebaseDocId || i}>
+                          <td className="ps-4 py-2 fs-8 text-muted">{i + 1}</td>
+                          <td className="py-2 fs-7">{r.name || sa?.name || "—"}</td>
+                          <td className="py-2 fs-8 text-muted">{sa?.email || "—"}</td>
+                          <td className="py-2 pe-4">
+                            <span className={`badge fs-9 ${r.status === "error" ? "badge-light-danger" : "badge-light-warning"}`}>
+                              {r.reason || r.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Student summary */}
       {!importing && !importComplete && (

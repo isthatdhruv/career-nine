@@ -90,7 +90,8 @@ const QuestionMappingWizard = ({ onBack }: Props) => {
   // Mapping state
   const [mappings, setMappings] = useState<QuestionMapping[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>("ability");
-  const [questionSearchSystem, setQuestionSearchSystem] = useState("");
+  // Per-question search terms: key = `${category}-${index}`
+  const [questionSearches, setQuestionSearches] = useState<Record<string, string>>({});
 
   // Save state
   const [saving, setSaving] = useState(false);
@@ -216,14 +217,14 @@ const QuestionMappingWizard = ({ onBack }: Props) => {
     }
   };
 
-  // Filtered system questions
-  const filteredSystemQuestions = useMemo(() => {
-    if (!questionSearchSystem.trim()) return systemQuestions;
-    const term = questionSearchSystem.toLowerCase();
+  // Filtered system questions per search key
+  const getFilteredSystemQuestions = (searchKey: string): SystemQuestion[] => {
+    const term = (questionSearches[searchKey] || "").toLowerCase().trim();
+    if (!term) return systemQuestions;
     return systemQuestions.filter((q) =>
       (q.questionText || "").toLowerCase().includes(term)
     );
-  }, [systemQuestions, questionSearchSystem]);
+  };
 
   // Category mappings
   const categoryMappings = useMemo(() => {
@@ -676,7 +677,7 @@ const QuestionMappingWizard = ({ onBack }: Props) => {
                     <button
                       key={key}
                       className={`btn btn-sm ${activeCategory === key ? "btn-primary" : "btn-light"}`}
-                      onClick={() => { setActiveCategory(key); setQuestionSearchSystem(""); }}
+                      onClick={() => { setActiveCategory(key); setQuestionSearches({}); }}
                     >
                       {label}
                       <span className={`badge ms-2 ${activeCategory === key ? "badge-light" : "badge-light-primary"} fs-9`}>
@@ -808,16 +809,22 @@ const QuestionMappingWizard = ({ onBack }: Props) => {
                                       type="text"
                                       className="form-control form-control-sm mb-2"
                                       placeholder="Search questions..."
-                                      value={questionSearchSystem}
-                                      onChange={(e) => setQuestionSearchSystem(e.target.value)}
+                                      value={questionSearches[`${activeCategory}-${idx}`] || ""}
+                                      onChange={(e) => setQuestionSearches((prev) => ({ ...prev, [`${activeCategory}-${idx}`]: e.target.value }))}
                                     />
+                                    {(() => {
+                                      const filtered = getFilteredSystemQuestions(`${activeCategory}-${idx}`);
+                                      return (
                                     <div className="border rounded" style={{ maxHeight: 200, overflowY: "auto" }}>
-                                      {filteredSystemQuestions.slice(0, 50).map((sq) => (
+                                      {filtered.slice(0, 50).map((sq) => (
                                         <div
                                           key={sq.questionId}
                                           className="px-3 py-2 border-bottom fs-8 d-flex align-items-center justify-content-between"
                                           style={{ cursor: "pointer" }}
-                                          onClick={() => handleMapQuestion(idx, sq)}
+                                          onClick={() => {
+                                            handleMapQuestion(idx, sq);
+                                            setQuestionSearches((prev) => ({ ...prev, [`${activeCategory}-${idx}`]: "" }));
+                                          }}
                                           onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#f5f8fa")}
                                           onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                                         >
@@ -827,15 +834,17 @@ const QuestionMappingWizard = ({ onBack }: Props) => {
                                           <span className="badge badge-light fs-9">#{sq.questionId}</span>
                                         </div>
                                       ))}
-                                      {filteredSystemQuestions.length === 0 && (
+                                      {filtered.length === 0 && (
                                         <div className="text-muted text-center py-3 fs-8">No questions match</div>
                                       )}
-                                      {filteredSystemQuestions.length > 50 && (
+                                      {filtered.length > 50 && (
                                         <div className="text-muted text-center py-2 fs-9">
-                                          Showing 50 of {filteredSystemQuestions.length} — refine search
+                                          Showing 50 of {filtered.length} — refine search
                                         </div>
                                       )}
                                     </div>
+                                      );
+                                    })()}
                                   </div>
                                 )}
                               </div>

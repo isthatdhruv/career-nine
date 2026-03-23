@@ -1,15 +1,8 @@
 import { useState } from "react";
 import AssessmentMappingStep from "./steps/AssessmentMappingStep";
 import type { StudentAssignment } from "./steps/AssessmentMappingStep";
-import ScoreTypeMappingStep from "./steps/ScoreTypeMappingStep";
+import QuestionMappingStep from "./steps/QuestionMappingStep";
 import StudentImportStep from "./steps/StudentImportStep";
-
-interface ScoreTypeMapping {
-  firebaseKey: string;
-  category: string;
-  measuredQualityTypeId: number | null;
-  measuredQualityTypeName: string;
-}
 
 interface Props {
   onBack: () => void;
@@ -17,36 +10,23 @@ interface Props {
 
 const STEPS = [
   { key: "assessment", label: "Student & Assessment Mapping", icon: "bi-clipboard-data" },
-  { key: "scoreType", label: "Score Type Mapping", icon: "bi-bar-chart" },
-  { key: "import", label: "Import", icon: "bi-people" },
+  { key: "import", label: "Import Students", icon: "bi-people" },
+  { key: "questionMapping", label: "Question & Option Mapping", icon: "bi-list-check" },
   { key: "done", label: "Done", icon: "bi-check-circle" },
 ];
 
 // ── Done Screen with clickable detail cards ──────────────────────────────
 const DoneScreen = ({ importResults, studentAssignments, onBack }: { importResults: any; studentAssignments: StudentAssignment[]; onBack: () => void }) => {
-  const [activePanel, setActivePanel] = useState<"students" | "scores" | "extra" | null>(null);
-  const [expandedScoreRow, setExpandedScoreRow] = useState<number | null>(null);
+  const [activePanel, setActivePanel] = useState<"students" | "extra" | "skipped" | null>(null);
 
   const studentsCreated = importResults?.studentsCreated || 0;
-  const scoresImported = importResults?.scoresImported || 0;
   const extraDataImported = importResults?.extraDataImported || 0;
   const studentsSkipped = importResults?.studentsSkipped || 0;
 
-  // Build details from studentAssignments (always available)
-  const scoreDetails: { name: string; category: string; count: number; scores: Record<string, number> }[] = [];
+  // Build details from studentAssignments
   const extraDetails: { name: string; type: string; value: string }[] = [];
 
   studentAssignments.forEach((sa) => {
-    if (sa.abilityScores && Object.keys(sa.abilityScores).length > 0) {
-      scoreDetails.push({ name: sa.name, category: "Ability", count: Object.keys(sa.abilityScores).length, scores: sa.abilityScores });
-    }
-    if (sa.multipleIntelligenceScores && Object.keys(sa.multipleIntelligenceScores).length > 0) {
-      scoreDetails.push({ name: sa.name, category: "Multiple Intelligence", count: Object.keys(sa.multipleIntelligenceScores).length, scores: sa.multipleIntelligenceScores });
-    }
-    if (sa.personalityScores && Object.keys(sa.personalityScores).length > 0) {
-      scoreDetails.push({ name: sa.name, category: "Personality", count: Object.keys(sa.personalityScores).length, scores: sa.personalityScores });
-    }
-
     (sa.careerAspirations || []).forEach((v) => extraDetails.push({ name: sa.name, type: "Career Aspiration", value: v }));
     (sa.subjectsOfInterest || []).forEach((v) => extraDetails.push({ name: sa.name, type: "Subject of Interest", value: v }));
     (sa.values || []).forEach((v) => extraDetails.push({ name: sa.name, type: "Value", value: v }));
@@ -74,16 +54,6 @@ const DoneScreen = ({ importResults, studentAssignments, onBack }: { importResul
         </div>
         <div className="col-auto">
           <div
-            className={`rounded p-4 text-center border-2 ${activePanel === "scores" ? "border border-primary" : ""}`}
-            style={{ minWidth: 140, cursor: "pointer", backgroundColor: activePanel === "scores" ? "#eef6ff" : "#f1faff" }}
-            onClick={() => setActivePanel(activePanel === "scores" ? null : "scores")}
-          >
-            <div className="fs-2x fw-bold text-primary">{scoresImported}</div>
-            <div className="fs-7 text-muted">Scores Imported</div>
-          </div>
-        </div>
-        <div className="col-auto">
-          <div
             className={`rounded p-4 text-center border-2 ${activePanel === "extra" ? "border border-info" : ""}`}
             style={{ minWidth: 140, cursor: "pointer", backgroundColor: activePanel === "extra" ? "#e8f7ff" : "#f1faff" }}
             onClick={() => setActivePanel(activePanel === "extra" ? null : "extra")}
@@ -94,7 +64,11 @@ const DoneScreen = ({ importResults, studentAssignments, onBack }: { importResul
         </div>
         {studentsSkipped > 0 && (
           <div className="col-auto">
-            <div className="bg-light-warning rounded p-4 text-center" style={{ minWidth: 140 }}>
+            <div
+              className={`rounded p-4 text-center border-2 ${activePanel === "skipped" ? "border border-warning" : ""}`}
+              style={{ minWidth: 140, cursor: "pointer", backgroundColor: activePanel === "skipped" ? "#fff8e1" : "#fff8dd" }}
+              onClick={() => setActivePanel(activePanel === "skipped" ? null : "skipped")}
+            >
               <div className="fs-2x fw-bold text-warning">{studentsSkipped}</div>
               <div className="fs-7 text-muted">Skipped</div>
             </div>
@@ -144,80 +118,6 @@ const DoneScreen = ({ importResults, studentAssignments, onBack }: { importResul
         </div>
       )}
 
-      {/* Scores detail */}
-      {activePanel === "scores" && (
-        <div className="card border border-primary mb-4">
-          <div className="card-header bg-light-primary py-3">
-            <h6 className="fw-bold mb-0">
-              <i className="bi bi-bar-chart me-2"></i>
-              Score Records ({scoreDetails.length})
-            </h6>
-          </div>
-          <div className="card-body p-0">
-            <div style={{ maxHeight: 350, overflowY: "auto" }}>
-              <table className="table table-row-bordered mb-0">
-                <thead className="bg-light">
-                  <tr className="fw-semibold text-muted fs-8">
-                    <th className="ps-4 py-2">#</th>
-                    <th className="py-2">Student</th>
-                    <th className="py-2">Category</th>
-                    <th className="py-2 pe-4">Score Types</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {scoreDetails.map((s, i) => (
-                    <>
-                      <tr
-                        key={i}
-                        style={{ cursor: "pointer" }}
-                        className={expandedScoreRow === i ? "bg-light-primary" : ""}
-                        onClick={() => setExpandedScoreRow(expandedScoreRow === i ? null : i)}
-                      >
-                        <td className="ps-4 py-2 fs-8 text-muted">{i + 1}</td>
-                        <td className="py-2 fs-7 fw-semibold">{s.name || "—"}</td>
-                        <td className="py-2">
-                          <span className={`badge fs-9 ${
-                            s.category === "Ability" ? "badge-light-success" :
-                            s.category === "Multiple Intelligence" ? "badge-light-primary" :
-                            "badge-light-info"
-                          }`}>
-                            {s.category}
-                          </span>
-                        </td>
-                        <td className="py-2 pe-4 fs-8">
-                          <span className="me-2">{s.count} types</span>
-                          <i className={`bi ${expandedScoreRow === i ? "bi-chevron-up" : "bi-chevron-down"} fs-9 text-muted`}></i>
-                        </td>
-                      </tr>
-                      {expandedScoreRow === i && (
-                        <tr key={`${i}-detail`}>
-                          <td colSpan={4} className="p-0">
-                            <div className="bg-light px-5 py-3">
-                              <div className="row g-2">
-                                {Object.entries(s.scores).map(([key, val]) => (
-                                  <div key={key} className="col-md-4 col-sm-6">
-                                    <div className="d-flex justify-content-between align-items-center bg-white rounded px-3 py-2 border">
-                                      <span className="fs-8 text-muted">{key}</span>
-                                      <span className="fw-bold fs-7">{val}</span>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </>
-                  ))}
-                  {scoreDetails.length === 0 && (
-                    <tr><td colSpan={4} className="text-center text-muted py-4 fs-8">No score data found in selected students</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Extra data detail */}
       {activePanel === "extra" && (
@@ -266,6 +166,58 @@ const DoneScreen = ({ importResults, studentAssignments, onBack }: { importResul
         </div>
       )}
 
+      {/* Skipped detail */}
+      {activePanel === "skipped" && (
+        <div className="card border border-warning mb-4">
+          <div className="card-header bg-light-warning py-3">
+            <h6 className="fw-bold mb-0">
+              <i className="bi bi-skip-forward me-2"></i>
+              Skipped Students ({studentsSkipped})
+            </h6>
+          </div>
+          <div className="card-body p-0">
+            <div style={{ maxHeight: 350, overflowY: "auto" }}>
+              <table className="table table-row-bordered mb-0">
+                <thead className="bg-light">
+                  <tr className="fw-semibold text-muted fs-8">
+                    <th className="ps-4 py-2">#</th>
+                    <th className="py-2">Name</th>
+                    <th className="py-2">Email</th>
+                    <th className="py-2">Firebase Doc ID</th>
+                    <th className="py-2 pe-4">Reason</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(importResults?.results || [])
+                    .filter((r: any) => r.status === "skipped" || r.status === "error")
+                    .map((r: any, i: number) => {
+                      const sa = studentAssignments.find((s) => s.firebaseDocId === r.firebaseDocId);
+                      return (
+                        <tr key={r.firebaseDocId || i}>
+                          <td className="ps-4 py-2 fs-8 text-muted">{i + 1}</td>
+                          <td className="py-2 fs-7 fw-semibold">{r.name || sa?.name || "—"}</td>
+                          <td className="py-2 fs-8 text-muted">{sa?.email || "—"}</td>
+                          <td className="py-2 fs-8">
+                            <code className="fs-9">{r.firebaseDocId || "—"}</code>
+                          </td>
+                          <td className="py-2 pe-4">
+                            <span className={`badge fs-9 ${r.status === "error" ? "badge-light-danger" : "badge-light-warning"}`}>
+                              {r.reason || r.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  {(importResults?.results || []).filter((r: any) => r.status === "skipped" || r.status === "error").length === 0 && (
+                    <tr><td colSpan={5} className="text-center text-muted py-4 fs-8">No skip details available</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="text-center mt-4">
         <button className="btn btn-primary" onClick={onBack}>
           Back to Main Menu
@@ -278,7 +230,6 @@ const DoneScreen = ({ importResults, studentAssignments, onBack }: { importResul
 const StudentImportWizard = ({ onBack }: Props) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [studentAssignments, setStudentAssignments] = useState<StudentAssignment[]>([]);
-  const [scoreTypeMappings, setScoreTypeMappings] = useState<ScoreTypeMapping[]>([]);
   const [importResults, setImportResults] = useState<any>(null);
 
   const handleAssessmentMappingDone = (assignments: StudentAssignment[]) => {
@@ -286,20 +237,19 @@ const StudentImportWizard = ({ onBack }: Props) => {
     setCurrentStep(1);
   };
 
-  const handleScoreTypeMappingDone = (mappings: ScoreTypeMapping[]) => {
-    setScoreTypeMappings(mappings);
+  const handleImportDone = (results: any) => {
+    setImportResults(results);
     setCurrentStep(2);
   };
 
-  const handleImportDone = (results: any) => {
-    setImportResults(results);
+  const handleQuestionMappingDone = () => {
     setCurrentStep(3);
   };
 
   return (
     <div className="container mt-8">
       <div className="row justify-content-center">
-        <div className="col-12 col-lg-10">
+        <div className="col-12">
           {/* Header */}
           <div className="d-flex align-items-center mb-6">
             <button className="btn btn-light-primary btn-sm me-4" onClick={onBack}>
@@ -369,18 +319,19 @@ const StudentImportWizard = ({ onBack }: Props) => {
               )}
 
               {currentStep === 1 && (
-                <ScoreTypeMappingStep
-                  mappings={scoreTypeMappings}
-                  onDone={handleScoreTypeMappingDone}
+                <StudentImportStep
+                  studentAssignments={studentAssignments}
+                  scoreTypeMappings={[]}
+                  onDone={handleImportDone}
                   onBack={() => setCurrentStep(0)}
                 />
               )}
 
               {currentStep === 2 && (
-                <StudentImportStep
+                <QuestionMappingStep
                   studentAssignments={studentAssignments}
-                  scoreTypeMappings={scoreTypeMappings}
-                  onDone={handleImportDone}
+                  importResults={importResults}
+                  onDone={handleQuestionMappingDone}
                   onBack={() => setCurrentStep(1)}
                 />
               )}

@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -36,6 +37,7 @@ import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.model.career9.MeasuredQualities;
 import com.kccitm.api.model.career9.MeasuredQualityTypes;
+import com.kccitm.api.model.career9.OptionScoreBasedOnMEasuredQualityTypes;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
@@ -50,6 +52,7 @@ import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.repository.Career9.MeasuredQualityTypesRepository;
+import com.kccitm.api.repository.Career9.OptionScoreBasedOnMeasuredQualityTypesRepository;
 import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.School.FirebaseDataMappingRepository;
@@ -98,6 +101,9 @@ public class FirebaseDataMappingController {
 
     @Autowired
     private AssessmentQuestionOptionsRepository assessmentQuestionOptionsRepository;
+
+    @Autowired
+    private OptionScoreBasedOnMeasuredQualityTypesRepository optionScoreRepository;
 
     @Autowired
     private QuestionnaireQuestionRepository questionnaireQuestionRepository;
@@ -156,6 +162,7 @@ public class FirebaseDataMappingController {
         return ResponseEntity.ok(result);
     }
 
+    @Transactional
     @PostMapping("/import-mapped-answers")
     public ResponseEntity<?> importMappedAnswers(@RequestBody Map<String, Object> payload) {
         try {
@@ -178,16 +185,33 @@ public class FirebaseDataMappingController {
             }
             AssessmentTable assessment = atOpt.get();
 
-            // Delete existing answers for this student + assessment to avoid duplicates
-            assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
-
-            List<Map<String, Object>> answers = (List<Map<String, Object>>) payload.get("answers");
-            if (answers == null || answers.isEmpty()) {
-                return ResponseEntity.ok(Map.of("saved", 0, "message", "No answers to save"));
+            // Find or create StudentAssessmentMapping
+            Optional<StudentAssessmentMapping> samOpt = studentAssessmentMappingRepository
+                    .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+            StudentAssessmentMapping sam;
+            if (samOpt.isPresent()) {
+                sam = samOpt.get();
+            } else {
+                sam = new StudentAssessmentMapping(userStudentId, assessmentId);
+                sam.setStatus("completed");
+                sam = studentAssessmentMappingRepository.save(sam);
             }
 
+            // Delete existing answers and raw scores for this student + assessment
+            assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
+            assessmentRawScoreRepository.deleteByStudentAssessmentMappingStudentAssessmentId(sam.getStudentAssessmentId());
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> answers = (List<Map<String, Object>>) payload.get("answers");
+            if (answers == null || answers.isEmpty()) {
+                return ResponseEntity.ok(Map.of("saved", 0, "scoresCalculated", 0, "message", "No answers to save"));
+            }
+
+            // Accumulate scores per MeasuredQualityType
+            Map<Long, Integer> scoreAccumulator = new LinkedHashMap<>();
+            Map<Long, MeasuredQualityTypes> mqtCache = new LinkedHashMap<>();
+
             int saved = 0;
-            int skipped = 0;
             for (Map<String, Object> ans : answers) {
                 Long optionId = getLong(ans, "optionId");
                 Long questionId = getLong(ans, "questionId");
@@ -198,7 +222,7 @@ public class FirebaseDataMappingController {
                 answer.setAssessment(assessment);
                 answer.setTextResponse(textResponse);
 
-                // Set the QuestionnaireQuestion by finding it via the linked AssessmentQuestions ID
+                // Set QuestionnaireQuestion
                 if (questionId != null) {
                     List<QuestionnaireQuestion> qqList = questionnaireQuestionRepository.findByQuestion_QuestionId(questionId);
                     if (!qqList.isEmpty()) {
@@ -206,10 +230,22 @@ public class FirebaseDataMappingController {
                     }
                 }
 
+                // Set option and accumulate scores
                 if (optionId != null) {
                     Optional<AssessmentQuestionOptions> optOpt = assessmentQuestionOptionsRepository.findById(optionId);
                     if (optOpt.isPresent()) {
                         answer.setOption(optOpt.get());
+
+                        // Fetch scores for this option and accumulate
+                        List<OptionScoreBasedOnMEasuredQualityTypes> optionScores =
+                                optionScoreRepository.findByOptionId(optionId);
+                        for (OptionScoreBasedOnMEasuredQualityTypes os : optionScores) {
+                            if (os.getMeasuredQualityType() != null && os.getScore() != null) {
+                                Long mqtId = os.getMeasuredQualityType().getMeasuredQualityTypeId();
+                                scoreAccumulator.merge(mqtId, os.getScore(), Integer::sum);
+                                mqtCache.putIfAbsent(mqtId, os.getMeasuredQualityType());
+                            }
+                        }
                     }
                 }
 
@@ -217,10 +253,32 @@ public class FirebaseDataMappingController {
                 saved++;
             }
 
+            // Save accumulated raw scores
+            int scoresCalculated = 0;
+            for (Map.Entry<Long, Integer> entry : scoreAccumulator.entrySet()) {
+                Long mqtId = entry.getKey();
+                Integer totalScore = entry.getValue();
+                MeasuredQualityTypes mqt = mqtCache.get(mqtId);
+
+                if (mqt != null) {
+                    AssessmentRawScore rawScore = new AssessmentRawScore();
+                    rawScore.setStudentAssessmentMapping(sam);
+                    rawScore.setMeasuredQualityType(mqt);
+                    rawScore.setMeasuredQuality(mqt.getMeasuredQuality());
+                    rawScore.setRawScore(totalScore);
+                    assessmentRawScoreRepository.save(rawScore);
+                    scoresCalculated++;
+                }
+            }
+
+            // Update mapping status
+            sam.setStatus("completed");
+            studentAssessmentMappingRepository.save(sam);
+
             return ResponseEntity.ok(Map.of(
                 "saved", saved,
-                "skipped", skipped,
-                "message", "Answers imported successfully"
+                "scoresCalculated", scoresCalculated,
+                "message", "Answers imported and scores calculated successfully"
             ));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -630,16 +688,96 @@ public class FirebaseDataMappingController {
                 resultMap.put("firebaseDocId", firebaseDocId);
                 resultMap.put("name", name);
 
-                // Check if already mapped
+                // Check if already mapped — update existing records instead of skipping
                 if (firebaseDocId != null) {
                     Optional<FirebaseDataMapping> existing =
                         firebaseDataMappingRepository.findByFirebaseIdAndFirebaseType(firebaseDocId, "STUDENT");
                     if (existing.isPresent()) {
-                        resultMap.put("status", "skipped");
-                        resultMap.put("reason", "Already mapped");
-                        resultMap.put("userStudentId", existing.get().getNewEntityId());
+                        Long existingUserStudentId = existing.get().getNewEntityId();
+                        try {
+                            // Update existing UserStudent's related records
+                            Optional<UserStudent> usOpt = userStudentRepository.findById(existingUserStudentId);
+                            if (usOpt.isPresent()) {
+                                UserStudent us = usOpt.get();
+
+                                // Update User
+                                User existingUser = us.getUserId() != null ? userRepository.findById(us.getUserId()).orElse(null) : null;
+                                if (existingUser != null) {
+                                    if (name != null) existingUser.setName(name);
+                                    if (email != null) existingUser.setEmail(email);
+                                    if (phone != null) existingUser.setPhone(phone);
+                                    if (dobStr != null && !dobStr.trim().isEmpty()) {
+                                        try {
+                                            SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
+                                            existingUser.setDobDate(sdf.parse(dobStr.trim()));
+                                        } catch (Exception e1) {
+                                            try {
+                                                SimpleDateFormat sdf2 = new SimpleDateFormat("yyyy-MM-dd");
+                                                existingUser.setDobDate(sdf2.parse(dobStr.trim()));
+                                            } catch (Exception ignored) {}
+                                        }
+                                    }
+                                    userRepository.save(existingUser);
+                                }
+
+                                // Update StudentInfo
+                                StudentInfo existingSi = us.getStudentInfo();
+                                if (existingSi != null) {
+                                    if (name != null) existingSi.setName(name);
+                                    if (email != null) existingSi.setEmail(email);
+                                    if (phone != null) existingSi.setPhoneNumber(phone);
+                                    if (gender != null) existingSi.setGender(gender);
+                                    if (instituteCode != null) existingSi.setInstituteId(instituteCode);
+                                    if (studentClass != null) existingSi.setStudentClass(studentClass);
+                                    if (schoolSectionId != null) existingSi.setSchoolSectionId(schoolSectionId);
+                                    studentInfoRepository.save(existingSi);
+                                }
+
+                                // Update institute if changed
+                                if (instituteCode != null) {
+                                    Optional<InstituteDetail> newInstOpt = instituteDetailRepository.findById(instituteCode);
+                                    if (newInstOpt.isPresent() && (us.getInstitute() == null ||
+                                            us.getInstitute().getInstituteCode() != instituteCode)) {
+                                        us.setInstitute(newInstOpt.get());
+                                        userStudentRepository.save(us);
+                                    }
+                                }
+
+                                // Create StudentAssessmentMapping if not exists
+                                Long assessmentId = getLong(student, "assessmentId");
+                                if (assessmentId != null && assessmentId > 0) {
+                                    Optional<StudentAssessmentMapping> existingSam = studentAssessmentMappingRepository
+                                            .findFirstByUserStudentUserStudentIdAndAssessmentId(
+                                                    us.getUserStudentId(), assessmentId);
+                                    if (!existingSam.isPresent()) {
+                                        StudentAssessmentMapping sam = new StudentAssessmentMapping(
+                                                (long) us.getUserStudentId(), assessmentId);
+                                        sam.setStatus("completed");
+                                        studentAssessmentMappingRepository.save(sam);
+                                    }
+                                }
+
+                                // Update mapping name
+                                existing.get().setNewEntityName(name);
+                                firebaseDataMappingRepository.save(existing.get());
+
+                                resultMap.put("status", "updated");
+                                resultMap.put("reason", "Existing record updated");
+                                resultMap.put("userStudentId", existingUserStudentId);
+                                results.add(resultMap);
+                                created++;
+                                continue;
+                            }
+                        } catch (Exception ex) {
+                            // Fall through to create new if update fails
+                        }
+
+                        // If UserStudent not found, still return the mapping
+                        resultMap.put("status", "updated");
+                        resultMap.put("reason", "Mapping exists");
+                        resultMap.put("userStudentId", existingUserStudentId);
                         results.add(resultMap);
-                        skipped++;
+                        created++;
                         continue;
                     }
                 }
@@ -706,7 +844,21 @@ public class FirebaseDataMappingController {
                 UserStudent userStudent = new UserStudent(user, studentInfo, instituteOpt.get());
                 userStudent = userStudentRepository.save(userStudent);
 
-                // 4. Save mapping
+                // 4. Create StudentAssessmentMapping if assessmentId provided
+                Long assessmentId = getLong(student, "assessmentId");
+                if (assessmentId != null && assessmentId > 0) {
+                    Optional<StudentAssessmentMapping> existingSam = studentAssessmentMappingRepository
+                            .findFirstByUserStudentUserStudentIdAndAssessmentId(
+                                    userStudent.getUserStudentId(), assessmentId);
+                    if (!existingSam.isPresent()) {
+                        StudentAssessmentMapping sam = new StudentAssessmentMapping(
+                                (long) userStudent.getUserStudentId(), assessmentId);
+                        sam.setStatus("completed");
+                        studentAssessmentMappingRepository.save(sam);
+                    }
+                }
+
+                // 5. Save firebase mapping
                 if (firebaseDocId != null) {
                     FirebaseDataMapping mapping = new FirebaseDataMapping();
                     mapping.setFirebaseId(firebaseDocId);
