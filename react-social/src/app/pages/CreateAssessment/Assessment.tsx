@@ -22,8 +22,7 @@ const AssessmentPage = () => {
       setIsDataLoading(true);
       try {
         const response = await ReadAssessmentList();
-        const activeOnly = (response.data || []).filter((a: any) => a.isActive !== false);
-        setAssessmentData(activeOnly);
+        setAssessmentData(response.data || []);
       } catch (error) {
         console.error("Error fetching assessments:", error);
         setAssessmentData([]);
@@ -41,8 +40,7 @@ const AssessmentPage = () => {
         setIsDataLoading(true);
         try {
           const response = await ReadAssessmentList();
-          const activeOnly = (response.data || []).filter((a: any) => a.isActive !== false);
-          setAssessmentData(activeOnly);
+          setAssessmentData(response.data || []);
         } catch (error) {
           console.error("Error refreshing assessments:", error);
         } finally {
