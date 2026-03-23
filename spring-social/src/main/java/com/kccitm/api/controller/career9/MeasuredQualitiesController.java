@@ -1,6 +1,7 @@
 package com.kccitm.api.controller.career9;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,7 +32,7 @@ public class MeasuredQualitiesController {
 
     @GetMapping("/getAll")
     public List<MeasuredQualities> getAllMeasuredQualities() {
-        return measuredQualitiesRepository.findAll();
+        return measuredQualitiesRepository.findByIsDeletedFalseOrIsDeletedIsNull();
     }
 
     @GetMapping("/get/{id}")
@@ -78,8 +79,9 @@ public class MeasuredQualitiesController {
             }
             measuredQuality.getQualityTypes().clear();
         }
-        measuredQualitiesRepository.deleteById(id);
-        return ResponseEntity.ok("MeasuredQualities deleted. All mappings to MeasuredQualityTypes removed, no types deleted.");
+        measuredQuality.setIsDeleted(true);
+        measuredQualitiesRepository.save(measuredQuality);
+        return ResponseEntity.ok("MeasuredQualities soft-deleted. All mappings to MeasuredQualityTypes removed, no types deleted.");
     }
 
     // Many-to-Many relationship management endpoints for Tools
@@ -124,5 +126,35 @@ public class MeasuredQualitiesController {
         }
 
         return ResponseEntity.ok(measuredQuality.getTools());
+    }
+
+    @GetMapping("/deleted")
+    public List<MeasuredQualities> getDeletedMeasuredQualities() {
+        return measuredQualitiesRepository.findByIsDeletedTrue();
+    }
+
+    @PutMapping("/restore/{id}")
+    public ResponseEntity<String> restoreMeasuredQualities(@PathVariable Long id) {
+        Optional<MeasuredQualities> opt = measuredQualitiesRepository.findById(id);
+        if (!opt.isPresent()) return ResponseEntity.notFound().build();
+        MeasuredQualities mq = opt.get();
+        mq.setIsDeleted(false);
+        measuredQualitiesRepository.save(mq);
+        return ResponseEntity.ok("Restored successfully.");
+    }
+
+    @DeleteMapping("/permanent-delete/{id}")
+    public ResponseEntity<String> permanentDeleteMeasuredQualities(@PathVariable Long id) {
+        Optional<MeasuredQualities> opt = measuredQualitiesRepository.findById(id);
+        if (!opt.isPresent()) return ResponseEntity.notFound().build();
+        MeasuredQualities mq = opt.get();
+        if (mq.getQualityTypes() != null) {
+            for (var type : mq.getQualityTypes()) {
+                type.setMeasuredQuality(null);
+            }
+            mq.getQualityTypes().clear();
+        }
+        measuredQualitiesRepository.deleteById(id);
+        return ResponseEntity.ok("Permanently deleted.");
     }
 }

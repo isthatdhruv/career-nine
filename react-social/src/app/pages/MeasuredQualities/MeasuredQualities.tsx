@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
 import { Button } from "react-bootstrap";
 import { IconContext } from "react-icons";
-import { MdQuestionAnswer } from "react-icons/md";
+import { MdQuestionAnswer, MdDeleteSweep } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { ReadMeasuredQualitiesData } from "./API/Measured_Qualities_APIs";
 import { MeasuredQualitiesTable } from "./components";
+import MeasuredQualitiesRecycleBinModal from "./components/MeasuredQualitiesRecycleBinModal";
 
 const MeasuredQualitiesPage = () => {
   const [measuredQualitiesData, setMeasuredQualitiesData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [sections, setSections] = useState<any[]>([]); 
   const [pageLoading, setPageLoading] = useState(["false"]);
+  const [showRecycleBin, setShowRecycleBin] = useState(false);
   const navigate = useNavigate();
 
   const fetchMeasuredQualities = async () => {
@@ -65,7 +67,19 @@ const MeasuredQualitiesPage = () => {
           </div>
 
           <div className="card-toolbar">
-            <div className="d-flex justify-content-end">
+            <div className="d-flex justify-content-end gap-2">
+              <Button
+                variant="outline-danger"
+                onClick={() => setShowRecycleBin(true)}
+              >
+                <IconContext.Provider
+                  value={{ style: { paddingBottom: "4px" } }}
+                >
+                  <div>
+                    Recycle Bin <MdDeleteSweep size={21} />
+                  </div>
+                </IconContext.Provider>
+              </Button>
               <Button
                 variant="primary"
                 onClick={() => {
@@ -94,6 +108,14 @@ const MeasuredQualitiesPage = () => {
           />
         </div>
       )}
+
+      <MeasuredQualitiesRecycleBinModal
+        show={showRecycleBin}
+        onHide={() => setShowRecycleBin(false)}
+        onRestoreComplete={() => {
+          fetchMeasuredQualities();
+        }}
+      />
     </div>
   );
 };

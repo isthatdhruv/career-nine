@@ -41,4 +41,14 @@ export function ReadLanguageData() {
   return axios.get(readLanguageData);
 }
 
+export function GetDeletedQuestionnaires() {
+  return axios.get(`${API_URL}/api/questionnaire/deleted`);
+}
 
+export function RestoreQuestionnaire(id: any) {
+  return axios.put(`${API_URL}/api/questionnaire/restore/${id}`);
+}
+
+export function PermanentDeleteQuestionnaire(id: any) {
+  return axios.delete(`${API_URL}/api/questionnaire/permanent-delete/${id}`);
+}

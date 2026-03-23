@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
 import { Button } from "react-bootstrap";
 import { IconContext } from "react-icons";
-import { MdQuestionAnswer } from "react-icons/md";
+import { MdQuestionAnswer, MdDeleteSweep } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { ReadQuestionSectionData } from "./API/Question_Section_APIs";
 import QuestionSectionTable from "./components/QuestionSectionTable";
+import QuestionSectionRecycleBinModal from "./components/QuestionSectionRecycleBinModal";
 
 const QuestionSectionPage = () => {
   const [questionSectionData, setQuestionSectionData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(["false"]);
+  const [showRecycleBin, setShowRecycleBin] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -41,7 +43,19 @@ const QuestionSectionPage = () => {
           </div>
 
           <div className="card-toolbar">
-            <div className="d-flex justify-content-end">
+            <div className="d-flex justify-content-end gap-2">
+              <Button
+                variant="danger"
+                onClick={() => setShowRecycleBin(true)}
+              >
+                <IconContext.Provider
+                  value={{ style: { paddingBottom: "4px" } }}
+                >
+                  <div>
+                    Recycle Bin <MdDeleteSweep size={21} />
+                  </div>
+                </IconContext.Provider>
+              </Button>
               <Button
                 variant="primary"
                 onClick={() => {
@@ -70,6 +84,11 @@ const QuestionSectionPage = () => {
           />
         </div>
       )}
+      <QuestionSectionRecycleBinModal
+        show={showRecycleBin}
+        onHide={() => setShowRecycleBin(false)}
+        onRestoreComplete={() => setPageLoading([String(Date.now())])}
+      />
     </div>
   );
 };

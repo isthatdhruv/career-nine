@@ -1,16 +1,16 @@
 import { useState } from "react";
 import StudentImportWizard from "./StudentImportWizard";
-import QuestionMappingWizard from "./QuestionMappingWizard";
+import ExistingMappingView from "./ExistingMappingView";
 
 const OldDataMappingPage = () => {
-  const [mode, setMode] = useState<"select" | "student-import" | "question-mapping">("select");
+  const [mode, setMode] = useState<"select" | "student-import" | "existing-mapping">("select");
 
   if (mode === "student-import") {
     return <StudentImportWizard onBack={() => setMode("select")} />;
   }
 
-  if (mode === "question-mapping") {
-    return <QuestionMappingWizard onBack={() => setMode("select")} />;
+  if (mode === "existing-mapping") {
+    return <ExistingMappingView onBack={() => setMode("select")} />;
   }
 
   return (
@@ -43,32 +43,32 @@ const OldDataMappingPage = () => {
                   <h4 className="fw-bold text-dark mb-2">Student & Score Import</h4>
                   <p className="text-muted fs-7">
                     Map Firebase schools to system schools, select students, assign assessments,
-                    and import scores &amp; additional data.
+                    map questions &amp; options, and import scores &amp; additional data.
                   </p>
                   <button className="btn btn-success mt-auto">Start Import</button>
                 </div>
               </div>
             </div>
 
-            {/* Question & Response Mapping */}
+            {/* Existing Mapping */}
             <div className="col-12 col-md-4">
               <div
                 className="card card-hover border border-primary border-2 h-100"
                 style={{ cursor: "pointer" }}
-                onClick={() => setMode("question-mapping")}
+                onClick={() => setMode("existing-mapping")}
               >
                 <div className="card-body p-6 d-flex flex-column align-items-center text-center">
                   <div className="symbol symbol-60px mb-4 bg-light-primary rounded">
                     <span className="symbol-label">
-                      <i className="bi bi-chat-left-text fs-2x text-primary"></i>
+                      <i className="bi bi-diagram-3 fs-2x text-primary"></i>
                     </span>
                   </div>
-                  <h4 className="fw-bold text-dark mb-2">Question & Response Mapping</h4>
+                  <h4 className="fw-bold text-dark mb-2">Existing Mapping</h4>
                   <p className="text-muted fs-7">
-                    Select a student, view their Firebase responses, and map questions &amp; answers
-                    to system assessment questions.
+                    View and edit saved question &amp; option mappings for each assessment.
+                    Mappings are auto-reused across schools.
                   </p>
-                  <button className="btn btn-primary mt-auto">Start Mapping</button>
+                  <button className="btn btn-primary mt-auto">View Mappings</button>
                 </div>
               </div>
             </div>

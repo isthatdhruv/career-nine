@@ -2,9 +2,12 @@ import React, { useEffect, useState } from "react";
 import { MDBDataTableV5 } from "mdbreact";
 import { Link } from "react-router-dom";
 import { ReadQuestionaireDataList } from "../../API/Create_Questionaire_APIs";
+import { MdDeleteSweep } from "react-icons/md";
+import QuestionnaireRecycleBinModal from "./QuestionnaireRecycleBinModal";
 
 const QuestionaireListPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
+  const [showRecycleBin, setShowRecycleBin] = useState(false);
   
   // This state variable 'questionaireList' holds the raw data
   const [questionaireList, setQuestionaireList] = useState<any[]>([]);
@@ -100,7 +103,15 @@ const QuestionaireListPage: React.FC = () => {
             List of all created questionaires
           </span>
         </h3>
-        <div className="card-toolbar">
+        <div className="card-toolbar d-flex gap-2">
+          <button
+            className="btn btn-sm btn-danger"
+            onClick={() => setShowRecycleBin(true)}
+            title="Recycle Bin"
+          >
+            <MdDeleteSweep size={18} className="me-1" />
+            Recycle Bin
+          </button>
           <Link to="/questionare/create" className="btn btn-sm btn-primary">
             Create Questionaire
           </Link>
@@ -121,6 +132,11 @@ const QuestionaireListPage: React.FC = () => {
           />
         )}
       </div>
+      <QuestionnaireRecycleBinModal
+        show={showRecycleBin}
+        onHide={() => setShowRecycleBin(false)}
+        onRestoreComplete={() => fetchData()}
+      />
     </div>
   );
 };

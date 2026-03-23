@@ -19,4 +19,7 @@ public interface QuestionnaireRepository extends JpaRepository<Questionnaire, Lo
 
     @Query("SELECT new com.kccitm.api.model.career9.Questionaire.Questionnaire(q.questionnaireId, q.name, q.modeId, q.type, q.isFree) FROM Questionnaire q")
     List<Questionnaire> findQuestionnaireList();
+
+    List<Questionnaire> findByDisplayFalse();
+    List<Questionnaire> findByDisplayTrueOrDisplayIsNull();
 }
