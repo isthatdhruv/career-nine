@@ -27,7 +27,7 @@ public class QuestionSectionController {
 
     @GetMapping("/getAll")
     public List<QuestionSection> getAllQuestionSections() {
-        return questionSectionRepository.findAll();
+        return questionSectionRepository.findByIsDeletedFalseOrIsDeletedIsNull();
     }
 
     @GetMapping("/getAllList")
@@ -74,10 +74,32 @@ public class QuestionSectionController {
                 question.setSection(null);
             }
         }
-        questionSectionRepository.deleteById(id);
+        questionSection.setIsDeleted(true);
+        questionSectionRepository.save(questionSection);
         return ResponseEntity.ok("Question section deleted successfully");
     }
     
+    @GetMapping("/deleted")
+    public List<QuestionSection> getDeletedQuestionSections() {
+        return questionSectionRepository.findByIsDeletedTrue();
+    }
+
+    @PutMapping("/restore/{id}")
+    public ResponseEntity<String> restoreQuestionSection(@PathVariable Long id) {
+        Optional<QuestionSection> opt = questionSectionRepository.findById(id);
+        if (!opt.isPresent()) return ResponseEntity.notFound().build();
+        QuestionSection qs = opt.get();
+        qs.setIsDeleted(false);
+        questionSectionRepository.save(qs);
+        return ResponseEntity.ok("Restored successfully.");
+    }
+
+    @DeleteMapping("/permanent-delete/{id}")
+    public ResponseEntity<String> permanentDeleteQuestionSection(@PathVariable Long id) {
+        questionSectionRepository.deleteById(id);
+        return ResponseEntity.ok("Permanently deleted.");
+    }
+
     // Additional endpoints
     @GetMapping("/{id}/questions")
     public ResponseEntity<List<com.kccitm.api.model.career9.AssessmentQuestions>> getSectionQuestions(@PathVariable Long id) {

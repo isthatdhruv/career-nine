@@ -1,6 +1,7 @@
 package com.kccitm.api.controller.career9;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,7 +47,7 @@ public class MeasuredQualityTypesController {
     @Cacheable("measuredQualityTypes")
     @GetMapping("/getAll")
     public List<MeasuredQualityTypes> getAllMeasuredQualityTypes() {
-        return measuredQualityTypesRepository.findAll();
+        return measuredQualityTypesRepository.findByIsDeletedFalseOrIsDeletedIsNull();
     }
 
     @GetMapping("/get/{id}")
@@ -87,8 +88,32 @@ public class MeasuredQualityTypesController {
                 optionScoreRepo.save(score);
             }
         }
+        type.setIsDeleted(true);
+        measuredQualityTypesRepository.save(type);
+        return ResponseEntity.ok("MeasuredQualityType soft-deleted. All mappings removed, no score entries deleted.");
+    }
+
+    @GetMapping("/deleted")
+    public List<MeasuredQualityTypes> getDeletedMeasuredQualityTypes() {
+        return measuredQualityTypesRepository.findByIsDeletedTrue();
+    }
+
+    @CacheEvict(value = "measuredQualityTypes", allEntries = true)
+    @PutMapping("/restore/{id}")
+    public ResponseEntity<String> restoreMeasuredQualityTypes(@PathVariable Long id) {
+        Optional<MeasuredQualityTypes> opt = measuredQualityTypesRepository.findById(id);
+        if (!opt.isPresent()) return ResponseEntity.notFound().build();
+        MeasuredQualityTypes mqt = opt.get();
+        mqt.setIsDeleted(false);
+        measuredQualityTypesRepository.save(mqt);
+        return ResponseEntity.ok("Restored successfully.");
+    }
+
+    @CacheEvict(value = "measuredQualityTypes", allEntries = true)
+    @DeleteMapping("/permanent-delete/{id}")
+    public ResponseEntity<String> permanentDeleteMeasuredQualityTypes(@PathVariable Long id) {
         measuredQualityTypesRepository.deleteById(id);
-        return ResponseEntity.ok("MeasuredQualityType deleted. All mappings removed, no score entries deleted.");
+        return ResponseEntity.ok("Permanently deleted.");
     }
     
     // Many-to-Many relationship management endpoints

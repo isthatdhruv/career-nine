@@ -36,3 +36,15 @@ export function AssignMeasuredQualityTypeToQuality(typeId: any, qualityId: any) 
 export function RemoveMeasuredQualityTypeFromQuality(typeId: any) {
   return axios.put(`${API_URL}/measured-quality-types/${typeId}/remove-quality`);
 }
+
+export function GetDeletedMeasuredQualityTypes() {
+  return axios.get(`${API_URL}/measured-quality-types/deleted`);
+}
+
+export function RestoreMeasuredQualityType(id: any) {
+  return axios.put(`${API_URL}/measured-quality-types/restore/${id}`);
+}
+
+export function PermanentDeleteMeasuredQualityType(id: any) {
+  return axios.delete(`${API_URL}/measured-quality-types/permanent-delete/${id}`);
+}
