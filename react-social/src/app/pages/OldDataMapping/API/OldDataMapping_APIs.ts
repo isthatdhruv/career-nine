@@ -101,6 +101,23 @@ export function importMappedAnswers(payload: { userStudentId: number; assessment
   return axios.post(`${API_URL}/firebase-mapping/import-mapped-answers`, payload);
 }
 
+// Question mapping persistence
+export function getQuestionMappings(assessmentId: number) {
+  return axios.get(`${API_URL}/firebase-mapping/question-mappings/${assessmentId}`);
+}
+
+export function saveQuestionMappings(assessmentId: number, mappings: any[]) {
+  return axios.post(`${API_URL}/firebase-mapping/save-question-mappings`, { assessmentId, mappings });
+}
+
+export function deleteQuestionMappings(assessmentId: number) {
+  return axios.delete(`${API_URL}/firebase-mapping/question-mappings/${assessmentId}`);
+}
+
+export function getAllMappedAssessments() {
+  return axios.get(`${API_URL}/firebase-mapping/question-mappings/all-assessments`);
+}
+
 // Existing assessment endpoints (reuse)
 export function getAllAssessments() {
   return axios.get(`${API_URL}/assessments/get/list`);

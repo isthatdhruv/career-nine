@@ -56,7 +56,9 @@ import com.kccitm.api.repository.Career9.OptionScoreBasedOnMeasuredQualityTypesR
 import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.School.FirebaseDataMappingRepository;
+import com.kccitm.api.repository.Career9.School.FirebaseQuestionMappingRepository;
 import com.kccitm.api.repository.Career9.School.FirebaseStudentExtraDataRepository;
+import com.kccitm.api.model.career9.school.FirebaseQuestionMapping;
 import com.kccitm.api.service.FirebaseService;
 
 @RestController
@@ -107,6 +109,9 @@ public class FirebaseDataMappingController {
 
     @Autowired
     private QuestionnaireQuestionRepository questionnaireQuestionRepository;
+
+    @Autowired
+    private FirebaseQuestionMappingRepository firebaseQuestionMappingRepository;
 
     @GetMapping("/getAll")
     public List<FirebaseDataMapping> getAll() {
@@ -1072,5 +1077,84 @@ public class FirebaseDataMappingController {
         if (val == null) return null;
         if (val instanceof Number) return ((Number) val).longValue();
         try { return Long.parseLong(val.toString()); } catch (NumberFormatException e) { return null; }
+    }
+
+    // ========================== Question Mapping Persistence ==========================
+
+    @GetMapping("/question-mappings/{assessmentId}")
+    public ResponseEntity<?> getQuestionMappings(@PathVariable("assessmentId") Long assessmentId) {
+        List<FirebaseQuestionMapping> mappings = firebaseQuestionMappingRepository.findByAssessmentId(assessmentId);
+        return ResponseEntity.ok(mappings);
+    }
+
+    @PostMapping("/save-question-mappings")
+    @Transactional
+    public ResponseEntity<?> saveQuestionMappings(@RequestBody Map<String, Object> payload) {
+        try {
+            Long assessmentId = getLong(payload, "assessmentId");
+            if (assessmentId == null) {
+                return ResponseEntity.badRequest().body("assessmentId is required");
+            }
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> mappingsList = (List<Map<String, Object>>) payload.get("mappings");
+            if (mappingsList == null || mappingsList.isEmpty()) {
+                return ResponseEntity.badRequest().body("No mappings provided");
+            }
+
+            // Delete existing mappings for this assessment
+            firebaseQuestionMappingRepository.deleteByAssessmentId(assessmentId);
+
+            int saved = 0;
+            for (Map<String, Object> m : mappingsList) {
+                FirebaseQuestionMapping mapping = new FirebaseQuestionMapping();
+                mapping.setAssessmentId(assessmentId);
+                mapping.setFirebaseQuestion(getString(m, "firebaseQuestion"));
+                mapping.setCategory(getString(m, "category"));
+                mapping.setSystemQuestionId(getLong(m, "systemQuestionId"));
+                mapping.setFirebaseAnswer(getString(m, "firebaseAnswer"));
+                mapping.setSystemOptionId(getLong(m, "systemOptionId"));
+                firebaseQuestionMappingRepository.save(mapping);
+                saved++;
+            }
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("saved", saved);
+            result.put("assessmentId", assessmentId);
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to save mappings: " + e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/question-mappings/{assessmentId}")
+    @Transactional
+    public ResponseEntity<?> deleteQuestionMappings(@PathVariable("assessmentId") Long assessmentId) {
+        firebaseQuestionMappingRepository.deleteByAssessmentId(assessmentId);
+        return ResponseEntity.ok(Map.of("deleted", true, "assessmentId", assessmentId));
+    }
+
+    @GetMapping("/question-mappings/all-assessments")
+    public ResponseEntity<?> getAllMappedAssessments() {
+        List<FirebaseQuestionMapping> all = firebaseQuestionMappingRepository.findAll();
+        // Group by assessmentId and return summary
+        Map<Long, Map<String, Object>> summary = new LinkedHashMap<>();
+        for (FirebaseQuestionMapping m : all) {
+            Long aid = m.getAssessmentId();
+            if (!summary.containsKey(aid)) {
+                Map<String, Object> info = new LinkedHashMap<>();
+                info.put("assessmentId", aid);
+                info.put("totalMappings", 0);
+                info.put("mappedAt", m.getMappedAt());
+                // Get assessment name
+                Optional<AssessmentTable> at = assessmentTableRepository.findById(aid);
+                info.put("assessmentName", at.isPresent() ? at.get().getAssessmentName() : "Unknown");
+                summary.put(aid, info);
+            }
+            summary.get(aid).put("totalMappings", (int) summary.get(aid).get("totalMappings") + 1);
+        }
+        return ResponseEntity.ok(new ArrayList<>(summary.values()));
     }
 }

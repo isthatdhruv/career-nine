@@ -1,11 +1,16 @@
 import { useState } from "react";
 import StudentImportWizard from "./StudentImportWizard";
+import ExistingMappingView from "./ExistingMappingView";
 
 const OldDataMappingPage = () => {
-  const [mode, setMode] = useState<"select" | "student-import">("select");
+  const [mode, setMode] = useState<"select" | "student-import" | "existing-mapping">("select");
 
   if (mode === "student-import") {
     return <StudentImportWizard onBack={() => setMode("select")} />;
+  }
+
+  if (mode === "existing-mapping") {
+    return <ExistingMappingView onBack={() => setMode("select")} />;
   }
 
   return (
@@ -23,7 +28,7 @@ const OldDataMappingPage = () => {
 
           <div className="row g-6 justify-content-center">
             {/* Student & Score Import */}
-            <div className="col-12 col-md-5">
+            <div className="col-12 col-md-4">
               <div
                 className="card card-hover border border-success border-2 h-100"
                 style={{ cursor: "pointer" }}
@@ -45,8 +50,31 @@ const OldDataMappingPage = () => {
               </div>
             </div>
 
+            {/* Existing Mapping */}
+            <div className="col-12 col-md-4">
+              <div
+                className="card card-hover border border-primary border-2 h-100"
+                style={{ cursor: "pointer" }}
+                onClick={() => setMode("existing-mapping")}
+              >
+                <div className="card-body p-6 d-flex flex-column align-items-center text-center">
+                  <div className="symbol symbol-60px mb-4 bg-light-primary rounded">
+                    <span className="symbol-label">
+                      <i className="bi bi-diagram-3 fs-2x text-primary"></i>
+                    </span>
+                  </div>
+                  <h4 className="fw-bold text-dark mb-2">Existing Mapping</h4>
+                  <p className="text-muted fs-7">
+                    View and edit saved question &amp; option mappings for each assessment.
+                    Mappings are auto-reused across schools.
+                  </p>
+                  <button className="btn btn-primary mt-auto">View Mappings</button>
+                </div>
+              </div>
+            </div>
+
             {/* Offline (Coming Soon) */}
-            <div className="col-12 col-md-5">
+            <div className="col-12 col-md-4">
               <div className="card h-100 border border-secondary border-2" style={{ opacity: 0.6 }}>
                 <div className="card-body p-6 d-flex flex-column align-items-center text-center">
                   <div className="symbol symbol-60px mb-4 bg-light-secondary rounded">

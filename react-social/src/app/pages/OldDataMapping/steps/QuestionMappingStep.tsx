@@ -2,6 +2,8 @@ import { useEffect, useState, useMemo } from "react";
 import {
   getAllAssessmentQuestions,
   importMappedAnswers,
+  getQuestionMappings,
+  saveQuestionMappings,
 } from "../API/OldDataMapping_APIs";
 import { StudentAssignment, DetailedResponse } from "./AssessmentMappingStep";
 
@@ -126,12 +128,81 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
       });
     });
 
-    setMappings(newMappings);
+    // Try to load saved mappings for the assessment
+    const assessmentId = studentAssignments[0]?.assessmentId;
+    if (assessmentId) {
+      getQuestionMappings(assessmentId)
+        .then((res) => {
+          const saved: any[] = res.data || [];
+          if (saved.length > 0) {
+            // Apply saved mappings to newMappings
+            const applied = newMappings.map((m) => {
+              // Find saved entries for this question + category
+              const savedForQ = saved.filter(
+                (s: any) => s.firebaseQuestion === m.firebaseQuestion && s.category === m.category
+              );
+              if (savedForQ.length === 0) return m;
+
+              const systemQuestionId = savedForQ[0].systemQuestionId;
+              const systemQ = systemQuestionId ? undefined : null; // will look up text later
+              const newAnswerMappings = m.answerMappings.map((am) => {
+                const savedAm = savedForQ.find((s: any) => s.firebaseAnswer === am.firebaseAnswer);
+                if (savedAm && savedAm.systemOptionId) {
+                  return {
+                    ...am,
+                    systemOptionId: savedAm.systemOptionId,
+                    systemOptionText: "", // will be filled by UI
+                  };
+                }
+                return am;
+              });
+
+              return {
+                ...m,
+                systemQuestionId: systemQuestionId || null,
+                systemQuestionText: "", // will be filled when systemQuestions load
+                answerMappings: newAnswerMappings,
+              };
+            });
+            setMappings(applied);
+          } else {
+            setMappings(newMappings);
+          }
+        })
+        .catch(() => setMappings(newMappings));
+    } else {
+      setMappings(newMappings);
+    }
+
     if (newMappings.length > 0) {
       const cats = ["ability", "multipleIntelligence", "personality"];
       setActiveCategory(cats.find((c) => newMappings.some((m) => m.category === c)) || "ability");
     }
   }, [studentAssignments]);
+
+  // Fill in display names from systemQuestions when both are loaded
+  useEffect(() => {
+    if (systemQuestions.length === 0 || mappings.length === 0) return;
+    const needsUpdate = mappings.some((m) => m.systemQuestionId && !m.systemQuestionText);
+    if (!needsUpdate) return;
+
+    setMappings((prev) =>
+      prev.map((m) => {
+        if (!m.systemQuestionId || m.systemQuestionText) return m;
+        const sq = systemQuestions.find((q) => q.questionId === m.systemQuestionId);
+        if (!sq) return m;
+        return {
+          ...m,
+          systemQuestionText: sq.questionText || "",
+          answerMappings: m.answerMappings.map((am) => {
+            if (!am.systemOptionId || am.systemOptionText) return am;
+            const opt = sq.options?.find((o) => o.optionId === am.systemOptionId);
+            return opt ? { ...am, systemOptionText: opt.optionText } : am;
+          }),
+        };
+      })
+    );
+  }, [systemQuestions, mappings]);
 
   // Filtered system questions
   const getFilteredSystemQuestions = (searchKey: string): SystemQuestion[] => {
@@ -433,6 +504,29 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
 
     setApplyResult({ totalStudents, totalAnswers, errors });
     setApplying(false);
+
+    // Save mappings to DB for reuse with next schools/batches
+    const assessmentId = studentAssignments[0]?.assessmentId;
+    if (assessmentId && totalMapped > 0) {
+      const dbMappings: any[] = [];
+      mappings.forEach((m) => {
+        if (!m.systemQuestionId) return;
+        m.answerMappings.forEach((am) => {
+          dbMappings.push({
+            firebaseQuestion: m.firebaseQuestion,
+            category: m.category,
+            systemQuestionId: m.systemQuestionId,
+            firebaseAnswer: am.firebaseAnswer,
+            systemOptionId: am.systemOptionId,
+          });
+        });
+      });
+      try {
+        await saveQuestionMappings(assessmentId, dbMappings);
+      } catch (err) {
+        console.warn("Failed to save mappings for reuse:", err);
+      }
+    }
   };
 
   // ── Render ─────────────────────────────────────────────────────────────
