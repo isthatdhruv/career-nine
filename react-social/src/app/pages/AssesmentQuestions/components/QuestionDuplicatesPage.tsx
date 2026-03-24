@@ -5,10 +5,10 @@ interface OptionScore {
   scoreId: number;
   score: number;
   measuredQualityType: {
-    measuredQualityTypeId: number;
-    measuredQualityTypeName: string;
-    measuredQualityTypeDescription: string;
-    measuredQualityTypeDisplayName: string;
+    measured_quality_type_id: number;
+    measured_quality_type_name: string;
+    measured_quality_type_description: string;
+    measured_quality_type_display_name: string;
   };
 }
 
@@ -320,9 +320,7 @@ const QuestionDuplicatesPage: React.FC = () => {
                               </thead>
                               <tbody>
                                 {q.options.map((opt, optIdx) => {
-                                  const scores = (opt.optionScores || []).filter(
-                                    (os) => os.measuredQualityType != null
-                                  );
+                                  const scores = opt.optionScores || [];
                                   if (scores.length === 0) {
                                     return (
                                       <tr key={opt.optionId}>
@@ -343,9 +341,9 @@ const QuestionDuplicatesPage: React.FC = () => {
                                       <td>
                                         <span
                                           className="badge badge-light-info"
-                                          title={os.measuredQualityType.measuredQualityTypeDescription || ""}
+                                          title={os.measuredQualityType?.measured_quality_type_description || ""}
                                         >
-                                          {os.measuredQualityType.measuredQualityTypeName}
+                                          {os.measuredQualityType?.measured_quality_type_name || "-"}
                                         </span>
                                       </td>
                                       <td className="fw-bold">{os.score}</td>

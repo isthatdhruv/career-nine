@@ -262,43 +262,6 @@ const QuestionareCreateSinglePage: React.FC = () => {
     if (!showQuestionModal) fetchQuestions();
   }, [showQuestionModal]);
 
-  // File upload handler
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const allowedExtensions = [".xlsx", ".xls"];
-    const fileExtension = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
-
-    if (!allowedExtensions.includes(fileExtension)) {
-      alert("❌ Only Excel files (.xlsx, .xls) are allowed!");
-      event.target.value = "";
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const data = new Uint8Array(e.target?.result as ArrayBuffer);
-      const workbook = XLSX.read(data, { type: "array" });
-      const worksheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[worksheetName];
-      
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
-      if (jsonData.length > 0) {
-        const keys = Object.keys(jsonData[0] as object);
-        const columns = keys.map(key => ({
-          label: key,
-          field: key,
-          sort: 'asc',
-          width: 150
-        }));
-        setTableData({ columns, rows: jsonData });
-      }
-    };
-    reader.readAsArrayBuffer(file);
-    setFileName(file.name);
-    setShowUploadModal(false);
-  };
 
   const handleSubmit = async (values: any) => {
     setLoading(true);
@@ -1328,28 +1291,6 @@ const QuestionareCreateSinglePage: React.FC = () => {
           setPageLoading={(isLoading) => setPageLoadingState(prev => [String(isLoading)])} 
         />
 
-        {/* File Upload Modal */}
-        <Modal show={showUploadModal} onHide={() => setShowUploadModal(false)} centered>
-          <Modal.Header closeButton>
-            <Modal.Title>Upload Excel File</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleFileUpload}
-              className="form-control"
-            />
-            <small className="text-muted mt-2 d-block">
-              Only Excel files (.xlsx, .xls) are allowed
-            </small>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowUploadModal(false)}>
-              Cancel
-            </Button>
-          </Modal.Footer>
-        </Modal>
           </div>
         </div>
       </div>
