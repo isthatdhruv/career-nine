@@ -4,7 +4,6 @@ import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
 import { Button, Modal, Spinner } from "react-bootstrap";
-import * as XLSX from "xlsx";
 
 // API imports
 import { ReadCollegeData } from "../../../College/API/College_APIs";
@@ -75,18 +74,7 @@ const QuestionareCreateSinglePage: React.FC = () => {
   const [showSectionModal, setShowSectionModal] = useState(false);
   const [showToolModal, setShowToolModal] = useState(false);
   const [showQuestionModal, setShowQuestionModal] = useState(false);
-  const [showUploadModal, setShowUploadModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
-  
-  // File upload states
-  const [fileName, setFileName] = useState("");
-  const [tableData, setTableData] = useState<{
-    columns: { label: string; field: string; sort: string; width: number }[];
-    rows: any[];
-  }>({
-    columns: [],
-    rows: [],
-  });
 
   const [pageLoadingState, setPageLoadingState] = useState(["false"]);
   
@@ -454,14 +442,9 @@ const QuestionareCreateSinglePage: React.FC = () => {
         createdAt: ""
       };
       
-      // Show alert with summary
-      const totalQuestions = sectionsPayload.reduce((acc: number, s: any) => acc + (s.questions?.length || 0), 0);
-      alert(`Questionare data prepared successfully!\n\nSummary:\n- Name: ${completePayload.name}\n- Tool: ${toolPayload.name || toolPayload.toolId}\n- Languages: ${values.languages?.length || 0}\n- Sections: ${sectionsPayload.length}\n- Total Questions: ${totalQuestions}\n\nCheck console for complete data.`);
-      
       // Clear localStorage
       localStorage.removeItem('questionareStep2');
-      
-      // Uncomment below when ready to actually create questionare
+
       const response = await CreateQuestionaire(completePayload);
       if (response.status === 200 || response.status === 201) {
         alert("✅ Questionare created successfully!");
@@ -484,20 +467,7 @@ const QuestionareCreateSinglePage: React.FC = () => {
     setShowTranslationModal(true);
   };
 
-  // build preSectionQuestions from questions fetched (auto-check)
-  useEffect(() => {
-    const map: { [k: string]: string[] } = {};
-    (questions || []).forEach((q: any) => {
-      const sid = q?.section?.sectionId ?? q?.sectionId ?? q?.section?.id;
-      const qid = String(q?.questionId ?? q?.id ?? "");
-      if (sid && qid) {
-        const s = String(sid);
-        if (!map[s]) map[s] = [];
-        if (!map[s].includes(qid)) map[s].push(qid);
-      }
-    });
-    setPreSectionQuestions(map);
-  }, [questions]);
+  // No auto-population of questions on create - start with empty assignments
 
   // Show loading screen while data is being fetched
   if (dataLoading) {
