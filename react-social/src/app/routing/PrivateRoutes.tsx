@@ -192,6 +192,9 @@ const PrivateRoutes = () => {
   const OldDataMappingPage = lazy(
     () => import("../pages/OldDataMapping/OldDataMappingPage")
   );
+  const ScoreDebugPage = lazy(
+    () => import("../pages/ScoreDebug/ScoreDebugPage")
+  );
   const Board = lazy(() => import("../pages/Board/BoardPage"));
   const Section = lazy(() => import("../pages/Section/SectionPage"));
   const Course = lazy(() => import("../pages/Course/CoursePage"));
@@ -964,6 +967,15 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <OldDataMappingPage />
+            </SuspensedView>
+          }
+        />
+
+        <Route
+          path="/score-debug"
+          element={
+            <SuspensedView>
+              <ScoreDebugPage />
             </SuspensedView>
           }
         />

@@ -1157,4 +1157,45 @@ public class FirebaseDataMappingController {
         }
         return ResponseEntity.ok(new ArrayList<>(summary.values()));
     }
+
+    /**
+     * GET /firebase-mapping/firebase-scores/{userStudentId}
+     *
+     * Looks up the Firebase docId for the given userStudentId from the mapping table,
+     * then fetches that document from Firestore and returns its scores.
+     */
+    @GetMapping("/firebase-scores/{userStudentId}")
+    public ResponseEntity<?> getFirebaseScores(@PathVariable Long userStudentId) {
+        try {
+            Optional<FirebaseDataMapping> mappingOpt =
+                    firebaseDataMappingRepository.findByNewEntityIdAndFirebaseType(userStudentId, "STUDENT");
+            if (!mappingOpt.isPresent()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "No Firebase mapping found for userStudentId: " + userStudentId));
+            }
+
+            String firebaseDocId = mappingOpt.get().getFirebaseId();
+            Map<String, Object> user = firebaseService.getDocument("users", firebaseDocId);
+            if (user == null || user.isEmpty()) {
+                user = firebaseService.getDocument("Users", firebaseDocId);
+            }
+            if (user == null || user.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Firebase document not found for docId: " + firebaseDocId));
+            }
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("firebaseDocId", firebaseDocId);
+            result.put("name", user.get("personal") instanceof Map ? ((Map<?, ?>) user.get("personal")).get("name") : null);
+            result.put("abilityScores", user.get("abilityScores"));
+            result.put("multipleIntelligenceScores", user.get("multipleIntelligenceScores"));
+            result.put("personalityScores", user.get("personalityScores"));
+            return ResponseEntity.ok(result);
+
+        } catch (ExecutionException | InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to fetch Firebase scores: " + e.getMessage()));
+        }
+    }
 }

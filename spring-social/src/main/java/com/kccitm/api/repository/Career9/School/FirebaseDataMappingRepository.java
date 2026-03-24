@@ -16,4 +16,6 @@ public interface FirebaseDataMappingRepository extends JpaRepository<FirebaseDat
     Optional<FirebaseDataMapping> findByFirebaseIdAndFirebaseType(String firebaseId, String firebaseType);
 
     List<FirebaseDataMapping> findByParentMappingId(Long parentMappingId);
+
+    Optional<FirebaseDataMapping> findByNewEntityIdAndFirebaseType(Long newEntityId, String firebaseType);
 }
