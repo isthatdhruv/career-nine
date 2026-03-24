@@ -24,6 +24,10 @@ export function ReadQuestionsData() {
 export function ReadQuestionsDataList() {
   return axios.get(readQuestionsList);
 }
+
+export function GetMqtCountsPerQuestion() {
+  return axios.get(`${API_URL}/assessment-questions/mqt-counts`);
+}
 export function ReadMeasuredQualityTypes() {
   return axios.get(readMeasuredQualityTypes);
 }
