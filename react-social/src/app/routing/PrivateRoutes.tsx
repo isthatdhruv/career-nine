@@ -180,6 +180,9 @@ const PrivateRoutes = () => {
   const QuestionEditPage = lazy(
     () => import("../pages/AssesmentQuestions/components/QuestionEditPage")
   );
+  const QuestionDuplicatesPage = lazy(
+    () => import("../pages/AssesmentQuestions/components/QuestionDuplicatesPage")
+  );
   const OfflineAssessmentUpload = lazy(
     () => import("../pages/OfflineAssessmentUpload/OfflineAssessmentUploadPage")
   );
@@ -603,6 +606,14 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <QuestionEditPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/assessment-questions/duplicates"
+          element={
+            <SuspensedView>
+              <QuestionDuplicatesPage />
             </SuspensedView>
           }
         />

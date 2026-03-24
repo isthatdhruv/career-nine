@@ -72,6 +72,13 @@ const AssessmentQuestionsPage = () => {
           <div className="card-toolbar">
             <div className="d-flex justify-content-end gap-2">
               <Button
+                variant="outline-warning"
+                className="d-flex align-items-center"
+                onClick={() => navigate("/assessment-questions/duplicates")}
+              >
+                Find Duplicates
+              </Button>
+              <Button
                 variant="outline-danger"
                 className="d-flex align-items-center"
                 onClick={() => setShowRecycleBinModal(true)}
