@@ -17,6 +17,12 @@ services:
       resources:
         limits:
           memory: 2g
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pCareer-qCsfeuECc3MW"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - career_shared_net
 
@@ -68,7 +74,55 @@ services:
         condition: service_healthy
     networks:
       - career_shared_net
+      
+  mysql_db_staging:
+    image: mysql:latest
+    restart: always
+    environment:
+      MYSQL_DATABASE: 'career-9'
+      MYSQL_USER: 'user'
+      MYSQL_PASSWORD: 'Career-qCsfeuECc3MW'
+      MYSQL_ROOT_PASSWORD: 'Career-qCsfeuECc3MW'
+    ports:
+      - '3307:3306'
+    volumes:
+      - mysql_staging_data:/var/lib/mysql
+      - ./mysql-custom.cnf:/etc/mysql/conf.d/custom.cnf
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pCareer-qCsfeuECc3MW"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - career_shared_net
 
+  sync_cron:
+    build:
+      context: .
+      dockerfile: Dockerfile.cron
+    restart: always
+    environment:
+      MASTER_HOST: 'mysql_db_api'
+      STAGING_HOST: 'mysql_db_staging'
+      DB_NAME: 'career-9'
+      DB_USER: 'root'
+      DB_PASSWORD: 'Career-qCsfeuECc3MW'
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    depends_on:
+      mysql_db_api:
+        condition: service_healthy
+      mysql_db_staging:
+        condition: service_healthy
+    networks:
+      - career_shared_net
   # redisinsight:
   #   image: redis/redisinsight:latest
   #   restart: always
@@ -88,6 +142,7 @@ services:
 
 volumes:
   mysql_data:
+  mysql_staging_data:
   redis_data:
   redisinsight_data:
 
