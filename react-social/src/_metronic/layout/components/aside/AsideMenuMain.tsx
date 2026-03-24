@@ -60,7 +60,7 @@ export function AsideMenuMain() {
     allowed("/assessment-questions") || allowed("/question-sections") ||
     allowed("/text-response-mapping") || allowed("/live-tracking");
 
-  const showReports = allowed("/reports") || allowed("/report-generation");
+  const showReports = allowed("/reports") || allowed("/report-generation") || allowed("/career-suggestion");
 
   const showTeacherDashboards =
     allowed("/teacher/class-dashboard") || allowed("/principal/dashboard");
@@ -414,6 +414,14 @@ export function AsideMenuMain() {
               icon="/media/icons/duotune/general/gen005.svg"
               title="Report Generation"
               fontIcon="bi-file-earmark-bar-graph"
+            />
+          )}
+          {allowed("/career-suggestion") && (
+            <AsideMenuItem
+              to="/career-suggestion"
+              icon="/media/icons/duotune/general/gen019.svg"
+              title="Career Suggestion"
+              fontIcon="bi-diagram-3"
             />
           )}
         </>
