@@ -1795,4 +1795,148 @@ public class AssessmentAnswerController {
             return ResponseEntity.status(500).body("Flush failed: " + e.getMessage());
         }
     }
+
+    /**
+     * GET /assessment-answer/score-debug/{userStudentId}/{assessmentId}
+     *
+     * Returns a detailed per-answer breakdown of questions, selected options,
+     * their MQT/MQ scores, and the totals — useful for backtracing score issues.
+     */
+    @GetMapping(value = "/score-debug/{userStudentId}/{assessmentId}", headers = "Accept=application/json")
+    public ResponseEntity<?> scoreDebug(@PathVariable Long userStudentId, @PathVariable Long assessmentId) {
+        try {
+            Optional<UserStudent> usOpt = userStudentRepository.findById(userStudentId);
+            if (!usOpt.isPresent()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "UserStudent not found"));
+            }
+            Optional<AssessmentTable> atOpt = assessmentTableRepository.findById(assessmentId);
+            if (!atOpt.isPresent()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Assessment not found"));
+            }
+
+            List<AssessmentAnswer> answers = assessmentAnswerRepository
+                    .findByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
+
+            // Per-answer detail rows
+            List<Map<String, Object>> rows = new ArrayList<>();
+            // Accumulate totals per MQT
+            Map<Long, Map<String, Object>> mqtTotals = new LinkedHashMap<>();
+
+            for (AssessmentAnswer ans : answers) {
+                AssessmentQuestionOptions opt = ans.getOption();
+                if (opt == null) continue;
+
+                // Get question text
+                String questionText = "";
+                Long questionId = null;
+                Long qqId = null;
+                String sectionName = "";
+                if (ans.getQuestionnaireQuestion() != null) {
+                    QuestionnaireQuestion qq = ans.getQuestionnaireQuestion();
+                    qqId = qq.getQuestionnaireQuestionId();
+                    if (qq.getQuestion() != null) {
+                        questionText = qq.getQuestion().getQuestionText();
+                        questionId = qq.getQuestion().getQuestionId();
+                        if (qq.getQuestion().getSection() != null) {
+                            sectionName = qq.getQuestion().getSection().getSectionName();
+                        }
+                    }
+                }
+
+                // Get option scores (MQT breakdown)
+                List<OptionScoreBasedOnMEasuredQualityTypes> optionScores =
+                        optionScoreRepository.findByOptionId(opt.getOptionId());
+
+                if (optionScores.isEmpty()) {
+                    // Still include the answer row even with no MQT scores
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("qqId", qqId);
+                    row.put("questionId", questionId);
+                    row.put("questionText", questionText);
+                    row.put("sectionName", sectionName);
+                    row.put("optionId", opt.getOptionId());
+                    row.put("optionText", opt.getOptionText());
+                    row.put("rankOrder", ans.getRankOrder());
+                    row.put("textResponse", ans.getTextResponse());
+                    row.put("mqtId", null);
+                    row.put("mqtName", null);
+                    row.put("mqId", null);
+                    row.put("mqName", null);
+                    row.put("score", 0);
+                    rows.add(row);
+                } else {
+                    for (OptionScoreBasedOnMEasuredQualityTypes os : optionScores) {
+                        MeasuredQualityTypes mqt = os.getMeasuredQualityType();
+                        if (mqt == null) continue;
+
+                        MeasuredQualities mq = mqt.getMeasuredQuality();
+                        int score = os.getScore() != null ? os.getScore() : 0;
+
+                        Map<String, Object> row = new LinkedHashMap<>();
+                        row.put("qqId", qqId);
+                        row.put("questionId", questionId);
+                        row.put("questionText", questionText);
+                        row.put("sectionName", sectionName);
+                        row.put("optionId", opt.getOptionId());
+                        row.put("optionText", opt.getOptionText());
+                        row.put("rankOrder", ans.getRankOrder());
+                        row.put("textResponse", ans.getTextResponse());
+                        row.put("mqtId", mqt.getMeasuredQualityTypeId());
+                        row.put("mqtName", mqt.getMeasuredQualityTypeName());
+                        row.put("mqId", mq != null ? mq.getMeasuredQualityId() : null);
+                        row.put("mqName", mq != null ? mq.getMeasuredQualityName() : null);
+                        row.put("score", score);
+                        rows.add(row);
+
+                        // Accumulate MQT totals
+                        Long mqtId = mqt.getMeasuredQualityTypeId();
+                        Map<String, Object> tot = mqtTotals.computeIfAbsent(mqtId, k -> {
+                            Map<String, Object> m = new LinkedHashMap<>();
+                            m.put("mqtId", mqtId);
+                            m.put("mqtName", mqt.getMeasuredQualityTypeName());
+                            m.put("mqId", mq != null ? mq.getMeasuredQualityId() : null);
+                            m.put("mqName", mq != null ? mq.getMeasuredQualityName() : null);
+                            m.put("calculatedTotal", 0);
+                            return m;
+                        });
+                        tot.put("calculatedTotal", (int) tot.get("calculatedTotal") + score);
+                    }
+                }
+            }
+
+            // Get stored raw scores for comparison
+            Optional<StudentAssessmentMapping> samOpt = studentAssessmentMappingRepository
+                    .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+            List<Map<String, Object>> storedScores = new ArrayList<>();
+            if (samOpt.isPresent()) {
+                List<AssessmentRawScore> rawScores = assessmentRawScoreRepository
+                        .findByStudentAssessmentMappingStudentAssessmentId(samOpt.get().getStudentAssessmentId());
+                for (AssessmentRawScore rs : rawScores) {
+                    Map<String, Object> s = new LinkedHashMap<>();
+                    s.put("mqtId", rs.getMeasuredQualityType() != null ? rs.getMeasuredQualityType().getMeasuredQualityTypeId() : null);
+                    s.put("mqtName", rs.getMeasuredQualityType() != null ? rs.getMeasuredQualityType().getMeasuredQualityTypeName() : null);
+                    s.put("mqId", rs.getMeasuredQuality() != null ? rs.getMeasuredQuality().getMeasuredQualityId() : null);
+                    s.put("mqName", rs.getMeasuredQuality() != null ? rs.getMeasuredQuality().getMeasuredQualityName() : null);
+                    s.put("storedRawScore", rs.getRawScore());
+                    storedScores.add(s);
+                }
+            }
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("userStudentId", userStudentId);
+            result.put("assessmentId", assessmentId);
+            result.put("studentName", usOpt.get().getStudentInfo() != null ? usOpt.get().getStudentInfo().getName() : null);
+            result.put("assessmentName", atOpt.get().getAssessmentName());
+            result.put("totalAnswers", answers.size());
+            result.put("answerDetails", rows);
+            result.put("calculatedTotals", new ArrayList<>(mqtTotals.values()));
+            result.put("storedRawScores", storedScores);
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            logger.error("Score debug failed", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
 }

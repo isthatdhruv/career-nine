@@ -12,5 +12,6 @@ import com.kccitm.api.model.career9.MeasuredQualityTypes;
 @Repository
 public interface MeasuredQualityTypesRepository extends JpaRepository<MeasuredQualityTypes, Long> {
 
-   
+    List<MeasuredQualityTypes> findByIsDeletedFalseOrIsDeletedIsNull();
+    List<MeasuredQualityTypes> findByIsDeletedTrue();
 }

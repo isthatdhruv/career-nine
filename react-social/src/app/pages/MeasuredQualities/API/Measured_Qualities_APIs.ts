@@ -50,3 +50,15 @@ export function UpdateMeasuredQualitiesData(id: any, values: any) {
 export function DeleteMeasuredQualitiesData(id: any) {
   return axios.delete(deleteMeasuredQualities + id);
 }
+
+export function GetDeletedMeasuredQualities() {
+  return axios.get(`${API_URL}/measured-qualities/deleted`);
+}
+
+export function RestoreMeasuredQuality(id: any) {
+  return axios.put(`${API_URL}/measured-qualities/restore/${id}`);
+}
+
+export function PermanentDeleteMeasuredQuality(id: any) {
+  return axios.delete(`${API_URL}/measured-qualities/permanent-delete/${id}`);
+}

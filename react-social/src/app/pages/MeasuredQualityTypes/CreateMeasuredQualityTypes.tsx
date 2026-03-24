@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "react-bootstrap";
 import { IconContext } from "react-icons";
-import { MdQuestionAnswer } from "react-icons/md";
+import { MdQuestionAnswer, MdDeleteSweep } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { FormControl, InputLabel, MenuItem, Select } from "@mui/material";
 import { ReadMeasuredQualityTypesData } from "./API/Measured_Quality_Types_APIs";
 import { ReadMeasuredQualitiesData } from "../MeasuredQualities/API/Measured_Qualities_APIs";
 import { MeasuredQualityTypesTable } from "./components";
+import MeasuredQualityTypesRecycleBinModal from "./components/MeasuredQualityTypesRecycleBinModal";
 
 const MeasuredQualityTypesPage = () => {
   const [measuredQualityTypesData, setMeasuredQualityTypesData] = useState<any[]>([]);
@@ -14,6 +15,7 @@ const MeasuredQualityTypesPage = () => {
   const [selectedQualityFilter, setSelectedQualityFilter] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(["false"]);
+  const [showRecycleBin, setShowRecycleBin] = useState(false);
   const navigate = useNavigate();
 
   const fetchMeasuredQualityTypes = async () => {
@@ -99,6 +101,18 @@ const MeasuredQualityTypesPage = () => {
                 </Select>
               </FormControl>
               <Button
+                variant="outline-danger"
+                onClick={() => setShowRecycleBin(true)}
+              >
+                <IconContext.Provider
+                  value={{ style: { paddingBottom: "4px" } }}
+                >
+                  <div>
+                    Recycle Bin <MdDeleteSweep size={21} />
+                  </div>
+                </IconContext.Provider>
+              </Button>
+              <Button
                 variant="primary"
                 onClick={() => {
                   navigate("/measured-quality-types/create");
@@ -126,6 +140,14 @@ const MeasuredQualityTypesPage = () => {
           />
         </div>
       )}
+
+      <MeasuredQualityTypesRecycleBinModal
+        show={showRecycleBin}
+        onHide={() => setShowRecycleBin(false)}
+        onRestoreComplete={() => {
+          fetchMeasuredQualityTypes();
+        }}
+      />
     </div>
   );
 };

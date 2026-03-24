@@ -128,11 +128,25 @@ public class InstituteDetailController {
 	// }
 	@GetMapping("/delete/{id}")
 	public InstituteDetail deleteUser(@PathVariable("id") Integer id) {
-		Optional<InstituteDetail> cpOpt = instituteDetailRepository.findById(id);
-		if (cpOpt.isPresent()) {
-			InstituteDetail cp = cpOpt.get();
-			instituteDetailRepository.deleteById(id);
-			return cp;
+		InstituteDetail institute = instituteDetailRepository.findById(id.intValue());
+		if (institute != null) {
+			institute.setDisplay(false);
+			return instituteDetailRepository.save(institute);
+		}
+		return null;
+	}
+
+	@GetMapping("/deleted")
+	public List<InstituteDetail> getDeletedInstitutes() {
+		return instituteDetailRepository.findByDisplay(false);
+	}
+
+	@GetMapping("/restore/{id}")
+	public InstituteDetail restoreInstitute(@PathVariable("id") Integer id) {
+		InstituteDetail institute = instituteDetailRepository.findById(id.intValue());
+		if (institute != null) {
+			institute.setDisplay(true);
+			return instituteDetailRepository.save(institute);
 		}
 		return null;
 	}

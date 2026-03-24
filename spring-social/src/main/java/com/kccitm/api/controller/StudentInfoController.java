@@ -107,10 +107,12 @@ public class StudentInfoController {
                     row.put("questionId", aa.getQuestionnaireQuestion() != null
                             ? aa.getQuestionnaireQuestion().getQuestionnaireQuestionId() : null);
 
-                    // Question text
+                    // Question text - try QuestionnaireQuestion first, fall back to option's parent question
                     String questionText = "";
                     if (aa.getQuestionnaireQuestion() != null && aa.getQuestionnaireQuestion().getQuestion() != null) {
                         questionText = aa.getQuestionnaireQuestion().getQuestion().getQuestionText();
+                    } else if (aa.getOption() != null && aa.getOption().getQuestion() != null) {
+                        questionText = aa.getOption().getQuestion().getQuestionText();
                     }
                     row.put("questionText", questionText);
 

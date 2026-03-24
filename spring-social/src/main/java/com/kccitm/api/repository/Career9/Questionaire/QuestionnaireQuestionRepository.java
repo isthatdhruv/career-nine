@@ -26,4 +26,6 @@ public interface QuestionnaireQuestionRepository extends JpaRepository<Questionn
            "LEFT JOIN FETCH q.options o " +
            "WHERE qq.questionnaireQuestionId IN :ids")
     List<QuestionnaireQuestion> findAllByIdIn(@Param("ids") List<Long> ids);
+
+    List<QuestionnaireQuestion> findByQuestion_QuestionId(Long questionId);
 }

@@ -180,14 +180,23 @@ const PrivateRoutes = () => {
   const QuestionEditPage = lazy(
     () => import("../pages/AssesmentQuestions/components/QuestionEditPage")
   );
+  const QuestionDuplicatesPage = lazy(
+    () => import("../pages/AssesmentQuestions/components/QuestionDuplicatesPage")
+  );
   const OfflineAssessmentUpload = lazy(
     () => import("../pages/OfflineAssessmentUpload/OfflineAssessmentUploadPage")
+  );
+  const OMRDataUpload = lazy(
+    () => import("../pages/OfflineAssessmentUpload/OMRDataUploadPage")
   );
   const TextResponseMapping = lazy(
     () => import("../pages/TextResponseMapping/TextResponseMappingPage")
   );
   const OldDataMappingPage = lazy(
     () => import("../pages/OldDataMapping/OldDataMappingPage")
+  );
+  const ScoreDebugPage = lazy(
+    () => import("../pages/ScoreDebug/ScoreDebugPage")
   );
   const Board = lazy(() => import("../pages/Board/BoardPage"));
   const Section = lazy(() => import("../pages/Section/SectionPage"));
@@ -601,10 +610,26 @@ const PrivateRoutes = () => {
           }
         />
         <Route
+          path="/assessment-questions/duplicates"
+          element={
+            <SuspensedView>
+              <QuestionDuplicatesPage />
+            </SuspensedView>
+          }
+        />
+        <Route
           path="/offline-assessment-upload"
           element={
             <SuspensedView>
               <OfflineAssessmentUpload />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/omr-data-upload"
+          element={
+            <SuspensedView>
+              <OMRDataUpload />
             </SuspensedView>
           }
         />
@@ -953,6 +978,15 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <OldDataMappingPage />
+            </SuspensedView>
+          }
+        />
+
+        <Route
+          path="/score-debug"
+          element={
+            <SuspensedView>
+              <ScoreDebugPage />
             </SuspensedView>
           }
         />

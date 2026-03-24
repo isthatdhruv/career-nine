@@ -108,9 +108,7 @@ public class QuestionnaireController {
 
     @GetMapping(value = "/get", headers = "Accept=application/json")
     public List<Questionnaire> getallQuestionnaire() {
-        List<Questionnaire> allQuestionnaires = questionnaireRepository.findAll();
-
-        return allQuestionnaires;
+        return questionnaireRepository.findByDisplayTrueOrDisplayIsNull();
     }
 
     @GetMapping(value = "/get/list", headers = "Accept=application/json")
@@ -199,14 +197,36 @@ public class QuestionnaireController {
     }
 
     @DeleteMapping("/delete/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-
-        if (!questionnaireRepository.existsById(id)) {
+    public ResponseEntity<String> delete(@PathVariable Long id) {
+        Optional<Questionnaire> opt = questionnaireRepository.findById(id);
+        if (!opt.isPresent()) {
             return ResponseEntity.notFound().build();
         }
+        Questionnaire q = opt.get();
+        q.setDisplay(false);
+        questionnaireRepository.save(q);
+        return ResponseEntity.ok("Soft deleted successfully.");
+    }
 
+    @GetMapping("/deleted")
+    public ResponseEntity<List<Questionnaire>> getDeletedQuestionnaires() {
+        return ResponseEntity.ok(questionnaireRepository.findByDisplayFalse());
+    }
+
+    @PutMapping("/restore/{id}")
+    public ResponseEntity<String> restoreQuestionnaire(@PathVariable Long id) {
+        Optional<Questionnaire> opt = questionnaireRepository.findById(id);
+        if (!opt.isPresent()) return ResponseEntity.notFound().build();
+        Questionnaire q = opt.get();
+        q.setDisplay(true);
+        questionnaireRepository.save(q);
+        return ResponseEntity.ok("Restored successfully.");
+    }
+
+    @DeleteMapping("/permanent-delete/{id}")
+    public ResponseEntity<String> permanentDeleteQuestionnaire(@PathVariable Long id) {
         questionnaireRepository.deleteById(id);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok("Permanently deleted.");
     }
 
     private void updateLanguages(Questionnaire existing, java.util.List<QuestionnaireLanguage> incomingList) {

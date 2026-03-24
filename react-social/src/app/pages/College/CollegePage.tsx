@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Button } from "react-bootstrap";
 import { IconContext } from "react-icons";
-import { MdSchool } from "react-icons/md";
+import { MdSchool, MdDeleteSweep } from "react-icons/md";
 import { ReadCollegeData } from "./API/College_APIs";
 import CollegeCreateModal from "./components/CollegeCreateModal";
 import CollegeTable from "./components/CollegeTable";
 import StudentUploadModal from "./components/StudentUploadModal";
+import InstituteRecycleBinModal from "./components/InstituteRecycleBinModal";
 
 const CollegePage = () => {
   const [modalShowCreate, setModalShowCreate] = useState(false);
@@ -14,6 +15,7 @@ const CollegePage = () => {
   const [pageLoading, setPageLoading] = useState(["false"]);
   const [showStudentUpload, setShowStudentUpload] = useState(false);
   const [selectedCollegeForUpload, setSelectedCollegeForUpload] = useState<any>(null);
+  const [showRecycleBin, setShowRecycleBin] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -59,6 +61,16 @@ const CollegePage = () => {
             <div className="d-flex justify-content-end">
               <div style={{ display: "flex", gap: 8 }}>
                 <Button
+                  variant="outline-danger"
+                  onClick={() => setShowRecycleBin(true)}
+                >
+                  <IconContext.Provider value={{ style: { paddingBottom: "4px" } }}>
+                    <div>
+                      Recycle Bin <MdDeleteSweep size={21} />
+                    </div>
+                  </IconContext.Provider>
+                </Button>
+                <Button
                   variant="primary"
                   onClick={() => {
                     setModalShowCreate(true);
@@ -98,6 +110,12 @@ const CollegePage = () => {
         onHide={() => setShowStudentUpload(false)}
         college={selectedCollegeForUpload}
         onUploaded={onUploadComplete}
+      />
+
+      <InstituteRecycleBinModal
+        show={showRecycleBin}
+        onHide={() => setShowRecycleBin(false)}
+        onRestoreComplete={() => setPageLoading([String(Date.now())])}
       />
     </div>
   );
