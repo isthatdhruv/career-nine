@@ -90,6 +90,17 @@ public class AssessmentQuestionController {
         return fromDb;
     }
 
+    @GetMapping("/mqt-counts")
+    public java.util.Map<Long, Long> getMqtCountsPerQuestion() {
+        java.util.Map<Long, Long> counts = new java.util.HashMap<>();
+        for (Object[] row : assessmentQuestionRepository.findMqtCountsPerQuestion()) {
+            Long questionId = ((Number) row[0]).longValue();
+            Long mqtCount = ((Number) row[1]).longValue();
+            counts.put(questionId, mqtCount);
+        }
+        return counts;
+    }
+
     @GetMapping("/get/{id}")
     public AssessmentQuestions getAssessmentQuestionById(@PathVariable Long id) {
         return assessmentQuestionRepository.findById(id).orElse(null);

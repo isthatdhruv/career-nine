@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import {
-  getAllAssessmentQuestions,
+  getAssessmentQuestionnaire,
   importMappedAnswers,
   getQuestionMappings,
   saveQuestionMappings,
@@ -73,14 +73,47 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
     return match ? match.userStudentId : null;
   };
 
-  // Fetch system questions on mount
+  // Fetch system questions for the mapped assessment only
   useEffect(() => {
+    const assessmentId = studentAssignments[0]?.assessmentId;
+    if (!assessmentId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    getAllAssessmentQuestions()
-      .then((res) => setSystemQuestions(res.data || []))
-      .catch(() => setError("Failed to load system questions"))
+    getAssessmentQuestionnaire(assessmentId)
+      .then((res) => {
+        // Parse questionnaire sections → QuestionnaireQuestion → AssessmentQuestions
+        const questionnaire = Array.isArray(res.data) ? res.data[0] : res.data;
+        const extracted: SystemQuestion[] = [];
+        const seen = new Set<number>();
+        // Response structure: questionnaire → sections[] → questions[] → question (AssessmentQuestions)
+        const sections = questionnaire?.sections || questionnaire?.section || [];
+        sections.forEach((sec: any) => {
+          const questions = sec.questions || sec.question || [];
+          questions.forEach((qq: any) => {
+            const aq = qq.question || qq;
+            const qId = aq.questionId;
+            if (!qId || seen.has(qId)) return;
+            seen.add(qId);
+            extracted.push({
+              questionId: qId,
+              questionText: aq.questionText || "",
+              questionType: aq.questionType,
+              options: (aq.options || []).map((o: any) => ({
+                optionId: o.optionId,
+                optionText: o.optionText || "",
+                optionDescription: o.optionDescription,
+              })),
+              section: sec.sectionId ? { sectionId: sec.sectionId, sectionName: sec.sectionName || "" } : null,
+            });
+          });
+        });
+        setSystemQuestions(extracted);
+      })
+      .catch(() => setError("Failed to load assessment questions"))
       .finally(() => setLoading(false));
-  }, []);
+  }, [studentAssignments]);
 
   // Build unique question mappings from all students' responses
   useEffect(() => {
