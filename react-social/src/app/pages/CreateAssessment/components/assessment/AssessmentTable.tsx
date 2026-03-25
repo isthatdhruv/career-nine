@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { MDBDataTableV5 } from "mdbreact";
 import { AiFillEdit } from "react-icons/ai";
-import { FaLock, FaLockOpen, FaFileDownload, FaFilePdf } from "react-icons/fa";
+import { FaLock, FaLockOpen, FaFileDownload, FaRecycle ,FaFilePdf } from "react-icons/fa";
+// import { FaLock, FaLockOpen, FaFileDownload, FaFilePdf } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
-import { DeactivateAssessment, LockAssessment, UnlockAssessment } from "../../API/Create_Assessment_APIs";
+import { SoftDeleteAssessment, LockAssessment, UnlockAssessment } from "../../API/Create_Assessment_APIs";
 import { generateOMRSheet } from "../../utils/generateOMRSheet";
+import AssessmentRecycleBinModal from "./AssessmentRecycleBinModal";
 import { generateQuestionnairePDF } from "../../utils/generateQuestionnairePDF";
 
 const AssessmentTable = (props: {
@@ -16,6 +18,7 @@ const AssessmentTable = (props: {
 }) => {
   const navigate = useNavigate();
   const [showLockedModal, setShowLockedModal] = useState(false);
+  const [showRecycleBin, setShowRecycleBin] = useState(false);
   const [omrLoading, setOmrLoading] = useState<number | null>(null);
   const [pdfLoading, setPdfLoading] = useState<number | null>(null);
 
@@ -129,14 +132,14 @@ const AssessmentTable = (props: {
                 setShowLockedModal(true);
                 return;
               }
-              if (!window.confirm(`Are you sure you want to deactivate "${data.AssessmentName || data.assessmentName}"?`)) return;
+              if (!window.confirm(`Are you sure you want to delete "${data.AssessmentName || data.assessmentName}"? It will be moved to the recycle bin.`)) return;
               props.setLoading(true);
               try {
-                await DeactivateAssessment(data.id || data.assessmentId, data);
+                await SoftDeleteAssessment(data.id || data.assessmentId);
                 props.setPageLoading(["true"]);
               } catch (error) {
-                console.error("Deactivate failed:", error);
-                alert("Failed to deactivate assessment. Please try again.");
+                console.error("Delete failed:", error);
+                alert("Failed to delete assessment. Please try again.");
               } finally {
                 props.setLoading(false);
               }
@@ -180,6 +183,15 @@ const AssessmentTable = (props: {
 
   return (
     <>
+      <div className="d-flex justify-content-end mb-3">
+        <button
+          className="btn btn-danger btn-sm"
+          onClick={() => setShowRecycleBin(true)}
+        >
+          <FaRecycle size={16} className="me-2" /> Recycle Bin
+        </button>
+      </div>
+
       <MDBDataTableV5
         hover
         scrollY
@@ -188,6 +200,12 @@ const AssessmentTable = (props: {
         entries={25}
         pagesAmount={4}
         data={datatable}
+      />
+
+      <AssessmentRecycleBinModal
+        show={showRecycleBin}
+        onHide={() => setShowRecycleBin(false)}
+        onRestoreComplete={() => props.setPageLoading(["true"])}
       />
 
       {/* Locked Assessment Modal */}

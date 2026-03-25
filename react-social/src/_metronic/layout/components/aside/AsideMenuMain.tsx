@@ -77,6 +77,7 @@ export function AsideMenuMain() {
   const showActivityLog = allowed("/activity-log");
   const showLeads = allowed("/leads");
   const showOldDataMapping = allowed("/old-data-mapping");
+  const showScoreDebug = allowed("/score-debug");
 
   return (
     <>
@@ -626,6 +627,24 @@ export function AsideMenuMain() {
             icon="/media/icons/duotune/general/gen022.svg"
             title="Old Assessment Mapping"
             fontIcon="bi-arrow-left-right"
+          />
+        </>
+      )}
+
+      {showScoreDebug && (
+        <>
+          <div className="menu-item">
+            <div className="menu-content pt-8 pb-2">
+              <span className="menu-section text-muted text-uppercase fs-8 ls-1">
+                Debugging
+              </span>
+            </div>
+          </div>
+          <AsideMenuItem
+            to="/score-debug"
+            icon="/media/icons/duotune/general/gen031.svg"
+            title="Score Debug"
+            fontIcon="bi-bug"
           />
         </>
       )}

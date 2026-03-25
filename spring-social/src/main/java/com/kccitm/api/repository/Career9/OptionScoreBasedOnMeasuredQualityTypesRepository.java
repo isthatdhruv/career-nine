@@ -17,4 +17,10 @@ public interface OptionScoreBasedOnMeasuredQualityTypesRepository extends JpaRep
            "LEFT JOIN FETCH mt.measuredQuality " +
            "WHERE os.question_option.optionId IN :optionIds")
     java.util.List<OptionScoreBasedOnMEasuredQualityTypes> findByOptionIdIn(@Param("optionIds") java.util.List<Long> optionIds);
+
+    @Query(value = "SELECT * FROM score_based_on_measured_quality_types " +
+           "WHERE fk_assessment_questions_option = :optionId " +
+           "AND fk_quality_type = :mqtId", nativeQuery = true)
+    java.util.List<OptionScoreBasedOnMEasuredQualityTypes> findByOptionIdAndMqtId(
+            @Param("optionId") Long optionId, @Param("mqtId") Long mqtId);
 }
