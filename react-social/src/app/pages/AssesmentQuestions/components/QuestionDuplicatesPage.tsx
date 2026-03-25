@@ -2,28 +2,29 @@ import React, { useEffect, useState, useMemo } from "react";
 import { ReadQuestionsData, DeleteQuestionData } from "../API/Question_APIs";
 
 interface OptionScore {
-  optionScoreId: number;
-  scoreValue: number;
+  scoreId: number;
+  score: number;
   measuredQualityType: {
-    measuredQualityTypeId: number;
-    qualityTypeName: string;
-    qualityTypeDescription: string;
+    measured_quality_type_id: number;
+    measured_quality_type_name: string;
+    measured_quality_type_description: string;
+    measured_quality_type_display_name: string;
   };
 }
 
 interface QuestionOption {
   optionId: number;
   optionText: string;
-  description: string;
-  correct: boolean;
+  optionDescription: string;
+  isCorrect: boolean;
   optionScores: OptionScore[];
 }
 
 interface Question {
   questionId: number;
   questionText: string;
-  questionSection: { sectionId: number; sectionName: string } | null;
-  assessmentQuestionOptions: QuestionOption[];
+  section: { sectionId: number; sectionName: string } | null;
+  options: QuestionOption[];
 }
 
 type SimilarityGroup = {
@@ -278,9 +279,9 @@ const QuestionDuplicatesPage: React.FC = () => {
                           <div className="flex-fill">
                             <div className="d-flex align-items-center gap-2 mb-1">
                               <span className="badge badge-light fs-8">ID: {q.questionId}</span>
-                              {q.questionSection && (
+                              {q.section && (
                                 <span className="badge badge-light-info fs-8">
-                                  {q.questionSection.sectionName}
+                                  {q.section.sectionName}
                                 </span>
                               )}
                               {qIdx === 0 && (
@@ -306,48 +307,49 @@ const QuestionDuplicatesPage: React.FC = () => {
                         </div>
 
                         {/* Options table */}
-                        {q.assessmentQuestionOptions && q.assessmentQuestionOptions.length > 0 && (
+                        {q.options && q.options.length > 0 && (
                           <div className="table-responsive mt-2">
                             <table className="table table-sm table-bordered table-striped mb-0 align-middle">
                               <thead>
                                 <tr className="bg-light">
                                   <th style={{ minWidth: 40 }}>#</th>
                                   <th style={{ minWidth: 200 }}>Option Text</th>
-                                  <th style={{ minWidth: 60 }}>Correct</th>
-                                  <th>MQT Scores</th>
+                                  <th>MQT</th>
+                                  <th style={{ minWidth: 60 }}>Score</th>
                                 </tr>
                               </thead>
                               <tbody>
-                                {q.assessmentQuestionOptions.map((opt, optIdx) => (
-                                  <tr key={opt.optionId}>
-                                    <td>{optIdx + 1}</td>
-                                    <td>{opt.optionText || <em className="text-muted">(image)</em>}</td>
-                                    <td className="text-center">
-                                      {opt.correct ? (
-                                        <span className="badge badge-light-success">Yes</span>
-                                      ) : (
-                                        <span className="text-muted">-</span>
+                                {q.options.map((opt, optIdx) => {
+                                  const scores = opt.optionScores || [];
+                                  if (scores.length === 0) {
+                                    return (
+                                      <tr key={opt.optionId}>
+                                        <td>{optIdx + 1}</td>
+                                        <td>{opt.optionText || <em className="text-muted">(image)</em>}</td>
+                                        <td colSpan={2} className="text-muted fs-8">No scores</td>
+                                      </tr>
+                                    );
+                                  }
+                                  return scores.map((os, osIdx) => (
+                                    <tr key={`${opt.optionId}-${os.scoreId}`}>
+                                      {osIdx === 0 && (
+                                        <>
+                                          <td rowSpan={scores.length}>{optIdx + 1}</td>
+                                          <td rowSpan={scores.length}>{opt.optionText || <em className="text-muted">(image)</em>}</td>
+                                        </>
                                       )}
-                                    </td>
-                                    <td>
-                                      {opt.optionScores && opt.optionScores.length > 0 ? (
-                                        <div className="d-flex flex-wrap gap-1">
-                                          {opt.optionScores.map((os) => (
-                                            <span
-                                              key={os.optionScoreId}
-                                              className="badge badge-light-info"
-                                              title={os.measuredQualityType?.qualityTypeDescription || ""}
-                                            >
-                                              {os.measuredQualityType?.qualityTypeName}: {os.scoreValue}
-                                            </span>
-                                          ))}
-                                        </div>
-                                      ) : (
-                                        <span className="text-muted fs-8">No scores</span>
-                                      )}
-                                    </td>
-                                  </tr>
-                                ))}
+                                      <td>
+                                        <span
+                                          className="badge badge-light-info"
+                                          title={os.measuredQualityType?.measured_quality_type_description || ""}
+                                        >
+                                          {os.measuredQualityType?.measured_quality_type_name || "-"}
+                                        </span>
+                                      </td>
+                                      <td className="fw-bold">{os.score}</td>
+                                    </tr>
+                                  ));
+                                })}
                               </tbody>
                             </table>
                           </div>

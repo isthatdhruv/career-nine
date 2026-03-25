@@ -1,12 +1,7 @@
 package com.kccitm.api.service;
 
 import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Base64;
-import java.util.List;
 import java.util.UUID;
 
 import javax.annotation.PostConstruct;
@@ -39,70 +34,29 @@ public class DigitalOceanSpacesService {
     @Value("${app.digitalocean.spaces.cdn-url:https://storage-c9.sgp1.digitaloceanspaces.com}")
     private String cdnUrl;
 
+    @Value("${app.digitalocean.spaces.access-key:}")
+    private String accessKey;
+
+    @Value("${app.digitalocean.spaces.secret-key:}")
+    private String secretKey;
+
+    @Value("${app.digitalocean.spaces.endpoint:https://sgp1.digitaloceanspaces.com}")
+    private String endpoint;
+
     private AmazonS3 s3Client;
 
     @PostConstruct
     public void init() {
-        // Read credentials from download.txt file
-        String accessKey = null;
-        String secretKey = null;
-        String endpoint = "https://sgp1.digitaloceanspaces.com";
-
-        try {
-            // Look for download.txt in project root (parent of spring-social)
-            Path downloadFile = findDownloadTxt();
-            if (downloadFile != null && Files.exists(downloadFile)) {
-                List<String> lines = Files.readAllLines(downloadFile);
-                for (String line : lines) {
-                    line = line.trim();
-                    if (line.contains("aws_access_key_id")) {
-                        accessKey = line.substring(line.lastIndexOf(" ") + 1).trim();
-                    } else if (line.contains("aws_secret_access_key")) {
-                        secretKey = line.substring(line.lastIndexOf(" ") + 1).trim();
-                    } else if (line.contains("endpoint_url")) {
-                        endpoint = line.substring(line.lastIndexOf(" ") + 1).trim();
-                    }
-                }
-                logger.info("DO Spaces credentials loaded from download.txt");
-            } else {
-                logger.warn("download.txt not found. DigitalOcean Spaces will not be available.");
-            }
-        } catch (Exception e) {
-            logger.error("Failed to read download.txt: " + e.getMessage());
-        }
-
         if (accessKey != null && !accessKey.isEmpty() && secretKey != null && !secretKey.isEmpty()) {
             BasicAWSCredentials credentials = new BasicAWSCredentials(accessKey, secretKey);
             s3Client = AmazonS3ClientBuilder.standard()
                     .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(endpoint, region))
                     .withCredentials(new AWSStaticCredentialsProvider(credentials))
                     .build();
+            logger.info("DO Spaces client initialized successfully");
+        } else {
+            logger.warn("DO Spaces credentials not configured. Set DO_SPACES_ACCESS_KEY and DO_SPACES_SECRET_KEY environment variables.");
         }
-    }
-
-    private Path findDownloadTxt() {
-        // Try multiple locations to find download.txt
-        String[] searchPaths = {
-            "../download.txt",           // relative to spring-social (project root)
-            "download.txt",              // current working directory
-            "../../download.txt",        // if running from deeper directory
-        };
-
-        // First try relative paths
-        for (String p : searchPaths) {
-            Path path = Paths.get(p).toAbsolutePath().normalize();
-            if (Files.exists(path)) {
-                return path;
-            }
-        }
-
-        // Also try user home directory
-        Path homePath = Paths.get(System.getProperty("user.home"), "Desktop", "career-nine", "download.txt");
-        if (Files.exists(homePath)) {
-            return homePath;
-        }
-
-        return null;
     }
 
     /**
