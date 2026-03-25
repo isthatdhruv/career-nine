@@ -693,4 +693,35 @@ public class AssessmentTableController {
         return ResponseEntity.ok(bundle);
     }
 
+    /**
+     * Returns all assessments that share the same questionnaire as the given assessment (excluding itself).
+     * Used to copy Firebase question mappings to other assessments with the same questionnaire.
+     */
+    @GetMapping("/find-by-same-questionnaire/{assessmentId}")
+    public ResponseEntity<?> findBySameQuestionnaire(@PathVariable Long assessmentId) {
+        Optional<AssessmentTable> opt = assessmentTableRepository.findById(assessmentId);
+        if (opt.isEmpty()) return ResponseEntity.notFound().build();
+
+        AssessmentTable source = opt.get();
+        if (source.getQuestionnaire() == null) {
+            return ResponseEntity.ok(java.util.Collections.emptyList());
+        }
+
+        Long questionnaireId = source.getQuestionnaire().getQuestionnaireId();
+        List<AssessmentTable> similar = assessmentTableRepository.findByQuestionnaireQuestionnaireId(questionnaireId);
+
+        // Return only id + name, excluding the source assessment itself
+        List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
+        for (AssessmentTable a : similar) {
+            if (!a.getId().equals(assessmentId)) {
+                java.util.Map<String, Object> item = new java.util.HashMap<>();
+                item.put("id", a.getId());
+                item.put("assessmentName", a.getAssessmentName());
+                item.put("questionnaireId", questionnaireId);
+                result.add(item);
+            }
+        }
+        return ResponseEntity.ok(result);
+    }
+
 }

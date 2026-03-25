@@ -5,6 +5,7 @@ import {
   getQuestionMappings,
   saveQuestionMappings,
   deleteQuestionMappings,
+  findAssessmentsBySameQuestionnaire,
 } from "./API/OldDataMapping_APIs";
 
 interface SystemOption {
@@ -69,6 +70,13 @@ const ExistingMappingView = ({ onBack }: Props) => {
   // Search per question
   const [questionSearches, setQuestionSearches] = useState<Record<string, string>>({});
 
+  // Copy to similar assessments
+  const [similarAssessments, setSimilarAssessments] = useState<{id: number; assessmentName: string}[]>([]);
+  const [showCopyModal, setShowCopyModal] = useState(false);
+  const [selectedTargets, setSelectedTargets] = useState<Set<number>>(new Set());
+  const [copying, setCopying] = useState(false);
+  const [copyMsg, setCopyMsg] = useState("");
+
   useEffect(() => {
     setLoading(true);
     Promise.all([getAllAssessments(), getAllAssessmentQuestions()])
@@ -132,7 +140,51 @@ const ExistingMappingView = ({ onBack }: Props) => {
   const handleSelectAssessment = (id: number) => {
     setSelectedAssessmentId(id);
     setEditing(false);
+    setSimilarAssessments([]);
+    setCopyMsg("");
     loadMappings(id);
+    findAssessmentsBySameQuestionnaire(id)
+      .then((res) => setSimilarAssessments(res.data || []))
+      .catch(() => {});
+  };
+
+  const handleOpenCopyModal = () => {
+    setSelectedTargets(new Set(similarAssessments.map((a) => a.id)));
+    setCopyMsg("");
+    setShowCopyModal(true);
+  };
+
+  const handleCopyToSimilar = async () => {
+    if (!selectedAssessmentId || selectedTargets.size === 0) return;
+    setCopying(true);
+    setCopyMsg("");
+    // Build raw mappings from grouped mappings
+    const rawMappings = mappings.flatMap((m) =>
+      m.answerMappings.map((am) => ({
+        firebaseQuestion: m.firebaseQuestion,
+        category: m.category,
+        systemQuestionId: m.systemQuestionId,
+        firebaseAnswer: am.firebaseAnswer,
+        systemOptionId: am.systemOptionId,
+      }))
+    );
+    let successCount = 0;
+    let failCount = 0;
+    for (const targetId of Array.from(selectedTargets)) {
+      try {
+        await saveQuestionMappings(targetId, rawMappings);
+        successCount++;
+      } catch {
+        failCount++;
+      }
+    }
+    setCopying(false);
+    setCopyMsg(
+      failCount === 0
+        ? `Mappings copied to ${successCount} assessment(s) successfully.`
+        : `Copied to ${successCount}, failed for ${failCount}.`
+    );
+    setTimeout(() => setShowCopyModal(false), 1500);
   };
 
   const filteredMappings = useMemo(() => {
@@ -244,6 +296,7 @@ const ExistingMappingView = ({ onBack }: Props) => {
   }
 
   return (
+    <>
     <div className="container mt-8">
       <div className="row justify-content-center">
         <div className="col-12">
@@ -300,6 +353,11 @@ const ExistingMappingView = ({ onBack }: Props) => {
                       {mappings.length} questions mapped
                     </span>
                     <div className="ms-auto d-flex gap-2">
+                      {similarAssessments.length > 0 && !editing && (
+                        <button className="btn btn-sm btn-light-success" onClick={handleOpenCopyModal}>
+                          <i className="bi bi-files me-1"></i>Copy to Similar ({similarAssessments.length})
+                        </button>
+                      )}
                       {!editing ? (
                         <button className="btn btn-sm btn-light-primary" onClick={() => setEditing(true)}>
                           <i className="bi bi-pencil me-1"></i>Edit Mappings
@@ -472,6 +530,61 @@ const ExistingMappingView = ({ onBack }: Props) => {
         </div>
       </div>
     </div>
+
+    {/* Copy to Similar Assessments Modal */}
+    {showCopyModal && (
+      <div className="modal d-block" style={{ background: "rgba(0,0,0,0.4)" }}>
+        <div className="modal-dialog modal-dialog-centered">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title">Copy Mappings to Similar Assessments</h5>
+              <button className="btn-close" onClick={() => setShowCopyModal(false)} />
+            </div>
+            <div className="modal-body">
+              <p className="text-muted fs-7 mb-3">
+                These assessments use the same questionnaire. Select which ones to copy the current mappings to:
+              </p>
+              {similarAssessments.map((a) => (
+                <div key={a.id} className="form-check mb-2">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    id={`target-${a.id}`}
+                    checked={selectedTargets.has(a.id)}
+                    onChange={(e) => {
+                      setSelectedTargets((prev) => {
+                        const next = new Set(prev);
+                        e.target.checked ? next.add(a.id) : next.delete(a.id);
+                        return next;
+                      });
+                    }}
+                  />
+                  <label className="form-check-label" htmlFor={`target-${a.id}`}>
+                    {a.assessmentName} <span className="text-muted">(ID: {a.id})</span>
+                  </label>
+                </div>
+              ))}
+              {copyMsg && (
+                <div className={`alert ${copyMsg.includes("failed") ? "alert-warning" : "alert-success"} py-2 mt-3`}>
+                  {copyMsg}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-light" onClick={() => setShowCopyModal(false)}>Cancel</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleCopyToSimilar}
+                disabled={copying || selectedTargets.size === 0}
+              >
+                {copying ? <><span className="spinner-border spinner-border-sm me-1" />Copying...</> : `Copy to ${selectedTargets.size} Assessment(s)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 
