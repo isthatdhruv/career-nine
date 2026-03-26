@@ -16,4 +16,6 @@ public interface OmrColumnMappingRepository extends JpaRepository<OmrColumnMappi
     List<OmrColumnMapping> findByAssessmentId(Long assessmentId);
 
     List<OmrColumnMapping> findByInstituteId(Long instituteId);
+
+    Optional<OmrColumnMapping> findFirstByQuestionnaireIdOrderByUpdatedAtDesc(Long questionnaireId);
 }

@@ -233,3 +233,4 @@ coverage/
 # docker-compose.yml files are important and should be committed
 # !docker-compose.yml
 # !**/docker-compose.yml
+./Dump20260324.sql

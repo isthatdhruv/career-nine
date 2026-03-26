@@ -130,3 +130,11 @@ export function getAllMeasuredQualityTypes() {
 export function getAllAssessmentQuestions() {
   return axios.get(`${API_URL}/assessment-questions/getAll`);
 }
+
+export function getAssessmentQuestionnaire(assessmentId: number) {
+  return axios.get(`${API_URL}/assessments/getby/${assessmentId}`);
+}
+
+export function findAssessmentsBySameQuestionnaire(assessmentId: number) {
+  return axios.get(`${API_URL}/assessments/find-by-same-questionnaire/${assessmentId}`);
+}

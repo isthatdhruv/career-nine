@@ -4,7 +4,6 @@ import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
 import { Button, Modal, Spinner } from "react-bootstrap";
-import * as XLSX from "xlsx";
 
 // API imports
 import { ReadCollegeData } from "../../../College/API/College_APIs";
@@ -75,18 +74,7 @@ const QuestionareCreateSinglePage: React.FC = () => {
   const [showSectionModal, setShowSectionModal] = useState(false);
   const [showToolModal, setShowToolModal] = useState(false);
   const [showQuestionModal, setShowQuestionModal] = useState(false);
-  const [showUploadModal, setShowUploadModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
-  
-  // File upload states
-  const [fileName, setFileName] = useState("");
-  const [tableData, setTableData] = useState<{
-    columns: { label: string; field: string; sort: string; width: number }[];
-    rows: any[];
-  }>({
-    columns: [],
-    rows: [],
-  });
 
   const [pageLoadingState, setPageLoadingState] = useState(["false"]);
   
@@ -274,43 +262,6 @@ const QuestionareCreateSinglePage: React.FC = () => {
     if (!showQuestionModal) fetchQuestions();
   }, [showQuestionModal]);
 
-  // File upload handler
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const allowedExtensions = [".xlsx", ".xls"];
-    const fileExtension = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
-
-    if (!allowedExtensions.includes(fileExtension)) {
-      alert("❌ Only Excel files (.xlsx, .xls) are allowed!");
-      event.target.value = "";
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const data = new Uint8Array(e.target?.result as ArrayBuffer);
-      const workbook = XLSX.read(data, { type: "array" });
-      const worksheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[worksheetName];
-      
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
-      if (jsonData.length > 0) {
-        const keys = Object.keys(jsonData[0] as object);
-        const columns = keys.map(key => ({
-          label: key,
-          field: key,
-          sort: 'asc',
-          width: 150
-        }));
-        setTableData({ columns, rows: jsonData });
-      }
-    };
-    reader.readAsArrayBuffer(file);
-    setFileName(file.name);
-    setShowUploadModal(false);
-  };
 
   const handleSubmit = async (values: any) => {
     setLoading(true);
@@ -454,14 +405,9 @@ const QuestionareCreateSinglePage: React.FC = () => {
         createdAt: ""
       };
       
-      // Show alert with summary
-      const totalQuestions = sectionsPayload.reduce((acc: number, s: any) => acc + (s.questions?.length || 0), 0);
-      alert(`Questionare data prepared successfully!\n\nSummary:\n- Name: ${completePayload.name}\n- Tool: ${toolPayload.name || toolPayload.toolId}\n- Languages: ${values.languages?.length || 0}\n- Sections: ${sectionsPayload.length}\n- Total Questions: ${totalQuestions}\n\nCheck console for complete data.`);
-      
       // Clear localStorage
       localStorage.removeItem('questionareStep2');
-      
-      // Uncomment below when ready to actually create questionare
+
       const response = await CreateQuestionaire(completePayload);
       if (response.status === 200 || response.status === 201) {
         alert("✅ Questionare created successfully!");
@@ -484,20 +430,7 @@ const QuestionareCreateSinglePage: React.FC = () => {
     setShowTranslationModal(true);
   };
 
-  // build preSectionQuestions from questions fetched (auto-check)
-  useEffect(() => {
-    const map: { [k: string]: string[] } = {};
-    (questions || []).forEach((q: any) => {
-      const sid = q?.section?.sectionId ?? q?.sectionId ?? q?.section?.id;
-      const qid = String(q?.questionId ?? q?.id ?? "");
-      if (sid && qid) {
-        const s = String(sid);
-        if (!map[s]) map[s] = [];
-        if (!map[s].includes(qid)) map[s].push(qid);
-      }
-    });
-    setPreSectionQuestions(map);
-  }, [questions]);
+  // No auto-population of questions on create - start with empty assignments
 
   // Show loading screen while data is being fetched
   if (dataLoading) {
@@ -1358,28 +1291,6 @@ const QuestionareCreateSinglePage: React.FC = () => {
           setPageLoading={(isLoading) => setPageLoadingState(prev => [String(isLoading)])} 
         />
 
-        {/* File Upload Modal */}
-        <Modal show={showUploadModal} onHide={() => setShowUploadModal(false)} centered>
-          <Modal.Header closeButton>
-            <Modal.Title>Upload Excel File</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleFileUpload}
-              className="form-control"
-            />
-            <small className="text-muted mt-2 d-block">
-              Only Excel files (.xlsx, .xls) are allowed
-            </small>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowUploadModal(false)}>
-              Cancel
-            </Button>
-          </Modal.Footer>
-        </Modal>
           </div>
         </div>
       </div>

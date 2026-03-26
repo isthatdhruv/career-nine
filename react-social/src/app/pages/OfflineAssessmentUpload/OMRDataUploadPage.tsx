@@ -3,7 +3,7 @@ import { Spinner, Button, Form, Badge, Alert, Modal, Table } from "react-bootstr
 import * as XLSX from "xlsx";
 import { ReadCollegeData } from "../College/API/College_APIs";
 import { getAssessmentMappingsByInstitute, getAssessmentSummaryList } from "../AssessmentMapping/API/AssessmentMapping_APIs";
-import { getOfflineMapping, bulkSubmitByRollNumber, bulkSubmitWithStudents, getSavedOmrMapping, saveOmrMapping } from "./API/OfflineUpload_APIs";
+import { getOfflineMapping, bulkSubmitByRollNumber, bulkSubmitWithStudents, getSavedOmrMapping, saveOmrMapping, getSavedOmrMappingByQuestionnaire } from "./API/OfflineUpload_APIs";
 
 // ============ Types ============
 
@@ -35,6 +35,7 @@ interface SectionMapping {
 interface MappingData {
   assessmentId: number;
   assessmentName: string;
+  questionnaireId: number;
   questionnaireName: string;
   questions: QuestionMapping[];
   sections: SectionMapping[];
@@ -153,6 +154,8 @@ const OMRDataUploadPage = () => {
   const [savedMappingExists, setSavedMappingExists] = useState(false);
   const [savingMapping, setSavingMapping] = useState(false);
   const [loadingSavedMapping, setLoadingSavedMapping] = useState(false);
+  const [autoLoadedMapping, setAutoLoadedMapping] = useState(false);
+  const savedMappingJsonRef = useRef<Record<string, string> | null>(null);
 
   // --- Parsed data ---
   const [parsedStudents, setParsedStudents] = useState<ParsedStudent[]>([]);
@@ -287,12 +290,8 @@ const OMRDataUploadPage = () => {
       try { mappings = (await getAssessmentMappingsByInstitute(instituteCode)).data || []; } catch {}
       try { allAssessments = (await getAssessmentSummaryList()).data || []; } catch {}
 
-      if (mappings.length > 0) {
-        const ids = new Set(mappings.map((m: any) => m.assessmentId));
-        setAssessmentMappings(allAssessments.filter((a: any) => ids.has(a.id)));
-      } else {
-        setAssessmentMappings(allAssessments);
-      }
+      const ids = new Set(mappings.map((m: any) => m.assessmentId));
+      setAssessmentMappings(allAssessments.filter((a: any) => ids.has(a.id)));
     } catch {} finally {
       setLoadingAssessments(false);
     }
@@ -309,14 +308,33 @@ const OMRDataUploadPage = () => {
       const res = await getOfflineMapping(assessmentId);
       setMappingData(res.data);
 
-      // Check if saved column mapping exists for this assessment + institute
+      // Check if saved column mapping exists:
+      // 1. Try exact match: (assessmentId, instituteId)
+      // 2. Fallback: any mapping saved for the same questionnaireId
       if (selectedInstitute) {
+        let found = false;
         try {
           const savedRes = await getSavedOmrMapping(assessmentId, Number(selectedInstitute));
           if (savedRes.data?.mappingJson) {
+            savedMappingJsonRef.current = JSON.parse(savedRes.data.mappingJson);
             setSavedMappingExists(true);
+            found = true;
           }
-        } catch {
+        } catch {}
+
+        if (!found && res.data?.questionnaireId) {
+          try {
+            const qRes = await getSavedOmrMappingByQuestionnaire(res.data.questionnaireId);
+            if (qRes.data?.mappingJson) {
+              savedMappingJsonRef.current = JSON.parse(qRes.data.mappingJson);
+              setSavedMappingExists(true);
+              found = true;
+            }
+          } catch {}
+        }
+
+        if (!found) {
+          savedMappingJsonRef.current = null;
           setSavedMappingExists(false);
         }
       }
@@ -327,24 +345,33 @@ const OMRDataUploadPage = () => {
     }
   };
 
+  const applyMappingFromJson = (saved: Record<string, string>, headers: string[]) => {
+    if (headers.length > 0) {
+      const headerSet = new Set(headers);
+      const filtered: Record<string, string> = {};
+      for (const [key, header] of Object.entries(saved)) {
+        if (headerSet.has(header)) filtered[key] = header;
+      }
+      setFieldToHeader(filtered);
+    } else {
+      setFieldToHeader(saved);
+    }
+  };
+
   const handleLoadSavedMapping = async () => {
     if (!selectedAssessment || !selectedInstitute) return;
+    // Use cached data if available — no redundant API call
+    if (savedMappingJsonRef.current) {
+      applyMappingFromJson(savedMappingJsonRef.current, excelHeaders);
+      return;
+    }
     setLoadingSavedMapping(true);
     try {
       const res = await getSavedOmrMapping(Number(selectedAssessment), Number(selectedInstitute));
       if (res.data?.mappingJson) {
         const saved: Record<string, string> = JSON.parse(res.data.mappingJson);
-        // Only apply mappings where the Excel header exists in current upload
-        if (excelHeaders.length > 0) {
-          const headerSet = new Set(excelHeaders);
-          const filtered: Record<string, string> = {};
-          for (const [key, header] of Object.entries(saved)) {
-            if (headerSet.has(header)) filtered[key] = header;
-          }
-          setFieldToHeader(filtered);
-        } else {
-          setFieldToHeader(saved);
-        }
+        savedMappingJsonRef.current = saved;
+        applyMappingFromJson(saved, excelHeaders);
       }
     } catch {
       alert("No saved mapping found.");
@@ -361,7 +388,9 @@ const OMRDataUploadPage = () => {
         assessmentId: Number(selectedAssessment),
         instituteId: Number(selectedInstitute),
         mappingJson: JSON.stringify(fieldToHeader),
+        questionnaireId: mappingData?.questionnaireId,
       });
+      savedMappingJsonRef.current = { ...fieldToHeader };
       setSavedMappingExists(true);
       alert("Mapping saved successfully!");
     } catch {
@@ -375,7 +404,8 @@ const OMRDataUploadPage = () => {
     setExcelHeaders([]); setRawExcelData([]); setFieldToHeader({});
     setMappingApplied(false); setParsedStudents([]);
     setFileName(""); setSubmitResult(null); setExpandedSections(new Set());
-    setSavedMappingExists(false);
+    setSavedMappingExists(false); setAutoLoadedMapping(false);
+    savedMappingJsonRef.current = null;
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -399,10 +429,25 @@ const OMRDataUploadPage = () => {
 
       if (jsonData.length === 0) { alert("Excel file is empty."); return; }
 
-      const headers = Object.keys(jsonData[0]);
+      const headers = Object.keys(jsonData[0]).filter(
+        (h) => h && !h.startsWith("__EMPTY")
+      );
       setExcelHeaders(headers);
       setRawExcelData(jsonData);
-      setFieldToHeader({});
+      setAutoLoadedMapping(false);
+
+      // Auto-apply saved mapping if available
+      if (savedMappingJsonRef.current) {
+        const headerSet = new Set(headers);
+        const filtered: Record<string, string> = {};
+        for (const [key, header] of Object.entries(savedMappingJsonRef.current)) {
+          if (headerSet.has(header)) filtered[key] = header;
+        }
+        setFieldToHeader(filtered);
+        setAutoLoadedMapping(true);
+      } else {
+        setFieldToHeader({});
+      }
     };
     reader.readAsBinaryString(file);
   };
@@ -688,9 +733,12 @@ const OMRDataUploadPage = () => {
                 <Badge bg="info">
                   {mappingValidation.mappedQuestionCount}/{mappingValidation.totalMappable} mapped
                 </Badge>
+                {autoLoadedMapping && (
+                  <Badge bg="success" style={{ fontSize: "0.7rem" }}>Saved mapping auto-applied</Badge>
+                )}
                 {savedMappingExists && (
                   <Button variant="outline-success" size="sm" onClick={handleLoadSavedMapping} disabled={loadingSavedMapping}>
-                    {loadingSavedMapping ? <><Spinner animation="border" size="sm" className="me-1" />Loading...</> : "Load Saved Mapping"}
+                    {loadingSavedMapping ? <><Spinner animation="border" size="sm" className="me-1" />Loading...</> : "Re-apply Saved Mapping"}
                   </Button>
                 )}
                 <Button

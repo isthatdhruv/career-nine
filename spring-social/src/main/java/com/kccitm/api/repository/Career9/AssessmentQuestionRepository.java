@@ -19,4 +19,7 @@ public interface AssessmentQuestionRepository extends JpaRepository<AssessmentQu
 
     List<AssessmentQuestions> findByIsDeletedTrue();
 
+    @Query(value = "SELECT aq.question_id, COUNT(DISTINCT s.fk_quality_type) FROM assessment_questions aq JOIN assessment_question_options aqo ON aqo.fk_assessment_questions = aq.question_id JOIN score_based_on_measured_quality_types s ON s.fk_assessment_questions_option = aqo.option_id WHERE (aq.is_deleted = false OR aq.is_deleted IS NULL) GROUP BY aq.question_id", nativeQuery = true)
+    List<Object[]> findMqtCountsPerQuestion();
+
 }
