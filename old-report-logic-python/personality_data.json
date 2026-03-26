@@ -1,0 +1,340 @@
+{
+  "personality": {
+    "realistic": {
+      "title": {
+        "english": "Doer",
+        "hindi": "करने वाला"
+      },
+      "titleImage": {
+        "english": "doer.png",
+        "hindi": "doer.png"
+      },
+      "descriptions": {
+        "6-8": {
+          "english": "Hands-on activities like fixing things, building models, or gardening are fun for you. You enjoy using tools and machines, and you feel proud of your hard work. You are practical and good at making things work.",
+          "hindi": "हाथ से करने वाली गतिविधियाँ जैसे कि चीजें ठीक करना, मॉडल बनाना, या बागवानी करना आपके लिए मजेदार हैं। आप उपकरणों और मशीनों का इस्तेमाल करना पसंद करते हैं, और अपनी मेहनत पर गर्व महसूस करते हैं। आप व्यावहारिक हैं और चीजें सही तरीके से काम करने में अच्छी हैं।"
+        },
+        "9-10": {
+          "english": "You Enjoy practical and hands-on tasks, you probably work well with tools, machinery, or nature. Building, fixing, and crafting bring you joy, as you love seeing the results of your hard work. Practical and good with mechanical things, you find satisfaction in tangible outcomes and the process of creating or repairing.",
+          "hindi": "आपको व्यावहारिक और हाथ से काम करने वाले कार्य पसंद हैं। आप शायद उपकरणों, मशीनों या प्रकृति के साथ अच्छा काम करते हैं। बनाना, सुधारना और कला का काम करना आपको खुशी देता है, क्योंकि आप अपने मेहनत का फल देखकर संतुष्ट होते हैं। व्यावहारिक होने के साथ-साथ मशीनों और चीजों को ठीक करने में भी आप अच्छा करते हैं। आपको अपने काम का नतीजा देखने में आनंद आता है और आप चीजें बनाने या सुधारने की प्रक्रिया का भी आनंद लेते हैं।"
+        },
+        "11-12": {
+          "english": "You enjoy practical, hands-on activities. Working with tools, machinery, plants, or animals interests you. You excel at building, repairing or crafting; you derive satisfaction in tangible results. You see yourself as practical and mechanically inclined.",
+          "hindi": "आप को व्यावहारिक, हाथ से करने वाली गतिविधियों में मज़ा आता है। आप उपकरणों, मशीनों, पौधों या जानवरों के साथ काम करना पसंद करते हैं। आप बनाने, सुधारने या हाथ से कुछ बनाने में अच्छा हैं और आपको अपने काम का फलीभूत परिणाम देखने में खुशी मिलती है। आप खुद को व्यावहारिक और मशीनरी के प्रति रुचि रखने वाला समझते हैं।"
+        }
+      },
+      "futureSuggestions": {
+        "6-8": {
+          "atSchool": {
+            "english": "Help maintain the school garden.\nAssist in setting up sports events.\nJoin a science club and participate in experiments.\nOrganize classroom clean-up activities.\nVolunteer to help with equipment in the sports room.\nJoin a nature or eco-club.\nAssist teachers in preparing school event logistics.\nParticipate in small construction or model-making competitions.",
+            "hindi": "स्कूल के बाग़ीचे की देखभाल में मदद करें।  \nखेल कार्यक्रमों के आयोजन में सहायता करें।  \nविज्ञान क्लब में शामिल होकर प्रयोगों में भाग लें।  \nकक्षा की सफाई का आयोजन करें।  \nखेलकूद कक्ष में उपकरणों की मदद के लिए स्वयंसेवक बनें।  \nप्रकृति या पर्यावरण क्लब में शामिल हों।  \nस्कूल के कार्यक्रम की योजना बनाने में शिक्षकों की मदद करें।  \nछोटी निर्माण या मॉडल बनाने की प्रतियोगिताओं में भाग लें।"
+          },
+          "atHome": {
+            "english": "Help fix small household items (e.g., bike repairs).\nOrganize a family outdoor activity like a nature walk.\nSet up a bird feeder or plant a small garden at home.\nHelp parents organize groceries.\nAssist in planning simple home repairs or improvements.\nOrganize a weekend schedule for family chores.\nTake responsibility for washing and maintaining sports equipment.\nHelp set up and maintain a pet’s living space.",
+            "hindi": "घर में छोटी-छोटी चीजें ठीक करना, जैसे साइकिल की मरम्मत करना।  \nपरिवार के साथ बाहर घूमने जाना, जैसे प्राकृतिक जगह की सैर।  \nघर पर पक्षी खाने का जुगाड़ करना या छोटा सा बगीचा लगाना।  \nमाता-पिता की मदद से खरीदारी की योजना बनाना।  \nघर में आसान मरम्मत या सुधार का प्लान बनाना।  \nसप्ताह के दिन परिवार के कामकाज का शेड्यूल बनाना।  \nखेल का सामान धोना और उसकी देखभाल करना की जिम्मेदारी लेना।  \nअपने पालतू जानवर का रहने का स्थान बनाना और उसकी देखभाल करना।"
+          }
+        },
+        "9-10": {
+          "atSchool": {
+            "english": "Participate in school gardening clubs to learn about horticulture.\nJoin a carpentry workshop to build small furniture.\nHelp in organizing sports day events and managing equipment.\nAttend workshops on basic automotive maintenance.\nParticipate in a school's eco-club and work on recycling projects.\nJoin a fitness club and train for athletic events.\nAssist in the school canteen to learn about food preparation.\nEngage in school campus clean-up and beautification projects.",
+            "hindi": "स्कूल के बागवानी क्लब में भाग लें और पौधों की देखभाल के बारे में सीखें।  \nलकड़ी का काम करने वाले कार्यशाला में शामिल होकर छोटी-छोटी फर्नीचर बनाना सीखें।  \nखेल दिवस के आयोजन में मदद करें और खेल का सामान संभालना सीखें।  \nकार की देखभाल से जुड़ी बेसिक बातें सीखने के लिए वर्कशॉप में भाग लें।  \nस्कूल के ईको क्लब का हिस्सा बनें और रीसायक्लिंग प्रोजेक्ट्स पर काम करें।  \nएक फिटनेस क्लब में शामिल होकर खेलों के लिए अभ्यास करें।  \nस्कूल के कैन्टीन में मदद करें और खाने की तैयारियों के बारे में जानें।  \nस्कूल के कैंपस की सफाई और सुंदरता बढ़ाने के कामों में हिस्सा लें।"
+          },
+          "atHome": {
+            "english": "Build and maintain a birdhouse or pet shelter.\nPlan and organize a home mini-garden or terrace garden.\nTake part in home repair projects like fixing leaks or painting.\nAssist in setting up a small home gym.\nCreate a schedule for household chores and tasks.\nEngage in DIY crafts using wood, metal, or other materials.\nSet up and maintain a home composting system.\nHelp with seasonal home maintenance tasks like cleaning gutters.",
+            "hindi": "एक पक्षीघर या पालतू जानवरों के लिए आश्रय बनाना और उसकी देखभाल करना।  \nअपने घर के पास या छत पर एक छोटा बाग़ या गार्डन की योजना बनाना और उसकी देखरेख करना।  \nघर में छोटी-मोटी मरम्मत जैसे लीक ठीक करना या दीवारें रंगना में मदद करना।  \nघर में एक छोटा जिम सेटअप करना और उसकी देखभाल करना।  \nघर के काम-काज और जिम्मेदारियों का शेड्यूल बनाना।  \nलकड़ी, धातु या अन्य सामग्री का उपयोग कर खुद से क्राफ्टिंग या हस्तकला करना।  \nघर में कम्पोस्टिंग सिस्टम लगाना और उसकी देखरेख करना ताकि कचरा Compost में बदल सके।  \nमौसम के हिसाब से घर की साफ-सफाई और रख-रखाव जैसे गटर की सफाई जैसी जिम्मेदारियों में मदद करना।"
+          }
+        },
+        "11-12": {
+          "atSchool": {
+            "english": "Join the school's robotics or mechanical club.\nOrganize inter-house sports competitions.\nAssist in setting up school labs for practical sessions.\nParticipate in district or state-level sports events.\nHelp in maintaining and organizing school inventory.\nVolunteer for setting up audio/visual equipment during events.\nTake a lead in organizing field trips or outdoor camps.\nJoin technical clubs for model building or DIY activities.",
+            "hindi": "स्कूल के रोबोटिक्स या मेकेनिकल क्लब में शामिल होइए।\nघरों के बीच खेलकूद प्रतियोगिताओं का आयोजन कीजिए।\nस्कूल के प्रयोगशालाओं को सेटअप करने में मदद कीजिए ताकि प्रैक्टिकल सेशंस अच्छे से हो सकें।\nजिले या राज्य स्तर के खेल आयोजनों में भाग लीजिए।\nस्कूल की इन्वेंट्री यानी सामान-सामान की देखभाल और आयोजन में सहयोग कीजिए।\nकिसी भी इवेंट के दौरान ऑडियो/विजुअल उपकरण लगाने में स्वयंसेवक बनिए।\nफील्ड ट्रिप या आउटडोर कैंप के आयोजन में अगुवाई कीजिए।\nमॉडल बनाने या DIY (खुद से बनाने) गतिविधियों के लिए टेक्निकल क्लब में जुड़िए।"
+          },
+          "atHome": {
+            "english": "Take charge of organizing the kitchen or storage spaces.\nBuild a simple project using DIY kits (e.g., circuits).\nHelp plan the layout for home improvement projects.\nSet up a fitness or workout routine for the family.\nMaintain home tools and assist in fixing minor issues.\nDesign a weekly household task schedule.\nHelp manage and organize a small vegetable or herb garden.\nAssist in planning a family outing, including logistics.",
+            "hindi": "रसोई घर या भंडारण के स्थान को व्यवस्थित करने की जिम्मेदारी लें।  \nDIY किट्स (जैसे सर्किट बनाना) का इस्तेमाल कर एक आसान प्रोजेक्ट बनाएं।  \nघर में सुधार के प्रोजेक्ट के लिए लेआउट की योजना बनाने में मदद करें।  \nपरिवार के लिए एक फिटनेस या वर्कआउट रूटीन सेट करें।  \nघर के टूल्स का ध्यान रखें और छोटे-मोटे मरम्मत में मदद करें।  \nहफ्तेवार घरेलू काम का शेड्यूल बनाएं।  \nछोटे सब्जी या जड़ी-बूटियों के बग़ीचे को मैनेज करने और व्यवस्थित करने में मदद करें।  \nपरिवार के बाहर घूमने का प्लान बनाने में सहायता करें, जिसमें ट्रांसपोर्ट और व्यवस्था शामिल हो।"
+          }
+        }
+      }
+    },
+    "investigative": {
+      "title": {
+        "english": "Thinker",
+        "hindi": "सोचने वाला"
+      },
+      "titleImage": {
+        "english": "thinker.png",
+        "hindi": "thinker.png"
+      },
+      "descriptions": {
+        "6-8": {
+          "english": "Puzzles and figuring out concepts interest you. You like science and math, and you're good at experiments and solving tough questions. People see you as smart and detail-oriented, always wanting to learn.",
+          "hindi": "तुम्हें पहेलियाँ हल करना और नई बातें समझना अच्छा लगता है। तुम्हें विज्ञान और गणित में भी रुचि है, और तुम प्रयोग करने में माहिर हो। कठिन सवालों को हल करना तुम्हें अच्छा लगता है। लोग तुम्हें समझदार और ध्यान से काम करने वाला मानते हैं, और तुम हमेशा कुछ नया सीखने की इच्छा रखते हो।"
+        },
+        "9-10": {
+          "english": "You Love science or maths! you enjoy experiments and solving problems. You're precise and love figuring out how things work, which really gets your mind going. Intellectual challenges excite you, and you find great satisfaction in understanding complex concepts and conducting detailed analyses.",
+          "hindi": "आपको विज्ञान या गणित बहुत पसंद है! आप प्रयोग करना और समस्याओं को हल करना पसंद करते हैं। आप बहुत सावधानी से काम करते हैं और यह जानने में रुचि रखते हैं कि चीजें कैसे काम करती हैं, जिससे आपका मन खुशी से भर जाता है। दिमागी चुनौतियां आपके लिए उत्साहवर्धक हैं, और आप जटिल विचारों को समझने और गहराई से विश्लेषण करने में बहुत अच्छा महसूस करते हैं।"
+        },
+        "11-12": {
+          "english": "You are interested in solving science and math problems. Conducting experiments, analyzing data, and exploring scientific concepts excite you. You're precise, scientific, and intellectual; you derive satisfaction in understanding how things work and enjoying mental challenges.",
+          "hindi": "आपको विज्ञान और गणित के सवाल हल करना अच्छा लगता है। प्रयोग करना, डेटा का विश्लेषण करना, और वैज्ञानिक विचारों को समझना आपको उत्साहित करता है। आप सटीक, वैज्ञानिक और बुद्धिमान हैं; आपको यह जानने में खुशी मिलती है कि चीजें कैसे काम करती हैं, और मानसिक चुनौतियों का सामना करना आपको संतुष्टि देता है।"
+        }
+      },
+      "futureSuggestions": {
+        "6-8": {
+          "atSchool": {
+            "english": "Join the science club and participate in lab experiments.\nTake part in quiz competitions focused on general knowledge.\nAssist teachers in organizing science exhibitions.\nParticipate in small coding or programming challenges.\nHelp in collecting data for school research projects.\nExplore a science-related hobby (e.g., astronomy).\nCreate a poster or presentation for a class science topic.\nParticipate in environmental awareness campaigns.",
+            "hindi": "विज्ञान क्लब में शामिल हों और प्रयोगशाला के प्रयोगों में भाग लें।  \nसामान्य ज्ञान पर आधारित क्विज प्रतियोगिताओं में हिस्सा लें।  \nविज्ञान प्रदर्शियों का आयोजन करने में शिक्षकों की मदद करें।  \nछोटे-छोटे कोडिंग या प्रोग्रामिंग चुनौतियों में भाग लें।  \nस्कूल के शोध प्रोजेक्ट्स के लिए डेटा इकट्ठा करने में मदद करें।  \nकिसी विज्ञान से जुड़ी हॉबी (जैसे खगोल विज्ञान) को सीखें।  \nकिसी विज्ञान विषय पर पोस्टर या प्रेजेंटेशन बनाएं।  \nपर्यावरण जागरूकता अभियान में हिस्सा लें।"
+          },
+          "atHome": {
+            "english": "Watch educational documentaries and write down observations.\nSet up a small home science lab (e.g., basic chemistry experiments).\nBuild simple machines or models from everyday materials.\nMaintain a journal of interesting scientific facts.\nResearch and report on local plants and their uses.\nPerform simple home experiments (e.g., making a volcano model).\nInvestigate how home appliances work by reading manuals.\nLearn to program using free coding tutorials.",
+            "hindi": "शैक्षिक डॉक्युमेंट्री देखें और अपनी नज़रिए से नोट्स बनाएं।  \nघर पर एक छोटी साइंस लैब लगाएं, जैसे कि बेसिक केमिस्ट्री के प्रयोग।  \nरोज़मर्रा की वस्तुओं से आसान मशीनें या मॉडल बनाएं।  \nएक जर्नल रखें जिसमें रोचक वैज्ञानिक तथ्य लिखें।  \nअपने इलाके के पौधों के बारे में रिसर्च करें और उनके इस्तेमाल के बारे में जानकारी जुटाएं।  \nघर पर आसान प्रयोग करें, जैसे कि एक वॉल्केनो का मॉडल बनाना।  \nघर में इस्तेमाल होने वाले उपकरणों को समझने के लिए उनके मैनुअल पढ़ें और जानें कि वे कैसे काम करते हैं।  \nफ्री कोडिंग ट्यूटोरियल्स देखकर प्रोग्रामिंग सीखें।"
+          }
+        },
+        "9-10": {
+          "atSchool": {
+            "english": "Conduct a survey on school-related issues and present findings.\nJoin the astronomy club and participate in stargazing events.\nDevelop and present a science project at the school fair.\nConduct soil and water testing for environmental studies.\nAttend seminars on advanced topics in physics or chemistry.\nWrite articles on scientific discoveries for the school magazine.\nCreate a school newsletter on recent scientific advancements.\nParticipate in the analysis of school energy usage and suggest improvements.",
+            "hindi": "स्कूल से जुड़ी समस्याओं पर सर्वेक्षण करें और अपने निष्कर्ष प्रस्तुत करें।  \nअंतरिक्ष विज्ञान क्लब में शामिल हों और तारे देखने के आयोजन में भाग लें।  \nस्कूल मेले में एक विज्ञान परियोजना विकसित करें और इसे प्रस्तुत करें।  \nपर्यावरण अध्ययन के लिए मिट्टी और पानी की जांच करें।  \nभौतिकी या रसायन विज्ञान के उन्नत विषयों पर सेमिनार में भाग लें।  \nस्कूल की पत्रिका के लिए वैज्ञानिक खोजों पर लेख लिखें।  \nहाल ही में हुई वैज्ञानिक प्रगति के बारे में एक स्कूल न्यूजलेटर बनाएं।  \nस्कूल की ऊर्जा के उपयोग का विश्लेषण करें और उसमें सुधार के सुझाव दें।"
+          },
+          "atHome": {
+            "english": "Perform home experiments to explore chemistry or physics concepts.\nMaintain a science journal documenting daily observations.\nBuild a small weather station to monitor local climate changes.\nDevelop a personal project like a DIY solar oven.\nConduct online research on global scientific challenges.\nBuild simple models to understand physics principles (e.g., catapults).\nParticipate in online forums or groups discussing science topics.\nCreate educational videos explaining scientific concepts.",
+            "hindi": "घर पर प्रयोग करके रसायन या भौतिक विज्ञान के सिद्धांतों को समझें।  \nअपनी रोज़मर्रा की बातें नोट करने के लिए एक साइंस जर्नल बनाएं।  \nअपने ही घर में एक छोटा मौसम स्टेशन बनाएं और आसमान में हो रहे बदलावों को देखें।  \nअपना खुद का प्रोजेक्ट शुरू करें, जैसे कि एक सोलर ओवन बनाना।  \nइंटरनेट पर जाकर विश्व की बड़ी वैज्ञानिक चुनौतियों के बारे में जानकारी हासिल करें।  \nसाधारण मॉडल बनाएं, जैसे कि कैटापल्ट, ताकि भौतिक विज्ञान के नियम समझ में आएं।  \nऑनलाइन फोरम या समूहों में शामिल होकर विज्ञान से जुड़ी बातें चर्चा करें।  \nशिक्षाप्रद वीडियो बनाएं, जिसमें वैज्ञानिक बातें सरल तरीके से समझाई जाएं।"
+          }
+        },
+        "11-12": {
+          "atSchool": {
+            "english": "Join a school-level research competition.\nLead a project in the science lab that involves data analysis.\nParticipate in mathematics Olympiads or science fairs.\nHelp teachers analyze school survey data for projects.\nParticipate in organizing workshops on robotics or AI.\nWrite for the school’s science magazine or blog.\nVolunteer to assist with scientific equipment in labs.\nDesign and conduct experiments to test scientific theories.",
+            "hindi": "स्कूल स्तर पर एक शोध प्रतियोगिता में भाग लें।  \nविज्ञान प्रयोगशाला में एक प्रोजेक्ट का नेतृत्व करें जिसमें डेटा का विश्लेषण किया जाए।  \nगणित ओलंपियाड या विज्ञान मेले में हिस्सा लें।  \nस्कूल सर्वेक्षण का डेटा शिक्षक की मदद से विश्लेषण करने में मदद करें।  \nरोबोटिक्स या आर्टिफिशियल इंटेलिजेंस (AI) पर वर्कशॉप आयोजित करने में भाग लें।  \nस्कूल के विज्ञान पत्रिका या ब्लॉग के लिए लेख लिखें।  \nप्रयोगशालाओं में वैज्ञानिक उपकरणों की मदद करने के लिए स्वयंसेवक बनें।  \nवैज्ञानिक सिद्धांतों को परखने के लिए प्रयोग डिजाइन करें और उन्हें संचालित करें।"
+          },
+          "atHome": {
+            "english": "Explore online courses on topics like coding, astronomy, or physics.\nResearch and explain a current scientific event or discovery.\nSolve puzzles or brain teasers to improve problem-solving skills.\nSet up a weather monitoring station at home and track patterns.\nParticipate in online science competitions.\nLearn to use a telescope or microscope at home.\nStudy nutrition science and create a healthy meal plan for the family.\nInvestigate family history or genealogy by researching old documents.",
+            "hindi": "कोडिंग, खगोल विज्ञान या भौतिक विज्ञान जैसे विषयों पर ऑनलाइन कोर्सेज़ करें।  \nकिसी वर्तमान वैज्ञानिक घटना या खोज के बारे में रिसर्च करें और उसे समझाएं।  \nपहेलियाँ या दिमागी चैलेंज हल करें ताकि आपका समस्या हल करने का दिमाग तेज़ हो सके।  \nघर पर ही मौसम मापने की मशीन लगाएँ और बारिश, धूप आदि का ट्रैक रखें।  \nऑनलाइन विज्ञान प्रतियोगिताओं में भाग लें।  \nघर पर टेलिस्कोप या माइक्रोस्कोप का इस्तेमाल करना सीखें।  \nपोषण विज्ञान पढ़ें और परिवार के लिए स्वस्थ खाने का प्लान बनाएं।  \nअपने परिवार का इतिहास या वंशावली पता लगाने के लिए पुराने डॉक्यूमेंट्स की खोज करें।"
+          }
+        }
+      }
+    },
+    "artistic": {
+      "title": {
+        "english": "Creator",
+        "hindi": "सृजनहार"
+      },
+      "titleImage": {
+        "english": "creator.png",
+        "hindi": "creator.png"
+      },
+      "descriptions": {
+        "6-8": {
+          "english": "Creativity is your thing, whether it's drawing, writing stories, acting, playing music, dancing, or making crafts. You have original ideas and enjoy expressing yourself. You don't like boring, repetitive tasks or strict rules.",
+          "hindi": "रचनात्मकता आपकी खासियत है, चाहे वह चित्र बनाना हो, कहानियां लिखना, अभिनय करना, संगीत बजाना, नाचना, या हस्तकला बनाना। आप नए और अनोखे विचार लाते हैं और अपने आप को व्यक्त करना पसंद करते हैं। आपको उबाऊ और बार-बार होने वाले काम या कठोर नियम अच्छे नहीं लगते।"
+        },
+        "9-10": {
+          "english": "You have a strong affinity for creative pursuits. You likely excel in activities such as creative writing, drama, crafts, music, dance, or visual arts. You probably value creative arts and enjoy expressing yourself in original and independent manner. You might see yourself as expressive and innovative, and you may prefer activities that allow you to explore and showcase your creativity. Highly ordered or repetitive tasks might not appeal to you as much.",
+          "hindi": "आपको रचनात्मक कामों का बहुत शौक है। आप अक्सर लेखन, नाटक, क्राफ्ट, संगीत, नृत्य, या चित्रकला जैसी गतिविधियों में अच्छा करते हैं। आप कला को बहुत महत्व देते हैं और खुद को अपनी अलग और नई सोच के साथ व्यक्त करना पसंद करते हैं। आप खुद को अभिव्यक्त करने वाला और नई चीजें खोजने वाला मान सकते हैं। इसलिए, आपको ऐसी गतिविधियाँ ज्यादा अच्छी लगती हैं जिनमें आप अपनी Creativity को दिखा सकें। आपको बहुत बार और बार-बार करने वाले काम जैसे कि बहुत ही सख्त या दोहराव वाले काम शायद पसंद नहीं आते।"
+        },
+        "11-12": {
+          "english": "You have a strong affinity for creative pursuits, excelling in creative writing, drama, crafts, music, dance, or visual arts. You value creativity and enjoy expressing yourself originally and independently. You see yourself as expressive and innovative and prefer activities that showcase your creativity over repetitive tasks.",
+          "hindi": "आपको रचनात्मक कामों का बहुत शौक है। आप अच्छी लेखनी, नाटक, क्राफ्ट, संगीत, नृत्य या चित्रकला में अच्छा करते हैं। आप अपने कलात्मक प्रतिभा को बहुत महत्वपूर्ण मानते हैं और अपने विचारों को स्वतंत्र और अनूठ तरीके से व्यक्त करना पसंद करते हैं। आप अपनी कल्पना और नए विचारों को दिखाने वाले कामों को अधिक पसंद करते हैं और उन कामों में आनंद महसूस करते हैं जो आपकी रचनात्मकता को निखारें, बजाय उन कामों के जो बार-बार करने पर भी वही रहते हैं।"
+        }
+      },
+      "futureSuggestions": {
+        "6-8": {
+          "atSchool": {
+            "english": "Join the school’s art and craft club.\nParticipate in painting or drawing competitions.\nHelp design posters for school events.\nWrite and perform a short play for a school function.\nDecorate classroom bulletin boards with creative themes.\nJoin the school choir or music group.\nCreate a comic strip for the school magazine.\nParticipate in inter-school cultural festivals.",
+            "hindi": "स्कूल की कला और क्राफ्ट क्लब में शामिल हों।\nपेंटिंग या ड्राइंग प्रतियोगिताओं में भाग लें।\nस्कूल के कार्यक्रमों के लिए पोस्टर बनाने में मदद करें।\nकिसी स्कूल फंक्शन के लिए एक छोटी नाटक लिखें और प्रस्तुत करें।\nकक्षा की बुलेटिन बोर्ड को रचनात्मक थीम्स से सजा दें।\nस्कूल के चॉइर या संगीत समूह में शामिल हों।\nस्कूल मैगजीन के लिए कॉमिक स्ट्रिप बनाएं।\nस्कूलों के बीच होने वाले सांस्कृतिक त्योहारों में हिस्सा लें।"
+          },
+          "atHome": {
+            "english": "Create handmade greeting cards for family and friends.\nPaint or decorate a corner of your room.\nWrite and illustrate your own short story.\nDesign a family photo album or scrapbook.\nTry making jewellery or accessories from DIY kits.\nExperiment with clay modelling or sculpture at home.\nOrganize a mini art exhibition at home for family members.\nLearn a new musical instrument or practice an existing one.",
+            "hindi": "अपने परिवार और दोस्तों के लिए हाथ से बने शुभकामनाएँ कार्ड बनाएँ।  \nअपने कमरे के किसी कोने को रंगीन या सजावट से सजाएँ।  \nअपनी खुद की छोटी कहानी लिखें और उसे चित्रित करें।  \nपरिवार की फोटो का एल्बम या स्क्रैपबुक बनाएँ।  \nघर पर ही बनाई जाने वाली ज्वेलरी या accessories बनाने की कोशिश करें।  \nमिट्टी की मूर्तिकला या मॉडलिंग का अभ्यास घर पर करें।  \nपरिवार के सदस्यों के लिए घर पर ही एक छोटी कला प्रदर्शनी का आयोजन करें।  \nकोई नया वाद्य यंत्र सीखें या पहले से चल रहे वाद्य यंत्र का अभ्यास करें।"
+          }
+        },
+        "9-10": {
+          "atSchool": {
+            "english": "Join a school choir or music band and perform at events.\nParticipate in school art competitions and exhibitions.\nCreate a mural in collaboration with classmates for the school.\nOrganize and perform in a school talent show.\nAttend workshops on creative writing or storytelling.\nJoin a theatre group and act in school plays.\nMake a documentary or short film on school activities.\nStart a school photography club and document events.",
+            "hindi": "स्कूल की गायन मंडली या संगीत बैंड में शामिल हों और कार्यक्रमों में प्रदर्शन करें।\nस्कूल की कला प्रतियोगिताओं और प्रदर्शनों में भाग लें।\nअपने सहपाठियों के साथ मिलकर स्कूल के लिए एक दीवार चित्र (म्यूरल) बनाएं।\nस्कूल में प्रतिभा शो का आयोजन करें और उसमें भाग लें।\nरचनात्मक लेखन या कहानी कहने के वर्कशॉप में भाग लें।\nथिएटर ग्रुप में शामिल हों और स्कूल के नाटकों में अभिनय करें।\nस्कूल की गतिविधियों पर एक डॉक्यूमेंटरी या छोटी फिल्म बनाएं।\nस्कूल का फोटोग्राफी क्लब शुरू करें और कार्यक्रमों की तस्वीरें लें।"
+          },
+          "atHome": {
+            "english": "Create a scrapbook or art journal showcasing personal projects.\nLearn and practice a new musical instrument.\nWrite and illustrate a short comic or graphic novel.\nExperiment with different painting techniques (e.g., watercolor, acrylic).\nDesign a personal website to showcase your artwork.\nParticipate in online art challenges or contests.\nCreate DIY decorations for home festivals and celebrations.\nMake handmade gifts for friends and family.",
+            "hindi": "अपने व्यक्तिगत प्रोजेक्ट्स को दिखाने के लिए एक स्क्रैपबुक या आर्ट जर्नल बनाएं।\nएक नया संगीत वाद्ययंत्र सीखें और उसकी प्रैक्टिस करें।\nएक छोटी कॉमिक या ग्राफिक नावेल लिखें और उसमें चित्र भी बनाएं।\nविभिन्न पेंटिंग तकनीकों का प्रयोग करें, जैसे वॉटरकलर या ऐक्रेलिक पेंट।\nअपनी कला को दिखाने के लिए एक अपना वेबसाइट बनाएं।\nऑनलाइन आर्ट चुनौतियों या प्रतियोगिताओं में भाग लें।\nघर के त्योहारों और जश्न के लिए खुद से सजावट बनाएँ।\nअपने दोस्तों और परिवार के लिए हाथ से बने तोहफे बनाएं।"
+          }
+        },
+        "11-12": {
+          "atSchool": {
+            "english": "Participate in the school’s annual art exhibition.\nHelp design stage sets or props for school dramas.\nJoin a photography club and capture school events.\nContribute creative writing pieces to the school magazine.\nOrganize an inter-house dance or music competition.\nHelp curate the school’s cultural festival.\nDesign and sell custom t-shirts for school events.\nWrite scripts and direct short plays for school functions.",
+            "hindi": "स्कूल की वार्षिक कला प्रदर्शनी में हिस्सा लें।  \nस्कूल के नाटकों के लिए स्टेज सेट या प्रॉप्स बनाने में मदद करें।  \nफोटोग्राफी क्लब में शामिल होकर स्कूल की गतिविधियों को कैद करें।  \nस्कूल मैगज़ीन के लिए अपनी रचनात्मक लेखन की प्रतिभा दिखाएं।  \nघर के बीच में नृत्य या संगीत प्रतियोगिता का आयोजन करें।  \nस्कूल के सांस्कृतिक त्योहार की व्यवस्था में मदद करें।  \nस्कूल के कार्यक्रमों के लिए खास ट-shirt डिज़ाइन करें और बेचें।  \nस्कूल की छोटी-छोटी नाटिकाएँ लिखें, निर्देशित करें और प्रस्तुत करें।"
+          },
+          "atHome": {
+            "english": "Create a portfolio of your artwork or photography.\nTry digital art using free design software.\nWrite poetry or short stories and share them with friends.\nStart a blog or Instagram page to showcase your creativity.\nPaint murals or wall art in your room or study space.\nTake up video editing or filmmaking as a hobby.\nDesign and sew simple clothes or accessories.\nLearn and experiment with a new form of dance or music.",
+            "hindi": "अपने कला या फोटोग्राफी का एक संग्रह बनाओ।  \nमुफ्त डिज़ाइन सॉफ्टवेयर का इस्तेमाल कर के डिजिटल आर्ट बनाने की कोशिश करो।  \nकविता या छोटी कहानियाँ लिखो और अपने दोस्तों के साथ शेयर करो।  \nएक ब्लॉग या इंस्टाग्राम पेज शुरू करो ताकि अपनी रचनात्मकता दिखा सको।  \nअपने कमरे या पढ़ाई के जगह पर दीवारों पर म्यूरल या दीवार की सजावट बनाओ।  \nवीडियो एडिटिंग या फिल्म बनाने का शौक अपनाओ।  \nसाधारण कपड़े या एक्सेसरीज़ डिज़ाइन और सिलो।  \nनई तरह की डांस या संगीत सीखो और उसकी कोशिश करो।"
+          }
+        }
+      }
+    },
+    "social": {
+      "title": {
+        "english": "Helper",
+        "hindi": "मद्‌दगार"
+      },
+      "titleImage": {
+        "english": "helper.png",
+        "hindi": "helper.png"
+      },
+      "descriptions": {
+        "6-8": {
+          "english": "Helping others, teaching friends, giving advice, or assisting those in need makes you happy. You are friendly and trustworthy, preferring to work with people instead of machines. Your empathy makes you a reliable person.",
+          "hindi": "दूसरों की मदद करना, दोस्तों को पढ़ाना, सलाह देना या जरूरतमंदों की सहायता करना आपको खुश करता है। आप मिलनसार और भरोसेमंद हैं, और आप मशीनों की बजाय लोगों के साथ काम करना पसंद करते हैं। आपकी सहानुभूति आपको एक भरोसेमंद व्यक्ति बनाती है।"
+        },
+        "9-10": {
+          "english": "Helping others makes you happy. You excel in teaching, counseling, or nursing and enjoy being seen as helpful and trustworthy. Making a positive impact on people's lives is important to you, and you find fulfillment in roles where you can offer support and guidance.",
+          "hindi": "दूसरों की मदद करना आपको खुशी देता है। आप पढ़ाने, सलाह देने या नर्सिंग करने में अच्छा हैं और दूसरों की मददगार और भरोसेमंद के रूप में देखे जाना आप को अच्छा लगता है। दूसरों की जिंदगी में अच्छा बदलाव लाना आपके लिए महत्वपूर्ण है, और आप उन कामों में संतुष्टि महसूस करते हैं जिनमें आप मदद और मार्गदर्शन कर सकते हैं।"
+        },
+        "11-12": {
+          "english": "You like helping others and excel in roles like teaching, counseling, nursing, or providing information. You value solving social problems and enjoy being seen as helpful, friendly, and trustworthy. You prefer making a positive impact on people's lives rather than working with machines or tools.",
+          "hindi": "आपको दूसरों की मदद करना अच्छा लगता है और आप शिक्षक, परामर्शदाता, नर्स या सूचना देने जैसे कामों में अच्छा करते हैं। आप सामाजिक समस्याओं का हल ढूंढने में रुचि रखते हैं और दूसरों की मदद करने, मित्रता दिखाने और भरोसेमंद बनने को महत्व देते हैं। आप मशीनों या उपकरणों के बजाय लोगों की जिंदगी में अच्छा बदलाव लाने का काम पसंद करते हैं।"
+        }
+      },
+      "futureSuggestions": {
+        "6-8": {
+          "atSchool": {
+            "english": "Join the school’s peer mentoring program.\nVolunteer to help new students settle in.\nOrganize a class charity drive for a cause.\nJoin the student council to represent your class.\nParticipate in a group discussion or debate event.\nHelp teachers with organizing school events.\nTake part in school health awareness campaigns.\nAssist in leading a group activity during sports day.",
+            "hindi": "स्कूल के साथी मेंटरिंग प्रोग्राम में भाग लें।  \nनए छात्रों को स्कूल में बसने में मदद करने के लिए स्वयंसेवक बनें।  \nकिसी सामाजिक कारण के लिए क्लास में चैरिटी ड्राइव का आयोजन करें।  \nअपने क्लास का प्रतिनिधित्व करने के लिए स्टूडेंट काउंसिल में शामिल हों।  \nसमूह चर्चा या बहस प्रतियोगिता में भाग लें।  \nस्कूल के कार्यक्रमों में शिक्षकों की मदद करें।  \nस्कूल की स्वास्थ्य जागरूकता अभियानों में हिस्सा लें।  \nखेल दिवस के दौरान समूह गतिविधि का नेतृत्व करने में मदद करें।"
+          },
+          "atHome": {
+            "english": "Help younger siblings with their homework.\nOrganize a neighbourhood cleanliness drive.\nVolunteer at a local community center.\nPlan and organize a family gathering or celebration.\nTeach basic skills to younger children in the neighbourhood.\nStart a small group reading club with friends.\nHelp manage a family member’s daily schedule.\nPlan a weekend outing for family or friends.",
+            "hindi": "अपने छोटे भाई-बहनों की होमवर्क में मदद करें।  \nअपने मोहल्ले में साफ-सफाई का अभियान चलाएं।  \nकिसी स्थानीय सामुदायिक केंद्र में स्वेच्छा से काम करें।  \nपरिवार के साथ मिलकर एक समारोह या पार्टी की योजना बनाएं और उसे आयोजित करें।  \nअपने आसपास के छोटे बच्चों को बुनियादी कामकाज सिखाएं।  \nअपने दोस्तों के साथ मिलकर एक छोटी पढ़ाई की क्लब शुरू करें।  \nपरिवार के किसी सदस्य की रोज़ाना की योजना बनाने में मदद करें।  \nपरिवार या दोस्तों के साथ मिलकर एक वीकेंड पर घूमने का कार्यक्रम बनाएं।"
+          }
+        },
+        "9-10": {
+          "atSchool": {
+            "english": "Organize peer mentoring programs for younger students.\nParticipate in school wellness committees to promote health.\nRun a campaign for school elections or student council.\nSet up a buddy system to help new students acclimate.\nVolunteer in organizing cultural exchange events.\nStart a club focused on mental health and well-being.\nCoordinate school charity events or fundraisers.\nOrganize awareness campaigns on social issues like bullying.",
+            "hindi": "छोटे छात्रों के लिए साथियों के मेंटरिंग प्रोग्राम का आयोजन करें।  \nस्कूल की वेलनेस कमेटियों में भाग लें ताकि स्वास्थ्य को बढ़ावा मिल सके।  \nस्कूल चुनाव या छात्र परिषद के लिए एक अभियान चलाएँ।  \nनए छात्रों की सहायता के लिए एक दोस्ताना प्रणाली बनाएँ ताकि वे आसानी से घुलमिल सकें।  \nसांस्कृतिक आदान-प्रदान कार्यक्रमों को आयोजित करने में स्वेच्छा से मदद करें।  \nमानसिक स्वास्थ्य और खुशहाली पर केंद्रित एक क्लब शुरू करें।  \nस्कूल में चैरिटी कार्यक्रम या फंडरेज़र का आयोजन करें।  \nस्कूल में सोशल मुद्दों जैसे कि धमकाने (बुलिंग) के बारे में जागरूकता बढ़ाने के अभियान चलाएँ।"
+          },
+          "atHome": {
+            "english": "Volunteer at local community centers or NGOs.\nOrganize neighborhood clean-up drives.\nStart a book or toy donation drive for underprivileged children.\nHelp organize family game nights or gatherings.\nTeach basic computer skills to elderly neighbors.\nPlan and run wellness activities like family yoga sessions.\nAssist in organizing community health check-ups.\nCreate a neighborhood newsletter highlighting local events.",
+            "hindi": "अपने पास के समुदाय केंद्रों या एनजीओ में स्वेच्छा से मदद करें।  \nआसपास के इलाके की सफाई के लिए सफाई अभियान आयोजित करें।  \nगरीब बच्चों के लिए किताब या खिलौने देने का अभियान शुरू करें।  \nपरिवारों के साथ मिलकर खेल की रात या छोटी-मोटी पार्टी का आयोजन करें।  \nअपने बुजुर्ग पड़ोसियों को बुनियादी कंप्यूटर कौशल सिखाएं।  \nपरिवार के साथ योग या स्वास्थ्य से जुड़ी गतिविधियों की योजना बनाएं और चलाएं।  \nसमुदाय में स्वास्थ्य जांच जैसी गतिविधियों का आयोजन करने में मदद करें।  \nअपने इलाके का एक समाचार पत्र बनाएं जिसमें स्थानीय गतिविधियों और खबरों को शामिल किया जाए।"
+          }
+        },
+        "11-12": {
+          "atSchool": {
+            "english": "Lead or join a social service club.\nOrganize blood donation or health camps with the school.\nVolunteer as a tutor for younger students.\nLead an anti-bullying awareness campaign.\nOrganize group discussions on current social issues.\nParticipate in or organize mental health awareness events.\nPlan an inter-school cultural exchange program.\nHelp organize and manage parent-teacher meetings.",
+            "hindi": "एक सामाजिक सेवा क्लब का नेतृत्व करें या उसमें शामिल हों।  \nस्कूल के साथ मिलकर रक्तदान या स्वास्थ्य शिविर का आयोजन करें।  \nछोटे छात्रों के लिए ट्यूटर बनकर स्वेच्छा से मदद करें।  \nएक एंटी-बुलिंग जागरूकता अभियान की अगुवाई करें।  \nवर्तमान सामाजिक मुद्दों पर समूह चर्चा का आयोजन करें।  \nमानसिक स्वास्थ्य जागरूकता कार्यक्रमों में भाग लें या उन्हें आयोजित करें।  \nस्कूलों के बीच सांस्कृतिक आदान-प्रदान का कार्यक्रम योजना बनाएं।  \nअभिभावक-शिक्षक बैठकें आयोजित करने और उनका प्रबंधन करने में मदद करें।"
+          },
+          "atHome": {
+            "english": "Plan and lead a community service project (e.g., tree planting).\nVolunteer to teach skills to underprivileged children.\nOrganize a donation drive for a local charity.\nPlan family wellness activities, like yoga sessions.\nHelp neighbours with daily tasks or errands.\nMentor younger cousins or friends with their studies.\nOrganize a community health or awareness camp.\nAssist in planning and preparing meals for family gatherings.",
+            "hindi": "एक सामुदायिक सेवा प्रोजेक्ट की योजना बनाएं और उसको नेतृत्व करें, जैसे पेड़ लगाना।\nजरूरतमंद बच्चों को नई स्किल्स सिखाने के लिए स्वेच्छा से मदद करें।\nकिसी स्थानीय चैरिटी के लिए दान का आयोजन करें।\nपरिवार के सदस्यों के लिए वेलनेस गतिविधियों की योजना बनाएं, जैसे योग सत्र।\nअपने आस-पास के पड़ोसियों की रोज़मर्रा की छोटी-छोटी मदद करें, जैसे सामान लाना या काम में मदद करना।\nछोटे भाई-बहनों या दोस्तों को पढ़ाई में मदद करें और उन्हें मार्गदर्शन दें।\nएक सामुदायिक स्वास्थ्य या जागरूकता कैंप का आयोजन करें।\nपरिवार की बैठकों या त्योहारों के लिए खाने का आयोजन और तैयारियों में मदद करें।"
+          }
+        }
+      }
+    },
+    "enterprising": {
+      "title": {
+        "english": "Persuader",
+        "hindi": "प्रेरक"
+      },
+      "titleImage": {
+        "english": "persuader.png",
+        "hindi": "persuader.png"
+      },
+      "descriptions": {
+        "6-8": {
+          "english": "Leadership roles, like organizing games or leading projects, excite you. You are energetic and ambitious, enjoying being in charge and making decisions, rather than tasks needing careful scientific thinking.",
+          "hindi": "नेतृत्व के रोल, जैसे खेलों का आयोजन करना या प्रोजेक्ट्स का नेतृत्व करना, आपको बहुत पसंद है। आप ऊर्जा से भरपूर और महत्वाकांक्षी हैं, और आपको नेतृत्व करना और निर्णय लेना अच्छा लगता है। ऐसी कामें आपको ज्यादा रास आती हैं, जिनमें गहरी वैज्ञानिक सोच की जरूरत नहीं होती।"
+        },
+        "9-10": {
+          "english": "Leadership suits you well. Organizing events, leading teams, or persuading others are your strengths. Energetic and ambitious, you enjoy influencing others and taking charge. Success in leadership, politics, or business appeals to you more than detailed analytical tasks.",
+          "hindi": "नेतृत्व आपकी खूब सूट करता है। आयोजन करना, टीम का नेतृत्व करना, या दूसरों को मनाना आपकी खास ताकतें हैं। आप ऊर्जा से भरपूर और महत्वाकांक्षी हैं, इसलिए दूसरों को प्रभावित करना और जिम्मेदारी लेना आपको अच्छा लगता है। नेतृत्व, राजनीति, या बिजनेस में सफलता पाने का सपना आप अधिक देखते हैं, बजाय जटिल विश्लेषण करने के काम के।"
+        },
+        "11-12": {
+          "english": "You are interested in leadership and persuasion, excelling in roles that involve leading people, organizing events, or selling ideas and products. You value success in politics, leadership, or business and see yourself as energetic, ambitious, and sociable. You prefer taking charge and influencing others rather than getting involved in detailed scientific or analytical thinking.",
+          "hindi": "आपको नेतृत्व और मनोवैज्ञानिक प्रभाव डालने में रुचि है। आप वे भूमिका निभाना पसंद करते हैं जिसमें आप लोगों का नेतृत्व कर सकें, कार्यक्रमों का आयोजन कर सकें, या अपने विचारों और उत्पादों को बेच सकें। आप राजनीति, नेतृत्व या व्यवसाय में सफलता को महत्व देते हैं और खुद को ऊर्जा से भरपूर, महत्वाकांक्षी और मिलनसार मानते हैं। आप दूसरों पर प्रभाव डालने और जिम्मेदारी लेने को प्राथमिकता देते हैं, बजाय जटिल वैज्ञानिक या विश्लेषणात्मक सोच में फंसे रहने के।"
+        }
+      },
+      "futureSuggestions": {
+        "6-8": {
+          "atSchool": {
+            "english": "Participate in student council elections.\nOrganize a fundraising event for school activities.\nLead a group project in class.\nPlan a class or house event for annual day.\nStart a small club with friends based on shared interests.\nHelp organize inter-school competitions.\nAssist in managing a school canteen or stall during events.\nLead a team in class debates or discussions.",
+            "hindi": "छात्र परिषद के चुनाव में भाग लें।\nस्कूल की गतिविधियों के लिए धन जुटाने का आयोजन करें।\nकक्षा में एक समूह परियोजना का नेतृत्व करें।\nवार्षिक दिवस के लिए कक्षा या हाउस इवेंट की योजना बनाएं।\nअपने दोस्तों के साथ मिलकर किसी छोटे क्लब की शुरुआत करें, जो आपकी रुचियों से जुड़ा हो।\nस्कूलों के बीच प्रतियोगिताओं का आयोजन में मदद करें।\nकार्यक्रमों के दौरान स्कूल की कैंटीन या स्टॉल को व्यवस्थित करने में सहायता करें।\nकक्षा में हो रहे बहस या चर्चा में टीम का नेतृत्व करें।"
+          },
+          "atHome": {
+            "english": "Start a small business selling handmade crafts.\nOrganize a family budget for outings or vacations.\nPlan and manage a family game night or event.\nHelp parents with managing finances (e.g., tracking expenses).\nStart a small savings plan for personal purchases.\nCreate a selling platform for old books or toys among friends.\nOrganize neighbourhood sales for unwanted items.\nOffer to help a family member with their business or side project.",
+            "hindi": "छोटा व्यवसाय शुरू करें जिसमें आप अपने हाथ से बने हुए हस्तशिल्प (Crafts)बेचें। \nपरिवार के साथ बाहर जाने या छुट्टियों के लिए बजट बनाएं और उसे व्यवस्थित करें। \nपरिवार के साथ मिलकर एक गेम नाइट या कोई खास इवेंट की योजना बनाएं और उसका आयोजन करें। \nमाता-पिता की मदद करें वित्तीय मामलों में, जैसे खर्चों का हिसाब रखना। \nअपनी जरूरतों के लिए छोटी बचत योजना शुरू करें। \nदोस्तों के बीच पुरानी किताबें या खिलौने बेचने का प्लेटफॉर्म बनाएं। \nपड़ोस में बेकार या अनावश्यक चीजें बेचने के लिए एक छोटी बिक्री का आयोजन करें। \nअपने परिवार के किसी सदस्य की व्यवसाय या अतिरिक्त काम (Side Project) में मदद करें।"
+          }
+        },
+        "9-10": {
+          "atSchool": {
+            "english": "Plan and execute small business ideas for school events.\nOrganize entrepreneurship lectures with guest speakers.\nDevelop marketing strategies for school events.\nJoin a debate team to enhance negotiation and persuasion skills.\nLead a school club focused on innovative solutions.\nOrganize workshops on financial literacy for peers.\nSet up a school marketplace to sell crafts or baked goods.\nParticipate in national or international business plan competitions.",
+            "hindi": "स्कूल के आयोजनों के लिए छोटे व्यवसाय के आइडिया सोचें और उन्हें लागू करें।  \nमेजबान बनकर उद्यमिता पर व्याख्यान आयोजित करें और विशेषज्ञों को बुलाएं।  \nस्कूल के कार्यक्रमों के लिए मार्केटिंग की रणनीतियाँ बनाएं ताकि वे ज्यादा लोगों तक पहुंच सकें।  \nबातचीत और मनाने की कला सीखने के लिए डिबेट टीम में शामिल हों।  \nएक ऐसे क्लब का नेतृत्व करें जो नए और रचनात्मक समाधान खोजने पर काम करता हो।  \nमित्रों के बीच वित्तीय साक्षरता पर वर्कशॉप का आयोजन करें ताकि सभी बेहतर तरीके से पैसे और बजट समझ सकें।  \nस्कूल में ऐसी जगह बनाएं जहां बच्चे अपने हाथ से बनाए गए crafts या baked goods बेच सकें।  \nराष्ट्रीय या अंतरराष्ट्रीय स्तर पर बिजनेस प्लान प्रतियोगिताओं में भाग लें और अपनी क्षमताओं को आजमाएं।"
+          },
+          "atHome": {
+            "english": "Plan and start a family business project (e.g., craft sales).\nHelp family members develop and implement a savings plan.\nOrganize and host garage sales or flea markets.\nCreate a business plan for a hypothetical product or service.\nAssist local vendors with promotional ideas.\nStart a blog or YouTube channel focusing on entrepreneurial skills.\nDesign and sell homemade crafts or products online.\nCreate financial plans for family vacations or major purchases.",
+            "hindi": "आप अपने परिवार के साथ मिलकर एक पारिवारिक व्यवसाय शुरू कर सकते हैं, जैसे कि हस्तशिल्प की बिक्री।  \nपरिवार के सदस्यों की मदद करें ताकि वे अपनी बचत की योजना बना सकें और उसे सही तरीके से लागू कर सकें।  \nगैरेज सेल या फ्ली मार्केट का आयोजन करें और बेचने का मज़ा लें।  \nकल्पना करें कि आप किसी नए उत्पाद या सेवा के लिए बिजनेस प्लान बना रहे हैं।  \nस्थानीय विक्रेताओं को प्रचार के नए Ideas देने में मदद करें।  \nएक ब्लॉग या यूट्यूब चैनल शुरू करें जहां आप उद्यमशीलता की बातें शेयर कर सकें।  \nघरेलू हस्तशिल्प या उत्पाद बनाकर ऑनलाइन बेचें।  \nपरिवार की छुट्टियों या बड़े खरीददारी के लिए वित्तीय योजना बनाएं।"
+          }
+        },
+        "11-12": {
+          "atSchool": {
+            "english": "Organize an entrepreneurship workshop for classmates.\nPlan a school-wide campaign for a cause (e.g., eco-friendly practices).\nStart a student-led business club.\nLead an inter-house competition (e.g., sports, quizzes).\nManage the marketing for school events (posters, social media).\nParticipate in school entrepreneurship challenges or contests.\nHelp organize school elections or leadership programs.\nCollaborate with local businesses for school events sponsorships.",
+            "hindi": "1. अपने साथियों के लिए एक उद्यमिता कार्यशाला का आयोजन करें।  \n2. किसी खास उद्देश्य के लिए स्कूल में पूरे स्कूल के छात्रों के साथ एक अभियान की योजना बनाएं, जैसे कि पर्यावरण-संबंधी उपाय।  \n3. एक छात्र-नेतृत्व वाला व्यवसाय क्लब शुरू करें।  \n4. घरों के बीच होने वाले खेल कूद या क्विज़ जैसी प्रतियोगिताओं का नेतृत्व करें।  \n5. स्कूल के कार्यक्रमों के प्रचार-प्रसार की जिम्मेदारी लें, जैसे पोस्टर बनाना और सोशल मीडिया पर प्रचार करना।  \n6. स्कूल में होने वाले उद्यमिता प्रतियोगिताओं या चुनौतियों में भाग लें।  \n7. स्कूल के चुनाव या नेतृत्व कार्यक्रमों का आयोजन में मदद करें।  \n8. स्कूल के कार्यक्रमों के लिए स्थानीय व्यवसायों के साथ मिलकर Sponsorship का इंतज़ाम करें।"
+          },
+          "atHome": {
+            "english": "Set up a small online business (e.g., selling crafts or snacks).\nHelp manage family expenses and plan a savings strategy.\nOrganize a neighbourhood fair or event.\nPlan and organize a family trip, including logistics.\nStart a blog or YouTube channel to share skills or hobbies.\nHelp local businesses with simple marketing ideas.\nStart a book exchange or rental service in your neighbourhood.\nCreate a family financial plan for big purchases.",
+            "hindi": "1. एक छोटी ऑनलाइन दुकान शुरू करें (जैसे हस्तशिल्प या स्नैक्स बेचें)।  \n2. परिवार के खर्चों का ध्यान रखें और बचत की योजना बनाएं।  \n3. अपने इलाके में मेले या छोटी इवेंट का आयोजन करें।  \n4. परिवार के साथ यात्रा की योजना बनाएं और उसे व्यवस्थित करें।  \n5. अपने शौक या हुनर को शेयर करने के लिए ब्लॉग या यूट्यूब चैनल शुरू करें।  \n6. आसपास के छोटे व्यवसायों को आसान मार्केटिंग के Ideas दें।  \n7. अपने इलाके में किताबों का आदान-प्रदान या किराए पर देने की सेवा शुरू करें।  \n8. बड़े खर्चों के लिए परिवार का आर्थिक योजना बनाएं।"
+          }
+        }
+      }
+    },
+    "conventional": {
+      "title": {
+        "english": "Organizer",
+        "hindi": "आयोजक"
+      },
+      "titleImage": {
+        "english": "organizer.png",
+        "hindi": "organizer.png"
+      },
+      "descriptions": {
+        "6-8": {
+          "english": "Numbers and keeping things organized are your strengths. You like sorting collections, making lists, and following schedules. You prefer activities with clear rules over messy or unstructured ones.",
+          "hindi": "संख्याओं को समझना और चीजों को व्यवस्थित रखना आपकी ताकत है। आपको चीजों को वर्गीकृत करना, सूचियाँ बनाना और समय सारिणी का पालन करना अच्छा लगता है। आप उन गतिविधियों को ज्यादा पसंद करते हैं जिनमें साफ-सुथरे नियम होते हैं, बजाय उन के जो अनियमित या बिना व्यवस्था के होते हैं।"
+        },
+        "9-10": {
+          "english": "Order and structure are your favorites. Working with numbers, keeping records, and organizing information comes naturally to you. You like clear, planned tasks and prefer structured activities over messy or unclear ones. You excel in maintaining organization and following systematic processes.",
+          "hindi": "आपको व्यवस्था और ढांचा बनाना बहुत पसंद है। नंबरों के साथ काम करना, रिकॉर्ड रखना और जानकारी को व्यवस्थित करना आपके स्वाभाविक गुण हैं। आपको साफ-सुथरे और योजनाबद्ध काम करना अच्छा लगता है और आप जटिल या अनिर्धारित गतिविधियों की तुलना में संरचित कार्यों को प्राथमिकता देते हैं। आप अच्छी तरह से व्यवस्थित रहना और सिस्टम के हिसाब से काम करने में माहिर हैं।"
+        },
+        "11-12": {
+          "english": "You prefer order and structure, excelling in tasks that involve working with numbers, keeping records, or organizing information systematically. You value business success, seeing yourself as orderly and capable of following plans. You prefer clear, structured activities over ambiguous or unstructured ones.",
+          "hindi": "आपको व्यवस्था और संरचना पसंद है। आप उन कार्यों में अच्छा करते हैं जिनमें नंबरों के साथ काम करना, रिकॉर्ड रखना या जानकारी को व्यवस्थित तरीके से सजाना शामिल है। आप व्यवसाय में सफलता को महत्व देते हैं और खुद को एक व्यवस्थित और योजना का पालन करने वाला व्यक्ति मानते हैं। आप ऐसे कार्यों को प्राथमिकता देते हैं जिनमें स्पष्ट दिशा-निर्देश और ढांचा हो, बजाय उन कार्यों के जो अस्पष्ट या बिना किसी तय ढांचे के हों।"
+        }
+      },
+      "futureSuggestions": {
+        "6-8": {
+          "atSchool": {
+            "english": "Help organize class notes for your classmates.\nAssist in setting up the classroom bulletin board.\nJoin the library club and help organize books.\nManage attendance and record-keeping for group projects.\nHelp teachers with organizing files and documents.\nAssist in organizing school events by handling registrations.\nMaintain a schedule for classroom duties.\nHelp arrange books and resources in the school library.",
+            "hindi": "अपने साथी छात्रों के लिए कक्षा के नोट्स को व्यवस्थित करने में मदद करें।  \nक्लासरूम के बुलेटिन बोर्ड को लगाने में सहायता करें।  \nलाइब्रेरी क्लब में शामिल होकर किताबों को सजाने और व्यवस्थित करने में मदद करें।  \nग्रुप प्रोजेक्ट्स के लिए उपस्थिति और रिकॉर्ड रखने का काम संभालें।  \nशिक्षकों की फाइलें और कागजात व्यवस्थित करने में मदद करें।  \nस्कूल के कार्यक्रमों के आयोजन में भाग लें और रजिस्ट्रेशन का काम संभालें।  \nकक्षा की जिम्मेदारियों का शेड्यूल बनाएं और उसका पालन करें।  \nस्कूल लाइब्रेरी में किताबें और संसाधनों को सही जगह पर रखने में मदद करें।"
+          },
+          "atHome": {
+            "english": "Organize family documents and important papers.\nCreate a daily schedule for household chores.\nHelp with making grocery lists and budgeting.\nMaintain a record of household expenses.\nAssist in organizing family photo albums.\nCreate a filing system for school papers and assignments.\nTrack personal savings and expenses in a notebook.\nHelp parents with organizing bills and receipts.",
+            "hindi": "परिवार के सभी दस्तावेज़ और जरूरी कागज़ात को व्यवस्थित करें।  \nघर के काम-काज के लिए रोज़ का समय तय करें।  \nसामान खरीदने की लिस्ट बनाना और बजट बनाने में मदद करें।  \nघर के खर्चों का रिकॉर्ड रखें।  \nपरिवार की फोटो एल्बम को संजोने और व्यवस्थित करने में मदद करें।  \nस्कूल की क्लासवर्क, होमवर्क और जरूरी कागज़ात के लिए एक फाइलिंग सिस्टम बनाएं।  \nअपनी बचत और खर्चों का हिसाब-किताब एक नोटबुक में रखें।  \nमाता-पिता को बिल और रसीदें व्यवस्थित करने में मदद करें।"
+          }
+        },
+        "9-10": {
+          "atSchool": {
+            "english": "Help in managing the school library and cataloging books.\nOrganize and maintain school files and records.\nSet up and manage schedules for school events.\nParticipate in school clubs focused on accounting or management.\nAssist in maintaining school attendance and report cards.\nCreate and update the school bulletin board with important notices.\nHelp manage school inventories and supply orders.\nOrganize a school archive to document historical events.",
+            "hindi": "स्कूल लाइब्रेरी का प्रबंधन करने में मदद करें और किताबों का कैटलॉग बनाएं।  \nस्कूल के फाइलें और रिकॉर्ड सही तरीके से संजोएं और बनाए रखें।  \nस्कूल के कार्यक्रमों के लिए समय-सारणी बनाएं और उसका प्रबंधन करें।  \nखाता-धन्दा या प्रबंधन से जुड़ी स्कूल क्लबों में भाग लें।  \nस्कूल की उपस्थिति रिकॉर्ड और रिपोर्ट कार्ड बनाने और सही रखने में मदद करें।  \nस्कूल नोटिस बोर्ड पर जरूरी सूचनाएं लगाएं और अपडेट करें।  \nस्कूल का सामान और आपूर्ति की व्यवस्था में मदद करें।  \nइतिहास को संजोने के लिए एक स्कूल आर्काइव या संग्रह बनाएँ, जिसमें पुराने घटनाक्रम का दस्तावेज़ हो।"
+          },
+          "atHome": {
+            "english": "Set up and maintain a home filing system for documents.\nCreate monthly budgets and track household expenses.\nManage family schedules and appointments.\nHelp organize family events like birthdays or anniversaries.\nCreate inventories for household supplies and restocking.\nAssist in preparing and filing household bills and utilities.\nMaintain a digital log of family records and important dates.\nOrganize family photos and create digital albums.",
+            "hindi": "घर के दस्तावेजों के लिए एक फाइलिंग सिस्टम बनाएं और उसे बनाए रखें।  \nमहीने भर के खर्चों का बजट बनाएं और देखभाल करें।  \nपरिवार की गतिविधियों और अपॉइंटमेंट का ध्यान रखें।  \nजन्मदिन, सालगिरह जैसी खास बातों के कार्यक्रमों की योजना बनाने में मदद करें।  \nघर की जरूरी चीजों का स्टॉक बनाएं और नई चीजें लेने का इंतजाम करें।  \nबिल और बिजली का बिल जैसी चीजों की तैयारी करें और उन्हें सही जगह पर फाइल करें।  \nपरिवार के महत्वपूर्ण तारीखों और रिकॉर्ड का डिजिटल रिकॉर्ड रखें।  \nपरिवार की तस्वीरें व्यवस्थित करें और डिजिटल एल्बम बनाएं।"
+          }
+        },
+        "11-12": {
+          "atSchool": {
+            "english": "Take responsibility for maintaining school inventory.\nAssist in preparing the class timetable or duty roster.\nOrganize materials for school workshops and events.\nMaintain financial records for school fundraisers.\nHelp teachers with data entry and record-keeping tasks.\nParticipate in school audit or finance-related clubs.\nCreate and manage a digital archive of school events.\nAssist in cataloguing school library resources.",
+            "hindi": "स्कूल की सामग्री का ध्यान रखना और उसकी जिम्मेदारी लेना।  \nक्लास का टाइमटेबल या ड्यूटी रोस्टर बनाने में मदद करना।  \nस्कूल वर्कशॉप और कार्यक्रम के लिए आवश्यक सामग्री का आयोजन करना।  \nस्कूल के फंडरेजर यानी धन जुटाने के कार्यक्रम का हिसाब-किताब रखना।  \nशिक्षकों की मदद करना, जैसे डेटा एंट्री और रिकॉर्ड रखने के काम में।  \nस्कूल की ऑडिट या वित्त से जुड़ी क्लबों में भाग लेना।  \nस्कूल के विभिन्न कार्यक्रमों की डिजिटल फाइलें बनाना और संभालना।  \nस्कूल की लाइब्रेरी में मौजूद किताबें और संसाधनों को सही ढंग से वर्गीकृत करना।"
+          },
+          "atHome": {
+            "english": "Create a monthly family budget and track expenses.\nHelp manage and file household bills and utilities.\nOrganize family schedules for work, school, and activities.\nSet up a personal filing system for important documents.\nAssist in organizing home files for tax or legal purposes.\nManage grocery lists and track weekly expenses.\nCreate a household inventory of items and supplies.\nHelp family members manage their daily to-do lists.",
+            "hindi": "महीनेभर के परिवार का बजट बनाएं और खर्चों को ट्रैक करें।  \nघर के बिल और उपयोगिताओं का प्रबंधन करें और उनका सही तरीके से रिकॉर्ड रखें।  \nपरिवार के काम, स्कूल और गतिविधियों की समय-सारिणी व्यवस्थित करें।  \nमहत्वपूर्ण दस्तावेजों के लिए अपनी व्यक्तिगत फाइलिंग सिस्टम सेट करें।  \nकर या कानूनी मामलों के लिए घर के जरूरी फाइलों को व्यवस्थित करने में मदद करें।  \nसब्जी, किराने का सामान की लिस्ट बनाएं और हर हफ्ते के खर्च का हिसाब रखें।  \nघर में मौजूद सामान और जरूरी वस्तुओं की सूची बनाएं।  \nपरिवार के हर सदस्य को उनके दैनिक कामों की लिस्ट बनाने और पूरी करने में मदद करें।"
+          }
+        }
+      }
+    }
+  }
+}
