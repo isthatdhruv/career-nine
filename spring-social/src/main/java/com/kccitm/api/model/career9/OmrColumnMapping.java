@@ -25,6 +25,9 @@ public class OmrColumnMapping implements java.io.Serializable {
     @Column(name = "institute_id", nullable = false)
     private Long instituteId;
 
+    @Column(name = "questionnaire_id")
+    private Long questionnaireId;
+
     @Column(name = "mapping_name")
     private String mappingName;
 
@@ -67,4 +70,7 @@ public class OmrColumnMapping implements java.io.Serializable {
 
     public String getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(String updatedAt) { this.updatedAt = updatedAt; }
+
+    public Long getQuestionnaireId() { return questionnaireId; }
+    public void setQuestionnaireId(Long questionnaireId) { this.questionnaireId = questionnaireId; }
 }
