@@ -35,12 +35,22 @@ public class OmrColumnMappingController {
         return ResponseEntity.ok(repository.findByAssessmentId(assessmentId));
     }
 
+    @GetMapping("/get-by-questionnaire/{questionnaireId}")
+    public ResponseEntity<?> getByQuestionnaire(@PathVariable Long questionnaireId) {
+        Optional<OmrColumnMapping> mapping = repository.findFirstByQuestionnaireIdOrderByUpdatedAtDesc(questionnaireId);
+        if (mapping.isPresent()) {
+            return ResponseEntity.ok(mapping.get());
+        }
+        return ResponseEntity.notFound().build();
+    }
+
     @PostMapping("/save")
     public ResponseEntity<?> saveMapping(@RequestBody Map<String, Object> body) {
         Long assessmentId = Long.valueOf(body.get("assessmentId").toString());
         Long instituteId = Long.valueOf(body.get("instituteId").toString());
         String mappingJson = body.get("mappingJson").toString();
         String mappingName = body.containsKey("mappingName") ? body.get("mappingName").toString() : null;
+        Long questionnaireId = body.containsKey("questionnaireId") ? Long.valueOf(body.get("questionnaireId").toString()) : null;
 
         String now = LocalDateTime.now().toString();
 
@@ -52,8 +62,10 @@ public class OmrColumnMappingController {
             mapping.setMappingJson(mappingJson);
             mapping.setUpdatedAt(now);
             if (mappingName != null) mapping.setMappingName(mappingName);
+            if (questionnaireId != null) mapping.setQuestionnaireId(questionnaireId);
         } else {
             mapping = new OmrColumnMapping(assessmentId, instituteId, mappingName, mappingJson);
+            mapping.setQuestionnaireId(questionnaireId);
             mapping.setCreatedAt(now);
             mapping.setUpdatedAt(now);
         }

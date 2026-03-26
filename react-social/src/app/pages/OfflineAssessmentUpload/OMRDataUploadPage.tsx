@@ -3,7 +3,7 @@ import { Spinner, Button, Form, Badge, Alert, Modal, Table } from "react-bootstr
 import * as XLSX from "xlsx";
 import { ReadCollegeData } from "../College/API/College_APIs";
 import { getAssessmentMappingsByInstitute, getAssessmentSummaryList } from "../AssessmentMapping/API/AssessmentMapping_APIs";
-import { getOfflineMapping, bulkSubmitByRollNumber, bulkSubmitWithStudents, getSavedOmrMapping, saveOmrMapping } from "./API/OfflineUpload_APIs";
+import { getOfflineMapping, bulkSubmitByRollNumber, bulkSubmitWithStudents, getSavedOmrMapping, saveOmrMapping, getSavedOmrMappingByQuestionnaire } from "./API/OfflineUpload_APIs";
 
 // ============ Types ============
 
@@ -35,6 +35,7 @@ interface SectionMapping {
 interface MappingData {
   assessmentId: number;
   assessmentName: string;
+  questionnaireId: number;
   questionnaireName: string;
   questions: QuestionMapping[];
   sections: SectionMapping[];
@@ -307,15 +308,32 @@ const OMRDataUploadPage = () => {
       const res = await getOfflineMapping(assessmentId);
       setMappingData(res.data);
 
-      // Check if saved column mapping exists for this assessment + institute
+      // Check if saved column mapping exists:
+      // 1. Try exact match: (assessmentId, instituteId)
+      // 2. Fallback: any mapping saved for the same questionnaireId
       if (selectedInstitute) {
+        let found = false;
         try {
           const savedRes = await getSavedOmrMapping(assessmentId, Number(selectedInstitute));
           if (savedRes.data?.mappingJson) {
             savedMappingJsonRef.current = JSON.parse(savedRes.data.mappingJson);
             setSavedMappingExists(true);
+            found = true;
           }
-        } catch {
+        } catch {}
+
+        if (!found && res.data?.questionnaireId) {
+          try {
+            const qRes = await getSavedOmrMappingByQuestionnaire(res.data.questionnaireId);
+            if (qRes.data?.mappingJson) {
+              savedMappingJsonRef.current = JSON.parse(qRes.data.mappingJson);
+              setSavedMappingExists(true);
+              found = true;
+            }
+          } catch {}
+        }
+
+        if (!found) {
           savedMappingJsonRef.current = null;
           setSavedMappingExists(false);
         }
@@ -370,6 +388,7 @@ const OMRDataUploadPage = () => {
         assessmentId: Number(selectedAssessment),
         instituteId: Number(selectedInstitute),
         mappingJson: JSON.stringify(fieldToHeader),
+        questionnaireId: mappingData?.questionnaireId,
       });
       savedMappingJsonRef.current = { ...fieldToHeader };
       setSavedMappingExists(true);

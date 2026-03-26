@@ -51,6 +51,11 @@ export function saveOmrMapping(data: {
   instituteId: number;
   mappingJson: string;
   mappingName?: string;
+  questionnaireId?: number;
 }) {
   return axios.post(`${API_URL}/omr-column-mapping/save`, data);
+}
+
+export function getSavedOmrMappingByQuestionnaire(questionnaireId: number) {
+  return axios.get(`${API_URL}/omr-column-mapping/get-by-questionnaire/${questionnaireId}`);
 }

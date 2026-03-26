@@ -349,6 +349,7 @@ public class AssessmentAnswerController {
             Map<String, Object> result = new HashMap<>();
             result.put("assessmentId", assessmentId);
             result.put("assessmentName", assessment.getAssessmentName());
+            result.put("questionnaireId", questionnaireId);
             result.put("questionnaireName", questionnaireName);
             result.put("questions", questions);
             result.put("sections", sections);
