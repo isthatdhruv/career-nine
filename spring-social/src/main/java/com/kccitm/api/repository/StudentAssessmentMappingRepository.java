@@ -23,4 +23,10 @@ public interface StudentAssessmentMappingRepository extends JpaRepository<Studen
 
     void deleteByUserStudentUserStudentIdAndAssessmentId(Long userStudentId, Long assessmentId);
 
+    // Bulk load mappings for multiple students at once
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT m FROM StudentAssessmentMapping m WHERE m.userStudent.userStudentId IN :ids")
+    List<StudentAssessmentMapping> findByUserStudentUserStudentIdIn(
+        @org.springframework.data.repository.query.Param("ids") List<Long> userStudentIds);
+
 }

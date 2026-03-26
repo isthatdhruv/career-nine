@@ -1,0 +1,308 @@
+{
+  "intelligence": {
+    "naturalistic": {
+      "title": {
+        "english": "Naturalistic",
+        "hindi": "प्राकृतिक रूप से देखने वाला"
+      },
+      "titleImage": {
+        "english": "naturalistic.png",
+        "hindi": "naturalistic.png"
+      },
+      "descriptions": {
+        "6-8": {
+          "english": "You have a strong connection with nature. You might enjoy spending time outdoors, observing animals and plants, or studying weather patterns. You could be interested in careers like environmental science, biology, or wildlife conservation.",
+          "hindi": "आपको प्रकृति के साथ गहरा लगाव है। आप बाहर जाकर समय बिताना पसंद कर सकते हैं, जानवरों और पेड़-पौधों को देखना, या मौसम के बदलावों को समझने में रुचि ले सकते हैं। आपको पर्यावरण विज्ञान, जीवविज्ञान या वन्य जीवन संरक्षण जैसे करियर भी आकर्षित कर सकते हैं।"
+        },
+        "9-10": {
+          "english": "You have a deep understanding of the natural world. This might show in your love for biology, geography, or environmental science. You're likely to excel in fields like environmental law, wildlife biology, or sustainable development.",
+          "hindi": "आपको प्राकृतिक दुनिया का बहुत अच्छा ज्ञान है। यह आपकी जीवविज्ञान, भूगोल या पर्यावरण विज्ञान के प्रति रुचि से दिखाई देता है। आप पर्यावरण कानून, वन्यजीव विज्ञान या टिकाऊ विकास जैसे क्षेत्रों में अच्छा कर सकते हैं।"
+        },
+        "11-12": {
+          "english": "You have a deep understanding of the natural world, excelling in biology, geography, or environmental science. This can lead to careers in environmental law, wildlife biology, or sustainable development.",
+          "hindi": "आपको प्राकृतिक दुनिया की अच्छी समझ है, और आप जीवविज्ञान, भूगोल या पर्यावरण विज्ञान में अच्छा प्रदर्शन करते हैं। इससे आप पर्यावरण कानून, वन्यजीव विज्ञान या सतत विकास जैसे क्षेत्रों में करियर बना सकते हैं।"
+        }
+      },
+      "learningStyle": {
+        "name": {
+          "english": "Nature smart",
+          "hindi": "प्रकृति-बुद्धिमान"
+        },
+        "enjoyStudiesWith": {
+          "english": "Real world applications",
+          "hindi": "वास्तविक जीवन में उपयोग"
+        },
+        "struggleWith": {
+          "english": "Real world applications",
+          "hindi": "वास्तविक जीवन में उपयोगिता"
+        }
+      }
+    },
+    "musical": {
+      "title": {
+        "english": "Musical",
+        "hindi": "संगीत संबंधी"
+      },
+      "titleImage": {
+        "english": "musical.png",
+        "hindi": "musical.png"
+      },
+      "descriptions": {
+        "6-8": {
+          "english": "Music comes naturally to you. You might find it easy to learn new instruments, recognize tunes, or create your own music. This talent could lead you to become a musician, composer, or music teacher in the future.",
+          "hindi": "संगीत आपके लिए स्वाभाविक है। आपको नए वाद्ययंत्र सीखना, गाने पहचानना या खुद ही अपना संगीत बनाना आसान लगता है। यह प्रतिभा आपको भविष्य में संगीतकार, रचनाकार या संगीत शिक्षक बनाने में मदद कर सकती है।"
+        },
+        "9-10": {
+          "english": "Your ability to understand and create music is exceptional. Whether it's performing, composing, or producing, you have a natural talent that could lead to a successful career in the music industry, perhaps as a composer, performer, or music producer.",
+          "hindi": "आपकी संगीत को समझने और बनाने की क्षमता बहुत ही खास है। चाहे वह प्रदर्शन करना हो, संगीत रचना करना हो या संगीत का निर्माण, आपके पास एक प्राकृतिक प्रतिभा है। यह प्रतिभा आपको संगीत की दुनिया में बहुत आगे ले जा सकती है, जैसे कि एक अच्छा संगीतकार, कलाकार या संगीत निर्माता बनने का मौका मिल सकता है।"
+        },
+        "11-12": {
+          "english": "Your musical talent is exceptional, whether in performing, composing, or producing. You could pursue a career in the music industry as a composer, performer, or producer.",
+          "hindi": "आपकी संगीत प्रतिभा बहुत ही खास है, चाहे वह प्रदर्शन हो, रचना हो या निर्माण। आप संगीत उद्योग में करियर बना सकते हैं, जैसे कि संगीतकार, कलाकार या निर्माता के रूप में।"
+        }
+      },
+      "learningStyle": {
+        "name": {
+          "english": "Rhythmic",
+          "hindi": "रिदमिक "
+        },
+        "enjoyStudiesWith": {
+          "english": "Music and Art",
+          "hindi": "संगीत और कला"
+        },
+        "struggleWith": {
+          "english": "Music and Art",
+          "hindi": "संगीत और कला"
+        }
+      }
+    },
+    "logical": {
+      "title": {
+        "english": "Logical",
+        "hindi": "तार्किक सोचने वाला"
+      },
+      "titleImage": {
+        "english": "logical.png",
+        "hindi": "logical.png"
+      },
+      "descriptions": {
+        "6-8": {
+          "english": "Numbers and puzzles are your friends! You're good at solving problems, working through math problems, and figuring out how things work. You might excel in science, technology, engineering, or mathematics (STEM) fields.",
+          "hindi": "अंक और पहेलियाँ आपके अच्छे दोस्त हैं! आप समस्याओं को हल करने, गणित के सवालों को समझने और यह जानने में बहुत अच्छे हैं कि चीजें कैसे काम करती हैं। आप विज्ञान, तकनीक, अभियांत्रिकी या गणित (STEM) जैसे विषयों में अच्छा कर सकते हैं।"
+        },
+        "9-10": {
+          "english": "You excel in logical thinking and problem-solving. Your skills are likely reflected in subjects like math and science, and you could be drawn to careers in engineering, computer science, economics, or research.",
+          "hindi": "आप तार्किक सोचने और समस्याओं को हल करने में बहुत अच्छे हैं। ये आपकी क्षमताएँ गणित और विज्ञान जैसे विषयों में स्पष्ट झलकती हैं। आप इंजीनियरिंग, कंप्यूटर साइंस, अर्थशास्त्र या अनुसंधान जैसे क्षेत्रों में करियर बनाने की भी सोच सकते हैं।"
+        },
+        "11-12": {
+          "english": "You excel in logical thinking and problem-solving, often associated with subjects like math and science. Potential careers include engineering, computer science, economics, or research.",
+          "hindi": "आपकी तार्किक सोच और समस्या सुलझाने की क्षमता बहुत अच्छी है। आप अक्सर गणित और विज्ञान जैसे विषयों में अच्छा करते हैं। इसलिए, इंजीनियरिंग, कंप्यूटर साइंस, अर्थशास्त्र या रिसर्च जैसे करियर आपके लिए उपयुक्त हो सकते हैं।"
+        }
+      },
+      "learningStyle": {
+        "name": {
+          "english": "Investigator",
+          "hindi": "जांचकर्ता"
+        },
+        "enjoyStudiesWith": {
+          "english": "Logic and facts",
+          "hindi": "तर्क और तथ्‍य"
+        },
+        "struggleWith": {
+          "english": "Logic and facts",
+          "hindi": "तर्क और तथ्य"
+        }
+      }
+    },
+    "interpersonal": {
+      "title": {
+        "english": "Interpersonal",
+        "hindi": "अंतरंग संबंध"
+      },
+      "titleImage": {
+        "english": "interpersonal.png",
+        "hindi": "interpersonal.png"
+      },
+      "descriptions": {
+        "6-8": {
+          "english": "You're great at understanding people. You might notice how your friends feel, know how to cheer someone up, or lead group activities. This intelligence can help you become a teacher, counselor, or a team leader.",
+          "hindi": "आप लोगों को समझने में बहुत अच्छे हैं। आप यह महसूस कर सकते हैं कि आपके दोस्त कैसे हैं, किसी का मन बहलाने के लिए कैसे प्रोत्साहित करें, या समूह के कार्यक्रमों का नेतृत्व कर सकते हैं। यह समझदारी आपको शिक्षक, परामर्शदाता या टीम का नेता बनने में मदद कर सकती है।"
+        },
+        "9-10": {
+          "english": "You have a strong ability to connect with others and understand their needs. This can lead you to excel in fields such as psychology, education, management, or diplomacy, where communication and empathy are crucial.",
+          "hindi": "आपमें दूसरों से जुड़ने और उनकी जरूरतों को समझने की बहुत अच्छी क्षमता है। इससे आप मनोविज्ञान, शिक्षा, प्रबंधन या कूटनीति जैसे क्षेत्रों में अच्छा कर सकते हैं, जहाँ संवाद और सहानुभूति बहुत जरूरी होती है।"
+        },
+        "11-12": {
+          "english": "You have a strong ability to connect with and understand others' needs, excelling in fields like psychology, education, management, or diplomacy, where communication and empathy are critical skills.",
+          "hindi": "आपमें दूसरों की जरूरतों को समझने और उनसे जुड़ने की बहुत अच्छी क्षमता है। आप मनोविज्ञान, शिक्षा, प्रबंधन या कूटनीति जैसे क्षेत्रों में अच्छा कर सकते हैं, जहां बात करने और समझदारी दिखाने की खास जरूरत होती है।"
+        }
+      },
+      "learningStyle": {
+        "name": {
+          "english": "Interactive",
+          "hindi": "इंटरेक्टिव"
+        },
+        "enjoyStudiesWith": {
+          "english": "Group discussions",
+          "hindi": "समूह चर्चाएँ"
+        },
+        "struggleWith": {
+          "english": "Group discussions",
+          "hindi": "समूह चर्चाएँ"
+        }
+      }
+    },
+    "bodily_kinesthetic": {
+      "title": {
+        "english": "Bodily-Kinesthetic",
+        "hindi": "शारीरिक-काइनेस्थेटिक"
+      },
+      "titleImage": {
+        "english": "bodily.png",
+        "hindi": "bodily.png"
+      },
+      "descriptions": {
+        "6-8": {
+          "english": "You're in tune with your body. Whether it's sports, dancing, or even crafting, you can control your movements well. This could lead you to a career as an athlete, dancer, or physical therapist.",
+          "hindi": "आप अपने शरीर के साथ अच्छी तरह से सजग हैं। चाहे खेल हो, नृत्य हो या कोई भी शिल्पकला, आप अपने शरीर की गतिविधियों पर अच्छा नियंत्रण रखते हैं। इससे आप एथलीट, नर्तक या फिजियोथेरेपिस्ट जैसे करियर भी अपना सकते हैं।"
+        },
+        "9-10": {
+          "english": "Your physical coordination and motor skills are outstanding. Whether in sports, dance, or hands-on activities, you have the potential to pursue careers in athletics, performing arts, or physical education and therapy.",
+          "hindi": "आपकी शारीरिक तालमेल और मोटर स्किल्स बहुत अच्छी हैं। चाहे वह खेल-कूद हो, नृत्य हो, या कोई भी हाथ से काम करने वाली गतिविधि, आप इन क्षेत्रों में करियर बनाने की पूरी काबिलियत रखते हैं। आप खेल, नाट्य कला, या शारीरिक शिक्षा और थेरेपी जैसे क्षेत्र में आगे बढ़ सकते हैं।"
+        },
+        "11-12": {
+          "english": "Your physical coordination and motor skills are outstanding, making you excel in sports, dance, or hands-on activities. Careers could include athletics, performing arts, or physical education and therapy.",
+          "hindi": "आपकी शारीरिक तालमेल और मोटर स्किल्स बहुत अच्छी हैं, जिसकी वजह से आप खेलकूद, नृत्य या हाथ से किए जाने वाले कामों में अच्छा प्रदर्शन करते हैं। आप खेल, परफॉर्मिंग आर्ट्स या शारीरिक शिक्षा और थेरेपी जैसे करियर भी अपना सकते हैं।"
+        }
+      },
+      "learningStyle": {
+        "name": {
+          "english": "Body smart",
+          "hindi": "शारीरिक बुद्धिमत्ता"
+        },
+        "enjoyStudiesWith": {
+          "english": "Hands-on activities",
+          "hindi": "व्यावहारिक गतिविधियाँ"
+        },
+        "struggleWith": {
+          "english": "Hands-on activities",
+          "hindi": "व्यावहारिक गतिविधियाँ"
+        }
+      }
+    },
+    "linguistic": {
+      "title": {
+        "english": "Linguistic",
+        "hindi": "भाषाई क्षमता"
+      },
+      "titleImage": {
+        "english": "linguistic.png",
+        "hindi": "linguistic.png"
+      },
+      "descriptions": {
+        "6-8": {
+          "english": "Words are your superpower! Whether it's telling stories, writing essays, or learning new languages, you excel at communicating. This could mean a future in writing, law, or journalism.",
+          "hindi": "शब्द आपकी सबसे बड़ी ताकत हैं! चाहे कहानी सुनाना हो, निबंध लिखना हो, या नई भाषाएँ सीखनी हों, आप अच्छी तरह से बात करने और समझाने में माहिर हैं। इसका मतलब है कि आपका भविष्य लेखक, वकील या पत्रकार बनने में भी हो सकता है।"
+        },
+        "9-10": {
+          "english": "You possess a deep understanding of languages, both in its written and spoken forms. This could lead you to excel in fields like literature, law, journalism, or public relations, where your ability to communicate effectively is key.",
+          "hindi": "आपको भाषाओं का अच्छी तरह से ज्ञान है, चाहे वो लिखित हो या बोलचाल की। इससे आप साहित्य, कानून, पत्रकारिता या जनसंपर्क जैसे क्षेत्रों में अच्छा कर सकते हैं, क्योंकि इन क्षेत्रों में अपनी बात को सही तरीके से कह पाना बहुत जरूरी होता है।"
+        },
+        "11-12": {
+          "english": "You have a deep understanding of languages, both written and spoken, leading to careers in literature, law, journalism, or public relations, where communication is vital.",
+          "hindi": "आपको भाषाओं की अच्छी समझ है, चाहे लिखित हो या बोली। इसी वजह से आप साहित्य, कानून, पत्रकारिता या जनसंपर्क जैसे क्षेत्रों में करियर बना सकते हैं, जहां संवाद और बातचीत बहुत जरूरी होते हैं।"
+        }
+      },
+      "learningStyle": {
+        "name": {
+          "english": "Word smart",
+          "hindi": "वर्ड स्मार्ट"
+        },
+        "enjoyStudiesWith": {
+          "english": "Verbal content",
+          "hindi": "मौखिक सामग्री"
+        },
+        "struggleWith": {
+          "english": "Verbal content",
+          "hindi": "मौखिक सामग्री"
+        }
+      }
+    },
+    "visual_spatial": {
+      "title": {
+        "english": "Visual-Spatial",
+        "hindi": "दृश्य-स्थानिक क्षमता"
+      },
+      "titleImage": {
+        "english": "spatial.png",
+        "hindi": "spatial.png"
+      },
+      "descriptions": {
+        "6-8": {
+          "english": "You see the world in pictures. You might enjoy drawing, designing, or building things. This talent can lead to a career in art, architecture, or engineering.",
+          "hindi": "आप दुनिया को तस्वीरों में देख सकते हैं। शायद आपको चित्र बनाने, डिज़ाइन करने या चीजें बनाना अच्छा लगता है। यह प्रतिभा आपको कला, वास्तुकला या इंजीनियरिंग जैसे क्षेत्रों में करियर बनाने में मदद कर सकती है।"
+        },
+        "9-10": {
+          "english": "You have a strong ability to visualize and manipulate objects and spaces. This talent is invaluable in fields like architecture, graphic design, engineering, or any creative profession that requires a keen sense of spatial awareness.",
+          "hindi": "आपमें वस्तुओं और स्थानों का कल्पना करने और उन्हें संभालने की बहुत अच्छी क्षमता है। यह प्रतिभा खासतौर पर आर्किटेक्चर, ग्राफिक डिजाइन, इंजीनियरिंग जैसी क्षेत्रों में बहुत जरूरी होती है, जहां स्थान का सही अंदाजा लगाना और उसकी समझ होना बहुत महत्वपूर्ण होता है।"
+        },
+        "11-12": {
+          "english": "You excel in visualizing and manipulating objects and spaces, valuable in fields like architecture, graphic design, engineering, or any creative profession requiring spatial awareness.",
+          "hindi": "आप वस्तुओं और जगहों की कल्पना करना और उनमें बदलाव करना बहुत अच्छे से कर सकते हैं। यह कौशल उन क्षेत्रों में बहुत काम आता है जैसे कि वास्तुकला, ग्राफिक डिज़ाइन, इंजीनियरिंग या कोई भी क्रिएटिव काम जिसमें जगह और आकार का सही अंदाजा होना जरूरी होता है।"
+        }
+      },
+      "learningStyle": {
+        "name": {
+          "english": "Visualizer",
+          "hindi": "दृश्यकर्ता "
+        },
+        "enjoyStudiesWith": {
+          "english": "Abstract concepts",
+          "hindi": "सारांश विचारधाराएँ"
+        },
+        "struggleWith": {
+          "english": "Abstract concepts",
+          "hindi": "सारांश विचारधाराएँ"
+        }
+      }
+    },
+    "intrapersonal": {
+      "title": {
+        "english": "Intrapersonal",
+        "hindi": "आंतरिक व्यक्तित्व"
+      },
+      "titleImage": {
+        "english": "intrapersonal.png",
+        "hindi": "intrapersonal.png"
+      },
+      "descriptions": {
+        "6-8": {
+          "english": "You have a strong awareness of emotions, you enjoy deep reflection, and prefer working alone while setting personal goals. Careers like counseling, writing, and psychology align well with your introspective nature.",
+          "hindi": "आपको अपनी भावनाओं का बहुत अच्छा अंदाजा होता है। आप गहरे विचार करना पसंद करते हैं और अकेले काम करना भी अच्छा लगता है, खासकर जब आप अपने लक्ष्य खुद तय करते हैं। काउंसलिंग, लेखन और मनोविज्ञान जैसे करियर आपके स्वभाव के साथ अच्छी तरह से मेल खाते हैं क्योंकि आप खुद के अंदर झांकने और समझने में रुचि रखते हैं।"
+        },
+        "9-10": {
+          "english": "You build a deeper understanding of yourself, including your strengths, weaknesses, and values. You enjoy journaling, self-reflection, and personal growth and you find subjects like psychology or philosophy particularly engaging.",
+          "hindi": "आप अपने बारे में अधिक समझ विकसित करते हैं, जिसमें आपकी ताकतें, कमजोरियां और मूल्य शामिल हैं। आपको जर्नलिंग, आत्म-चिंतन और व्यक्तिगत विकास में मज़ा आता है। साथ ही, मनोविज्ञान या दर्शनशास्त्र जैसे विषयों में आपकी खास रुचि रहती है।"
+        },
+        "11-12": {
+          "english": "You have a strong ability to analyze emotions, motivations, and life goals independently, excelling in fields involving emotional intelligence, such as mental health, coaching, or leadership.",
+          "hindi": "आपमें अपनी भावनाओं, प्रेरणाओं और जीवन के उद्देश्यों का विश्लेषण करने की बहुत अच्छी क्षमता है। आप इन क्षेत्रों में अच्छा प्रदर्शन करते हैं, जैसे कि मानसिक स्वास्थ्य, कोचिंग या नेतृत्व की भूमिकाएं, जहां भावनात्मक बुद्धिमत्ता की ज्यादा जरूरत होती है।"
+        }
+      },
+      "learningStyle": {
+        "name": {
+          "english": "Self aware",
+          "hindi": "आत्म-जागरूक"
+        },
+        "enjoyStudiesWith": {
+          "english": "Emotion and insight",
+          "hindi": "भावनाएँ और समझदारी"
+        },
+        "struggleWith": {
+          "english": "Emotion and insight",
+          "hindi": "भावनाएँ और समझदारी"
+        }
+      }
+    }
+  }
+}
