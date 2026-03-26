@@ -3,7 +3,7 @@ import { Spinner, Button, Form, Badge, Alert, Modal, Table } from "react-bootstr
 import * as XLSX from "xlsx";
 import { ReadCollegeData } from "../College/API/College_APIs";
 import { getAssessmentMappingsByInstitute, getAssessmentSummaryList } from "../AssessmentMapping/API/AssessmentMapping_APIs";
-import { getOfflineMapping, bulkSubmitByRollNumber, bulkSubmitWithStudents, getSavedOmrMapping, saveOmrMapping, getSavedOmrMappingByQuestionnaire } from "./API/OfflineUpload_APIs";
+import { getOfflineMapping, bulkSubmitByRollNumber, bulkSubmitWithStudents, getSavedOmrMapping, saveOmrMapping, getSavedOmrMappingByQuestionnaire, getAllOmrMappings } from "./API/OfflineUpload_APIs";
 
 // ============ Types ============
 
@@ -167,6 +167,9 @@ const OMRDataUploadPage = () => {
   // --- Modals ---
   const [warningModalStudent, setWarningModalStudent] = useState<ParsedStudent | null>(null);
   const [answerModalStudent, setAnswerModalStudent] = useState<ParsedStudent | null>(null);
+  const [showSavedMappingsModal, setShowSavedMappingsModal] = useState(false);
+  const [allSavedMappings, setAllSavedMappings] = useState<any[]>([]);
+  const [loadingAllMappings, setLoadingAllMappings] = useState(false);
 
   // ============ Build mapping rows from questionnaire ============
 
@@ -642,13 +645,31 @@ const OMRDataUploadPage = () => {
     }
   };
 
+  // ============ Saved Mappings Modal ============
+
+  const handleShowSavedMappings = async () => {
+    setShowSavedMappingsModal(true);
+    setLoadingAllMappings(true);
+    try {
+      const res = await getAllOmrMappings();
+      setAllSavedMappings(res.data || []);
+    } catch {
+      setAllSavedMappings([]);
+    } finally {
+      setLoadingAllMappings(false);
+    }
+  };
+
   // ============ Render ============
 
   return (
     <div className="card">
       <div className="card-header">
         <h3 className="card-title">OMR Data Upload</h3>
-        <div className="card-toolbar">
+        <div className="card-toolbar d-flex align-items-center gap-3">
+          <Button variant="outline-primary" size="sm" onClick={handleShowSavedMappings}>
+            View Saved Mappings
+          </Button>
           <small className="text-muted">Upload scanned OMR data with manual column mapping</small>
         </div>
       </div>
@@ -1074,6 +1095,62 @@ const OMRDataUploadPage = () => {
           </Modal.Body>
           <Modal.Footer>
             <Button variant="secondary" onClick={() => setAnswerModalStudent(null)}>Close</Button>
+          </Modal.Footer>
+        </Modal>
+
+        {/* ===== Saved Mappings Modal ===== */}
+        <Modal show={showSavedMappingsModal} onHide={() => setShowSavedMappingsModal(false)} size="xl" centered scrollable>
+          <Modal.Header closeButton>
+            <Modal.Title>Saved Column Mappings</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {loadingAllMappings ? (
+              <div className="text-center py-4"><Spinner animation="border" /> Loading...</div>
+            ) : allSavedMappings.length === 0 ? (
+              <p className="text-muted text-center py-4">No saved mappings found.</p>
+            ) : (
+              <Table striped bordered hover size="sm">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Questionnaire</th>
+                    <th>Assessment</th>
+                    <th>Mapped Fields</th>
+                    <th>Saved On</th>
+                    <th>Last Updated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allSavedMappings.map((m: any, idx: number) => (
+                    <tr key={m.id}>
+                      <td>{idx + 1}</td>
+                      <td>
+                        {m.questionnaireName || <span className="text-muted">-</span>}
+                        {m.questionnaireId && (
+                          <Badge bg="secondary" className="ms-1" style={{ fontSize: "0.6rem" }}>
+                            ID: {m.questionnaireId}
+                          </Badge>
+                        )}
+                      </td>
+                      <td>
+                        {m.assessmentName || <span className="text-muted">-</span>}
+                        <Badge bg="light" text="dark" className="ms-1" style={{ fontSize: "0.6rem" }}>
+                          ID: {m.assessmentId}
+                        </Badge>
+                      </td>
+                      <td>
+                        <Badge bg="info">{m.mappedFieldsCount} fields</Badge>
+                      </td>
+                      <td><small>{m.createdAt ? new Date(m.createdAt).toLocaleDateString() : "-"}</small></td>
+                      <td><small>{m.updatedAt ? new Date(m.updatedAt).toLocaleDateString() : "-"}</small></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => setShowSavedMappingsModal(false)}>Close</Button>
           </Modal.Footer>
         </Modal>
 

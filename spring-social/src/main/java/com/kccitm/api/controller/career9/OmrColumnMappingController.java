@@ -10,7 +10,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.kccitm.api.model.career9.OmrColumnMapping;
+import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.repository.Career9.OmrColumnMappingRepository;
+import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 
 @RestController
 @RequestMapping("/omr-column-mapping")
@@ -18,6 +20,52 @@ public class OmrColumnMappingController {
 
     @Autowired
     private OmrColumnMappingRepository repository;
+
+    @Autowired
+    private AssessmentTableRepository assessmentTableRepository;
+
+    @GetMapping("/getAll")
+    public ResponseEntity<?> getAllMappings() {
+        List<OmrColumnMapping> mappings = repository.findAll();
+        List<Map<String, Object>> result = new java.util.ArrayList<>();
+
+        for (OmrColumnMapping m : mappings) {
+            Map<String, Object> item = new java.util.HashMap<>();
+            item.put("id", m.getId());
+            item.put("assessmentId", m.getAssessmentId());
+            item.put("instituteId", m.getInstituteId());
+            item.put("questionnaireId", m.getQuestionnaireId());
+            item.put("mappingName", m.getMappingName());
+            item.put("createdAt", m.getCreatedAt());
+            item.put("updatedAt", m.getUpdatedAt());
+
+            // Resolve assessment name and questionnaire name
+            try {
+                Optional<AssessmentTable> assessment = assessmentTableRepository.findById(m.getAssessmentId());
+                if (assessment.isPresent()) {
+                    item.put("assessmentName", assessment.get().getAssessmentName());
+                    if (assessment.get().getQuestionnaire() != null) {
+                        item.put("questionnaireName", assessment.get().getQuestionnaire().getName());
+                    }
+                }
+            } catch (Exception e) {
+                // ignore
+            }
+
+            // Count mapped fields from JSON
+            try {
+                com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+                Map<String, String> parsed = om.readValue(m.getMappingJson(), Map.class);
+                item.put("mappedFieldsCount", parsed.size());
+            } catch (Exception e) {
+                item.put("mappedFieldsCount", 0);
+            }
+
+            result.add(item);
+        }
+
+        return ResponseEntity.ok(result);
+    }
 
     @GetMapping("/get/{assessmentId}/{instituteId}")
     public ResponseEntity<?> getMapping(
