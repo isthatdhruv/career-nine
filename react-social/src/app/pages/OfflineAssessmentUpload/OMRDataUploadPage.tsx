@@ -90,7 +90,13 @@ function resolveMultiQuestionAnswer(
   if (val === "" || val === "BLANK" || val === "blank") return { optionId: null };
 
   if (val.startsWith("(") && val.includes(",")) {
-    return { optionId: null, warning: `Multiple answers: ${val}` };
+    // Extract first answer from "(Yes,No)" or "(A,B)" format
+    const inner = val.replace(/[()]/g, "").split(",")[0].trim();
+    if (inner) {
+      const result = resolveMultiQuestionAnswer(inner, options);
+      return { optionId: result.optionId, warning: result.warning };
+    }
+    return { optionId: null };
   }
 
   const upper = val.toUpperCase();
@@ -521,11 +527,8 @@ const OMRDataUploadPage = () => {
             if (val === "1") selectedOptionIds.push(opt.optionId);
           }
 
-          if (selectedOptionIds.length === 1) {
-            answers.push({ questionnaireQuestionId: q.questionnaireQuestionId, optionId: selectedOptionIds[0] });
-          } else if (selectedOptionIds.length > 1) {
-            answers.push({ questionnaireQuestionId: q.questionnaireQuestionId, optionId: selectedOptionIds[0] });
-            warnings.push(`Sec ${sLetter}: Multiple options selected, using first`);
+          for (const optId of selectedOptionIds) {
+            answers.push({ questionnaireQuestionId: q.questionnaireQuestionId, optionId: optId });
           }
           // length === 0 means unanswered, no warning needed
         } else {
@@ -552,6 +555,11 @@ const OMRDataUploadPage = () => {
     setMappingApplied(true);
   };
 
+  // ============ Helpers ============
+
+  const countUniqueQuestions = (answers: ParsedAnswer[]) =>
+    new Set(answers.map((a) => a.questionnaireQuestionId)).size;
+
   // ============ Stats ============
 
   const stats = useMemo(() => {
@@ -560,7 +568,7 @@ const OMRDataUploadPage = () => {
     const withWarnings = parsedStudents.filter((s) => s.warnings.length > 0).length;
     const withRollNumber = parsedStudents.filter((s) => s.rollNumber.trim()).length;
     const avgAnswers = Math.round(
-      parsedStudents.reduce((sum, s) => sum + s.answers.length, 0) / parsedStudents.length
+      parsedStudents.reduce((sum, s) => sum + countUniqueQuestions(s.answers), 0) / parsedStudents.length
     );
     return { totalQuestions, withWarnings, withRollNumber, avgAnswers };
   }, [parsedStudents, mappingData]);
@@ -582,15 +590,27 @@ const OMRDataUploadPage = () => {
         const sLetter = String.fromCharCode(65 + si);
         for (let qi = 0; qi < section.questions.length; qi++) {
           const q = section.questions[qi];
-          const answer = student.answers.find((a) => a.questionnaireQuestionId === q.questionnaireQuestionId);
-          const selectedOpt = answer ? q.options.find((o) => o.optionId === answer.optionId) : null;
-          details.push({
-            sectionName: section.sectionName, sectionLetter: sLetter, questionNumber: qi + 1,
-            questionText: q.questionText || `Question ${q.questionnaireQuestionId}`,
-            selectedOption: selectedOpt?.optionText || "-",
-            optionSequence: selectedOpt?.sequence || 0,
-            answered: !!answer,
-          });
+          const matchingAnswers = student.answers.filter((a) => a.questionnaireQuestionId === q.questionnaireQuestionId);
+          if (matchingAnswers.length > 0) {
+            const selectedOpts = matchingAnswers
+              .map((a) => q.options.find((o) => o.optionId === a.optionId))
+              .filter(Boolean);
+            details.push({
+              sectionName: section.sectionName, sectionLetter: sLetter, questionNumber: qi + 1,
+              questionText: q.questionText || `Question ${q.questionnaireQuestionId}`,
+              selectedOption: selectedOpts.map((o) => o!.optionText).join(", ") || "-",
+              optionSequence: selectedOpts[0]?.sequence || 0,
+              answered: true,
+            });
+          } else {
+            details.push({
+              sectionName: section.sectionName, sectionLetter: sLetter, questionNumber: qi + 1,
+              questionText: q.questionText || `Question ${q.questionnaireQuestionId}`,
+              selectedOption: "-",
+              optionSequence: 0,
+              answered: false,
+            });
+          }
         }
       }
       return details;
@@ -918,11 +938,11 @@ const OMRDataUploadPage = () => {
                           <td>{student.studentClass || "-"}</td>
                           <td>
                             <Badge
-                              bg={student.answers.length === stats.totalQuestions ? "success" : "warning"}
+                              bg={countUniqueQuestions(student.answers) === stats.totalQuestions ? "success" : "warning"}
                               role="button" style={{ cursor: "pointer" }}
                               onClick={() => setAnswerModalStudent(student)}
                             >
-                              {student.answers.length}/{stats.totalQuestions}
+                              {countUniqueQuestions(student.answers)}/{stats.totalQuestions}
                             </Badge>
                           </td>
                           <td>
@@ -1032,7 +1052,7 @@ const OMRDataUploadPage = () => {
               Answer Mapping - {answerModalStudent?.name || answerModalStudent?.rollNumber || `Row ${(answerModalStudent?.rowIndex ?? 0) + 1}`}
               {answerModalStudent && stats && (
                 <Badge bg="info" className="ms-3" style={{ fontSize: "0.7rem" }}>
-                  {answerModalStudent.answers.length}/{stats.totalQuestions} answered
+                  {countUniqueQuestions(answerModalStudent.answers)}/{stats.totalQuestions} answered
                 </Badge>
               )}
             </Modal.Title>
@@ -1099,9 +1119,9 @@ const OMRDataUploadPage = () => {
         </Modal>
 
         {/* ===== Saved Mappings Modal ===== */}
-        <Modal show={showSavedMappingsModal} onHide={() => setShowSavedMappingsModal(false)} size="xl" centered scrollable>
+        <Modal show={showSavedMappingsModal} onHide={() => setShowSavedMappingsModal(false)} centered>
           <Modal.Header closeButton>
-            <Modal.Title>Saved Column Mappings</Modal.Title>
+            <Modal.Title>Questionnaires with Saved Mappings</Modal.Title>
           </Modal.Header>
           <Modal.Body>
             {loadingAllMappings ? (
@@ -1109,44 +1129,14 @@ const OMRDataUploadPage = () => {
             ) : allSavedMappings.length === 0 ? (
               <p className="text-muted text-center py-4">No saved mappings found.</p>
             ) : (
-              <Table striped bordered hover size="sm">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Questionnaire</th>
-                    <th>Assessment</th>
-                    <th>Mapped Fields</th>
-                    <th>Saved On</th>
-                    <th>Last Updated</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allSavedMappings.map((m: any, idx: number) => (
-                    <tr key={m.id}>
-                      <td>{idx + 1}</td>
-                      <td>
-                        {m.questionnaireName || <span className="text-muted">-</span>}
-                        {m.questionnaireId && (
-                          <Badge bg="secondary" className="ms-1" style={{ fontSize: "0.6rem" }}>
-                            ID: {m.questionnaireId}
-                          </Badge>
-                        )}
-                      </td>
-                      <td>
-                        {m.assessmentName || <span className="text-muted">-</span>}
-                        <Badge bg="light" text="dark" className="ms-1" style={{ fontSize: "0.6rem" }}>
-                          ID: {m.assessmentId}
-                        </Badge>
-                      </td>
-                      <td>
-                        <Badge bg="info">{m.mappedFieldsCount} fields</Badge>
-                      </td>
-                      <td><small>{m.createdAt ? new Date(m.createdAt).toLocaleDateString() : "-"}</small></td>
-                      <td><small>{m.updatedAt ? new Date(m.updatedAt).toLocaleDateString() : "-"}</small></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
+              <ul className="list-group">
+                {allSavedMappings.map((m: any, idx: number) => (
+                  <li key={idx} className="list-group-item d-flex justify-content-between align-items-center">
+                    <span>{m.questionnaireName || <span className="text-muted">Unknown Questionnaire</span>}</span>
+                    <Badge bg="info">{m.mappedFieldsCount} fields mapped</Badge>
+                  </li>
+                ))}
+              </ul>
             )}
           </Modal.Body>
           <Modal.Footer>

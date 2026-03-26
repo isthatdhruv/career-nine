@@ -27,44 +27,47 @@ public class OmrColumnMappingController {
     @GetMapping("/getAll")
     public ResponseEntity<?> getAllMappings() {
         List<OmrColumnMapping> mappings = repository.findAll();
-        List<Map<String, Object>> result = new java.util.ArrayList<>();
+
+        // Group by questionnaire — deduplicate so we show each questionnaire once
+        Map<String, Map<String, Object>> byQuestionnaire = new java.util.LinkedHashMap<>();
 
         for (OmrColumnMapping m : mappings) {
-            Map<String, Object> item = new java.util.HashMap<>();
-            item.put("id", m.getId());
-            item.put("assessmentId", m.getAssessmentId());
-            item.put("instituteId", m.getInstituteId());
-            item.put("questionnaireId", m.getQuestionnaireId());
-            item.put("mappingName", m.getMappingName());
-            item.put("createdAt", m.getCreatedAt());
-            item.put("updatedAt", m.getUpdatedAt());
+            String questionnaireName = null;
+            Long resolvedQuestionnaireId = m.getQuestionnaireId();
 
-            // Resolve assessment name and questionnaire name
             try {
                 Optional<AssessmentTable> assessment = assessmentTableRepository.findById(m.getAssessmentId());
-                if (assessment.isPresent()) {
-                    item.put("assessmentName", assessment.get().getAssessmentName());
-                    if (assessment.get().getQuestionnaire() != null) {
-                        item.put("questionnaireName", assessment.get().getQuestionnaire().getName());
+                if (assessment.isPresent() && assessment.get().getQuestionnaire() != null) {
+                    questionnaireName = assessment.get().getQuestionnaire().getName();
+                    if (resolvedQuestionnaireId == null) {
+                        resolvedQuestionnaireId = assessment.get().getQuestionnaire().getQuestionnaireId();
                     }
                 }
             } catch (Exception e) {
                 // ignore
             }
 
-            // Count mapped fields from JSON
-            try {
-                com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
-                Map<String, String> parsed = om.readValue(m.getMappingJson(), Map.class);
-                item.put("mappedFieldsCount", parsed.size());
-            } catch (Exception e) {
-                item.put("mappedFieldsCount", 0);
-            }
+            String key = resolvedQuestionnaireId != null ? String.valueOf(resolvedQuestionnaireId) : "unknown_" + m.getId();
 
-            result.add(item);
+            if (!byQuestionnaire.containsKey(key)) {
+                Map<String, Object> item = new java.util.HashMap<>();
+                item.put("questionnaireId", resolvedQuestionnaireId);
+                item.put("questionnaireName", questionnaireName);
+                item.put("updatedAt", m.getUpdatedAt());
+
+                int mappedFieldsCount = 0;
+                try {
+                    com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
+                    Map<String, String> parsed = om.readValue(m.getMappingJson(), Map.class);
+                    mappedFieldsCount = parsed.size();
+                } catch (Exception e) {}
+                item.put("mappedFieldsCount", mappedFieldsCount);
+
+                byQuestionnaire.put(key, item);
+            }
         }
 
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(new java.util.ArrayList<>(byQuestionnaire.values()));
     }
 
     @GetMapping("/get/{assessmentId}/{instituteId}")
