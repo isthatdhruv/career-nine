@@ -53,15 +53,18 @@ public class OmrColumnMappingController {
                 Map<String, Object> item = new java.util.HashMap<>();
                 item.put("questionnaireId", resolvedQuestionnaireId);
                 item.put("questionnaireName", questionnaireName);
+                item.put("assessmentId", m.getAssessmentId());
                 item.put("updatedAt", m.getUpdatedAt());
 
                 int mappedFieldsCount = 0;
+                Map<String, String> parsedMapping = null;
                 try {
                     com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
-                    Map<String, String> parsed = om.readValue(m.getMappingJson(), Map.class);
-                    mappedFieldsCount = parsed.size();
+                    parsedMapping = om.readValue(m.getMappingJson(), Map.class);
+                    mappedFieldsCount = parsedMapping.size();
                 } catch (Exception e) {}
                 item.put("mappedFieldsCount", mappedFieldsCount);
+                item.put("mapping", parsedMapping);
 
                 byQuestionnaire.put(key, item);
             }
