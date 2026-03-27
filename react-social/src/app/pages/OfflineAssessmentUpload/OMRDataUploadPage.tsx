@@ -127,6 +127,47 @@ function resolveMultiQuestionAnswer(
   return { optionId: null, warning: `Unrecognized: "${val}"` };
 }
 
+// ============ Header normalization for fuzzy matching ============
+
+/** Normalize a header string for comparison: lowercase, strip dashes/underscores/spaces */
+function normalizeHeader(h: string): string {
+  return h.toLowerCase().replace(/[-_\s]+/g, "");
+}
+
+/**
+ * Match saved mapping headers to actual Excel headers using normalized comparison.
+ * Identity fields (id_*) are skipped — they vary too much between schools.
+ * Returns a new mapping with matched Excel headers.
+ */
+function matchMappingToHeaders(
+  saved: Record<string, string>,
+  excelHeaders: string[]
+): Record<string, string> {
+  // Build a normalized → actual header lookup
+  const normalizedMap = new Map<string, string>();
+  for (const h of excelHeaders) {
+    normalizedMap.set(normalizeHeader(h), h);
+  }
+
+  const result: Record<string, string> = {};
+  for (const [key, savedHeader] of Object.entries(saved)) {
+    // Skip identity fields — they differ between schools (Name vs Student Name, etc.)
+    if (key.startsWith("id_")) continue;
+
+    // Exact match first
+    if (excelHeaders.includes(savedHeader)) {
+      result[key] = savedHeader;
+      continue;
+    }
+    // Normalized match (ignores dashes/underscores/spaces/case)
+    const actual = normalizedMap.get(normalizeHeader(savedHeader));
+    if (actual) {
+      result[key] = actual;
+    }
+  }
+  return result;
+}
+
 // ============ Component ============
 
 const OMRDataUploadPage = () => {
@@ -357,12 +398,8 @@ const OMRDataUploadPage = () => {
 
   const applyMappingFromJson = (saved: Record<string, string>, headers: string[]) => {
     if (headers.length > 0) {
-      const headerSet = new Set(headers);
-      const filtered: Record<string, string> = {};
-      for (const [key, header] of Object.entries(saved)) {
-        if (headerSet.has(header)) filtered[key] = header;
-      }
-      setFieldToHeader(filtered);
+      const matched = matchMappingToHeaders(saved, headers);
+      setFieldToHeader(matched);
     } else {
       setFieldToHeader(saved);
     }
@@ -446,15 +483,11 @@ const OMRDataUploadPage = () => {
       setRawExcelData(jsonData);
       setAutoLoadedMapping(false);
 
-      // Auto-apply saved mapping if available
+      // Auto-apply saved mapping if available (normalized matching, skip identity fields)
       if (savedMappingJsonRef.current) {
-        const headerSet = new Set(headers);
-        const filtered: Record<string, string> = {};
-        for (const [key, header] of Object.entries(savedMappingJsonRef.current)) {
-          if (headerSet.has(header)) filtered[key] = header;
-        }
-        setFieldToHeader(filtered);
-        setAutoLoadedMapping(true);
+        const matched = matchMappingToHeaders(savedMappingJsonRef.current, headers);
+        setFieldToHeader(matched);
+        setAutoLoadedMapping(Object.keys(matched).length > 0);
       } else {
         setFieldToHeader({});
       }

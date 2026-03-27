@@ -452,6 +452,7 @@ export function JungleSpotGame({ userStudentId, playerName, onComplete, onExit }
         }}
       >
         <div
+          className="game-video-card"
           style={{
             background: 'linear-gradient(135deg, rgba(6, 78, 59, 0.9), rgba(6, 46, 35, 0.95))',
             borderRadius: '24px',
@@ -561,6 +562,7 @@ export function JungleSpotGame({ userStudentId, playerName, onComplete, onExit }
         }}
       >
         <div
+          className="game-video-card"
           style={{
             background: 'linear-gradient(135deg, rgba(6, 78, 59, 0.9), rgba(6, 46, 35, 0.95))',
             borderRadius: '24px',
@@ -576,6 +578,7 @@ export function JungleSpotGame({ userStudentId, playerName, onComplete, onExit }
           {/* Practice Icon */}
           <div style={{ marginBottom: '16px' }}>
             <div
+              className="icon-circle"
               style={{
                 width: '80px',
                 height: '80px',
@@ -680,6 +683,7 @@ export function JungleSpotGame({ userStudentId, playerName, onComplete, onExit }
         }}
       >
         <div
+          className="game-modal-card"
           style={{
             background: 'linear-gradient(135deg, rgba(6, 78, 59, 0.9), rgba(6, 46, 35, 0.95))',
             borderRadius: '24px',
@@ -695,6 +699,7 @@ export function JungleSpotGame({ userStudentId, playerName, onComplete, onExit }
           {/* Checkmark Icon */}
           <div style={{ marginBottom: '16px' }}>
             <div
+              className="icon-circle"
               style={{
                 width: '80px',
                 height: '80px',
@@ -719,7 +724,7 @@ export function JungleSpotGame({ userStudentId, playerName, onComplete, onExit }
           </p>
 
           {/* Practice Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
+          <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
             <div style={{ background: 'rgba(21, 128, 61, 0.4)', borderRadius: '12px', padding: '12px', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
               <div style={{ fontSize: '24px', fontWeight: 700, color: '#4ade80' }}>{final.hits}</div>
               <div style={{ fontSize: '10px', color: 'rgba(134, 239, 172, 0.7)', textTransform: 'uppercase', letterSpacing: '1px' }}>Lions Found</div>
@@ -794,6 +799,7 @@ export function JungleSpotGame({ userStudentId, playerName, onComplete, onExit }
         }}
       >
         <div
+          className="game-modal-card"
           style={{
             background: 'linear-gradient(135deg, rgba(6, 78, 59, 0.9), rgba(6, 46, 35, 0.95))',
             borderRadius: '24px',
@@ -809,6 +815,7 @@ export function JungleSpotGame({ userStudentId, playerName, onComplete, onExit }
           {/* Trophy */}
           <div style={{ marginBottom: '16px' }}>
             <div
+              className="icon-circle"
               style={{
                 width: '80px',
                 height: '80px',
@@ -833,7 +840,7 @@ export function JungleSpotGame({ userStudentId, playerName, onComplete, onExit }
           </p>
 
           {/* Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '24px' }}>
+          <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '24px' }}>
             <div style={{ background: 'rgba(21, 128, 61, 0.4)', borderRadius: '12px', padding: '12px', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
               <div style={{ fontSize: '24px', fontWeight: 700, color: '#4ade80' }}>{final.hits}</div>
               <div style={{ fontSize: '10px', color: 'rgba(134, 239, 172, 0.7)', textTransform: 'uppercase', letterSpacing: '1px' }}>Lions Found</div>
@@ -932,6 +939,7 @@ export function JungleSpotGame({ userStudentId, playerName, onComplete, onExit }
 
       {/* Player Info - Top Left */}
       <div
+        className="game-top-left"
         style={{
           position: 'absolute',
           top: '20px',
@@ -956,6 +964,7 @@ export function JungleSpotGame({ userStudentId, playerName, onComplete, onExit }
 
       {/* Trial Counter - Top Center */}
       <div
+        className="game-top-center"
         style={{
           position: 'absolute',
           top: '20px',
@@ -983,6 +992,7 @@ export function JungleSpotGame({ userStudentId, playerName, onComplete, onExit }
 
       {/* Controls - Top Right */}
       <div
+        className="game-top-right"
         style={{
           position: 'absolute',
           top: '20px',
@@ -1066,9 +1076,8 @@ export function JungleSpotGame({ userStudentId, playerName, onComplete, onExit }
           >
             {/* Image Container - Square */}
             <div
+              className="jungle-image-container"
               style={{
-                width: '300px',
-                height: '300px',
                 background: 'linear-gradient(135deg, #064e3b 0%, #022c22 100%)',
                 borderRadius: '10px',
                 display: 'flex',
@@ -1140,6 +1149,7 @@ export function JungleSpotGame({ userStudentId, playerName, onComplete, onExit }
         >
           {/* Instruction Card */}
           <div
+            className="jungle-instruction-card"
             style={{
               background: 'linear-gradient(to right, rgba(120, 53, 15, 0.95), rgba(146, 64, 14, 0.95), rgba(120, 53, 15, 0.95))',
               padding: '16px 32px',
@@ -1150,16 +1160,16 @@ export function JungleSpotGame({ userStudentId, playerName, onComplete, onExit }
             onPointerDown={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
-              <span style={{ fontSize: '40px' }}>🦁</span>
+              <span className="lion-emoji" style={{ fontSize: '40px' }}>🦁</span>
               <div style={{ textAlign: 'center' }}>
                 <p style={{ color: 'rgba(253, 230, 138, 0.9)', fontSize: '14px', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '4px' }}>
                   Spot the
                 </p>
-                <p style={{ color: '#fcd34d', fontSize: '32px', fontWeight: 900, letterSpacing: '-1px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+                <p className="lion-text" style={{ color: '#fcd34d', fontSize: '32px', fontWeight: 900, letterSpacing: '-1px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
                   LION
                 </p>
               </div>
-              <span style={{ fontSize: '40px' }}>👆</span>
+              <span className="tap-emoji" style={{ fontSize: '40px' }}>👆</span>
             </div>
           </div>
 
