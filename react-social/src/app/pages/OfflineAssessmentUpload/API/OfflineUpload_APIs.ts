@@ -59,3 +59,7 @@ export function saveOmrMapping(data: {
 export function getSavedOmrMappingByQuestionnaire(questionnaireId: number) {
   return axios.get(`${API_URL}/omr-column-mapping/get-by-questionnaire/${questionnaireId}`);
 }
+
+export function getAllOmrMappings() {
+  return axios.get(`${API_URL}/omr-column-mapping/getAll`);
+}

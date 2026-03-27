@@ -3,7 +3,7 @@ import { Spinner, Button, Form, Badge, Alert, Modal, Table } from "react-bootstr
 import * as XLSX from "xlsx";
 import { ReadCollegeData } from "../College/API/College_APIs";
 import { getAssessmentMappingsByInstitute, getAssessmentSummaryList } from "../AssessmentMapping/API/AssessmentMapping_APIs";
-import { getOfflineMapping, bulkSubmitByRollNumber, bulkSubmitWithStudents, getSavedOmrMapping, saveOmrMapping, getSavedOmrMappingByQuestionnaire } from "./API/OfflineUpload_APIs";
+import { getOfflineMapping, bulkSubmitByRollNumber, bulkSubmitWithStudents, getSavedOmrMapping, saveOmrMapping, getSavedOmrMappingByQuestionnaire, getAllOmrMappings } from "./API/OfflineUpload_APIs";
 
 // ============ Types ============
 
@@ -90,7 +90,13 @@ function resolveMultiQuestionAnswer(
   if (val === "" || val === "BLANK" || val === "blank") return { optionId: null };
 
   if (val.startsWith("(") && val.includes(",")) {
-    return { optionId: null, warning: `Multiple answers: ${val}` };
+    // Extract first answer from "(Yes,No)" or "(A,B)" format
+    const inner = val.replace(/[()]/g, "").split(",")[0].trim();
+    if (inner) {
+      const result = resolveMultiQuestionAnswer(inner, options);
+      return { optionId: result.optionId, warning: result.warning };
+    }
+    return { optionId: null };
   }
 
   const upper = val.toUpperCase();
@@ -167,6 +173,10 @@ const OMRDataUploadPage = () => {
   // --- Modals ---
   const [warningModalStudent, setWarningModalStudent] = useState<ParsedStudent | null>(null);
   const [answerModalStudent, setAnswerModalStudent] = useState<ParsedStudent | null>(null);
+  const [showSavedMappingsModal, setShowSavedMappingsModal] = useState(false);
+  const [allSavedMappings, setAllSavedMappings] = useState<any[]>([]);
+  const [loadingAllMappings, setLoadingAllMappings] = useState(false);
+  const [expandedMappingIdx, setExpandedMappingIdx] = useState<number | null>(null);
 
   // ============ Build mapping rows from questionnaire ============
 
@@ -518,11 +528,8 @@ const OMRDataUploadPage = () => {
             if (val === "1") selectedOptionIds.push(opt.optionId);
           }
 
-          if (selectedOptionIds.length === 1) {
-            answers.push({ questionnaireQuestionId: q.questionnaireQuestionId, optionId: selectedOptionIds[0] });
-          } else if (selectedOptionIds.length > 1) {
-            answers.push({ questionnaireQuestionId: q.questionnaireQuestionId, optionId: selectedOptionIds[0] });
-            warnings.push(`Sec ${sLetter}: Multiple options selected, using first`);
+          for (const optId of selectedOptionIds) {
+            answers.push({ questionnaireQuestionId: q.questionnaireQuestionId, optionId: optId });
           }
           // length === 0 means unanswered, no warning needed
         } else {
@@ -549,6 +556,11 @@ const OMRDataUploadPage = () => {
     setMappingApplied(true);
   };
 
+  // ============ Helpers ============
+
+  const countUniqueQuestions = (answers: ParsedAnswer[]) =>
+    new Set(answers.map((a) => a.questionnaireQuestionId)).size;
+
   // ============ Stats ============
 
   const stats = useMemo(() => {
@@ -557,7 +569,7 @@ const OMRDataUploadPage = () => {
     const withWarnings = parsedStudents.filter((s) => s.warnings.length > 0).length;
     const withRollNumber = parsedStudents.filter((s) => s.rollNumber.trim()).length;
     const avgAnswers = Math.round(
-      parsedStudents.reduce((sum, s) => sum + s.answers.length, 0) / parsedStudents.length
+      parsedStudents.reduce((sum, s) => sum + countUniqueQuestions(s.answers), 0) / parsedStudents.length
     );
     return { totalQuestions, withWarnings, withRollNumber, avgAnswers };
   }, [parsedStudents, mappingData]);
@@ -579,15 +591,27 @@ const OMRDataUploadPage = () => {
         const sLetter = String.fromCharCode(65 + si);
         for (let qi = 0; qi < section.questions.length; qi++) {
           const q = section.questions[qi];
-          const answer = student.answers.find((a) => a.questionnaireQuestionId === q.questionnaireQuestionId);
-          const selectedOpt = answer ? q.options.find((o) => o.optionId === answer.optionId) : null;
-          details.push({
-            sectionName: section.sectionName, sectionLetter: sLetter, questionNumber: qi + 1,
-            questionText: q.questionText || `Question ${q.questionnaireQuestionId}`,
-            selectedOption: selectedOpt?.optionText || "-",
-            optionSequence: selectedOpt?.sequence || 0,
-            answered: !!answer,
-          });
+          const matchingAnswers = student.answers.filter((a) => a.questionnaireQuestionId === q.questionnaireQuestionId);
+          if (matchingAnswers.length > 0) {
+            const selectedOpts = matchingAnswers
+              .map((a) => q.options.find((o) => o.optionId === a.optionId))
+              .filter(Boolean);
+            details.push({
+              sectionName: section.sectionName, sectionLetter: sLetter, questionNumber: qi + 1,
+              questionText: q.questionText || `Question ${q.questionnaireQuestionId}`,
+              selectedOption: selectedOpts.map((o) => o!.optionText).join(", ") || "-",
+              optionSequence: selectedOpts[0]?.sequence || 0,
+              answered: true,
+            });
+          } else {
+            details.push({
+              sectionName: section.sectionName, sectionLetter: sLetter, questionNumber: qi + 1,
+              questionText: q.questionText || `Question ${q.questionnaireQuestionId}`,
+              selectedOption: "-",
+              optionSequence: 0,
+              answered: false,
+            });
+          }
         }
       }
       return details;
@@ -642,13 +666,88 @@ const OMRDataUploadPage = () => {
     }
   };
 
+  // ============ Saved Mappings Modal ============
+
+  const handleShowSavedMappings = async () => {
+    setShowSavedMappingsModal(true);
+    setLoadingAllMappings(true);
+    try {
+      const res = await getAllOmrMappings();
+      setAllSavedMappings(res.data || []);
+    } catch {
+      setAllSavedMappings([]);
+    } finally {
+      setLoadingAllMappings(false);
+    }
+  };
+
+  const handleExpandMapping = async (idx: number) => {
+    if (expandedMappingIdx === idx) {
+      setExpandedMappingIdx(null);
+      return;
+    }
+    setExpandedMappingIdx(idx);
+
+    const m = allSavedMappings[idx];
+    // If already fully loaded with question texts, skip
+    if (m.questionLookup && Object.keys(m.questionLookup).length > 0) return;
+
+    const updated = [...allSavedMappings];
+    let mappingObj = m.mapping;
+
+    // Fetch mapping JSON if not present
+    if (!mappingObj || Object.keys(mappingObj).length === 0) {
+      if (m.questionnaireId) {
+        try {
+          const res = await getSavedOmrMappingByQuestionnaire(m.questionnaireId);
+          if (res.data?.mappingJson) {
+            mappingObj = JSON.parse(res.data.mappingJson);
+          }
+        } catch {}
+      }
+    }
+
+    // Fetch questionnaire structure to get question texts
+    // Try using assessmentId from getAll response, or find an assessment that uses this questionnaire
+    const questionLookup: Record<string, string> = {};
+    let assessmentIdToUse = m.assessmentId;
+
+    // If no assessmentId from getAll, find one from assessmentMappings or the currently selected assessment
+    if (!assessmentIdToUse && assessmentMappings.length > 0) {
+      assessmentIdToUse = assessmentMappings[0]?.id;
+    }
+
+    if (assessmentIdToUse) {
+      try {
+        const res = await getOfflineMapping(Number(assessmentIdToUse));
+        const data = res.data as MappingData;
+        if (data?.sections) {
+          for (const section of data.sections) {
+            for (const q of section.questions) {
+              questionLookup[`q_${q.questionnaireQuestionId}`] = q.questionText || "";
+              for (const opt of (q.options || [])) {
+                questionLookup[`opt_${q.questionnaireQuestionId}_${opt.optionId}`] = `${q.questionText?.substring(0, 40) || ""} → Option ${opt.sequence}: ${opt.optionText}`;
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+
+    updated[idx] = { ...m, mapping: mappingObj, questionLookup };
+    setAllSavedMappings(updated);
+  };
+
   // ============ Render ============
 
   return (
     <div className="card">
       <div className="card-header">
         <h3 className="card-title">OMR Data Upload</h3>
-        <div className="card-toolbar">
+        <div className="card-toolbar d-flex align-items-center gap-3">
+          <Button variant="outline-primary" size="sm" onClick={handleShowSavedMappings}>
+            View Saved Mappings
+          </Button>
           <small className="text-muted">Upload scanned OMR data with manual column mapping</small>
         </div>
       </div>
@@ -897,11 +996,11 @@ const OMRDataUploadPage = () => {
                           <td>{student.studentClass || "-"}</td>
                           <td>
                             <Badge
-                              bg={student.answers.length === stats.totalQuestions ? "success" : "warning"}
+                              bg={countUniqueQuestions(student.answers) === stats.totalQuestions ? "success" : "warning"}
                               role="button" style={{ cursor: "pointer" }}
                               onClick={() => setAnswerModalStudent(student)}
                             >
-                              {student.answers.length}/{stats.totalQuestions}
+                              {countUniqueQuestions(student.answers)}/{stats.totalQuestions}
                             </Badge>
                           </td>
                           <td>
@@ -1011,7 +1110,7 @@ const OMRDataUploadPage = () => {
               Answer Mapping - {answerModalStudent?.name || answerModalStudent?.rollNumber || `Row ${(answerModalStudent?.rowIndex ?? 0) + 1}`}
               {answerModalStudent && stats && (
                 <Badge bg="info" className="ms-3" style={{ fontSize: "0.7rem" }}>
-                  {answerModalStudent.answers.length}/{stats.totalQuestions} answered
+                  {countUniqueQuestions(answerModalStudent.answers)}/{stats.totalQuestions} answered
                 </Badge>
               )}
             </Modal.Title>
@@ -1074,6 +1173,93 @@ const OMRDataUploadPage = () => {
           </Modal.Body>
           <Modal.Footer>
             <Button variant="secondary" onClick={() => setAnswerModalStudent(null)}>Close</Button>
+          </Modal.Footer>
+        </Modal>
+
+        {/* ===== Saved Mappings Modal ===== */}
+        <Modal show={showSavedMappingsModal} onHide={() => { setShowSavedMappingsModal(false); setExpandedMappingIdx(null); }} size="lg" centered scrollable>
+          <Modal.Header closeButton>
+            <Modal.Title>Questionnaires with Saved Mappings</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {loadingAllMappings ? (
+              <div className="text-center py-4"><Spinner animation="border" /> Loading...</div>
+            ) : allSavedMappings.length === 0 ? (
+              <p className="text-muted text-center py-4">No saved mappings found.</p>
+            ) : (
+              <div className="accordion">
+                {allSavedMappings.map((m: any, idx: number) => {
+                  const isExpanded = expandedMappingIdx === idx;
+                  const mapping: Record<string, string> = m.mapping || {};
+                  const questionLookup: Record<string, string> = m.questionLookup || {};
+                  const identityFields = Object.entries(mapping).filter(([k]) => k.startsWith("id_"));
+                  const questionFields = Object.entries(mapping).filter(([k]) => !k.startsWith("id_"));
+
+                  return (
+                    <div className="accordion-item" key={idx}>
+                      <h2 className="accordion-header">
+                        <button
+                          className={`accordion-button ${!isExpanded ? "collapsed" : ""}`}
+                          type="button"
+                          onClick={() => handleExpandMapping(idx)}
+                          style={{ padding: "0.75rem 1rem" }}
+                        >
+                          <div className="d-flex align-items-center gap-2 w-100">
+                            <strong>{m.questionnaireName || "Unknown Questionnaire"}</strong>
+                            <Badge bg="info" className="ms-auto me-2">{m.mappedFieldsCount} fields mapped</Badge>
+                          </div>
+                        </button>
+                      </h2>
+                      <div className={`accordion-collapse collapse ${isExpanded ? "show" : ""}`}>
+                        <div className="accordion-body p-0">
+                          {Object.keys(mapping).length === 0 ? (
+                            <p className="text-muted text-center py-3 mb-0">No mapping data available.</p>
+                          ) : (
+                            <table className="table table-sm table-bordered mb-0">
+                              <thead>
+                                <tr style={{ backgroundColor: "#212529", color: "#fff" }}>
+                                  <th style={{ width: "50%", backgroundColor: "#212529", color: "#fff" }}>Mapped Field</th>
+                                  <th style={{ width: "50%", backgroundColor: "#212529", color: "#fff" }}>Excel Column</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {identityFields.length > 0 && (
+                                  <tr style={{ backgroundColor: "#e8f4fd" }}>
+                                    <td colSpan={2}><strong style={{ color: "#0d6efd" }}>Student Identity</strong></td>
+                                  </tr>
+                                )}
+                                {identityFields.map(([key, header]) => (
+                                  <tr key={key}>
+                                    <td className="fw-semibold">{key.replace("id_", "").replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase())}</td>
+                                    <td><Badge bg="primary">{header}</Badge></td>
+                                  </tr>
+                                ))}
+                                {questionFields.length > 0 && (
+                                  <tr style={{ backgroundColor: "#e8f4fd" }}>
+                                    <td colSpan={2}><strong style={{ color: "#0d6efd" }}>Questions / Options</strong></td>
+                                  </tr>
+                                )}
+                                {questionFields.map(([key, header]) => (
+                                  <tr key={key}>
+                                    <td style={{ color: "#333" }}>
+                                      <span className="fw-semibold">{questionLookup[key] || key}</span>
+                                    </td>
+                                    <td><Badge bg="success">{header}</Badge></td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => { setShowSavedMappingsModal(false); setExpandedMappingIdx(null); }}>Close</Button>
           </Modal.Footer>
         </Modal>
 
