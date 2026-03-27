@@ -650,6 +650,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
   if (showHowToPlayVideo) {
     return (
       <div
+        className="game-screen"
         style={{
           minHeight: '100vh',
           width: '100%',
@@ -664,6 +665,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
         }}
       >
         <div
+          className="game-video-card"
           style={{
             background: 'linear-gradient(135deg, rgba(30, 58, 95, 0.9), rgba(15, 31, 51, 0.95))',
             borderRadius: '24px',
@@ -756,7 +758,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
   }
 
   return (
-    <div style={{
+    <div className="game-screen" style={{
       minHeight: '100vh',
       width: '100%',
       display: 'flex',
@@ -800,7 +802,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
       )}
 
       {/* Player Info - Top Left */}
-      <div style={{
+      <div className="game-top-left" style={{
         position: 'absolute',
         top: '20px',
         left: '16px',
@@ -822,7 +824,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
       </div>
 
       {/* Status - Top Center */}
-      <div style={{
+      <div className="game-top-center" style={{
         position: 'absolute',
         top: '20px',
         left: '50%',
@@ -851,7 +853,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
       </div>
 
       {/* Controls - Top Right */}
-      <div style={{
+      <div className="game-top-right" style={{
         position: 'absolute',
         top: '20px',
         right: '16px',
@@ -896,7 +898,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
 
       {/* Phase & Timer Info */}
       {(phase === "show" || phase === "input") && (
-        <div style={{
+        <div className="game-phase-bar" style={{
           position: 'absolute',
           bottom: '20px',
           left: '50%',
@@ -936,7 +938,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
         }}
       >
         {/* Game Frame */}
-        <div style={{
+        <div className="game-frame" style={{
           position: 'relative',
           background: 'linear-gradient(135deg, #1e3a5f 0%, #0f1f33 50%, #1a2d47 100%)',
           padding: '12px',
@@ -945,7 +947,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
           border: '4px solid #3b82f6',
         }}>
           {/* Inner Frame */}
-          <div style={{
+          <div className="game-frame-inner" style={{
             background: 'linear-gradient(135deg, #0f1f33, #071520)',
             padding: '6px',
             borderRadius: '14px',
