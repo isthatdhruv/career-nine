@@ -27,7 +27,7 @@ case $choice in
 esac
 
 # Find local MySQL container
-LOCAL_CONTAINERS=$(docker ps --filter ancestor=mysql --format "{{.Names}}" 2>/dev/null)
+LOCAL_CONTAINERS=$(docker ps --format "{{.Names}}\t{{.Image}}" 2>/dev/null | grep -i mysql | awk '{print $1}')
 
 if [ -z "$LOCAL_CONTAINERS" ]; then
   echo "ERROR: No local MySQL containers found running."
