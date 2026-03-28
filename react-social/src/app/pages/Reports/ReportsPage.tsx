@@ -600,7 +600,7 @@ const ReportsPage: React.FC = () => {
                 <button
                   className="btn btn-sm"
                   onClick={async () => {
-                    if (selectedAssessment === "") return;
+                    if (!selectedAssessment) return;
                     setExportingOMR(true);
                     try {
                       const res = await exportGeneralAssessmentExcel(Number(selectedAssessment));
@@ -765,7 +765,7 @@ const ReportsPage: React.FC = () => {
                               )}
                               <button
                                 onClick={async () => {
-                                  if (selectedAssessment === "") return;
+                                  if (!selectedAssessment) return;
                                   setExportingStudentId(s.userStudentId);
                                   try {
                                     const res = await exportGeneralAssessmentExcelForStudent(
