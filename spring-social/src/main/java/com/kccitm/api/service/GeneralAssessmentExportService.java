@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.hibernate.Hibernate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,18 +38,20 @@ public class GeneralAssessmentExportService {
     @Autowired private StudentAssessmentMappingRepository mappingRepository;
     @Autowired private SchoolSectionsRepository schoolSectionsRepository;
 
-    private static final int DEMO_COLS = 5; // Roll Number, Name, Class, School, Section
+    private static final int DEMO_COLS = 5;
 
-    // ── Internal helper: tracks how one questionnaire section maps to Excel columns ──
-
-    private enum SectionType { MULTI_SELECT, SINGLE_ANSWER }
+    // Section types:
+    // MULTI_SELECT  = 1 question with N options, each option is a column, value = "1" if selected
+    // SINGLE_ANSWER = N questions, each question is a column, value = optionText (YES/NO, A/B/C/D)
+    // SELECTION     = N questions, each question is a column, value = "1" if answer exists
+    private enum SectionType { MULTI_SELECT, SINGLE_ANSWER, SELECTION }
 
     private static class SectionMapping {
         final String letter;
         final SectionType type;
-        Long questionnaireQuestionId;                         // only for MULTI_SELECT (the single question's ID)
-        final Map<Long, Integer> optionIdToCol = new LinkedHashMap<>();   // optionId  → colIndex (MULTI_SELECT)
-        final Map<Long, Integer> questionIdToCol = new LinkedHashMap<>(); // qqId      → colIndex (SINGLE_ANSWER)
+        Long questionnaireQuestionId;
+        final Map<Long, Integer> optionIdToCol = new LinkedHashMap<>();
+        final Map<Long, Integer> questionIdToCol = new LinkedHashMap<>();
 
         SectionMapping(String letter, SectionType type) {
             this.letter = letter;
@@ -56,17 +59,13 @@ public class GeneralAssessmentExportService {
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════
-    // PUBLIC API
-    // ══════════════════════════════════════════════════════════════════
-
     /** Export all completed students for an assessment. */
     @Transactional(readOnly = true)
     public byte[] exportToOldFormat(Long assessmentId) throws Exception {
         return exportToOldFormat(assessmentId, null);
     }
 
-    /** Export a single student for an assessment. */
+    /** Export a single student (or all if userStudentId is null). */
     @Transactional(readOnly = true)
     public byte[] exportToOldFormat(Long assessmentId, Long userStudentId) throws Exception {
 
@@ -79,10 +78,15 @@ public class GeneralAssessmentExportService {
             throw new RuntimeException("No questionnaire linked to assessment " + assessmentId);
         }
 
-        // ── 2. Sort sections by orderIndex → A, B, C, D, E, F ──────
-        List<QuestionnaireSection> sortedSections = questionnaire.getSections().stream()
+        // ── 2. Sort sections by orderIndex ──────────────────────────
+        List<QuestionnaireSection> sections = questionnaire.getSections();
+        Hibernate.initialize(sections); // force lazy load
+
+        List<QuestionnaireSection> sortedSections = sections.stream()
                 .sorted(Comparator.comparingInt(s -> parseInt(s.getOrder())))
                 .collect(Collectors.toList());
+
+        logger.info("Assessment {} has {} sections", assessmentId, sortedSections.size());
 
         // ── 3. Build headers + column mappings ──────────────────────
         List<String> headers = new ArrayList<>(Arrays.asList(
@@ -95,32 +99,59 @@ public class GeneralAssessmentExportService {
             QuestionnaireSection qs = sortedSections.get(i);
             String letter = String.valueOf((char) ('A' + i));
 
-            // Force lazy-load questions within this transaction
             Set<QuestionnaireQuestion> questions = qs.getQuestions();
-            if (questions == null || questions.isEmpty()) continue;
+            Hibernate.initialize(questions); // force lazy load
+
+            if (questions == null || questions.isEmpty()) {
+                logger.warn("Section {} ({}) has no questions — skipping", letter, qs.getQuestionnaireSectionId());
+                continue;
+            }
+
+            logger.info("Section {} (id={}): {} questions", letter, qs.getQuestionnaireSectionId(), questions.size());
 
             if (questions.size() == 1) {
-                colOffset = buildMultiSelectMapping(letter, questions.iterator().next(),
-                        headers, sectionMappings, colOffset);
+                // 1 question → check if it has multiple options
+                QuestionnaireQuestion qq = questions.iterator().next();
+                List<AssessmentQuestionOptions> opts = loadOptions(qq);
+
+                if (opts.size() > 1) {
+                    // MULTI_SELECT: 1 question, N options — columns are options
+                    logger.info("  → MULTI_SELECT: {} options", opts.size());
+                    colOffset = buildMultiSelectMapping(letter, qq, opts, headers, sectionMappings, colOffset);
+                } else {
+                    // 1 question with 0-1 options — treat as SELECTION
+                    logger.info("  → SELECTION (single question, {} options)", opts.size());
+                    colOffset = buildSelectionMapping(letter, questions, headers, sectionMappings, colOffset);
+                }
             } else {
-                colOffset = buildSingleAnswerMapping(letter, questions,
-                        headers, sectionMappings, colOffset);
+                // N questions — determine if it's MCQ (A/B/C/D, YES/NO) or selection (1 if picked)
+                // Peek at first question's options to decide
+                QuestionnaireQuestion firstQ = questions.iterator().next();
+                List<AssessmentQuestionOptions> firstOpts = loadOptions(firstQ);
+
+                if (firstOpts.size() >= 2) {
+                    // Multiple options per question → SINGLE_ANSWER (YES/NO or A/B/C/D)
+                    logger.info("  → SINGLE_ANSWER: {} questions, {} opts/q", questions.size(), firstOpts.size());
+                    colOffset = buildSingleAnswerMapping(letter, questions, headers, sectionMappings, colOffset);
+                } else {
+                    // 0-1 options per question → SELECTION (answer exists = "1")
+                    logger.info("  → SELECTION: {} questions", questions.size());
+                    colOffset = buildSelectionMapping(letter, questions, headers, sectionMappings, colOffset);
+                }
             }
         }
 
-        logger.info("Export columns: {} headers for assessment {}", headers.size(), assessmentId);
+        logger.info("Total columns: {} for assessment {}", headers.size(), assessmentId);
 
         // ── 4. Load students ────────────────────────────────────────
         List<StudentAssessmentMapping> targetStudents;
         if (userStudentId != null) {
-            // Single student
             targetStudents = mappingRepository
                     .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
                     .map(Collections::singletonList)
                     .orElseThrow(() -> new RuntimeException(
                             "No mapping found for student " + userStudentId + " assessment " + assessmentId));
         } else {
-            // All completed students
             targetStudents = mappingRepository.findAllByAssessmentId(assessmentId)
                     .stream()
                     .filter(m -> "completed".equalsIgnoreCase(m.getStatus()))
@@ -137,14 +168,17 @@ public class GeneralAssessmentExportService {
         } else {
             allAnswers = answerRepository.findAllByAssessmentIdForExport(assessmentId);
         }
+
+        logger.info("Loaded {} answers for assessment {}", allAnswers.size(), assessmentId);
+
         Map<Long, List<AssessmentAnswer>> answersByStudent = allAnswers.stream()
                 .filter(a -> a.getUserStudent() != null)
                 .collect(Collectors.groupingBy(a -> a.getUserStudent().getUserStudentId()));
 
-        // ── 6. Section name cache (schoolSectionId → name) ──────────
+        // ── 6. Section name cache ───────────────────────────────────
         Map<Integer, String> sectionNameCache = new HashMap<>();
 
-        // ── 7. Build Excel workbook ─────────────────────────────────
+        // ── 7. Build Excel ──────────────────────────────────────────
         XSSFWorkbook workbook = new XSSFWorkbook();
         Sheet sheet = workbook.createSheet("General Assessment Data");
 
@@ -153,7 +187,6 @@ public class GeneralAssessmentExportService {
         headerFont.setBold(true);
         headerStyle.setFont(headerFont);
 
-        // Header row
         Row headerRow = sheet.createRow(0);
         for (int i = 0; i < headers.size(); i++) {
             Cell cell = headerRow.createCell(i);
@@ -161,7 +194,6 @@ public class GeneralAssessmentExportService {
             cell.setCellStyle(headerStyle);
         }
 
-        // Data rows
         int rowIdx = 1;
         for (StudentAssessmentMapping sam : targetStudents) {
             UserStudent us = sam.getUserStudent();
@@ -169,7 +201,6 @@ public class GeneralAssessmentExportService {
 
             Row row = sheet.createRow(rowIdx++);
 
-            // Demographics
             row.createCell(0).setCellValue(si != null ? safe(si.getSchoolRollNumber()) : "");
             row.createCell(1).setCellValue(si != null ? safe(si.getName()) : "");
             row.createCell(2).setCellValue(si != null && si.getStudentClass() != null
@@ -185,14 +216,12 @@ public class GeneralAssessmentExportService {
             }
             row.createCell(4).setCellValue(sectionName);
 
-            // Answer columns
             List<AssessmentAnswer> studentAnswers = answersByStudent.getOrDefault(
                     us.getUserStudentId(), Collections.emptyList());
 
             writeAnswerColumns(row, studentAnswers, sectionMappings);
         }
 
-        // Auto-size demographic columns only
         for (int i = 0; i < DEMO_COLS; i++) {
             sheet.autoSizeColumn(i);
         }
@@ -206,16 +235,24 @@ public class GeneralAssessmentExportService {
     }
 
     // ══════════════════════════════════════════════════════════════════
-    // PRIVATE HELPERS
+    // COLUMN MAPPING BUILDERS
     // ══════════════════════════════════════════════════════════════════
 
-    private int buildMultiSelectMapping(String letter, QuestionnaireQuestion qq,
-            List<String> headers, List<SectionMapping> mappings, int colOffset) {
-
-        // Sort options by optionId ascending (creation order = questionnaire order)
-        List<AssessmentQuestionOptions> options = qq.getQuestion().getOptions().stream()
+    /** Load options for a QuestionnaireQuestion, forcing Hibernate initialization. */
+    private List<AssessmentQuestionOptions> loadOptions(QuestionnaireQuestion qq) {
+        if (qq.getQuestion() == null) return Collections.emptyList();
+        List<AssessmentQuestionOptions> opts = qq.getQuestion().getOptions();
+        if (opts == null) return Collections.emptyList();
+        Hibernate.initialize(opts);
+        return opts.stream()
                 .sorted(Comparator.comparingLong(AssessmentQuestionOptions::getOptionId))
                 .collect(Collectors.toList());
+    }
+
+    /** MULTI_SELECT: 1 question with N options — each option becomes a column. */
+    private int buildMultiSelectMapping(String letter, QuestionnaireQuestion qq,
+            List<AssessmentQuestionOptions> options,
+            List<String> headers, List<SectionMapping> mappings, int colOffset) {
 
         SectionMapping sm = new SectionMapping(letter, SectionType.MULTI_SELECT);
         sm.questionnaireQuestionId = qq.getQuestionnaireQuestionId();
@@ -228,6 +265,7 @@ public class GeneralAssessmentExportService {
         return colOffset;
     }
 
+    /** SINGLE_ANSWER: N questions — each question becomes a column, value = optionText. */
     private int buildSingleAnswerMapping(String letter, Set<QuestionnaireQuestion> questions,
             List<String> headers, List<SectionMapping> mappings, int colOffset) {
 
@@ -244,37 +282,96 @@ public class GeneralAssessmentExportService {
         return colOffset;
     }
 
+    /** SELECTION: N questions — each question becomes a column, value = "1" if answered. */
+    private int buildSelectionMapping(String letter, Set<QuestionnaireQuestion> questions,
+            List<String> headers, List<SectionMapping> mappings, int colOffset) {
+
+        List<QuestionnaireQuestion> sorted = questions.stream()
+                .sorted(Comparator.comparingInt(q -> parseInt(q.getOrder())))
+                .collect(Collectors.toList());
+
+        SectionMapping sm = new SectionMapping(letter, SectionType.SELECTION);
+        for (int j = 0; j < sorted.size(); j++) {
+            headers.add("Sec_" + letter + "_" + (j + 1));
+            sm.questionIdToCol.put(sorted.get(j).getQuestionnaireQuestionId(), colOffset++);
+        }
+        mappings.add(sm);
+        return colOffset;
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // ANSWER WRITING
+    // ══════════════════════════════════════════════════════════════════
+
     private void writeAnswerColumns(Row row, List<AssessmentAnswer> answers,
             List<SectionMapping> sectionMappings) {
 
         for (SectionMapping sm : sectionMappings) {
-            if (sm.type == SectionType.MULTI_SELECT) {
-                // Check which options the student selected for this question
-                for (AssessmentAnswer answer : answers) {
-                    if (answer.getQuestionnaireQuestion() == null || answer.getOption() == null) continue;
-                    if (!answer.getQuestionnaireQuestion().getQuestionnaireQuestionId()
-                            .equals(sm.questionnaireQuestionId)) continue;
+            switch (sm.type) {
+                case MULTI_SELECT:
+                    writeMultiSelect(row, answers, sm);
+                    break;
+                case SINGLE_ANSWER:
+                    writeSingleAnswer(row, answers, sm);
+                    break;
+                case SELECTION:
+                    writeSelection(row, answers, sm);
+                    break;
+            }
+        }
+    }
 
-                    Integer col = sm.optionIdToCol.get(answer.getOption().getOptionId());
-                    if (col != null) {
-                        row.createCell(col).setCellValue("1");
-                    }
-                }
-                // Non-selected options → cell never created → blank
-            } else {
-                // Write the selected option text for each question
-                for (AssessmentAnswer answer : answers) {
-                    if (answer.getQuestionnaireQuestion() == null || answer.getOption() == null) continue;
+    /** MULTI_SELECT: "1" if student selected that option, blank if not. */
+    private void writeMultiSelect(Row row, List<AssessmentAnswer> answers, SectionMapping sm) {
+        for (AssessmentAnswer answer : answers) {
+            if (answer.getQuestionnaireQuestion() == null) continue;
+            if (!answer.getQuestionnaireQuestion().getQuestionnaireQuestionId()
+                    .equals(sm.questionnaireQuestionId)) continue;
 
-                    Long qqId = answer.getQuestionnaireQuestion().getQuestionnaireQuestionId();
-                    Integer col = sm.questionIdToCol.get(qqId);
-                    if (col != null) {
-                        row.createCell(col).setCellValue(safe(answer.getOption().getOptionText()));
-                    }
+            if (answer.getOption() != null) {
+                Integer col = sm.optionIdToCol.get(answer.getOption().getOptionId());
+                if (col != null) {
+                    row.createCell(col).setCellValue("1");
                 }
             }
         }
     }
+
+    /** SINGLE_ANSWER: write optionText (YES/NO, A/B/C/D). */
+    private void writeSingleAnswer(Row row, List<AssessmentAnswer> answers, SectionMapping sm) {
+        for (AssessmentAnswer answer : answers) {
+            if (answer.getQuestionnaireQuestion() == null) continue;
+
+            Long qqId = answer.getQuestionnaireQuestion().getQuestionnaireQuestionId();
+            Integer col = sm.questionIdToCol.get(qqId);
+            if (col != null) {
+                String value = "";
+                if (answer.getOption() != null && answer.getOption().getOptionText() != null) {
+                    value = answer.getOption().getOptionText().trim();
+                } else if (answer.getTextResponse() != null && !answer.getTextResponse().trim().isEmpty()) {
+                    value = answer.getTextResponse().trim();
+                }
+                if (!value.isEmpty()) {
+                    row.createCell(col).setCellValue(value);
+                }
+            }
+        }
+    }
+
+    /** SELECTION: "1" if answer exists for that question, blank if not. */
+    private void writeSelection(Row row, List<AssessmentAnswer> answers, SectionMapping sm) {
+        for (AssessmentAnswer answer : answers) {
+            if (answer.getQuestionnaireQuestion() == null) continue;
+
+            Long qqId = answer.getQuestionnaireQuestion().getQuestionnaireQuestionId();
+            Integer col = sm.questionIdToCol.get(qqId);
+            if (col != null) {
+                row.createCell(col).setCellValue("1");
+            }
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
 
     private static int parseInt(String s) {
         if (s == null || s.trim().isEmpty()) return 0;
