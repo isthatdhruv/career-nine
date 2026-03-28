@@ -601,17 +601,35 @@ const ReportsPage: React.FC = () => {
                   className="btn btn-sm"
                   onClick={async () => {
                     if (!selectedAssessment) return;
+                    const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
+                    const selectedVisible = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
                     setExportingOMR(true);
                     try {
-                      const res = await exportGeneralAssessmentExcel(Number(selectedAssessment));
-                      const url = window.URL.createObjectURL(new Blob([res.data]));
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `general_assessment_${selectedAssessment}.xlsx`;
-                      document.body.appendChild(a);
-                      a.click();
-                      a.remove();
-                      window.URL.revokeObjectURL(url);
+                      if (selectedVisible.length === 1) {
+                        // Single student selected → per-student export
+                        const res = await exportGeneralAssessmentExcelForStudent(
+                          Number(selectedAssessment), selectedVisible[0]
+                        );
+                        const url = window.URL.createObjectURL(new Blob([res.data]));
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `general_assessment_${selectedAssessment}_student_${selectedVisible[0]}.xlsx`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        window.URL.revokeObjectURL(url);
+                      } else {
+                        // No selection or multiple → export all
+                        const res = await exportGeneralAssessmentExcel(Number(selectedAssessment));
+                        const url = window.URL.createObjectURL(new Blob([res.data]));
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `general_assessment_${selectedAssessment}.xlsx`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        window.URL.revokeObjectURL(url);
+                      }
                     } catch (err: any) {
                       alert("Export failed: " + (err?.response?.data?.error || err.message));
                     } finally {
@@ -628,7 +646,16 @@ const ReportsPage: React.FC = () => {
                     boxShadow: exportingOMR ? "none" : "0 4px 12px rgba(13, 148, 136, 0.3)",
                   }}
                 >
-                  {exportingOMR ? "Exporting..." : "Export OMR Data"}
+                  {exportingOMR ? "Exporting..." : (
+                    <>
+                      Export OMR Data
+                      {visibleSelectedCount === 1
+                        ? ` (1 selected)`
+                        : visibleSelectedCount > 1
+                        ? ` (${visibleSelectedCount} selected)`
+                        : ` (All)`}
+                    </>
+                  )}
                 </button>
               </div>
 
