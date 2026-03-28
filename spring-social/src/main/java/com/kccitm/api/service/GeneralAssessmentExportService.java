@@ -337,25 +337,53 @@ public class GeneralAssessmentExportService {
         }
     }
 
-    /** SINGLE_ANSWER: write optionText (YES/NO, A/B/C/D). */
+    /** SINGLE_ANSWER: write option label (A/B/C/D or YES/NO). */
     private void writeSingleAnswer(Row row, List<AssessmentAnswer> answers, SectionMapping sm) {
         for (AssessmentAnswer answer : answers) {
-            if (answer.getQuestionnaireQuestion() == null) continue;
+            if (answer.getQuestionnaireQuestion() == null || answer.getOption() == null) continue;
 
             Long qqId = answer.getQuestionnaireQuestion().getQuestionnaireQuestionId();
             Integer col = sm.questionIdToCol.get(qqId);
             if (col != null) {
-                String value = "";
-                if (answer.getOption() != null && answer.getOption().getOptionText() != null) {
-                    value = answer.getOption().getOptionText().trim();
-                } else if (answer.getTextResponse() != null && !answer.getTextResponse().trim().isEmpty()) {
-                    value = answer.getTextResponse().trim();
-                }
-                if (!value.isEmpty()) {
-                    row.createCell(col).setCellValue(value);
+                String optionText = safe(answer.getOption().getOptionText()).trim();
+
+                // If optionText is already a short label (A/B/C/D/YES/NO), use it directly
+                if (optionText.matches("(?i)^[A-D]$") || optionText.matches("(?i)^(YES|NO|Y|N)$")) {
+                    row.createCell(col).setCellValue(optionText.toUpperCase());
+                } else {
+                    // Derive letter from option position within the question's options
+                    String label = getOptionLabel(answer);
+                    row.createCell(col).setCellValue(label);
                 }
             }
         }
+    }
+
+    /** Determine the option label (A/B/C/D or YES/NO) from the option's position. */
+    private String getOptionLabel(AssessmentAnswer answer) {
+        if (answer.getOption() == null || answer.getQuestionnaireQuestion() == null) return "";
+
+        // Try to get all options for this question to find position
+        if (answer.getQuestionnaireQuestion().getQuestion() != null) {
+            List<AssessmentQuestionOptions> allOptions = loadOptions(answer.getQuestionnaireQuestion());
+            if (!allOptions.isEmpty()) {
+                Long selectedId = answer.getOption().getOptionId();
+                for (int i = 0; i < allOptions.size(); i++) {
+                    if (allOptions.get(i).getOptionId().equals(selectedId)) {
+                        if (allOptions.size() == 2) {
+                            // 2 options → YES/NO
+                            return i == 0 ? "YES" : "NO";
+                        } else {
+                            // N options → A, B, C, D...
+                            return String.valueOf((char) ('A' + i));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback: use optionText as-is
+        return safe(answer.getOption().getOptionText()).trim();
     }
 
     /** SELECTION: "1" if answer exists for that question, blank if not. */
