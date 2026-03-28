@@ -174,4 +174,29 @@ public class GeneralAssessmentController {
                     .body(Map.of("error", "Export failed: " + e.getMessage()));
         }
     }
+
+    /**
+     * Export a single student's answers in the old OMR format.
+     */
+    @GetMapping("/export-excel/{assessmentId}/student/{userStudentId}")
+    public ResponseEntity<?> exportExcelForStudent(
+            @PathVariable Long assessmentId,
+            @PathVariable Long userStudentId) {
+        try {
+            byte[] excelBytes = exportService.exportToOldFormat(assessmentId, userStudentId);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType(
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+            headers.setContentDispositionFormData("attachment",
+                    "general_assessment_" + assessmentId + "_student_" + userStudentId + ".xlsx");
+            headers.setContentLength(excelBytes.length);
+
+            return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
+        } catch (Exception e) {
+            logger.error("Export failed for student {} assessment {}: {}", userStudentId, assessmentId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Export failed: " + e.getMessage()));
+        }
+    }
 }

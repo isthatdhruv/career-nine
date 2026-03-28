@@ -60,8 +60,15 @@ public class GeneralAssessmentExportService {
     // PUBLIC API
     // ══════════════════════════════════════════════════════════════════
 
+    /** Export all completed students for an assessment. */
     @Transactional(readOnly = true)
     public byte[] exportToOldFormat(Long assessmentId) throws Exception {
+        return exportToOldFormat(assessmentId, null);
+    }
+
+    /** Export a single student for an assessment. */
+    @Transactional(readOnly = true)
+    public byte[] exportToOldFormat(Long assessmentId, Long userStudentId) throws Exception {
 
         // ── 1. Load assessment → questionnaire ──────────────────────
         AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
@@ -93,11 +100,9 @@ public class GeneralAssessmentExportService {
             if (questions == null || questions.isEmpty()) continue;
 
             if (questions.size() == 1) {
-                // ─── MULTI_SELECT: 1 question, N options ───
                 colOffset = buildMultiSelectMapping(letter, questions.iterator().next(),
                         headers, sectionMappings, colOffset);
             } else {
-                // ─── SINGLE_ANSWER: N questions, 1 answer each ───
                 colOffset = buildSingleAnswerMapping(letter, questions,
                         headers, sectionMappings, colOffset);
             }
@@ -105,19 +110,35 @@ public class GeneralAssessmentExportService {
 
         logger.info("Export columns: {} headers for assessment {}", headers.size(), assessmentId);
 
-        // ── 4. Load completed students ──────────────────────────────
-        List<StudentAssessmentMapping> completed = mappingRepository.findAllByAssessmentId(assessmentId)
-                .stream()
-                .filter(m -> "completed".equalsIgnoreCase(m.getStatus()))
-                .collect(Collectors.toList());
-
-        if (completed.isEmpty()) {
-            throw new RuntimeException("No completed students found for assessment " + assessmentId);
+        // ── 4. Load students ────────────────────────────────────────
+        List<StudentAssessmentMapping> targetStudents;
+        if (userStudentId != null) {
+            // Single student
+            targetStudents = mappingRepository
+                    .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                    .map(Collections::singletonList)
+                    .orElseThrow(() -> new RuntimeException(
+                            "No mapping found for student " + userStudentId + " assessment " + assessmentId));
+        } else {
+            // All completed students
+            targetStudents = mappingRepository.findAllByAssessmentId(assessmentId)
+                    .stream()
+                    .filter(m -> "completed".equalsIgnoreCase(m.getStatus()))
+                    .collect(Collectors.toList());
+            if (targetStudents.isEmpty()) {
+                throw new RuntimeException("No completed students found for assessment " + assessmentId);
+            }
         }
 
-        // ── 5. Bulk-load all answers, group by student ──────────────
-        List<AssessmentAnswer> allAnswers = answerRepository.findAllByAssessmentIdForExport(assessmentId);
+        // ── 5. Load answers, group by student ───────────────────────
+        List<AssessmentAnswer> allAnswers;
+        if (userStudentId != null) {
+            allAnswers = answerRepository.findByAssessmentIdAndStudentIdForExport(assessmentId, userStudentId);
+        } else {
+            allAnswers = answerRepository.findAllByAssessmentIdForExport(assessmentId);
+        }
         Map<Long, List<AssessmentAnswer>> answersByStudent = allAnswers.stream()
+                .filter(a -> a.getUserStudent() != null)
                 .collect(Collectors.groupingBy(a -> a.getUserStudent().getUserStudentId()));
 
         // ── 6. Section name cache (schoolSectionId → name) ──────────
@@ -140,11 +161,11 @@ public class GeneralAssessmentExportService {
             cell.setCellStyle(headerStyle);
         }
 
-        // Data rows — one per completed student
+        // Data rows
         int rowIdx = 1;
-        for (StudentAssessmentMapping sam : completed) {
+        for (StudentAssessmentMapping sam : targetStudents) {
             UserStudent us = sam.getUserStudent();
-            StudentInfo si = us.getStudentInfo(); // lazy — OK inside @Transactional
+            StudentInfo si = us.getStudentInfo();
 
             Row row = sheet.createRow(rowIdx++);
 
@@ -171,7 +192,7 @@ public class GeneralAssessmentExportService {
             writeAnswerColumns(row, studentAnswers, sectionMappings);
         }
 
-        // Auto-size demographic columns only (section cols are narrow single-char)
+        // Auto-size demographic columns only
         for (int i = 0; i < DEMO_COLS; i++) {
             sheet.autoSizeColumn(i);
         }
@@ -180,7 +201,7 @@ public class GeneralAssessmentExportService {
         workbook.write(out);
         workbook.close();
 
-        logger.info("Exported {} students for assessment {}", completed.size(), assessmentId);
+        logger.info("Exported {} students for assessment {}", targetStudents.size(), assessmentId);
         return out.toByteArray();
     }
 

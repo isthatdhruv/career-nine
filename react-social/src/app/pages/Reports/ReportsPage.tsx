@@ -9,6 +9,8 @@ import {
   getBetReportDataByAssessment,
   generateHtmlReports,
   BetReportData,
+  exportGeneralAssessmentExcel,
+  exportGeneralAssessmentExcelForStudent,
 } from "../ReportGeneration/API/BetReportData_APIs";
 
 type StudentRow = {
@@ -66,6 +68,8 @@ const ReportsPage: React.FC = () => {
 
   // ── Generate ──
   const [generating, setGenerating] = useState(false);
+  const [exportingOMR, setExportingOMR] = useState(false);
+  const [exportingStudentId, setExportingStudentId] = useState<number | null>(null);
 
   // ═══════════════════════ DATA LOADING ═══════════════════════
 
@@ -593,6 +597,39 @@ const ReportsPage: React.FC = () => {
                     </>
                   )}
                 </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={async () => {
+                    if (selectedAssessment === "") return;
+                    setExportingOMR(true);
+                    try {
+                      const res = await exportGeneralAssessmentExcel(Number(selectedAssessment));
+                      const url = window.URL.createObjectURL(new Blob([res.data]));
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `general_assessment_${selectedAssessment}.xlsx`;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      window.URL.revokeObjectURL(url);
+                    } catch (err: any) {
+                      alert("Export failed: " + (err?.response?.data?.error || err.message));
+                    } finally {
+                      setExportingOMR(false);
+                    }
+                  }}
+                  disabled={exportingOMR}
+                  style={{
+                    background: exportingOMR
+                      ? "#6c757d"
+                      : "linear-gradient(135deg, #0d9488 0%, #065f46 100%)",
+                    border: "none", borderRadius: 8, padding: "8px 20px",
+                    fontWeight: 600, color: "white", fontSize: "0.85rem",
+                    boxShadow: exportingOMR ? "none" : "0 4px 12px rgba(13, 148, 136, 0.3)",
+                  }}
+                >
+                  {exportingOMR ? "Exporting..." : "Export OMR Data"}
+                </button>
               </div>
 
               {/* Table */}
@@ -684,49 +721,80 @@ const ReportsPage: React.FC = () => {
                             </span>
                           </td>
                           <td style={tdStyle}>
-                            {reportUrl ? (
-                              <div style={{ display: "flex", gap: 6 }}>
-                                <a
-                                  href={reportUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{
-                                    padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem",
-                                    fontWeight: 600, background: "#dbeafe", color: "#2563eb",
-                                    textDecoration: "none",
-                                  }}
-                                >
-                                  Preview
-                                </a>
-                                <button
-                                  onClick={async () => {
-                                    try {
-                                      const res = await fetch(reportUrl);
-                                      const blob = await res.blob();
-                                      const url = window.URL.createObjectURL(blob);
-                                      const a = document.createElement("a");
-                                      a.href = url;
-                                      a.download = `${s.name || "report"}_bet_report.html`;
-                                      document.body.appendChild(a);
-                                      a.click();
-                                      document.body.removeChild(a);
-                                      window.URL.revokeObjectURL(url);
-                                    } catch (e) {
-                                      console.error("Download failed", e);
-                                    }
-                                  }}
-                                  style={{
-                                    padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem",
-                                    fontWeight: 600, background: "#f0fdf4", color: "#059669",
-                                    border: "none", cursor: "pointer",
-                                  }}
-                                >
-                                  Download
-                                </button>
-                              </div>
-                            ) : (
-                              <span style={{ color: "#9ca3af", fontSize: "0.75rem" }}>-</span>
-                            )}
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              {reportUrl && (
+                                <>
+                                  <a
+                                    href={reportUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                      padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem",
+                                      fontWeight: 600, background: "#dbeafe", color: "#2563eb",
+                                      textDecoration: "none",
+                                    }}
+                                  >
+                                    Preview
+                                  </a>
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        const res = await fetch(reportUrl);
+                                        const blob = await res.blob();
+                                        const url = window.URL.createObjectURL(blob);
+                                        const a = document.createElement("a");
+                                        a.href = url;
+                                        a.download = `${s.name || "report"}_bet_report.html`;
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        document.body.removeChild(a);
+                                        window.URL.revokeObjectURL(url);
+                                      } catch (e) {
+                                        console.error("Download failed", e);
+                                      }
+                                    }}
+                                    style={{
+                                      padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem",
+                                      fontWeight: 600, background: "#f0fdf4", color: "#059669",
+                                      border: "none", cursor: "pointer",
+                                    }}
+                                  >
+                                    Download
+                                  </button>
+                                </>
+                              )}
+                              <button
+                                onClick={async () => {
+                                  if (selectedAssessment === "") return;
+                                  setExportingStudentId(s.userStudentId);
+                                  try {
+                                    const res = await exportGeneralAssessmentExcelForStudent(
+                                      Number(selectedAssessment), s.userStudentId
+                                    );
+                                    const url = window.URL.createObjectURL(new Blob([res.data]));
+                                    const a = document.createElement("a");
+                                    a.href = url;
+                                    a.download = `${(s.name || "student").replace(/\s+/g, "_")}_OMR_${s.userStudentId}.xlsx`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    a.remove();
+                                    window.URL.revokeObjectURL(url);
+                                  } catch (err: any) {
+                                    alert("Export failed: " + (err?.response?.data?.error || err.message));
+                                  } finally {
+                                    setExportingStudentId(null);
+                                  }
+                                }}
+                                disabled={exportingStudentId === s.userStudentId}
+                                style={{
+                                  padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem",
+                                  fontWeight: 600, background: "#f0fdfa", color: "#0d9488",
+                                  border: "none", cursor: "pointer",
+                                }}
+                              >
+                                {exportingStudentId === s.userStudentId ? "..." : "OMR"}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );

@@ -43,12 +43,22 @@ public interface AssessmentAnswerRepository extends JpaRepository<AssessmentAnsw
        List<AssessmentAnswer> findByUserStudent_UserStudentIdAndAssessment_Id(Long userStudentId, Long assessmentId);
 
        @Query("SELECT aa FROM AssessmentAnswer aa " +
-              "JOIN FETCH aa.option " +
-              "JOIN FETCH aa.questionnaireQuestion " +
-              "JOIN FETCH aa.userStudent " +
+              "LEFT JOIN FETCH aa.option " +
+              "LEFT JOIN FETCH aa.questionnaireQuestion " +
+              "LEFT JOIN FETCH aa.userStudent " +
               "WHERE aa.assessment.id = :assessmentId")
        List<AssessmentAnswer> findAllByAssessmentIdForExport(
               @Param("assessmentId") Long assessmentId);
+
+       @Query("SELECT aa FROM AssessmentAnswer aa " +
+              "LEFT JOIN FETCH aa.option " +
+              "LEFT JOIN FETCH aa.questionnaireQuestion " +
+              "LEFT JOIN FETCH aa.userStudent " +
+              "WHERE aa.assessment.id = :assessmentId " +
+              "AND aa.userStudent.userStudentId = :userStudentId")
+       List<AssessmentAnswer> findByAssessmentIdAndStudentIdForExport(
+              @Param("assessmentId") Long assessmentId,
+              @Param("userStudentId") Long userStudentId);
 
        // Find a previously mapped text response for the same question (for auto-mapping)
        Optional<AssessmentAnswer> findFirstByQuestionnaireQuestion_QuestionnaireQuestionIdAndTextResponseAndMappedOptionIsNotNull(
