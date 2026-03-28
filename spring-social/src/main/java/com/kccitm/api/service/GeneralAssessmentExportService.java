@@ -88,14 +88,10 @@ public class GeneralAssessmentExportService {
         }
 
         // ── 3. Load ALL answers for the assessment ──────────────────
-        //    This is the single source of truth — no questionnaire navigation needed
-        List<AssessmentAnswer> allAnswers;
-        if (userStudentId != null) {
-            allAnswers = answerRepository.findByAssessmentIdAndStudentIdForExport(assessmentId, userStudentId);
-        } else {
-            allAnswers = answerRepository.findAllByAssessmentIdForExport(assessmentId);
-        }
-        logger.info("Loaded {} answers for assessment {}", allAnswers.size(), assessmentId);
+        //    Always load ALL answers to detect section types correctly
+        //    (single-student answers alone can't distinguish SINGLE_ANSWER from SELECTION)
+        List<AssessmentAnswer> allAnswers = answerRepository.findAllByAssessmentIdForExport(assessmentId);
+        logger.info("Loaded {} total answers for assessment {}", allAnswers.size(), assessmentId);
 
         // ── 4. Discover section structure FROM the answers ──────────
         //    Group answers by QuestionnaireSection (via answer → qq → section)
