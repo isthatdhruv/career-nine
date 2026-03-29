@@ -297,6 +297,40 @@ public class GeneralAssessmentExportService {
         }
 
         // ── DIAGNOSTICS SHEET ────────────────────────────────────
+        // Log per-student per-section answer counts for first 3 students
+        int diagStudentCount = 0;
+        for (StudentAssessmentMapping sam : targetStudents) {
+            if (diagStudentCount++ >= 3) break;
+            Long sid = sam.getUserStudent().getUserStudentId();
+            List<AssessmentAnswer> sa = answersByStudent.getOrDefault(sid, Collections.emptyList());
+            logger.info("Student {} has {} total answers", sid, sa.size());
+            // Count per section
+            Map<Long, Integer> secCounts = new LinkedHashMap<>();
+            Map<Long, Integer> secWithOption = new LinkedHashMap<>();
+            Map<Long, Integer> secMatchQQ = new LinkedHashMap<>();
+            for (AssessmentAnswer a : sa) {
+                if (a.getQuestionnaireQuestion() == null || a.getQuestionnaireQuestion().getSection() == null) continue;
+                Long secId = a.getQuestionnaireQuestion().getSection().getQuestionnaireSectionId();
+                secCounts.merge(secId, 1, Integer::sum);
+                if (a.getOption() != null) secWithOption.merge(secId, 1, Integer::sum);
+                // check if matches any MULTI_SELECT mapping
+                for (SectionMapping smx : sectionMappings) {
+                    if (smx.type == SectionType.MULTI_SELECT && smx.singleQuestionQQId != null
+                            && smx.singleQuestionQQId.equals(a.getQuestionnaireQuestion().getQuestionnaireQuestionId())) {
+                        secMatchQQ.merge(secId, 1, Integer::sum);
+                    }
+                }
+            }
+            for (int si2 = 0; si2 < sortedSections.size(); si2++) {
+                Long secId = sortedSections.get(si2).getQuestionnaireSectionId();
+                logger.info("  Section {} (id={}): {} answers, {} with option, {} match MULTI_SELECT qqId",
+                        (char) ('A' + si2), secId,
+                        secCounts.getOrDefault(secId, 0),
+                        secWithOption.getOrDefault(secId, 0),
+                        secMatchQQ.getOrDefault(secId, 0));
+            }
+        }
+
         Sheet diagSheet = workbook.createSheet("Diagnostics");
         int dr = 0;
 
