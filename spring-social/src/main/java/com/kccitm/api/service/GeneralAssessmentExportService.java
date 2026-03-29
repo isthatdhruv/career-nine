@@ -38,19 +38,15 @@ public class GeneralAssessmentExportService {
 
     private static final int DEMO_COLS = 5;
 
-    // A section is either:
-    //   MULTI_SELECT  — 1 question, N options → columns = options, value = "1"/blank
-    //   SINGLE_ANSWER — N questions, each has 2+ options → value = YES/NO or A/B/C/D
-    //   SELECTION     — N questions, 0-1 options each → value = "1"/blank
     private enum SectionType { MULTI_SELECT, SINGLE_ANSWER, SELECTION }
 
     private static class SectionMapping {
         final String letter;
         final SectionType type;
-        Long singleQuestionQQId;                              // for MULTI_SELECT
-        final Map<Long, Integer> optionIdToCol = new LinkedHashMap<>();   // MULTI_SELECT: optionId → col
-        final Map<Long, Integer> questionIdToCol = new LinkedHashMap<>(); // SINGLE_ANSWER/SELECTION: qqId → col
-        final Map<Long, List<Long>> questionOptionOrder = new LinkedHashMap<>(); // qqId → sorted optionIds (for label derivation)
+        Long singleQuestionQQId;
+        final Map<Long, Integer> optionIdToCol = new LinkedHashMap<>();
+        final Map<Long, Integer> questionIdToCol = new LinkedHashMap<>();
+        final Map<Long, List<Long>> questionOptionOrder = new LinkedHashMap<>();
 
         SectionMapping(String letter, SectionType type) {
             this.letter = letter;
@@ -66,11 +62,11 @@ public class GeneralAssessmentExportService {
     @Transactional(readOnly = true)
     public byte[] exportToOldFormat(Long assessmentId, Long userStudentId) throws Exception {
 
-        // ── 1. Validate assessment exists ───────────────────────────
+        // ── 1. Validate assessment ──────────────────────────────────
         assessmentTableRepository.findById(assessmentId)
                 .orElseThrow(() -> new RuntimeException("Assessment not found: " + assessmentId));
 
-        // ── 2. Load students ────────────────────────────────────────
+        // ── 2. Load target students ─────────────────────────────────
         List<StudentAssessmentMapping> targetStudents;
         if (userStudentId != null) {
             targetStudents = mappingRepository
@@ -87,17 +83,14 @@ public class GeneralAssessmentExportService {
             }
         }
 
-        // ── 3. Load ALL answers for the assessment ──────────────────
-        //    Always load ALL answers to detect section types correctly
-        //    (single-student answers alone can't distinguish SINGLE_ANSWER from SELECTION)
+        // ── 3. Load ALL answers (needed for section type detection) ─
         List<AssessmentAnswer> allAnswers = answerRepository.findAllByAssessmentIdForExport(assessmentId);
-        logger.info("Loaded {} total answers for assessment {}", allAnswers.size(), assessmentId);
+        logger.info("Loaded {} answers for assessment {}", allAnswers.size(), assessmentId);
 
-        // ── 4. Discover section structure FROM the answers ──────────
-        //    Group answers by QuestionnaireSection (via answer → qq → section)
+        // ── 4. Discover sections from answers ───────────────────────
         Map<Long, QuestionnaireSection> sectionById = new LinkedHashMap<>();
-        Map<Long, Set<Long>> sectionUniqueQQIds = new LinkedHashMap<>();        // sectionId → unique qqIds
-        Map<Long, Map<Long, Set<Long>>> sectionQQOptions = new LinkedHashMap<>(); // sectionId → qqId → optionIds
+        Map<Long, Set<Long>> sectionUniqueQQIds = new LinkedHashMap<>();
+        Map<Long, Map<Long, Set<Long>>> sectionQQOptions = new LinkedHashMap<>();
 
         for (AssessmentAnswer a : allAnswers) {
             if (a.getQuestionnaireQuestion() == null) continue;
@@ -107,7 +100,6 @@ public class GeneralAssessmentExportService {
 
             Long secId = sec.getQuestionnaireSectionId();
             sectionById.putIfAbsent(secId, sec);
-
             sectionUniqueQQIds.computeIfAbsent(secId, k -> new TreeSet<>())
                     .add(qq.getQuestionnaireQuestionId());
 
@@ -119,50 +111,11 @@ public class GeneralAssessmentExportService {
             }
         }
 
-        // Sort sections by orderIndex → A, B, C, D, E, F
         List<QuestionnaireSection> sortedSections = sectionById.values().stream()
                 .sorted(Comparator.comparingInt(s -> parseInt(s.getOrder())))
                 .collect(Collectors.toList());
 
-        logger.info("Discovered {} sections from answers", sortedSections.size());
-
-        // ── DIAGNOSTIC: dump first few answers to understand data shape ──
-        int diagCount = 0;
-        for (AssessmentAnswer a : allAnswers) {
-            if (diagCount++ >= 20) break;
-            String secName = "null";
-            String secOrder = "?";
-            Long secId2 = null;
-            if (a.getQuestionnaireQuestion() != null && a.getQuestionnaireQuestion().getSection() != null) {
-                QuestionnaireSection s = a.getQuestionnaireQuestion().getSection();
-                secId2 = s.getQuestionnaireSectionId();
-                secOrder = s.getOrder();
-                if (s.getSection() != null) {
-                    secName = s.getSection().getSectionName();
-                }
-            }
-            logger.info("DIAG answer: secId={} secOrder={} secName='{}' qqId={} optionId={} optionText='{}'",
-                    secId2,
-                    secOrder,
-                    secName,
-                    a.getQuestionnaireQuestion() != null ? a.getQuestionnaireQuestion().getQuestionnaireQuestionId() : null,
-                    a.getOption() != null ? a.getOption().getOptionId() : "NULL",
-                    a.getOption() != null ? a.getOption().getOptionText() : "NULL");
-        }
-
-        // Log section structure summary
-        for (int si = 0; si < sortedSections.size(); si++) {
-            QuestionnaireSection sec = sortedSections.get(si);
-            Long sid = sec.getQuestionnaireSectionId();
-            Set<Long> uqq = sectionUniqueQQIds.getOrDefault(sid, Collections.emptySet());
-            Map<Long, Set<Long>> qopts = sectionQQOptions.getOrDefault(sid, Collections.emptyMap());
-            int maxO = qopts.values().stream().mapToInt(Set::size).max().orElse(0);
-            logger.info("Section {} (id={} order={}): {} unique questions, maxOptions={}, total option entries={}",
-                    (char)('A' + si), sid, sec.getOrder(), uqq.size(), maxO,
-                    qopts.values().stream().mapToInt(Set::size).sum());
-        }
-
-        // ── 5. Build column headers + mappings ──────────────────────
+        // ── 5. Build headers + column mappings ──────────────────────
         List<String> headers = new ArrayList<>(Arrays.asList(
                 "Roll Number", "Name", "Class", "School", "Section"));
 
@@ -178,14 +131,11 @@ public class GeneralAssessmentExportService {
             Map<Long, Set<Long>> qqOptions = sectionQQOptions.getOrDefault(secId, Collections.emptyMap());
 
             if (uniqueQQIds.size() == 1) {
-                // 1 question in this section → MULTI_SELECT (options = columns)
+                // MULTI_SELECT: 1 question, N options → "1"/blank
                 Long theQQId = uniqueQQIds.iterator().next();
-                Set<Long> optionIds = qqOptions.getOrDefault(theQQId, Collections.emptySet());
-                List<Long> sortedOptionIds = new ArrayList<>(optionIds);
+                List<Long> sortedOptionIds = new ArrayList<>(
+                        qqOptions.getOrDefault(theQQId, Collections.emptySet()));
                 Collections.sort(sortedOptionIds);
-
-                logger.info("Section {} (id={}): MULTI_SELECT, 1 question, {} options from answers",
-                        letter, secId, sortedOptionIds.size());
 
                 SectionMapping sm = new SectionMapping(letter, SectionType.MULTI_SELECT);
                 sm.singleQuestionQQId = theQQId;
@@ -194,19 +144,11 @@ public class GeneralAssessmentExportService {
                     sm.optionIdToCol.put(sortedOptionIds.get(j), colOffset++);
                 }
                 sectionMappings.add(sm);
-
             } else {
-                // N questions → determine type by how many options each question has
-                // Check max options across questions
-                int maxOptions = 0;
-                for (Set<Long> opts : qqOptions.values()) {
-                    maxOptions = Math.max(maxOptions, opts.size());
-                }
+                int maxOptions = qqOptions.values().stream().mapToInt(Set::size).max().orElse(0);
 
-                // Sort questions by their orderIndex
                 List<Long> sortedQQIds = uniqueQQIds.stream()
                         .sorted((a2, b) -> {
-                            // Find the QQ objects to get orderIndex
                             QuestionnaireQuestion qqA = findQQ(allAnswers, a2);
                             QuestionnaireQuestion qqB = findQQ(allAnswers, b);
                             return Integer.compare(
@@ -215,32 +157,19 @@ public class GeneralAssessmentExportService {
                         })
                         .collect(Collectors.toList());
 
-                SectionType type;
-                if (maxOptions >= 2) {
-                    type = SectionType.SINGLE_ANSWER;
-                    logger.info("Section {} (id={}): SINGLE_ANSWER, {} questions, max {} opts",
-                            letter, secId, sortedQQIds.size(), maxOptions);
-                } else {
-                    type = SectionType.SELECTION;
-                    logger.info("Section {} (id={}): SELECTION, {} questions",
-                            letter, secId, sortedQQIds.size());
-                }
+                SectionType type = maxOptions >= 2 ? SectionType.SINGLE_ANSWER : SectionType.SELECTION;
 
                 SectionMapping sm = new SectionMapping(letter, type);
                 for (int j = 0; j < sortedQQIds.size(); j++) {
                     Long qqId = sortedQQIds.get(j);
                     headers.add("Sec_" + letter + "_" + (j + 1));
                     sm.questionIdToCol.put(qqId, colOffset++);
-
-                    // Store option order per question (for deriving A/B/C/D labels)
                     Set<Long> opts = qqOptions.getOrDefault(qqId, Collections.emptySet());
                     sm.questionOptionOrder.put(qqId, new ArrayList<>(new TreeSet<>(opts)));
                 }
                 sectionMappings.add(sm);
             }
         }
-
-        logger.info("Total columns: {}", headers.size());
 
         // ── 6. Group answers by student ─────────────────────────────
         Map<Long, List<AssessmentAnswer>> answersByStudent = allAnswers.stream()
@@ -249,7 +178,6 @@ public class GeneralAssessmentExportService {
 
         // ── 7. Build Excel ──────────────────────────────────────────
         Map<Integer, String> sectionNameCache = new HashMap<>();
-
         XSSFWorkbook workbook = new XSSFWorkbook();
         Sheet sheet = workbook.createSheet("General Assessment Data");
 
@@ -288,130 +216,12 @@ public class GeneralAssessmentExportService {
 
             List<AssessmentAnswer> studentAnswers = answersByStudent.getOrDefault(
                     us.getUserStudentId(), Collections.emptyList());
-
             writeAnswerColumns(row, studentAnswers, sectionMappings);
         }
 
         for (int i = 0; i < DEMO_COLS; i++) {
             sheet.autoSizeColumn(i);
         }
-
-        // ── DIAGNOSTICS SHEET ────────────────────────────────────
-        // Log per-student per-section answer counts for first 3 students
-        int diagStudentCount = 0;
-        for (StudentAssessmentMapping sam : targetStudents) {
-            if (diagStudentCount++ >= 3) break;
-            Long sid = sam.getUserStudent().getUserStudentId();
-            List<AssessmentAnswer> sa = answersByStudent.getOrDefault(sid, Collections.emptyList());
-            logger.info("Student {} has {} total answers", sid, sa.size());
-            // Count per section
-            Map<Long, Integer> secCounts = new LinkedHashMap<>();
-            Map<Long, Integer> secWithOption = new LinkedHashMap<>();
-            Map<Long, Integer> secMatchQQ = new LinkedHashMap<>();
-            for (AssessmentAnswer a : sa) {
-                if (a.getQuestionnaireQuestion() == null || a.getQuestionnaireQuestion().getSection() == null) continue;
-                Long secId = a.getQuestionnaireQuestion().getSection().getQuestionnaireSectionId();
-                secCounts.merge(secId, 1, Integer::sum);
-                if (a.getOption() != null) secWithOption.merge(secId, 1, Integer::sum);
-                // check if matches any MULTI_SELECT mapping
-                for (SectionMapping smx : sectionMappings) {
-                    if (smx.type == SectionType.MULTI_SELECT && smx.singleQuestionQQId != null
-                            && smx.singleQuestionQQId.equals(a.getQuestionnaireQuestion().getQuestionnaireQuestionId())) {
-                        secMatchQQ.merge(secId, 1, Integer::sum);
-                    }
-                }
-            }
-            for (int si2 = 0; si2 < sortedSections.size(); si2++) {
-                Long secId = sortedSections.get(si2).getQuestionnaireSectionId();
-                logger.info("  Section {} (id={}): {} answers, {} with option, {} match MULTI_SELECT qqId",
-                        (char) ('A' + si2), secId,
-                        secCounts.getOrDefault(secId, 0),
-                        secWithOption.getOrDefault(secId, 0),
-                        secMatchQQ.getOrDefault(secId, 0));
-            }
-        }
-
-        Sheet diagSheet = workbook.createSheet("Diagnostics");
-        int dr = 0;
-
-        // Section structure
-        Row dh = diagSheet.createRow(dr++);
-        dh.createCell(0).setCellValue("Section");
-        dh.createCell(1).setCellValue("SectionId");
-        dh.createCell(2).setCellValue("Order");
-        dh.createCell(3).setCellValue("Type");
-        dh.createCell(4).setCellValue("UniqueQuestions");
-        dh.createCell(5).setCellValue("MaxOptionsPerQ");
-        dh.createCell(6).setCellValue("Columns");
-        dh.createCell(7).setCellValue("SampleQQId");
-        dh.createCell(8).setCellValue("SampleOptionIds");
-
-        for (int si = 0; si < sortedSections.size(); si++) {
-            QuestionnaireSection sec = sortedSections.get(si);
-            Long sid = sec.getQuestionnaireSectionId();
-            Set<Long> uqq = sectionUniqueQQIds.getOrDefault(sid, Collections.emptySet());
-            Map<Long, Set<Long>> qopts = sectionQQOptions.getOrDefault(sid, Collections.emptyMap());
-            int maxO = qopts.values().stream().mapToInt(Set::size).max().orElse(0);
-            SectionMapping sm = si < sectionMappings.size() ? sectionMappings.get(si) : null;
-
-            Row row2 = diagSheet.createRow(dr++);
-            row2.createCell(0).setCellValue(String.valueOf((char) ('A' + si)));
-            row2.createCell(1).setCellValue(sid);
-            row2.createCell(2).setCellValue(safe(sec.getOrder()));
-            row2.createCell(3).setCellValue(sm != null ? sm.type.name() : "UNKNOWN");
-            row2.createCell(4).setCellValue(uqq.size());
-            row2.createCell(5).setCellValue(maxO);
-            row2.createCell(6).setCellValue(sm != null
-                    ? (sm.type == SectionType.MULTI_SELECT ? sm.optionIdToCol.size() : sm.questionIdToCol.size()) : 0);
-            // sample qqId
-            row2.createCell(7).setCellValue(uqq.isEmpty() ? "" : uqq.iterator().next().toString());
-            // sample optionIds
-            if (!qopts.isEmpty()) {
-                Set<Long> firstOpts = qopts.values().iterator().next();
-                row2.createCell(8).setCellValue(firstOpts.toString());
-            }
-        }
-
-        // Blank row
-        dr++;
-
-        // Sample answers (first 30)
-        Row ah = diagSheet.createRow(dr++);
-        ah.createCell(0).setCellValue("AnswerIdx");
-        ah.createCell(1).setCellValue("StudentId");
-        ah.createCell(2).setCellValue("SectionId");
-        ah.createCell(3).setCellValue("SectionOrder");
-        ah.createCell(4).setCellValue("SectionName");
-        ah.createCell(5).setCellValue("QQId");
-        ah.createCell(6).setCellValue("OptionId");
-        ah.createCell(7).setCellValue("OptionText");
-
-        int diagMax = Math.min(50, allAnswers.size());
-        for (int ai = 0; ai < diagMax; ai++) {
-            AssessmentAnswer a = allAnswers.get(ai);
-            Row ar = diagSheet.createRow(dr++);
-            ar.createCell(0).setCellValue(ai);
-            ar.createCell(1).setCellValue(a.getUserStudent() != null ? a.getUserStudent().getUserStudentId() : -1);
-
-            if (a.getQuestionnaireQuestion() != null) {
-                QuestionnaireSection s = a.getQuestionnaireQuestion().getSection();
-                ar.createCell(2).setCellValue(s != null ? s.getQuestionnaireSectionId() : -1);
-                ar.createCell(3).setCellValue(s != null ? safe(s.getOrder()) : "");
-                ar.createCell(4).setCellValue(s != null && s.getSection() != null
-                        ? safe(s.getSection().getSectionName()) : "");
-                ar.createCell(5).setCellValue(a.getQuestionnaireQuestion().getQuestionnaireQuestionId());
-            }
-
-            if (a.getOption() != null) {
-                ar.createCell(6).setCellValue(a.getOption().getOptionId());
-                ar.createCell(7).setCellValue(safe(a.getOption().getOptionText()));
-            } else {
-                ar.createCell(6).setCellValue("NULL");
-                ar.createCell(7).setCellValue("NULL");
-            }
-        }
-
-        for (int c = 0; c < 9; c++) diagSheet.autoSizeColumn(c);
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         workbook.write(out);
@@ -422,15 +232,12 @@ public class GeneralAssessmentExportService {
     }
 
     // ══════════════════════════════════════════════════════════════════
-    // ANSWER WRITING
-    // ══════════════════════════════════════════════════════════════════
 
     private void writeAnswerColumns(Row row, List<AssessmentAnswer> answers,
             List<SectionMapping> sectionMappings) {
         for (SectionMapping sm : sectionMappings) {
             switch (sm.type) {
                 case MULTI_SELECT:
-                    // "1" for each selected option, blank for unselected
                     for (AssessmentAnswer a : answers) {
                         if (a.getQuestionnaireQuestion() == null || a.getOption() == null) continue;
                         if (!a.getQuestionnaireQuestion().getQuestionnaireQuestionId().equals(sm.singleQuestionQQId))
@@ -443,7 +250,6 @@ public class GeneralAssessmentExportService {
                     break;
 
                 case SELECTION:
-                    // "1" if answer exists for that question, blank otherwise
                     for (AssessmentAnswer a : answers) {
                         if (a.getQuestionnaireQuestion() == null) continue;
                         Long qqId = a.getQuestionnaireQuestion().getQuestionnaireQuestionId();
@@ -455,7 +261,6 @@ public class GeneralAssessmentExportService {
                     break;
 
                 case SINGLE_ANSWER:
-                    // Write option label: YES/NO for 2-option questions, A/B/C/D for 4-option
                     for (AssessmentAnswer a : answers) {
                         if (a.getQuestionnaireQuestion() == null || a.getOption() == null) continue;
                         Long qqId = a.getQuestionnaireQuestion().getQuestionnaireQuestionId();
@@ -470,32 +275,22 @@ public class GeneralAssessmentExportService {
         }
     }
 
-    /** Derive A/B/C/D or YES/NO from the option's position in the sorted option list. */
     private String deriveLabel(AssessmentQuestionOptions option, List<Long> sortedOptionIds) {
         if (option == null) return "";
-
-        // If optionText is already a short label, use it
         String text = safe(option.getOptionText()).trim();
         if (text.matches("(?i)^[A-D]$") || text.matches("(?i)^(YES|NO|Y|N)$")) {
             return text.toUpperCase();
         }
-
-        // Derive from position
         if (sortedOptionIds != null) {
             int idx = sortedOptionIds.indexOf(option.getOptionId());
             if (idx >= 0) {
-                if (sortedOptionIds.size() == 2) {
-                    return idx == 0 ? "YES" : "NO";
-                }
+                if (sortedOptionIds.size() == 2) return idx == 0 ? "YES" : "NO";
                 return String.valueOf((char) ('A' + idx));
             }
         }
-
-        // Fallback
         return text;
     }
 
-    /** Find a QuestionnaireQuestion by ID from the loaded answers. */
     private QuestionnaireQuestion findQQ(List<AssessmentAnswer> answers, Long qqId) {
         for (AssessmentAnswer a : answers) {
             if (a.getQuestionnaireQuestion() != null
