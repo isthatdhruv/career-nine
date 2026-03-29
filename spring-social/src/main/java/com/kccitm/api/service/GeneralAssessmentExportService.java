@@ -126,6 +126,42 @@ public class GeneralAssessmentExportService {
 
         logger.info("Discovered {} sections from answers", sortedSections.size());
 
+        // ── DIAGNOSTIC: dump first few answers to understand data shape ──
+        int diagCount = 0;
+        for (AssessmentAnswer a : allAnswers) {
+            if (diagCount++ >= 20) break;
+            String secName = "null";
+            String secOrder = "?";
+            Long secId2 = null;
+            if (a.getQuestionnaireQuestion() != null && a.getQuestionnaireQuestion().getSection() != null) {
+                QuestionnaireSection s = a.getQuestionnaireQuestion().getSection();
+                secId2 = s.getQuestionnaireSectionId();
+                secOrder = s.getOrder();
+                if (s.getSection() != null) {
+                    secName = s.getSection().getSectionName();
+                }
+            }
+            logger.info("DIAG answer: secId={} secOrder={} secName='{}' qqId={} optionId={} optionText='{}'",
+                    secId2,
+                    secOrder,
+                    secName,
+                    a.getQuestionnaireQuestion() != null ? a.getQuestionnaireQuestion().getQuestionnaireQuestionId() : null,
+                    a.getOption() != null ? a.getOption().getOptionId() : "NULL",
+                    a.getOption() != null ? a.getOption().getOptionText() : "NULL");
+        }
+
+        // Log section structure summary
+        for (int si = 0; si < sortedSections.size(); si++) {
+            QuestionnaireSection sec = sortedSections.get(si);
+            Long sid = sec.getQuestionnaireSectionId();
+            Set<Long> uqq = sectionUniqueQQIds.getOrDefault(sid, Collections.emptySet());
+            Map<Long, Set<Long>> qopts = sectionQQOptions.getOrDefault(sid, Collections.emptyMap());
+            int maxO = qopts.values().stream().mapToInt(Set::size).max().orElse(0);
+            logger.info("Section {} (id={} order={}): {} unique questions, maxOptions={}, total option entries={}",
+                    (char)('A' + si), sid, sec.getOrder(), uqq.size(), maxO,
+                    qopts.values().stream().mapToInt(Set::size).sum());
+        }
+
         // ── 5. Build column headers + mappings ──────────────────────
         List<String> headers = new ArrayList<>(Arrays.asList(
                 "Roll Number", "Name", "Class", "School", "Section"));
@@ -259,6 +295,89 @@ public class GeneralAssessmentExportService {
         for (int i = 0; i < DEMO_COLS; i++) {
             sheet.autoSizeColumn(i);
         }
+
+        // ── DIAGNOSTICS SHEET ────────────────────────────────────
+        Sheet diagSheet = workbook.createSheet("Diagnostics");
+        int dr = 0;
+
+        // Section structure
+        Row dh = diagSheet.createRow(dr++);
+        dh.createCell(0).setCellValue("Section");
+        dh.createCell(1).setCellValue("SectionId");
+        dh.createCell(2).setCellValue("Order");
+        dh.createCell(3).setCellValue("Type");
+        dh.createCell(4).setCellValue("UniqueQuestions");
+        dh.createCell(5).setCellValue("MaxOptionsPerQ");
+        dh.createCell(6).setCellValue("Columns");
+        dh.createCell(7).setCellValue("SampleQQId");
+        dh.createCell(8).setCellValue("SampleOptionIds");
+
+        for (int si = 0; si < sortedSections.size(); si++) {
+            QuestionnaireSection sec = sortedSections.get(si);
+            Long sid = sec.getQuestionnaireSectionId();
+            Set<Long> uqq = sectionUniqueQQIds.getOrDefault(sid, Collections.emptySet());
+            Map<Long, Set<Long>> qopts = sectionQQOptions.getOrDefault(sid, Collections.emptyMap());
+            int maxO = qopts.values().stream().mapToInt(Set::size).max().orElse(0);
+            SectionMapping sm = si < sectionMappings.size() ? sectionMappings.get(si) : null;
+
+            Row row2 = diagSheet.createRow(dr++);
+            row2.createCell(0).setCellValue(String.valueOf((char) ('A' + si)));
+            row2.createCell(1).setCellValue(sid);
+            row2.createCell(2).setCellValue(safe(sec.getOrder()));
+            row2.createCell(3).setCellValue(sm != null ? sm.type.name() : "UNKNOWN");
+            row2.createCell(4).setCellValue(uqq.size());
+            row2.createCell(5).setCellValue(maxO);
+            row2.createCell(6).setCellValue(sm != null
+                    ? (sm.type == SectionType.MULTI_SELECT ? sm.optionIdToCol.size() : sm.questionIdToCol.size()) : 0);
+            // sample qqId
+            row2.createCell(7).setCellValue(uqq.isEmpty() ? "" : uqq.iterator().next().toString());
+            // sample optionIds
+            if (!qopts.isEmpty()) {
+                Set<Long> firstOpts = qopts.values().iterator().next();
+                row2.createCell(8).setCellValue(firstOpts.toString());
+            }
+        }
+
+        // Blank row
+        dr++;
+
+        // Sample answers (first 30)
+        Row ah = diagSheet.createRow(dr++);
+        ah.createCell(0).setCellValue("AnswerIdx");
+        ah.createCell(1).setCellValue("StudentId");
+        ah.createCell(2).setCellValue("SectionId");
+        ah.createCell(3).setCellValue("SectionOrder");
+        ah.createCell(4).setCellValue("SectionName");
+        ah.createCell(5).setCellValue("QQId");
+        ah.createCell(6).setCellValue("OptionId");
+        ah.createCell(7).setCellValue("OptionText");
+
+        int diagMax = Math.min(50, allAnswers.size());
+        for (int ai = 0; ai < diagMax; ai++) {
+            AssessmentAnswer a = allAnswers.get(ai);
+            Row ar = diagSheet.createRow(dr++);
+            ar.createCell(0).setCellValue(ai);
+            ar.createCell(1).setCellValue(a.getUserStudent() != null ? a.getUserStudent().getUserStudentId() : -1);
+
+            if (a.getQuestionnaireQuestion() != null) {
+                QuestionnaireSection s = a.getQuestionnaireQuestion().getSection();
+                ar.createCell(2).setCellValue(s != null ? s.getQuestionnaireSectionId() : -1);
+                ar.createCell(3).setCellValue(s != null ? safe(s.getOrder()) : "");
+                ar.createCell(4).setCellValue(s != null && s.getSection() != null
+                        ? safe(s.getSection().getSectionName()) : "");
+                ar.createCell(5).setCellValue(a.getQuestionnaireQuestion().getQuestionnaireQuestionId());
+            }
+
+            if (a.getOption() != null) {
+                ar.createCell(6).setCellValue(a.getOption().getOptionId());
+                ar.createCell(7).setCellValue(safe(a.getOption().getOptionText()));
+            } else {
+                ar.createCell(6).setCellValue("NULL");
+                ar.createCell(7).setCellValue("NULL");
+            }
+        }
+
+        for (int c = 0; c < 9; c++) diagSheet.autoSizeColumn(c);
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         workbook.write(out);
