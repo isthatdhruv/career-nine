@@ -1276,6 +1276,7 @@ public class AssessmentAnswerController {
      * @param requestData - JSON containing userStudentId
      * @return StudentDashboardResponse with complete assessment data
      */
+    @Transactional
     @PostMapping(value = "/dashboard", headers = "Accept=application/json")
     public ResponseEntity<?> getStudentDashboard(@RequestBody Map<String, Object> requestData) {
         try {

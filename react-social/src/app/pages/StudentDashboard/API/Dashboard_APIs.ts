@@ -1393,3 +1393,198 @@ export async function downloadPDFReport(studentId: number): Promise<Blob> {
     throw error;
   }
 }
+
+// ========== GENERAL ASSESSMENT DASHBOARD ==========
+
+export interface GeneralAssessmentData {
+  id: number;
+  userStudentId: number;
+  assessmentId: number;
+  classGroup: string;
+  studentClass: number;
+
+  // Personality
+  personalityScores: string; // JSON string
+  personalityTop1: string;
+  personalityTop2: string;
+  personalityTop3: string;
+  personalityProfiles: string; // JSON string
+
+  // Intelligence
+  intelligenceScores: string;
+  intelligenceTop1: string;
+  intelligenceTop2: string;
+  intelligenceTop3: string;
+  intelligenceProfiles: string;
+
+  // Abilities
+  abilityScores: string;
+  abilityTop1: string;
+  abilityTop2: string;
+  abilityTop3: string;
+  abilityTop4: string;
+  abilityTop5: string;
+  weakAbility: string;
+  weakAbilityRecommendations: string;
+
+  // Learning Styles
+  learningStyles: string;
+
+  // Career Pathways
+  suitabilityPathways: string;
+  careerMatchResult: string;
+
+  // Preferences
+  subjectsOfInterest: string;
+  careerAspirations: string;
+  studentValues: string;
+
+  // AI
+  aiSummary: string;
+  learningSummary: string;
+
+  // Enriched
+  futureSuggestions: string;
+
+  // Eligibility
+  eligibilityStatus: string;
+  eligibilityIssues: string;
+
+  processedAt: string;
+}
+
+// Parsed versions of JSON string fields
+export interface PersonalityScore {
+  raw: number;
+  stanine: number;
+}
+
+export interface ProfileData {
+  name: string;
+  title: string;
+  description: string;
+  image: string;
+}
+
+export interface LearningStyleData {
+  intelligence: string;
+  style: string;
+  enjoys: string;
+  struggles: string;
+}
+
+export interface PathwayHasLacks {
+  has: string[];
+  lacks: string[];
+}
+
+export interface PathwayDetail {
+  rank: number;
+  name: string;
+  description?: string;
+  subjects?: string;
+  skills?: string;
+  courses?: string;
+  exams?: string;
+  hasLacks?: {
+    personality: PathwayHasLacks;
+    intelligence: PathwayHasLacks;
+    soi: PathwayHasLacks;
+    abilities: PathwayHasLacks;
+    values: PathwayHasLacks;
+  };
+}
+
+export interface ParsedGeneralAssessmentData {
+  raw: GeneralAssessmentData;
+  personalityScores: Record<string, PersonalityScore>;
+  personalityProfiles: ProfileData[];
+  intelligenceScores: Record<string, number>;
+  intelligenceProfiles: ProfileData[];
+  abilityScores: Record<string, number>;
+  learningStyles: LearningStyleData[];
+  suitabilityPathways: PathwayDetail[];
+  subjectsOfInterest: string[];
+  careerAspirations: string[];
+  studentValues: string[];
+  futureSuggestions: { atSchool: string; atHome: string };
+}
+
+function safeJsonParse<T>(json: string | null | undefined, fallback: T): T {
+  if (!json) return fallback;
+  try {
+    return JSON.parse(json);
+  } catch {
+    return fallback;
+  }
+}
+
+export function parseGeneralAssessmentData(data: GeneralAssessmentData): ParsedGeneralAssessmentData {
+  return {
+    raw: data,
+    personalityScores: safeJsonParse(data.personalityScores, {}),
+    personalityProfiles: safeJsonParse(data.personalityProfiles, []),
+    intelligenceScores: safeJsonParse(data.intelligenceScores, {}),
+    intelligenceProfiles: safeJsonParse(data.intelligenceProfiles, []),
+    abilityScores: safeJsonParse(data.abilityScores, {}),
+    learningStyles: safeJsonParse(data.learningStyles, []),
+    suitabilityPathways: safeJsonParse(data.suitabilityPathways, []),
+    subjectsOfInterest: safeJsonParse(data.subjectsOfInterest, []),
+    careerAspirations: safeJsonParse(data.careerAspirations, []),
+    studentValues: safeJsonParse(data.studentValues, []),
+    futureSuggestions: safeJsonParse(data.futureSuggestions, { atSchool: "", atHome: "" }),
+  };
+}
+
+/**
+ * Fetch processed general assessment dashboard data.
+ */
+export async function fetchGeneralDashboardData(
+  studentId: number,
+  assessmentId: number
+): Promise<ParsedGeneralAssessmentData | null> {
+  try {
+    const response = await axios.get(
+      `${API_BASE_URL}/general-assessment/dashboard/${studentId}/${assessmentId}`
+    );
+    return parseGeneralAssessmentData(response.data);
+  } catch (error) {
+    console.error("Failed to fetch general dashboard data:", error);
+    return null;
+  }
+}
+
+/**
+ * Trigger processing for a student's general assessment.
+ */
+export async function processGeneralAssessment(
+  studentId: number,
+  assessmentId: number
+): Promise<GeneralAssessmentData | null> {
+  try {
+    const response = await axios.post(
+      `${API_BASE_URL}/general-assessment/process/${studentId}/${assessmentId}`
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Failed to process general assessment:", error);
+    return null;
+  }
+}
+
+/**
+ * Check if general assessment result is processed.
+ */
+export async function checkGeneralAssessmentStatus(
+  studentId: number,
+  assessmentId: number
+): Promise<{ processed: boolean; processedAt?: string }> {
+  try {
+    const response = await axios.get(
+      `${API_BASE_URL}/general-assessment/status/${studentId}/${assessmentId}`
+    );
+    return response.data;
+  } catch {
+    return { processed: false };
+  }
+}
