@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useRef,
 } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAssessment } from "../contexts/AssessmentContext";
 import { usePreventReload } from "../hooks/usePreventReload";
@@ -580,10 +581,11 @@ const SectionQuestionPage: React.FC = () => {
 
     // Determine if this selection will trigger auto-advance
     // Auto-advance when: adding an option (not removing), and new count equals maxAllowed
+    // When maxAllowed === 0 (no limit set), auto-advance after 1 selection
+    const effectiveMax = maxAllowed === 0 ? 1 : maxAllowed;
     const willAutoAdvance =
       !isAlreadySelected &&
-      maxAllowed > 0 &&
-      currentSelectedCount + 1 === maxAllowed;
+      currentSelectedCount + 1 === effectiveMax;
 
     setAnswers((prev) => {
       const sec = prev[sectionId!] || {};
@@ -1176,8 +1178,8 @@ const SectionQuestionPage: React.FC = () => {
     <div
       style={{
         display: "flex",
-        height: "100vh",
         height: "100dvh",
+        minHeight: "100vh",
         background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
         colorScheme: "light",
         overflow: "hidden",
@@ -1592,8 +1594,8 @@ const SectionQuestionPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Submit Warning Popup */}
-            {showWarning && (
+            {/* Submit Warning Popup - portaled to body for mobile compatibility */}
+            {showWarning && createPortal(
               <div
                 style={{
                   position: "fixed",
@@ -1701,10 +1703,10 @@ const SectionQuestionPage: React.FC = () => {
                   </div>
                 </div>
               </div>
-            )}
+            , document.body)}
 
-            {/* Confirm Submission Modal */}
-            {showConfirmSubmit && (
+            {/* Confirm Submission Modal - portaled to body for mobile compatibility */}
+            {showConfirmSubmit && createPortal(
               <div
                 className="assessment-modal-overlay"
                 onClick={() => !isSubmitting && setShowConfirmSubmit(false)}
@@ -1820,7 +1822,7 @@ const SectionQuestionPage: React.FC = () => {
                   </div>
                 </div>
               </div>
-            )}
+            , document.body)}
 
             {availableLanguages.length > 0 ? (
               <div
