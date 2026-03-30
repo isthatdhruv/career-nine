@@ -28,19 +28,19 @@ public class DigitalOceanSpacesService {
     @Value("${app.digitalocean.spaces.bucket:storage-c9}")
     private String bucket;
 
-    @Value("${app.digitalocean.spaces.region:sgp1}")
+    @Value("${app.digitalocean.spaces.region:${DO_SPACES_REGION:sgp1}}")
     private String region;
 
-    @Value("${app.digitalocean.spaces.cdn-url:https://storage-c9.sgp1.digitaloceanspaces.com}")
+    @Value("${app.digitalocean.spaces.cdn-url:${DO_SPACES_CDN_URL:https://storage-c9.sgp1.digitaloceanspaces.com}}")
     private String cdnUrl;
 
-    @Value("${app.digitalocean.spaces.access-key:}")
+    @Value("${app.digitalocean.spaces.access-key:${DO_SPACES_ACCESS_KEY:}}")
     private String accessKey;
 
-    @Value("${app.digitalocean.spaces.secret-key:}")
+    @Value("${app.digitalocean.spaces.secret-key:${DO_SPACES_SECRET_KEY:}}")
     private String secretKey;
 
-    @Value("${app.digitalocean.spaces.endpoint:https://sgp1.digitaloceanspaces.com}")
+    @Value("${app.digitalocean.spaces.endpoint:${DO_SPACES_ENDPOINT:https://sgp1.digitaloceanspaces.com}}")
     private String endpoint;
 
     private AmazonS3 s3Client;

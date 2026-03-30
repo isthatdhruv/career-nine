@@ -1,6 +1,6 @@
 spring:
   profiles:
-    active: dev
+    active: staging
     
 
 server:
@@ -180,8 +180,8 @@ app:
       bucket: storage-c9
       region: sgp1
       cdn-url: https://storage-c9.sgp1.digitaloceanspaces.com
-      access-key: DO801M9C9HTCLN8969ZU
-      secret-key: 1IpfeL83WIcDG8bY6XVOfrPXPm8TZ1azculAIhZxsjY
+      access-key: DO801AE4NCA78VQRRHX9
+      secret-key: R0vTmFkoMZsOuLq3IkGJXCc1eaiKIDrEkBBaPV5qMGk
       endpoint: https://sgp1.digitaloceanspaces.com
 
 ---
@@ -243,6 +243,14 @@ spring:
           connectiontimeout: 10000
           timeout: 10000
           writetimeout: 10000
+  digitalocean:
+    spaces:
+      bucket: storage-c9
+      region: sgp1
+      cdn-url: https://storage-c9.sgp1.digitaloceanspaces.com
+      access-key: DO801AE4NCA78VQRRHX9
+      secret-key: R0vTmFkoMZsOuLq3IkGJXCc1eaiKIDrEkBBaPV5qMGk
+      endpoint: https://sgp1.digitaloceanspaces.com
   security:
     oauth2:
       client:
