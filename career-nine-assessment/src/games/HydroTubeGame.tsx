@@ -511,6 +511,7 @@ export function HydroTubeGame({
         }}
       >
         <div
+          className="game-video-card"
           style={{
             background:
               "linear-gradient(135deg, rgba(12, 74, 110, 0.95), rgba(7, 89, 133, 0.95))",
@@ -646,6 +647,7 @@ export function HydroTubeGame({
         }}
       >
         <div
+          className="game-modal-card"
           style={{
             background:
               "linear-gradient(135deg, rgba(12, 74, 110, 0.95), rgba(7, 89, 133, 0.95))",
@@ -826,6 +828,7 @@ export function HydroTubeGame({
 
       {/* Player Info - Top Left */}
       <div
+        className="game-top-left"
         style={{
           position: "absolute",
           top: "20px",
@@ -861,6 +864,7 @@ export function HydroTubeGame({
 
       {/* Timer/Practice Badge - Top Center */}
       <div
+        className="game-top-center"
         style={{
           position: "absolute",
           top: "20px",
@@ -916,6 +920,7 @@ export function HydroTubeGame({
 
       {/* Controls - Top Right */}
       <div
+        className="game-top-right"
         style={{
           position: "absolute",
           top: "20px",
@@ -946,6 +951,7 @@ export function HydroTubeGame({
       {/* Stats Cards - Left Side (only during main game) */}
       {!isTrial && (
         <div
+          className="game-stats-panel"
           style={{
             position: "absolute",
             top: "80px",
@@ -1060,6 +1066,7 @@ export function HydroTubeGame({
       {/* Practice Info Card - Left Side (only during trial) */}
       {isTrial && (
         <div
+          className="game-stats-panel"
           style={{
             position: "absolute",
             top: "80px",
@@ -1267,6 +1274,7 @@ export function HydroTubeGame({
 
         {/* Game Frame */}
         <div
+          className="game-frame"
           style={{
             position: "relative",
             background: isWon
@@ -1358,10 +1366,9 @@ export function HydroTubeGame({
 
           {/* Tile Grid */}
           <div
+            className="hydro-grid"
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(4, 80px)",
-              gridTemplateRows: "repeat(4, 80px)",
               gap: "4px",
             }}
           >
@@ -1374,10 +1381,9 @@ export function HydroTubeGame({
               return (
                 <div
                   key={tileNumber}
+                  className="hydro-tile"
                   onClick={() => handleTileClick(tileNumber)}
                   style={{
-                    width: "80px",
-                    height: "80px",
                     background: isHighlighted
                       ? "linear-gradient(145deg, #fef3c7 0%, #fde68a 100%)"
                       : "linear-gradient(145deg, #ffffff 0%, #f1f5f9 100%)",

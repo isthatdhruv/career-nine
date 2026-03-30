@@ -6,6 +6,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import com.kccitm.api.service.GeneralAssessmentExportService;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +37,9 @@ public class GeneralAssessmentController {
 
     @Autowired
     private StudentAssessmentMappingRepository mappingRepository;
+
+    @Autowired
+    private GeneralAssessmentExportService exportService;
 
     /**
      * Process a single student's general assessment.
@@ -142,5 +149,54 @@ public class GeneralAssessmentController {
     public ResponseEntity<?> getResultsByAssessment(@PathVariable Long assessmentId) {
         List<GeneralAssessmentResult> results = resultRepository.findByAssessmentId(assessmentId);
         return ResponseEntity.ok(results);
+    }
+
+    /**
+     * Export all completed student answers for a general assessment
+     * in the old 167-column OMR format (Sec_A_1 through Sec_F_24).
+     */
+    @GetMapping("/export-excel/{assessmentId}")
+    public ResponseEntity<?> exportExcel(@PathVariable Long assessmentId) {
+        try {
+            byte[] excelBytes = exportService.exportToOldFormat(assessmentId);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType(
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+            headers.setContentDispositionFormData("attachment",
+                    "general_assessment_" + assessmentId + ".xlsx");
+            headers.setContentLength(excelBytes.length);
+
+            return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
+        } catch (Exception e) {
+            logger.error("Export failed for assessment {}: {}", assessmentId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Export failed: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Export a single student's answers in the old OMR format.
+     */
+    @GetMapping("/export-excel/{assessmentId}/student/{userStudentId}")
+    public ResponseEntity<?> exportExcelForStudent(
+            @PathVariable Long assessmentId,
+            @PathVariable Long userStudentId) {
+        try {
+            byte[] excelBytes = exportService.exportToOldFormat(assessmentId, userStudentId);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType(
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+            headers.setContentDispositionFormData("attachment",
+                    "general_assessment_" + assessmentId + "_student_" + userStudentId + ".xlsx");
+            headers.setContentLength(excelBytes.length);
+
+            return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
+        } catch (Exception e) {
+            logger.error("Export failed for student {} assessment {}: {}", userStudentId, assessmentId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Export failed: " + e.getMessage()));
+        }
     }
 }
