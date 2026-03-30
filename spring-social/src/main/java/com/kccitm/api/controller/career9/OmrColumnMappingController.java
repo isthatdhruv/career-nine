@@ -91,10 +91,21 @@ public class OmrColumnMappingController {
 
     @GetMapping("/get-by-questionnaire/{questionnaireId}")
     public ResponseEntity<?> getByQuestionnaire(@PathVariable Long questionnaireId) {
+        // 1. Try direct match on questionnaireId column
         Optional<OmrColumnMapping> mapping = repository.findFirstByQuestionnaireIdOrderByUpdatedAtDesc(questionnaireId);
         if (mapping.isPresent()) {
             return ResponseEntity.ok(mapping.get());
         }
+
+        // 2. Fallback: find assessments using this questionnaire, then find their mappings
+        List<AssessmentTable> assessments = assessmentTableRepository.findByQuestionnaireQuestionnaireId(questionnaireId);
+        for (AssessmentTable a : assessments) {
+            List<OmrColumnMapping> mappings = repository.findByAssessmentId(a.getId());
+            if (!mappings.isEmpty()) {
+                return ResponseEntity.ok(mappings.get(0));
+            }
+        }
+
         return ResponseEntity.notFound().build();
     }
 
