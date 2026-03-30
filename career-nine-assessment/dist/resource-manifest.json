@@ -1,6 +1,6 @@
 {
-  "version": "mn8u1zpg",
-  "generated": "2026-03-27T11:43:34.660Z",
+  "version": "mncqxo5q",
+  "generated": "2026-03-30T05:27:18.926Z",
   "resources": [
     {
       "url": "/assessment-cache/16/config.json",
@@ -15,6 +15,36 @@
     {
       "url": "/assessment-cache/16/images/1596.webp",
       "size": 874,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/18/config.json",
+      "size": 267109,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/18/data.json",
+      "size": 266831,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/19/config.json",
+      "size": 260918,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/19/data.json",
+      "size": 260638,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/20/config.json",
+      "size": 266409,
+      "priority": "assessment"
+    },
+    {
+      "url": "/assessment-cache/20/data.json",
+      "size": 266129,
       "priority": "assessment"
     },
     {
@@ -274,12 +304,12 @@
     }
   ],
   "summary": {
-    "total": 54,
-    "totalSize": 23653015,
+    "total": 60,
+    "totalSize": 25241049,
     "byPriority": {
       "assessment": {
-        "count": 13,
-        "size": 876203
+        "count": 19,
+        "size": 2464237
       },
       "game": {
         "count": 11,
