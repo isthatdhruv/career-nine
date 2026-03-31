@@ -51,6 +51,8 @@ import GroupStudentAdminPage from "../pages/GroupStudent/GroupStudentAdminPage";
 import GroupStudentSchoolPage from "../pages/GroupStudent/GroupStudentSchoolPage";
 import AssignedStudentsPage from "../pages/GroupStudent/AssignedStudentsPage";
 import ReportGenerationPage from "../pages/ReportGeneration/ReportGenerationPage";
+import BetReportGenerationPage from "../pages/ReportGeneration/BetReportGenerationPage";
+import NavigatorReportGenerationPage from "../pages/NavigatorReportGeneration/NavigatorReportGenerationPage";
 import GamePage from "../pages/Games/GamePage";
 import DemographicFieldsPage from "../pages/DemographicFields/DemographicFieldsPage";
 import DemographicFieldCreatePage from "../pages/DemographicFields/components/DemographicFieldCreatePage";
@@ -943,6 +945,22 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <ReportsPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/bet-report-generation"
+          element={
+            <SuspensedView>
+              <BetReportGenerationPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/navigator-report-generation"
+          element={
+            <SuspensedView>
+              <NavigatorReportGenerationPage />
             </SuspensedView>
           }
         />

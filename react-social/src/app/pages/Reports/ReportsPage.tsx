@@ -11,6 +11,8 @@ import {
   BetReportData,
   exportGeneralAssessmentExcel,
   exportGeneralAssessmentExcelForStudent,
+  exportMqtScoresExcel,
+  exportBetReportExcel,
 } from "../ReportGeneration/API/BetReportData_APIs";
 
 type StudentRow = {
@@ -69,6 +71,8 @@ const ReportsPage: React.FC = () => {
   // ── Generate ──
   const [generating, setGenerating] = useState(false);
   const [exportingOMR, setExportingOMR] = useState(false);
+  const [exportingMQT, setExportingMQT] = useState(false);
+  const [exportingBET, setExportingBET] = useState(false);
   const [exportingStudentId, setExportingStudentId] = useState<number | null>(null);
 
   // ═══════════════════════ DATA LOADING ═══════════════════════
@@ -656,6 +660,84 @@ const ReportsPage: React.FC = () => {
                         : ` (All)`}
                     </>
                   )}
+                </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={async () => {
+                    if (!selectedAssessment) return;
+                    const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
+                    const selectedVisible = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
+                    setExportingMQT(true);
+                    try {
+                      const res = await exportMqtScoresExcel(
+                        Number(selectedAssessment),
+                        selectedVisible.length > 0 ? selectedVisible : undefined
+                      );
+                      const url = window.URL.createObjectURL(new Blob([res.data]));
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `mqt_scores_${selectedAssessment}.xlsx`;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      window.URL.revokeObjectURL(url);
+                    } catch (err: any) {
+                      alert("Export failed: " + (err?.response?.data?.error || err.message));
+                    } finally {
+                      setExportingMQT(false);
+                    }
+                  }}
+                  disabled={exportingMQT}
+                  style={{
+                    background: exportingMQT
+                      ? "#6c757d"
+                      : "linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)",
+                    border: "none", borderRadius: 8, padding: "8px 20px",
+                    fontWeight: 600, color: "white", fontSize: "0.85rem",
+                    boxShadow: exportingMQT ? "none" : "0 4px 12px rgba(124, 58, 237, 0.3)",
+                  }}
+                >
+                  {exportingMQT ? "Exporting..." : (
+                    <>
+                      Export MQ/MQT Scores
+                      {visibleSelectedCount > 0
+                        ? ` (${visibleSelectedCount} selected)`
+                        : ` (All)`}
+                    </>
+                  )}
+                </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={async () => {
+                    if (!selectedAssessment) return;
+                    setExportingBET(true);
+                    try {
+                      const res = await exportBetReportExcel(Number(selectedAssessment));
+                      const url = window.URL.createObjectURL(new Blob([res.data]));
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `bet_report_data_${selectedAssessment}.xlsx`;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      window.URL.revokeObjectURL(url);
+                    } catch (err: any) {
+                      alert("Export failed: " + (err?.response?.data?.error || err.message));
+                    } finally {
+                      setExportingBET(false);
+                    }
+                  }}
+                  disabled={exportingBET}
+                  style={{
+                    background: exportingBET
+                      ? "#6c757d"
+                      : "linear-gradient(135deg, #e67e22 0%, #d35400 100%)",
+                    border: "none", borderRadius: 8, padding: "8px 20px",
+                    fontWeight: 600, color: "white", fontSize: "0.85rem",
+                    boxShadow: exportingBET ? "none" : "0 4px 12px rgba(230, 126, 34, 0.3)",
+                  }}
+                >
+                  {exportingBET ? "Exporting..." : "Export BET Report"}
                 </button>
               </div>
 

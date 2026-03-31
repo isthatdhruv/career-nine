@@ -413,16 +413,24 @@ export function AsideMenuMain() {
             <AsideMenuItem
               to="/reports"
               icon="/media/icons/duotune/files/fil003.svg"
-              title="Reports & Exports"
+              title="Reports"
+              fontIcon="bi-file-earmark-text"
+            />
+          )}
+          {allowed("/reports") && (
+            <AsideMenuItem
+              to="/bet-report-generation"
+              icon="/media/icons/duotune/general/gen005.svg"
+              title="BET Report Generation"
               fontIcon="bi-file-earmark-bar-graph"
             />
           )}
-          {allowed("/report-generation") && (
+          {allowed("/reports") && (
             <AsideMenuItem
-              to="/report-generation"
-              icon="/media/icons/duotune/general/gen005.svg"
-              title="Report Generation"
-              fontIcon="bi-file-earmark-bar-graph"
+              to="/navigator-report-generation"
+              icon="/media/icons/duotune/maps/map001.svg"
+              title="Navigator Report Generation"
+              fontIcon="bi-compass"
             />
           )}
         </>
