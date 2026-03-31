@@ -369,15 +369,14 @@ public class StudentInfoController {
                     .map(StudentInfo::getId)
                     .collect(Collectors.toList());
 
-            // 3. Bulk load all UserStudents for these studentInfo IDs (1 query)
-            // Build a map: studentInfoId → UserStudent
+            // 3. Bulk load all UserStudents for these studentInfo IDs (1 query instead of N)
             Map<Integer, UserStudent> studentInfoToUserStudent = new HashMap<>();
             List<Long> allUserStudentIds = new ArrayList<>();
-            for (Integer siId : studentInfoIds) {
-                List<UserStudent> usList = userStudentRepository.findByStudentInfoId(siId);
-                if (!usList.isEmpty()) {
-                    studentInfoToUserStudent.put(siId, usList.get(0));
-                    allUserStudentIds.add(usList.get(0).getUserStudentId());
+            List<UserStudent> allUserStudents = userStudentRepository.findByStudentInfoIdIn(studentInfoIds);
+            for (UserStudent us : allUserStudents) {
+                if (us.getStudentInfo() != null) {
+                    studentInfoToUserStudent.putIfAbsent(us.getStudentInfo().getId(), us);
+                    allUserStudentIds.add(us.getUserStudentId());
                 }
             }
 

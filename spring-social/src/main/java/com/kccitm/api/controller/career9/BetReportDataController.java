@@ -82,6 +82,73 @@ public class BetReportDataController {
     @Autowired private FirebaseService firebaseService;
     @Autowired private DigitalOceanSpacesService digitalOceanSpacesService;
 
+    // ═══════════════════════ ONE-CLICK REPORT ═══════════════════════
+
+    /**
+     * POST /bet-report-data/one-click-report
+     * Body: { "assessmentId": 5, "userStudentId": 874 }
+     *
+     * Generates report data (if not exists) + generates HTML report + returns URL.
+     * Single endpoint for the "Download Report" button in student assessment modal.
+     */
+    @PostMapping("/one-click-report")
+    @Transactional
+    public ResponseEntity<?> oneClickReport(@RequestBody Map<String, Object> request) {
+        try {
+            Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+            Long userStudentId = ((Number) request.get("userStudentId")).longValue();
+
+            // Step 1: Check if report data already exists
+            Optional<BetReportData> existing = betReportDataRepository
+                    .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+
+            // Step 2: Generate data if missing
+            if (existing.isEmpty()) {
+                BetReportData report = generateForStudentLive(userStudentId, assessmentId);
+                if (report == null) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body(Map.of("error", "No completed assessment found for this student"));
+                }
+                existing = Optional.of(report);
+            }
+
+            BetReportData report = existing.get();
+
+            // Step 3: Generate HTML if not already generated
+            if (!"generated".equals(report.getReportStatus()) || report.getReportUrl() == null) {
+                String template = loadHtmlTemplate();
+                if (template == null) {
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body(Map.of("error", "Could not load BET HTML template"));
+                }
+
+                String filledHtml = fillTemplate(template, report);
+                String safeName = (report.getStudentName() != null ? report.getStudentName() : "student")
+                        .replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
+                String fileName = safeName + "_" + userStudentId + "_bet_report.html";
+                String folder = "bet-reports/assessment-" + assessmentId;
+
+                String reportUrl = digitalOceanSpacesService.uploadBytes(
+                        filledHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                        "text/html", folder, fileName);
+
+                report.setReportStatus("generated");
+                report.setReportUrl(reportUrl);
+                betReportDataRepository.save(report);
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "reportUrl", report.getReportUrl(),
+                    "studentName", safe(report.getStudentName()),
+                    "status", "generated"
+            ));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Report generation failed: " + e.getMessage()));
+        }
+    }
+
     // ═══════════════════════ CRUD ═══════════════════════
 
     @GetMapping("/getAll")

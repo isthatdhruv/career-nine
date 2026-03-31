@@ -44,7 +44,8 @@ public interface AssessmentAnswerRepository extends JpaRepository<AssessmentAnsw
 
        @Query("SELECT aa FROM AssessmentAnswer aa " +
               "LEFT JOIN FETCH aa.option " +
-              "LEFT JOIN FETCH aa.questionnaireQuestion " +
+              "LEFT JOIN FETCH aa.questionnaireQuestion qq " +
+              "LEFT JOIN FETCH qq.section " +
               "LEFT JOIN FETCH aa.userStudent " +
               "WHERE aa.assessment.id = :assessmentId")
        List<AssessmentAnswer> findAllByAssessmentIdForExport(
@@ -52,7 +53,8 @@ public interface AssessmentAnswerRepository extends JpaRepository<AssessmentAnsw
 
        @Query("SELECT aa FROM AssessmentAnswer aa " +
               "LEFT JOIN FETCH aa.option " +
-              "LEFT JOIN FETCH aa.questionnaireQuestion " +
+              "LEFT JOIN FETCH aa.questionnaireQuestion qq " +
+              "LEFT JOIN FETCH qq.section " +
               "LEFT JOIN FETCH aa.userStudent " +
               "WHERE aa.assessment.id = :assessmentId " +
               "AND aa.userStudent.userStudentId = :userStudentId")

@@ -105,6 +105,10 @@ public class NavigatorReportGenerationService {
      * @return the saved NavigatorReportData, or null if student has no completed assessment
      */
     public NavigatorReportData generateForStudent(Long userStudentId, Long assessmentId) {
+        return generateForStudent(userStudentId, assessmentId, false);
+    }
+
+    public NavigatorReportData generateForStudent(Long userStudentId, Long assessmentId, boolean skipAI) {
         UserStudent us = userStudentRepository.findById(userStudentId)
                 .orElseThrow(() -> new RuntimeException("Student not found: " + userStudentId));
 
@@ -219,59 +223,102 @@ public class NavigatorReportGenerationService {
         for (String a : APTITUDE_NAMES) aptitudeScores.put(a, 0);
         for (String m : MI_NAMES) miScores.put(m, 0);
 
+        // Detect sections by content (question count + type) instead of letter position.
+        // Different questionnaires (Insight/Subject/Career Navigator) have different section orders.
         for (SectionMeta sm : sectionMetas) {
-            switch (sm.letter) {
-                case "A": // Career Aspirations (MULTI_SELECT)
+            int qCount = sm.sortedQQIds.size();
+            int optCount = sm.sortedOptionIds.size();
+
+            if (sm.isMultiSelect) {
+                // MULTI_SELECT sections: identify by option count
+                if (optCount >= 20) {
+                    // 24 options = Career Aspirations
                     selectedCareerAsps = extractMultiSelectLabels(studentAnswers, sm, CAREER_ASP_LABELS);
-                    break;
-                case "B": // Values (MULTI_SELECT)
-                    selectedValues = extractMultiSelectLabels(studentAnswers, sm, VALUE_LABELS);
-                    break;
-                case "C": // SOI (MULTI_SELECT)
-                    selectedSOIs = extractMultiSelectLabels(studentAnswers, sm, SOI_LABELS);
-                    break;
-                case "D": // RIASEC Personality (SINGLE_ANSWER, YES/NO)
+                } else if (optCount >= 14 && optCount <= 16) {
+                    // 15 options = could be SOI or Values — distinguish by label matching
+                    // Try SOI first (Agriculture, Art, etc.)
+                    List<String> extracted = extractMultiSelectLabels(studentAnswers, sm, SOI_LABELS);
+                    if (!extracted.isEmpty()) {
+                        selectedSOIs = extracted;
+                    } else {
+                        selectedValues = extractMultiSelectLabels(studentAnswers, sm, VALUE_LABELS);
+                    }
+                } else if (optCount <= 10 && optCount > 0) {
+                    // Small multi-select — could be Values or SOI with fewer options
+                    if (selectedValues.isEmpty()) {
+                        selectedValues = extractMultiSelectLabels(studentAnswers, sm, VALUE_LABELS);
+                    } else if (selectedSOIs.isEmpty()) {
+                        selectedSOIs = extractMultiSelectLabels(studentAnswers, sm, SOI_LABELS);
+                    }
+                }
+            } else if (sm.isSingleAnswer) {
+                // SINGLE_ANSWER sections: identify by question count
+                // Use flags to avoid overwriting already-detected sections
+                boolean riasecDone = riasecScores.values().stream().mapToInt(Integer::intValue).sum() > 0;
+                boolean aptitudeDone = aptitudeScores.values().stream().mapToInt(Integer::intValue).sum() > 0;
+                boolean miDone = miScores.values().stream().mapToInt(Integer::intValue).sum() > 0;
+
+                if (qCount >= 48 && qCount <= 60 && !riasecDone) {
+                    // 54 questions = RIASEC Personality (YES/NO)
                     riasecScores = computeRiasecScores(studentAnswers, sm, allAnswers);
-                    break;
-                case "E": // Aptitude (SINGLE_ANSWER, A/B/C/D)
+                } else if (qCount >= 25 && qCount <= 35 && !aptitudeDone) {
+                    // 30 questions = Aptitude (A/B/C/D)
                     aptitudeScores = computeAptitudeScores(studentAnswers, sm, allAnswers);
-                    break;
-                case "F": // Multiple Intelligence (SINGLE_ANSWER, A/B/C/D)
+                } else if (qCount >= 20 && qCount <= 26 && !miDone) {
+                    // 24 questions = Multiple Intelligence (A/B/C/D)
                     miScores = computeMIScores(studentAnswers, sm, allAnswers);
-                    break;
+                }
+                // Extra sections (e.g., 30 questions in Insight Navigator Sec_F) are skipped
             }
         }
+
+        logger.info("Detected sections: RIASEC={}, Aptitude={}, MI={}, SOI={}, Values={}, CareerAsp={}",
+                riasecScores.values().stream().mapToInt(Integer::intValue).sum() > 0 ? "Y" : "N",
+                aptitudeScores.values().stream().mapToInt(Integer::intValue).sum() > 0 ? "Y" : "N",
+                miScores.values().stream().mapToInt(Integer::intValue).sum() > 0 ? "Y" : "N",
+                selectedSOIs.isEmpty() ? "N" : selectedSOIs.size() + " items",
+                selectedValues.isEmpty() ? "N" : selectedValues.size() + " items",
+                selectedCareerAsps.isEmpty() ? "N" : selectedCareerAsps.size() + " items");
 
         // ── 6. Phase 0b: Eligibility Check ──
+        // Only check sections that were actually detected (different questionnaires have different sections)
         List<String> eligibilityIssues = new ArrayList<>();
+        boolean hasRiasec = riasecScores.values().stream().mapToInt(Integer::intValue).sum() > 0;
+        boolean hasAptitude = aptitudeScores.values().stream().mapToInt(Integer::intValue).sum() > 0;
+        boolean hasMI = miScores.values().stream().mapToInt(Integer::intValue).sum() > 0;
 
-        // Check 1: Each RIASEC personality score >= 9
+        // Check 1: Each RIASEC personality score >= 9 (only if RIASEC section exists)
         int personalityLowCount = 0;
-        for (Map.Entry<String, Integer> entry : riasecScores.entrySet()) {
-            int score = entry.getValue();
-            if (score < 9) {
-                eligibilityIssues.add("Personality " + entry.getKey() + ": " + score + " (< 9)");
+        if (hasRiasec) {
+            for (Map.Entry<String, Integer> entry : riasecScores.entrySet()) {
+                int score = entry.getValue();
+                if (score < 9) {
+                    eligibilityIssues.add("Personality " + entry.getKey() + ": " + score + " (< 9)");
+                }
+                if (score == 1) {
+                    personalityLowCount++;
+                }
             }
-            if (score == 1) {
-                personalityLowCount++;
-            }
-        }
-        // Disqualification: more than 3 personality traits scoring 1
-        if (personalityLowCount > 3) {
-            eligibilityIssues.add("DISQUALIFIED: " + personalityLowCount + " personality traits scoring 1 (> 3)");
-        }
-
-        // Check 2: Each ability score >= 3
-        for (Map.Entry<String, Integer> entry : aptitudeScores.entrySet()) {
-            if (entry.getValue() < 3) {
-                eligibilityIssues.add("Ability " + entry.getKey() + ": " + entry.getValue() + " (< 3)");
+            if (personalityLowCount > 3) {
+                eligibilityIssues.add("DISQUALIFIED: " + personalityLowCount + " personality traits scoring 1 (> 3)");
             }
         }
 
-        // Check 3: Each intelligence score >= 3
-        for (Map.Entry<String, Integer> entry : miScores.entrySet()) {
-            if (entry.getValue() < 3) {
-                eligibilityIssues.add("Intelligence " + entry.getKey() + ": " + entry.getValue() + " (< 3)");
+        // Check 2: Each ability score >= 3 (only if aptitude section exists)
+        if (hasAptitude) {
+            for (Map.Entry<String, Integer> entry : aptitudeScores.entrySet()) {
+                if (entry.getValue() < 3) {
+                    eligibilityIssues.add("Ability " + entry.getKey() + ": " + entry.getValue() + " (< 3)");
+                }
+            }
+        }
+
+        // Check 3: Each intelligence score >= 3 (only if MI section exists)
+        if (hasMI) {
+            for (Map.Entry<String, Integer> entry : miScores.entrySet()) {
+                if (entry.getValue() < 3) {
+                    eligibilityIssues.add("Intelligence " + entry.getKey() + ": " + entry.getValue() + " (< 3)");
+                }
             }
         }
 
@@ -440,8 +487,8 @@ public class NavigatorReportGenerationService {
         report.setIntelligenceGraph(generateBarChartDataUri(
                 miScores, null, "#2e86ab"));
 
-        // ── Phase 4: AI Summaries (only for eligible students) ──
-        if (isEligible) {
+        // ── Phase 4: AI Summaries (only for eligible students, skippable for one-click) ──
+        if (isEligible && !skipAI) {
             try {
                 NavigatorAISummaryService.AISummaryResult aiResult = aiSummaryService
                         .generateSummaries(studentName, studentClass, coreResult);

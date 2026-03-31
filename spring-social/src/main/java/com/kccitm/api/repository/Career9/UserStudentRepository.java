@@ -15,7 +15,9 @@ public interface UserStudentRepository extends JpaRepository<UserStudent, Long> 
     List<UserStudent> findByInstituteInstituteCode(Integer instituteCode);
     Optional<UserStudent> findByStudentInfo(StudentInfo studentInfo);
     List<UserStudent> findByStudentInfoId(Integer studentInfoId);
-    
+    List<UserStudent> findByStudentInfoIdIn(List<Integer> studentInfoIds);
+    List<UserStudent> findByInstituteInstituteCodeAndStudentInfoIdIn(Integer instituteCode, List<Integer> studentInfoIds);
+
     @Query("SELECT aa.studentInfo.name FROM UserStudent aa " +
            "WHERE aa.userStudentId = :userStudentId " )
     String getNameByUserID(@Param("userStudentId") Long userStudentId);
