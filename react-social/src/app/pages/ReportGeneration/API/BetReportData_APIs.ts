@@ -66,6 +66,15 @@ export function generateHtmlReports(assessmentId: number, userStudentIds: number
   });
 }
 
+export function exportMqtScoresExcel(assessmentId: number, userStudentIds?: number[]) {
+  return axios.post(`${BASE}/export-mqt-scores`, {
+    assessmentId,
+    userStudentIds: userStudentIds || [],
+  }, {
+    responseType: 'blob',
+  });
+}
+
 export function exportGeneralAssessmentExcel(assessmentId: number) {
   return axios.get(`${API_URL}/general-assessment/export-excel/${assessmentId}`, {
     responseType: 'blob',

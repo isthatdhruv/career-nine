@@ -63,6 +63,8 @@ services:
     restart: always
     env_file:
       - .env
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     deploy:
       resources:
         limits:
