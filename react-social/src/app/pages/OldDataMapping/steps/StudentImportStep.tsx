@@ -2,7 +2,6 @@ import { useState } from "react";
 import {
   importStudents,
   importScores,
-  importExtraData,
 } from "../API/OldDataMapping_APIs";
 import type { StudentAssignment } from "./AssessmentMappingStep";
 
@@ -55,11 +54,9 @@ const StudentImportStep = ({
 
     let studentsImported = 0;
     let scoresImported = 0;
-    let extraDataImported = 0;
     const errors: string[] = [];
     const importedStudentDetails: { name: string; email: string; grade: string; school: string; firebaseDocId: string }[] = [];
     const importedScoreDetails: { studentName: string; category: string; scoreCount: number }[] = [];
-    const importedExtraDetails: { studentName: string; type: string; value: string }[] = [];
 
     try {
       // Step 1: Import Students
@@ -173,60 +170,6 @@ const StudentImportStep = ({
         }
       }
 
-      setProgress(70);
-
-      // Step 3: Import Extra Data
-      setStatusMessage(
-        "Importing extra data (career aspirations, subjects, values)..."
-      );
-
-      const extraDataItems: any[] = [];
-      studentAssignments.forEach((sa) => {
-        const userStudentId = studentResultsMap[sa.firebaseDocId];
-        if (!userStudentId) return;
-
-        (sa.careerAspirations || []).forEach((val: string) => {
-          extraDataItems.push({
-            userStudentId,
-            firebaseDocId: sa.firebaseDocId,
-            dataType: "CAREER_ASPIRATION",
-            dataValue: val,
-          });
-          importedExtraDetails.push({ studentName: sa.name, type: "Career Aspiration", value: val });
-        });
-        (sa.subjectsOfInterest || []).forEach((val: string) => {
-          extraDataItems.push({
-            userStudentId,
-            firebaseDocId: sa.firebaseDocId,
-            dataType: "SUBJECT_OF_INTEREST",
-            dataValue: val,
-          });
-          importedExtraDetails.push({ studentName: sa.name, type: "Subject of Interest", value: val });
-        });
-        (sa.values || []).forEach((val: string) => {
-          extraDataItems.push({
-            userStudentId,
-            firebaseDocId: sa.firebaseDocId,
-            dataType: "VALUE",
-            dataValue: val,
-          });
-          importedExtraDetails.push({ studentName: sa.name, type: "Value", value: val });
-        });
-      });
-
-      if (extraDataItems.length > 0) {
-        try {
-          const extraRes = await importExtraData({ data: extraDataItems });
-          extraDataImported =
-            extraRes.data?.imported ?? extraDataItems.length;
-        } catch (err: any) {
-          errors.push(
-            "Extra data import error: " +
-              (err?.response?.data?.message || err?.message || "Unknown error")
-          );
-        }
-      }
-
       setProgress(100);
       setStatusMessage("Import complete!");
 
@@ -234,13 +177,11 @@ const StudentImportStep = ({
         studentsCreated: studentsImported,
         studentsSkipped: studentAssignments.length - studentsImported,
         scoresImported,
-        extraDataImported,
         totalUsers: studentAssignments.length,
         errors,
         results: apiResults,
         studentDetails: importedStudentDetails,
         scoreDetails: importedScoreDetails,
-        extraDetails: importedExtraDetails,
       };
 
       setImportResults(results);
@@ -318,8 +259,8 @@ const StudentImportStep = ({
               <strong>{importResults.scoresImported}</strong>
             </li>
             <li>
-              Extra data records imported:{" "}
-              <strong>{importResults.extraDataImported}</strong>
+              Questionnaire answers (career, subjects, values):{" "}
+              <em className="text-muted">will be saved in Step 3 via question mapping</em>
             </li>
           </ul>
           {importResults.errors.length > 0 && (

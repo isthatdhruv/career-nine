@@ -63,6 +63,7 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
   const [applyResult, setApplyResult] = useState<{
     totalStudents: number;
     totalAnswers: number;
+    partialStudents: number;
     errors: string[];
   } | null>(null);
 
@@ -506,6 +507,7 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
 
     let totalStudents = 0;
     let totalAnswers = 0;
+    let partialStudents = 0;
     const errors: string[] = [];
 
     for (let i = 0; i < studentAssignments.length; i++) {
@@ -561,16 +563,18 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
       processStringArray(sa.subjectsOfInterest, "subjectOfInterest", "Subject of Interest");
       processStringArray(sa.values, "value", "Values");
 
-      if (answers.length === 0) continue;
-
+      // Always call importMappedAnswers — even with 0 answers, backend sets status to "ongoing"
       try {
-        await importMappedAnswers({
+        const res = await importMappedAnswers({
           userStudentId,
           assessmentId: sa.assessmentId,
           answers,
         });
         totalStudents++;
         totalAnswers += answers.length;
+        if (res.data?.status === "ongoing") {
+          partialStudents++;
+        }
       } catch (err: any) {
         const msg = err?.response?.data?.error || err?.message || "Unknown error";
         errors.push(`${sa.name}: ${msg}`);
@@ -579,7 +583,7 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
       setApplyProgress(Math.round(((i + 1) / studentAssignments.length) * 100));
     }
 
-    setApplyResult({ totalStudents, totalAnswers, errors });
+    setApplyResult({ totalStudents, totalAnswers, partialStudents, errors });
     setApplying(false);
 
     // Save mappings to DB for reuse with next schools/batches
@@ -718,6 +722,11 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
           <div className="mb-2">
             <strong>{applyResult.totalStudents}</strong> students processed,
             <strong> {applyResult.totalAnswers}</strong> answers saved with raw scores calculated.
+            {applyResult.partialStudents > 0 && (
+              <span className="text-warning ms-1">
+                ({applyResult.partialStudents} with incomplete data — marked as ongoing)
+              </span>
+            )}
           </div>
           {applyResult.errors.length > 0 && (
             <div>
