@@ -235,16 +235,18 @@ export interface OneClickReportResponse {
     status: string;
 }
 
-export function generateBetReportOneClick(assessmentId: number, userStudentId: number) {
+export function generateBetReportOneClick(assessmentId: number, userStudentId: number, force = false) {
     return axios.post<OneClickReportResponse>(`${API_URL}/bet-report-data/one-click-report`, {
         assessmentId,
         userStudentId,
+        force,
     }, { timeout: 120000 }); // 2 min timeout for report generation
 }
 
-export function generateNavigatorReportOneClick(assessmentId: number, userStudentId: number) {
+export function generateNavigatorReportOneClick(assessmentId: number, userStudentId: number, force = false) {
     return axios.post<OneClickReportResponse>(`${API_URL}/navigator-report-data/one-click-report`, {
         assessmentId,
         userStudentId,
+        force,
     }, { timeout: 120000 }); // 2 min timeout for report generation + AI
 }

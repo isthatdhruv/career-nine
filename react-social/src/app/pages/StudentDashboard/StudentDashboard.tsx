@@ -930,7 +930,7 @@ const StudentDashboard: React.FC = () => {
                     <XAxis type="number" domain={[0, social.values.length]} />
                     <YAxis dataKey="name" type="category" style={{ fontSize: '13px' }} />
                     <Tooltip
-                      formatter={(value: any, name: string | undefined, props: any) => [
+                      formatter={(value: any, name: any, props: any) => [
                         `Rank ${props.payload.rank}`,
                         'Priority Level'
                       ]}

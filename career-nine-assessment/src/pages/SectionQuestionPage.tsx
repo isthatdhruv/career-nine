@@ -1898,14 +1898,8 @@ const SectionQuestionPage: React.FC = () => {
                     <strong>{question.question.maxOptionsAllowed}</strong>{" "}
                     option(s) in order of preference (1 = most important).
                   </>
-                ) : question.question.maxOptionsAllowed === 0 ? (
-                  <></>
                 ) : (
-                  <>
-                    You can select up to{" "}
-                    <strong>{question.question.maxOptionsAllowed}</strong>{" "}
-                    option(s).
-                  </>
+                  <></>
                 )}
               </small>
             </div>

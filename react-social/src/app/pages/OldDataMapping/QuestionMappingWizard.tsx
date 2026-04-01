@@ -195,6 +195,27 @@ const QuestionMappingWizard = ({ onBack }: Props) => {
       addResponses(fbUser.multipleIntelligenceResponses, "multipleIntelligence");
       addResponses(fbUser.personalityDetailedResponses, "personality");
 
+      // Multi-select categories: Firebase stores these as plain string arrays
+      const addStringArray = (arr: string[] | undefined, category: string, questionLabel: string) => {
+        if (!arr || !Array.isArray(arr)) return;
+        arr.forEach((val) => {
+          if (!val) return;
+          newMappings.push({
+            firebaseQuestion: questionLabel,
+            firebaseAnswer: val,
+            systemQuestionId: null,
+            systemQuestionText: "",
+            systemOptionId: null,
+            systemOptionText: "",
+            category,
+          });
+        });
+      };
+
+      addStringArray(fbUser.careerAspirations, "careerAspiration", "Career Aspiration");
+      addStringArray(fbUser.subjectsOfInterest, "subjectOfInterest", "Subject of Interest");
+      addStringArray(fbUser.values, "value", "Values");
+
       setMappings(newMappings);
       setActiveCategory(newMappings.length > 0 ? newMappings[0].category : "ability");
 
@@ -235,6 +256,9 @@ const QuestionMappingWizard = ({ onBack }: Props) => {
     ability: "Ability",
     multipleIntelligence: "Multiple Intelligence",
     personality: "Personality",
+    careerAspiration: "Career Aspiration",
+    subjectOfInterest: "Subject of Interest",
+    value: "Values",
   };
 
   const categoryCounts = useMemo(() => {

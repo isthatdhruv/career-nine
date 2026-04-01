@@ -49,6 +49,9 @@ const categoryLabels: Record<string, string> = {
   ability: "Ability",
   multipleIntelligence: "Multiple Intelligence",
   personality: "Personality",
+  careerAspiration: "Career Aspiration",
+  subjectOfInterest: "Subject of Interest",
+  value: "Values",
 };
 
 const ExistingMappingView = ({ onBack }: Props) => {
@@ -129,7 +132,7 @@ const ExistingMappingView = ({ onBack }: Props) => {
         const grouped = Array.from(groupMap.values());
         setMappings(grouped);
         if (grouped.length > 0) {
-          const cats = ["ability", "multipleIntelligence", "personality"];
+          const cats = ["ability", "multipleIntelligence", "personality", "careerAspiration", "subjectOfInterest", "value"];
           setActiveCategory(cats.find((c) => grouped.some((m) => m.category === c)) || "ability");
         }
       })

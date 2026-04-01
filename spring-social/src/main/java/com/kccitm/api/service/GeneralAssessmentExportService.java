@@ -47,6 +47,8 @@ public class GeneralAssessmentExportService {
         final Map<Long, Integer> optionIdToCol = new LinkedHashMap<>();
         final Map<Long, Integer> questionIdToCol = new LinkedHashMap<>();
         final Map<Long, List<Long>> questionOptionOrder = new LinkedHashMap<>();
+        // text-based fallback for MULTI_SELECT (option text lowercase → col index)
+        final Map<String, Integer> textToCol = new LinkedHashMap<>();
 
         SectionMapping(String letter, SectionType type) {
             this.letter = letter;
@@ -91,6 +93,7 @@ public class GeneralAssessmentExportService {
         Map<Long, QuestionnaireSection> sectionById = new LinkedHashMap<>();
         Map<Long, Set<Long>> sectionUniqueQQIds = new LinkedHashMap<>();
         Map<Long, Map<Long, Set<Long>>> sectionQQOptions = new LinkedHashMap<>();
+        Map<Long, String> optionIdToText = new LinkedHashMap<>(); // optionId → option text (for text-based fallback)
 
         for (AssessmentAnswer a : allAnswers) {
             if (a.getQuestionnaireQuestion() == null) continue;
@@ -108,6 +111,7 @@ public class GeneralAssessmentExportService {
                         .computeIfAbsent(secId, k -> new LinkedHashMap<>())
                         .computeIfAbsent(qq.getQuestionnaireQuestionId(), k -> new TreeSet<>())
                         .add(a.getOption().getOptionId());
+                optionIdToText.putIfAbsent(a.getOption().getOptionId(), safe(a.getOption().getOptionText()));
             }
         }
 
@@ -140,8 +144,15 @@ public class GeneralAssessmentExportService {
                 SectionMapping sm = new SectionMapping(letter, SectionType.MULTI_SELECT);
                 sm.singleQuestionQQId = theQQId;
                 for (int j = 0; j < sortedOptionIds.size(); j++) {
+                    Long optId = sortedOptionIds.get(j);
+                    int col = colOffset++;
                     headers.add("Sec_" + letter + "_" + (j + 1));
-                    sm.optionIdToCol.put(sortedOptionIds.get(j), colOffset++);
+                    sm.optionIdToCol.put(optId, col);
+                    // Build text-based fallback map for answers stored without optionId
+                    String optText = optionIdToText.get(optId);
+                    if (optText != null && !optText.isEmpty()) {
+                        sm.textToCol.put(optText.toLowerCase().trim(), col);
+                    }
                 }
                 sectionMappings.add(sm);
             } else {
@@ -242,7 +253,7 @@ public class GeneralAssessmentExportService {
                     for (Integer col : sm.optionIdToCol.values()) {
                         row.createCell(col).setCellValue("BLANK");
                     }
-                    // Overwrite selected options with "1"
+                    // Overwrite selected options with "1" (option FK present)
                     for (AssessmentAnswer a : answers) {
                         if (a.getQuestionnaireQuestion() == null || a.getOption() == null) continue;
                         if (!a.getQuestionnaireQuestion().getQuestionnaireQuestionId().equals(sm.singleQuestionQQId))
@@ -250,6 +261,31 @@ public class GeneralAssessmentExportService {
                         Integer col = sm.optionIdToCol.get(a.getOption().getOptionId());
                         if (col != null) {
                             row.createCell(col).setCellValue("1");
+                        }
+                    }
+                    // Fallback: text-based answers (imported from Firebase without optionId)
+                    if (!sm.textToCol.isEmpty()) {
+                        for (AssessmentAnswer a : answers) {
+                            if (a.getQuestionnaireQuestion() == null || a.getOption() != null) continue;
+                            if (!a.getQuestionnaireQuestion().getQuestionnaireQuestionId().equals(sm.singleQuestionQQId))
+                                continue;
+                            String txt = a.getTextResponse();
+                            if (txt == null || txt.isEmpty()) continue;
+                            String txtKey = txt.toLowerCase().trim();
+                            // Exact match first
+                            Integer col = sm.textToCol.get(txtKey);
+                            if (col == null) {
+                                // Partial match: check if any option text contains or is contained by textResponse
+                                for (Map.Entry<String, Integer> entry : sm.textToCol.entrySet()) {
+                                    if (entry.getKey().contains(txtKey) || txtKey.contains(entry.getKey())) {
+                                        col = entry.getValue();
+                                        break;
+                                    }
+                                }
+                            }
+                            if (col != null) {
+                                row.createCell(col).setCellValue("1");
+                            }
                         }
                     }
                     break;
