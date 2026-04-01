@@ -61,10 +61,13 @@ services:
       - 8080:8080
     command: ["java", "-Xms1g", "-Xmx2g", "-jar", "/usr/local/lib/demo.jar"]
     restart: always
+    volumes:
+      - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
     env_file:
       - .env
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
     deploy:
       resources:
         limits:

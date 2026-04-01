@@ -34,6 +34,7 @@ import com.kccitm.api.model.career9.AssessmentRawScore;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.Questionaire.AssessmentAnswer;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
+import com.kccitm.api.model.career9.Questionaire.QuestionnaireSection;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.model.career9.MeasuredQualities;
 import com.kccitm.api.model.career9.MeasuredQualityTypes;
@@ -212,6 +213,10 @@ public class FirebaseDataMappingController {
                 return ResponseEntity.ok(Map.of("saved", 0, "scoresCalculated", 0, "message", "No answers to save"));
             }
 
+            // Get questionnaire ID scoped to this assessment (prevents wrong-questionnaire QQ links)
+            final Long questionnaireId = (assessment.getQuestionnaire() != null)
+                    ? assessment.getQuestionnaire().getQuestionnaireId() : null;
+
             // Accumulate scores per MeasuredQualityType
             Map<Long, Integer> scoreAccumulator = new LinkedHashMap<>();
             Map<Long, MeasuredQualityTypes> mqtCache = new LinkedHashMap<>();
@@ -233,18 +238,20 @@ public class FirebaseDataMappingController {
                     if (optOpt.isPresent()) {
                         answer.setOption(optOpt.get());
 
-                        // Set QuestionnaireQuestion: try payload questionId first,
-                        // then fall back to the option's parent question (handles multi-select sections
-                        // where questionId may be null or not directly linked to a QuestionnaireQuestion)
+                        // Set QuestionnaireQuestion scoped to this assessment's questionnaire
                         if (questionId != null) {
-                            List<QuestionnaireQuestion> qqList = questionnaireQuestionRepository.findByQuestion_QuestionId(questionId);
+                            List<QuestionnaireQuestion> qqList = (questionnaireId != null)
+                                    ? questionnaireQuestionRepository.findByQuestionIdAndQuestionnaireId(questionId, questionnaireId)
+                                    : questionnaireQuestionRepository.findByQuestion_QuestionId(questionId);
                             if (!qqList.isEmpty()) {
                                 answer.setQuestionnaireQuestion(qqList.get(0));
                             }
                         }
                         if (answer.getQuestionnaireQuestion() == null && optOpt.get().getQuestion() != null) {
                             Long parentQId = optOpt.get().getQuestion().getQuestionId();
-                            List<QuestionnaireQuestion> qqList = questionnaireQuestionRepository.findByQuestion_QuestionId(parentQId);
+                            List<QuestionnaireQuestion> qqList = (questionnaireId != null)
+                                    ? questionnaireQuestionRepository.findByQuestionIdAndQuestionnaireId(parentQId, questionnaireId)
+                                    : questionnaireQuestionRepository.findByQuestion_QuestionId(parentQId);
                             if (!qqList.isEmpty()) {
                                 answer.setQuestionnaireQuestion(qqList.get(0));
                             }
@@ -262,8 +269,10 @@ public class FirebaseDataMappingController {
                         }
                     }
                 } else if (questionId != null) {
-                    // No optionId (text answer) — still set QuestionnaireQuestion from questionId
-                    List<QuestionnaireQuestion> qqList = questionnaireQuestionRepository.findByQuestion_QuestionId(questionId);
+                    // No optionId (text answer) — still set QuestionnaireQuestion scoped to this assessment
+                    List<QuestionnaireQuestion> qqList = (questionnaireId != null)
+                            ? questionnaireQuestionRepository.findByQuestionIdAndQuestionnaireId(questionId, questionnaireId)
+                            : questionnaireQuestionRepository.findByQuestion_QuestionId(questionId);
                     if (!qqList.isEmpty()) {
                         answer.setQuestionnaireQuestion(qqList.get(0));
                     }
@@ -1211,6 +1220,89 @@ public class FirebaseDataMappingController {
             Thread.currentThread().interrupt();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to fetch Firebase scores: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * POST /firebase-mapping/repair-questionnaire-questions
+     * Body: { "assessmentId": 18 }  (optional: "userStudentId": 658)
+     *
+     * Fixes AssessmentAnswer rows where questionnaireQuestion is null but option is set.
+     * Looks up option -> AssessmentQuestions -> QuestionnaireQuestion and patches the row.
+     * Run this once after the FirebaseDataMappingController import fix was deployed.
+     */
+    @PostMapping("/repair-questionnaire-questions")
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<?> repairQuestionnaireQuestions(@RequestBody Map<String, Object> request) {
+        try {
+            Long assessmentId = getLong(request, "assessmentId");
+            Long userStudentId = getLong(request, "userStudentId"); // optional
+
+            // Get the correct questionnaire ID for this assessment
+            Optional<AssessmentTable> atOpt = assessmentTableRepository.findById(assessmentId);
+            if (!atOpt.isPresent()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Assessment not found: " + assessmentId));
+            }
+            AssessmentTable assessment = atOpt.get();
+            final Long questionnaireId = (assessment.getQuestionnaire() != null)
+                    ? assessment.getQuestionnaire().getQuestionnaireId() : null;
+
+            List<AssessmentAnswer> answers;
+            if (userStudentId != null) {
+                answers = assessmentAnswerRepository.findByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
+            } else {
+                answers = assessmentAnswerRepository.findAllByAssessmentIdForExport(assessmentId);
+            }
+
+            int repaired = 0;
+            int skipped = 0;
+            for (AssessmentAnswer a : answers) {
+                // Fix: null QQ OR QQ pointing to wrong questionnaire
+                boolean needsRepair = false;
+                if (a.getQuestionnaireQuestion() == null) {
+                    needsRepair = true;
+                } else if (questionnaireId != null) {
+                    QuestionnaireSection sec = a.getQuestionnaireQuestion().getSection();
+                    if (sec == null || sec.getQuestionnaire() == null
+                            || !questionnaireId.equals(sec.getQuestionnaire().getQuestionnaireId())) {
+                        needsRepair = true;
+                    }
+                }
+                if (!needsRepair) { skipped++; continue; }
+
+                // Determine questionId to lookup
+                Long qId = null;
+                if (a.getOption() != null && a.getOption().getQuestion() != null) {
+                    qId = a.getOption().getQuestion().getQuestionId();
+                } else if (a.getQuestionnaireQuestion() != null
+                        && a.getQuestionnaireQuestion().getQuestion() != null) {
+                    // Text-only answer: get questionId from the (possibly wrong) QQ's question
+                    qId = a.getQuestionnaireQuestion().getQuestion().getQuestionId();
+                }
+
+                if (qId == null) { skipped++; continue; }
+
+                List<QuestionnaireQuestion> qqList = (questionnaireId != null)
+                        ? questionnaireQuestionRepository.findByQuestionIdAndQuestionnaireId(qId, questionnaireId)
+                        : questionnaireQuestionRepository.findByQuestion_QuestionId(qId);
+                if (qqList.isEmpty()) { skipped++; continue; }
+
+                a.setQuestionnaireQuestion(qqList.get(0));
+                assessmentAnswerRepository.save(a);
+                repaired++;
+            }
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("repaired", repaired);
+            result.put("skipped", skipped);
+            result.put("assessmentId", assessmentId);
+            result.put("questionnaireId", questionnaireId);
+            if (userStudentId != null) result.put("userStudentId", userStudentId);
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Repair failed: " + e.getMessage()));
         }
     }
 }

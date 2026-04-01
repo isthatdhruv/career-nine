@@ -102,7 +102,12 @@ public class BetReportDataController {
             Optional<BetReportData> existing = betReportDataRepository
                     .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
 
-            // Step 2: Generate data if missing
+            // Step 2: Generate data if missing or force=true
+            boolean force = Boolean.TRUE.equals(request.get("force"));
+            if (force && existing.isPresent()) {
+                betReportDataRepository.deleteByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+                existing = Optional.empty();
+            }
             if (existing.isEmpty()) {
                 BetReportData report = generateForStudentLive(userStudentId, assessmentId);
                 if (report == null) {

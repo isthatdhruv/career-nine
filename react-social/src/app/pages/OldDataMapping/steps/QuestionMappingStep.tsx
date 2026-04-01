@@ -141,6 +141,22 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
       addResponses(sa.abilityDetailedResponses, "ability");
       addResponses(sa.multipleIntelligenceResponses, "multipleIntelligence");
       addResponses(sa.personalityDetailedResponses, "personality");
+
+      // Multi-select categories: stored as plain string arrays in Firebase
+      const addStringArray = (arr: string[] | undefined, category: string, questionLabel: string) => {
+        if (!arr || !Array.isArray(arr)) return;
+        const key = `${category}::${questionLabel}`;
+        if (!questionMap.has(key)) {
+          questionMap.set(key, { category, answers: new Set<string>() });
+        }
+        arr.forEach((val) => {
+          if (val) questionMap.get(key)!.answers.add(val);
+        });
+      };
+
+      addStringArray(sa.careerAspirations, "careerAspiration", "Career Aspiration");
+      addStringArray(sa.subjectsOfInterest, "subjectOfInterest", "Subject of Interest");
+      addStringArray(sa.values, "value", "Values");
     });
 
     const newMappings: AssessmentQuestionMapping[] = [];
@@ -168,18 +184,20 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
         .then((res) => {
           const saved: any[] = res.data || [];
           if (saved.length > 0) {
+            // Normalize text for fuzzy matching (handle encoding differences from Firebase)
+            const normalize = (s: string) => (s || "").toLowerCase().trim().replace(/\s+/g, " ");
+
             // Apply saved mappings to newMappings
             const applied = newMappings.map((m) => {
-              // Find saved entries for this question + category
+              // Find saved entries for this question + category (normalized comparison)
               const savedForQ = saved.filter(
-                (s: any) => s.firebaseQuestion === m.firebaseQuestion && s.category === m.category
+                (s: any) => normalize(s.firebaseQuestion) === normalize(m.firebaseQuestion) && s.category === m.category
               );
               if (savedForQ.length === 0) return m;
 
               const systemQuestionId = savedForQ[0].systemQuestionId;
-              const systemQ = systemQuestionId ? undefined : null; // will look up text later
               const newAnswerMappings = m.answerMappings.map((am) => {
-                const savedAm = savedForQ.find((s: any) => s.firebaseAnswer === am.firebaseAnswer);
+                const savedAm = savedForQ.find((s: any) => normalize(s.firebaseAnswer) === normalize(am.firebaseAnswer));
                 if (savedAm && savedAm.systemOptionId) {
                   return {
                     ...am,
@@ -208,7 +226,7 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
     }
 
     if (newMappings.length > 0) {
-      const cats = ["ability", "multipleIntelligence", "personality"];
+      const cats = ["ability", "multipleIntelligence", "personality", "careerAspiration", "subjectOfInterest", "value"];
       setActiveCategory(cats.find((c) => newMappings.some((m) => m.category === c)) || "ability");
     }
   }, [studentAssignments]);
@@ -251,6 +269,9 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
     ability: "Ability",
     multipleIntelligence: "Multiple Intelligence",
     personality: "Personality",
+    careerAspiration: "Career Aspiration",
+    subjectOfInterest: "Subject of Interest",
+    value: "Values",
   };
 
   const categoryMappings = useMemo(() => {
@@ -469,13 +490,15 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
       answerMap: Map<string, number | null>;
     }>();
 
+    const normQ = (s: string) => (s || "").toLowerCase().trim().replace(/\s+/g, " ");
+
     mappings.forEach((m) => {
       if (!m.systemQuestionId) return;
-      const key = `${m.category}::${m.firebaseQuestion}`;
+      const key = `${m.category}::${normQ(m.firebaseQuestion)}`;
       const answerMap = new Map<string, number | null>();
       m.answerMappings.forEach((am) => {
         if (am.firebaseAnswer) {
-          answerMap.set(am.firebaseAnswer.toLowerCase().trim(), am.systemOptionId);
+          answerMap.set(normQ(am.firebaseAnswer), am.systemOptionId);
         }
       });
       questionLookup.set(key, { systemQuestionId: m.systemQuestionId, answerMap });
@@ -499,12 +522,12 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
       const processResponses = (responses: DetailedResponse[] | undefined, category: string) => {
         if (!responses || !Array.isArray(responses)) return;
         responses.forEach((r) => {
-          const q = (r.question || "").trim();
+          const q = normQ(r.question || "");
           const answer = r.selectedOption || r.selectedAnswer || r.answer || r.selected || "";
           const key = `${category}::${q}`;
           const mapping = questionLookup.get(key);
           if (!mapping) return;
-          const optionId = mapping.answerMap.get(answer.toLowerCase().trim()) ?? null;
+          const optionId = mapping.answerMap.get(normQ(answer)) ?? null;
           answers.push({
             questionId: mapping.systemQuestionId,
             optionId,
@@ -516,6 +539,27 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
       processResponses(sa.abilityDetailedResponses, "ability");
       processResponses(sa.multipleIntelligenceResponses, "multipleIntelligence");
       processResponses(sa.personalityDetailedResponses, "personality");
+
+      // Multi-select categories: plain string arrays, each value is a separate answer
+      const processStringArray = (arr: string[] | undefined, category: string, questionLabel: string) => {
+        if (!arr || !Array.isArray(arr)) return;
+        const key = `${category}::${normQ(questionLabel)}`;
+        const mapping = questionLookup.get(key);
+        if (!mapping) return;
+        arr.forEach((val) => {
+          if (!val) return;
+          const optionId = mapping.answerMap.get(normQ(val)) ?? null;
+          answers.push({
+            questionId: mapping.systemQuestionId,
+            optionId,
+            textResponse: val,
+          });
+        });
+      };
+
+      processStringArray(sa.careerAspirations, "careerAspiration", "Career Aspiration");
+      processStringArray(sa.subjectsOfInterest, "subjectOfInterest", "Subject of Interest");
+      processStringArray(sa.values, "value", "Values");
 
       if (answers.length === 0) continue;
 

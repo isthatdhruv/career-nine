@@ -2652,6 +2652,7 @@ export default function GroupStudentAdminPage() {
                           Reset
                         </button>
                         {assessment.status === "completed" && (
+                          <>
                           <button
                             className="btn btn-outline-success btn-sm d-flex align-items-center gap-1"
                             disabled={reportGeneratingFor === assessment.assessmentId}
@@ -2686,6 +2687,42 @@ export default function GroupStudentAdminPage() {
                             <i className={reportGeneratingFor === assessment.assessmentId ? "bi bi-hourglass-split" : "bi bi-file-earmark-arrow-down"}></i>
                             {reportGeneratingFor === assessment.assessmentId ? "Generating..." : "Report"}
                           </button>
+                          <button
+                            className="btn btn-outline-warning btn-sm d-flex align-items-center gap-1"
+                            disabled={reportGeneratingFor === assessment.assessmentId}
+                            title="Force regenerate report from latest data"
+                            onClick={async () => {
+                              if (!modalStudent) return;
+                              setReportGeneratingFor(assessment.assessmentId);
+                              try {
+                                const fullAssessment = assessments.find((a: any) => a.id === assessment.assessmentId) as any;
+                                const isBet = fullAssessment?.questionnaire?.type === true
+                                  || (fullAssessment?.questionnaire?.type == null && (assessment.assessmentName || '').toUpperCase().includes('BET'));
+                                const res = isBet
+                                  ? await generateBetReportOneClick(assessment.assessmentId, modalStudent.userStudentId, true)
+                                  : await generateNavigatorReportOneClick(assessment.assessmentId, modalStudent.userStudentId, true);
+                                const reportUrl = res.data.reportUrl;
+                                if (reportUrl) {
+                                  window.open(reportUrl, "_blank");
+                                }
+                              } catch (err: any) {
+                                alert("Report generation failed: " + (err?.response?.data?.error || err.message));
+                              } finally {
+                                setReportGeneratingFor(null);
+                              }
+                            }}
+                            style={{
+                              borderRadius: "8px",
+                              padding: "6px 12px",
+                              fontWeight: 500,
+                              fontSize: "0.8rem",
+                              transition: "all 0.2s",
+                            }}
+                          >
+                            <i className="bi bi-arrow-clockwise"></i>
+                            {reportGeneratingFor === assessment.assessmentId ? "" : "Regenerate"}
+                          </button>
+                          </>
                         )}
                       </div>
                     </div>

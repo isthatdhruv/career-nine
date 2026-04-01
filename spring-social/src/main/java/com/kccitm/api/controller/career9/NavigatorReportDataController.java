@@ -63,8 +63,10 @@ public class NavigatorReportDataController {
             Optional<NavigatorReportData> existing = navigatorReportDataRepository
                     .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
 
-            // Step 2: Generate data if missing OR if AI summary is empty (needs regeneration)
-            boolean needsRegeneration = existing.isEmpty()
+            // Step 2: Generate data if missing, AI summary is empty, or force=true
+            boolean force = Boolean.TRUE.equals(request.get("force"));
+            boolean needsRegeneration = force
+                    || existing.isEmpty()
                     || existing.get().getSummary() == null
                     || existing.get().getSummary().isEmpty()
                     || existing.get().getSummary().startsWith("Summary generation failed");
