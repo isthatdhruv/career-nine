@@ -1,0 +1,94 @@
+{
+  "values": {
+    "lucrative_salary": {
+      "title": {
+        "english": "Lucrative Salary",
+        "hindi": "अच्छा वेतन"
+      }
+    },
+    "job_security": {
+      "title": {
+        "english": "Job Security",
+        "hindi": "नौकरी की सुरक्षा"
+      }
+    },
+    "variety_and_diversity": {
+      "title": {
+        "english": "Variety and Diversity",
+        "hindi": "विविधता-विचलन"
+      }
+    },
+    "building_relations": {
+      "title": {
+        "english": "Building Relations",
+        "hindi": "टीम/समूह में काम करना"
+      }
+    },
+    "high_achievement": {
+      "title": {
+        "english": "High achievement",
+        "hindi": "उच्च उपलब्धि"
+      }
+    },
+    "autonomy": {
+      "title": {
+        "english": "Autonomy",
+        "hindi": "स्वतंत्रता/ स्वायत्तता"
+      }
+    },
+    "hands_on_activities": {
+      "title": {
+        "english": "Hands on activities",
+        "hindi": "हाथों से काम करना"
+      }
+    },
+    "prestige_recognition": {
+      "title": {
+        "english": "Prestige/ Recognition",
+        "hindi": "प्रतिष्ठा/ मान्यता"
+      }
+    },
+    "creativity": {
+      "title": {
+        "english": "Creativity",
+        "hindi": "रचनात्मकता"
+      }
+    },
+    "mental_activity": {
+      "title": {
+        "english": "Mental Activity",
+        "hindi": "मन के साथ काम करना"
+      }
+    },
+    "physical_activity": {
+      "title": {
+        "english": "Physical Activity",
+        "hindi": "शारीरिक गतिविधि"
+      }
+    },
+    "leadership": {
+      "title": {
+        "english": "Leadership",
+        "hindi": "नेतृत्व"
+      }
+    },
+    "routine_activity": {
+      "title": {
+        "english": "Routine Activity",
+        "hindi": "नियमित गतिविधि"
+      }
+    },
+    "supervised_work": {
+      "title": {
+        "english": "Supervised Work",
+        "hindi": "निरीक्षित कार्य"
+      }
+    },
+    "working_conditions": {
+      "title": {
+        "english": "Working Conditions",
+        "hindi": "कार्य परिस्थितियाँ"
+      }
+    }
+  }
+}

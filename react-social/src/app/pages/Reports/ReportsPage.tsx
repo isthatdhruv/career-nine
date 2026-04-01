@@ -5,10 +5,15 @@ import {
   getStudentsWithMappingByInstituteId,
   Assessment,
 } from "../StudentInformation/StudentInfo_APIs";
+import { getAssessmentMappingsByInstitute } from "../AssessmentMapping/API/AssessmentMapping_APIs";
 import {
   getBetReportDataByAssessment,
   generateHtmlReports,
   BetReportData,
+  exportGeneralAssessmentExcel,
+  exportGeneralAssessmentExcelForStudent,
+  exportMqtScoresExcel,
+  exportBetReportExcel,
 } from "../ReportGeneration/API/BetReportData_APIs";
 
 type StudentRow = {
@@ -40,6 +45,7 @@ const ReportsPage: React.FC = () => {
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
   const [institutesLoading, setInstitutesLoading] = useState(false);
 
+  const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [selectedAssessment, setSelectedAssessment] = useState<number | "">("");
   const [assessmentsLoading, setAssessmentsLoading] = useState(false);
@@ -66,6 +72,10 @@ const ReportsPage: React.FC = () => {
 
   // ── Generate ──
   const [generating, setGenerating] = useState(false);
+  const [exportingOMR, setExportingOMR] = useState(false);
+  const [exportingMQT, setExportingMQT] = useState(false);
+  const [exportingBET, setExportingBET] = useState(false);
+  const [exportingStudentId, setExportingStudentId] = useState<number | null>(null);
 
   // ═══════════════════════ DATA LOADING ═══════════════════════
 
@@ -78,12 +88,39 @@ const ReportsPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    setAssessmentsLoading(true);
     getAllAssessments()
-      .then((res) => setAssessments(res.data || []))
-      .catch(() => setAssessments([]))
-      .finally(() => setAssessmentsLoading(false));
+      .then((res) => setAllAssessments(res.data || []))
+      .catch(() => setAllAssessments([]));
   }, []);
+
+  const [mappedAssessmentIds, setMappedAssessmentIds] = useState<Set<number> | null>(null);
+
+  useEffect(() => {
+    if (selectedInstitute === "") {
+      setMappedAssessmentIds(null);
+      return;
+    }
+    setAssessmentsLoading(true);
+    getAssessmentMappingsByInstitute(Number(selectedInstitute))
+      .then((res) => {
+        const ids = new Set<number>(
+          (res.data || [])
+            .filter((m: any) => m.isActive !== false)
+            .map((m: any) => Number(m.assessmentId))
+        );
+        setMappedAssessmentIds(ids.size > 0 ? ids : null);
+      })
+      .catch(() => setMappedAssessmentIds(null))
+      .finally(() => setAssessmentsLoading(false));
+  }, [selectedInstitute]);
+
+  useEffect(() => {
+    if (mappedAssessmentIds && mappedAssessmentIds.size > 0) {
+      setAssessments(allAssessments.filter((a) => mappedAssessmentIds.has(a.id)));
+    } else {
+      setAssessments(allAssessments);
+    }
+  }, [allAssessments, mappedAssessmentIds]);
 
   useEffect(() => {
     if (selectedInstitute === "") {
@@ -593,6 +630,144 @@ const ReportsPage: React.FC = () => {
                     </>
                   )}
                 </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={async () => {
+                    if (!selectedAssessment) return;
+                    const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
+                    const selectedVisible = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
+                    setExportingOMR(true);
+                    try {
+                      if (selectedVisible.length === 1) {
+                        // Single student selected → per-student export
+                        const res = await exportGeneralAssessmentExcelForStudent(
+                          Number(selectedAssessment), selectedVisible[0]
+                        );
+                        const url = window.URL.createObjectURL(new Blob([res.data]));
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `general_assessment_${selectedAssessment}_student_${selectedVisible[0]}.xlsx`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        window.URL.revokeObjectURL(url);
+                      } else {
+                        // No selection or multiple → export all
+                        const res = await exportGeneralAssessmentExcel(Number(selectedAssessment));
+                        const url = window.URL.createObjectURL(new Blob([res.data]));
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `general_assessment_${selectedAssessment}.xlsx`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        window.URL.revokeObjectURL(url);
+                      }
+                    } catch (err: any) {
+                      alert("Export failed: " + (err?.response?.data?.error || err.message));
+                    } finally {
+                      setExportingOMR(false);
+                    }
+                  }}
+                  disabled={exportingOMR}
+                  style={{
+                    background: exportingOMR
+                      ? "#6c757d"
+                      : "linear-gradient(135deg, #0d9488 0%, #065f46 100%)",
+                    border: "none", borderRadius: 8, padding: "8px 20px",
+                    fontWeight: 600, color: "white", fontSize: "0.85rem",
+                    boxShadow: exportingOMR ? "none" : "0 4px 12px rgba(13, 148, 136, 0.3)",
+                  }}
+                >
+                  {exportingOMR ? "Exporting..." : (
+                    <>
+                      Export OMR Data
+                      {visibleSelectedCount === 1
+                        ? ` (1 selected)`
+                        : visibleSelectedCount > 1
+                        ? ` (${visibleSelectedCount} selected)`
+                        : ` (All)`}
+                    </>
+                  )}
+                </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={async () => {
+                    if (!selectedAssessment) return;
+                    const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
+                    const selectedVisible = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
+                    setExportingMQT(true);
+                    try {
+                      const res = await exportMqtScoresExcel(
+                        Number(selectedAssessment),
+                        selectedVisible.length > 0 ? selectedVisible : undefined
+                      );
+                      const url = window.URL.createObjectURL(new Blob([res.data]));
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `mqt_scores_${selectedAssessment}.xlsx`;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      window.URL.revokeObjectURL(url);
+                    } catch (err: any) {
+                      alert("Export failed: " + (err?.response?.data?.error || err.message));
+                    } finally {
+                      setExportingMQT(false);
+                    }
+                  }}
+                  disabled={exportingMQT}
+                  style={{
+                    background: exportingMQT
+                      ? "#6c757d"
+                      : "linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)",
+                    border: "none", borderRadius: 8, padding: "8px 20px",
+                    fontWeight: 600, color: "white", fontSize: "0.85rem",
+                    boxShadow: exportingMQT ? "none" : "0 4px 12px rgba(124, 58, 237, 0.3)",
+                  }}
+                >
+                  {exportingMQT ? "Exporting..." : (
+                    <>
+                      Export MQ/MQT Scores
+                      {visibleSelectedCount > 0
+                        ? ` (${visibleSelectedCount} selected)`
+                        : ` (All)`}
+                    </>
+                  )}
+                </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={async () => {
+                    if (!selectedAssessment) return;
+                    setExportingBET(true);
+                    try {
+                      const res = await exportBetReportExcel(Number(selectedAssessment));
+                      const url = window.URL.createObjectURL(new Blob([res.data]));
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `bet_report_data_${selectedAssessment}.xlsx`;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      window.URL.revokeObjectURL(url);
+                    } catch (err: any) {
+                      alert("Export failed: " + (err?.response?.data?.error || err.message));
+                    } finally {
+                      setExportingBET(false);
+                    }
+                  }}
+                  disabled={exportingBET}
+                  style={{
+                    background: exportingBET
+                      ? "#6c757d"
+                      : "linear-gradient(135deg, #e67e22 0%, #d35400 100%)",
+                    border: "none", borderRadius: 8, padding: "8px 20px",
+                    fontWeight: 600, color: "white", fontSize: "0.85rem",
+                    boxShadow: exportingBET ? "none" : "0 4px 12px rgba(230, 126, 34, 0.3)",
+                  }}
+                >
+                  {exportingBET ? "Exporting..." : "Export BET Report"}
+                </button>
               </div>
 
               {/* Table */}
@@ -684,49 +859,80 @@ const ReportsPage: React.FC = () => {
                             </span>
                           </td>
                           <td style={tdStyle}>
-                            {reportUrl ? (
-                              <div style={{ display: "flex", gap: 6 }}>
-                                <a
-                                  href={reportUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{
-                                    padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem",
-                                    fontWeight: 600, background: "#dbeafe", color: "#2563eb",
-                                    textDecoration: "none",
-                                  }}
-                                >
-                                  Preview
-                                </a>
-                                <button
-                                  onClick={async () => {
-                                    try {
-                                      const res = await fetch(reportUrl);
-                                      const blob = await res.blob();
-                                      const url = window.URL.createObjectURL(blob);
-                                      const a = document.createElement("a");
-                                      a.href = url;
-                                      a.download = `${s.name || "report"}_bet_report.html`;
-                                      document.body.appendChild(a);
-                                      a.click();
-                                      document.body.removeChild(a);
-                                      window.URL.revokeObjectURL(url);
-                                    } catch (e) {
-                                      console.error("Download failed", e);
-                                    }
-                                  }}
-                                  style={{
-                                    padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem",
-                                    fontWeight: 600, background: "#f0fdf4", color: "#059669",
-                                    border: "none", cursor: "pointer",
-                                  }}
-                                >
-                                  Download
-                                </button>
-                              </div>
-                            ) : (
-                              <span style={{ color: "#9ca3af", fontSize: "0.75rem" }}>-</span>
-                            )}
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              {reportUrl && (
+                                <>
+                                  <a
+                                    href={reportUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                      padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem",
+                                      fontWeight: 600, background: "#dbeafe", color: "#2563eb",
+                                      textDecoration: "none",
+                                    }}
+                                  >
+                                    Preview
+                                  </a>
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        const res = await fetch(reportUrl);
+                                        const blob = await res.blob();
+                                        const url = window.URL.createObjectURL(blob);
+                                        const a = document.createElement("a");
+                                        a.href = url;
+                                        a.download = `${s.name || "report"}_bet_report.html`;
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        document.body.removeChild(a);
+                                        window.URL.revokeObjectURL(url);
+                                      } catch (e) {
+                                        console.error("Download failed", e);
+                                      }
+                                    }}
+                                    style={{
+                                      padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem",
+                                      fontWeight: 600, background: "#f0fdf4", color: "#059669",
+                                      border: "none", cursor: "pointer",
+                                    }}
+                                  >
+                                    Download
+                                  </button>
+                                </>
+                              )}
+                              <button
+                                onClick={async () => {
+                                  if (!selectedAssessment) return;
+                                  setExportingStudentId(s.userStudentId);
+                                  try {
+                                    const res = await exportGeneralAssessmentExcelForStudent(
+                                      Number(selectedAssessment), s.userStudentId
+                                    );
+                                    const url = window.URL.createObjectURL(new Blob([res.data]));
+                                    const a = document.createElement("a");
+                                    a.href = url;
+                                    a.download = `${(s.name || "student").replace(/\s+/g, "_")}_OMR_${s.userStudentId}.xlsx`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    a.remove();
+                                    window.URL.revokeObjectURL(url);
+                                  } catch (err: any) {
+                                    alert("Export failed: " + (err?.response?.data?.error || err.message));
+                                  } finally {
+                                    setExportingStudentId(null);
+                                  }
+                                }}
+                                disabled={exportingStudentId === s.userStudentId}
+                                style={{
+                                  padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem",
+                                  fontWeight: 600, background: "#f0fdfa", color: "#0d9488",
+                                  border: "none", cursor: "pointer",
+                                }}
+                              >
+                                {exportingStudentId === s.userStudentId ? "..." : "OMR"}
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );

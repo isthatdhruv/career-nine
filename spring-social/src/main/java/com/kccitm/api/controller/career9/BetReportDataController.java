@@ -4,9 +4,11 @@ import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Font;
@@ -45,6 +47,7 @@ import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
 import com.kccitm.api.repository.Career9.AssessmentQuestionOptionsRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.BetReportDataRepository;
+import com.kccitm.api.repository.Career9.MeasuredQualitiesRepository;
 import com.kccitm.api.repository.Career9.MeasuredQualityTypesRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.Career9.School.SchoolSectionsRepository;
@@ -73,10 +76,78 @@ public class BetReportDataController {
     @Autowired private AssessmentRawScoreRepository assessmentRawScoreRepository;
     @Autowired private SchoolSectionsRepository schoolSectionsRepository;
     @Autowired private MeasuredQualityTypesRepository measuredQualityTypesRepository;
+    @Autowired private MeasuredQualitiesRepository measuredQualitiesRepository;
     @Autowired private AssessmentQuestionOptionsRepository assessmentQuestionOptionsRepository;
     @Autowired private QuestionnaireQuestionRepository questionnaireQuestionRepository;
     @Autowired private FirebaseService firebaseService;
     @Autowired private DigitalOceanSpacesService digitalOceanSpacesService;
+
+    // ═══════════════════════ ONE-CLICK REPORT ═══════════════════════
+
+    /**
+     * POST /bet-report-data/one-click-report
+     * Body: { "assessmentId": 5, "userStudentId": 874 }
+     *
+     * Generates report data (if not exists) + generates HTML report + returns URL.
+     * Single endpoint for the "Download Report" button in student assessment modal.
+     */
+    @PostMapping("/one-click-report")
+    @Transactional
+    public ResponseEntity<?> oneClickReport(@RequestBody Map<String, Object> request) {
+        try {
+            Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+            Long userStudentId = ((Number) request.get("userStudentId")).longValue();
+
+            // Step 1: Check if report data already exists
+            Optional<BetReportData> existing = betReportDataRepository
+                    .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+
+            // Step 2: Generate data if missing
+            if (existing.isEmpty()) {
+                BetReportData report = generateForStudentLive(userStudentId, assessmentId);
+                if (report == null) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body(Map.of("error", "No completed assessment found for this student"));
+                }
+                existing = Optional.of(report);
+            }
+
+            BetReportData report = existing.get();
+
+            // Step 3: Generate HTML if not already generated
+            if (!"generated".equals(report.getReportStatus()) || report.getReportUrl() == null) {
+                String template = loadHtmlTemplate();
+                if (template == null) {
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body(Map.of("error", "Could not load BET HTML template"));
+                }
+
+                String filledHtml = fillTemplate(template, report);
+                String safeName = (report.getStudentName() != null ? report.getStudentName() : "student")
+                        .replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
+                String fileName = safeName + "_" + userStudentId + "_bet_report.html";
+                String folder = "bet-reports/assessment-" + assessmentId;
+
+                String reportUrl = digitalOceanSpacesService.uploadBytes(
+                        filledHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                        "text/html", folder, fileName);
+
+                report.setReportStatus("generated");
+                report.setReportUrl(reportUrl);
+                betReportDataRepository.save(report);
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "reportUrl", report.getReportUrl(),
+                    "studentName", safe(report.getStudentName()),
+                    "status", "generated"
+            ));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Report generation failed: " + e.getMessage()));
+        }
+    }
 
     // ═══════════════════════ CRUD ═══════════════════════
 
@@ -179,6 +250,160 @@ public class BetReportDataController {
             HttpHeaders responseHeaders = new HttpHeaders();
             responseHeaders.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
             responseHeaders.setContentDispositionFormData("attachment", "bet_report_data.xlsx");
+            responseHeaders.setContentLength(out.size());
+
+            return new ResponseEntity<>(out.toByteArray(), responseHeaders, HttpStatus.OK);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Export failed: " + e.getMessage()));
+        }
+    }
+
+    // ═══════════════════════ MQ/MQT SCORE EXPORT ═══════════════════════
+
+    /**
+     * POST /bet-report-data/export-mqt-scores
+     * Body: { "assessmentId": 123, "userStudentIds": [1, 2, 3] }
+     * If userStudentIds is empty or absent, exports all students for the assessment.
+     *
+     * Exports an Excel file with columns:
+     * Student Name | Roll No | Grade | Section | [MQ1: MQT1] | [MQ1: MQT2] | ... | [MQ2: MQT3] | ...
+     */
+    @PostMapping("/export-mqt-scores")
+    public ResponseEntity<?> exportMqtScores(@RequestBody Map<String, Object> request) {
+        try {
+            if (!request.containsKey("assessmentId")) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "assessmentId is required"));
+            }
+            Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+
+            // 1. Get student mappings for this assessment
+            List<StudentAssessmentMapping> allMappings = studentAssessmentMappingRepository.findAllByAssessmentId(assessmentId);
+            if (allMappings.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "No student mappings found for this assessment"));
+            }
+
+            // 2. Filter by selected student IDs if provided
+            @SuppressWarnings("unchecked")
+            List<Number> selectedIds = (List<Number>) request.get("userStudentIds");
+            if (selectedIds != null && !selectedIds.isEmpty()) {
+                java.util.Set<Long> selectedSet = selectedIds.stream()
+                        .map(Number::longValue).collect(Collectors.toSet());
+                allMappings = allMappings.stream()
+                        .filter(m -> selectedSet.contains(m.getUserStudent().getUserStudentId()))
+                        .collect(Collectors.toList());
+            }
+
+            if (allMappings.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "No matching students found"));
+            }
+
+            // 3. Get all active MQTs grouped by their parent MQ
+            List<MeasuredQualityTypes> allMqts = measuredQualityTypesRepository.findByIsDeletedFalseOrIsDeletedIsNull();
+
+            // Group MQTs by MQ, maintaining order
+            LinkedHashMap<String, List<MeasuredQualityTypes>> mqToMqts = new LinkedHashMap<>();
+            for (MeasuredQualityTypes mqt : allMqts) {
+                String mqName = mqt.getMeasuredQuality() != null
+                        ? safe(mqt.getMeasuredQuality().getQualityDisplayName() != null
+                            ? mqt.getMeasuredQuality().getQualityDisplayName()
+                            : mqt.getMeasuredQuality().getMeasuredQualityName())
+                        : "Ungrouped";
+                mqToMqts.computeIfAbsent(mqName, k -> new ArrayList<>()).add(mqt);
+            }
+
+            // 4. Build ordered list of MQT columns
+            List<MeasuredQualityTypes> orderedMqts = new ArrayList<>();
+            List<String> mqtColumnHeaders = new ArrayList<>();
+            for (Map.Entry<String, List<MeasuredQualityTypes>> entry : mqToMqts.entrySet()) {
+                String mqName = entry.getKey();
+                for (MeasuredQualityTypes mqt : entry.getValue()) {
+                    orderedMqts.add(mqt);
+                    String mqtName = mqt.getMeasuredQualityTypeDisplayName() != null
+                            ? mqt.getMeasuredQualityTypeDisplayName()
+                            : mqt.getMeasuredQualityTypeName();
+                    mqtColumnHeaders.add(mqName + ": " + safe(mqtName));
+                }
+            }
+
+            // 5. Bulk-fetch all raw scores for these mappings
+            List<Long> mappingIds = allMappings.stream()
+                    .map(StudentAssessmentMapping::getStudentAssessmentId)
+                    .collect(Collectors.toList());
+            List<AssessmentRawScore> allScores = assessmentRawScoreRepository
+                    .findByStudentAssessmentMappingStudentAssessmentIdIn(mappingIds);
+
+            // Index scores by (mappingId -> mqtId -> rawScore)
+            Map<Long, Map<Long, Integer>> scoreIndex = new HashMap<>();
+            for (AssessmentRawScore score : allScores) {
+                Long mapId = score.getStudentAssessmentMapping().getStudentAssessmentId();
+                Long mqtId = score.getMeasuredQualityType() != null
+                        ? score.getMeasuredQualityType().getMeasuredQualityTypeId() : null;
+                if (mqtId != null) {
+                    scoreIndex.computeIfAbsent(mapId, k -> new HashMap<>())
+                            .put(mqtId, score.getRawScore());
+                }
+            }
+
+            // 6. Build Excel
+            Workbook workbook = new XSSFWorkbook();
+            Sheet sheet = workbook.createSheet("MQ-MQT Scores");
+
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerStyle.setFont(headerFont);
+
+            // Header row: Student Name | Roll No | Grade | Section | [MQT columns...]
+            List<String> baseHeaders = List.of("Student Name", "Roll No", "Grade", "Section");
+            Row headerRow = sheet.createRow(0);
+            for (int i = 0; i < baseHeaders.size(); i++) {
+                headerRow.createCell(i).setCellValue(baseHeaders.get(i));
+                headerRow.getCell(i).setCellStyle(headerStyle);
+            }
+            for (int i = 0; i < mqtColumnHeaders.size(); i++) {
+                int col = baseHeaders.size() + i;
+                headerRow.createCell(col).setCellValue(mqtColumnHeaders.get(i));
+                headerRow.getCell(col).setCellStyle(headerStyle);
+            }
+
+            // Data rows
+            int rowIdx = 1;
+            for (StudentAssessmentMapping mapping : allMappings) {
+                UserStudent us = mapping.getUserStudent();
+                StudentInfo si = us.getStudentInfo();
+                Row row = sheet.createRow(rowIdx++);
+
+                row.createCell(0).setCellValue(safe(si != null ? si.getName() : ""));
+                row.createCell(1).setCellValue(safe(si != null ? si.getSchoolRollNumber() : ""));
+                row.createCell(2).setCellValue(resolveGrade(si));
+                row.createCell(3).setCellValue(resolveSection(si));
+
+                Map<Long, Integer> studentScores = scoreIndex.getOrDefault(
+                        mapping.getStudentAssessmentId(), Map.of());
+                for (int i = 0; i < orderedMqts.size(); i++) {
+                    Long mqtId = orderedMqts.get(i).getMeasuredQualityTypeId();
+                    Integer score = studentScores.get(mqtId);
+                    row.createCell(baseHeaders.size() + i).setCellValue(score != null ? score : 0);
+                }
+            }
+
+            // Auto-size first 4 columns
+            for (int i = 0; i < baseHeaders.size(); i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            workbook.write(out);
+            workbook.close();
+
+            HttpHeaders responseHeaders = new HttpHeaders();
+            responseHeaders.setContentType(MediaType.parseMediaType(
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+            responseHeaders.setContentDispositionFormData("attachment", "mqt_scores_export.xlsx");
             responseHeaders.setContentLength(out.size());
 
             return new ResponseEntity<>(out.toByteArray(), responseHeaders, HttpStatus.OK);
@@ -1121,6 +1346,19 @@ public class BetReportDataController {
             Optional<SchoolSections> sectionOpt = schoolSectionsRepository.findById(si.getSchoolSectionId());
             if (sectionOpt.isPresent() && sectionOpt.get().getSchoolClasses() != null) {
                 return sectionOpt.get().getSchoolClasses().getClassName();
+            }
+        } catch (Exception e) {
+            // ignore
+        }
+        return "";
+    }
+
+    private String resolveSection(StudentInfo si) {
+        if (si == null || si.getSchoolSectionId() == null) return "";
+        try {
+            Optional<SchoolSections> sectionOpt = schoolSectionsRepository.findById(si.getSchoolSectionId());
+            if (sectionOpt.isPresent()) {
+                return safe(sectionOpt.get().getSectionName());
             }
         } catch (Exception e) {
             // ignore

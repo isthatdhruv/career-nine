@@ -52,6 +52,7 @@ import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
 import com.kccitm.api.repository.AssessmentRawScoreRepository;
 import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
 import com.kccitm.api.repository.Career9.StudentInfoRepository;
+import javax.transaction.Transactional;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
@@ -354,11 +355,59 @@ public class StudentInfoController {
         return studentInfoRepository.findByInstituteId(instituteId);
     }
 
+    @Transactional
     @GetMapping("/getStudentsWithMappingByInstituteId/{instituteId}")
     public List<java.util.Map<String, Object>> getStudentsWithMappingByInstituteId(
             @PathVariable("instituteId") Integer instituteId) {
         try {
+            // 1. Bulk load all students for this institute (1 query)
             List<StudentInfo> students = studentInfoRepository.findByInstituteId(instituteId);
+            if (students.isEmpty()) return new java.util.ArrayList<>();
+
+            // 2. Collect all studentInfo IDs
+            List<Integer> studentInfoIds = students.stream()
+                    .map(StudentInfo::getId)
+                    .collect(Collectors.toList());
+
+            // 3. Bulk load all UserStudents for these studentInfo IDs (1 query instead of N)
+            Map<Integer, UserStudent> studentInfoToUserStudent = new HashMap<>();
+            List<Long> allUserStudentIds = new ArrayList<>();
+            List<UserStudent> allUserStudents = userStudentRepository.findByStudentInfoIdIn(studentInfoIds);
+            for (UserStudent us : allUserStudents) {
+                if (us.getStudentInfo() != null) {
+                    studentInfoToUserStudent.putIfAbsent(us.getStudentInfo().getId(), us);
+                    allUserStudentIds.add(us.getUserStudentId());
+                }
+            }
+
+            // 4. Bulk load all assessment mappings for all these userStudentIds (1 query)
+            // Group by userStudentId
+            Map<Long, List<StudentAssessmentMapping>> mappingsByStudent = new HashMap<>();
+            if (!allUserStudentIds.isEmpty()) {
+                List<StudentAssessmentMapping> allMappings = studentAssessmentMappingRepository
+                        .findByUserStudentUserStudentIdIn(allUserStudentIds);
+                for (StudentAssessmentMapping m : allMappings) {
+                    Long usId = m.getUserStudent().getUserStudentId();
+                    mappingsByStudent.computeIfAbsent(usId, k -> new ArrayList<>()).add(m);
+                }
+            }
+
+            // 5. Bulk load all assessment names (1 query)
+            Set<Long> allAssessmentIds = new java.util.HashSet<>();
+            for (List<StudentAssessmentMapping> maps : mappingsByStudent.values()) {
+                for (StudentAssessmentMapping m : maps) {
+                    allAssessmentIds.add(m.getAssessmentId());
+                }
+            }
+            Map<Long, String> assessmentNames = new HashMap<>();
+            if (!allAssessmentIds.isEmpty()) {
+                List<AssessmentTable> assessments = assessmentTableRepository.findAllById(allAssessmentIds);
+                for (AssessmentTable a : assessments) {
+                    assessmentNames.put(a.getId(), a.getAssessmentName());
+                }
+            }
+
+            // 6. Assemble response in memory — no more DB queries
             List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
 
             for (StudentInfo si : students) {
@@ -372,66 +421,45 @@ public class StudentInfoController {
                 studentData.put("studentDob", si.getStudentDob());
                 studentData.put("schoolSectionId", si.getSchoolSectionId());
                 studentData.put("controlNumber", si.getControlNumber());
-                studentData.put("username", si.getUser().getUsername());
-
-                // Find UserStudent for this StudentInfo to get userStudentId
                 try {
-                    List<UserStudent> userStudentList = userStudentRepository.findByStudentInfoId(si.getId());
-                    if (!userStudentList.isEmpty()) {
-                        UserStudent us = userStudentList.get(0); // Take the first one if multiple exist
-                        studentData.put("userStudentId", us.getUserStudentId());
-
-                        // Get ALL assessment mappings for this student
-                        List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
-                                .findByUserStudentUserStudentId(us.getUserStudentId());
-
-                        // Deduplicate mappings by assessmentId (keep the first occurrence)
-                        java.util.Map<Long, StudentAssessmentMapping> uniqueMappings = new java.util.LinkedHashMap<>();
-                        for (StudentAssessmentMapping mapping : mappings) {
-                            uniqueMappings.putIfAbsent(mapping.getAssessmentId(), mapping);
-                        }
-                        List<StudentAssessmentMapping> deduplicatedMappings = new java.util.ArrayList<>(uniqueMappings.values());
-
-                        // Return all assigned assessment IDs (deduplicated)
-                        List<Long> assignedAssessmentIds = new java.util.ArrayList<>();
-                        for (StudentAssessmentMapping mapping : deduplicatedMappings) {
-                            assignedAssessmentIds.add(mapping.getAssessmentId());
-                        }
-                        studentData.put("assignedAssessmentIds", assignedAssessmentIds);
-
-                        // Return full assessment details (id, name, status) - deduplicated
-                        List<java.util.Map<String, Object>> assessmentDetails = new java.util.ArrayList<>();
-                        for (StudentAssessmentMapping mapping : deduplicatedMappings) {
-                            java.util.Map<String, Object> detail = new java.util.HashMap<>();
-                            detail.put("assessmentId", mapping.getAssessmentId());
-                            detail.put("status", mapping.getStatus());
-                            // Get assessment name
-                            java.util.Optional<com.kccitm.api.model.career9.AssessmentTable> assessment = assessmentTableRepository
-                                    .findById(mapping.getAssessmentId());
-                            if (assessment.isPresent()) {
-                                detail.put("assessmentName", assessment.get().getAssessmentName());
-                            } else {
-                                detail.put("assessmentName", "Unknown");
-                            }
-                            assessmentDetails.add(detail);
-                        }
-                        studentData.put("assessments", assessmentDetails);
-
-                        // Also keep the latest for backward compatibility
-                        if (!mappings.isEmpty()) {
-                            StudentAssessmentMapping latestMapping = mappings.get(mappings.size() - 1);
-                            studentData.put("assessmentId", latestMapping.getAssessmentId());
-                        } else {
-                            studentData.put("assessmentId", null);
-                        }
-                    } else {
-                        studentData.put("userStudentId", null);
-                        studentData.put("assessmentId", null);
-                        studentData.put("assignedAssessmentIds", new java.util.ArrayList<>());
-                        studentData.put("assessments", new java.util.ArrayList<>());
-                    }
+                    studentData.put("username", si.getUser() != null ? si.getUser().getUsername() : null);
                 } catch (Exception e) {
-                    System.out.println("Error finding mapping for student " + si.getId() + ": " + e.getMessage());
+                    studentData.put("username", null);
+                }
+
+                UserStudent us = studentInfoToUserStudent.get(si.getId());
+                if (us != null) {
+                    studentData.put("userStudentId", us.getUserStudentId());
+
+                    List<StudentAssessmentMapping> mappings = mappingsByStudent
+                            .getOrDefault(us.getUserStudentId(), new ArrayList<>());
+
+                    // Deduplicate by assessmentId
+                    java.util.Map<Long, StudentAssessmentMapping> uniqueMappings = new java.util.LinkedHashMap<>();
+                    for (StudentAssessmentMapping mapping : mappings) {
+                        uniqueMappings.putIfAbsent(mapping.getAssessmentId(), mapping);
+                    }
+                    List<StudentAssessmentMapping> deduplicatedMappings = new java.util.ArrayList<>(uniqueMappings.values());
+
+                    List<Long> assignedAssessmentIds = new java.util.ArrayList<>();
+                    List<java.util.Map<String, Object>> assessmentDetails = new java.util.ArrayList<>();
+                    for (StudentAssessmentMapping mapping : deduplicatedMappings) {
+                        assignedAssessmentIds.add(mapping.getAssessmentId());
+                        java.util.Map<String, Object> detail = new java.util.HashMap<>();
+                        detail.put("assessmentId", mapping.getAssessmentId());
+                        detail.put("status", mapping.getStatus());
+                        detail.put("assessmentName", assessmentNames.getOrDefault(mapping.getAssessmentId(), "Unknown"));
+                        assessmentDetails.add(detail);
+                    }
+                    studentData.put("assignedAssessmentIds", assignedAssessmentIds);
+                    studentData.put("assessments", assessmentDetails);
+
+                    if (!mappings.isEmpty()) {
+                        studentData.put("assessmentId", mappings.get(mappings.size() - 1).getAssessmentId());
+                    } else {
+                        studentData.put("assessmentId", null);
+                    }
+                } else {
                     studentData.put("userStudentId", null);
                     studentData.put("assessmentId", null);
                     studentData.put("assignedAssessmentIds", new java.util.ArrayList<>());

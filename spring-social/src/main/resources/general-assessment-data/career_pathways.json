@@ -1,0 +1,3764 @@
+{
+  "career_pathways": {
+    "architecture": {
+      "title": {
+        "english": "Architecture",
+        "hindi": "वास्तुकला"
+      },
+      "6-8": {
+        "description": {
+          "english": "Architects design buildings, homes, and public spaces like parks and bridges. They make sure these spaces are both useful and look good.",
+          "hindi": "आर्किटेक्ट यानी वास्तुशिल्पकार इमारतें, घर, और पार्क जैसे सार्वजनिक स्थान बनाते हैं, जैसे पुल भी। वे यह सुनिश्चित करते हैं कि ये जगहें न सिर्फ़ देखने में अच्छी हों, बल्कि उपयोगी भी हों।"
+        },
+        "subjects": {
+          "english": "Mathematics, Art, Science (Physics), Social Studies",
+          "hindi": "गणित, कला, विज्ञान (भौतिकी), सामाजिक अध्ययन"
+        },
+        "skills": {
+          "english": "Creativity, Problem-solving, Spatial awareness, Drawing and Modelling, Teamwork",
+          "hindi": "रचनात्मकता, समस्या सुलझाने की क्षमता, स्थान की समझ, चित्रकारी और मॉडल बनाना, टीमवर्क"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "Architects plan and design structures like houses, office buildings, and public spaces. They must consider the function, safety, and beauty of their designs while using both technical and creative skills.",
+          "hindi": "आर्किटेक्ट्स यानी वास्तुकार घरों, ऑफिस बिल्डिंग्स और सार्वजनिक जगहों जैसी इमारतों की योजना बनाते हैं और उन्हें डिजाइन करते हैं। उन्हें अपने डिजाइनों में कामकाज, सुरक्षा और सुंदरता का ध्यान रखना पड़ता है। इसके लिए वे तकनीकी जानकारी और रचनात्मक सोच दोनों का इस्तेमाल करते हैं।"
+        },
+        "subjects": {
+          "english": "Mathematics (Geometry, Trigonometry), Physics, Art and Design, Computer Science, History and Geography",
+          "hindi": "गणित (जैसे ज्यामिति और त्रिकोणमिति), भौतिकी, कला और डिज़ाइन, कंप्यूटर विज्ञान, इतिहास और भूगोल"
+        },
+        "skills": {
+          "english": "Technical Drawing and Computer-Aided Design (CAD), Analytical Thinking, Communication, Time Management",
+          "hindi": "प्राविधिक चित्रण और कंप्यूटर-आधारित डिज़ाइन (CAD), विश्लेषणात्मक सोच, संवाद कौशल, समय प्रबंधन"
+        },
+        "courses": {
+          "english": "Bachelor of Architecture (B.Arch.), Diploma in Architectural Technology, BSc in Architectural Engineering",
+          "hindi": "बैचलर ऑफ आर्किटेक्चर (B.Arch.), वास्तुकला तकनीक में डिप्लोमा, और वास्तुकला अभियंत्रण में बीएससी।"
+        },
+        "exams": {
+          "english": "NATA (National Aptitude Test in Architecture), JEE Main Paper 2, SAT/ACT, Portfolio Submission",
+          "hindi": "NATA (राष्ट्रीय वास्तुकला योग्यता परीक्षा), JEE मेन पेपर 2, SAT/ACT, और पोर्टफोलियो जमा करना"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "Architecture is a profession that involves designing, planning, and overseeing the construction of buildings. Architects combine creativity with technical knowledge to ensure their designs are functional, safe, and aesthetically pleasing.",
+          "hindi": "आर्किटेक्चर यानी वास्तुकला एक ऐसा पेशा है जिसमें इमारतों का डिज़ाइन बनाना, योजना बनाना और निर्माण का काम देखना शामिल है। आर्किटेक्ट अपनी रचनात्मकता और तकनीकी ज्ञान का इस्तेमाल करके यह सुनिश्चित करते हैं कि उनके डिज़ाइन न केवल सुंदर और आकर्षक हों, बल्कि सुरक्षित भी हों और कामकाजी तौर पर उपयोगी भी हों।"
+        },
+        "subjects": {
+          "english": "Advanced Mathematics\nPhysics\nArt/Design (including 3D Modelling)\nComputer Science (CAD software and 3D modelling)\nHistory (Architecture History)",
+          "hindi": "उन्नत गणित  \nभौतिकी  \nकला/डिज़ाइन (जिसमें 3D मॉडलिंग भी शामिल है)  \nकंप्यूटर साइंस (CAD सॉफ्टवेयर और 3D मॉडलिंग)  \nइतिहास (आर्किटेक्चर का इतिहास)"
+        },
+        "skills": {
+          "english": "Advanced CAD and Design Software\nSpatial Awareness and Visualization\nProject Management and Leadership\nSustainability Practices\nAttention to Detail",
+          "hindi": "उन्नत सीएडी और डिजाइन सॉफ्टवेयर  \nस्थानिक जागरूकता और कल्पना शक्ति  \nप्रोजेक्ट प्रबंधन और नेतृत्व कौशल  \nसततता के अभ्यास  \n細細 बातों पर ध्यान देना"
+        },
+        "career_options": {
+          "english": "Sustainable Design Consultant\nBIM Specialist\nUrban Designer\nArchitect\nInfrastructure Project Manager",
+          "hindi": "सतत डिज़ाइन सलाहकार  \nBIM विशेषज्ञ (बिल्डिंग इंफ्रास्ट्रक्चर मॉडलिंग)  \nशहरी डिज़ाइनर  \nआर्किटेक्ट (वास्तुकार)  \nइन्फ्रास्ट्रक्चर परियोजना प्रबंधक"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Creator",
+          "hindi": "कलात्मक"
+        },
+        {
+          "english": "Thinker",
+          "hindi": "जांच-पड़ताल करने वाला"
+        },
+        {
+          "english": "Doer",
+          "hindi": "व्यावहारिक"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Creativity",
+          "hindi": "रचनात्मकता"
+        },
+        {
+          "english": "Decision making & problem solving",
+          "hindi": "निर्णय लेना और समस्या का समाधान"
+        },
+        {
+          "english": "Computational",
+          "hindi": "गणनात्मक"
+        },
+        {
+          "english": "Technical",
+          "hindi": "तकनीकी"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Mathematics",
+          "hindi": "गणित"
+        },
+        {
+          "english": "Science",
+          "hindi": "विज्ञान"
+        },
+        {
+          "english": "Art",
+          "hindi": "कला"
+        },
+        {
+          "english": "Cultural studies",
+          "hindi": "सांस्कृतिक अध्ययन"
+        },
+        {
+          "english": "Technology",
+          "hindi": "प्रौद्योगिकी"
+        }
+      ],
+      "values": [
+        {
+          "english": "Hands-on activities",
+          "hindi": "हाथों से काम करना"
+        },
+        {
+          "english": "Creativity",
+          "hindi": "रचनात्मकता"
+        },
+        {
+          "english": "Lucrative Salary",
+          "hindi": "अच्छा वेतन"
+        },
+        {
+          "english": "Variety and Diversity",
+          "hindi": "विविधता-विचलन"
+        },
+        {
+          "english": "Prestige/ Recognition",
+          "hindi": "प्रतिष्ठा/ मान्यता"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Spatial-Visual",
+          "hindi": "स्थानिक-दृश्य"
+        },
+        {
+          "english": "Logical",
+          "hindi": "तार्किक"
+        },
+        {
+          "english": "Naturalistic",
+          "hindi": "प्राकृतिक"
+        }
+      ]
+    },
+    "art_design": {
+      "title": {
+        "english": "Art, Design",
+        "hindi": "कला और डिज़ाइन"
+      },
+      "6-8": {
+        "description": {
+          "english": "Art and Design involve using your creativity to create beautiful or meaningful works, whether by drawing, painting, designing clothing, or decorating rooms.",
+          "hindi": "कला और डिज़ाइन का मतलब है अपनी रचनात्मकता का इस्तेमाल करके सुंदर या महत्वपूर्ण चीजें बनाना। इसमें आप चित्र बनाना, पेंटिंग करना, कपड़ों का डिज़ाइन करना, या कमरे सजाना जैसी गतिविधियों का हिस्सा हो सकते हैं। यह सब आपकी कल्पना और हुनर को दिखाने का तरीका है।"
+        },
+        "subjects": {
+          "english": "Art and Craft, Mathematics, Computer Science (Basic Design Software)",
+          "hindi": "कला और शिल्प, गणित, और कंप्यूटर विज्ञान (मूल डिज़ाइन सॉफ्टवेयर)"
+        },
+        "skills": {
+          "english": "Creativity, Attention to Detail, Visualization, Basic Digital Tools",
+          "hindi": "रचनात्मकता, ध्यान देना, कल्पना शक्ति, और आसान डिजिटल टूल्स"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "Art and Design involves creating visual projects that communicate ideas, solve problems, or beautify surroundings. This includes designing logos, creating fashion, or developing artistic spaces.",
+          "hindi": "कला और डिज़ाइन में ऐसे विजुअल प्रोजेक्ट बनाना शामिल है जो आइडिया को आसानी से समझाने, समस्याओं का हल निकालने या अपने आसपास को सुंदर बनाने में मदद करें। इसमें लोगो बनाना, फैशन डिज़ाइन करना या कला से जुड़े जगहें बनाना जैसी चीजें शामिल हैं।"
+        },
+        "subjects": {
+          "english": "Art (Painting, Sculpture), Mathematics (Geometry, Proportions), Information Technology (Basic Design Software, PhotoVocational Studies), Fashion Studies (for Fashion Design)",
+          "hindi": "कला (पेंटिंग, मूर्तिकला), गणित (आकृति विज्ञान, अनुपात), सूचना प्रौद्योगिकी (बुनियादी डिज़ाइन सॉफ्टवेयर, फोटोवोकेशनल स्टडीज), फैशन स्टडीज़ (फैशन डिज़ाइन के लिए)"
+        },
+        "skills": {
+          "english": "Creativity and Innovation, Sketching and Drawing Skills, Digital Design, Time Management",
+          "hindi": "रचनात्मकता और नवाचार, स्केचिंग और ड्राइंग कौशल, डिजिटल डिज़ाइन, समय का अच्छा प्रबंधन"
+        },
+        "courses": {
+          "english": "Bachelor of Fine Arts (BFA), Bachelor of Design (B.Des), Diploma in Fashion Design, B.Arch. (Bachelor of Architecture), Diploma in Animation and Multimedia",
+          "hindi": "फाइन आर्ट्स में स्नातक (BFA), डिज़ाइन में स्नातक (B.Des), फैशन डिज़ाइन में डिप्लोमा, आर्किटेक्चर में स्नातक (B.Arch.), और एनीमेशन व मल्टिमीडिया में डिप्लोमा।"
+        },
+        "exams": {
+          "english": "NID DAT (National Institute of Design Entrance Exam), UCEED (Undergraduate Common Entrance Exam for Design), NIFT Entrance Exam (National Institute of Fashion Technology), CEED (Common Entrance Examination for Design), Pearl Academy Entrance Exam, State Level Art Entrance Exams",
+          "hindi": "राष्ट्रीय डिजाइन संस्थान प्रवेश परीक्षा (NID DAT), अंडरग्रेजुएट कॉमन एंट्रेंस परीक्षा फॉर डिज़ाइन (UCEED), राष्ट्रीय फैशन तकनीक संस्थान प्रवेश परीक्षा (NIFT), कॉमन एंट्रेंस परीक्षा फॉर डिज़ाइन (CEED), पर्ल अकादमी प्रवेश परीक्षा, राज्य स्तर की कला प्रवेश परीक्षाएँ"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "Art and Design encompass a broad range of creative fields, such as graphic design, fine arts, fashion, animation, and interior design, where artists create visual works for communication, expression, or practical purposes. These fields focus on conveying messages, emotions, and ideas through visuals and enhancing the appearance of products or spaces.",
+          "hindi": "कला और डिज़ाइन कई तरह के रचनात्मक क्षेत्रों को मिलाकर बने हैं, जैसे ग्राफिक डिज़ाइन, चित्रकला, फैशन, एनीमेशन और इंटीरियर डिज़ाइन। इन क्षेत्रों में कलाकार अपनी कला का इस्तेमाल करके बातें कहने, भावनाएँ व्यक्त करने और व्यावहारिक जरूरतों को पूरा करने के लिए विजुअल यानी तस्वीरें बनाते हैं। ये क्षेत्र हमें अपनी बातें, जज़्बात और विचार तस्वीरों के ज़रिए दिखाने का मौका देते हैं और साथ ही किसी चीज़ या जगह की सुंदरता भी बढ़ाते हैं।"
+        },
+        "subjects": {
+          "english": "Fine Arts (Drawing, Painting, Sculpture)\nGraphic Design (Digital Media)\nFashion Design (Garment Construction, Textile Science)\nInterior Design (Space Planning, Aesthetics)\nAnimation (3D Design, Character Creation)",
+          "hindi": "सौंदर्य कला (चित्रकला, पेंटिंग, मूर्तिकला)  \nग्राफिक डिजाइन (डिजिटल मीडिया)  \nफैशन डिजाइन (कपड़ों की बनावट, वस्त्र विज्ञान)  \nइंटीरियर डिजाइन (कमरे और जगहों का सुंदर और सही ढंग से सजावट)  \nएनीमेशन (3D डिज़ाइन, कैरेक्टर बनाना)"
+        },
+        "skills": {
+          "english": "Advanced Creativity\nDigital Proficiency\nProject Management\nCollaboration\nAesthetic Sense\nSpatial Awareness (Interior Design)",
+          "hindi": "उन्नत रचनात्मकता  \nडिजिटल कौशल  \nपरियोजना प्रबंधन  \nसहयोग क्षमता  \nसौंदर्यबोध (सज्जा और सजावट की समझ)  \nस्थानिक जागरूकता (आंतरिक डिज़ाइन)"
+        },
+        "career_options": {
+          "english": "Social Media Manager\nContent Editor/Developer\nGraphic Designer/Animator\nFilmmaker/Video Game Designer\nMedia Communications Specialist",
+          "hindi": "सोशल मीडिया मैनेजर  \nकंटेंट एडिटर/डेवलपर  \nग्राफिक डिजाइनर/एनीमेटर  \nफ़िल्ममेकर/वीडियो गेम डिज़ाइनर  \nमीडिया कम्युनिकेशंस स्पेशलिस्ट"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Creator",
+          "hindi": "कलात्मक"
+        },
+        {
+          "english": "Persuader",
+          "hindi": "उद्यमी"
+        },
+        {
+          "english": "Helper",
+          "hindi": "सामाजिक"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Creativity",
+          "hindi": "रचनात्मकता"
+        },
+        {
+          "english": "Communication",
+          "hindi": "संचार"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        },
+        {
+          "english": "Finger dexterity",
+          "hindi": "उंगली की निपुणता"
+        },
+        {
+          "english": "Decision making & problem solving",
+          "hindi": "निर्णय लेना और समस्या का समाधान"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Art",
+          "hindi": "कला"
+        },
+        {
+          "english": "Languages",
+          "hindi": "भाषाएँ"
+        },
+        {
+          "english": "Social Sciences",
+          "hindi": "सामाजिक विज्ञान"
+        },
+        {
+          "english": "English",
+          "hindi": "अंग्रेज़ी"
+        },
+        {
+          "english": "Technology",
+          "hindi": "प्रौद्योगिकी"
+        }
+      ],
+      "values": [
+        {
+          "english": "Mental activity",
+          "hindi": "मन के साथ काम करना"
+        },
+        {
+          "english": "Creativity",
+          "hindi": "रचनात्मकता"
+        },
+        {
+          "english": "Lucrative Salary",
+          "hindi": "अच्छा वेतन"
+        },
+        {
+          "english": "Variety and Diversity",
+          "hindi": "विविधता-विचलन"
+        },
+        {
+          "english": "Autonomy",
+          "hindi": "स्वतंत्रता/ स्वायत्तता"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Spatial-Visual, Musical",
+          "hindi": "Spatial-Visual, Musical"
+        },
+        {
+          "english": "Interpersonal",
+          "hindi": "अंतरंग संबंध"
+        },
+        {
+          "english": "Linguistic, Interpersonal",
+          "hindi": "Linguistic, Interpersonal"
+        }
+      ]
+    },
+    "entertainment_and_mass_media": {
+      "title": {
+        "english": "Entertainment and Mass Media",
+        "hindi": "मनोरंजन और जनसम्पर्क (मास मीडिया)"
+      },
+      "6-8": {
+        "description": {
+          "english": "Entertainment and Mass Media Communication is about creating and sharing information, news, or fun things like movies, shows, and music with many people through TV, radio, the internet, and other media.",
+          "hindi": "मनोरंजन और मास मीडिया कम्युनिकेशन का मतलब है ऐसी चीजें बनाना और फैलाना जिनमें जानकारी, खबरें या मज़ेदार बातें जैसे फिल्में, शो, और संगीत शामिल होते हैं। ये सब टीवी, रेडियो, इंटरनेट और अन्य मीडिया के ज़रिए बहुत सारे लोगों तक पहुंचाई जाती हैं।"
+        },
+        "subjects": {
+          "english": "English, Social Studies, Computer Science, Music and Art",
+          "hindi": "अंग्रेज़ी, सामाजिक अध्ययन, कंप्यूटर विज्ञान, संगीत और कला"
+        },
+        "skills": {
+          "english": "Creativity, Communication, Storytelling, Basic Technology Skills",
+          "hindi": "रचनात्मकता, संवाद कौशल, कहानी कहने की क्षमता, और बुनियादी तकनीकी कौशल"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "Entertainment and Mass Media Communication involves creating content for different media platforms like TV, film, radio, and digital media. This content entertains, informs, or educates audiences. It also includes managing how media is distributed and how the public perceives it.",
+          "hindi": "मनोरंजन और जनसंपर्क माध्यम का मतलब है कि टीवी, फिल्म, रेडियो और डिजिटल मीडिया जैसे अलग-अलग प्लेटफार्मों के लिए सामग्री बनाना। यह सामग्री दर्शकों का मनोरंजन करती है, उन्हें जानकारी देती है या शिक्षित भी करती है। साथ ही, इसमें यह भी शामिल है कि मीडिया कैसे फैलाया जाए और जनता इसे कैसे देखे या समझे।"
+        },
+        "subjects": {
+          "english": "English (Language and Literature), Media Studies, ICT (Information and Communication Technology), History and Social Studies, Public Speaking and Drama (Extracurricular), Business Studies (For Public Relations)",
+          "hindi": "अंग्रेज़ी (भाषा और साहित्य), मीडिया अध्ययन, आईसीटी (सूचना और संचार तकनीक), इतिहास और सामाजिक अध्ययन, सार्वजनिक भाषण और नाटक (अतिरिक्त गतिविधि), व्यवसाय अध्ययन (जनसंपर्क के लिए)"
+        },
+        "skills": {
+          "english": "Advanced Communication Skills, Editing Skills, Creativity and Innovation, Collaboration, Time Management",
+          "hindi": "उन्नत संचार कौशल, संपादन कौशल, रचनात्मकता और नवाचार, सहयोग, समय प्रबंधन"
+        },
+        "courses": {
+          "english": "Bachelor of Mass Media (BMM), Bachelor of Journalism and Mass Communication (BJMC), Bachelor of Fine Arts (BFA) - Film Making, Digital Media, Animation, Diploma in Digital Media or Film Studies, BA in Visual Communication, Bachelor of Performing Arts (BPA)",
+          "hindi": "यहाँ उन कोर्सों की सूची दी गई है जो छात्रों को उनके करियर विकल्पों के बारे में सोचने में मदद कर सकते हैं:\n\n- बैचलर ऑफ़ मास मीडिया (BMM): इसमें आप टीवी, रेडियो, सोशल मीडिया जैसी नई मीडिया की दुनिया को समझते हैं और इसमें काम करने का अनुभव प्राप्त करते हैं।\n- बैचलर ऑफ़ जर्नलिज़्म और मास कम्युनिकेशन (BJMC): इस कोर्स में आप खबरें बनाने, रिपोर्टिंग और मीडिया से जुड़ी कई अन्य चीजें सीखते हैं।\n- बैचलर ऑफ़ फ़ाइन आर्ट्स (BFA) - फिल्म मेकिंग, डिजिटल मीडिया, एनीमेशन: यहाँ आप फ़िल्म बनाने, डिजिटल मीडिया, एनीमेशन जैसी क्रिएटिव चीज़ों में निपुण बनते हैं।\n- डिजिटल मीडिया या फ़िल्म स्टडीज़ में डिप्लोमा: यह कोर्स आपको डिजिटल मीडिया या फ़िल्म की गहरी समझ और कौशल सिखाता है।\n- बीए इन विजुअल कम्युनिकेशन: इसमें आप चित्र, ग्राफिक्स और वीडियो के जरिए अपनी बात कहने के तरीके सीखते हैं।\n- बैचलर ऑफ़ परफ़ॉर्मिंग आर्ट्स (BPA): यह कोर्स नाट्य, नृत्य, संगीत जैसे परफ़ॉर्मिंग आर्ट्स में प्रतिभा विकसित करने के लिए है।\n\nइन कोर्सों के द्वारा आप अपनी रुचि और प्रतिभा के अनुसार अपने करियर का रास्ता चुन सकते हैं।"
+        },
+        "exams": {
+          "english": "IIMC Entrance Exam, IPU CET (Indraprastha University Common Entrance Test), Symbiosis Entrance Test (SET), MUCMET (Mumbai University Common Entrance Test), DUET (Delhi University Entrance Test), Film and Television Institute of India (FTII) Entrance Exam",
+          "hindi": "यहाँ कुछ महत्वपूर्ण प्रवेश परीक्षाएँ दी गई हैं, जिनके बारे में जानना जरूरी है:\n\n1. IIMC प्रवेश परीक्षा – यह परीक्षा भारत के प्रसिद्ध मीडिया एवं पत्रकारिता संस्थान के लिए होती है। इसमें हिस्सा लेकर आप पत्रकारिता, मीडिया और संचार के क्षेत्र में करियर बना सकते हैं।\n2. IPU CET (इंद्रप्रस्थ विश्वविद्यालय का सामान्य प्रवेश परीक्षा) – यह परीक्षा दिल्ली के इंद्रप्रस्थ विश्वविद्यालय में विभिन्न कोर्सों में दाखिला लेने के लिए ली जाती है।\n3. Symbiosis Entrance Test (SET) – यह परीक्षा सुबोध और प्रतिष्ठित Symbiosis संस्थान में विभिन्न कोर्सों के लिए होती है, जैसे कि प्रबंधन, मीडिया, कानून आदि।\n4. MUCMET (मुंबई विश्वविद्यालय का सामान्य प्रवेश परीक्षा) – यह परीक्षा मुंबई विश्वविद्यालय के विभिन्न कोर्सों में दाखिला पाने के लिए जरूरी है।\n5. DUET (दिल्ली विश्वविद्यालय का प्रवेश परीक्षा) – दिल्ली विश्वविद्यालय में स्नातक और स्नातकोत्तर पाठ्यक्रमों में दाखिले के लिए यह परीक्षा ली जाती है।\n6. Film and Television Institute of India (FTII) प्रवेश परीक्षा – यह परीक्षा फिल्म और टेलीविजन के क्षेत्र में करियर बनाने के इच्छुक छात्रों के लिए है, ताकि वे इस प्रतिष्ठित संस्थान में अपनी कला का प्रदर्शन कर सकें।"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "Entertainment and Mass Media Communication encompass the development, production, and management of content for film, TV, radio, digital platforms, and other media. It involves creative storytelling, technical production, and understanding the impact of media on society and audiences. This field also includes managing media-related activities, such as public relations, branding, and marketing.",
+          "hindi": "मनोरंजन और जनसंचार का क्षेत्र फिल्म, टीवी, रेडियो, डिजिटल प्लेटफार्म और अन्य मीडिया के लिए सामग्री बनाने, तैयार करने और प्रबंधित करने का काम है। इसमें रचनात्मक कहानी कहने, तकनीकी उत्पादन, और मीडिया का समाज और दर्शकों पर पड़ने वाले प्रभाव को समझना शामिल है। इस क्षेत्र में मीडिया से जुड़ी गतिविधियों का भी ध्यान रखा जाता है, जैसे कि प्रचार-प्रसार, ब्रांडिंग और मार्केटिंग।"
+        },
+        "subjects": {
+          "english": "Mass Media Studies (optional)\nEnglish (Advanced Writing, Journalism)\nPsychology\nICT (Advanced)\nDrama and Performing Arts\nBusiness Studies (Marketing & PR)\nPolitical Science (optional)",
+          "hindi": "मास मीडिया स्टडीज़ (वैकल्पिक)\nअंग्रेज़ी (उन्नत लेखन, पत्रकारिता)\nमनोविज्ञान\nआईसीटी (उन्नत)\nनाटक और प्रदर्शन कला\nव्यवसाय अध्ययन (मार्केटिंग और पीआर)\nराजनीति विज्ञान (वैकल्पिक)"
+        },
+        "skills": {
+          "english": "Scriptwriting & Storytelling\nMedia Production Skills\nSocial Media Management\nPublic Relations and Branding\nContent Distribution\nResearch and Analysis",
+          "hindi": "स्क्रिप्ट लिखना और कहानी कहनी  \nमीडिया प्रोडक्शन के कौशल  \nसोशल मीडिया का सही इस्तेमाल करना  \nपब्लिक रिलेशन और ब्रांडिंग  \nसामग्री का वितरण और प्रचार  \nरिसर्च और विश्लेषण"
+        },
+        "career_options": {
+          "english": "",
+          "hindi": ""
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Creator",
+          "hindi": "कलात्मक"
+        },
+        {
+          "english": "Helper",
+          "hindi": "सामाजिक"
+        },
+        {
+          "english": "Persuader",
+          "hindi": "उद्यमी"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Creativity",
+          "hindi": "रचनात्मकता"
+        },
+        {
+          "english": "Communication",
+          "hindi": "संचार"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        },
+        {
+          "english": "Technical",
+          "hindi": "तकनीकी"
+        },
+        {
+          "english": "Logical reasoning",
+          "hindi": "तार्किक सोच"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Art",
+          "hindi": "कला"
+        },
+        {
+          "english": "Music",
+          "hindi": "संगीत"
+        },
+        {
+          "english": "Languages",
+          "hindi": "भाषाएँ"
+        },
+        {
+          "english": "Cultural studies",
+          "hindi": "सांस्कृतिक अध्ययन"
+        },
+        {
+          "english": "English",
+          "hindi": "अंग्रेज़ी"
+        }
+      ],
+      "values": [
+        {
+          "english": "Creativity",
+          "hindi": "रचनात्मकता"
+        },
+        {
+          "english": "Variety and Diversity",
+          "hindi": "विविधता-विचलन"
+        },
+        {
+          "english": "Building relations",
+          "hindi": "टीम/समूह में काम करना"
+        },
+        {
+          "english": "Technology",
+          "hindi": "प्रौद्योगिकी"
+        },
+        {
+          "english": "Prestige/ Recognition",
+          "hindi": "प्रतिष्ठा/ मान्यता"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Spatial-Visual",
+          "hindi": "स्थानिक-दृश्य"
+        },
+        {
+          "english": "Interpersonal",
+          "hindi": "अंतरंग संबंध"
+        },
+        {
+          "english": "Musical",
+          "hindi": "संगीत संबंधी"
+        },
+        {
+          "english": "Linguistic",
+          "hindi": "भाषाई क्षमता"
+        }
+      ]
+    },
+    "management_and_administration": {
+      "title": {
+        "english": "Management and Administration",
+        "hindi": "प्रबंधन और प्रशासन"
+      },
+      "6-8": {
+        "description": {
+          "english": "Management and administration involve making sure a business or organization runs smoothly by organizing people and resources to reach goals.",
+          "hindi": "प्रबंधन और प्रशासन का मतलब है कि किसी व्यवसाय या संगठन को सही तरीके से चलाना, जिसमें लोगों और संसाधनों का सही ढंग से आयोजन किया जाए ताकि वे अपने लक्ष्य आसानी से हासिल कर सकें।"
+        },
+        "subjects": {
+          "english": "Math, Social Studies, Language Arts, Computer Skills",
+          "hindi": "गणित, सामाजिक अध्ययन, भाषा कला, और कंप्यूटर कौशल"
+        },
+        "skills": {
+          "english": "Organization, Leadership, Problem-solving, Communication, Teamwork",
+          "hindi": "संगठन, नेतृत्व, समस्या सुलझाने की क्षमता, संवाद करने की योग्यता, और टीमवर्क"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "Management and administration focus on planning, organizing, leading, and controlling the operations of a business or organization to achieve its goals efficiently and effectively.",
+          "hindi": "प्रबंधन और प्रशासन का मकसद होता है कि किसी भी बिजनेस या संगठन की गतिविधियों की योजना बनाना, उन्हें व्यवस्थित करना, सही दिशा देना और नियंत्रण रखना। इससे हम अपने लक्ष्यों को बेहतर तरीके से पूरा कर सकते हैं।"
+        },
+        "subjects": {
+          "english": "Business Studies, Economics, Accounting, Marketing, Computer Applications",
+          "hindi": "व्यवसाय अध्ययन, अर्थशास्त्र, लेखा, विपणन, कंप्यूटर अनुप्रयोग"
+        },
+        "skills": {
+          "english": "Strategic Thinking, Decision-making, Financial Management, Interpersonal Skills, Adaptability",
+          "hindi": "सामरिक सोच, निर्णय लेने की क्षमता, वित्तीय प्रबंधन, सामाजिक कौशल, और लचीलापन"
+        },
+        "courses": {
+          "english": "Bachelor of Business Administration (BBA), Bachelor of Management Studies (BMS), Bachelor of Commerce (B.Com), Master of Business Administration (MBA)",
+          "hindi": "बिजनेस एडमिनिस्ट्रेशन में स्नातक (BBA), प्रबंधन अध्ययन में स्नातक (BMS), वाणिज्य में स्नातक (B.Com), और व्यवसाय प्रबंधन में स्नातकोत्तर (MBA)"
+        },
+        "exams": {
+          "english": "Common Admission Test (CAT), Common Entrance Test (CET), Joint Entrance Examination (JEE), Management Aptitude Test (MAT), Undergraduate Aptitude Test (UGAT), Symbiosis Entrance Test (SET)",
+          "hindi": "सामान्य प्रवेश परीक्षा (CAT), सामान्य प्रवेश परीक्षा (CET), संयुक्त प्रवेश परीक्षा (JEE), प्रबंधन योग्यता परीक्षा (MAT), स्नातक योग्यता परीक्षा (UGAT), सिम्बायोसिस प्रवेश परीक्षा (SET)"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "Management and administration encompass the processes involved in directing and overseeing the daily functions of a business or organization, including strategic planning, resource management, and leadership to ensure objectives are met effectively and efficiently.",
+          "hindi": "प्रबंधन और प्रशासन का मतलब है उस प्रक्रिया को समझना, जिसमें किसी भी व्यवसाय या संगठन के रोज़ाना कामकाज को सही तरीके से चलाने के लिए योजना बनाना, संसाधनों का सही इस्तेमाल करना और नेतृत्व करना शामिल है। इससे यह सुनिश्चित होता है कि सभी काम सही समय पर और ठीक तरह से पूरे हों, ताकि लक्ष्य आसानी से पूरे किए जा सकें।"
+        },
+        "subjects": {
+          "english": "Management Principles\nBusiness Law\nFinancial Management\nOperations Management\nHuman Resource Management",
+          "hindi": "प्रबंधन के मूल सिद्धांत \nव्यावसायिक कानून \nवित्तीय प्रबंधन \nऑपरेशन्स प्रबंधन (कार्य संचालन का प्रबंधन) \nमानव संसाधन प्रबंधन"
+        },
+        "skills": {
+          "english": "Leadership and Motivation\nAnalytical Skills\nProject Management\nConflict Resolution\nNegotiation Skills",
+          "hindi": "नेतृत्व और प्रेरणा  \nविश्लेषणात्मक क्षमताएँ  \nपरियोजना प्रबंधन  \nविवाद सुलझाने के कौशल  \nमोलभाव करने की कला"
+        },
+        "career_options": {
+          "english": "Business Analyst\nProject Manager\nBrand Manager\nFinancial Analyst\nHuman Resource Manager",
+          "hindi": "व्यावसायिक विश्लेषक  \nपरियोजना प्रबंधक  \nब्रांड प्रबंधक  \nवित्तीय विश्लेषक  \nमानव संसाधन प्रबंधक"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Organizer",
+          "hindi": "परंपरागत"
+        },
+        {
+          "english": "Persuader",
+          "hindi": "उद्यमी"
+        },
+        {
+          "english": "Helper",
+          "hindi": "सामाजिक"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Computational",
+          "hindi": "गणनात्मक"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        },
+        {
+          "english": "Decision making & problem solving",
+          "hindi": "निर्णय लेना और समस्या का समाधान"
+        },
+        {
+          "english": "Communication",
+          "hindi": "संचार"
+        },
+        {
+          "english": "Logical reasoning",
+          "hindi": "तार्किक सोच"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Management",
+          "hindi": "प्रबंधन"
+        },
+        {
+          "english": "Mathematics",
+          "hindi": "गणित"
+        },
+        {
+          "english": "Finance",
+          "hindi": "वित्त"
+        },
+        {
+          "english": "Languages",
+          "hindi": "भाषाएँ"
+        },
+        {
+          "english": "Technology",
+          "hindi": "प्रौद्योगिकी"
+        }
+      ],
+      "values": [
+        {
+          "english": "Lucrative Salary",
+          "hindi": "अच्छा वेतन"
+        },
+        {
+          "english": "Building relations",
+          "hindi": "टीम/समूह में काम करना"
+        },
+        {
+          "english": "Leadership",
+          "hindi": "नेतृत्व"
+        },
+        {
+          "english": "Mental activity",
+          "hindi": "मन के साथ काम करना"
+        },
+        {
+          "english": "Supervised work",
+          "hindi": "निरीक्षित कार्य"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Intrapersonal",
+          "hindi": "आंतरिक व्यक्तित्व"
+        },
+        {
+          "english": "Interpersonal",
+          "hindi": "अंतरंग संबंध"
+        },
+        {
+          "english": "Linguistic",
+          "hindi": "भाषाई क्षमता"
+        },
+        {
+          "english": "Bodily-Kinesthetic",
+          "hindi": "शारीरिक-काइनेस्थेटिक"
+        }
+      ]
+    },
+    "banking_and_finance": {
+      "title": {
+        "english": "Banking and Finance",
+        "hindi": "बैंकिंग और वित्तीय क्षेत्र"
+      },
+      "6-8": {
+        "description": {
+          "english": "Banking and finance is about handling money and helping people or businesses save, invest, and make smart financial decisions.",
+          "hindi": "बैंकिंग और वित्त का मतलब है पैसे का सही तरीके से इस्तेमाल करना और लोगों या कारोबारों की मदद करना ताकि वे अपने पैसे बचा सकें, सही जगह निवेश कर सकें, और समझदारी से आर्थिक फैसले ले सकें।"
+        },
+        "subjects": {
+          "english": "Math, Social Studies, Computer Skills, English Language Arts",
+          "hindi": "गणित, सामाजिक अध्ययन, कंप्यूटर कौशल, अंग्रेज़ी भाषा कला"
+        },
+        "skills": {
+          "english": "Numeracy, Critical Thinking, Communication, Attention to Detail",
+          "hindi": "गणितीय समझ, आलोचनात्मक सोच, संवाद कौशल, और छोटी-छोटी बातों पर ध्यान देना"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "Banking and finance focuses on the management of money and investments, involving roles that help individuals and organizations with financial planning, investment strategies, and understanding financial markets.",
+          "hindi": "बैंकिंग और वित्त का मतलब है पैसे और निवेश का सही तरीके से प्रबंधन करना। इसमें ऐसे काम होते हैं जो लोगों और कंपनियों की मदद करते हैं ताकि वे अपने पैसे का सही तरीके से इस्तेमाल करें, निवेश करें और बाजार को समझें। इससे वे अपने वित्तीय लक्ष्यों को पूरा कर सकते हैं।"
+        },
+        "subjects": {
+          "english": "Accounting, Economics, Business Studies, Mathematics, Computer Applications",
+          "hindi": "लेखा, अर्थशास्त्र, व्यापार अध्ययन, गणित, और कंप्यूटर अनुप्रयोग"
+        },
+        "skills": {
+          "english": "Financial Analysis, Problem-solving, Interpersonal Skills, Risk Management",
+          "hindi": "वित्तीय विश्लेषण, समस्या सुलझाने की क्षमता, आपसी संबंध बनाने की कला, और जोखिम प्रबंधन"
+        },
+        "courses": {
+          "english": "Bachelor of Commerce (B.Com) in Finance, Bachelor of Business Administration (BBA), Bachelor of Economics, Master of Business Administration (MBA) in Finance",
+          "hindi": "वित्त में स्नातक की डिग्री (B.Com), व्यवसाय प्रबंधन में स्नातक (BBA), अर्थशास्त्र में स्नातक, और वित्त में व्यवसाय प्रबंधन में मास्टर डिग्री (MBA)"
+        },
+        "exams": {
+          "english": "Common Admission Test (CAT), Management Aptitude Test (MAT), Undergraduate Aptitude Test (UGAT), State-Level CETs, National Eligibility cum Entrance Test (NEET)",
+          "hindi": "कॉमन एडमिशन टेस्ट (CAT), मैनेजमेंट एप्टीट्यूड टेस्ट (MAT), अंडरग्रेजुएट एप्टीट्यूड टेस्ट (UGAT), राज्य स्तरीय CETs, राष्ट्रीय योग्यता और प्रवेश परीक्षा (NEET)"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "Banking and finance encompasses a variety of roles focused on the management of financial resources, including banking operations, investment analysis, financial advising, and risk management to optimize wealth and resource allocation.",
+          "hindi": "बैंकिंग और वित्त का क्षेत्र बहुत सारी जिम्मेदारियों को मिलाकर बना है, जैसे बैंकिंग का काम, निवेश का विश्लेषण, वित्तीय सलाह देना, और जोखिम का सामना कर के अपने पैसे और संसाधनों का सही इस्तेमाल करना। इसका मकसद होता है कि हम अपने पैसे का बेहतर इस्तेमाल करें और अपने संसाधनों को सही तरीके से बढ़ाएं।"
+        },
+        "subjects": {
+          "english": "Advanced Accounting\nCorporate Finance\nInvestment Analysis\nBusiness Law\nStatistics",
+          "hindi": "उन्नत लेखांकन  \nकॉर्पोरेट फाइनेंस (सामूहिक वित्त)  \nनिवेश विश्लेषण  \nव्यवसाय कानून  \nआंकड़े (सांख्यिकी)"
+        },
+        "skills": {
+          "english": "Analytical Skills\nStrategic Planning\nNegotiation Skills\nTechnology Proficiency",
+          "hindi": "विश्लेषणात्मक कौशल  \nरणनीतिक योजना बनाने की क्षमता  \nमुलाकात और समझौता करने के कौशल  \nप्रौद्योगिकी का अच्छा ज्ञान"
+        },
+        "career_options": {
+          "english": "Financial Analyst\nChartered Accountant\nFinancial Planner\nRisk Analyst\nCompliance Officer.",
+          "hindi": "वित्तीय विश्लेषक \nचार्टर्ड अकाउंटेंट (सीए) \nवित्तीय योजना बनाने वाला (फाइनान्शियल प्लानर) \nजोखिम विश्लेषक \nअनुपालन अधिकारी"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Organizer",
+          "hindi": "परंपरागत"
+        },
+        {
+          "english": "Thinker",
+          "hindi": "जांच-पड़ताल करने वाला"
+        },
+        {
+          "english": "Persuader",
+          "hindi": "उद्यमी"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Computational",
+          "hindi": "गणनात्मक"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        },
+        {
+          "english": "Decision making & problem solving",
+          "hindi": "निर्णय लेना और समस्या का समाधान"
+        },
+        {
+          "english": "Logical reasoning",
+          "hindi": "तार्किक सोच"
+        },
+        {
+          "english": "Finger dexterity",
+          "hindi": "उंगली की निपुणता"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Finance",
+          "hindi": "वित्त"
+        },
+        {
+          "english": "Mathematics",
+          "hindi": "गणित"
+        },
+        {
+          "english": "Technology",
+          "hindi": "प्रौद्योगिकी"
+        },
+        {
+          "english": "Languages",
+          "hindi": "भाषाएँ"
+        },
+        {
+          "english": "Management",
+          "hindi": "प्रबंधन"
+        }
+      ],
+      "values": [
+        {
+          "english": "Lucrative Salary",
+          "hindi": "अच्छा वेतन"
+        },
+        {
+          "english": "Mental activity",
+          "hindi": "मन के साथ काम करना"
+        },
+        {
+          "english": "Prestige/ Recognition",
+          "hindi": "प्रतिष्ठा/ मान्यता"
+        },
+        {
+          "english": "High achievement",
+          "hindi": "उच्च उपलब्धि"
+        },
+        {
+          "english": "Routine activity",
+          "hindi": "नियमित गतिविधि"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Intrapersonal",
+          "hindi": "आंतरिक व्यक्तित्व"
+        },
+        {
+          "english": "Logical",
+          "hindi": "तार्किक"
+        },
+        {
+          "english": "Interpersonal",
+          "hindi": "अंतरंग संबंध"
+        },
+        {
+          "english": "Bodily-Kinesthetic",
+          "hindi": "शारीरिक-काइनेस्थेटिक"
+        }
+      ]
+    },
+    "law_studies": {
+      "title": {
+        "english": "Law Studies",
+        "hindi": "कानून की पढ़ाई"
+      },
+      "6-8": {
+        "description": {
+          "english": "Law studies teach about the rules in society called 'laws.' Lawyers help people solve problems by using these rules, and judges make decisions in court about what is fair and right.",
+          "hindi": "कानून की पढ़ाई में समाज के उन नियमों के बारे में सिखाया जाता है, जिन्हें 'कानून' कहा जाता है। वकील इन नियमों का उपयोग करके लोगों की समस्याएँ हल करने में मदद करते हैं, और जज कोर्ट में यह तय करते हैं कि क्या सही और न्यायसंगत है।"
+        },
+        "subjects": {
+          "english": "Social Studies, English, Ethics",
+          "hindi": "सामाजिक अध्ययन, अंग्रेज़ी, नैतिक शिक्षा"
+        },
+        "skills": {
+          "english": "Critical Thinking, Debating and Arguing, Problem Solving, Attention to Detail",
+          "hindi": "आलोचनात्मक सोच, बहस करना और तर्क-वितर्क करना, समस्या को हल करना, और छोटी-छोटी बातों पर ध्यान देना"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "Law is the system of rules that countries or societies create to ensure fairness and justice. People who study law can become lawyers, judges, or legal advisors who help people understand their rights and responsibilities.",
+          "hindi": "कानून वह नियमों का सिस्टम है जो देश या समाज बनाते हैं ताकि सबके साथ न्याय और समानता बनी रहे। जो लोग कानून का अध्ययन करते हैं, वे वकील, जज या कानूनी सलाहकार बन सकते हैं। ये लोग लोगों की मदद करते हैं ताकि वे अपनी हक़ और जिम्मेदारी को सही ढंग से समझ सकें।"
+        },
+        "subjects": {
+          "english": "Political Science, History, English/Communication Skills, Economics",
+          "hindi": "राजनीति विज्ञान, इतिहास, अंग्रेज़ी/संचार कौशल, अर्थशास्त्र"
+        },
+        "skills": {
+          "english": "Research and Analysis, Logical reasoning, Communication, Persuasion and Advocacy",
+          "hindi": "शोध और विश्लेषण, तार्किक सोच, संचार कौशल, मनाना और समर्थन करना"
+        },
+        "courses": {
+          "english": "Bachelor of Laws (LLB), BA LLB (Integrated), BBA LLB (Integrated), B.Com LLB (Integrated), Diploma Courses in specialized fields like labour law, corporate law, and intellectual property rights (IPR)",
+          "hindi": "कानून की डिग्री (एलएलबी), बैचलर ऑफ कॉमर्स और लॉ (बीए एलएलबी), बैचलर ऑफ बिज़नेस एडमिनिस्ट्रेशन और लॉ (बीबीए एलएलबी), कॉमर्स और लॉ की संयुक्त डिग्री (बीकॉम एलएलबी), और विभिन्न विशेषज्ञता वाले कोर्स जैसे श्रम कानून, कॉर्पोरेट लॉ और बौद्धिक संपदा अधिकार (आईपीआर) में डिप्लोमा कोर्स।"
+        },
+        "exams": {
+          "english": "CLAT (Common Law Admission Test), AILET (All India Law Entrance Test), LSAT India (Law School Admission Test), DU LLB Entrance Test, SLAT (Symbiosis Law Admission Test), MH CET Law",
+          "hindi": "यहां कुछ प्रमुख लॉ परीक्षा के नाम दिए गए हैं:\n\n- CLAT (कॉमन लॉ एडमिशन टेस्ट): यह परीक्षा भारत के कई लॉ कॉलेजों में दाखिले के लिए होती है।\n- AILET (ऑल इंडिया लॉ एंट्रेंस टेस्ट): यह नेशनल लॉ यूनिवर्सिटी सेलेक्शन के लिए आयोजित होती है।\n- LSAT इंडिया (लॉ स्कूल एडमिशन टेस्ट): यह लॉ स्कूल में प्रवेश पाने के लिए एक इंटरनेशनल स्तर की परीक्षा है।\n- DU LLB एंट्रेंस टेस्ट: दिल्ली विश्वविद्यालय के लॉ कॉलेजों में दाखिले के लिए यह परीक्षा ली जाती है।\n- SLAT (सिंबायोसिस लॉ एडमिशन टेस्ट): यह सिंबायोसिस लॉ स्कूल में एडमिशन के लिए जरूरी है।\n- MH CET Law: यह महाराष्ट्र कॉमन एंट्रेंस टेस्ट है, जो वहां के लॉ कॉलेजों में दाखिले के लिए जरूरी है।\n\nइन परीक्षाओं का उद्देश्य छात्रों की लॉ में रुचि और समझ को जांचना है ताकि वे सही कॉलेज में जगह पा सकें।"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "Law studies involve learning about legal systems, rights, and responsibilities. It prepares individuals for careers as legal professionals like lawyers, judges, or consultants who ensure justice and the enforcement of laws in society.",
+          "hindi": "कानूनी अध्ययन में आप कानून व्यवस्था, हक़ और जिम्मेदारियों के बारे में सीखते हैं। इससे आप वकील, जज या सलाहकार जैसे पेशेवर बन सकते हैं, जो समाज में न्याय कायम करने और कानूनों को सही ढंग से लागू करने का काम करते हैं।"
+        },
+        "subjects": {
+          "english": "Political Science/Legal Studies\nEnglish Literature and Language\nEconomics\nHistory",
+          "hindi": "राजनीति विज्ञान / कानून संबंधी अध्ययन  \nअंग्रेज़ी साहित्य और भाषा  \nअर्थशास्त्र (आर्थिक विज्ञान)  \nइतिहास"
+        },
+        "skills": {
+          "english": "Argumentation and Reasoning\nCritical Reading\nPublic Speaking and Advocacy\nEthical Judgement",
+          "hindi": "तर्क और सोच-विचार  \nआलोचनात्मक पढ़ाई  \nसार्वजनिक भाषण और वकालत  \nनैतिक निर्णय"
+        },
+        "career_options": {
+          "english": "Corporate Lawyer\nLegal Consultant\nCompliance Officer\nIntellectual Property Rights Lawyer\nHuman Rights Lawyer",
+          "hindi": "कॉर्पोरेट वकील  \nकानूनी सलाहकार  \nअनुपालन अधिकारी  \nबौद्धिक संपदा अधिकार वकील  \nमानवाधिकार वकील"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Organizer",
+          "hindi": "परंपरागत"
+        },
+        {
+          "english": "Thinker",
+          "hindi": "जांच-पड़ताल करने वाला"
+        },
+        {
+          "english": "Persuader",
+          "hindi": "उद्यमी"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Communication",
+          "hindi": "संचार"
+        },
+        {
+          "english": "Decision making & problem solving",
+          "hindi": "निर्णय लेना और समस्या का समाधान"
+        },
+        {
+          "english": "Logical reasoning",
+          "hindi": "तार्किक सोच"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        },
+        {
+          "english": "Creativity",
+          "hindi": "रचनात्मकता"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "English",
+          "hindi": "अंग्रेज़ी"
+        },
+        {
+          "english": "Languages",
+          "hindi": "भाषाएँ"
+        },
+        {
+          "english": "Social Sciences",
+          "hindi": "सामाजिक विज्ञान"
+        },
+        {
+          "english": "Cultural studies",
+          "hindi": "सांस्कृतिक अध्ययन"
+        },
+        {
+          "english": "Management",
+          "hindi": "प्रबंधन"
+        }
+      ],
+      "values": [
+        {
+          "english": "Prestige/ Recognition",
+          "hindi": "प्रतिष्ठा/ मान्यता"
+        },
+        {
+          "english": "Lucrative Salary",
+          "hindi": "अच्छा वेतन"
+        },
+        {
+          "english": "Autonomy",
+          "hindi": "स्वतंत्रता/ स्वायत्तता"
+        },
+        {
+          "english": "High achievement",
+          "hindi": "उच्च उपलब्धि"
+        },
+        {
+          "english": "Variety and Diversity",
+          "hindi": "विविधता-विचलन"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Intrapersonal",
+          "hindi": "आंतरिक व्यक्तित्व"
+        },
+        {
+          "english": "Logical",
+          "hindi": "तार्किक"
+        },
+        {
+          "english": "Interpersonal",
+          "hindi": "अंतरंग संबंध"
+        },
+        {
+          "english": "Bodily-Kinesthetic",
+          "hindi": "शारीरिक-काइनेस्थेटिक"
+        }
+      ]
+    },
+    "government_and_public_administration": {
+      "title": {
+        "english": "Government and Public Administration",
+        "hindi": "सरकार और सार्वजनिक प्रशासन"
+      },
+      "6-8": {
+        "description": {
+          "english": "Involves managing and implementing public policies, overseeing government programs, and serving in roles that facilitate the functioning of local, state, or national government.",
+          "hindi": "यह काम सरकार की नीतियों को बनाना और लागू करना, सरकारी योजनाओं की देखरेख करना, और उन पदों पर काम करना होता है जिनसे स्थानीय, राज्य या राष्ट्रीय सरकार का काम सुगम बनता है।"
+        },
+        "subjects": {
+          "english": "Social Studies, Political Science, Public Administration, Economics, History",
+          "hindi": "सामाजिक अध्ययन, राजनीतिक विज्ञान, लोक प्रशासन, अर्थशास्त्र, इतिहास"
+        },
+        "skills": {
+          "english": "Leadership, Analytical Thinking, Interpersonal Skills, Project Management",
+          "hindi": "नेतृत्व क्षमता, विश्लेषणात्मक सोच, आपसी संबंध बनाने की कला, और परियोजना प्रबंधन"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "Careers in Government and Public Administration focus on managing public resources and services to benefit communities and the nation. Professionals work in government offices, public agencies, and non-profit organizations to implement policies and ensure public welfare. They aim to create efficient systems and programs, addressing the needs and concerns of citizens to improve society overall.",
+          "hindi": "सरकारी और सार्वजनिक प्रशासन में करियर का उद्देश्य जनता के संसाधनों और सेवाओं का सही ढंग से प्रबंधन करना है, ताकि समुदायों और देश का भला हो सके। इन क्षेत्रों में काम करने वाले विशेषज्ञ सरकार के कार्यालयों, सार्वजनिक संस्थाओं और गैर-लाभकारी संगठनों में काम करते हैं। उनका मकसद नीतियों को लागू करना और जनता की भलाई सुनिश्चित करना है। वे ऐसे सिस्टम और योजनाएँ बनाते हैं जो जनता की आवश्यकताओं और समस्याओं को समझकर समाज को बेहतर बनाने में मदद करें।"
+        },
+        "subjects": {
+          "english": "Civics, Political Science, Public Administration, Economics, Law",
+          "hindi": "नागरिकशास्त्र, राजनीति विज्ञान, सार्वजनिक प्रशासन, अर्थशास्त्र, कानून"
+        },
+        "skills": {
+          "english": "Leadership, Communication Skills, Analytical thinking, Policy analysis and Implementation, Ethical Judgement and Integrity",
+          "hindi": "नेतृत्व क्षमता, संवाद कौशल, विश्लेषणात्मक सोच, नीति विश्लेषण और उसे लागू करना, नैतिक निर्णय और ईमानदारी"
+        },
+        "courses": {
+          "english": "Certificate Programs in Public Administration, Diploma and PG Diploma in Public Administration, Bachelor of Arts in Public Administration (BA), Master of Arts in Public Administration (MA)",
+          "hindi": "सार्वजनिक प्रशासन में सर्टिफिकेट प्रोग्राम्स, डिप्लोमा और पीजी डिप्लोमा, बैचलर ऑफ आर्ट्स (BA) इन सार्वजनिक प्रशासन, और मास्टर ऑफ आर्ट्स (MA) इन सार्वजनिक प्रशासन।"
+        },
+        "exams": {
+          "english": "CUET (Common University Entrance Test), JMI Entrance Exam, PUBDET, UPSC",
+          "hindi": "सीयूईटी (कॉमन यूनिवर्सिटी एंट्रेंस टेस्ट), जेएमआई एंट्रेंस परीक्षा, पीयूबीडीईटी, यूपीएससी"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "Government and Public Administration involve studying policies, governance, and public service. Professionals in this field work in government roles, policy-making, or administrative services to address societal issues, ensure law and order, and manage public welfare programs.",
+          "hindi": "सरकारी और सार्वजनिक प्रशासन में नीतियों, शासन व्यवस्था और जनता की सेवाओं का अध्ययन किया जाता है। इस क्षेत्र के पेशेवर सरकार के कामकाज, नीति बनाने और प्रशासनिक सेवाओं में काम करते हैं। उनका उद्देश्य समाज की समस्याओं का समाधान करना, कानून व्यवस्था बनाए रखना, और जनता के कल्याण के कार्यक्रमों का संचालन करना है।"
+        },
+        "subjects": {
+          "english": "Political Science\nEconomics\nHistory\nLaw and legal Studies\nEnglish",
+          "hindi": "राजनीति विज्ञान  \nअर्थशास्त्र  \nइतिहास  \nकानून और विधिक अध्ययन  \nअंग्रेज़ी"
+        },
+        "skills": {
+          "english": "Policy Analysis\nResearch and Data Interpretation\nPublic Relations\nTime Management",
+          "hindi": "नीति विश्लेषण  \nशोध और आंकड़ों की समझ  \nसार्वजनिक संबंध  \nसमय का सही प्रबंधन"
+        },
+        "career_options": {
+          "english": "Urban Planner\nPolicy Advisor\nPublic Relations Officer\nData/National Security Analyst\nCivil Servant/IAS/IPS/IFS Officer",
+          "hindi": "शहरी योजनाकार (Urban Planner)  \nनीति सलाहकार (Policy Advisor)  \nजनसंपर्क अधिकारी (Public Relations Officer)  \nडेटा और राष्ट्रीय सुरक्षा विश्लेषक (Data/National Security Analyst)  \nसार्वजनिक सेवक / आईएएस / आईपीएस / आईएफएस अधिकारी (Civil Servant/IAS/IPS/IFS Officer)"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Organizer",
+          "hindi": "परंपरागत"
+        },
+        {
+          "english": "Thinker",
+          "hindi": "जांच-पड़ताल करने वाला"
+        },
+        {
+          "english": "Persuader",
+          "hindi": "उद्यमी"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Decision making & problem solving",
+          "hindi": "निर्णय लेना और समस्या का समाधान"
+        },
+        {
+          "english": "Communication",
+          "hindi": "संचार"
+        },
+        {
+          "english": "Logical reasoning",
+          "hindi": "तार्किक सोच"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        },
+        {
+          "english": "Computational",
+          "hindi": "गणनात्मक"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Social Sciences",
+          "hindi": "सामाजिक विज्ञान"
+        },
+        {
+          "english": "Cultural studies",
+          "hindi": "सांस्कृतिक अध्ययन"
+        },
+        {
+          "english": "Languages",
+          "hindi": "भाषाएँ"
+        },
+        {
+          "english": "Management",
+          "hindi": "प्रबंधन"
+        },
+        {
+          "english": "Finance",
+          "hindi": "वित्त"
+        }
+      ],
+      "values": [
+        {
+          "english": "Job Security",
+          "hindi": "नौकरी की सुरक्षा"
+        },
+        {
+          "english": "Building relations",
+          "hindi": "टीम/समूह में काम करना"
+        },
+        {
+          "english": "Prestige/ Recognition",
+          "hindi": "प्रतिष्ठा/ मान्यता"
+        },
+        {
+          "english": "Leadership",
+          "hindi": "नेतृत्व"
+        },
+        {
+          "english": "Lucrative Salary",
+          "hindi": "अच्छा वेतन"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Bodily-Kinesthetic",
+          "hindi": "शारीरिक-काइनेस्थेटिक"
+        },
+        {
+          "english": "Logical",
+          "hindi": "तार्किक"
+        },
+        {
+          "english": "Interpersonal",
+          "hindi": "अंतरंग संबंध"
+        }
+      ]
+    },
+    "marketing": {
+      "title": {
+        "english": "Marketing",
+        "hindi": "विपणन (मार्केटिंग)"
+      },
+      "6-8": {
+        "description": {
+          "english": "Marketing is all about helping people learn about and buy things they might want or need. It includes creating ads, understanding what customers like, and finding the best ways to tell people about products.",
+          "hindi": "मार्केटिंग का मतलब है लोगों को यह समझाने में मदद करना कि कौन-कौन सी चीजें वे खरीद सकते हैं या जिनकी उन्हें जरूरत हो सकती है। इसमें विज्ञापन बनाना, यह जानना कि ग्राहक क्या पसंद करते हैं, और यह पता लगाना कि कैसे सबसे अच्छा तरीके से लोगों को अपने प्रोडक्ट्स के बारे में बताया जाए, शामिल है।"
+        },
+        "subjects": {
+          "english": "Business Basics, Art and Design, Social Studies, Computer Skills",
+          "hindi": "व्यावसायिक मूल बातें, कला और डिजाइन, सामाजिक अध्ययन, कंप्यूटर कौशल"
+        },
+        "skills": {
+          "english": "Communication, Creativity, Teamwork, Research Skills",
+          "hindi": "संवाद कौशल, रचनात्मकता, टीमवर्क, और अनुसंधान क्षमता"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "In marketing, you learn how to analyse consumer needs and preferences, create effective advertising strategies, and use digital platforms to promote products or services. Marketing professionals study trends and develop campaigns to attract and retain customers.",
+          "hindi": "विपणन में आप सीखते हैं कि कैसे उपभोक्ताओं की आवश्यकताओं और रुचियों का विश्लेषण किया जाए, प्रभावी विज्ञापन रणनीतियों बनाई जाएं, और डिजिटल प्लेटफॉर्म का उपयोग कर अपने उत्पादों या सेवाओं का प्रचार किया जाए। मार्केटिंग के विशेषज्ञ नवीनतम रुझानों को समझते हैं और ग्राहकों को आकर्षित करने और बनाए रखने के लिए नई-नई योजनाएं बनाते हैं।"
+        },
+        "subjects": {
+          "english": "Marketing Principles, Economics, Statistics, Digital Media",
+          "hindi": "विपणन के नियम, अर्थशास्त्र, सांख्यिकी, डिजिटल मीडिया"
+        },
+        "skills": {
+          "english": "Analytical Skills, Strategic Thinking, Public Speaking, Digital Literacy",
+          "hindi": "विश्लेषणात्मक कौशल, रणनीतिक सोच, सार्वजनिक बोलना, डिजिटल साक्षरता"
+        },
+        "courses": {
+          "english": "Bachelor's Degree in Marketing, Bachelor's in Business Administration (BBA), Digital Marketing Certifications, Marketing Analytics",
+          "hindi": "बैचलर डिग्री इन मार्केटिंग, बैचलर इन बिजनेस एडमिनिस्ट्रेशन (BBA), डिजिटल मार्केटिंग सर्टिफिकेट्स, मार्केटिंग एनालिटिक्स"
+        },
+        "exams": {
+          "english": "SAT or ACT, Common Entrance Test (CET), GMAT (Graduate Management Admission Test)",
+          "hindi": "SAT या ACT, सामान्य प्रवेश परीक्षा (CET), GMAT (ग्रेजुएट मैनेजमेंट एडमिशन टेस्ट)"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "Marketing professionals are responsible for researching and analysing market trends, creating targeted advertising campaigns, and developing brand strategies. They work in various sectors to build customer relationships and enhance product visibility through innovative marketing techniques.",
+          "hindi": "मार्केटिंग पेशेवर बाजार के रुझानों को समझने और उनका विश्लेषण करने के लिए जिम्मेदार होते हैं। वे खास तरह के विज्ञापन अभियानों का निर्माण करते हैं और ब्रांड की रणनीतियों को विकसित करते हैं। ये लोग अलग-अलग क्षेत्रों में काम करते हैं ताकि ग्राहकों के साथ अच्छे संबंध बना सकें और अपने उत्पाद को ज्यादा से ज्यादा लोगों तक पहुंचा सकें। नए-नए मार्केटिंग तरीकों का इस्तेमाल करके वे अपने ब्रांड को और मजबूत बनाते हैं।"
+        },
+        "subjects": {
+          "english": "Advanced Marketing Courses\nBusiness Management\nMedia and Communications\nDigital Marketing",
+          "hindi": "उन्नत मार्केटिंग कोर्सेज  \nव्यवसाय प्रबंधन  \nमीडिया और संचार  \nडिजिटल मार्केटिंग"
+        },
+        "skills": {
+          "english": "Data Analysis\nCreative Problem Solving\nProject Management\nNetworking",
+          "hindi": "डेटा विश्लेषण  \nरचनात्मक समस्या का समाधान  \nप्रोजेक्ट प्रबंधन  \nनेटवर्किंग"
+        },
+        "career_options": {
+          "english": "Digital Marketing Specialist\nBrand Manager\nContent Marketing Manager\nSocial Media Marketing Manager\nMarket Research Analyst",
+          "hindi": "डिजिटल मार्केटिंग विशेषज्ञ  \nब्रांड मैनेजर  \nकंटेंट मार्केटिंग मैनेजर  \nसोशल मीडिया मार्केटिंग मैनेजर  \nबाजार अनुसंधान विश्लेषक"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Persuader",
+          "hindi": "उद्यमी"
+        },
+        {
+          "english": "Helper",
+          "hindi": "सामाजिक"
+        },
+        {
+          "english": "Creator",
+          "hindi": "कलात्मक"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Communication",
+          "hindi": "संचार"
+        },
+        {
+          "english": "Decision making & problem solving",
+          "hindi": "निर्णय लेना और समस्या का समाधान"
+        },
+        {
+          "english": "Creativity",
+          "hindi": "रचनात्मकता"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        },
+        {
+          "english": "Logical reasoning",
+          "hindi": "तार्किक सोच"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Management",
+          "hindi": "प्रबंधन"
+        },
+        {
+          "english": "English",
+          "hindi": "अंग्रेज़ी"
+        },
+        {
+          "english": "Languages",
+          "hindi": "भाषाएँ"
+        },
+        {
+          "english": "Finance",
+          "hindi": "वित्त"
+        },
+        {
+          "english": "Technology",
+          "hindi": "प्रौद्योगिकी"
+        }
+      ],
+      "values": [
+        {
+          "english": "Building relations",
+          "hindi": "टीम/समूह में काम करना"
+        },
+        {
+          "english": "Creativity",
+          "hindi": "रचनात्मकता"
+        },
+        {
+          "english": "Mental activity",
+          "hindi": "मन के साथ काम करना"
+        },
+        {
+          "english": "Lucrative Salary",
+          "hindi": "अच्छा वेतन"
+        },
+        {
+          "english": "High achievement",
+          "hindi": "उच्च उपलब्धि"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Interpersonal",
+          "hindi": "अंतरंग संबंध"
+        },
+        {
+          "english": "Linguistic",
+          "hindi": "भाषाई क्षमता"
+        },
+        {
+          "english": "Spatial-Visual",
+          "hindi": "स्थानिक-दृश्य"
+        }
+      ]
+    },
+    "entrepreneurship": {
+      "title": {
+        "english": "Entrepreneurship",
+        "hindi": "उद्यमिता"
+      },
+      "6-8": {
+        "description": {
+          "english": "Entrepreneurs are people who start their own business by creating new products or services and taking the risk of running their company.",
+          "hindi": "उद्यमी वे लोग होते हैं जो नई चीजें या सेवाएं बनाकर अपना खुद का व्यवसाय शुरू करते हैं। वे अपने व्यवसाय को चलाने का जोखिम भी उठाते हैं।"
+        },
+        "subjects": {
+          "english": "Math, Social Studies, Computer Skills, Language Arts",
+          "hindi": "गणित, सामाजिक अध्ययन, कंप्यूटर कौशल, भाषा कला"
+        },
+        "skills": {
+          "english": "Creativity, Leadership, Problem-solving, Risk-taking, Organization",
+          "hindi": "रचनात्मकता, नेतृत्व क्षमता, समस्या को हल करने की क्षमता, जोखिम लेने का साहस, और आयोजन करने की क्षमता"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "Entrepreneurship involves identifying gaps or opportunities in the market and creating new businesses to provide innovative products or services. Entrepreneurs take on financial risks to potentially earn profits by solving problems or offering something unique.",
+          "hindi": "उद्यमिता का मतलब है बाजार में मौजूद कमियों या अवसरों को पहचानना और नए व्यवसाय शुरू करना, ताकि नए और अच्छा सामान या सेवाएँ बनाई जा सकें। उद्यमी अपने पैसे का जोखिम उठाते हैं ताकि वे समस्याओं को हल कर सकें या कुछ खास और अलग पेश कर सकें, जिससे उन्हें लाभ कमाने का मौका मिल सके।"
+        },
+        "subjects": {
+          "english": "Business Studies, Economics, Accounting, Marketing, Information Technology (IT)",
+          "hindi": "व्यवसाय अध्ययन, अर्थशास्त्र, लेखा, विपणन, और सूचना प्रौद्योगिकी (आईटी)"
+        },
+        "skills": {
+          "english": "Creativity and Innovation, Decision-making, Negotiation, Networking, Resilience",
+          "hindi": "रचनात्मकता और नवाचार, निर्णय लेना, बातचीत करना, संपर्क बनाना, और जुझारूपन"
+        },
+        "courses": {
+          "english": "Bachelor of Business Administration (BBA), Bachelor of Commerce (B.Com), Bachelor of Entrepreneurship and Innovation, Bachelor in Business Economics (BBE), Diploma in Entrepreneurship Management",
+          "hindi": "व्यवसाय प्रशासन में स्नातक (BBA), वाणिज्य में स्नातक (B.Com), उद्यमिता और नवाचार में स्नातक, व्यवसाय अर्थशास्त्र में स्नातक (BBE), और उद्यमिता प्रबंधन में डिप्लोमा।"
+        },
+        "exams": {
+          "english": "Common Entrance Test (CET), Joint Entrance Examination (JEE), Management Aptitude Test (MAT), Symbiosis Entrance Test (SET), Undergraduate Aptitude Test (UGAT)",
+          "hindi": "कॉमन एंट्रेंस टेस्ट (CET), जॉइंट एंट्रेंस एग्जामिनेशन (JEE), मैनेजमेंट एपटिट्यूड टेस्ट (MAT), सिम्बायोसिस एंट्रेंस टेस्ट (SET), अंडरग्रेजुएट एपटिट्यूड टेस्ट (UGAT)"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "Entrepreneurship refers to the process of identifying market needs, creating new products, and building a business around them. Entrepreneurs are individuals who innovate, organize resources, and take financial risks to grow their business ventures and influence the economy.",
+          "hindi": "उद्यमिता यानी कि बाजार की जरूरतों को समझना, नई चीजें बनाना और उनके चारों ओर अपना व्यवसाय खड़ा करना। उद्यमी वे लोग होते हैं जो नए आइडिया लाते हैं, संसाधनों का सही ढंग से इस्तेमाल करते हैं और अपने व्यवसाय को आगे बढ़ाने के लिए पैसा जोखिम में डालते हैं। इससे न केवल उनका व्यवसाय बढ़ता है, बल्कि इससे पूरे देश की अर्थव्यवस्था भी मजबूत होती है।"
+        },
+        "subjects": {
+          "english": "Entrepreneurship Studies\nBusiness Administration/Management\nEconomics and Financial Management\nAccounting and Taxation\nMarketing and Sales\nLegal Studies",
+          "hindi": "उद्यमिता अध्ययन  \nव्यवसाय प्रबंधन/प्रशासन  \nअर्थशास्त्र और वित्तीय प्रबंधन  \nलेखा और कराधान  \nबाजार और बिक्री  \nकानूनी अध्ययन"
+        },
+        "skills": {
+          "english": "Leadership and Management\nRisk Management\nFinancial Literacy\nBusiness Strategy and Planning\nAdaptability and Innovation\nSales and Negotiation",
+          "hindi": "नेतृत्व और प्रबंधन  \nखतरे को समझना और संभालना  \nआर्थिक ज्ञान और समझदारी  \nव्यापार की योजना और रणनीति बनाना  \nबदलाव के साथ तालमेल बिठाना और नई चीजें खोजना  \nबिक्री करना और मोलभाव करना"
+        },
+        "career_options": {
+          "english": "Startup Founder\nProduct Manager\nBusiness Consultant\nInnovation Strategist\nVenture Capitalist/Angel Investor",
+          "hindi": "स्टार्टअप फाउंडर (नई कंपनी बनाने वाला)  \nप्रोडक्ट मैनेजर (उत्पाद का ध्यान रखने वाला)  \nबिजनेस कंसल्टेंट (व्यापार में सलाह देने वाला)  \nइनोवेशन स्ट्रैटजिस्ट (नई सोच और तरकीबें बनाने वाला)  \nवेंचर कैपिटलिस्ट/एंजल इनवेस्टर (निवेश करने वाला, खासकर नई कंपनियों में पैसा लगाने वाला)"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Persuader",
+          "hindi": "उद्यमी"
+        },
+        {
+          "english": "Helper",
+          "hindi": "सामाजिक"
+        },
+        {
+          "english": "Thinker",
+          "hindi": "जांच-पड़ताल करने वाला"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Decision making & problem solving",
+          "hindi": "निर्णय लेना और समस्या का समाधान"
+        },
+        {
+          "english": "Communication",
+          "hindi": "संचार"
+        },
+        {
+          "english": "Computational",
+          "hindi": "गणनात्मक"
+        },
+        {
+          "english": "Creativity",
+          "hindi": "रचनात्मकता"
+        },
+        {
+          "english": "Logical reasoning",
+          "hindi": "तार्किक सोच"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Management",
+          "hindi": "प्रबंधन"
+        },
+        {
+          "english": "Finance",
+          "hindi": "वित्त"
+        },
+        {
+          "english": "Mathematics",
+          "hindi": "गणित"
+        },
+        {
+          "english": "Languages",
+          "hindi": "भाषाएँ"
+        },
+        {
+          "english": "Technology",
+          "hindi": "प्रौद्योगिकी"
+        }
+      ],
+      "values": [
+        {
+          "english": "Lucrative Salary",
+          "hindi": "अच्छा वेतन"
+        },
+        {
+          "english": "Variety and Diversity",
+          "hindi": "विविधता-विचलन"
+        },
+        {
+          "english": "Building relations",
+          "hindi": "टीम/समूह में काम करना"
+        },
+        {
+          "english": "Mental activity",
+          "hindi": "मन के साथ काम करना"
+        },
+        {
+          "english": "Leadership",
+          "hindi": "नेतृत्व"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Interpersonal",
+          "hindi": "अंतरंग संबंध"
+        },
+        {
+          "english": "Interpersonal",
+          "hindi": "अंतरंग संबंध"
+        },
+        {
+          "english": "Logical",
+          "hindi": "तार्किक"
+        },
+        {
+          "english": "Linguistic",
+          "hindi": "भाषाई क्षमता"
+        }
+      ]
+    },
+    "sales": {
+      "title": {
+        "english": "Sales",
+        "hindi": "बिक्री"
+      },
+      "6-8": {
+        "description": {
+          "english": "Sales is about helping people buy things they need. People in sales talk to customers, explain the products or services, and make deals. They help match the right product or service with what the customer is looking for.",
+          "hindi": "बिक्री का काम है लोगों की मदद करना ताकि वे अपनी जरूरत की चीजें खरीद सकें। बिक्री करने वाले लोग ग्राहकों से बात करते हैं, उन्हें अपने प्रोडक्ट्स या सर्विसेज के बारे में समझाते हैं, और सौदे करते हैं। वे यह सुनिश्चित करते हैं कि ग्राहक को उसकी जरूरत और पसंद के हिसाब से सही प्रोडक्ट या सर्विस मिले।"
+        },
+        "subjects": {
+          "english": "Math, English/Language Arts, Social Studies",
+          "hindi": "गणित, अंग्रेज़ी/भाषा कला, और सामाजिक अध्ययन"
+        },
+        "skills": {
+          "english": "Communication, Problem-Solving, Listening, Basic Math Skills",
+          "hindi": "संचार, समस्या सुलझाना, सुनना, और मूल गणित कौशल"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "Sales professionals help customers by understanding their needs and showing them the right products or services. Salespeople build relationships with customers to ensure they are satisfied with their purchases. This career involves persuasion, negotiation, and a deep understanding of the product.",
+          "hindi": "बिक्री के पेशे में काम करने वाले लोग ग्राहकों की जरूरतों को समझकर उन्हें सही उत्पादों या सेवाओं का सुझाव देते हैं। ये विक्रेता ग्राहकों के साथ अच्छे संबंध बनाते हैं ताकि वे अपने खरीदे हुए सामान से खुश रह सकें। इस करियर में आपको मनाना, बातचीत करना और उत्पाद को अच्छी तरह से जानना जरूरी होता है।"
+        },
+        "subjects": {
+          "english": "Mathematics, Business Studies, Economics, English, Psychology",
+          "hindi": "गणित, व्यवसाय अध्ययन, अर्थशास्त्र, अंग्रेजी, मनोविज्ञान"
+        },
+        "skills": {
+          "english": "Persuasion and Negotiation, Customer Service, Product Knowledge, Time Management, Networking",
+          "hindi": "मनोवृत्ति और बातचीत, ग्राहक सेवा, उत्पाद की जानकारी, समय का सही इस्तेमाल, नेटवर्किंग"
+        },
+        "courses": {
+          "english": "Bachelor's in Business Administration (BBA), Bachelor's in Marketing, Bachelor's in Commerce (B.Com), Sales Certification Courses, Diploma in Sales and Marketing Management",
+          "hindi": "बिजनेस एडमिनिस्ट्रेशन में स्नातक (BBA), मार्केटिंग में स्नातक, कॉमर्स में स्नातक (B.Com), बिक्री से जुड़ी सर्टिफिकेशन कोर्सेस, और बिक्री एवं मार्केटिंग मैनेजमेंट में डिप्लोमा।"
+        },
+        "exams": {
+          "english": "DU JAT (Delhi University Joint Admission Test), IPU CET (Indraprastha University Common Entrance Test), NPAT (Narsee Monjee Institute Management Studies Program), SET (Symbiosis Entrance Test), Skill-Based Certifications in Sales and Marketing",
+          "hindi": "डीयू जेट (दिल्ली विश्वविद्यालय संयुक्त प्रवेश परीक्षा), आईपीयू सेट (इंद्रप्रस्थ विश्वविद्यालय सामान्य प्रवेश परीक्षा), एनपीएटी (नर्सी मोंजी इंस्टिट्यूट ऑफ मैनजमेंट स्टडीज प्रोग्राम), सेट (सिम्बायोसिस प्रवेश परीक्षा), और बिक्री व मार्केटिंग में कौशल आधारित प्रमाणपत्र परीक्षाएं।"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "A career in sales involves identifying potential customers, understanding their needs, and providing solutions through products or services. Sales professionals engage in negotiations, build strong client relationships, and aim to close transactions that benefit both the customer and the business. Whether in retail, corporate sales, or specialized industries like technology or pharmaceuticals, sales is a crucial part of business success.",
+          "hindi": "बिक्री का करियर यानी कि सेल्स में काम करना, इसमें आपको संभावित ग्राहकों को खोजना होता है, उनकी जरूरतों को समझना होता है, और उनके लिए सही उत्पाद या सेवा प्रदान करनी होती है। सेल्स के प्रोफेशनल्स बातचीत करते हैं, ग्राहकों के साथ अच्छा रिश्ता बनाते हैं, और ऐसी डील पूरी करने की कोशिश करते हैं जिससे दोनों, यानी ग्राहक और कंपनी, दोनों को फायदा हो। चाहे आप रिटेल में काम कर रहे हों, कंपनी की बिक्री कर रहे हों, या फिर टेक्नोलॉजी या दवाओं जैसे खास क्षेत्रों में, सेल्स का काम बिजनेस की सफलता की बहुत जरूरी हिस्सा है।"
+        },
+        "subjects": {
+          "english": "Business and Commerce\nMathematics\nMarketing\nEconomics\nPsychology and Sociology\nEnglish and Communication",
+          "hindi": "व्यवसाय और वाणिज्य  \nगणित  \nविपणन (मार्केटिंग)  \nअर्थशास्त्र  \nमनोविज्ञान और समाजशास्त्र  \nअंग्रेज़ी और संवाद कौशल"
+        },
+        "skills": {
+          "english": "Interpersonal Skills\nNegotiation\nAnalytical Skills\nConfidence and Presentation\nProblem-Solving",
+          "hindi": "आपसी संबंध कौशल  \nमुलाकात और बातचीत का कौशल  \nविश्लेषणात्मक क्षमताएँ  \nआत्मविश्वास और प्रस्तुति कौशल  \nसमस्या सुलझाने की योग्यता"
+        },
+        "career_options": {
+          "english": "Sales Manager\nAccount Manager\nE-Commerce Specialist\nBusiness Development Manager\nReal Estate Agent",
+          "hindi": "बिक्री प्रबंधक  \nखाता प्रबंधक  \nई-कॉमर्स विशेषज्ञ  \nव्यवसाय विकास प्रबंधक  \nरियल एस्टेट एजेंट"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Persuader",
+          "hindi": "उद्यमी"
+        },
+        {
+          "english": "Helper",
+          "hindi": "सामाजिक"
+        },
+        {
+          "english": "Thinker",
+          "hindi": "जांच-पड़ताल करने वाला"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Communication",
+          "hindi": "संचार"
+        },
+        {
+          "english": "Decision making & problem solving",
+          "hindi": "निर्णय लेना और समस्या का समाधान"
+        },
+        {
+          "english": "Computational",
+          "hindi": "गणनात्मक"
+        },
+        {
+          "english": "Logical reasoning",
+          "hindi": "तार्किक सोच"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Management",
+          "hindi": "प्रबंधन"
+        },
+        {
+          "english": "Finance",
+          "hindi": "वित्त"
+        },
+        {
+          "english": "English",
+          "hindi": "अंग्रेज़ी"
+        },
+        {
+          "english": "Social Sciences",
+          "hindi": "सामाजिक विज्ञान"
+        },
+        {
+          "english": "Mathematics",
+          "hindi": "गणित"
+        }
+      ],
+      "values": [
+        {
+          "english": "Building relations",
+          "hindi": "टीम/समूह में काम करना"
+        },
+        {
+          "english": "High achievement",
+          "hindi": "उच्च उपलब्धि"
+        },
+        {
+          "english": "Creativity",
+          "hindi": "रचनात्मकता"
+        },
+        {
+          "english": "Autonomy",
+          "hindi": "स्वतंत्रता/ स्वायत्तता"
+        },
+        {
+          "english": "Variety and Diversity",
+          "hindi": "विविधता-विचलन"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Interpersonal",
+          "hindi": "अंतरंग संबंध"
+        },
+        {
+          "english": "Linguistic",
+          "hindi": "भाषाई क्षमता"
+        },
+        {
+          "english": "Logical",
+          "hindi": "तार्किक"
+        }
+      ]
+    },
+    "science_and_mathematics": {
+      "title": {
+        "english": "Science and Mathematics",
+        "hindi": "विज्ञान और गणित"
+      },
+      "6-8": {
+        "description": {
+          "english": "Science and Mathematics help us understand how things work in the world around us. Scientists study plants, animals, and reactions, while mathematicians solve problems using numbers and shapes. People in these careers use experiments and math to find answers and create new ideas.",
+          "hindi": "विज्ञान और गणित हमें यह समझने में मदद करते हैं कि हमारे आसपास की दुनिया कैसे काम करती है। वैज्ञानिक पौधों, जानवरों और रासायनिक प्रतिक्रियाओं का अध्ययन करते हैं, जबकि गणितज्ञ संख्याओं और आकृतियों का इस्तेमाल करके समस्याओं का समाधान ढूंढ़ते हैं। इन क्षेत्रों में काम करने वाले लोग प्रयोगों और गणित का उपयोग करके उत्तर खोजते हैं और नए विचार बनाते हैं।"
+        },
+        "subjects": {
+          "english": "Science, Mathematics, Technology, Environmental Studies",
+          "hindi": "विज्ञान, गणित, प्रौद्योगिकी, पर्यावरण अध्ययन"
+        },
+        "skills": {
+          "english": "Critical Thinking, Observation, Communication, Teamwork",
+          "hindi": "आलोचनात्मक सोच, निरीक्षण, संवाद, टीमवर्क"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "The Science and Mathematics career path involves in-depth study and application of scientific principles and mathematical theories. Professionals in this field conduct experiments, analyse data, and develop mathematical models to address real-world challenges in various sectors, including healthcare, environmental science, and technology.",
+          "hindi": "विज्ञान और गणित का करियर रास्ता विज्ञान के सिद्धांतों और गणितीय सिद्धांतों का गहरा अध्ययन और इस्तेमाल करता है। इस क्षेत्र के पेशेवर प्रयोग करते हैं, डेटा का विश्लेषण करते हैं, और गणितीय मॉडल बनाते हैं ताकि स्वास्थ्य, पर्यावरण, टेक्नोलॉजी जैसे विभिन्न क्षेत्रों में आने वाली समस्याओं का समाधान किया जा सके।"
+        },
+        "subjects": {
+          "english": "Advanced Science Courses, Mathematics Courses, Computer Science, Statistics",
+          "hindi": "उन्नत विज्ञान कोर्स, गणित कोर्स, कंप्यूटर साइंस, सांख्यिकी"
+        },
+        "skills": {
+          "english": "Analytical Skills, Problem-Solving, Research Skills, Technical Skills",
+          "hindi": "विश्लेषणात्मक कौशल, समस्या सुलझाने की क्षमता, अनुसंधान कौशल, तकनीकी कौशल"
+        },
+        "courses": {
+          "english": "Bachelor's Degree in Science (Biology, Chemistry, Physics), Bachelor's Degree in Mathematics or Applied Mathematics, Engineering Programs, Data Science or Statistics",
+          "hindi": "स्नातक डिग्री (विज्ञान – जैसे जीवविज्ञान, रसायनविज्ञान, भौतिकी), गणित या अनुप्रयुक्त गणित में स्नातक डिग्री, इंजीनियरिंग कार्यक्रम, डेटा साइंस या सांख्यिकी में डिग्री।"
+        },
+        "exams": {
+          "english": "SAT or ACT, Advanced Placement (AP) Exams, GRE (Graduate Record Examination)",
+          "hindi": "SAT या ACT, एडवांस्ड प्लेसमेंट (AP) परीक्षाएँ, GRE (स्नातक रिकॉर्ड परीक्षा)"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "Careers in Science and Mathematics involve rigorous study and application of scientific knowledge and mathematical theories to solve complex problems. These professionals work in various industries, such as healthcare, engineering, finance, and environmental science, contributing to advancements in technology and improving quality of life through research and analysis.",
+          "hindi": "विज्ञान और गणित के क्षेत्र में करियर बनाना मतलब बहुत मेहनत से पढ़ाई करना और वैज्ञानिक ज्ञान और गणित के सिद्धांतों का सही तरीके से इस्तेमाल करना ताकि जटिल समस्याओं का समाधान किया जा सके। ये प्रोफेशनल्स कई तरह के कामों में लगे रहते हैं, जैसे कि हेल्थकेयर, इंजीनियरिंग, फाइनेंस, और पर्यावरण विज्ञान। इन क्षेत्रों में ये लोग नई तकनीकों का विकास करते हैं और रिसर्च व विश्लेषण के ज़रिए जीवन की गुणवत्ता को बेहतर बनाते हैं।"
+        },
+        "subjects": {
+          "english": "College Preparatory Science Courses\nMathematics Courses\nResearch Methods\nInterdisciplinary Studies",
+          "hindi": "कॉलेज की तैयारी के लिए विज्ञान के कोर्स  \nगणित के कोर्स  \nअनुसंधान के तरीके  \nअंतरविषयक अध्ययन"
+        },
+        "skills": {
+          "english": "Research Proficiency\nQuantitative Analysis\nCreative Thinking\nProfessional Communication",
+          "hindi": "शोध करने की क्षमता  \nमात्रात्मक विश्लेषण (सांख्यिकी के आधार पर विचार करने की योग्यता)  \nरचनात्मक सोच (नई और अनूठी बातें सोचने की क्षमता)  \nपेशेवर संवाद कौशल (अच्छी तरह से बात करने और लिखने की कला)"
+        },
+        "career_options": {
+          "english": "Data Scientist\nBiotechnologist\nEnvironmental Scientist\nResearcher\nBioinformatics Specialist",
+          "hindi": "डाटा वैज्ञानिक  \nबायोटेक्नोलॉजिस्ट (जैविक प्रौद्योगिकी विशेषज्ञ)  \nपर्यावरण वैज्ञानिक  \nशोधकर्ता  \nबायोइन्फॉर्मेटिक्स विशेषज्ञ"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Thinker",
+          "hindi": "जांच-पड़ताल करने वाला"
+        },
+        {
+          "english": "Organizer",
+          "hindi": "परंपरागत"
+        },
+        {
+          "english": "Doer",
+          "hindi": "व्यावहारिक"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Computational",
+          "hindi": "गणनात्मक"
+        },
+        {
+          "english": "Form perception",
+          "hindi": "रूप पहचानने की क्षमता"
+        },
+        {
+          "english": "Decision making & problem solving",
+          "hindi": "निर्णय लेना और समस्या का समाधान"
+        },
+        {
+          "english": "Technical",
+          "hindi": "तकनीकी"
+        },
+        {
+          "english": "Finger dexterity",
+          "hindi": "उंगली की निपुणता"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Science",
+          "hindi": "विज्ञान"
+        },
+        {
+          "english": "Mathematics",
+          "hindi": "गणित"
+        },
+        {
+          "english": "Technology",
+          "hindi": "प्रौद्योगिकी"
+        },
+        {
+          "english": "Health",
+          "hindi": "स्वास्थ्य"
+        },
+        {
+          "english": "Languages",
+          "hindi": "भाषाएँ"
+        }
+      ],
+      "values": [
+        {
+          "english": "Lucrative Salary",
+          "hindi": "अच्छा वेतन"
+        },
+        {
+          "english": "Mental activity",
+          "hindi": "मन के साथ काम करना"
+        },
+        {
+          "english": "High achievement",
+          "hindi": "उच्च उपलब्धि"
+        },
+        {
+          "english": "Prestige/ Recognition",
+          "hindi": "प्रतिष्ठा/ मान्यता"
+        },
+        {
+          "english": "Job Security",
+          "hindi": "नौकरी की सुरक्षा"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Logical",
+          "hindi": "तार्किक"
+        },
+        {
+          "english": "Intrapersonal",
+          "hindi": "आंतरिक व्यक्तित्व"
+        },
+        {
+          "english": "Bodily-Kinesthetic",
+          "hindi": "शारीरिक-काइनेस्थेटिक"
+        },
+        {
+          "english": "Naturalistic",
+          "hindi": "प्राकृतिक"
+        }
+      ]
+    },
+    "computer_science_it_and_allied_fields": {
+      "title": {
+        "english": "Computer Science, IT and Allied Fields",
+        "hindi": "कंप्यूटर साइंस, आईटी और संबंधित क्षेत्र"
+      },
+      "6-8": {
+        "description": {
+          "english": "IT and Computer Science involves working with computers to solve problems, develop software, and protect data online.",
+          "hindi": "आईटी और कंप्यूटर विज्ञान का मतलब है कंप्यूटर का इस्तेमाल करके समस्याओं का समाधान करना, सॉफ्टवेयर बनाना और ऑनलाइन डेटा की सुरक्षा करना।"
+        },
+        "subjects": {
+          "english": "Mathematics, Computer Science, Science",
+          "hindi": "गणित, कंप्यूटर साइंस, विज्ञान"
+        },
+        "skills": {
+          "english": "Logical Thinking, Creativity, Attention to Detail, Teamwork",
+          "hindi": "तार्किक सोच, रचनात्मकता, ध्यान देने की क्षमता, टीमवर्क"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "IT and Computer Science include building, improving, and managing computer systems, software, and networks, essential for business and everyday technology use.",
+          "hindi": "आईटी और कंप्यूटर साइंस का मतलब है कंप्यूटर सिस्टम, सॉफ्टवेयर और नेटवर्क को बनाना, सुधारना और संभालना। ये चीजें बिज़नेस और रोज़मर्रा की तकनीक के इस्तेमाल के लिए बहुत जरूरी हैं।"
+        },
+        "subjects": {
+          "english": "Mathematics (Algebra, Geometry, Discrete Mathematics), Computer Science (Programming Languages like Python, Java), Science (Physics, Electronics)",
+          "hindi": "गणित (बीजगणित, ज्यामिति, विशिष्ट गणित), कंप्यूटर विज्ञान (प्रोग्रामिंग भाषाएँ जैसे पाइथन, जावा), विज्ञान (भौतिकी, इलेक्ट्रॉनिक्स)"
+        },
+        "skills": {
+          "english": "Problem-Solving, Programming Proficiency, Database Management, Cybersecurity Awareness, Innovation",
+          "hindi": "समस्या सुलझाने की क्षमता, प्रोग्रामिंग में दक्षता, डेटाबेस का सही उपयोग, साइबर सुरक्षा का ज्ञान, और नई खोज करने का जज़बा।"
+        },
+        "courses": {
+          "english": "B.E./B.Tech in Computer Science and Engineering (CSE), B.E./B.Tech in Information Technology (IT), MCA, M.Sc.(Computer Science), B.Sc. in Computer Science, BCA (Bachelor of Computer Applications), Diploma in IT",
+          "hindi": "कंप्यूटर साइंस और इंजीनियरिंग में बी.ई./बी.टेक. (CSE), सूचना प्रौद्योगिकी में बी.ई./बी.टेक. (IT), एम.सी.ए., एम.एससी. (कंप्यूटर साइंस), बी.एससी. (कंप्यूटर साइंस), बी.सी.ए. (बैचलर ऑफ कंप्यूटर एप्लिकेशन), और आईटी में डिप्लोमा।"
+        },
+        "exams": {
+          "english": "JEE (Joint Entrance Examination), BITSAT (Birla Institute of Technology and Science Admission Test), VITEEE (Vellore Institute of Technology Entrance Exam), State Engineering Exams (e.g., KCET, MHT-CET, WBJEE), SAT/ACT (for studying abroad), NIMCET (NIT MCA Common Entrance Test)",
+          "hindi": "यहाँ कुछ प्रमुख परीक्षाओं के नाम दिए गए हैं, जो छात्रों की पढ़ाई और करियर बनाने में मदद करती हैं:\n\n- जेईई (जॉइंट एंट्रेंस एग्जामिनेशन): यह परीक्षा देश की सबसे बड़ी इंजीनियरिंग प्रवेश परीक्षा है, जिससे आप देश के टॉप इंजीनियरिंग कॉलेजों में दाखिला ले सकते हैं।\n- बीआईटीएसएटी (बिरला इंस्टीट्यूट ऑफ टेक्नोलॉजी एंड साइंस एडमिशन टेस्ट): यह परीक्षा बिरला इंस्टीट्यूट ऑफ टेक्नोलॉजी में प्रवेश के लिए होती है।\n- वीआईटीईईई (वेल्लोर टेक्नोलॉजी इनटरेंस एग्जाम): यह वेल्लोर इंस्टीट्यूट ऑफ टेक्नोलॉजी में दाखिले के लिए होती है।\n- स्टेट इंजीनियरिंग परीक्षाएं (जैसे KCET, MHT-CET, WBJEE): ये परीक्षाएं हर राज्य के अलग-अलग इंजीनियरिंग कॉलेजों में प्रवेश के लिए आयोजित की जाती हैं।\n- SAT/ACT: ये परीक्षाएं विदेश में पढ़ाई करने के इच्छुक छात्रों के लिए हैं।\n- NIMCET (NIT MCA कॉमन एंट्रेंस टेस्ट): यह परीक्षा NITs में मास्टर ऑफ कंप्यूटर एप्लिकेशन (MCA) कोर्स में दाखिले के लिए होती है।\n\nइन परीक्षाओं का उद्देश्य है कि छात्रों को उनके रुचि और मेहनत के आधार पर सही कॉलेज और कोर्स में जगह मिले ताकि उनका भविष्य उज्जवल हो सके।"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "IT and Computer Science focus on designing, managing, and improving systems that use hardware and software to store, process, and share information. This field is critical for industries such as healthcare, finance, and education, where technology plays a central role.",
+          "hindi": "आईटी और कंप्यूटर साइंस का क्षेत्र उन सिस्टम्स को डिज़ाइन, मैनेज और बेहतर बनाने पर केंद्रित है, जो हार्डवेयर और सॉफ्टवेयर का इस्तेमाल करके जानकारी को संग्रहित, संसाधित और साझा करते हैं। यह क्षेत्र उन उद्योगों के लिए बहुत महत्वपूर्ण है, जैसे कि स्वास्थ्य सेवा, बैंकिंग, और शिक्षा, जहां तकनीक का इस्तेमाल बहुत अहम होता है।"
+        },
+        "subjects": {
+          "english": "Advanced Mathematics (Calculus, Probability, Discrete Math)\nComputer Science (Data Structures, Algorithms, AI, Machine Learning)\nPhysics (Electronics, Circuits)\nInformation Technology (Cybersecurity, Networking)",
+          "hindi": "उन्नत गणित (कलन, संभावना, डिस्क्रीट मैथ)\nकंप्यूटर विज्ञान (डाटा स्ट्रक्चर, एल्गोरिदम, आर्टिफिशियल इंटेलिजेंस, मशीन लर्निंग)\nभौतिकी (इलेक्ट्रॉनिक्स, सर्किट)\nसूचना प्रौद्योगिकी (साइबर सुरक्षा, नेटवर्किंग)"
+        },
+        "skills": {
+          "english": "Advanced Programming\nSystem Design\nData Analysis and Management\nCybersecurity and Ethical Hacking\nArtificial Intelligence and Machine Learning\nCloud Computing\nProject Management",
+          "hindi": "उन्नत प्रोग्रामिंग  \nसिस्टम डिज़ाइन  \nडेटा विश्लेषण और प्रबंधन  \nसाइबर सुरक्षा और नैतिक हैकिंग  \nकृत्रिम बुद्धिमत्ता और मशीन लर्निंग  \nक्लाउड कंप्यूटिंग  \nप्रोजेक्ट मैनेजमेंट"
+        },
+        "career_options": {
+          "english": "Cybersecurity Analyst\nSoftware Developer\nUX/UI Designer\nArtificial Intelligence Specialist\nCloud Computing Specialist",
+          "hindi": "साइबर सुरक्षा विश्लेषक  \nसॉफ्टवेयर डेवलपर  \nयूएक्स/यूआई डिज़ाइनर  \nकृत्रिम बुद्धिमत्ता विशेषज्ञ  \nक्लाउड कम्प्यूटिंग विशेषज्ञ"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Thinker",
+          "hindi": "जांच-पड़ताल करने वाला"
+        },
+        {
+          "english": "Doer",
+          "hindi": "व्यावहारिक"
+        },
+        {
+          "english": "Organizer",
+          "hindi": "परंपरागत"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Technical",
+          "hindi": "तकनीकी"
+        },
+        {
+          "english": "Communication",
+          "hindi": "संचार"
+        },
+        {
+          "english": "Logical reasoning",
+          "hindi": "तार्किक सोच"
+        },
+        {
+          "english": "Decision making & problem solving",
+          "hindi": "निर्णय लेना और समस्या का समाधान"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Technology",
+          "hindi": "प्रौद्योगिकी"
+        },
+        {
+          "english": "Mathematics",
+          "hindi": "गणित"
+        },
+        {
+          "english": "Science",
+          "hindi": "विज्ञान"
+        },
+        {
+          "english": "Languages",
+          "hindi": "भाषाएँ"
+        },
+        {
+          "english": "English",
+          "hindi": "अंग्रेज़ी"
+        }
+      ],
+      "values": [
+        {
+          "english": "Hands-on activities",
+          "hindi": "हाथों से काम करना"
+        },
+        {
+          "english": "Lucrative Salary",
+          "hindi": "अच्छा वेतन"
+        },
+        {
+          "english": "Autonomy",
+          "hindi": "स्वतंत्रता/ स्वायत्तता"
+        },
+        {
+          "english": "High achievement",
+          "hindi": "उच्च उपलब्धि"
+        },
+        {
+          "english": "Variety and Diversity",
+          "hindi": "विविधता-विचलन"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Logical",
+          "hindi": "तार्किक"
+        },
+        {
+          "english": "Bodily-Kinesthetic",
+          "hindi": "शारीरिक-काइनेस्थेटिक"
+        },
+        {
+          "english": "Intrapersonal",
+          "hindi": "आंतरिक व्यक्तित्व"
+        }
+      ]
+    },
+    "life_sciences_medicine_and_healthcare": {
+      "title": {
+        "english": "Life Sciences /Medicine and Healthcare",
+        "hindi": "जीवन विज्ञान / चिकित्सा और स्वास्थ्य सेवाएं"
+      },
+      "6-8": {
+        "description": {
+          "english": "Life sciences are about studying living things like plants, animals, and humans. Medicine and healthcare are fields where doctors, nurses, and other professionals help people when they are sick or hurt, and researchers discover new ways to keep people healthy.",
+          "hindi": "जीव विज्ञान का मतलब है जीवित चीजों का अध्ययन करना, जैसे पौधे, जानवर और इंसान। चिकित्सा और स्वास्थ्य सेवाएँ ऐसे क्षेत्र हैं जहाँ डॉक्टर, नर्स और अन्य पेशेवर लोगों की मदद करते हैं जब वे बीमार या घायल हो जाते हैं। साथ ही, शोधकर्ता नए तरीके खोजते हैं ताकि लोग स्वस्थ रह सकें।"
+        },
+        "subjects": {
+          "english": "Biology, Chemistry, Mathematics, Physical Education",
+          "hindi": "जीवविज्ञान, रसायन विज्ञान, गणित, शारीरिक शिक्षा"
+        },
+        "skills": {
+          "english": "Observation and Analysis, Communication, Empathy and Care, Basic Problem Solving",
+          "hindi": "निरीक्षण और विश्लेषण, संवाद कौशल, सहानुभूति और देखभाल, मूल समस्या का हल करने की क्षमता"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "Life sciences are about studying biology, including plants, animals, and human beings, while medicine and healthcare focus on understanding the human body, how diseases occur, and how to treat or prevent them. People in these fields work to save lives, promote health, and discover new cures.",
+          "hindi": "जीव विज्ञान का अध्ययन पौधों, जानवरों और मनुष्यों जैसे जीवों के बारे में होता है। वहीं, चिकित्सा और स्वास्थ्य देखभाल का मकसद मानव शरीर को समझना, बीमारियों का कारण जानना और उनका इलाज या रोकथाम करना है। इन क्षेत्रों में काम करने वाले लोग जीवन को बचाने, स्वास्थ्य को बेहतर बनाने और नई दवाइयां खोजने के लिए मेहनत करते हैं।"
+        },
+        "subjects": {
+          "english": "Biology, Chemistry, Physics, Mathematics",
+          "hindi": "बायोलॉजी, केमिस्ट्री, फिजिक्स और गणित"
+        },
+        "skills": {
+          "english": "Critical Thinking and Analysis, Scientific Research, Problem Solving, Teamwork",
+          "hindi": "आलोचनात्मक सोच और विश्लेषण, वैज्ञानिक अनुसंधान, समस्या हल करने की क्षमता, टीमवर्क"
+        },
+        "courses": {
+          "english": "MBBS (Bachelor of Medicine, Bachelor of Surgery), BDS (Bachelor of Dental Surgery), B.Sc. in Nursing, B.Sc. in Biotechnology / Microbiology, B.Pharm (Bachelor of Pharmacy), BHMS / BAMS (Homeopathy / Ayurveda)",
+          "hindi": "एमबीबीएस (बैचलर ऑफ मेडिसिन, बैचलर ऑफ सर्जरी), बीडीएस (बैचलर ऑफ डेंटल सर्जरी), बी.एससी. नर्सिंग में, बी.एससी. बायोटेक्नोलॉजी / माइक्रोबायोलॉजी में, बी.फार्म (बैचलर ऑफ फार्मेसी), बीएचएमएस / बीएएमएस (होम्योपैथी / आयुर्वेद)"
+        },
+        "exams": {
+          "english": "NEET (National Eligibility cum Entrance Test), AIIMS MBBS, JIPMER MBBS, CET (Common Entrance Test) for Pharmacy and Nursing Courses, ICAR AIEEA (All India Entrance Examination for Admission)",
+          "hindi": "नीट (राष्ट्रीय पात्रता सह प्रवेश परीक्षा), AIIMS MBBS, JIPMER MBBS, CET (सामान्य प्रवेश परीक्षा) फार्मेसी और नर्सिंग कोर्स के लिए, ICAR AIEEA (ऑल इंडिया एंट्रेंस परीक्षा) प्रवेश के लिए।"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "Life sciences are an area of study that focuses on living organisms, including humans, while medicine and healthcare focus on understanding the human body, diagnosing illnesses, and developing treatments to improve or restore health. Professionals in this field are responsible for caring for patients, preventing diseases, and conducting medical research.",
+          "hindi": "जीव विज्ञान एक ऐसा क्षेत्र है जिसमें जीवित प्राणियों का अध्ययन किया जाता है, जिसमें मनुष्यों भी शामिल हैं। वहीं, चिकित्सा और स्वास्थ्य सेवा का उद्देश्य इंसानी शरीर को समझना, बीमारियों का पता लगाना और उन्हें ठीक करने या सुधारने के इलाज विकसित करना है। इस क्षेत्र के विशेषज्ञ मरीजों की देखभाल करने, बीमारियों को रोकने और नई दवाइयों व इलाज़ खोजने का काम करते हैं।"
+        },
+        "subjects": {
+          "english": "Biology (Human Physiology, Genetics)\nChemistry (Organic and Inorganic)\nPhysics\nMathematics (Statistics)",
+          "hindi": "जीवविज्ञान (मानव शरीर विज्ञान, आनुवंशिकी)  \nरसायन विज्ञान (कार्बनिक और अजैविक)  \nभौतिकी  \nगणित (सांख्यिकी)"
+        },
+        "skills": {
+          "english": "Advanced Problem Solving\nResearch and Scientific Analysis\nEmpathy and Patient Care\nAttention to Detail",
+          "hindi": "उन्नत समस्या सुलझाने की क्षमता  \nशोध और वैज्ञानिक विश्लेषण  \nसहानुभूति और धैर्यपूर्ण देखभाल  \nबारीकी पर ध्यान देना"
+        },
+        "career_options": {
+          "english": "Medical Doctor/Specialist\nNurse Practitioner\nHealthcare Administrator\nMedical Research Scientist\nHealth Informatics Specialist",
+          "hindi": "चिकित्सा डॉक्टर/विशेषज्ञ  \nनर्स प्रैक्टिशनर (नर्स प्रैक्टिशनर)  \nस्वास्थ्य प्रबंधक (हेल्थकेयर एडमिनिस्ट्रेटर)  \nचिकित्सा अनुसंधान वैज्ञानिक (मेडिकल रिसर्च साइंटिस्ट)  \nस्वास्थ्य सूचना विशेषज्ञ (हेल्थ इनफॉर्मेटिक्स स्पेशलिस्ट)"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Thinker",
+          "hindi": "जांच-पड़ताल करने वाला"
+        },
+        {
+          "english": "Doer",
+          "hindi": "व्यावहारिक"
+        },
+        {
+          "english": "Helper",
+          "hindi": "सामाजिक"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Form Perception",
+          "hindi": "Form Perception"
+        },
+        {
+          "english": "Decision making & problem solving",
+          "hindi": "निर्णय लेना और समस्या का समाधान"
+        },
+        {
+          "english": "Logical reasoning",
+          "hindi": "तार्किक सोच"
+        },
+        {
+          "english": "Communication",
+          "hindi": "संचार"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Health",
+          "hindi": "स्वास्थ्य"
+        },
+        {
+          "english": "Science",
+          "hindi": "विज्ञान"
+        },
+        {
+          "english": "Mathematics",
+          "hindi": "गणित"
+        },
+        {
+          "english": "Languages",
+          "hindi": "भाषाएँ"
+        },
+        {
+          "english": "Home and Consumer science",
+          "hindi": "गृह और उपभोक्ता विज्ञान"
+        }
+      ],
+      "values": [
+        {
+          "english": "Prestige/ Recognition",
+          "hindi": "प्रतिष्ठा/ मान्यता"
+        },
+        {
+          "english": "High achievement",
+          "hindi": "उच्च उपलब्धि"
+        },
+        {
+          "english": "Mental activity",
+          "hindi": "मन के साथ काम करना"
+        },
+        {
+          "english": "Building relations",
+          "hindi": "टीम/समूह में काम करना"
+        },
+        {
+          "english": "Autonomy",
+          "hindi": "स्वतंत्रता/ स्वायत्तता"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Logical",
+          "hindi": "तार्किक"
+        },
+        {
+          "english": "Bodily-Kinesthetic",
+          "hindi": "शारीरिक-काइनेस्थेटिक"
+        },
+        {
+          "english": "Interpersonal",
+          "hindi": "अंतरंग संबंध"
+        },
+        {
+          "english": "Naturalistic",
+          "hindi": "प्राकृतिक"
+        }
+      ]
+    },
+    "environmental_service": {
+      "title": {
+        "english": "Environmental Service",
+        "hindi": "पर्यावरण सेवा"
+      },
+      "6-8": {
+        "description": {
+          "english": "Environmental services focus on taking care of the Earth and its resources. This includes things like recycling, protecting wildlife, and finding ways to keep our air and water clean.",
+          "hindi": "पर्यावरण सेवाएँ पृथ्वी और उसके संसाधनों की देखभाल पर केंद्रित हैं। इसमें रिसाइकिलिंग, जंगली जानवरों की सुरक्षा, और हवा-पानी को साफ-सुथरा रखने के तरीके ढूँढना जैसी बातें शामिल हैं।"
+        },
+        "subjects": {
+          "english": "Science, Geography, Health Education, Art",
+          "hindi": "विज्ञान, भूगोल, स्वास्थ्य शिक्षा, कला"
+        },
+        "skills": {
+          "english": "Critical Thinking, Communication, Teamwork, Observational Skills",
+          "hindi": "आलोचनात्मक सोच, बातचीत करने की क्षमता, टीम में काम करने का तरीका, और नज़र रखने की सूझ-बूझ"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "Environmental service professionals study the environment to understand how to protect it. They work on projects related to pollution control, wildlife conservation, and sustainable practices that help maintain ecological balance.",
+          "hindi": "पर्यावरण सेवा के पेशेवर पर्यावरण का अध्ययन करते हैं ताकि वे यह समझ सकें कि इसे कैसे सुरक्षित और संरक्षित किया जाए। वे ऐसे प्रोजेक्ट्स पर काम करते हैं जिनमें प्रदूषण को रोकना, वन्यजीवों का संरक्षण करना और ऐसी टिकाऊ आदतें अपनाना शामिल है, जो पर्यावरण को संतुलित और स्वस्थ बनाए रखने में मदद करें।"
+        },
+        "subjects": {
+          "english": "Environmental Science, Biology, Chemistry, Social Studies",
+          "hindi": "पर्यावरण विज्ञान, जीवविज्ञान, रसायन विज्ञान, सामाजिक अध्ययन"
+        },
+        "skills": {
+          "english": "Research Skills, Problem-Solving, Public Speaking, Technical Skills",
+          "hindi": "शोध क्षमता, समस्या सुलझाने की योग्यता, सार्वजनिक बोलना, तकनीकी कौशल"
+        },
+        "courses": {
+          "english": "Bachelor's Degree in Environmental Science, Bachelor's in Ecology or Conservation Biology, Sustainable Resource Management: Programs focusing on sustainable practices in agriculture, forestry, and fisheries, Environmental Policy and Management",
+          "hindi": "पर्यावरण विज्ञान में स्नातक की डिग्री, पारिस्थितिकी या संरक्षण जीवविज्ञान में स्नातक, स्थायी संसाधन प्रबंधन: ऐसे प्रोग्राम जो खेती, वन्यजीवन और मत्स्य पालन में टिकाऊ अभ्यास पर केंद्रित हैं, और पर्यावरण नीति एवं प्रबंधन।"
+        },
+        "exams": {
+          "english": "SAT or ACT, Environmental Science Entrance Tests (University Specific), GRE (Graduate Record Examination)",
+          "hindi": "SAT या ACT, पर्यावरण विज्ञान प्रवेश परीक्षाएँ (विशेष विश्वविद्यालय के अनुसार), GRE (स्नातक परीक्षात्मक परीक्षा)"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "Careers in environmental services focus on reducing human impact on the environment through research and implementation of sustainable practices. Professionals in this field work on projects related to conservation, climate change mitigation, and resource management.",
+          "hindi": "पर्यावरण सेवाओं में करियर का उद्देश्य है मानव गतिविधियों का पर्यावरण पर पड़ने वाले प्रभाव को कम करना। इसके लिए वे रिसर्च करते हैं और टिकाऊ (सतत) तरीके अपनाते हैं। इस क्षेत्र के पेशेवर संरक्षण, जलवायु परिवर्तन से निपटने और संसाधनों का सही तरीके से इस्तेमाल करने जैसे प्रोजेक्ट्स पर काम करते हैं। यह करियर पर्यावरण की देखभाल करने और सुरक्षित बनाने का अच्छा तरीका है।"
+        },
+        "subjects": {
+          "english": "Advanced Environmental Studies\nEcology\nEnvironmental Policy\nSustainability Studies",
+          "hindi": "उन्नत पर्यावरण अध्ययन  \nइकोलॉजी (पर्यावरण विज्ञान)  \nपर्यावरण नीति  \nस्थिरता अध्ययन"
+        },
+        "skills": {
+          "english": "Analytical Skills\nProject Management\nNetworking\nAdvocacy",
+          "hindi": "विश्लेषणात्मक कौशल  \nपरियोजना प्रबंधन  \nसंबंध बनाने और नेटवर्किंग  \nवकालत (अपनी बात को सही तरीके से रखने और दूसरों की मदद करने का कौशल)"
+        },
+        "career_options": {
+          "english": "Environmental Scientist\nSustainability Consultant\nEnvironmental Engineer\nConservation Biologist\nClimate Change Analyst",
+          "hindi": "पर्यावरण वैज्ञानिक  \nस्थिरता सलाहकार  \nपर्यावरण इंजीनियर  \nसंरक्षण जीवविज्ञानी  \nजलवायु परिवर्तन विश्लेषक"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Thinker",
+          "hindi": "जांच-पड़ताल करने वाला"
+        },
+        {
+          "english": "Doer",
+          "hindi": "व्यावहारिक"
+        },
+        {
+          "english": "Helper",
+          "hindi": "सामाजिक"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Decision making & problem solving",
+          "hindi": "निर्णय लेना और समस्या का समाधान"
+        },
+        {
+          "english": "Form perception",
+          "hindi": "रूप पहचानने की क्षमता"
+        },
+        {
+          "english": "Motor movement",
+          "hindi": "शारीरिक गति"
+        },
+        {
+          "english": "Finger dexterity",
+          "hindi": "उंगली की निपुणता"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Social Sciences",
+          "hindi": "सामाजिक विज्ञान"
+        },
+        {
+          "english": "Languages",
+          "hindi": "भाषाएँ"
+        },
+        {
+          "english": "Technology",
+          "hindi": "प्रौद्योगिकी"
+        },
+        {
+          "english": "Mathematics",
+          "hindi": "गणित"
+        },
+        {
+          "english": "Science",
+          "hindi": "विज्ञान"
+        }
+      ],
+      "values": [
+        {
+          "english": "Hands-on activities",
+          "hindi": "हाथों से काम करना"
+        },
+        {
+          "english": "Building relations",
+          "hindi": "टीम/समूह में काम करना"
+        },
+        {
+          "english": "Mental activity",
+          "hindi": "मन के साथ काम करना"
+        },
+        {
+          "english": "Creativity",
+          "hindi": "रचनात्मकता"
+        },
+        {
+          "english": "Variety and Diversity",
+          "hindi": "विविधता-विचलन"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Logical",
+          "hindi": "तार्किक"
+        },
+        {
+          "english": "Naturalistic",
+          "hindi": "प्राकृतिक"
+        },
+        {
+          "english": "Interpersonal",
+          "hindi": "अंतरंग संबंध"
+        },
+        {
+          "english": "Bodily-Kinesthetic",
+          "hindi": "शारीरिक-काइनेस्थेटिक"
+        }
+      ]
+    },
+    "social_sciences_and_humanities": {
+      "title": {
+        "english": "Social Sciences and Humanities",
+        "hindi": "सामाजिक विज्ञान और मानवीिकी (मानविकी)"
+      },
+      "6-8": {
+        "description": {
+          "english": "Social Sciences: Studying how people live together in societies, how they interact, and how they solve problems. This includes learning about people's behaviours, governments, and economies. Humanities: Learning about human culture, including history, languages, art, and literature. It focuses on understanding how people express their ideas and emotions.",
+          "hindi": "सामाजिक विज्ञान: इसका अध्ययन होता है कि लोग समाज में एक साथ कैसे रहते हैं, उनके बीच कैसे बातचीत होती है और वे अपने समस्याओं का हल कैसे निकालते हैं। इसमें यह भी सीखना शामिल है कि लोग कैसे व्यवहार करते हैं, सरकारें कैसी होती हैं और आर्थिक व्यवस्था कैसी चलती है।  \n\nमानविकी: इसमें मानव संस्कृति के बारे में पढ़ाई की जाती है, जैसे इतिहास, भाषाएँ, कला और साहित्य। इसका उद्देश्य है यह समझना कि लोग अपनी बातें और भावनाएँ कैसे व्यक्त करते हैं।"
+        },
+        "subjects": {
+          "english": "Social Sciences: History, Geography, Civics, Psychology; Humanities: Literature, Art & Music, Language Studies",
+          "hindi": "सामाजिक विज्ञान: इतिहास, भूगोल, नागरिक शास्त्र, मनोविज्ञान; मानविकी: साहित्य, कला और संगीत, भाषाई अध्ययन"
+        },
+        "skills": {
+          "english": "Curiosity, Critical Thinking, Reading & Writing, Empathy",
+          "hindi": "जिज्ञासा, आलोचनात्मक सोच, पढ़ना और लिखना, सहानुभूति"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "Social Sciences: Involves studying human behaviour and relationships in societies, focusing on the interaction between people and institutions. It looks at how cultures, economies, and politics shape the world we live in. Humanities: Studies human expression, exploring subjects like history, literature, philosophy, and the arts. It focuses on how people interpret and make sense of the world through culture.",
+          "hindi": "सामाजिक विज्ञान: इसमें मानव व्यवहार और समाज में लोगों के बीच संबंधों का अध्ययन किया जाता है। यह देखने का प्रयास करता है कि कैसे संस्कृतियां, आर्थिक स्थिति और राजनीति हमारे जीवन को प्रभावित करते हैं।  \n\nमानविकी: इसमें मानव की अभिव्यक्ति का अध्ययन किया जाता है, जैसे इतिहास, साहित्य, दर्शन और कला। यह समझने की कोशिश करता है कि लोग अपने अनुभवों और संस्कृति के माध्यम से दुनिया को कैसे समझते हैं और व्यक्त करते हैं।"
+        },
+        "subjects": {
+          "english": "Social Sciences: History, Political Science, Economics, Sociology; Humanities: Philosophy, Literature & Language, Art History, Ethics",
+          "hindi": "सामाजिक विज्ञान: इतिहास, राजनीति विज्ञान, अर्थशास्त्र, समाजशास्त्र  \nमानविकी: दर्शनशास्त्र, साहित्य और भाषा, कला इतिहास, नैतिकता"
+        },
+        "skills": {
+          "english": "Analytical Thinking, Cultural Awareness, Communication, Problem-solving",
+          "hindi": "विश्लेषणात्मक सोच, सांस्कृतिक जागरूकता, संवाद कौशल, समस्या हल करने की क्षमता"
+        },
+        "courses": {
+          "english": "Bachelor of Arts (BA) in Social Sciences, Bachelor of Arts (BA) in Humanities, Bachelor of Public Administration (BPA), Bachelor of Fine Arts (BFA)",
+          "hindi": "सामाजिक विज्ञान में बैचलर ऑफ आर्ट्स (BA), मानविकी में बैचलर ऑफ आर्ट्स (BA), लोक प्रशासन में बैचलर ऑफ पब्लिक एडमिनिस्ट्रेशन (BPA), और कला में बैचलर ऑफ फाइन आर्ट्स (BFA)।"
+        },
+        "exams": {
+          "english": "National Eligibility cum Entrance Test (NEET) for Social Work (India), Central Universities Common Entrance Test (CUCET), Humanities-Specific Entrance Exams in International Universities",
+          "hindi": "राष्ट्रीय पात्रता सह प्रवेश परीक्षा (NEET) समाज सेवा के लिए (भारत), केंद्रीय विश्वविद्यालयों की सामान्य प्रवेश परीक्षा (CUCET), और अंतरराष्ट्रीय विश्वविद्यालयों में मानविकी विशिष्ट प्रवेश परीक्षाएं"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "Social Sciences: Focuses on analysing human behaviour and the structure of societies through disciplines like psychology, economics, sociology, and political science. It involves understanding how people and institutions shape the world around us. Humanities: Focuses on understanding human expression, culture, and experiences through disciplines like history, literature, philosophy, and the arts. It emphasizes analysing how societies interpret meaning, ethics, and aesthetics.",
+          "hindi": "सामाजिक विज्ञान: यह मानव व्यवहार और समाज की संरचना का अध्ययन करता है। इसमें मनोविज्ञान, अर्थशास्त्र, समाजशास्त्र और राजनीति विज्ञान जैसे विषय शामिल हैं। इसका मकसद है यह समझना कि लोग और संस्थान मिलकर हमारे आस-पास की दुनिया को कैसे बनाते हैं।  \n\nमानविकी: यह मानव की अभिव्यक्ति, संस्कृति और अनुभव को समझने पर केंद्रित है। इसमें इतिहास, साहित्य, दर्शन और कला जैसे विषय शामिल हैं। इसका मुख्य ध्यान है यह जानना कि समाज कैसे अर्थ, नैतिकता और सुंदरता को समझता है।"
+        },
+        "subjects": {
+          "english": "Social Science:\n\nAdvanced Psychology\nPolitical Science\nMacroeconomics & Microeconomics\nSociology\nHumanities:\n\nPhilosophy\nLiterature\nLinguistics\nCultural Studies",
+          "hindi": "सामाजिक विज्ञान:\n\n- उन्नत मनोविज्ञान\n- राजनीति विज्ञान\n- सूक्ष्म और आर्थिक अर्थव्यवस्था (माइक्रो और मैक्रोइकॉनॉमिक्स)\n- समाजशास्त्र (सामाजिक अध्ययन)\n\nमानविकी (ह्यूमैनिटीज):\n\n- दर्शनशास्त्र (फिलософी)\n- साहित्य\n- भाषाविज्ञान (लिंग्विस्टिक्स)\n- सांस्कृतिक अध्ययन"
+        },
+        "skills": {
+          "english": "Critical Analysis\nResearch & Writing\nDebate & Discussion\nInterdisciplinary Thinking",
+          "hindi": "आलोचनात्मक विश्लेषण  \nशोध और लेखन  \nविवाद और चर्चा  \nअंतरविषयक सोच"
+        },
+        "career_options": {
+          "english": "Psychologist\nSocial Worker\nPublic Administrator\nUrban Planner\nCounselling and Mental Health Services Provider",
+          "hindi": "मनोवैज्ञानिक  \nसामाजिक कार्यकर्ता  \nसार्वजनिक प्रबंधक (सरकारी अधिकारी)  \nशहरी नियोजक (शहरी योजना बनाने वाला)  \nमनोविज्ञान और मानसिक स्वास्थ्य सेवाएँ प्रदान करने वाला सलाहकार"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Thinker",
+          "hindi": "जांच-पड़ताल करने वाला"
+        },
+        {
+          "english": "Helper",
+          "hindi": "सामाजिक"
+        },
+        {
+          "english": "Creator",
+          "hindi": "कलात्मक"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Communication",
+          "hindi": "संचार"
+        },
+        {
+          "english": "Decision making & problem solving",
+          "hindi": "निर्णय लेना और समस्या का समाधान"
+        },
+        {
+          "english": "Creativity",
+          "hindi": "रचनात्मकता"
+        },
+        {
+          "english": "Logical reasoning",
+          "hindi": "तार्किक सोच"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Social Sciences",
+          "hindi": "सामाजिक विज्ञान"
+        },
+        {
+          "english": "Languages",
+          "hindi": "भाषाएँ"
+        },
+        {
+          "english": "Home and Consumer science",
+          "hindi": "गृह और उपभोक्ता विज्ञान"
+        },
+        {
+          "english": "Art",
+          "hindi": "कला"
+        },
+        {
+          "english": "Health",
+          "hindi": "स्वास्थ्य"
+        }
+      ],
+      "values": [
+        {
+          "english": "Building relations",
+          "hindi": "टीम/समूह में काम करना"
+        },
+        {
+          "english": "High achievement",
+          "hindi": "उच्च उपलब्धि"
+        },
+        {
+          "english": "Variety and Diversity",
+          "hindi": "विविधता-विचलन"
+        },
+        {
+          "english": "Autonomy",
+          "hindi": "स्वतंत्रता/ स्वायत्तता"
+        },
+        {
+          "english": "Physical activity",
+          "hindi": "शारीरिक गतिविधि"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Logical",
+          "hindi": "तार्किक"
+        },
+        {
+          "english": "Interpersonal",
+          "hindi": "अंतरंग संबंध"
+        },
+        {
+          "english": "Spatial-Visual",
+          "hindi": "स्थानिक-दृश्य"
+        },
+        {
+          "english": "Linguistic",
+          "hindi": "भाषाई क्षमता"
+        }
+      ]
+    },
+    "defence_protective_service": {
+      "title": {
+        "english": "Defence/ Protective Service",
+        "hindi": "रक्षा/सुरक्षा सेवा"
+      },
+      "6-8": {
+        "description": {
+          "english": "Defence and protective services are jobs that help keep people safe. This includes soldiers who protect the country, police officers who stop crimes, and firefighters who save people in danger.",
+          "hindi": "रक्षा और सुरक्षा सेवाएँ ऐसी नौकरी होती हैं जो लोगों को सुरक्षित रखने में मदद करती हैं। इसमें देश की रक्षा करने वाले सैनिक, अपराधों को रोकने वाले पुलिस वाले, और आग लगने या किसी खतरे में फंसे लोगों को बचाने वाले फायरफाइटर शामिल हैं।"
+        },
+        "subjects": {
+          "english": "Social Studies, Physical Education, Science, Civics",
+          "hindi": "सामाजिक अध्ययन, शारीरिक शिक्षा, विज्ञान, नागरिकता"
+        },
+        "skills": {
+          "english": "Physical Fitness, Bravery and Teamwork, Problem Solving, Discipline",
+          "hindi": "शारीरिक तंदुरुस्ती, बहादुरी और टीमवर्क, समस्या सुलझाने की क्षमता, अनुशासन"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "Defence careers include working in the military, police, or fire department to ensure the safety of people and the country. Protective services involve enforcing laws, maintaining peace, and responding to emergencies like natural disasters or criminal activities. Professionals in this field play a critical role in national security, crime prevention, and rescue missions.",
+          "hindi": "रक्षा करियर में आप सेना, पुलिस या फायर ब्रिगेड जैसी सेवाओं में काम करते हैं ताकि लोगों और देश की सुरक्षा कर सकें। सुरक्षा सेवाओं में कानून का पालन कराना, शांति बनाए रखना और आपातकालीन स्थिति जैसे प्राकृतिक आपदाएँ या अपराधों का सामना करना शामिल है। इस क्षेत्र में काम करने वाले पेशेवर देश की सुरक्षा, अपराध रोकथाम और नागरिकों की मदद के लिए बहुत महत्वपूर्ण भूमिका निभाते हैं।"
+        },
+        "subjects": {
+          "english": "Civics, History and Political Science, Physical Education, Mathematics, Science (Physics)",
+          "hindi": "नागरिक शास्त्र, इतिहास और राजनीति विज्ञान, शारीरिक शिक्षा, गणित, और विज्ञान (भौतिकी)"
+        },
+        "skills": {
+          "english": "Leadership and Teamwork, Physical Fitness and Endurance, Discipline and Focus, Crisis Management and Quick Thinking, Problem Solving and Analytical Thinking",
+          "hindi": "नेतृत्व और टीमवर्क, शारीरिक फिटनेस और सहनशक्ति, अनुशासन और ध्यान केंद्रित करना, संकट प्रबंधन और तेजी से सोचने की क्षमता, समस्या हल करने और विश्लेषणात्मक सोच"
+        },
+        "courses": {
+          "english": "National Defence Academy (NDA), Bachelor's in Defence Studies, B.Sc. in Nautical Science, B.Tech in Military Engineering, Fire and Safety Engineering",
+          "hindi": "राष्ट्रीय रक्षा अकादमी (NDA), रक्षा अध्ययन में स्नातक डिग्री, नाविक विज्ञान में बी.एससी., सैन्य इंजीनियरिंग में बी.टेक., फायर और सेफ्टी इंजीनियरिंग।"
+        },
+        "exams": {
+          "english": "NDA (National Defence Academy), CDS (Combined Defence Services), Indian Coast Guard Entrance Test, CAPF (Central Armed Police Forces) Exam, SSC Constable Exam",
+          "hindi": "रक्षा मंत्रालय की परीक्षाएँ:  \n- एनडीए (राष्ट्रीय रक्षा अकादमी)  \n- सीडीएस (संयुक्त रक्षा सेवाएँ)  \n- भारतीय तटरक्षक प्रवेश परीक्षा  \n- सीएपीएफ (केंद्रीय सशस्त्र पुलिस बल) परीक्षा  \n- एसएससी कांस्टेबल परीक्षा  \n\nइन परीक्षाओं के जरिए आप सेना, नौसेना, वायु सेना, तटरक्षक और पुलिस में भर्ती हो सकते हैं। यदि आप इन परीक्षाओं की तैयारी कर रहे हैं, तो यह जरूरी है कि आप अपनी योग्यता और कौशल को समझें, ताकि आप सही दिशा में आगे बढ़ सकें।"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "Defence and protective services involve careers in military and law enforcement roles such as army officers, police officers, firefighters, or security personnel. These jobs ensure the security and protection of a nation's citizens, enforce laws, and manage emergency situations. Individuals in these professions work to safeguard the country from internal and external threats and ensure peace and public order.",
+          "hindi": "रक्षा और सुरक्षा सेवाएँ उन करियर विकल्पों को दर्शाती हैं जिनमें आप सेना, पुलिस, फायर ब्रिगेड या सुरक्षा कर्मी जैसे पदों पर काम कर सकते हैं। इन नौकरियों का मकसद देश के नागरिकों की सुरक्षा करना, कानून का पालन सुनिश्चित करना और आपातकालीन स्थिति से निपटना है। इन पेशों में काम करने वाले लोग देश को अंदरूनी और बाहरी खतरों से सुरक्षित रखते हैं, शांति बनाए रखते हैं और जनता का सुरक्षा प्रबंध करते हैं।"
+        },
+        "subjects": {
+          "english": "Political Science and Civics\nPhysical Education and Sports Science\nHistory\nMathematics\nScience (Physics)",
+          "hindi": "राजनीति विज्ञान और नागरिक शास्त्र  \nशारीरिक शिक्षा और खेल विज्ञान  \nइतिहास  \nगणित  \nविज्ञान (भौतिकी)"
+        },
+        "skills": {
+          "english": "Strategic Thinking and Decision Making\nLeadership\nDiscipline and Integrity\nPhysical Fitness\nCommunication and Negotiation",
+          "hindi": "रणनीतिक सोच और निर्णय लेना  \nनेतृत्व कौशल  \nअनुशासन और ईमानदारी  \nशारीरिक फिटनेस  \nसंचार और वार्तालाप कौशल"
+        },
+        "career_options": {
+          "english": "Cybersecurity Analyst\nIntelligence Agent\nForensic Analyst\nHomeland Security Specialist\nState Police Officer/Defence Personnel",
+          "hindi": "साइबरसिक्योरिटी एनालिस्ट (साइबर सुरक्षा विश्लेषक)  \nबुद्धिमत्ता एजेंट (गुप्तचर एजेंट)  \nफोरेंसिक एनालिस्ट (प्रमाण विश्लेषक)  \nहोमलैंड सिक्योरिटी स्पेशलिस्ट (राष्ट्रीय सुरक्षा विशेषज्ञ)  \nराज्य पुलिस अफसर/रक्षा कर्मी"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Doer",
+          "hindi": "व्यावहारिक"
+        },
+        {
+          "english": "Organizer",
+          "hindi": "परंपरागत"
+        },
+        {
+          "english": "Helper",
+          "hindi": "सामाजिक"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Decision making & problem solving",
+          "hindi": "निर्णय लेना और समस्या का समाधान"
+        },
+        {
+          "english": "Motor Movement",
+          "hindi": "Motor Movement"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        },
+        {
+          "english": "Communication",
+          "hindi": "संचार"
+        },
+        {
+          "english": "Logical reasoning",
+          "hindi": "तार्किक सोच"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Mathematics",
+          "hindi": "गणित"
+        },
+        {
+          "english": "Science",
+          "hindi": "विज्ञान"
+        },
+        {
+          "english": "Languages",
+          "hindi": "भाषाएँ"
+        },
+        {
+          "english": "Technology",
+          "hindi": "प्रौद्योगिकी"
+        },
+        {
+          "english": "Social Sciences",
+          "hindi": "सामाजिक विज्ञान"
+        }
+      ],
+      "values": [
+        {
+          "english": "Job Security",
+          "hindi": "नौकरी की सुरक्षा"
+        },
+        {
+          "english": "Physical activity",
+          "hindi": "शारीरिक गतिविधि"
+        },
+        {
+          "english": "Leadership",
+          "hindi": "नेतृत्व"
+        },
+        {
+          "english": "Supervised work",
+          "hindi": "निरीक्षित कार्य"
+        },
+        {
+          "english": "Prestige/ Recognition",
+          "hindi": "प्रतिष्ठा/ मान्यता"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Bodily-Kinesthetic",
+          "hindi": "शारीरिक-काइनेस्थेटिक"
+        },
+        {
+          "english": "Intrapersonal",
+          "hindi": "आंतरिक व्यक्तित्व"
+        },
+        {
+          "english": "Interpersonal",
+          "hindi": "अंतरंग संबंध"
+        }
+      ]
+    },
+    "sports": {
+      "title": {
+        "english": "Sports",
+        "hindi": "खेल-कूद"
+      },
+      "6-8": {
+        "description": {
+          "english": "Sports involves playing games, practicing physical skills, competing with others, and being part of a team. People in sports either play, coach others, or help manage sporting events.",
+          "hindi": "खेलकूद का मतलब है खेल खेलना, शरीर से जुड़ी कौशल का अभ्यास करना, दूसरों के साथ मुकाबला करना और टीम का हिस्सा बनना। खेल से जुड़े लोग या तो खुद खेलते हैं, दूसरे खिलाड़ियों को कोचिंग देते हैं, या फिर खेल आयोजन का प्रबंधन करते हैं।"
+        },
+        "subjects": {
+          "english": "Physical Education (PE), Biology, Health and Nutrition, Math",
+          "hindi": "शारीरिक शिक्षा (पीई), जीवविज्ञान, स्वास्थ्य और पौष्टिकता, गणित"
+        },
+        "skills": {
+          "english": "Teamwork, Discipline, Coordination, Leadership, Endurance",
+          "hindi": "टीमवर्क (टीम में काम करने की क्षमता), अनुशासन, तालमेल, नेतृत्व और सहनशक्ति"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "Sports careers involve playing professionally, coaching, or managing teams. Athletes develop physical and mental skills to excel in their sport, while coaches and managers focus on strategy, training, and organizing events.",
+          "hindi": "खेलों का करियर में प्रोफेशनल खिलाड़ी बनना, कोचिंग करना या टीम का संचालन करना शामिल है। खिलाड़ी अपने शारीरिक और मानसिक कौशल विकसित करते हैं ताकि वे अपने खेल में अच्छा प्रदर्शन कर सकें। वहीं कोच और मैनेजर योजना बनाना, ट्रेनिंग कराना और टूर्नामेंट का आयोजन करने पर ध्यान देते हैं।"
+        },
+        "subjects": {
+          "english": "Physical Education, Biology (Human Body), Psychology (optional), Health Science, Math (Statistics)",
+          "hindi": "शारीरिक शिक्षा, जीवविज्ञान (मानव शरीर), मनोविज्ञान (वैकल्पिक), स्वास्थ्य विज्ञान, गणित (सांख्यिकी)"
+        },
+        "skills": {
+          "english": "Advanced Physical Skills, Leadership and Mentorship, Strategy and Game Planning, Analytical Thinking, Time Management",
+          "hindi": "उन्नत शारीरिक कौशल, नेतृत्व और मार्गदर्शन, रणनीति और खेल की योजना बनाना, विश्लेषणात्मक सोच, समय का सही प्रबंधन"
+        },
+        "courses": {
+          "english": "Bachelor of Physical Education (B.P.Ed), Bachelor of Science in Sports Science, Diploma in Sports Coaching, Bachelor of Sports Management (BSM), Bachelor of Physiotherapy (BPT), Bachelor of Nutrition and Dietetics, Bachelor in Sports Journalism",
+          "hindi": "फिजिकल एजुकेशन में स्नातक (B.P.Ed), खेल विज्ञान में विज्ञान स्नातक (B.Sc. Sports Science), खेल कोचिंग का डिप्लोमा, खेल प्रबंधन में स्नातक (B.S.M.), फिजियोथेरेपी में स्नातक (BPT), पोषण और आहार विज्ञान में स्नातक, और खेल पत्रकारिता में स्नातक।"
+        },
+        "exams": {
+          "english": "Sports Authority of India (SAI) Entrance Exam, NIS (National Institute of Sports) Entrance Exam, CUET (Common University Entrance Test), BHU (Banaras Hindu University) Entrance Exam, AIIMS/NEET (For Sports Medicine)",
+          "hindi": "खेल मंत्रालय की परीक्षा (Sports Authority of India - SAI), राष्ट्रीय खेल संस्थान की परीक्षा (NIS), कॉमन यूनिवर्सिटी एंट्रेंस टेस्ट (CUET), बनारस हिंदू विश्वविद्यालय की परीक्षा (BHU), और AIIMS/NEET (खेल चिकित्सा के लिए) जैसी परीक्षाएं विद्यार्थियों के करियर के लिए बहुत महत्वपूर्ण हैं। ये परीक्षाएं आपकी प्रतिभा और मेहनत को परखकर आपको सही दिशा में कदम बढ़ाने में मदद करती हैं। यदि आप इनमें से किसी भी परीक्षा की तैयारी कर रहे हैं, तो अपने लक्ष्य पर ध्यान केंद्रित करें और निरंतर मेहनत करें। सफलता आपके कदम चूमेगी!"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "A career in sports may involve becoming a professional athlete, coach, or sports manager. It also includes related roles such as sports medicine, physiotherapy, sports journalism, or managing sports events and facilities. Sports professionals work to improve athletic skills, design training programs, and contribute to team success at various competitive levels.",
+          "hindi": "खेलों में करियर बनाना मतलब आप प्रोफेशनल खिलाड़ी, कोच या खेल प्रबंधक बन सकते हैं। इसमें खेल से जुड़ी दूसरी जिम्मेदारियां भी हो सकती हैं, जैसे खेल की चिकित्सा, फिजियोथैरेपी, खेल पत्रकारिता या खेल आयोजन और सुविधाओं का प्रबंधन। खेल के क्षेत्र में काम करने वाले लोग अपने खिलाड़ियों की क्षमताओं को बढ़ाने, प्रशिक्षण कार्यक्रम बनाने और टीम की सफलता में मदद करने का काम करते हैं, चाहे वह कितनी भी प्रतियोगिताएं हों।"
+        },
+        "subjects": {
+          "english": "Physical Education\nBiology (Anatomy and Physiology)\nSports Science\nPsychology\nNutrition and Dietetics\nBusiness Studies\nPhysics",
+          "hindi": "शारीरिक शिक्षा  \nजीवविज्ञान (अंगरचना और शारीरिक प्रक्रियाएँ)  \nखेल विज्ञान  \nमनोविज्ञान (मानसिक स्वास्थ्य और व्यवहार)  \nपोषण और आहार विज्ञान  \nव्यवसाय अध्ययन  \nभौतिकी"
+        },
+        "skills": {
+          "english": "Physical Stamina and Athleticism\nLeadership and Coaching\nData Analysis\nTeam Management\nHealth and Fitness Expertise\nCommunication",
+          "hindi": "शारीरिक सहनशक्ति और खेलकूद की क्षमता  \nनेतृत्व और कोचिंग कौशल  \nडेटा विश्लेषण की क्षमता  \nटीम का प्रबंधन और नेतृत्व  \nस्वास्थ्य और फिटनेस का ज्ञान  \nसंचार कौशल"
+        },
+        "career_options": {
+          "english": "Athletic Trainer\nSports Coach\nSports Medicine Physician\nFitness Trainer\nSports Psychologist",
+          "hindi": "खेल प्रशिक्षक  \nखेल कोच  \nखेल चिकित्सा डॉक्टर  \nफिटनेस ट्रेनर  \nखेल मनोवैज्ञानिक"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Doer",
+          "hindi": "व्यावहारिक"
+        },
+        {
+          "english": "Persuader",
+          "hindi": "उद्यमी"
+        },
+        {
+          "english": "Helper",
+          "hindi": "सामाजिक"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Motor Movement",
+          "hindi": "Motor Movement"
+        },
+        {
+          "english": "Decision making & problem solving",
+          "hindi": "निर्णय लेना और समस्या का समाधान"
+        },
+        {
+          "english": "Finger dexterity",
+          "hindi": "उंगली की निपुणता"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        },
+        {
+          "english": "Communication",
+          "hindi": "संचार"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Sport",
+          "hindi": "खेल"
+        },
+        {
+          "english": "Languages",
+          "hindi": "भाषाएँ"
+        },
+        {
+          "english": "Social Sciences",
+          "hindi": "सामाजिक विज्ञान"
+        },
+        {
+          "english": "Health",
+          "hindi": "स्वास्थ्य"
+        },
+        {
+          "english": "Management",
+          "hindi": "प्रबंधन"
+        }
+      ],
+      "values": [
+        {
+          "english": "Physical activity",
+          "hindi": "शारीरिक गतिविधि"
+        },
+        {
+          "english": "Leadership",
+          "hindi": "नेतृत्व"
+        },
+        {
+          "english": "Building relations",
+          "hindi": "टीम/समूह में काम करना"
+        },
+        {
+          "english": "Hands-on activities",
+          "hindi": "हाथों से काम करना"
+        },
+        {
+          "english": "Lucrative Salary",
+          "hindi": "अच्छा वेतन"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Bodily-Kinesthetic, Naturalistic",
+          "hindi": "Bodily-Kinesthetic, Naturalistic"
+        },
+        {
+          "english": "Interpersonal",
+          "hindi": "अंतरंग संबंध"
+        },
+        {
+          "english": "Logical",
+          "hindi": "तार्किक"
+        }
+      ]
+    },
+    "engineering_and_technology": {
+      "title": {
+        "english": "Engineering and Technology",
+        "hindi": "इंजीनियरिंग और तकनीक"
+      },
+      "6-8": {
+        "description": {
+          "english": "Engineers solve problems using science and technology. They design and build things like bridges, machines, computers, and even rockets!",
+          "hindi": "इंजीनियर विज्ञान और तकनीक का इस्तेमाल करके समस्याओं का हल करते हैं। वे पुल, मशीनें, कंप्यूटर और यहां तक कि रॉकेट जैसी चीजें भी बनाते हैं।"
+        },
+        "subjects": {
+          "english": "Mathematics, Science (Physics, Chemistry), Technology/Computer Science",
+          "hindi": "गणित, विज्ञान (भौतिकी, रसायन विज्ञान), प्रौद्योगिकी/कंप्यूटर विज्ञान"
+        },
+        "skills": {
+          "english": "Problem-solving, Creativity, Teamwork, Attention to Detail",
+          "hindi": "समस्या हल करने की क्षमता, रचनात्मकता, टीमवर्क (टीम के साथ काम करने की कला), और ध्यान देने की सूक्ष्मता"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "Engineering and technology involve creating solutions for everyday problems by applying scientific knowledge. Engineers design everything from simple machines to advanced technologies like robotics and spacecraft.",
+          "hindi": "इंजीनियरिंग और तकनीक का मतलब है रोज़मर्रा की समस्याओं का समाधान खोजने के लिए विज्ञान का इस्तेमाल करना। इंजीनियर साधारण मशीनों से लेकर रोबोटिक्स और अंतरिक्षयान जैसी जटिल तकनीकों तक सब कुछ बनाते हैं।"
+        },
+        "subjects": {
+          "english": "Mathematics (Algebra, Geometry, Calculus), Physics, Chemistry (for Chemical Engineering), Computer Science (Programming, CAD), Technology (Robotics, Electronics)",
+          "hindi": "गणित (बीजगणित, ज्यामिति, कलन), भौतिकी, रसायन विज्ञान (केमिकल इंजीनियरिंग के लिए), कंप्यूटर साइंस (प्रोग्रामिंग, CAD), और तकनीक (रॉबोटिक्स, इलेक्ट्रॉनिक्स)"
+        },
+        "skills": {
+          "english": "Analytical Thinking, Technical Skills, Communication, Adaptability",
+          "hindi": "विश्लेषणात्मक सोच, तकनीकी कौशल, संवाद कौशल, और अनुकूलन क्षमता"
+        },
+        "courses": {
+          "english": "Bachelor of Technology (B.Tech) / Bachelor of Engineering (B.E), Diploma in Engineering, Bachelor of Science (B.Sc.) in Engineering, Bachelor of Computer Applications (BCA) or related courses",
+          "hindi": "बैचलर ऑफ टेक्नोलॉजी (B.Tech) / बैचलर ऑफ इंजीनियरिंग (B.E), इंजीनियरिंग में डिप्लोमा, बैचलर ऑफ साइंस (B.Sc.) इन इंजीनियरिंग, बैचलर ऑफ कंप्यूटर एप्लीकेशन्स (BCA) या उससे जुड़े कोर्सेस।"
+        },
+        "exams": {
+          "english": "JEE (Joint Entrance Examination), SAT/ACT, BITSAT (Birla Institute of Technology and Science Admission Test), VITEEE (Vellore Institute of Technology Engineering Entrance Examination), State Engineering Exams (like KCET, MHT-CET, WBJEE, etc.), Portfolio Submission (for Architecture or Design Engineering)",
+          "hindi": "JEE (संयुक्त प्रवेश परीक्षा), SAT/ACT, BITSAT (बिरला इंस्टीट्यूट ऑफ टेक्नोलॉजी एंड साइंसेस एडमिशन टेस्ट), VITEEE (वेल्लोर इंस्टीट्यूट ऑफ टेक्नोलॉजी इंजीनियरिंग प्रवेश परीक्षा), राज्य स्तर की इंजीनियरिंग परीक्षाएं (जैसे KCET, MHT-CET, WBJEE आदि), और आर्किटेक्चर या डिजाइन इंजीनियरिंग के लिए पोर्टफोलियो जमा करना।"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "Engineering applies scientific and mathematical principles to design and develop machines, structures, systems, and technology that address complex challenges in various fields such as construction, mechanics, electronics, and software development.",
+          "hindi": "इंजीनियरिंग का मतलब है वैज्ञानिक और गणितीय सिद्धांतों का इस्तेमाल करके मशीनें, इमारतें, सिस्टम्स और नई तकनीकें बनाना। ये तकनीकें हमें कई तरह की जटिल समस्याओं को हल करने में मदद करती हैं, जैसे निर्माण, मशीनें, इलेक्ट्रॉनिक्स और सॉफ्टवेयर बनाने के क्षेत्र में।"
+        },
+        "subjects": {
+          "english": "Advanced Mathematics (Calculus, Differential Equations)\nPhysics (Mechanics, Thermodynamics, Electromagnetism)\nChemistry (For Chemical Engineering)\nComputer Science (programming, CAD, Data structures)                                                                                                                                                                                                                                                         technology and Robotics",
+          "hindi": "उन्नत गणित (कलन, अवकल समीकरण)  \nभौतिकी (यांत्रिकी, ऊष्मा, विद्युत चुम्बकत्व)  \nरसायन विज्ञान (रासायनिक अभियांत्रिकी के लिए)  \nकंप्यूटर विज्ञान (प्रोग्रामिंग, कंप्यूटर एडेड डिज़ाइन, डेटा संरचनाएँ)  \nऔर तकनीक व रोबोटिक्स भी पढ़ाई जाती है।"
+        },
+        "skills": {
+          "english": "Technical Proficiency (tools and coding)\nProblem-Solving & Critical Thinking\nProject Management\nInnovation\nCollaboration\nSustainability and Ethics",
+          "hindi": "तकनीकी दक्षता (उपकरण और कोडिंग)  \nसमस्या सुलझाने और आलोचनात्मक सोच  \nप्रोजेक्ट प्रबंधन  \nनवाचार (नई खोज और नई सोच)  \nसहयोग और टीमवर्क  \nस्थिरता और नैतिकता"
+        },
+        "career_options": {
+          "english": "Software Engineer\nData Engineer\nEnvironmental Engineer\nCivil Engineer\nBiomedical Engineer",
+          "hindi": "सॉफ्टवेयर इंजीनियर  \nडेटा इंजीनियर  \nपर्यावरण इंजीनियर  \nसिविल इंजीनियर  \nबायोमेडिकल इंजीनियर"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Doer",
+          "hindi": "व्यावहारिक"
+        },
+        {
+          "english": "Thinker",
+          "hindi": "जांच-पड़ताल करने वाला"
+        },
+        {
+          "english": "Organizer",
+          "hindi": "परंपरागत"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Technical",
+          "hindi": "तकनीकी"
+        },
+        {
+          "english": "Computational",
+          "hindi": "गणनात्मक"
+        },
+        {
+          "english": "Logical reasoning",
+          "hindi": "तार्किक सोच"
+        },
+        {
+          "english": "Decision making & problem solving",
+          "hindi": "निर्णय लेना और समस्या का समाधान"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Technology",
+          "hindi": "प्रौद्योगिकी"
+        },
+        {
+          "english": "Mathematics",
+          "hindi": "गणित"
+        },
+        {
+          "english": "Science",
+          "hindi": "विज्ञान"
+        },
+        {
+          "english": "Languages",
+          "hindi": "भाषाएँ"
+        },
+        {
+          "english": "Vocational Studies",
+          "hindi": "व्यावसायिक अध्ययन"
+        }
+      ],
+      "values": [
+        {
+          "english": "Hands-on activities",
+          "hindi": "हाथों से काम करना"
+        },
+        {
+          "english": "Lucrative Salary",
+          "hindi": "अच्छा वेतन"
+        },
+        {
+          "english": "Autonomy",
+          "hindi": "स्वतंत्रता/ स्वायत्तता"
+        },
+        {
+          "english": "High achievement",
+          "hindi": "उच्च उपलब्धि"
+        },
+        {
+          "english": "Variety and Diversity",
+          "hindi": "विविधता-विचलन"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Bodily-Kinesthetic",
+          "hindi": "शारीरिक-काइनेस्थेटिक"
+        },
+        {
+          "english": "Logical",
+          "hindi": "तार्किक"
+        },
+        {
+          "english": "Bodily-Kinesthetic",
+          "hindi": "शारीरिक-काइनेस्थेटिक"
+        },
+        {
+          "english": "Naturalistic",
+          "hindi": "प्राकृतिक"
+        }
+      ]
+    },
+    "agriculture_food_industry_and_forestry": {
+      "title": {
+        "english": "Agriculture, Food Industry and Forestry",
+        "hindi": "खेती-बाड़ी, खाद्य उद्योग और वन्य जीवन"
+      },
+      "6-8": {
+        "description": {
+          "english": "Working in farming to grow food and taking care of trees in forests to keep the environment healthy. It also involves producing food utilizing specialized tools and machinery to simplify farming, to ensure everyone is fed.",
+          "hindi": "खेतों में फसल उगाने और जंगलों में पेड़-पौधों की देखभाल करने का काम करते हैं ताकि हमारा पर्यावरण स्वस्थ और सुरक्षित रहे। इसमें खास तरह के उपकरणों और मशीनों का इस्तेमाल करके खेती को आसान बनाया जाता है, ताकि हर कोई पेट भर खाना खा सके।"
+        },
+        "subjects": {
+          "english": "Science, Geography, Math, Environmental Studies",
+          "hindi": "विज्ञान, भूगोल, गणित, पर्यावरण अध्ययन"
+        },
+        "skills": {
+          "english": "Observation, Problem-solving, Teamwork, Responsibility",
+          "hindi": "निरीक्षण, समस्या को सुलझाने की क्षमता, टीम के साथ काम करना, और जिम्मेदारी लेना"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "Agriculture is the science of growing crops and raising animals to produce food, while forestry involves managing trees and forested areas for wood and environmental protection. This field combines new technologies with traditional methods to ensure we have enough food and resources for future generations.",
+          "hindi": "खेती-बाड़ी का अर्थ है फसलें उगाना और जानवरों का पालन-पोषण करना ताकि हमें खाने के लिए भोजन मिल सके। वहीं, वनों का काम है पेड़-पौधों और जंगलों का ध्यान रखना, ताकि लकड़ी और पर्यावरण की रक्षा हो सके। यह दोनों मिलकर एक ऐसा क्षेत्र बनाते हैं जो नई-नई तकनीकों और पारंपरिक तरीकों को मिलाकर हमारे आने वाली पीढ़ियों के लिए पर्याप्त खाना और संसाधन सुनिश्चित करता है।"
+        },
+        "subjects": {
+          "english": "Biology, Chemistry, Economics, Agricultural Science",
+          "hindi": "बायोलॉजी, केमिस्ट्री, इकोनॉमिक्स, और एग्रीकल्चर साइंस"
+        },
+        "skills": {
+          "english": "Agri-Tech Skills, Environmental Awareness, Research Skills, Critical Thinking",
+          "hindi": "कृषि-तकनीक कौशल, पर्यावरण के प्रति जागरूकता, अनुसंधान की क्षमता, और आलोचनात्मक सोच"
+        },
+        "courses": {
+          "english": "B.Sc. in Agriculture, B.Sc. in Forestry, B.Tech in Agricultural Engineering, Diploma in Food Technology, M.Sc. in Horticulture/Soil Science",
+          "hindi": "कृषि में बी.एससी., वुनीकरण में बी.एससी., कृषि अभियांत्रिकी में बी.टेक, खाद्य प्रौद्योगिकी में डिप्लोमा, और बागवानी/मृदा विज्ञान में एम.एससी. की पढ़ाई।"
+        },
+        "exams": {
+          "english": "ICAR AIEEA, EAMCET, KEAM, JEE Mains & Advanced, State Agriculture Entrance Exams",
+          "hindi": "ICAR AIEEA, EAMCET, KEAM, JEE मुख्य और एडवांस्ड, और राज्य कृषि प्रवेश परीक्षाएँ"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "Agriculture and Food focus on producing crops, livestock, and other food products, while Agri-Forestry emphasizes sustainable resource management and forest cultivation. It combines the use of innovative technologies, such as genetic engineering and climate-smart agriculture, with traditional farming methods to meet global food and resource demands.",
+          "hindi": "कृषि और खाद्य क्षेत्र का मुख्य ध्यान फसलों, पशुधन और अन्य खाद्य उत्पादों के उत्पादन पर होता है, जबकि कृषि-वन संसाधनों का सतत उपयोग और वनों की देखभाल पर केंद्रित होता है। इसमें नई तकनीकों जैसे जीन इंजीनियरिंग और जलवायु के अनुकूल खेती को पारंपरिक खेती के साथ मिलाकर दुनिया की बढ़ती खाद्य और संसाधनों की जरूरतों को पूरा किया जाता है।"
+        },
+        "subjects": {
+          "english": "Advanced Biology\nAgricultural Engineering\nEnvironmental Science\nBusiness and Economics\nSustainable Agriculture",
+          "hindi": "उन्नत जीवविज्ञान  \nकृषि अभियांत्रिकी  \nपर्यावरण विज्ञान  \nव्यापार और अर्थशास्त्र  \nस्थायी खेती"
+        },
+        "skills": {
+          "english": "Innovation & Technology\nAnalytical Thinking\nManagement\nSustainability Practices",
+          "hindi": "नवाचार और प्रौद्योगिकी  \nविश्लेषणात्मक सोच  \nप्रबंधन  \nस्थिरता के उपाय"
+        },
+        "career_options": {
+          "english": "Agricultural Scientist\nAgronomist\nAgricultural Engineer\nFood Quality Assurance Specialist\nAgribusiness Manager",
+          "hindi": "कृषि वैज्ञानिक  \nखेत विज्ञान विशेषज्ञ  \nकृषि अभियंता  \nखाद्य गुणवत्ता आश्वासन विशेषज्ञ  \nकृषि व्यवसाय प्रबंधक"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Doer",
+          "hindi": "व्यावहारिक"
+        },
+        {
+          "english": "Thinker",
+          "hindi": "जांच-पड़ताल करने वाला"
+        },
+        {
+          "english": "Persuader",
+          "hindi": "उद्यमी"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Form perception",
+          "hindi": "रूप पहचानने की क्षमता"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        },
+        {
+          "english": "Technical",
+          "hindi": "तकनीकी"
+        },
+        {
+          "english": "Decision making & problem solving",
+          "hindi": "निर्णय लेना और समस्या का समाधान"
+        },
+        {
+          "english": "Logical reasoning",
+          "hindi": "तार्किक सोच"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Agriculture",
+          "hindi": "कृषि"
+        },
+        {
+          "english": "Science",
+          "hindi": "विज्ञान"
+        },
+        {
+          "english": "Mathematics",
+          "hindi": "गणित"
+        },
+        {
+          "english": "Technology",
+          "hindi": "प्रौद्योगिकी"
+        },
+        {
+          "english": "Home and Consumer science",
+          "hindi": "गृह और उपभोक्ता विज्ञान"
+        }
+      ],
+      "values": [
+        {
+          "english": "Autonomy",
+          "hindi": "स्वतंत्रता/ स्वायत्तता"
+        },
+        {
+          "english": "Lucrative Salary",
+          "hindi": "अच्छा वेतन"
+        },
+        {
+          "english": "Hands-on activities",
+          "hindi": "हाथों से काम करना"
+        },
+        {
+          "english": "Physical activity",
+          "hindi": "शारीरिक गतिविधि"
+        },
+        {
+          "english": "Mental activity",
+          "hindi": "मन के साथ काम करना"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Naturalistic",
+          "hindi": "प्राकृतिक"
+        },
+        {
+          "english": "Bodily-Kinesthetic",
+          "hindi": "शारीरिक-काइनेस्थेटिक"
+        },
+        {
+          "english": "Logical",
+          "hindi": "तार्किक"
+        },
+        {
+          "english": "Interpersonal",
+          "hindi": "अंतरंग संबंध"
+        }
+      ]
+    },
+    "education_and_training": {
+      "title": {
+        "english": "Education and Training",
+        "hindi": "शिक्षा और प्रशिक्षण"
+      },
+      "6-8": {
+        "description": {
+          "english": "Teaching people in schools or other places to help them learn new things, like how to read, math, or any specific skill like drawing or sports.",
+          "hindi": "स्कूल या कहीं और बच्चों को नई चीजें सीखने में मदद करना, जैसे पढ़ना, गणित या कोई खास कौशल जैसे ड्राइंग या खेलकूद।"
+        },
+        "subjects": {
+          "english": "English, Mathematics, Science, Art & Physical Education",
+          "hindi": "अंग्रेज़ी, गणित, विज्ञान, कला और शारीरिक शिक्षा"
+        },
+        "skills": {
+          "english": "Communication, Patience, Creativity, Leadership",
+          "hindi": "संवाद कला, धैर्य, रचनात्मकता, नेतृत्व क्षमता"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "Teaching encompasses guiding students in essential subjects, equipping them with knowledge for both academic success and life skills. It can also mean training others in specific skills for jobs or careers, helping them develop expertise through hands-on learning.",
+          "hindi": "शिक्षण का मतलब है विद्यार्थियों को जरूरी विषयों में मार्गदर्शन देना, ताकि वे पढ़ाई में सफल होने के साथ-साथ जीवन के जरूरी कौशल भी सीख सकें। इसका मतलब यह भी हो सकता है कि आप दूसरों को खास-खास स्किल्स सिखाएं, ताकि वे अपने काम या करियर में बेहतर बन सकें। इसमें व्यावहारिक अभ्यास के जरिए वे अपने हुनर को निखारते हैं।"
+        },
+        "subjects": {
+          "english": "Pedagogy (Study of Teaching), Psychology, Social Studies, Technology",
+          "hindi": "शिक्षण का तरीका (पढ़ाने का तरीका), मनोविज्ञान, सामाजिक अध्ययन, और तकनीक"
+        },
+        "skills": {
+          "english": "Classroom Management, Problem-solving, Organization, Collaboration",
+          "hindi": "कक्षा में व्यवस्था बनाना, समस्याओं का हल निकालना, अपने काम को व्यवस्थित करना, और साथ मिलकर काम करना।"
+        },
+        "courses": {
+          "english": "Bachelor of Education (B.Ed), Bachelor of Arts in Education, Diploma in Education (D.Ed), Bachelor of Science in Education (B.Sc. Ed), Bachelor of Vocational Education (B.Voc)",
+          "hindi": "शिक्षा में स्नातक डिग्री (B.Ed), शिक्षा में कला स्नातक (B.A. in Education), शिक्षा में डिप्लोमा (D.Ed), विज्ञान में स्नातक (B.Sc. Ed), और व्यावसायिक शिक्षा में स्नातक (B.Voc)"
+        },
+        "exams": {
+          "english": "B.Ed Entrance Exams, TET (Teacher Eligibility Test), SAT/ACT",
+          "hindi": "बीएड प्रवेश परीक्षा, टीईटी (शिक्षक पात्रता परीक्षा), एसएटी/एसीटी"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "Education focuses on teaching in schools or universities, while training develops specific skills, such as technology, medicine, or arts, necessary for careers. Educators shape students' futures, while trainers prepare individuals for vocational or specialized jobs.",
+          "hindi": "शिक्षा का मतलब है स्कूल या विश्वविद्यालय में पढ़ाना, जबकि प्रशिक्षण का मकसद खास जरूरी कौशल सिखाना होता है, जैसे कि तकनीक, चिकित्सा, या कला, ताकि आप अपने करियर में आगे बढ़ सकें। शिक्षक विद्यार्थियों का भविष्य संवारते हैं, वहीं प्रशिक्षक उन्हें व्यावसायिक या खास कामों के लिए तैयार करते हैं।"
+        },
+        "subjects": {
+          "english": "Education Theory\nSpecial Education\nDevelopmental Psychology\nCurriculum Design\nInstructional Technology",
+          "hindi": "शिक्षा का सिद्धांत  \nविशेष शिक्षा  \nविकासात्मक मनोविज्ञान  \nपाठ्यक्रम की योजना और डिजाइन  \nशिक्षण में आधुनिक तकनीक"
+        },
+        "skills": {
+          "english": "Leadership & Mentoring\nAdaptability\nCritical Thinking\nEvaluation & Assessment",
+          "hindi": "नेतृत्व और मार्गदर्शन  \nअनुकूलता (परिवर्तन के साथ सामंजस्य बनाने की क्षमता)  \nआलोचनात्मक सोच (समस्या का गहराई से विश्लेषण करने की क्षमता)  \nमूल्यांकन और आकलन (प्रयोगों और प्रदर्शन का सही मूल्यांकन करने की क्षमता)"
+        },
+        "career_options": {
+          "english": "Teacher/Professor\nE-Learning Developer\nInstructional Designer\nCareer Counsellor\nSpecial Education Teacher",
+          "hindi": "शिक्षक / प्रोफेसर  \nई-लर्निंग डेवलपर (ऑनलाइन सीखने का माहिर)  \nशिक्षण डिज़ाइनर (शिक्षण योजनाएँ बनाने वाले)  \nकैरियर काउंसलर (सुझाव देने वाले करियर सलाहकार)  \nविशेष शिक्षा शिक्षक (अधिकारियों और छात्रों की विशेष जरूरतों को समझने वाले शिक्षक)"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Helper",
+          "hindi": "सामाजिक"
+        },
+        {
+          "english": "Creator",
+          "hindi": "कलात्मक"
+        },
+        {
+          "english": "Thinker",
+          "hindi": "जांच-पड़ताल करने वाला"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Communication",
+          "hindi": "संचार"
+        },
+        {
+          "english": "Creativity",
+          "hindi": "रचनात्मकता"
+        },
+        {
+          "english": "Logical reasoning",
+          "hindi": "तार्किक सोच"
+        },
+        {
+          "english": "Technical",
+          "hindi": "तकनीकी"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Social Sciences",
+          "hindi": "सामाजिक विज्ञान"
+        },
+        {
+          "english": "English",
+          "hindi": "अंग्रेज़ी"
+        },
+        {
+          "english": "Languages",
+          "hindi": "भाषाएँ"
+        },
+        {
+          "english": "Mathematics",
+          "hindi": "गणित"
+        },
+        {
+          "english": "Art",
+          "hindi": "कला"
+        }
+      ],
+      "values": [
+        {
+          "english": "Building relations",
+          "hindi": "टीम/समूह में काम करना"
+        },
+        {
+          "english": "Variety and Diversity",
+          "hindi": "विविधता-विचलन"
+        },
+        {
+          "english": "Creativity",
+          "hindi": "रचनात्मकता"
+        },
+        {
+          "english": "Autonomy",
+          "hindi": "स्वतंत्रता/ स्वायत्तता"
+        },
+        {
+          "english": "Hands-on activities",
+          "hindi": "हाथों से काम करना"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Interpersonal",
+          "hindi": "अंतरंग संबंध"
+        },
+        {
+          "english": "Logical",
+          "hindi": "तार्किक"
+        },
+        {
+          "english": "Linguistic",
+          "hindi": "भाषाई क्षमता"
+        },
+        {
+          "english": "Spatial-Visual, Musical",
+          "hindi": "Spatial-Visual, Musical"
+        }
+      ]
+    },
+    "paramedical": {
+      "title": {
+        "english": "Paramedical",
+        "hindi": "पेरामेडिकल"
+      },
+      "6-8": {
+        "description": {
+          "english": "Paramedical careers involve helping people when they get hurt or sick. Paramedics, nurses, and technicians work with doctors to take care of patients in emergencies or provide support in hospitals.",
+          "hindi": "पेरामेडिकल करियर का मतलब है कि आप उन लोगों की मदद करते हैं जब उन्हें चोट लगती है या वे बीमार हो जाते हैं। पैरामेडिक्स, नर्सें, और तकनीशियन मिलकर डॉक्टर्स के साथ काम करते हैं ताकि आपातकालीन स्थिति में मरीजों का ख्याल रखा जा सके या अस्पताल में सहायता दी जा सके।"
+        },
+        "subjects": {
+          "english": "Science (Biology), Health Education, Physical Education",
+          "hindi": "विज्ञान (जीवविज्ञान), स्वास्थ्य शिक्षा, और शारीरिक शिक्षा"
+        },
+        "skills": {
+          "english": "First Aid and CPR, Observation, Empathy and Care, Communication",
+          "hindi": "प्राथमिक चिकित्सा और सीपीआर, अवलोकन, सहानुभूति और देखभाल, संचार"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "Paramedical careers focus on providing critical healthcare services in emergencies and offering diagnostic and rehabilitative support. Paramedics, radiologists, and physiotherapists use medical tools and knowledge to save lives and improve patients' health.",
+          "hindi": "पैरामेडिकल करियर का मकसद आपातकालीन स्थिति में जरूरी स्वास्थ्य सेवाएं देना और सही जांच व उपचार में मदद करना है। पैरामेडिक्स, रेडियोलॉजिस्ट्स और फिजियोथेरेपिस्ट्स मेडिकल टूल्स और जानकारी का इस्तेमाल करके लोगों की जान बचाते हैं और उनके स्वस्थ्य में सुधार करते हैं।"
+        },
+        "subjects": {
+          "english": "Biology, Chemistry, Health & Physical Education, Physics",
+          "hindi": "बायोलॉजी, रसायन विज्ञान, स्वास्थ्य और शारीरिक शिक्षा, भौतिक विज्ञान"
+        },
+        "skills": {
+          "english": "Critical Thinking, Teamwork, Technical Skills, Physical Stamina",
+          "hindi": "समीक्षात्मक सोच, टीमवर्क, तकनीकी कौशल, शारीरिक शक्ति"
+        },
+        "courses": {
+          "english": "Diploma in Medical Laboratory Technology (DMLT), Diploma in Radiology and Imaging Technology, B.Sc. in Nursing, B.Sc. in Physiotherapy, B.Sc. in Medical Lab Technology, Diploma in Emergency Medical Technology",
+          "hindi": "डिप्लोमा इन मेडिकल लैबोरेटरी टेक्नोलॉजी (DMLT), डिप्लोमा इन रेडियोलॉजी और इमेजिंग टेक्नोलॉजी, बी.एससी. इन नर्सिंग, बी.एससी. इन फिजियोथेरेपी, बी.एससी. इन मेडिकल लैब टेक्नोलॉजी, और डिप्लोमा इन इमरजेंसी मेडिकल टेक्नोलॉजी।"
+        },
+        "exams": {
+          "english": "NEET (National Eligibility cum Entrance Test), AIIMS Paramedical Entrance Exam, JIPMER Paramedical Entrance Exam, State-Level Paramedical Exams, IPU CET (Guru Gobind Singh Indraprastha University Common Entrance Test)",
+          "hindi": "NEET (राष्ट्रीय पात्रता cum प्रवेश परीक्षा), AIIMS पैरामेडिकल प्रवेश परीक्षा, JIPMER पैरामेडिकल प्रवेश परीक्षा, राज्य स्तरीय पैरामेडिकल परीक्षाएं, IPU CET (गुरु गोबिंद सिंह इंद्रप्रस्थ विश्वविद्यालय सामान्य प्रवेश परीक्षा)"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "Paramedical science is a branch of medical services focused on providing immediate and essential care to patients in emergency settings and supporting healthcare in diagnostic and therapeutic fields. It includes roles such as paramedics, radiology technicians, lab technicians, and physiotherapists who assist doctors and nurses in treating patients.",
+          "hindi": "पैरामेडिकल साइंस मेडिकल सेवाओं की एक शाखा है, जिसका मकसद आपातकालीन स्थिति में मरीजों को तुरंत और जरूरी देखभाल प्रदान करना है। यह क्षेत्र हेल्थकेयर के डाइग्नोस्टिक और थेरेपी के क्षेत्रों में भी मदद करता है। इसमें पैरामेडिक्स, रेडियोलॉजी तकनीशियन, लैब तकनीशियन और फिजियोथेरेपिस्ट जैसी भूमिकाएँ शामिल हैं, जो डॉक्टरों और नर्सों की मदद कर मरीजों का सही तरीके से इलाज करने में सहायता करते हैं।"
+        },
+        "subjects": {
+          "english": "Biology\nPhysics\nChemistry\nHealth Sciences",
+          "hindi": "बायोलॉजी (जीवविज्ञान)  \nभौतिकी (फिजिक्स)  \nरसायन विज्ञान (केमिस्ट्री)  \nस्वास्थ्य विज्ञान"
+        },
+        "skills": {
+          "english": "Clinical Skills\nEmergency Response\nInterpersonal Skills\nAttention to Detail",
+          "hindi": "क्लीनिकल स्किल्स (चिकित्सकीय कौशल)  \nआपातकालीन प्रतिक्रिया (आपात स्थिति में तुरंत सही कदम उठाने की क्षमता)  \nअंतरंग संबंध कौशल (अच्छी बातचीत और मेलजोल बनाने की क्षमता)  \nध्यान देने की सूझबूझ (बारीक बातों पर ध्यान देना)"
+        },
+        "career_options": {
+          "english": "Nurse\nRadiologic Technologist\nMedical Laboratory Technician\nPhysical Therapist\nHealth Informatics Specialist",
+          "hindi": "अस्पताल में काम करने वाले कुछ महत्वपूर्ण पेशे हैं:\n\n- नर्स: जो मरीजों की देखभाल करती है और डॉक्टरों की सहायता करती है।\n- रेडियोलॉजिक टेक्नोलॉजिस्ट: जो एक्स-रे और अन्य तस्वीरें लेकर डॉक्टरों को बीमारी का पता लगाने में मदद करते हैं।\n- मेडिकल लैबोरेटरी टेक्नीशियन: जो खून, मूत्र और बाकी जांचों का नमूना लेकर उनकी जाँच करते हैं।\n- फिजियोथेरेपिस्ट (शारीरिक चिकित्सक): जो मरीजों की हड्डियों और मांसपेशियों की चोटों का इलाज करते हैं और उन्हें ठीक होने में मदद करते हैं।\n- हेल्थ इनफॉर्मेटिक्स स्पेशलिस्ट: जो अस्पताल की जानकारी और कंप्यूटर सिस्टम को सही तरीके से चलाने में मदद करते हैं, ताकि मरीजों का इलाज सही ढंग से हो सके।\n- हेल्थ इनफॉर्मेटिक्स स्पेशलिस्ट: जो अस्पताल की जानकारी और कंप्यूटर सिस्टम को सही तरीके से चलाने में मदद करते हैं, ताकि मरीजों का इलाज सही ढंग से हो सके।"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Helper",
+          "hindi": "सामाजिक"
+        },
+        {
+          "english": "Thinker",
+          "hindi": "जांच-पड़ताल करने वाला"
+        },
+        {
+          "english": "Doer",
+          "hindi": "व्यावहारिक"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Form perception",
+          "hindi": "रूप पहचानने की क्षमता"
+        },
+        {
+          "english": "Decision making & problem solving",
+          "hindi": "निर्णय लेना और समस्या का समाधान"
+        },
+        {
+          "english": "Communication",
+          "hindi": "संचार"
+        },
+        {
+          "english": "Logical reasoning",
+          "hindi": "तार्किक सोच"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Health",
+          "hindi": "स्वास्थ्य"
+        },
+        {
+          "english": "Science",
+          "hindi": "विज्ञान"
+        },
+        {
+          "english": "Mathematics",
+          "hindi": "गणित"
+        },
+        {
+          "english": "Technology",
+          "hindi": "प्रौद्योगिकी"
+        },
+        {
+          "english": "Languages",
+          "hindi": "भाषाएँ"
+        }
+      ],
+      "values": [
+        {
+          "english": "Building relations",
+          "hindi": "टीम/समूह में काम करना"
+        },
+        {
+          "english": "High achievement",
+          "hindi": "उच्च उपलब्धि"
+        },
+        {
+          "english": "Lucrative Salary",
+          "hindi": "अच्छा वेतन"
+        },
+        {
+          "english": "Job Security",
+          "hindi": "नौकरी की सुरक्षा"
+        },
+        {
+          "english": "Mental activity",
+          "hindi": "मन के साथ काम करना"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Bodily-Kinesthetic",
+          "hindi": "शारीरिक-काइनेस्थेटिक"
+        },
+        {
+          "english": "Logical",
+          "hindi": "तार्किक"
+        },
+        {
+          "english": "Interpersonal",
+          "hindi": "अंतरंग संबंध"
+        }
+      ]
+    },
+    "hospitality_and_tourism": {
+      "title": {
+        "english": "Hospitality and Tourism",
+        "hindi": "अतिथि सत्कार और यात्रा-पर्यटन"
+      },
+      "6-8": {
+        "description": {
+          "english": "Hospitality and tourism is about helping people enjoy their travel experiences by providing places to stay, good food, and planning fun events.",
+          "hindi": "होस्पिटैलिटी और टूरिज़्म का मतलब है कि लोगों को उनके यात्रा के दौरान अच्छा अनुभव देने में मदद करना। इसमें उनके रहने के लिए अच्छा स्थान, स्वादिष्ट खाना और मजेदार कार्यक्रमों की योजना बनाना शामिल है।"
+        },
+        "subjects": {
+          "english": "Social Studies, English Language Arts, Math, Art and Design",
+          "hindi": "सामाजिक अध्ययन, अंग्रेज़ी भाषा कला, गणित, कला और डिज़ाइन"
+        },
+        "skills": {
+          "english": "Communication, Teamwork, Organization, Customer Service",
+          "hindi": "संचार कौशल, टीमवर्क, आयोजन क्षमता, और ग्राहक सेवा"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "Hospitality and tourism involves managing services for travellers, focusing on customer satisfaction through accommodations, food, and event planning.",
+          "hindi": "अतिथि सेवा और पर्यटन का मतलब है यात्रियों के लिए सुविधाएँ और सेवाएँ प्रदान करना। इसमें रुकने की व्यवस्था, खाने-पीने का इंतजाम, और कार्यक्रमों की योजना बनाना शामिल है। इसका मकसद है कि यात्रियों को अच्छा अनुभव हो और वे खुश रहें।"
+        },
+        "subjects": {
+          "english": "Business Studies, Culinary Arts, Marketing, Geography",
+          "hindi": "व्यापार अध्ययन, पाक कला, विपणन, भूगोल"
+        },
+        "skills": {
+          "english": "Problem-solving, Cultural Awareness, Sales Skills, Time Management",
+          "hindi": "समस्या सुलझाने की क्षमता, सांस्कृतिक जागरूकता, बिक्री कौशल, समय का सही उपयोग"
+        },
+        "courses": {
+          "english": "Bachelor of Hospitality Management, Bachelor of Tourism Management, Culinary Arts Programs, Event Management Courses",
+          "hindi": "होस्टलिटी मैनेजमेंट में स्नातक, पर्यटन प्रबंधन में स्नातक, रसोइया कला के कोर्स, और कार्यक्रम प्रबंधन के कोर्स।"
+        },
+        "exams": {
+          "english": "Undergraduate Entrance Tests, Common Entrance Test (CET), SAT or ACT",
+          "hindi": "स्नातक प्रवेश परीक्षाएँ, सामान्य प्रवेश परीक्षा (CET), SAT या ACT"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "Hospitality and tourism encompasses a wide range of services provided to guests, including lodging, food and beverage management, travel coordination, and event planning, all aimed at enhancing customer experiences.",
+          "hindi": "हॉस्पिटैलिटी और पर्यटन का मतलब है ऐसी सेवाएं देना, जो मेहमानों को खुश और संतुष्ट महसूस कराएं। इसमें होटल में रुकने की व्यवस्था, खाने-पीने का ध्यान रखना, यात्रा की योजना बनाना और कार्यक्रमों का आयोजन शामिल है। इन सभी का मकसद है मेहमानों का अनुभव अच्छा हो और वे फिर से वापस आना चाहें।"
+        },
+        "subjects": {
+          "english": "Hospitality Management\nTravel and Tourism\nCulinary Management\nEconomics",
+          "hindi": "स्टाफ़ व मेहमाननवाज़ी प्रबंधन  \nयात्रा और पर्यटन  \nखाना बनाने का प्रबंधन  \nअर्थशास्त्र"
+        },
+        "skills": {
+          "english": "Leadership\nFinancial Management\nNegotiation\nEvent Planning",
+          "hindi": "नेतृत्व क्षमता  \nआर्थिक प्रबंधन  \nमोलभाव और बातचीत करने की कला  \nकार्यक्रम आयोजन की योजना और व्यवस्था"
+        },
+        "career_options": {
+          "english": "Hotel Manager\nEvent Planner\nChef\nTravel Agent/Blogger\nRestaurant Manager",
+          "hindi": "होटल मैनेजर  \nइवेंट प्लानर (कार्यक्रम आयोजक)  \nशेफ (रसोइया)  \nयात्रा एजेंट/ब्लॉगर  \nरेस्तरां मैनेजर"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Helper",
+          "hindi": "सामाजिक"
+        },
+        {
+          "english": "Doer",
+          "hindi": "व्यावहारिक"
+        },
+        {
+          "english": "Creator",
+          "hindi": "कलात्मक"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Communication",
+          "hindi": "संचार"
+        },
+        {
+          "english": "Creativity",
+          "hindi": "रचनात्मकता"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        },
+        {
+          "english": "Decision making & problem solving",
+          "hindi": "निर्णय लेना और समस्या का समाधान"
+        },
+        {
+          "english": "Motor movement",
+          "hindi": "शारीरिक गति"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Management",
+          "hindi": "प्रबंधन"
+        },
+        {
+          "english": "Cultural studies",
+          "hindi": "सांस्कृतिक अध्ययन"
+        },
+        {
+          "english": "Languages",
+          "hindi": "भाषाएँ"
+        },
+        {
+          "english": "Social Sciences",
+          "hindi": "सामाजिक विज्ञान"
+        },
+        {
+          "english": "Art",
+          "hindi": "कला"
+        }
+      ],
+      "values": [
+        {
+          "english": "Leadership",
+          "hindi": "नेतृत्व"
+        },
+        {
+          "english": "Building relations",
+          "hindi": "टीम/समूह में काम करना"
+        },
+        {
+          "english": "Variety and Diversity",
+          "hindi": "विविधता-विचलन"
+        },
+        {
+          "english": "Prestige/ Recognition",
+          "hindi": "प्रतिष्ठा/ मान्यता"
+        },
+        {
+          "english": "Lucrative Salary",
+          "hindi": "अच्छा वेतन"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Interpersonal",
+          "hindi": "अंतरंग संबंध"
+        },
+        {
+          "english": "Bodily-Kinesthetic",
+          "hindi": "शारीरिक-काइनेस्थेटिक"
+        },
+        {
+          "english": "Spatial-Visual",
+          "hindi": "स्थानिक-दृश्य"
+        },
+        {
+          "english": "Linguistic",
+          "hindi": "भाषाई क्षमता"
+        },
+        {
+          "english": "Naturalistic",
+          "hindi": "प्राकृतिक"
+        }
+      ]
+    },
+    "community_and_social_service": {
+      "title": {
+        "english": "Community and Social Service",
+        "hindi": "सामाजिक और समुदाय सेवा"
+      },
+      "6-8": {
+        "description": {
+          "english": "People in community and social services help others by giving them support, guidance, and resources, such as social workers who help families, or counsellors who talk to people about their feelings.",
+          "hindi": "समुदाय और सामाजिक सेवाओं में लोग दूसरों की मदद करते हैं, उन्हें समर्थन, सलाह और ज़रूरी संसाधन देकर। जैसे सोशल वर्कर्स जो परिवारों की मदद करते हैं, या काउंसलर्स जो लोगों से उनके जज़बात और मन की बातें सुनते हैं।"
+        },
+        "subjects": {
+          "english": "Social Studies, Health Education, English Language Arts",
+          "hindi": "सामाजिक अध्ययन, स्वास्थ्य शिक्षा, और अंग्रेज़ी भाषा कला"
+        },
+        "skills": {
+          "english": "Empathy, Communication, Problem-solving, Teamwork",
+          "hindi": "सहानुभूति, संवाद कौशल, समस्या हल करने की क्षमता, और टीमवर्क"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "Community and social service careers focus on supporting individuals, families, and communities through various services like counselling, social work, and advocacy, helping them cope with issues such as health, poverty, or mental well-being.",
+          "hindi": "सामुदायिक और सामाजिक सेवा के करियर का मकसद है लोगों, परिवारों और समुदायों की मदद करना। इसमें परामर्श, सामाजिक कार्य और वकालत जैसी सेवाएँ दी जाती हैं ताकि वे अपनी समस्याओं से जूझ सकें—जैसे स्वास्थ्य, गरीबी या मानसिक स्वास्थ्य की चुनौतियों में। ये करियर दूसरों का सहारा बनकर उन्हें बेहतर जिंदगी जीने में मदद करते हैं।"
+        },
+        "subjects": {
+          "english": "Psychology, Sociology, Health Education, Ethics",
+          "hindi": "मनोविज्ञान, समाजशास्त्र, स्वास्थ्य शिक्षा, नैतिकता"
+        },
+        "skills": {
+          "english": "Crisis Management, Advocacy, Interpersonal Communication, Cultural Awareness",
+          "hindi": "गंभीर स्थिति से निपटना, अपने हक के लिए बोलना, दूसरों से अच्छा संबंध बनाना, और अलग-अलग संस्कृतियों को समझना"
+        },
+        "courses": {
+          "english": "Bachelor of Social Work (BSW), Bachelor of Psychology, Bachelor of Sociology, Bachelor in Public Health",
+          "hindi": "सामाजिक कार्य में स्नातक (बीएसडब्ल्यू), मनोविज्ञान में स्नातक, समाजशास्त्र में स्नातक, और सार्वजनिक स्वास्थ्य में स्नातक"
+        },
+        "exams": {
+          "english": "Central Universities Common Entrance Test (CUCET), State-level Entrance Exams, SAT/ACT (for international admissions)",
+          "hindi": "केंद्रीय विश्वविद्यालयों की सामान्य प्रवेश परीक्षा (CUCET), राज्य स्तरीय प्रवेश परीक्षाएँ, SAT/ACT (अंतरराष्ट्रीय दाखिले के लिए)"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "Community and social service professionals work in roles such as social workers, counsellors, and community advocates to improve the quality of life for individuals, families, and communities. They offer counselling, resource management, and advocacy to help people overcome challenges such as poverty, addiction, mental health issues, and more.",
+          "hindi": "सामाजिक और सामुदायिक सेवा के पेशेवर ऐसे काम करते हैं जैसे कि सामाजिक कार्यकर्ता, परामर्शदाता और समुदाय के वकील। उनका मकसद है कि हर व्यक्ति, परिवार और समुदाय का जीवन बेहतर बन सके। ये लोग परामर्श देते हैं, संसाधनों का सही इस्तेमाल करने में मदद करते हैं और लोगों को उनकी परेशानियों से निकालने के लिए उनका साथ देते हैं। उनकी मदद से लोग गरीबी, नशा, मानसिक स्वास्थ्य की समस्याओं जैसे कई मुश्किलों को हल कर पाते हैं।"
+        },
+        "subjects": {
+          "english": "Psychology\nSociology\nPublic Health\nLaw and Ethics",
+          "hindi": "मनोविज्ञान  \nसमाजशास्त्र  \nसार्वजनिक स्वास्थ्य  \nकानून और नैतिकता"
+        },
+        "skills": {
+          "english": "Counselling\nCase Management\nCrisis Intervention\nCultural Competency",
+          "hindi": "मनोविज्ञान परामर्श  \nमामला प्रबंधन  \nसंकट स्थिति में मदद करना  \nसांस्कृतिक समझदारी"
+        },
+        "career_options": {
+          "english": "Social Worker\nMental Health Counsellor\nCommunity Outreach Coordinator\nNonprofit Manager\nRehabilitation Services Provider",
+          "hindi": "सामाजिक कार्यकर्ता  \nमानसिक स्वास्थ्य परामर्शदाता  \nसमुदाय से जुड़ाव और जागरूकता समन्वयक  \nगैर लाभकारी संगठन का प्रबंधक  \nपुनर्वास सेवाओं का प्रदाता"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Helper",
+          "hindi": "सामाजिक"
+        },
+        {
+          "english": "Doer",
+          "hindi": "व्यावहारिक"
+        },
+        {
+          "english": "Persuader",
+          "hindi": "उद्यमी"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Communication",
+          "hindi": "संचार"
+        },
+        {
+          "english": "Creativity",
+          "hindi": "रचनात्मकता"
+        },
+        {
+          "english": "Decision making & problem solving",
+          "hindi": "निर्णय लेना और समस्या का समाधान"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        },
+        {
+          "english": "Motor movement",
+          "hindi": "शारीरिक गति"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Social Sciences",
+          "hindi": "सामाजिक विज्ञान"
+        },
+        {
+          "english": "Cultural studies",
+          "hindi": "सांस्कृतिक अध्ययन"
+        },
+        {
+          "english": "Languages",
+          "hindi": "भाषाएँ"
+        },
+        {
+          "english": "Art",
+          "hindi": "कला"
+        },
+        {
+          "english": "Health",
+          "hindi": "स्वास्थ्य"
+        }
+      ],
+      "values": [
+        {
+          "english": "Building relations",
+          "hindi": "टीम/समूह में काम करना"
+        },
+        {
+          "english": "Variety and Diversity",
+          "hindi": "विविधता-विचलन"
+        },
+        {
+          "english": "Physical activity",
+          "hindi": "शारीरिक गतिविधि"
+        },
+        {
+          "english": "Creativity",
+          "hindi": "रचनात्मकता"
+        },
+        {
+          "english": "Prestige/ Recognition",
+          "hindi": "प्रतिष्ठा/ मान्यता"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Interpersonal",
+          "hindi": "अंतरंग संबंध"
+        },
+        {
+          "english": "Bodily-Kinesthetic",
+          "hindi": "शारीरिक-काइनेस्थेटिक"
+        },
+        {
+          "english": "Linguistic",
+          "hindi": "भाषाई क्षमता"
+        },
+        {
+          "english": "Naturalistic",
+          "hindi": "प्राकृतिक"
+        }
+      ]
+    },
+    "personal_care_and_services": {
+      "title": {
+        "english": "Personal Care and Services",
+        "hindi": "व्यक्तिगत देखभाल और सेवाएँ"
+      },
+      "6-8": {
+        "description": {
+          "english": "Personal care and services careers help people stay healthy, look good, and feel great. Examples include hairdressers, personal trainers, and beauty experts.",
+          "hindi": "व्यक्तिगत देखभाल और सेवाओं से जुड़ी करियर की राहें आपको लोगों को स्वस्थ रहने, अच्छा दिखने और अच्छा महसूस करने में मदद करने का मौका देती हैं। इसमें हेयरड्रेसर, पर्सनल ट्रेनर और ब्यूटी एक्सपर्ट जैसे पेशे शामिल हैं।"
+        },
+        "subjects": {
+          "english": "Health and Physical Education, Art and Craft, Science (Basic Biology), Communication Skills",
+          "hindi": "स्वास्थ्य और शारीरिक शिक्षा, कला और शिल्प, विज्ञान (बुनियादी जीवविज्ञान), संचार कौशल"
+        },
+        "skills": {
+          "english": "Creativity, Communication, Physical Strength and Stamina, Empathy",
+          "hindi": "रचनात्मकता, संचार कौशल, शारीरिक ताकत और सहनशक्ति, और सहानुभूति"
+        }
+      },
+      "9-10": {
+        "description": {
+          "english": "Careers in personal care and services involve offering beauty treatments, health and wellness support, or physical fitness coaching to individuals. Professionals such as hairstylists, personal trainers, and massage therapists help others improve their physical appearance or well-being. The aim is to enhance self-confidence and promote healthier lifestyles.",
+          "hindi": "व्यक्तिगत देखभाल और सेवाओं में करियर का मतलब है कि आप लोगों को सुंदरता की देखभाल, स्वास्थ्य और तंदुरस्ती का समर्थन या शारीरिक फिटनेस का प्रशिक्षण देते हैं। जैसे हेयर स्टाइलिस्ट, पर्सनल ट्रेनर, और मसाज थेरेपिस्ट जैसे विशेषज्ञ दूसरों की बेहतर दिखने और अच्छा महसूस करने में मदद करते हैं। इनका मकसद है कि लोग खुद पर भरोसा करें और स्वस्थ जीवनशैली अपनाएँ।"
+        },
+        "subjects": {
+          "english": "Health and Fitness Education, Biology, Entrepreneurship (for salon/spa owners), Psychology, Art and Design",
+          "hindi": "स्वास्थ्य और फिटनेस शिक्षा, जीवविज्ञान, उद्यमिता (सैलून/स्पा मालिकों के लिए), मनोविज्ञान, कला और डिज़ाइन"
+        },
+        "skills": {
+          "english": "Interpersonal Skills, Creativity and Aesthetic Sense, Physical Fitness and Technique, Patience and Attention to Detail, Time Management",
+          "hindi": "आपसी बातचीत की कला, रचनात्मकता और सौंदर्यबोध, शारीरिक फिटनेस और तकनीक, धैर्य और ध्यान देने की क्षमता, समय का सही उपयोग"
+        },
+        "courses": {
+          "english": "Diploma in Beauty Culture and Cosmetology, Bachelor's in Physical Education (B.P.Ed), Certificate/Diploma in Spa and Wellness Management, Diploma in Massage Therapy, B.Sc. in Nutrition and Dietetics, Bachelor's in Cosmetology",
+          "hindi": "ब्यूटी कल्चर और कॉस्मेटोलॉजी में डिप्लोमा, फिजिकल एजुकेशन में बैचलर की डिग्री (B.P.Ed), स्पा और वेलनेस मैनेजमेंट में सर्टिफिकेट/डिप्लोमा, मसाज थेरेपी में डिप्लोमा, न्यूट्रिशन और डाइटेटिक्स में बी.एससी., और कॉस्मेटोलॉजी में बैचलर डिग्री।"
+        },
+        "exams": {
+          "english": "No specific entrance exams, but some courses may require Physical Fitness Tests (for B.P.Ed), Personal Interviews, or Skill-Based Tests for beauty and wellness programs, Nutrition/Dietetics Courses",
+          "hindi": "कोई खास प्रवेश परीक्षा नहीं है, लेकिन कुछ कोर्सों में शारीरिक फिटनेस टेस्ट (जैसे बी.पी.एड के लिए), व्यक्तिगत बातचीत या कौशल आधारित परीक्षाएं हो सकती हैं। ये खासकर सौंदर्य और वेलनेस प्रोग्राम, पोषण या डायटेटिक्स कोर्स के लिए जरूरी हो सकती हैं।"
+        }
+      },
+      "11-12": {
+        "description": {
+          "english": "Personal care and services professionals are involved in helping others improve their appearance, health, and well-being. This includes careers like hairstylists, beauty experts, fitness trainers, and wellness coaches. These jobs are focused on customer satisfaction, self-care, and providing customized services tailored to individual needs. The industry includes wellness centers, salons, gyms, and personal care product development.",
+          "hindi": "व्यक्तिगत देखभाल और सेवाएँ प्रदान करने वाले पेशेवर दूसरों की सुंदरता, सेहत और खुशहाली को बेहतर बनाने में मदद करते हैं। इनमें हेयरस्टाइलिस्ट, ब्यूटी एक्सपर्ट, फिटनेस ट्रेनर और वेलनेस कोच जैसे करियर शामिल हैं। ये काम ग्राहकों की संतुष्टि, खुद का ख्याल रखने और हर व्यक्ति की खास जरूरत के मुताबिक सेवाएँ देने पर केंद्रित होते हैं। इस क्षेत्र में वेलनेस सेंटर्स, सैलून, जिम और व्यक्तिगत देखभाल से जुड़े उत्पाद बनाना भी शामिल है।"
+        },
+        "subjects": {
+          "english": "Biology (Human Anatomy)\nHealth Science\nBusiness Studies\nCosmetology and Aesthetic Science\nPhysical Education and Sports Science",
+          "hindi": "बायोलॉजी (मानव शरीर का विज्ञान)  \nस्वास्थ्य विज्ञान  \nव्यवसाय अध्ययन  \nकॉस्मेटोलॉजी और सौंदर्य विज्ञान  \nशारीरिक शिक्षा और खेल विज्ञान"
+        },
+        "skills": {
+          "english": "Customer Service\nTechnical Expertise\nCreativity and Innovation\nFitness and Body Mechanics\nEntrepreneurial Skills",
+          "hindi": "ग्राहक सेवा  \nतकनीकी जानकारी और कौशल  \nरचनात्मकता और नवाचार  \nफिटनेस और शरीर की चालें  \nउद्यमिता (व्यवसाय शुरू करने और चलाने की क्षमता)"
+        },
+        "career_options": {
+          "english": "Personal Trainer\nWellness Coach\nNutrition Consultant\nBeauty Consultant\nEvent Planner",
+          "hindi": "व्यक्तिगत ट्रेनर  \nस्वास्थ्य सलाहकार  \nपोषण विशेषज्ञ  \nसौंदर्य सलाहकार  \nइवेंट प्लानर"
+        }
+      },
+      "personality_types": [
+        {
+          "english": "Helper",
+          "hindi": "सामाजिक"
+        },
+        {
+          "english": "Doer",
+          "hindi": "व्यावहारिक"
+        },
+        {
+          "english": "Persuader",
+          "hindi": "उद्यमी"
+        }
+      ],
+      "abilities": [
+        {
+          "english": "Communication",
+          "hindi": "संचार"
+        },
+        {
+          "english": "Finger dexterity",
+          "hindi": "उंगली की निपुणता"
+        },
+        {
+          "english": "Technical",
+          "hindi": "तकनीकी"
+        },
+        {
+          "english": "Creativity",
+          "hindi": "रचनात्मकता"
+        },
+        {
+          "english": "Speed and accuracy",
+          "hindi": "गति और सटीकता"
+        }
+      ],
+      "subjects_of_interest": [
+        {
+          "english": "Home and Consumer science",
+          "hindi": "गृह और उपभोक्ता विज्ञान"
+        },
+        {
+          "english": "Health",
+          "hindi": "स्वास्थ्य"
+        },
+        {
+          "english": "Art",
+          "hindi": "कला"
+        },
+        {
+          "english": "Technology",
+          "hindi": "प्रौद्योगिकी"
+        },
+        {
+          "english": "Languages",
+          "hindi": "भाषाएँ"
+        }
+      ],
+      "values": [
+        {
+          "english": "Building relations",
+          "hindi": "टीम/समूह में काम करना"
+        },
+        {
+          "english": "Creativity",
+          "hindi": "रचनात्मकता"
+        },
+        {
+          "english": "Hands-on activities",
+          "hindi": "हाथों से काम करना"
+        },
+        {
+          "english": "Routine activity",
+          "hindi": "नियमित गतिविधि"
+        },
+        {
+          "english": "Working Conditions",
+          "hindi": "कार्य परिस्थितियाँ"
+        }
+      ],
+      "intelligence_types": [
+        {
+          "english": "Interpersonal",
+          "hindi": "अंतरंग संबंध"
+        },
+        {
+          "english": "Bodily-Kinesthetic",
+          "hindi": "शारीरिक-काइनेस्थेटिक"
+        },
+        {
+          "english": "Naturalistic",
+          "hindi": "प्राकृतिक"
+        },
+        {
+          "english": "Musical",
+          "hindi": "संगीत संबंधी"
+        }
+      ]
+    }
+  }
+}

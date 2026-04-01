@@ -14,6 +14,8 @@ import {
   getDemographicFieldsForStudent,
   getBulkDemographicData,
   exportProctoringExcel,
+  generateBetReportOneClick,
+  generateNavigatorReportOneClick,
 } from "../StudentInformation/StudentInfo_APIs";
 import * as XLSX from "xlsx";
 
@@ -81,6 +83,7 @@ export default function GroupStudentAdminPage() {
 
   // Proctoring download state
   const [proctoringDownloading, setProctoringDownloading] = useState(false);
+  const [reportGeneratingFor, setReportGeneratingFor] = useState<number | null>(null);
 
   // Filter panel state
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -554,12 +557,6 @@ export default function GroupStudentAdminPage() {
       getStudentsWithMappingByInstituteId(Number(selectedInstitute))
         .then((response) => {
           const studentData = response.data.map((student: any) => {
-            const assessmentId = student.assessmentId
-              ? String(student.assessmentId)
-              : "";
-            const assessment = assessments.find(
-              (a) => a.id === Number(assessmentId)
-            );
             const assignedIds = Array.isArray(student.assignedAssessmentIds)
               ? student.assignedAssessmentIds
               : [];
@@ -573,7 +570,7 @@ export default function GroupStudentAdminPage() {
               controlNumber: student.controlNumber ?? undefined,
               selectedAssessment: "",
               userStudentId: student.userStudentId,
-              assessmentName: assessment?.assessmentName || "",
+              assessmentName: "",
               username: student.username || "",
               schoolSectionId: student.schoolSectionId ?? undefined,
               assessments: student.assessments || [],
@@ -587,10 +584,28 @@ export default function GroupStudentAdminPage() {
         })
         .finally(() => setLoading(false));
     }
-  }, [selectedInstitute, assessments]);
+  }, [selectedInstitute]);
 
-  // Set of active assessment IDs — used to hide deactivated assessments everywhere
-  const activeAssessmentIds = new Set(assessments.map((a) => a.id));
+  // Set of active assessment IDs — memoized to prevent re-creation on every render
+  const activeAssessmentIds = useMemo(() => new Set(assessments.map((a) => a.id)), [assessments]);
+
+  // Pre-compute per-student active assessment count (avoids Set creation per row per render)
+  const studentAssessmentCounts = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const s of students) {
+      const count = new Set(
+        (s.assessments || [])
+          .filter(a => activeAssessmentIds.has(Number(a.assessmentId)))
+          .map(a => Number(a.assessmentId))
+      ).size;
+      map.set(s.userStudentId, count);
+    }
+    return map;
+  }, [students, activeAssessmentIds]);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   const filteredStudents = useMemo(() => {
     return students.filter((s) => {
@@ -639,6 +654,19 @@ export default function GroupStudentAdminPage() {
       return matchesQuery && matchesSection && matchesAssessment && matchesStatus;
     });
   }, [students, query, filteredSectionIds, hasAssessmentFilter, appliedAssessmentIds, hasStatusFilter, appliedStatuses, activeAssessmentIds]);
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedStudents = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredStudents.slice(start, start + pageSize);
+  }, [filteredStudents, safeCurrentPage, pageSize]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, filteredSectionIds, appliedAssessmentIds, appliedStatuses]);
 
   const getSelectedInstituteName = () => {
     const institute = institutes.find(
@@ -2070,7 +2098,7 @@ export default function GroupStudentAdminPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredStudents.map((student, index) => (
+                      {paginatedStudents.map((student, index) => (
                         <tr
                           key={student.userStudentId}
                           style={{
@@ -2165,7 +2193,7 @@ export default function GroupStudentAdminPage() {
                               }}
                             >
                               <i className="bi bi-list-ul"></i>
-                              View ({new Set((student.assessments || []).filter(a => activeAssessmentIds.has(Number(a.assessmentId))).map(a => Number(a.assessmentId))).size})
+                              View ({studentAssessmentCounts.get(student.userStudentId) || 0})
                             </button>
                           </td>
                           <td
@@ -2299,6 +2327,56 @@ export default function GroupStudentAdminPage() {
                       ))}
                     </tbody>
                   </table>
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "12px 24px", borderTop: "1px solid #e5e7eb", flexWrap: "wrap", gap: 8,
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
+                          {(safeCurrentPage - 1) * pageSize + 1}-{Math.min(safeCurrentPage * pageSize, filteredStudents.length)} of {filteredStudents.length}
+                        </span>
+                        <select
+                          className="form-select form-select-sm form-select-solid"
+                          style={{ width: 72, fontSize: "0.85rem" }}
+                          value={pageSize}
+                          onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                        >
+                          {[25, 50, 100, 200].map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <button className="btn btn-sm btn-light" disabled={safeCurrentPage <= 1}
+                          onClick={() => setCurrentPage(1)} style={{ padding: "4px 10px", fontSize: "0.85rem" }}>First</button>
+                        <button className="btn btn-sm btn-light" disabled={safeCurrentPage <= 1}
+                          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} style={{ padding: "4px 10px", fontSize: "0.85rem" }}>Prev</button>
+                        {(() => {
+                          const pages: (number | string)[] = [];
+                          const maxV = 5;
+                          let start = Math.max(1, safeCurrentPage - Math.floor(maxV / 2));
+                          let end = Math.min(totalPages, start + maxV - 1);
+                          if (end - start + 1 < maxV) start = Math.max(1, end - maxV + 1);
+                          if (start > 1) { pages.push(1); if (start > 2) pages.push("..."); }
+                          for (let i = start; i <= end; i++) pages.push(i);
+                          if (end < totalPages) { if (end < totalPages - 1) pages.push("..."); pages.push(totalPages); }
+                          return pages.map((p, i) =>
+                            typeof p === "string" ? (
+                              <span key={`e-${i}`} style={{ padding: "4px 6px", color: "#9ca3af", fontSize: "0.85rem" }}>...</span>
+                            ) : (
+                              <button key={p} className={`btn btn-sm ${p === safeCurrentPage ? "btn-primary" : "btn-light"}`}
+                                onClick={() => setCurrentPage(p)} style={{ padding: "4px 12px", fontSize: "0.85rem", minWidth: 36 }}>{p}</button>
+                            )
+                          );
+                        })()}
+                        <button className="btn btn-sm btn-light" disabled={safeCurrentPage >= totalPages}
+                          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} style={{ padding: "4px 10px", fontSize: "0.85rem" }}>Next</button>
+                        <button className="btn btn-sm btn-light" disabled={safeCurrentPage >= totalPages}
+                          onClick={() => setCurrentPage(totalPages)} style={{ padding: "4px 10px", fontSize: "0.85rem" }}>Last</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2573,6 +2651,41 @@ export default function GroupStudentAdminPage() {
                           <i className="bi bi-arrow-counterclockwise"></i>
                           Reset
                         </button>
+                        {assessment.status === "completed" && (
+                          <button
+                            className="btn btn-outline-success btn-sm d-flex align-items-center gap-1"
+                            disabled={reportGeneratingFor === assessment.assessmentId}
+                            onClick={async () => {
+                              if (!modalStudent) return;
+                              setReportGeneratingFor(assessment.assessmentId);
+                              try {
+                                const fullAssessment = assessments.find((a: any) => a.id === assessment.assessmentId) as any;
+                                const isBet = fullAssessment?.questionnaire?.type === true;
+                                const res = isBet
+                                  ? await generateBetReportOneClick(assessment.assessmentId, modalStudent.userStudentId)
+                                  : await generateNavigatorReportOneClick(assessment.assessmentId, modalStudent.userStudentId);
+                                const reportUrl = res.data.reportUrl;
+                                if (reportUrl) {
+                                  window.open(reportUrl, "_blank");
+                                }
+                              } catch (err: any) {
+                                alert("Report generation failed: " + (err?.response?.data?.error || err.message));
+                              } finally {
+                                setReportGeneratingFor(null);
+                              }
+                            }}
+                            style={{
+                              borderRadius: "8px",
+                              padding: "6px 12px",
+                              fontWeight: 500,
+                              fontSize: "0.8rem",
+                              transition: "all 0.2s",
+                            }}
+                          >
+                            <i className={reportGeneratingFor === assessment.assessmentId ? "bi bi-hourglass-split" : "bi bi-file-earmark-arrow-down"}></i>
+                            {reportGeneratingFor === assessment.assessmentId ? "Generating..." : "Report"}
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}

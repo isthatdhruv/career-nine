@@ -1,3 +1,6 @@
+# Local secrets (never commit)
+**/application-local.yml
+
 # Dependencies
 node_modules/
 npm-debug.log*
