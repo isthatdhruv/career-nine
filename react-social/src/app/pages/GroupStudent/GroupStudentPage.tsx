@@ -2675,9 +2675,11 @@ export default function GroupStudentPage() {
                               if (!modalStudent) return;
                               setReportGeneratingFor(assessment.assessmentId);
                               try {
-                                // Determine BET vs Navigator from assessments list
+                                // Determine BET vs Navigator: use questionnaire.type flag,
+                                // fall back to assessment name containing "BET" if type is not set
                                 const fullAssessment = assessments.find((a: any) => a.id === assessment.assessmentId) as any;
-                                const isBet = fullAssessment?.questionnaire?.type === true;
+                                const isBet = fullAssessment?.questionnaire?.type === true
+                                  || (fullAssessment?.questionnaire?.type == null && (assessment.assessmentName || '').toUpperCase().includes('BET'));
 
                                 const res = isBet
                                   ? await generateBetReportOneClick(assessment.assessmentId, modalStudent.userStudentId)

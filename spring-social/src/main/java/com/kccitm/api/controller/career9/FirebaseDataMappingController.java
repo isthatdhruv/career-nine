@@ -227,19 +227,28 @@ public class FirebaseDataMappingController {
                 answer.setAssessment(assessment);
                 answer.setTextResponse(textResponse);
 
-                // Set QuestionnaireQuestion
-                if (questionId != null) {
-                    List<QuestionnaireQuestion> qqList = questionnaireQuestionRepository.findByQuestion_QuestionId(questionId);
-                    if (!qqList.isEmpty()) {
-                        answer.setQuestionnaireQuestion(qqList.get(0));
-                    }
-                }
-
                 // Set option and accumulate scores
                 if (optionId != null) {
                     Optional<AssessmentQuestionOptions> optOpt = assessmentQuestionOptionsRepository.findById(optionId);
                     if (optOpt.isPresent()) {
                         answer.setOption(optOpt.get());
+
+                        // Set QuestionnaireQuestion: try payload questionId first,
+                        // then fall back to the option's parent question (handles multi-select sections
+                        // where questionId may be null or not directly linked to a QuestionnaireQuestion)
+                        if (questionId != null) {
+                            List<QuestionnaireQuestion> qqList = questionnaireQuestionRepository.findByQuestion_QuestionId(questionId);
+                            if (!qqList.isEmpty()) {
+                                answer.setQuestionnaireQuestion(qqList.get(0));
+                            }
+                        }
+                        if (answer.getQuestionnaireQuestion() == null && optOpt.get().getQuestion() != null) {
+                            Long parentQId = optOpt.get().getQuestion().getQuestionId();
+                            List<QuestionnaireQuestion> qqList = questionnaireQuestionRepository.findByQuestion_QuestionId(parentQId);
+                            if (!qqList.isEmpty()) {
+                                answer.setQuestionnaireQuestion(qqList.get(0));
+                            }
+                        }
 
                         // Fetch scores for this option and accumulate
                         List<OptionScoreBasedOnMEasuredQualityTypes> optionScores =
@@ -251,6 +260,12 @@ public class FirebaseDataMappingController {
                                 mqtCache.putIfAbsent(mqtId, os.getMeasuredQualityType());
                             }
                         }
+                    }
+                } else if (questionId != null) {
+                    // No optionId (text answer) — still set QuestionnaireQuestion from questionId
+                    List<QuestionnaireQuestion> qqList = questionnaireQuestionRepository.findByQuestion_QuestionId(questionId);
+                    if (!qqList.isEmpty()) {
+                        answer.setQuestionnaireQuestion(qqList.get(0));
                     }
                 }
 

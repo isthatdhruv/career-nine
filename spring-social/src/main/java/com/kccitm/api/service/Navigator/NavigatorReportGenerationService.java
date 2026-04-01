@@ -191,8 +191,12 @@ public class NavigatorReportGenerationService {
                 Collections.sort(sortedOptionIds);
             }
 
+            String sectionName = "";
+            if (sec.getSection() != null && sec.getSection().getSectionName() != null) {
+                sectionName = sec.getSection().getSectionName().toLowerCase();
+            }
             sectionMetas.add(new SectionMeta(letter, secId, isMultiSelect, isSingleAnswer,
-                    sortedQQIds, sortedOptionIds, singleQQId, qqOptions));
+                    sortedQQIds, sortedOptionIds, singleQQId, qqOptions, sectionName));
         }
 
         logger.info("Discovered {} sections for assessment {}: {}",
@@ -230,26 +234,21 @@ public class NavigatorReportGenerationService {
             int optCount = sm.sortedOptionIds.size();
 
             if (sm.isMultiSelect) {
-                // MULTI_SELECT sections: identify by option count
-                if (optCount >= 20) {
-                    // 24 options = Career Aspirations
+                // MULTI_SELECT sections: identify by section name first (reliable),
+                // fall back to option count (unreliable when few students have answered).
+                // optCount = distinct options selected by all students — NOT total defined options.
+                String name = sm.sectionName;
+                boolean isCareerAsp = name.contains("career") || name.contains("aspir");
+                boolean isValues    = name.contains("value");
+                boolean isSOI       = name.contains("interest") || name.contains("soi")
+                                      || name.contains("subject");
+
+                if (isCareerAsp || (!isValues && !isSOI && optCount >= 20)) {
                     selectedCareerAsps = extractMultiSelectLabels(studentAnswers, sm, CAREER_ASP_LABELS);
-                } else if (optCount >= 14 && optCount <= 16) {
-                    // 15 options = could be SOI or Values — distinguish by label matching
-                    // Try SOI first (Agriculture, Art, etc.)
-                    List<String> extracted = extractMultiSelectLabels(studentAnswers, sm, SOI_LABELS);
-                    if (!extracted.isEmpty()) {
-                        selectedSOIs = extracted;
-                    } else {
-                        selectedValues = extractMultiSelectLabels(studentAnswers, sm, VALUE_LABELS);
-                    }
-                } else if (optCount <= 10 && optCount > 0) {
-                    // Small multi-select — could be Values or SOI with fewer options
-                    if (selectedValues.isEmpty()) {
-                        selectedValues = extractMultiSelectLabels(studentAnswers, sm, VALUE_LABELS);
-                    } else if (selectedSOIs.isEmpty()) {
-                        selectedSOIs = extractMultiSelectLabels(studentAnswers, sm, SOI_LABELS);
-                    }
+                } else if (isValues || (!isCareerAsp && !isSOI && optCount >= 14 && optCount <= 16)) {
+                    selectedValues = extractMultiSelectLabels(studentAnswers, sm, VALUE_LABELS);
+                } else if (isSOI || (!isCareerAsp && !isValues && optCount > 0)) {
+                    selectedSOIs = extractMultiSelectLabels(studentAnswers, sm, SOI_LABELS);
                 }
             } else if (sm.isSingleAnswer) {
                 // SINGLE_ANSWER sections: identify by question count
@@ -797,10 +796,11 @@ public class NavigatorReportGenerationService {
         final List<Long> sortedOptionIds;   // sorted option IDs (for MULTI_SELECT)
         final Long singleQQId;              // the single question ID (for MULTI_SELECT)
         final Map<Long, Set<Long>> qqOptions; // qqId → set of option IDs
+        final String sectionName;           // lowercase section name for type detection
 
         SectionMeta(String letter, Long sectionId, boolean isMultiSelect, boolean isSingleAnswer,
                 List<Long> sortedQQIds, List<Long> sortedOptionIds, Long singleQQId,
-                Map<Long, Set<Long>> qqOptions) {
+                Map<Long, Set<Long>> qqOptions, String sectionName) {
             this.letter = letter;
             this.sectionId = sectionId;
             this.isMultiSelect = isMultiSelect;
@@ -809,6 +809,7 @@ public class NavigatorReportGenerationService {
             this.sortedOptionIds = sortedOptionIds;
             this.singleQQId = singleQQId;
             this.qqOptions = qqOptions;
+            this.sectionName = sectionName != null ? sectionName : "";
         }
     }
 }

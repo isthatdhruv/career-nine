@@ -2660,7 +2660,8 @@ export default function GroupStudentAdminPage() {
                               setReportGeneratingFor(assessment.assessmentId);
                               try {
                                 const fullAssessment = assessments.find((a: any) => a.id === assessment.assessmentId) as any;
-                                const isBet = fullAssessment?.questionnaire?.type === true;
+                                const isBet = fullAssessment?.questionnaire?.type === true
+                                  || (fullAssessment?.questionnaire?.type == null && (assessment.assessmentName || '').toUpperCase().includes('BET'));
                                 const res = isBet
                                   ? await generateBetReportOneClick(assessment.assessmentId, modalStudent.userStudentId)
                                   : await generateNavigatorReportOneClick(assessment.assessmentId, modalStudent.userStudentId);
