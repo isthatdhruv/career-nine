@@ -47,16 +47,26 @@ public class DigitalOceanSpacesService {
 
     @PostConstruct
     public void init() {
+        logger.info("========== DigitalOcean Spaces Configuration ==========");
+        logger.info("  Bucket:     {}", bucket);
+        logger.info("  Region:     {}", region);
+        logger.info("  Endpoint:   {}", endpoint);
+        logger.info("  CDN URL:    {}", cdnUrl);
+        logger.info("  Access Key: {}", accessKey != null && accessKey.length() > 4
+                ? accessKey.substring(0, 4) + "****" : "(not set)");
+        logger.info("  Secret Key: {}", secretKey != null && !secretKey.isEmpty() ? "****configured****" : "(not set)");
+
         if (accessKey != null && !accessKey.isEmpty() && secretKey != null && !secretKey.isEmpty()) {
             BasicAWSCredentials credentials = new BasicAWSCredentials(accessKey, secretKey);
             s3Client = AmazonS3ClientBuilder.standard()
                     .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(endpoint, region))
                     .withCredentials(new AWSStaticCredentialsProvider(credentials))
                     .build();
-            logger.info("DO Spaces client initialized successfully");
+            logger.info("  Status:     READY");
         } else {
-            logger.warn("DO Spaces credentials not configured. Set DO_SPACES_ACCESS_KEY and DO_SPACES_SECRET_KEY environment variables.");
+            logger.warn("  Status:     NOT CONFIGURED - Set DO_SPACES_ACCESS_KEY and DO_SPACES_SECRET_KEY");
         }
+        logger.info("=======================================================");
     }
 
     /**

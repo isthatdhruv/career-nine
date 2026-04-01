@@ -8,6 +8,8 @@ import java.net.http.HttpResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import javax.annotation.PostConstruct;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +30,21 @@ public class NavigatorAISummaryService {
 
     @Value("${app.openai.api-key:}")
     private String openaiApiKey;
+
+    @PostConstruct
+    public void init() {
+        logger.info("============= OpenAI API Configuration =============");
+        logger.info("  API Key:  {}", openaiApiKey != null && openaiApiKey.length() > 8
+                ? openaiApiKey.substring(0, 8) + "****" : "(not set)");
+        logger.info("  Model:    gpt-4o");
+        logger.info("  Endpoint: {}", OPENAI_API_URL);
+        if (openaiApiKey == null || openaiApiKey.isEmpty()) {
+            logger.warn("  Status:   NOT CONFIGURED - Set OPENAI_API_KEY env variable or app.openai.api-key in application.yml");
+        } else {
+            logger.info("  Status:   READY");
+        }
+        logger.info("=====================================================");
+    }
 
     // ═══════════════════════ RESULT HOLDER ═══════════════════════
 
