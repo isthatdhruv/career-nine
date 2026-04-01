@@ -5,6 +5,7 @@ import {
   getStudentsWithMappingByInstituteId,
   Assessment,
 } from "../StudentInformation/StudentInfo_APIs";
+import { getAssessmentMappingsByInstitute } from "../AssessmentMapping/API/AssessmentMapping_APIs";
 import {
   getBetReportDataByAssessment,
   generateHtmlReports,
@@ -44,6 +45,7 @@ const ReportsPage: React.FC = () => {
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
   const [institutesLoading, setInstitutesLoading] = useState(false);
 
+  const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [selectedAssessment, setSelectedAssessment] = useState<number | "">("");
   const [assessmentsLoading, setAssessmentsLoading] = useState(false);
@@ -86,12 +88,39 @@ const ReportsPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    setAssessmentsLoading(true);
     getAllAssessments()
-      .then((res) => setAssessments(res.data || []))
-      .catch(() => setAssessments([]))
-      .finally(() => setAssessmentsLoading(false));
+      .then((res) => setAllAssessments(res.data || []))
+      .catch(() => setAllAssessments([]));
   }, []);
+
+  const [mappedAssessmentIds, setMappedAssessmentIds] = useState<Set<number> | null>(null);
+
+  useEffect(() => {
+    if (selectedInstitute === "") {
+      setMappedAssessmentIds(null);
+      return;
+    }
+    setAssessmentsLoading(true);
+    getAssessmentMappingsByInstitute(Number(selectedInstitute))
+      .then((res) => {
+        const ids = new Set<number>(
+          (res.data || [])
+            .filter((m: any) => m.isActive !== false)
+            .map((m: any) => Number(m.assessmentId))
+        );
+        setMappedAssessmentIds(ids.size > 0 ? ids : null);
+      })
+      .catch(() => setMappedAssessmentIds(null))
+      .finally(() => setAssessmentsLoading(false));
+  }, [selectedInstitute]);
+
+  useEffect(() => {
+    if (mappedAssessmentIds && mappedAssessmentIds.size > 0) {
+      setAssessments(allAssessments.filter((a) => mappedAssessmentIds.has(a.id)));
+    } else {
+      setAssessments(allAssessments);
+    }
+  }, [allAssessments, mappedAssessmentIds]);
 
   useEffect(() => {
     if (selectedInstitute === "") {

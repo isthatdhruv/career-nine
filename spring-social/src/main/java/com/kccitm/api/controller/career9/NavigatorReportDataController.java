@@ -44,6 +44,94 @@ public class NavigatorReportDataController {
 
     // ═══════════════════════ CRUD ═══════════════════════
 
+    // ═══════════════════════ ONE-CLICK REPORT ═══════════════════════
+
+    /**
+     * POST /navigator-report-data/one-click-report
+     * Body: { "assessmentId": 18, "userStudentId": 874 }
+     *
+     * Generates report data (if not exists) + generates HTML report + returns URL.
+     */
+    @PostMapping("/one-click-report")
+    @Transactional
+    public ResponseEntity<?> oneClickReport(@RequestBody Map<String, Object> request) {
+        try {
+            Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+            Long userStudentId = ((Number) request.get("userStudentId")).longValue();
+
+            // Step 1: Check existing
+            Optional<NavigatorReportData> existing = navigatorReportDataRepository
+                    .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+
+            // Step 2: Generate data if missing OR if AI summary is empty (needs regeneration)
+            boolean needsRegeneration = existing.isEmpty()
+                    || existing.get().getSummary() == null
+                    || existing.get().getSummary().isEmpty()
+                    || existing.get().getSummary().startsWith("Summary generation failed");
+
+            if (needsRegeneration) {
+                // Delete stale data if exists
+                if (existing.isPresent()) {
+                    navigatorReportDataRepository.deleteByUserStudentUserStudentIdAndAssessmentId(
+                            userStudentId, assessmentId);
+                }
+                NavigatorReportData report = navigatorReportGenerationService
+                        .generateForStudent(userStudentId, assessmentId, false);
+                if (report == null) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body(Map.of("error", "No completed assessment found for this student"));
+                }
+                existing = Optional.of(report);
+            }
+
+            NavigatorReportData report = existing.get();
+
+            // Check eligibility
+            if (!report.isEligible()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "Student is ineligible for report generation",
+                                "issues", safe(report.getEligibilityIssues())));
+            }
+
+            // Step 3: Generate HTML if not already generated
+            if (!"generated".equals(report.getReportStatus()) || report.getReportUrl() == null) {
+                String templateName = resolveTemplateName(report.getStudentClass());
+                String template = loadNavigatorTemplate(templateName);
+                if (template == null) {
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body(Map.of("error", "Could not load Navigator template: " + templateName));
+                }
+
+                String filledHtml = fillTemplate(template, report);
+                String safeName = (report.getStudentName() != null ? report.getStudentName() : "student")
+                        .replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
+                String reportType = resolveReportType(report.getStudentClass());
+                String fileName = safeName + "_" + userStudentId + "_" + reportType + ".html";
+                String folder = "navigator-reports/assessment-" + assessmentId;
+
+                String reportUrl = digitalOceanSpacesService.uploadBytes(
+                        filledHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                        "text/html", folder, fileName);
+
+                report.setReportStatus("generated");
+                report.setReportUrl(reportUrl);
+                navigatorReportDataRepository.save(report);
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "reportUrl", report.getReportUrl(),
+                    "studentName", safe(report.getStudentName()),
+                    "status", "generated"
+            ));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Report generation failed: " + e.getMessage()));
+        }
+    }
+
+    // ═══════════════════════ CRUD ═══════════════════════
+
     @GetMapping("/getAll")
     public ResponseEntity<?> getAll() {
         return ResponseEntity.ok(navigatorReportDataRepository.findAll());

@@ -778,6 +778,7 @@ public class NavigatorCoreAnalysis {
             }
         }
         // Try title case
+        if (weakNorm.isEmpty()) return "";
         return weakNorm.substring(0, 1).toUpperCase() + weakNorm.substring(1);
     }
 
@@ -1262,9 +1263,10 @@ public class NavigatorCoreAnalysis {
         List<String> lacks = new ArrayList<>();
 
         for (String req : requirements) {
+            if (req == null || req.isEmpty()) continue;
             String reqNorm = isPersonality ? req : normalizeWord(req);
             String displayName = isPersonality
-                    ? req.substring(0, 1).toUpperCase() + req.substring(1)
+                    ? titleCase(req)
                     : DISPLAY_ALIASES.getOrDefault(reqNorm, titleCase(reqNorm));
 
             boolean found = false;

@@ -226,3 +226,25 @@ export function getBetReport(instituteId: number, assessmentId: number) {
         `${STUDENT_INFO_BASE}/bet-report/${instituteId}/${assessmentId}`
     );
 }
+
+// ── One-click report generation (generates data + HTML + returns URL) ──
+
+export interface OneClickReportResponse {
+    reportUrl: string;
+    studentName: string;
+    status: string;
+}
+
+export function generateBetReportOneClick(assessmentId: number, userStudentId: number) {
+    return axios.post<OneClickReportResponse>(`${API_URL}/bet-report-data/one-click-report`, {
+        assessmentId,
+        userStudentId,
+    }, { timeout: 120000 }); // 2 min timeout for report generation
+}
+
+export function generateNavigatorReportOneClick(assessmentId: number, userStudentId: number) {
+    return axios.post<OneClickReportResponse>(`${API_URL}/navigator-report-data/one-click-report`, {
+        assessmentId,
+        userStudentId,
+    }, { timeout: 120000 }); // 2 min timeout for report generation + AI
+}

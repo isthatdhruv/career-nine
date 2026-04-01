@@ -24,6 +24,11 @@ server:
   #   key-store-password: 123456
   #   key-store-type: PKCS12
   #   key-alias: mysslcert
+
+app:
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+
 ---
 spring:
   profiles: dev
@@ -164,7 +169,7 @@ app:
       - myiosapp://oauth2/redirect
       - http://192.168.0.204:3000
   openai:
-    api-key: ${OPENAI_API_KEY}
+    api-key: ${OPENAI_API_KEY:}
   mandrill: WXX3fC00pJTZgonjnVvkgQ
   odoo:
     url: https://career-91.odoo.com

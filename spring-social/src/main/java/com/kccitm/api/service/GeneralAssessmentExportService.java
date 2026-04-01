@@ -238,6 +238,11 @@ public class GeneralAssessmentExportService {
         for (SectionMapping sm : sectionMappings) {
             switch (sm.type) {
                 case MULTI_SELECT:
+                    // Pre-fill all MULTI_SELECT columns with "BLANK"
+                    for (Integer col : sm.optionIdToCol.values()) {
+                        row.createCell(col).setCellValue("BLANK");
+                    }
+                    // Overwrite selected options with "1"
                     for (AssessmentAnswer a : answers) {
                         if (a.getQuestionnaireQuestion() == null || a.getOption() == null) continue;
                         if (!a.getQuestionnaireQuestion().getQuestionnaireQuestionId().equals(sm.singleQuestionQQId))
