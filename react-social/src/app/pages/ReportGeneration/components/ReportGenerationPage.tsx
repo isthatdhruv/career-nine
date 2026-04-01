@@ -492,7 +492,8 @@ const ReportGenerationPage: React.FC<{ config: ReportGenerationConfig }> = ({ co
                         try {
                           const res = await api.generateReports(Number(selectedAssessment), ids);
                           const { generated, errors } = res.data;
-                          alert(`Generated ${generated} report(s).${errors.length > 0 ? `\n${errors.length} failed.` : ""}`);
+                          const errorDetails = errors.length > 0 ? errors.map((e: any) => `Student ${e.userStudentId}: ${e.reason}`).join("\n") : "";
+                          alert(`Generated ${generated} report(s).${errors.length > 0 ? `\n${errors.length} failed:\n${errorDetails}` : ""}`);
                           await refreshReportData();
                         } catch (err: any) { alert("Failed: " + (err?.response?.data?.error || err.message)); }
                         finally { setGeneratingReports(false); }
