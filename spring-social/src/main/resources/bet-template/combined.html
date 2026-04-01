@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
   <head>
     <meta charset="utf-8" />
@@ -303,6 +303,11 @@
       }
 
       @media print {
+        * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          color-adjust: exact !important;
+        }
         body {
           background-color: #fff;
           gap: 0;
@@ -312,7 +317,7 @@
 
       .text-dark {
         color: #282828;
-        font-size: 14px;
+        font-size: 17px;
         font-family: "Calibri";
         font-weight: 400;
         line-height: normal;
@@ -352,7 +357,7 @@
       .column-text4 {
         align-self: stretch;
         color: #282828;
-        font-size: 14px;
+        font-size: 17px;
       }
 
       .rect {
@@ -631,19 +636,19 @@
 
       .page-report-details .card-left1 {
         margin-top: 9px;
-        width: 124px;
+        width: 180px;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
         background-color: #ede7db;
-        padding: 10px;
+        padding: 14px;
         border-radius: 24px 0;
       }
 
       .page-report-details .card-left-img {
-        width: 100px;
+        width: 150px;
         flex-shrink: 0;
       }
 
@@ -743,7 +748,7 @@
       }
 
       .page-report-details .card5 .column-text4 {
-        font-size: 14px;
+        font-size: 17px;
         line-height: 1.3;
       }
 
@@ -772,7 +777,7 @@
 
       .page-report-details .card-text2 {
         color: #282828;
-        font-size: 14px;
+        font-size: 17px;
         line-height: 1.3;
       }
 
@@ -1058,16 +1063,139 @@
         text-align: left;
       }
 
+      /* Flowchart Section */
+      .page-closing .flowchart-section {
+        margin: 16px 28px 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0;
+      }
+
+      .page-closing .flowchart-section .section-intro {
+        text-align: center;
+        font-family: "Montserrat";
+        font-size: 13px;
+        font-weight: 500;
+        color: #333;
+        margin-bottom: 10px;
+        line-height: 1.4;
+      }
+
+      .page-closing .flowchart-row {
+        display: flex;
+        align-items: stretch;
+        justify-content: center;
+        gap: 0;
+        width: 100%;
+        max-width: 880px;
+      }
+
+      .page-closing .flowchart-box {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 12px 10px;
+        border-radius: 12px;
+        text-align: center;
+        position: relative;
+      }
+
+      .page-closing .flowchart-box.box-report {
+        background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+        border: 2px solid #66bb6a;
+      }
+
+      .page-closing .flowchart-box.box-parenting {
+        background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+        border: 2px solid #42a5f5;
+      }
+
+      .page-closing .flowchart-box.box-support {
+        background: linear-gradient(135deg, #fce4ec, #f8bbd0);
+        border: 2px solid #ef5350;
+      }
+
+      .page-closing .flowchart-box-title {
+        font-family: "Montserrat";
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 6px;
+        color: #1a1a1a;
+      }
+
+      .page-closing .flowchart-box-text {
+        font-size: 11px;
+        line-height: 1.4;
+        color: #444;
+        margin: 0;
+      }
+
+      .page-closing .flowchart-box-text li {
+        text-align: left;
+        margin-bottom: 2px;
+      }
+
+      .page-closing .flowchart-arrow {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        flex-shrink: 0;
+        font-size: 22px;
+        color: #004d40;
+        font-weight: bold;
+      }
+
+      @media screen and (max-width: 576px) {
+        .page-closing .flowchart-row {
+          flex-direction: column;
+          align-items: center;
+          gap: 0;
+        }
+        .page-closing .flowchart-arrow {
+          transform: rotate(90deg);
+          width: auto;
+          height: 24px;
+        }
+        .page-closing .flowchart-section {
+          margin: 12px 16px 0;
+        }
+      }
+
+      .page-closing .qr-section {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        align-self: center;
+        flex: 1;
+        justify-content: center;
+      }
+
+      .page-closing .qr-img {
+        width: 100px;
+        height: 100px;
+      }
+
+      .page-closing .qr-label {
+        margin-top: 6px;
+        font-size: 11px;
+        color: #555;
+        font-family: "Montserrat";
+      }
+
       .page-closing .footer {
         display: flex;
         flex-direction: column;
         align-items: center;
         align-self: stretch;
         color: #000;
-        font-size: 14px;
+        font-size: 13px;
         line-height: normal;
         background-color: #ede7db;
-        padding: 30px 36px 50px 28px;
+        padding: 14px 28px;
+        margin-top: auto;
       }
 
       .page-closing .footer-col {
@@ -1075,11 +1203,11 @@
         max-width: 880px;
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: 3px;
       }
 
       .page-closing .footer-text-top {
-        font-size: 18px;
+        font-size: 16px;
         font-family: "Montserrat";
       }
 
@@ -1150,7 +1278,7 @@
        Page 1: Cover
        ============================================================ -->
     <div class="page page-cover">
-      <img src="assets/cover/img.png" class="img" />
+      <!-- <img src="assets/cover/img.png" class="img" /> -->
 
       <div class="row">
         <div class="col1">
@@ -1238,19 +1366,14 @@
 
               <div class="column-b col3">
                 <p class="column-text3">Problem Solving</p>
-                <p class="column-text4">
-                  {{cog1}}
-                </p>
+                <p class="column-text4">{{cog1}}</p>
               </div>
             </div>
           </div>
 
           <div class="row-bottom1">
             <div class="card-left1">
-              <img
-                src="{{cog2}}.png"
-                class="card-left-img"
-              />
+              <img src="{{cog2}}.png" class="card-left-img" />
             </div>
 
             <div class="card3">
@@ -1261,9 +1384,7 @@
 
               <div class="column-b col4">
                 <p class="column-text3">{{cog_3}}</p>
-                <p class="column-text4">
-                  {{cognitive_3_description}}
-                </p>
+                <p class="column-text4">{{cognitive_3_description}}</p>
               </div>
             </div>
           </div>
@@ -1292,9 +1413,7 @@
             <div class="card5">
               <div class="column-b">
                 <p class="column-text3">Self Efficacy</p>
-                <p class="column-text4">
-                  {{self_management_1}}
-                </p>
+                <p class="column-text4">{{self_management_1}}</p>
               </div>
             </div>
           </div>
@@ -1302,16 +1421,12 @@
           <div class="row-bottom2">
             <div class="card card-left2">
               <p class="card-text1">Self Regulation</p>
-              <p class="card-text2">
-                {{self_management_2}}
-              </p>
+              <p class="card-text2">{{self_management_2}}</p>
             </div>
 
             <div class="card card-right">
               <p class="card-text1">Emotional Regulation</p>
-              <p class="card-text2">
-                {{self_management_3}}
-              </p>
+              <p class="card-text2">{{self_management_3}}</p>
             </div>
           </div>
         </div>
@@ -1359,9 +1474,7 @@
 
               <div class="column-b col4">
                 <p class="column-text3">Social Insight</p>
-                <p class="column-text4">
-                  {{social_insight}}
-                </p>
+                <p class="column-text4">{{social_insight}}</p>
               </div>
             </div>
           </div>
@@ -1384,12 +1497,72 @@
 
               <div class="card-col">
                 <p class="text-black">Values</p>
-                <p class="text-dark">
-                  {{value_overview}}
+                <p class="text-dark">{{value_overview}}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Flowchart Section -->
+        <div class="flowchart-section">
+          <p class="section-intro">
+            This report is designed to help you be aware of your child's
+            development.
+          </p>
+
+          <div class="flowchart-row">
+            <!-- Box 1: Report Purpose -->
+            <div class="flowchart-box box-report">
+              <p class="flowchart-box-title">What This Report Tells You</p>
+              <p class="flowchart-box-text">
+                A snapshot of your child's cognitive, social &amp; emotional
+                development to guide your next steps.
+              </p>
+            </div>
+
+            <div class="flowchart-arrow">&#10132;</div>
+
+            <!-- Box 2: Key Parenting Practices -->
+            <div class="flowchart-box box-parenting">
+              <p class="flowchart-box-title">Key Parenting Practices</p>
+              <div class="flowchart-box-text">
+                <ul style="padding-left: 18px; margin: 0">
+                  <li>
+                    <strong>Active Listening</strong> — Be fully present in
+                    conversations
+                  </li>
+                  <li>
+                    <strong>Cultivate Patience</strong> — Allow room for growth
+                  </li>
+                  <li>
+                    <strong>Positive Discipline</strong> — Guide with empathy
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="flowchart-arrow">&#10132;</div>
+
+            <!-- Box 3: Need More Support -->
+            <div class="flowchart-box box-support">
+              <p class="flowchart-box-title">Need More Support?</p>
+              <div class="flowchart-box-text">
+                <p style="margin: 0 0 6px">
+                  Unlock our <strong>Parental Handbook</strong> for detailed
+                  strategies.
+                </p>
+                <p style="margin: 0">
+                  Schedule a <strong>Counsellor Session</strong> for
+                  personalised guidance.
                 </p>
               </div>
             </div>
           </div>
+        </div>
+
+        <div class="qr-section">
+          <img src="assets/closing/qr-code.png" class="qr-img" alt="QR Code" />
+          <p class="qr-label">Scan to visit Career-9</p>
         </div>
 
         <footer class="footer">
@@ -1405,40 +1578,63 @@
         </footer>
       </div>
     </div>
-<!-- Download PDF Button -->
-<button id="downloadBtn" onclick="window.print()" style="
-    position: fixed;
-    bottom: 30px;
-    right: 30px;
-    background: linear-gradient(135deg, #1a7a6d, #004d40);
-    color: white;
-    border: none;
-    padding: 14px 28px;
-    font-size: 15px;
-    font-weight: 600;
-    border-radius: 50px;
-    cursor: pointer;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: transform 0.2s, box-shadow 0.2s;
-" onmouseover="this.style.transform='scale(1.05)';this.style.boxShadow='0 6px 20px rgba(0,0,0,0.4)'"
-   onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 4px 15px rgba(0,0,0,0.3)'">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-        <polyline points="7 10 12 15 17 10"/>
-        <line x1="12" y1="15" x2="12" y2="3"/>
-    </svg>
-    Download PDF
-</button>
+    <!-- Download PDF Button -->
+    <button
+      id="downloadBtn"
+      onclick="window.print()"
+      style="
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        background: linear-gradient(135deg, #1a7a6d, #004d40);
+        color: white;
+        border: none;
+        padding: 14px 28px;
+        font-size: 15px;
+        font-weight: 600;
+        border-radius: 50px;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s;
+      "
+      onmouseover="
+        this.style.transform = 'scale(1.05)';
+        this.style.boxShadow = '0 6px 20px rgba(0,0,0,0.4)';
+      "
+      onmouseout="
+        this.style.transform = 'scale(1)';
+        this.style.boxShadow = '0 4px 15px rgba(0,0,0,0.3)';
+      "
+    >
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="white"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="7 10 12 15 17 10" />
+        <line x1="12" y1="15" x2="12" y2="3" />
+      </svg>
+      Download PDF
+    </button>
 
-<style>
-    @media print {
-        #downloadBtn { display: none !important; }
-    }
-</style>
-
+    <style>
+      @media print {
+        #downloadBtn {
+          display: none !important;
+        }
+      }
+    </style>
   </body>
 </html>

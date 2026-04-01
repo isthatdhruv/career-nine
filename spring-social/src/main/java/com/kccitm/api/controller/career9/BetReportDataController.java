@@ -784,6 +784,7 @@ public class BetReportDataController {
                 "assets/cog-2-assets/inconsistent.png",
                 "assets/cog-2-assets/detached.png",
                 "assets/cog-2-assets/vigilant.png",
+                "assets/closing/qr-code.png",
             };
 
             List<String> uploaded = new ArrayList<>();

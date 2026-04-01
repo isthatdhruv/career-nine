@@ -14,6 +14,7 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.JoinTable;
+import javax.persistence.Lob;
 import javax.persistence.ManyToMany;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
@@ -51,6 +52,10 @@ public class InstituteDetail implements Serializable {
     private Integer maxContactPersons;
 
     private Boolean isSchool;
+
+    @Lob
+    @Column(name = "school_logo", columnDefinition = "LONGBLOB")
+    private byte[] schoolLogo;
 
     // IMPORTANT FIX: Boolean instead of boolean
     @Column(name = "display")
@@ -214,6 +219,14 @@ public class InstituteDetail implements Serializable {
 
     public void setBoards(Set<BoardName> boards) {
         this.boards = boards;
+    }
+
+    public byte[] getSchoolLogo() {
+        return schoolLogo;
+    }
+
+    public void setSchoolLogo(byte[] schoolLogo) {
+        this.schoolLogo = schoolLogo;
     }
 
     // public Integer getId() {
