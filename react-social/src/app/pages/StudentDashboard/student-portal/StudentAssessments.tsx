@@ -168,7 +168,7 @@ const StudentAssessments: React.FC = () => {
                       borderRadius: 8,
                       border: 'none',
                       cursor: 'pointer',
-                      background: isOngoing ? '#E65100' : '#084A3E',
+                      background: isOngoing ? '#E65100' : '#263B6A',
                       color: '#fff',
                       whiteSpace: 'nowrap',
                     }}

@@ -1,4 +1,5 @@
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
 
 interface BookCounsellingProps {
   cciLevel: 'HIGH' | 'MEDIUM' | 'LOW'
@@ -17,6 +18,7 @@ const dummySlots = [
 ]
 
 const BookCounselling: React.FC<BookCounsellingProps> = ({ cciLevel }) => {
+  const navigate = useNavigate()
   return (
     <div className='sp-card'>
       <div className='sp-card-title'>Book a Counselling Session</div>
@@ -46,7 +48,7 @@ const BookCounselling: React.FC<BookCounsellingProps> = ({ cciLevel }) => {
             <button
               className='btn btn-sm btn-light-primary'
               style={{ fontSize: '11px', padding: '4px 12px' }}
-              onClick={() => alert('Appointment booking coming soon!')}
+              onClick={() => navigate('/student/counselling/book')}
             >
               Select
             </button>
@@ -56,7 +58,7 @@ const BookCounselling: React.FC<BookCounsellingProps> = ({ cciLevel }) => {
 
       <button
         className='sp-report-btn sp-report-btn-primary'
-        onClick={() => alert('Appointment request feature coming soon!')}
+        onClick={() => navigate('/student/counselling')}
       >
         Request Appointment
       </button>

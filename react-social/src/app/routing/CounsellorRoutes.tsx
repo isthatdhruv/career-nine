@@ -15,12 +15,12 @@ const CounsellorFallback: FC = () => (
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#F2F7F5',
+      background: '#F5F7FA',
     }}
   >
     <div style={{ textAlign: 'center' }}>
       <img src='/media/logos/kcc.jpg' alt='Career-9' style={{ height: 30, marginBottom: 20 }} />
-      <div style={{ color: '#5C7A72', fontSize: 14 }}>Loading ...</div>
+      <div style={{ color: '#6B7A8D', fontSize: 14 }}>Loading ...</div>
     </div>
   </div>
 )

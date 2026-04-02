@@ -13,6 +13,8 @@ const StudentAssessments = lazy(
 const StudentInfoForm = lazy(
   () => import('../pages/StudentDashboard/student-portal/StudentInfoForm')
 )
+const StudentCounsellingPage = lazy(() => import('../pages/Counselling/student/StudentCounsellingPage'))
+const SlotBookingPage = lazy(() => import('../pages/Counselling/student/SlotBookingPage'))
 
 const StudentFallback: FC = () => (
   <div
@@ -21,12 +23,12 @@ const StudentFallback: FC = () => (
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#F2F7F5',
+      background: '#F5F7FA',
     }}
   >
     <div style={{ textAlign: 'center' }}>
       <img src='/media/logos/kcc.jpg' alt='Career-9' style={{ height: 30, marginBottom: 20 }} />
-      <div style={{ color: '#5C7A72', fontSize: 14 }}>Loading ...</div>
+      <div style={{ color: '#6B7A8D', fontSize: 14 }}>Loading ...</div>
     </div>
   </div>
 )
@@ -110,7 +112,8 @@ const StudentRoutes: FC = () => {
             <Route path='dashboard' element={<StudentPortalDashboard />} />
             <Route path='assessments' element={<StudentAssessments />} />
             <Route path='reports' element={<StudentPortalDashboard />} />
-            <Route path='counselling' element={<StudentPortalDashboard />} />
+            <Route path='counselling' element={<StudentCounsellingPage />} />
+            <Route path='counselling/book' element={<SlotBookingPage />} />
           </Route>
         </Route>
 

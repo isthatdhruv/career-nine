@@ -79,6 +79,10 @@ export function AsideMenuMain() {
   const showOldDataMapping = allowed("/old-data-mapping");
   const showScoreDebug = allowed("/score-debug");
 
+  const showCounselling =
+    allowed("/admin/counselling-queue") || allowed("/admin/counsellors") ||
+    allowed("/counsellor/dashboard") || allowed("/counsellor/availability");
+
   return (
     <>
       <AsideMenuItem
@@ -654,6 +658,37 @@ export function AsideMenuMain() {
             title="Score Debug"
             fontIcon="bi-bug"
           />
+        </>
+      )}
+
+      {showCounselling && (
+        <>
+          <div className="menu-item">
+            <div className="menu-content pt-8 pb-2">
+              <span className="menu-section text-muted text-uppercase fs-8 ls-1">
+                Counselling
+              </span>
+            </div>
+          </div>
+          <AsideMenuItemWithSub
+            to="/counselling"
+            title="Counselling"
+            fontIcon="bi-app-indicator"
+            icon="/media/icons/duotune/general/gen049.svg"
+          >
+            {allowed("/admin/counselling-queue") && (
+              <AsideMenuItem to="/admin/counselling-queue" title="Request Queue" hasBullet={true} />
+            )}
+            {allowed("/admin/counsellors") && (
+              <AsideMenuItem to="/admin/counsellors" title="Manage Counsellors" hasBullet={true} />
+            )}
+            {allowed("/counsellor/dashboard") && (
+              <AsideMenuItem to="/counsellor/dashboard" title="My Schedule" hasBullet={true} />
+            )}
+            {allowed("/counsellor/availability") && (
+              <AsideMenuItem to="/counsellor/availability" title="My Availability" hasBullet={true} />
+            )}
+          </AsideMenuItemWithSub>
         </>
       )}
     </>

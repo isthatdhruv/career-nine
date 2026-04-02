@@ -67,7 +67,7 @@ const StudentListPanel: React.FC<StudentListPanelProps> = ({ selectedStudentId, 
           </div>
         ))}
         {filtered.length === 0 && (
-          <div style={{ padding: 20, textAlign: 'center', color: '#5C7A72', fontSize: 12 }}>
+          <div style={{ padding: 20, textAlign: 'center', color: '#6B7A8D', fontSize: 12 }}>
             No students found
           </div>
         )}

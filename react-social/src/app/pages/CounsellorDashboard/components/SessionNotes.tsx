@@ -14,7 +14,7 @@ const SessionNotes: React.FC = () => {
       {DEMO_NOTES.map((note, i) => (
         <div className='cp-note-item' key={i}>
           <div className='cp-note-meta'>
-            <span style={{ fontWeight: 600, color: '#084A3E' }}>{note.student}</span>
+            <span style={{ fontWeight: 600, color: '#263B6A' }}>{note.student}</span>
             <span>{note.date}</span>
           </div>
           <div className='cp-note-text'>{note.text}</div>

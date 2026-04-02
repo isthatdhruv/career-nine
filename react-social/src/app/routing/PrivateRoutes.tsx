@@ -215,6 +215,11 @@ const PrivateRoutes = () => {
   const UniversityResultDashboard = lazy(
     () => import("../pages/UniversityResult/UniversityResultDashboard")
   );
+  const CounsellorDashboardPage = lazy(() => import("../pages/Counselling/counsellor/CounsellorDashboardPage"));
+  const AvailabilityManagerPage = lazy(() => import("../pages/Counselling/counsellor/AvailabilityManagerPage"));
+  const SessionNotesPage = lazy(() => import("../pages/Counselling/counsellor/SessionNotesPage"));
+  const AdminCounsellingQueuePage = lazy(() => import("../pages/Counselling/admin/AdminCounsellingQueuePage"));
+  const CounsellorManagementPage = lazy(() => import("../pages/Counselling/admin/CounsellorManagementPage"));
   // const UniversityAllResultDashboard = lazy(
   //   () => import("../pages/UniversityResult/UniversityAllResultDashboard")
   // );
@@ -1005,6 +1010,47 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <ScoreDebugPage />
+            </SuspensedView>
+          }
+        />
+
+        <Route
+          path="/counsellor/dashboard"
+          element={
+            <SuspensedView>
+              <CounsellorDashboardPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/counsellor/availability"
+          element={
+            <SuspensedView>
+              <AvailabilityManagerPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/counsellor/session-notes/:id"
+          element={
+            <SuspensedView>
+              <SessionNotesPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/admin/counselling-queue"
+          element={
+            <SuspensedView>
+              <AdminCounsellingQueuePage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/admin/counsellors"
+          element={
+            <SuspensedView>
+              <CounsellorManagementPage />
             </SuspensedView>
           }
         />

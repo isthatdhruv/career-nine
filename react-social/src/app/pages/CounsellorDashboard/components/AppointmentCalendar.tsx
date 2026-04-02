@@ -13,7 +13,7 @@ const AppointmentCalendar: React.FC = () => {
   return (
     <div className='cp-card'>
       <div className='cp-card-title'>Today's Appointments</div>
-      <div style={{ fontSize: 12, color: '#5C7A72', marginBottom: 12 }}>{dateStr}</div>
+      <div style={{ fontSize: 12, color: '#6B7A8D', marginBottom: 12 }}>{dateStr}</div>
 
       {DEMO_APPOINTMENTS.map((appt, i) => (
         <div className='cp-appt-item' key={i}>

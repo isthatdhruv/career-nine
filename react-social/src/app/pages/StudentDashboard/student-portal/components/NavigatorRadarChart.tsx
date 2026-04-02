@@ -18,12 +18,12 @@ interface NavigatorRadarChartProps {
 }
 
 const PILLAR_COLORS: Record<string, string> = {
-  'Career Personality': '#0C6B5A',
-  'Learning Styles': '#36B37E',
+  'Career Personality': '#263B6A',
+  'Learning Styles': '#6984A9',
   Ability: '#3B82F6',
-  Values: '#F59E0B',
+  Values: '#A0D585',
   'Subjects Interest': '#7C3AED',
-  Aspirations: '#0891B2',
+  Aspirations: '#4A6FA5',
 }
 
 const NavigatorRadarChart: React.FC<NavigatorRadarChartProps> = ({ pillars }) => {
@@ -41,11 +41,11 @@ const NavigatorRadarChart: React.FC<NavigatorRadarChartProps> = ({ pillars }) =>
       <div style={{ width: '100%', height: 220, marginBottom: 16 }}>
         <ResponsiveContainer>
           <RadarChart data={radarData} cx='50%' cy='50%' outerRadius='70%'>
-            <PolarGrid stroke='#D1E5DF' />
+            <PolarGrid stroke='#DDE3EC' />
             {/* @ts-ignore */}
             <PolarAngleAxis
               dataKey='subject'
-              tick={{ fontSize: 11, fill: '#5C7A72' }}
+              tick={{ fontSize: 11, fill: '#6B7A8D' }}
             />
             <PolarRadiusAxis
               angle={90}
@@ -55,9 +55,9 @@ const NavigatorRadarChart: React.FC<NavigatorRadarChartProps> = ({ pillars }) =>
             />
             <Radar
               dataKey='value'
-              stroke='#0C6B5A'
-              fill='#0C6B5A'
-              fillOpacity={0.2}
+              stroke='#263B6A'
+              fill='#6984A9'
+              fillOpacity={0.25}
               strokeWidth={2}
             />
           </RadarChart>
@@ -66,7 +66,7 @@ const NavigatorRadarChart: React.FC<NavigatorRadarChartProps> = ({ pillars }) =>
 
       {/* Pillar Bars */}
       {pillars.map((pillar) => {
-        const color = PILLAR_COLORS[pillar.name] || '#0C6B5A'
+        const color = PILLAR_COLORS[pillar.name] || '#263B6A'
         return (
           <div className='sp-pillar-row' key={pillar.name}>
             <div className='sp-pillar-label'>{pillar.name}</div>

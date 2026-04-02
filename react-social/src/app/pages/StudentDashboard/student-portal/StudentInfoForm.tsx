@@ -107,11 +107,11 @@ const StudentInfoForm: React.FC = () => {
   if (!profile) return null
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F2F7F5' }}>
+    <div style={{ minHeight: '100vh', background: '#F5F7FA' }}>
       {/* Top bar */}
       <div
         style={{
-          background: '#084A3E',
+          background: '#263B6A',
           color: '#fff',
           padding: '0 20px',
           height: 56,
@@ -245,7 +245,7 @@ const StudentInfoForm: React.FC = () => {
                   fontWeight: 600,
                   borderRadius: 8,
                   border: 'none',
-                  background: submitting ? '#6B9E94' : '#084A3E',
+                  background: submitting ? '#6984A9' : '#263B6A',
                   color: '#fff',
                   cursor: submitting ? 'not-allowed' : 'pointer',
                 }}

@@ -1,18 +1,20 @@
 /* ── Student Portal Dashboard ── */
 :root {
-  --sp-primary: #0C6B5A;
-  --sp-primary-dark: #084A3E;
-  --sp-primary-light: #E0F2EE;
-  --sp-success: #36B37E;
-  --sp-accent: #F59E0B;
+  --sp-primary: #263B6A;
+  --sp-primary-dark: #1C2D52;
+  --sp-primary-light: #EEFABD;
+  --sp-secondary: #6984A9;
+  --sp-green: #A0D585;
+  --sp-cream: #EEFABD;
+  --sp-success: #A0D585;
+  --sp-accent: #6984A9;
   --sp-danger: #EF4444;
-  --sp-info: #3B82F6;
-  --sp-purple: #7C3AED;
-  --sp-bg: #F2F7F5;
+  --sp-info: #6984A9;
+  --sp-bg: #F5F7FA;
   --sp-card: #fff;
-  --sp-text: #1A2B28;
-  --sp-muted: #5C7A72;
-  --sp-border: #D1E5DF;
+  --sp-text: #1A1F2E;
+  --sp-muted: #6B7A8D;
+  --sp-border: #DDE3EC;
   --sp-radius: 12px;
 }
 
@@ -46,7 +48,7 @@
 
 /* ── Profile Header ── */
 .sp-profile-header {
-  background: linear-gradient(135deg, var(--sp-primary-dark), var(--sp-primary));
+  background: linear-gradient(135deg, #1C2D52, #263B6A, #354D7A);
   border-radius: var(--sp-radius);
   padding: 20px 24px;
   color: #fff;
@@ -61,7 +63,7 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -93,7 +95,7 @@
 }
 
 .sp-trait-tag {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.15);
   padding: 3px 10px;
   border-radius: 12px;
   font-size: 11px;
@@ -122,8 +124,8 @@
   justify-content: flex-end;
 }
 
-.sp-cci-high { color: #6EE7B7; }
-.sp-cci-medium { color: #FCD34D; }
+.sp-cci-high { color: #A0D585; }
+.sp-cci-medium { color: #EEFABD; }
 .sp-cci-low { color: #FCA5A5; }
 
 /* ── Cards ── */
@@ -132,7 +134,7 @@
   border: 1px solid var(--sp-border);
   border-radius: var(--sp-radius);
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   height: 100%;
 }
 
@@ -180,7 +182,7 @@
   text-align: right;
   font-size: 12px;
   font-weight: 600;
-  color: var(--sp-primary-dark);
+  color: var(--sp-primary);
 }
 
 /* ── Career Match Cards ── */
@@ -193,8 +195,8 @@
 }
 
 .sp-career-card:hover {
-  border-color: var(--sp-primary);
-  box-shadow: 0 2px 12px rgba(12, 107, 90, 0.1);
+  border-color: var(--sp-secondary);
+  box-shadow: 0 2px 12px rgba(38, 59, 106, 0.1);
 }
 
 .sp-career-rank {
@@ -203,9 +205,9 @@
   margin-bottom: 4px;
 }
 
-.sp-career-rank-best { color: #059669; }
-.sp-career-rank-strong { color: var(--sp-info); }
-.sp-career-rank-good { color: var(--sp-accent); }
+.sp-career-rank-best { color: #263B6A; }
+.sp-career-rank-strong { color: #6984A9; }
+.sp-career-rank-good { color: #A0D585; }
 
 .sp-career-name {
   font-size: 15px;
@@ -227,8 +229,8 @@
 }
 
 .sp-career-tag {
-  background: var(--sp-primary-light);
-  color: var(--sp-primary-dark);
+  background: rgba(105, 132, 169, 0.12);
+  color: var(--sp-primary);
   padding: 2px 8px;
   border-radius: 8px;
   font-size: 10px;
@@ -333,32 +335,32 @@
 }
 
 .sp-report-btn-outline {
-  background: var(--sp-primary-light);
-  color: var(--sp-primary-dark);
+  background: rgba(105, 132, 169, 0.1);
+  color: var(--sp-primary);
   border: 1px solid var(--sp-border);
 }
 
 .sp-report-btn-outline:hover {
-  background: #c5e6dd;
+  background: rgba(105, 132, 169, 0.2);
 }
 
 .sp-report-btn-share {
-  background: var(--sp-success);
+  background: var(--sp-secondary);
   color: #fff;
 }
 
 .sp-report-btn-share:hover {
-  background: #2d9d6c;
+  background: #5A7594;
 }
 
 /* ── Insight Box ── */
 .sp-insight {
-  background: var(--sp-primary-light);
-  border: 1px solid rgba(12, 107, 90, 0.2);
+  background: rgba(238, 250, 189, 0.35);
+  border: 1px solid rgba(238, 250, 189, 0.7);
   border-radius: 8px;
   padding: 12px 14px;
   font-size: 12px;
-  color: var(--sp-primary-dark);
+  color: var(--sp-primary);
   display: flex;
   gap: 8px;
   align-items: flex-start;

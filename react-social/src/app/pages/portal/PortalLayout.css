@@ -1,14 +1,14 @@
 /* ── Portal Shared Layout ── */
 .portal-wrapper {
   min-height: 100vh;
-  background: #F2F7F5;
+  background: #F5F7FA;
   display: flex;
   flex-direction: column;
 }
 
 /* ── Top Bar ── */
 .portal-topbar {
-  background: #084A3E;
+  background: #263B6A;
   color: #fff;
   padding: 0 20px;
   height: 56px;
@@ -84,7 +84,7 @@
 .portal-aside {
   width: 240px;
   background: #fff;
-  border-right: 1px solid #D1E5DF;
+  border-right: 1px solid #DDE3EC;
   padding: 16px 0;
   flex-shrink: 0;
   transition: width 0.2s ease;
@@ -108,7 +108,7 @@
   gap: 12px;
   padding: 10px 12px;
   border-radius: 8px;
-  color: #5C7A72;
+  color: #6B7A8D;
   text-decoration: none;
   font-size: 13px;
   font-weight: 500;
@@ -118,13 +118,13 @@
 }
 
 .portal-aside-item:hover {
-  background: #E0F2EE;
-  color: #084A3E;
+  background: rgba(105, 132, 169, 0.1);
+  color: #263B6A;
 }
 
 .portal-aside-item.active {
-  background: #E0F2EE;
-  color: #0C6B5A;
+  background: rgba(105, 132, 169, 0.14);
+  color: #263B6A;
   font-weight: 600;
 }
 
