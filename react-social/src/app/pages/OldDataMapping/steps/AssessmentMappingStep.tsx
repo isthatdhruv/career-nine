@@ -31,9 +31,6 @@ export interface StudentAssignment {
   instituteName: string;
   assessmentId: number;
   assessmentName: string;
-  abilityScores?: Record<string, number>;
-  multipleIntelligenceScores?: Record<string, number>;
-  personalityScores?: Record<string, number>;
   abilityDetailedResponses?: DetailedResponse[];
   multipleIntelligenceResponses?: DetailedResponse[];
   personalityDetailedResponses?: DetailedResponse[];
@@ -57,9 +54,6 @@ interface FirebaseUser {
     studentClass?: string;
     section?: string;
   };
-  abilityScores?: Record<string, number>;
-  multipleIntelligenceScores?: Record<string, number>;
-  personalityScores?: Record<string, number>;
   abilityDetailedResponses?: DetailedResponse[];
   multipleIntelligenceResponses?: DetailedResponse[];
   personalityDetailedResponses?: DetailedResponse[];
@@ -624,9 +618,6 @@ const AssessmentMappingStep = ({
           instituteName: selectedInstitute.instituteName,
           assessmentId: assessment.id,
           assessmentName: assessment.AssessmentName,
-          abilityScores: user.abilityScores,
-          multipleIntelligenceScores: user.multipleIntelligenceScores,
-          personalityScores: user.personalityScores,
           abilityDetailedResponses: user.abilityDetailedResponses,
           multipleIntelligenceResponses: user.multipleIntelligenceResponses,
           personalityDetailedResponses: user.personalityDetailedResponses,

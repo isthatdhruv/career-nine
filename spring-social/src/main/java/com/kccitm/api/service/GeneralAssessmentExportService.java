@@ -24,6 +24,7 @@ import com.kccitm.api.model.career9.school.SchoolSections;
 import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.School.SchoolSectionsRepository;
+import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 
 @Service
@@ -35,6 +36,7 @@ public class GeneralAssessmentExportService {
     @Autowired private AssessmentAnswerRepository answerRepository;
     @Autowired private StudentAssessmentMappingRepository mappingRepository;
     @Autowired private SchoolSectionsRepository schoolSectionsRepository;
+    @Autowired private QuestionnaireQuestionRepository questionnaireQuestionRepository;
 
     private static final int DEMO_COLS = 5;
 
@@ -64,9 +66,11 @@ public class GeneralAssessmentExportService {
     @Transactional(readOnly = true)
     public byte[] exportToOldFormat(Long assessmentId, Long userStudentId) throws Exception {
 
-        // ── 1. Validate assessment ──────────────────────────────────
-        assessmentTableRepository.findById(assessmentId)
+        // ── 1. Validate assessment and get questionnaire ──────────────
+        AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
                 .orElseThrow(() -> new RuntimeException("Assessment not found: " + assessmentId));
+        Long questionnaireId = (assessment.getQuestionnaire() != null)
+                ? assessment.getQuestionnaire().getQuestionnaireId() : null;
 
         // ── 2. Load target students ─────────────────────────────────
         List<StudentAssessmentMapping> targetStudents;
@@ -89,35 +93,81 @@ public class GeneralAssessmentExportService {
         List<AssessmentAnswer> allAnswers = answerRepository.findAllByAssessmentIdForExport(assessmentId);
         logger.info("Loaded {} answers for assessment {}", allAnswers.size(), assessmentId);
 
-        // ── 4. Discover sections from answers ───────────────────────
+        // ── 4. Discover sections from QUESTIONNAIRE (not answers) ────
+        // This ensures all options are present even if no student selected them,
+        // so position-based label derivation (A/B/C/D, YES/NO) is always correct.
         Map<Long, QuestionnaireSection> sectionById = new LinkedHashMap<>();
         Map<Long, Set<Long>> sectionUniqueQQIds = new LinkedHashMap<>();
         Map<Long, Map<Long, Set<Long>>> sectionQQOptions = new LinkedHashMap<>();
-        Map<Long, String> optionIdToText = new LinkedHashMap<>(); // optionId → option text (for text-based fallback)
+        Map<Long, String> optionIdToText = new LinkedHashMap<>();
 
-        for (AssessmentAnswer a : allAnswers) {
-            if (a.getQuestionnaireQuestion() == null) continue;
-            QuestionnaireQuestion qq = a.getQuestionnaireQuestion();
-            QuestionnaireSection sec = qq.getSection();
-            if (sec == null) continue;
+        if (questionnaireId != null) {
+            List<QuestionnaireQuestion> allQQs = questionnaireQuestionRepository
+                    .findByQuestionnaireIdWithOptions(questionnaireId);
+            for (QuestionnaireQuestion qq : allQQs) {
+                QuestionnaireSection sec = qq.getSection();
+                if (sec == null) continue;
 
-            Long secId = sec.getQuestionnaireSectionId();
-            sectionById.putIfAbsent(secId, sec);
-            sectionUniqueQQIds.computeIfAbsent(secId, k -> new TreeSet<>())
-                    .add(qq.getQuestionnaireQuestionId());
+                Long secId = sec.getQuestionnaireSectionId();
+                sectionById.putIfAbsent(secId, sec);
+                sectionUniqueQQIds.computeIfAbsent(secId, k -> new TreeSet<>())
+                        .add(qq.getQuestionnaireQuestionId());
 
-            if (a.getOption() != null) {
-                sectionQQOptions
-                        .computeIfAbsent(secId, k -> new LinkedHashMap<>())
-                        .computeIfAbsent(qq.getQuestionnaireQuestionId(), k -> new TreeSet<>())
-                        .add(a.getOption().getOptionId());
-                optionIdToText.putIfAbsent(a.getOption().getOptionId(), safe(a.getOption().getOptionText()));
+                if (qq.getQuestion() != null && qq.getQuestion().getOptions() != null) {
+                    for (AssessmentQuestionOptions opt : qq.getQuestion().getOptions()) {
+                        sectionQQOptions
+                                .computeIfAbsent(secId, k -> new LinkedHashMap<>())
+                                .computeIfAbsent(qq.getQuestionnaireQuestionId(), k -> new TreeSet<>())
+                                .add(opt.getOptionId());
+                        optionIdToText.putIfAbsent(opt.getOptionId(), safe(opt.getOptionText()));
+                    }
+                }
+            }
+        }
+
+        // Fallback: if no questionnaire linked, discover from answers (legacy behavior)
+        if (sectionById.isEmpty()) {
+            for (AssessmentAnswer a : allAnswers) {
+                if (a.getQuestionnaireQuestion() == null) continue;
+                QuestionnaireQuestion qq = a.getQuestionnaireQuestion();
+                QuestionnaireSection sec = qq.getSection();
+                if (sec == null) continue;
+
+                Long secId = sec.getQuestionnaireSectionId();
+                sectionById.putIfAbsent(secId, sec);
+                sectionUniqueQQIds.computeIfAbsent(secId, k -> new TreeSet<>())
+                        .add(qq.getQuestionnaireQuestionId());
+
+                if (a.getOption() != null) {
+                    sectionQQOptions
+                            .computeIfAbsent(secId, k -> new LinkedHashMap<>())
+                            .computeIfAbsent(qq.getQuestionnaireQuestionId(), k -> new TreeSet<>())
+                            .add(a.getOption().getOptionId());
+                    optionIdToText.putIfAbsent(a.getOption().getOptionId(), safe(a.getOption().getOptionText()));
+                }
             }
         }
 
         List<QuestionnaireSection> sortedSections = sectionById.values().stream()
                 .sorted(Comparator.comparingInt(s -> parseInt(s.getOrder())))
                 .collect(Collectors.toList());
+
+        // Build a QQ lookup map for ordering (works with questionnaire-sourced data)
+        Map<Long, QuestionnaireQuestion> qqById = new LinkedHashMap<>();
+        if (questionnaireId != null) {
+            List<QuestionnaireQuestion> allQQsList = questionnaireQuestionRepository
+                    .findByQuestionnaireIdWithOptions(questionnaireId);
+            for (QuestionnaireQuestion qq : allQQsList) {
+                qqById.put(qq.getQuestionnaireQuestionId(), qq);
+            }
+        }
+        // Also index from answers as fallback
+        for (AssessmentAnswer a : allAnswers) {
+            if (a.getQuestionnaireQuestion() != null) {
+                qqById.putIfAbsent(a.getQuestionnaireQuestion().getQuestionnaireQuestionId(),
+                        a.getQuestionnaireQuestion());
+            }
+        }
 
         // ── 5. Build headers + column mappings ──────────────────────
         List<String> headers = new ArrayList<>(Arrays.asList(
@@ -148,7 +198,6 @@ public class GeneralAssessmentExportService {
                     int col = colOffset++;
                     headers.add("Sec_" + letter + "_" + (j + 1));
                     sm.optionIdToCol.put(optId, col);
-                    // Build text-based fallback map for answers stored without optionId
                     String optText = optionIdToText.get(optId);
                     if (optText != null && !optText.isEmpty()) {
                         sm.textToCol.put(optText.toLowerCase().trim(), col);
@@ -160,8 +209,8 @@ public class GeneralAssessmentExportService {
 
                 List<Long> sortedQQIds = uniqueQQIds.stream()
                         .sorted((a2, b) -> {
-                            QuestionnaireQuestion qqA = findQQ(allAnswers, a2);
-                            QuestionnaireQuestion qqB = findQQ(allAnswers, b);
+                            QuestionnaireQuestion qqA = qqById.get(a2);
+                            QuestionnaireQuestion qqB = qqById.get(b);
                             return Integer.compare(
                                     parseInt(qqA != null ? qqA.getOrder() : "0"),
                                     parseInt(qqB != null ? qqB.getOrder() : "0"));
@@ -330,16 +379,6 @@ public class GeneralAssessmentExportService {
             }
         }
         return text;
-    }
-
-    private QuestionnaireQuestion findQQ(List<AssessmentAnswer> answers, Long qqId) {
-        for (AssessmentAnswer a : answers) {
-            if (a.getQuestionnaireQuestion() != null
-                    && qqId.equals(a.getQuestionnaireQuestion().getQuestionnaireQuestionId())) {
-                return a.getQuestionnaireQuestion();
-            }
-        }
-        return null;
     }
 
     private static int parseInt(String s) {

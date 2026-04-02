@@ -335,6 +335,32 @@ public class FirebaseDataMappingController {
         }
     }
 
+    @Transactional
+    @PostMapping("/force-complete-status")
+    public ResponseEntity<?> forceCompleteStatus(@RequestBody List<Map<String, Object>> payload) {
+        try {
+            int updated = 0;
+            for (Map<String, Object> item : payload) {
+                Long userStudentId = getLong(item, "userStudentId");
+                Long assessmentId = getLong(item, "assessmentId");
+                if (userStudentId == null || assessmentId == null) continue;
+
+                Optional<StudentAssessmentMapping> samOpt = studentAssessmentMappingRepository
+                        .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+                if (samOpt.isPresent()) {
+                    StudentAssessmentMapping sam = samOpt.get();
+                    sam.setStatus("completed");
+                    studentAssessmentMappingRepository.save(sam);
+                    updated++;
+                }
+            }
+            return ResponseEntity.ok(Map.of("updated", updated));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<?> deleteMapping(@PathVariable("id") Long id) {
         Optional<FirebaseDataMapping> opt = firebaseDataMappingRepository.findById(id);

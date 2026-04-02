@@ -16,9 +16,12 @@ import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.Questionaire.AssessmentAnswer;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
 import com.kccitm.api.model.career9.Questionaire.QuestionnaireSection;
+import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
+import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.NavigatorReportDataRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
+import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 
 @Service
@@ -30,6 +33,8 @@ public class NavigatorReportGenerationService {
     @Autowired private UserStudentRepository userStudentRepository;
     @Autowired private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
     @Autowired private AssessmentAnswerRepository assessmentAnswerRepository;
+    @Autowired private AssessmentTableRepository assessmentTableRepository;
+    @Autowired private QuestionnaireQuestionRepository questionnaireQuestionRepository;
     @Autowired private NavigatorCoreAnalysis coreAnalysis;
     @Autowired private NavigatorAISummaryService aiSummaryService;
 
@@ -124,31 +129,66 @@ public class NavigatorReportGenerationService {
         String studentSchool = (us.getInstitute() != null && us.getInstitute().getInstituteName() != null)
                 ? us.getInstitute().getInstituteName() : "";
 
-        // ── 1. Load ALL answers for section structure discovery ──
+        // ── 1. Load ALL answers for student data ──
         List<AssessmentAnswer> allAnswers = assessmentAnswerRepository
                 .findAllByAssessmentIdForExport(assessmentId);
 
-        // ── 2. Discover section structure (same logic as GeneralAssessmentExportService) ──
+        // ── 2. Discover section structure from QUESTIONNAIRE (not answers) ──
+        // This ensures all options are present for correct position-based label derivation.
         Map<Long, QuestionnaireSection> sectionById = new LinkedHashMap<>();
         Map<Long, Set<Long>> sectionUniqueQQIds = new LinkedHashMap<>();
         Map<Long, Map<Long, Set<Long>>> sectionQQOptions = new LinkedHashMap<>();
+        Map<Long, QuestionnaireQuestion> qqById = new LinkedHashMap<>();
 
-        for (AssessmentAnswer a : allAnswers) {
-            if (a.getQuestionnaireQuestion() == null) continue;
-            QuestionnaireQuestion qq = a.getQuestionnaireQuestion();
-            QuestionnaireSection sec = qq.getSection();
-            if (sec == null) continue;
+        // Get questionnaire ID from assessment
+        AssessmentTable assessmentEntity = assessmentTableRepository.findById(assessmentId).orElse(null);
+        Long questionnaireId = (assessmentEntity != null && assessmentEntity.getQuestionnaire() != null)
+                ? assessmentEntity.getQuestionnaire().getQuestionnaireId() : null;
 
-            Long secId = sec.getQuestionnaireSectionId();
-            sectionById.putIfAbsent(secId, sec);
-            sectionUniqueQQIds.computeIfAbsent(secId, k -> new TreeSet<>())
-                    .add(qq.getQuestionnaireQuestionId());
+        if (questionnaireId != null) {
+            List<QuestionnaireQuestion> allQQs = questionnaireQuestionRepository
+                    .findByQuestionnaireIdWithOptions(questionnaireId);
+            for (QuestionnaireQuestion qq : allQQs) {
+                QuestionnaireSection sec = qq.getSection();
+                if (sec == null) continue;
 
-            if (a.getOption() != null) {
-                sectionQQOptions
-                        .computeIfAbsent(secId, k -> new LinkedHashMap<>())
-                        .computeIfAbsent(qq.getQuestionnaireQuestionId(), k -> new TreeSet<>())
-                        .add(a.getOption().getOptionId());
+                Long secId = sec.getQuestionnaireSectionId();
+                sectionById.putIfAbsent(secId, sec);
+                sectionUniqueQQIds.computeIfAbsent(secId, k -> new TreeSet<>())
+                        .add(qq.getQuestionnaireQuestionId());
+                qqById.put(qq.getQuestionnaireQuestionId(), qq);
+
+                if (qq.getQuestion() != null && qq.getQuestion().getOptions() != null) {
+                    for (AssessmentQuestionOptions opt : qq.getQuestion().getOptions()) {
+                        sectionQQOptions
+                                .computeIfAbsent(secId, k -> new LinkedHashMap<>())
+                                .computeIfAbsent(qq.getQuestionnaireQuestionId(), k -> new TreeSet<>())
+                                .add(opt.getOptionId());
+                    }
+                }
+            }
+        }
+
+        // Fallback: if no questionnaire linked, discover from answers (legacy behavior)
+        if (sectionById.isEmpty()) {
+            for (AssessmentAnswer a : allAnswers) {
+                if (a.getQuestionnaireQuestion() == null) continue;
+                QuestionnaireQuestion qq = a.getQuestionnaireQuestion();
+                QuestionnaireSection sec = qq.getSection();
+                if (sec == null) continue;
+
+                Long secId = sec.getQuestionnaireSectionId();
+                sectionById.putIfAbsent(secId, sec);
+                sectionUniqueQQIds.computeIfAbsent(secId, k -> new TreeSet<>())
+                        .add(qq.getQuestionnaireQuestionId());
+                qqById.putIfAbsent(qq.getQuestionnaireQuestionId(), qq);
+
+                if (a.getOption() != null) {
+                    sectionQQOptions
+                            .computeIfAbsent(secId, k -> new LinkedHashMap<>())
+                            .computeIfAbsent(qq.getQuestionnaireQuestionId(), k -> new TreeSet<>())
+                            .add(a.getOption().getOptionId());
+                }
             }
         }
 
@@ -173,8 +213,8 @@ public class NavigatorReportGenerationService {
             // Sort question IDs by their order within the section
             List<Long> sortedQQIds = uniqueQQIds.stream()
                     .sorted((a2, b) -> {
-                        QuestionnaireQuestion qqA = findQQ(allAnswers, a2);
-                        QuestionnaireQuestion qqB = findQQ(allAnswers, b);
+                        QuestionnaireQuestion qqA = qqById.get(a2);
+                        QuestionnaireQuestion qqB = qqById.get(b);
                         return Integer.compare(
                                 parseInt(qqA != null ? qqA.getOrder() : "0"),
                                 parseInt(qqB != null ? qqB.getOrder() : "0"));
@@ -553,7 +593,7 @@ public class NavigatorReportGenerationService {
                 Long qqId = sm.sortedQQIds.get(qIdx);
                 String letter = RIASEC_LETTERS[qIdx % 6];
 
-                String answerLabel = getStudentAnswerLabel(studentAnswers, qqId, allAnswers);
+                String answerLabel = getStudentAnswerLabel(studentAnswers, qqId, sm.qqOptions);
                 int weight;
                 if ("YES".equalsIgnoreCase(answerLabel) || "Y".equalsIgnoreCase(answerLabel)) {
                     weight = 2;
@@ -585,7 +625,7 @@ public class NavigatorReportGenerationService {
                 int abilityIdx = qIdx % 10;
                 if (abilityIdx >= APTITUDE_NAMES.length) continue;
 
-                String answerLabel = getStudentAnswerLabel(studentAnswers, qqId, allAnswers);
+                String answerLabel = getStudentAnswerLabel(studentAnswers, qqId, sm.qqOptions);
                 int weight = aptitudeWeight(answerLabel);
                 scores.merge(APTITUDE_NAMES[abilityIdx], weight, Integer::sum);
             }
@@ -623,7 +663,7 @@ public class NavigatorReportGenerationService {
                 int miIdx = qIdx / 3;
                 if (miIdx >= MI_NAMES.length) continue;
 
-                String answerLabel = getStudentAnswerLabel(studentAnswers, qqId, allAnswers);
+                String answerLabel = getStudentAnswerLabel(studentAnswers, qqId, sm.qqOptions);
                 int weight = miWeight(answerLabel);
                 scores.merge(MI_NAMES[miIdx], weight, Integer::sum);
             }
@@ -649,7 +689,7 @@ public class NavigatorReportGenerationService {
      * Uses the same deriveLabel logic as GeneralAssessmentExportService.
      */
     private String getStudentAnswerLabel(List<AssessmentAnswer> studentAnswers,
-            Long qqId, List<AssessmentAnswer> allAnswers) {
+            Long qqId, Map<Long, Set<Long>> qqOptions) {
         for (AssessmentAnswer a : studentAnswers) {
             if (a.getQuestionnaireQuestion() == null || a.getOption() == null) continue;
             if (!a.getQuestionnaireQuestion().getQuestionnaireQuestionId().equals(qqId)) continue;
@@ -662,16 +702,10 @@ public class NavigatorReportGenerationService {
                 return text.toUpperCase();
             }
 
-            // Derive label from option position: scan all answers to find all
-            // unique option IDs for this question, sort by ID, then map position
-            Set<Long> allOptIdsForQuestion = new TreeSet<>();
-            for (AssessmentAnswer aa : allAnswers) {
-                if (aa.getQuestionnaireQuestion() == null || aa.getOption() == null) continue;
-                if (aa.getQuestionnaireQuestion().getQuestionnaireQuestionId().equals(qqId)) {
-                    allOptIdsForQuestion.add(aa.getOption().getOptionId());
-                }
-            }
-            List<Long> sortedOptions = new ArrayList<>(allOptIdsForQuestion);
+            // Derive label from option position using questionnaire-defined options
+            // (all options present, not just those selected by students)
+            Set<Long> allOptIds = qqOptions.getOrDefault(qqId, Collections.emptySet());
+            List<Long> sortedOptions = new ArrayList<>(new TreeSet<>(allOptIds));
 
             int idx = sortedOptions.indexOf(option.getOptionId());
             if (idx >= 0) {
@@ -687,16 +721,6 @@ public class NavigatorReportGenerationService {
     }
 
     // ═══════════════════════ HELPERS ═══════════════════════
-
-    private QuestionnaireQuestion findQQ(List<AssessmentAnswer> answers, Long qqId) {
-        for (AssessmentAnswer a : answers) {
-            if (a.getQuestionnaireQuestion() != null
-                    && qqId.equals(a.getQuestionnaireQuestion().getQuestionnaireQuestionId())) {
-                return a.getQuestionnaireQuestion();
-            }
-        }
-        return null;
-    }
 
     private static int parseInt(String s) {
         if (s == null || s.trim().isEmpty()) return 0;

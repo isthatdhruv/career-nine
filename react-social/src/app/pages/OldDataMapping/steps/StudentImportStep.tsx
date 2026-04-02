@@ -1,27 +1,17 @@
 import { useState } from "react";
 import {
   importStudents,
-  importScores,
 } from "../API/OldDataMapping_APIs";
 import type { StudentAssignment } from "./AssessmentMappingStep";
 
-interface ScoreTypeMapping {
-  firebaseKey: string;
-  category: string;
-  measuredQualityTypeId: number | null;
-  measuredQualityTypeName: string;
-}
-
 interface Props {
   studentAssignments: StudentAssignment[];
-  scoreTypeMappings: ScoreTypeMapping[];
   onDone: (results: any) => void;
   onBack: () => void;
 }
 
 const StudentImportStep = ({
   studentAssignments,
-  scoreTypeMappings,
   onDone,
   onBack,
 }: Props) => {
@@ -53,10 +43,8 @@ const StudentImportStep = ({
     setError("");
 
     let studentsImported = 0;
-    let scoresImported = 0;
     const errors: string[] = [];
     const importedStudentDetails: { name: string; email: string; grade: string; school: string; firebaseDocId: string }[] = [];
-    const importedScoreDetails: { studentName: string; category: string; scoreCount: number }[] = [];
 
     try {
       // Step 1: Import Students
@@ -107,81 +95,16 @@ const StudentImportStep = ({
         );
       }
 
-      setProgress(40);
-
-      // Step 2: Import Scores
-      setStatusMessage("Importing assessment scores...");
-
-      const validScoreMappings = scoreTypeMappings.filter(
-        (m) => m.measuredQualityTypeId !== null
-      );
-
-      type ScoreField = "abilityScores" | "multipleIntelligenceScores" | "personalityScores";
-      const categoryToScoreField: Record<string, ScoreField> = {
-        ability: "abilityScores",
-        multipleIntelligence: "multipleIntelligenceScores",
-        personality: "personalityScores",
-      };
-
-      const scorePayloads: any[] = [];
-      studentAssignments.forEach((sa) => {
-        const userStudentId = studentResultsMap[sa.firebaseDocId];
-        if (!userStudentId) return;
-
-        // Single assessmentId for all score categories
-        const assessmentId = sa.assessmentId;
-
-        const categories = new Set(validScoreMappings.map((m) => m.category));
-        categories.forEach((cat) => {
-          const scoreFieldName = categoryToScoreField[cat];
-          const userScores = scoreFieldName ? sa[scoreFieldName] : null;
-          if (!userScores || typeof userScores !== "object") return;
-
-          const scoreMap: Record<string, number> = {};
-          validScoreMappings
-            .filter((m) => m.category === cat)
-            .forEach((mapping) => {
-              const val = userScores[mapping.firebaseKey];
-              if (val !== undefined && val !== null) {
-                scoreMap[String(mapping.measuredQualityTypeId)] = Number(val);
-              }
-            });
-
-          if (Object.keys(scoreMap).length > 0) {
-            scorePayloads.push({ userStudentId, assessmentId, scoreMap });
-            importedScoreDetails.push({
-              studentName: sa.name,
-              category: cat,
-              scoreCount: Object.keys(scoreMap).length,
-            });
-          }
-        });
-      });
-
-      if (scorePayloads.length > 0) {
-        try {
-          const scoreRes = await importScores({ scores: scorePayloads });
-          scoresImported = scoreRes.data?.scoresImported ?? 0;
-        } catch (err: any) {
-          errors.push(
-            "Score import error: " +
-              (err?.response?.data?.message || err?.message || "Unknown error")
-          );
-        }
-      }
-
       setProgress(100);
       setStatusMessage("Import complete!");
 
       const results = {
         studentsCreated: studentsImported,
         studentsSkipped: studentAssignments.length - studentsImported,
-        scoresImported,
         totalUsers: studentAssignments.length,
         errors,
         results: apiResults,
         studentDetails: importedStudentDetails,
-        scoreDetails: importedScoreDetails,
       };
 
       setImportResults(results);
@@ -253,10 +176,6 @@ const StudentImportStep = ({
             <li>
               Students created:{" "}
               <strong>{importResults.studentsCreated}</strong>
-            </li>
-            <li>
-              Score records imported:{" "}
-              <strong>{importResults.scoresImported}</strong>
             </li>
             <li>
               Questionnaire answers (career, subjects, values):{" "}
