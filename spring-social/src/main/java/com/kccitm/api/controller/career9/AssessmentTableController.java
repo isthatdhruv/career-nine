@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -153,6 +154,17 @@ public class AssessmentTableController {
     @GetMapping("/get/list")
     public List<AssessmentTable> getAllAssessment() {
         return assessmentTableRepository.findByIsDeletedFalseOrIsDeletedIsNull();
+    }
+
+    @GetMapping("/get/by-institute/{instituteCode}")
+    public ResponseEntity<List<AssessmentTable>> getAssessmentsByInstitute(@PathVariable Integer instituteCode) {
+        List<Long> assessmentIds = studentAssessmentMappingRepository
+                .findDistinctAssessmentIdsByInstituteCode(instituteCode);
+        if (assessmentIds.isEmpty()) {
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+        List<AssessmentTable> assessments = assessmentTableRepository.findAllById(assessmentIds);
+        return ResponseEntity.ok(assessments);
     }
 
     @GetMapping("/{id}")

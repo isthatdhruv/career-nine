@@ -47,11 +47,22 @@ interface Props {
 
 const categoryLabels: Record<string, string> = {
   ability: "Ability",
-  multipleIntelligence: "Multiple Intelligence",
+  multipleintelligence: "Multiple Intelligence",
   personality: "Personality",
-  careerAspiration: "Career Aspiration",
-  subjectOfInterest: "Subject of Interest",
-  value: "Values",
+  careeraspirations: "Career Aspirations",
+  subjectofinterest: "Subject of Interest",
+  values: "Values",
+};
+
+// Normalize old DB keys (camelCase) to new lowercase keys
+const normalizeCategoryKey = (key: string): string => {
+  const mapping: Record<string, string> = {
+    multipleIntelligence: "multipleintelligence",
+    careerAspiration: "careeraspirations",
+    subjectOfInterest: "subjectofinterest",
+    value: "values",
+  };
+  return mapping[key] || key;
 };
 
 const ExistingMappingView = ({ onBack }: Props) => {
@@ -103,15 +114,16 @@ const ExistingMappingView = ({ onBack }: Props) => {
           return;
         }
 
-        // Group by firebaseQuestion + category
+        // Group by firebaseQuestion + category (normalize old DB keys)
         const groupMap = new Map<string, GroupedMapping>();
         saved.forEach((s) => {
-          const key = `${s.category}::${s.firebaseQuestion}`;
+          const cat = normalizeCategoryKey(s.category);
+          const key = `${cat}::${s.firebaseQuestion}`;
           if (!groupMap.has(key)) {
             const sq = systemQuestions.find((q) => q.questionId === s.systemQuestionId);
             groupMap.set(key, {
               firebaseQuestion: s.firebaseQuestion,
-              category: s.category,
+              category: cat,
               systemQuestionId: s.systemQuestionId,
               systemQuestionText: sq?.questionText || "",
               answerMappings: [],
@@ -132,8 +144,8 @@ const ExistingMappingView = ({ onBack }: Props) => {
         const grouped = Array.from(groupMap.values());
         setMappings(grouped);
         if (grouped.length > 0) {
-          const cats = ["ability", "multipleIntelligence", "personality", "careerAspiration", "subjectOfInterest", "value"];
-          setActiveCategory(cats.find((c) => grouped.some((m) => m.category === c)) || "ability");
+          const cats = Object.keys(categoryLabels);
+          setActiveCategory(cats.find((c) => grouped.some((m) => m.category === c)) || grouped[0]?.category || "ability");
         }
       })
       .catch(() => setError("Failed to load mappings"))
@@ -382,10 +394,9 @@ const ExistingMappingView = ({ onBack }: Props) => {
                   </div>
 
                   {/* Category tabs */}
-                  <div className="d-flex gap-2 mb-3">
-                    {Object.entries(categoryLabels).map(([key, label]) => {
-                      const counts = categoryCounts[key];
-                      if (!counts) return null;
+                  <div className="d-flex gap-2 mb-3 flex-wrap">
+                    {Object.entries(categoryCounts).map(([key, counts]) => {
+                      const label = categoryLabels[key] || key.charAt(0).toUpperCase() + key.slice(1);
                       return (
                         <button
                           key={key}

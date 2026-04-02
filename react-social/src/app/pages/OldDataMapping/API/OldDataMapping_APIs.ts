@@ -86,19 +86,15 @@ export function importStudents(payload: any) {
   return axios.post(`${API_URL}/firebase-mapping/import-students`, payload);
 }
 
-// Import assessment raw scores
-export function importScores(payload: any) {
-  return axios.post(`${API_URL}/firebase-mapping/import-scores`, payload);
-}
-
-// Import extra data (career aspirations, subjects, values)
-export function importExtraData(payload: any) {
-  return axios.post(`${API_URL}/firebase-mapping/import-extra-data`, payload);
-}
 
 // Import mapped question-answer pairs as AssessmentAnswer records
 export function importMappedAnswers(payload: { userStudentId: number; assessmentId: number; answers: { questionId: number | null; optionId: number | null; textResponse: string }[] }) {
   return axios.post(`${API_URL}/firebase-mapping/import-mapped-answers`, payload);
+}
+
+// Force-complete status for partial students
+export function forceCompleteStatus(payload: { userStudentId: number; assessmentId: number }[]) {
+  return axios.post(`${API_URL}/firebase-mapping/force-complete-status`, payload);
 }
 
 // Question mapping persistence
@@ -123,8 +119,8 @@ export function getAllAssessments() {
   return axios.get(`${API_URL}/assessments/get/list`);
 }
 
-export function getAllMeasuredQualityTypes() {
-  return axios.get(`${API_URL}/measured-quality-types/getAll`);
+export function getAssessmentsByInstitute(instituteCode: number) {
+  return axios.get(`${API_URL}/assessments/get/by-institute/${instituteCode}`);
 }
 
 export function getAllAssessmentQuestions() {

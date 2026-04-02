@@ -630,14 +630,14 @@ export function AsideMenuMain() {
           <div className="menu-item">
             <div className="menu-content pt-8 pb-2">
               <span className="menu-section text-muted text-uppercase fs-8 ls-1">
-                Old Assessment Mapping
+                Firebase Data Mapping
               </span>
             </div>
           </div>
           <AsideMenuItem
             to="/old-data-mapping"
             icon="/media/icons/duotune/general/gen022.svg"
-            title="Old Assessment Mapping"
+            title="Firebase Data Mapping"
             fontIcon="bi-arrow-left-right"
           />
         </>

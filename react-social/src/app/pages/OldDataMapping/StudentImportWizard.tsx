@@ -254,7 +254,6 @@ const StudentImportWizard = ({ onBack }: Props) => {
               {currentStep === 1 && (
                 <StudentImportStep
                   studentAssignments={studentAssignments}
-                  scoreTypeMappings={[]}
                   onDone={handleImportDone}
                   onBack={() => setCurrentStep(0)}
                 />

@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import {
   getAllAssessments,
+  getAssessmentsByInstitute,
   fetchFirebaseUserData,
   fetchFirebaseSchoolData,
   getAllInstitutes,
@@ -31,9 +32,6 @@ export interface StudentAssignment {
   instituteName: string;
   assessmentId: number;
   assessmentName: string;
-  abilityScores?: Record<string, number>;
-  multipleIntelligenceScores?: Record<string, number>;
-  personalityScores?: Record<string, number>;
   abilityDetailedResponses?: DetailedResponse[];
   multipleIntelligenceResponses?: DetailedResponse[];
   personalityDetailedResponses?: DetailedResponse[];
@@ -57,9 +55,6 @@ interface FirebaseUser {
     studentClass?: string;
     section?: string;
   };
-  abilityScores?: Record<string, number>;
-  multipleIntelligenceScores?: Record<string, number>;
-  personalityScores?: Record<string, number>;
   abilityDetailedResponses?: DetailedResponse[];
   multipleIntelligenceResponses?: DetailedResponse[];
   personalityDetailedResponses?: DetailedResponse[];
@@ -172,6 +167,8 @@ const AssessmentMappingStep = ({
   // Bulk assign form
   const [bulkSchoolId, setBulkSchoolId] = useState<string>("");
   const [bulkAssessmentId, setBulkAssessmentId] = useState<string>("");
+  const [schoolAssessments, setSchoolAssessments] = useState<any[]>([]);
+  const [schoolAssessmentsLoading, setSchoolAssessmentsLoading] = useState(false);
   const [bulkSchoolSearch, setBulkSchoolSearch] = useState("");
   const [bulkSchoolDropdownOpen, setBulkSchoolDropdownOpen] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -236,6 +233,21 @@ const AssessmentMappingStep = ({
       .catch(() => setError("Failed to load data"))
       .finally(() => setLoading(false));
   }, []);
+
+  // Fetch assessments for the selected system school
+  useEffect(() => {
+    if (!bulkSchoolId) {
+      setSchoolAssessments([]);
+      setBulkAssessmentId("");
+      return;
+    }
+    setSchoolAssessmentsLoading(true);
+    setBulkAssessmentId("");
+    getAssessmentsByInstitute(Number(bulkSchoolId))
+      .then((res) => setSchoolAssessments(res.data || []))
+      .catch(() => setSchoolAssessments(assessments)) // fallback to all
+      .finally(() => setSchoolAssessmentsLoading(false));
+  }, [bulkSchoolId]);
 
   // Unique grades and schools for filters
   const uniqueGrades = useMemo(() => {
@@ -418,7 +430,8 @@ const AssessmentMappingStep = ({
       return;
     }
 
-    const assessment = assessments.find((a: any) => String(a.id) === bulkAssessmentId);
+    const assessment = schoolAssessments.find((a: any) => String(a.id) === bulkAssessmentId)
+      || assessments.find((a: any) => String(a.id) === bulkAssessmentId);
     if (!assessment) {
       console.log("Assessment not found. bulkAssessmentId:", bulkAssessmentId, "assessments:", assessments.slice(0, 3));
       setError("Assessment not found. Please reselect the assessment.");
@@ -624,9 +637,6 @@ const AssessmentMappingStep = ({
           instituteName: selectedInstitute.instituteName,
           assessmentId: assessment.id,
           assessmentName: assessment.AssessmentName,
-          abilityScores: user.abilityScores,
-          multipleIntelligenceScores: user.multipleIntelligenceScores,
-          personalityScores: user.personalityScores,
           abilityDetailedResponses: user.abilityDetailedResponses,
           multipleIntelligenceResponses: user.multipleIntelligenceResponses,
           personalityDetailedResponses: user.personalityDetailedResponses,
@@ -880,8 +890,8 @@ const AssessmentMappingStep = ({
                 onChange={(e) => setBulkAssessmentId(e.target.value)}
                 disabled={applying}
               >
-                <option value="">-- Select Assessment --</option>
-                {assessments.map((a: any) => (
+                <option value="">{schoolAssessmentsLoading ? "Loading..." : bulkSchoolId ? "-- Select Assessment --" : "-- Select School First --"}</option>
+                {schoolAssessments.map((a: any) => (
                   <option key={a.id} value={a.id}>
                     {a.AssessmentName}
                   </option>
