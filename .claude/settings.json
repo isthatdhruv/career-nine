@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(curl -s -X POST http://localhost:8080/navigator-report-data/generate -H \"Content-Type: application/json\" -d '{\"\"\"\"assessmentId\"\"\"\":19,\"\"\"\"userStudentIds\"\"\"\":[337]}')",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://student.localhost:3000/student/login)",
+      "Bash(ls /home/kccsw/Projects/career-nine/react-social/public/media/logos/kcc*)",
+      "Read(//home/kccsw/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills/brainstorming/**)",
+      "Bash(/home/kccsw/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills/brainstorming/scripts/start-server.sh --project-dir /home/kccsw/Projects/career-nine)",
+      "Read(//home/kccsw/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills/subagent-driven-development/**)",
+      "Bash(git checkout:*)"
     ]
   },
   "hooks": {
