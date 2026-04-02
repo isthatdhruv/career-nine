@@ -119,6 +119,10 @@ export function getAllAssessments() {
   return axios.get(`${API_URL}/assessments/get/list`);
 }
 
+export function getAssessmentsByInstitute(instituteCode: number) {
+  return axios.get(`${API_URL}/assessments/get/by-institute/${instituteCode}`);
+}
+
 export function getAllAssessmentQuestions() {
   return axios.get(`${API_URL}/assessment-questions/getAll`);
 }
