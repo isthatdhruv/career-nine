@@ -809,16 +809,7 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
       processStringArray(sa.subjectsOfInterest, "subjectofinterest", "Subject of Interest");
       processStringArray(sa.values, "values", "Values");
 
-      // Find missing questions
-      const missingQuestions: string[] = [];
-      allMappedKeys.forEach((key) => {
-        if (!answeredKeys.has(key)) {
-          const lookup = questionLookup.get(key);
-          if (lookup) {
-            missingQuestions.push(`[${getCategoryLabel(lookup.category)}] ${lookup.firebaseQuestion}`);
-          }
-        }
-      });
+      if (answers.length === 0) continue;
 
       try {
         const res = await importMappedAnswers({
@@ -828,18 +819,6 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
         });
         totalStudents++;
         totalAnswers += answers.length;
-        if (res.data?.status === "ongoing") {
-          partialStudents++;
-          partialDetails.push({
-            name: sa.name,
-            firebaseDocId: sa.firebaseDocId,
-            userStudentId,
-            assessmentId: sa.assessmentId,
-            answeredCount: answers.length,
-            totalMapped,
-            missingQuestions,
-          });
-        }
       } catch (err: any) {
         const msg = err?.response?.data?.error || err?.message || "Unknown error";
         errors.push(`${sa.name}: ${msg}`);
