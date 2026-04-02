@@ -199,7 +199,7 @@ public class FirebaseDataMappingController {
                 sam = samOpt.get();
             } else {
                 sam = new StudentAssessmentMapping(userStudentId, assessmentId);
-                sam.setStatus("completed");
+                sam.setStatus("ongoing");
                 sam = studentAssessmentMappingRepository.save(sam);
             }
 
@@ -210,7 +210,9 @@ public class FirebaseDataMappingController {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> answers = (List<Map<String, Object>>) payload.get("answers");
             if (answers == null || answers.isEmpty()) {
-                return ResponseEntity.ok(Map.of("saved", 0, "scoresCalculated", 0, "message", "No answers to save"));
+                sam.setStatus("ongoing");
+                studentAssessmentMappingRepository.save(sam);
+                return ResponseEntity.ok(Map.of("saved", 0, "scoresCalculated", 0, "status", "ongoing", "message", "No answers to save, status set to ongoing"));
             }
 
             // Get questionnaire ID scoped to this assessment (prevents wrong-questionnaire QQ links)
@@ -300,14 +302,32 @@ public class FirebaseDataMappingController {
                 }
             }
 
-            // Update mapping status
-            sam.setStatus("completed");
+            // Determine completeness: compare saved answers against total questions in questionnaire
+            String status = "ongoing";
+            int totalQuestions = 0;
+            if (questionnaireId != null) {
+                List<QuestionnaireQuestion> allQQ = questionnaireQuestionRepository
+                        .findByQuestionnaireIdWithOptions(questionnaireId);
+                totalQuestions = allQQ.size();
+                if (totalQuestions > 0 && saved >= totalQuestions) {
+                    status = "completed";
+                }
+            } else if (saved > 0) {
+                // No questionnaire linked — can't determine total, mark ongoing
+                status = "ongoing";
+            }
+
+            sam.setStatus(status);
             studentAssessmentMappingRepository.save(sam);
 
             return ResponseEntity.ok(Map.of(
                 "saved", saved,
                 "scoresCalculated", scoresCalculated,
-                "message", "Answers imported and scores calculated successfully"
+                "totalQuestions", totalQuestions,
+                "status", status,
+                "message", saved >= totalQuestions
+                    ? "Answers imported and scores calculated successfully"
+                    : "Partial answers imported (" + saved + "/" + totalQuestions + "), status set to ongoing"
             ));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -772,7 +792,7 @@ public class FirebaseDataMappingController {
                                     }
                                 }
 
-                                // Create StudentAssessmentMapping if not exists
+                                // Create StudentAssessmentMapping if not exists (ongoing until answers are imported)
                                 Long assessmentId = getLong(student, "assessmentId");
                                 if (assessmentId != null && assessmentId > 0) {
                                     Optional<StudentAssessmentMapping> existingSam = studentAssessmentMappingRepository
@@ -781,7 +801,7 @@ public class FirebaseDataMappingController {
                                     if (!existingSam.isPresent()) {
                                         StudentAssessmentMapping sam = new StudentAssessmentMapping(
                                                 (long) us.getUserStudentId(), assessmentId);
-                                        sam.setStatus("completed");
+                                        sam.setStatus("ongoing");
                                         studentAssessmentMappingRepository.save(sam);
                                     }
                                 }
@@ -873,7 +893,7 @@ public class FirebaseDataMappingController {
                 UserStudent userStudent = new UserStudent(user, studentInfo, instituteOpt.get());
                 userStudent = userStudentRepository.save(userStudent);
 
-                // 4. Create StudentAssessmentMapping if assessmentId provided
+                // 4. Create StudentAssessmentMapping if assessmentId provided (ongoing until answers are imported)
                 Long assessmentId = getLong(student, "assessmentId");
                 if (assessmentId != null && assessmentId > 0) {
                     Optional<StudentAssessmentMapping> existingSam = studentAssessmentMappingRepository
@@ -882,7 +902,7 @@ public class FirebaseDataMappingController {
                     if (!existingSam.isPresent()) {
                         StudentAssessmentMapping sam = new StudentAssessmentMapping(
                                 (long) userStudent.getUserStudentId(), assessmentId);
-                        sam.setStatus("completed");
+                        sam.setStatus("ongoing");
                         studentAssessmentMappingRepository.save(sam);
                     }
                 }
