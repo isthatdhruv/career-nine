@@ -7,6 +7,8 @@ import {
   generateNavigatorHtmlReports,
   resetNavigatorForStudent,
   resetNavigatorForAssessment,
+  downloadNavigatorReport,
+  getNavigatorReportUrls,
   exportGeneralAssessmentExcel,
   exportGeneralAssessmentExcelForStudent,
 } from "./API/NavigatorReportData_APIs";
@@ -36,6 +38,8 @@ const navigatorConfig: ReportGenerationConfig = {
     generateReports: (assessmentId, ids) => generateNavigatorHtmlReports(assessmentId, ids),
     exportOMR: (assessmentId) => exportGeneralAssessmentExcel(assessmentId),
     exportOMRStudent: (assessmentId, studentId) => exportGeneralAssessmentExcelForStudent(assessmentId, studentId),
+    downloadReport: (userStudentId, assessmentId) => downloadNavigatorReport(userStudentId, assessmentId),
+    getReportUrls: (assessmentId, userStudentIds) => getNavigatorReportUrls(assessmentId, userStudentIds),
     resetStudent: (studentId, assessmentId) => resetNavigatorForStudent(studentId, assessmentId),
     resetAssessment: (assessmentId) => resetNavigatorForAssessment(assessmentId),
   },

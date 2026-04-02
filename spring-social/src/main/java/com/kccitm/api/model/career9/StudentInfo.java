@@ -60,6 +60,9 @@ public class StudentInfo implements Serializable {
     @Transient
     private String assesment_id;
 
+    @Transient
+    private String careerNineRollNumber;
+
     @JsonFormat(pattern = "dd-MM-yyyy")
     private Date studentDob;
 
@@ -206,6 +209,14 @@ public class StudentInfo implements Serializable {
 
     public void setControlNumber(Long controlNumber) {
         this.controlNumber = controlNumber;
+    }
+
+    public String getCareerNineRollNumber() {
+        return careerNineRollNumber;
+    }
+
+    public void setCareerNineRollNumber(String careerNineRollNumber) {
+        this.careerNineRollNumber = careerNineRollNumber;
     }
 
 }

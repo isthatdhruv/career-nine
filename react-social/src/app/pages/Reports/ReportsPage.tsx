@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { downloadReportAsPdf, downloadReportsAsZip, ZipProgress } from "../ReportGeneration/utils/htmlToPdf";
 import { ReadCollegeList, GetSessionsByInstituteCode } from "../College/API/College_APIs";
 import {
   getAllAssessments,
@@ -9,6 +10,8 @@ import { getAssessmentMappingsByInstitute } from "../AssessmentMapping/API/Asses
 import {
   getBetReportDataByAssessment,
   generateHtmlReports,
+  downloadBetReport,
+  getBetReportUrls,
   BetReportData,
   exportGeneralAssessmentExcel,
   exportGeneralAssessmentExcelForStudent,
@@ -30,12 +33,13 @@ type StudentRow = {
 };
 
 type SectionInfo = { className: string; sectionName: string };
-type FilterKey = "name" | "grade" | "section" | "status";
+type FilterKey = "name" | "grade" | "section" | "status" | "dataGenerated";
 
 const FILTER_ITEMS: { key: FilterKey; label: string }[] = [
   { key: "grade", label: "Grade / Class" },
   { key: "section", label: "Section" },
   { key: "status", label: "Report Status" },
+  { key: "dataGenerated", label: "Data Generated" },
   { key: "name", label: "Name" },
 ];
 
@@ -69,12 +73,15 @@ const ReportsPage: React.FC = () => {
   const [selectedGrade, setSelectedGrade] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<Set<string>>(new Set());
+  const [selectedDataGenerated, setSelectedDataGenerated] = useState<Set<string>>(new Set());
 
   // ── Generate ──
   const [generating, setGenerating] = useState(false);
   const [exportingOMR, setExportingOMR] = useState(false);
   const [exportingMQT, setExportingMQT] = useState(false);
   const [exportingBET, setExportingBET] = useState(false);
+  const [downloadingZip, setDownloadingZip] = useState(false);
+  const [zipProgress, setZipProgress] = useState<ZipProgress | null>(null);
   const [exportingStudentId, setExportingStudentId] = useState<number | null>(null);
 
   // ═══════════════════════ DATA LOADING ═══════════════════════
@@ -182,6 +189,7 @@ const ReportsPage: React.FC = () => {
     setSelectedGrade("");
     setSelectedSection("");
     setSelectedStatus(new Set<string>());
+    setSelectedDataGenerated(new Set<string>());
     setSelectedStudentIds(new Set());
     setCurrentPage(1);
   }, [selectedInstitute, selectedAssessment]);
@@ -243,11 +251,19 @@ const ReportsPage: React.FC = () => {
         return selectedStatus.has(status);
       });
     }
+    if (filterEnabled.has("dataGenerated") && selectedDataGenerated.size > 0) {
+      result = result.filter((s) => {
+        const hasData = reportDataMap.has(s.userStudentId);
+        if (selectedDataGenerated.has("yes") && hasData) return true;
+        if (selectedDataGenerated.has("no") && !hasData) return true;
+        return false;
+      });
+    }
     return result;
   }, [
     assessmentStudents, filterEnabled, nameQuery,
     selectedGrade, selectedSection, sectionLookup,
-    selectedStatus, reportDataMap,
+    selectedStatus, selectedDataGenerated, reportDataMap,
   ]);
 
   const totalPages = Math.max(1, Math.ceil(displayedStudents.length / pageSize));
@@ -259,7 +275,7 @@ const ReportsPage: React.FC = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [nameQuery, selectedGrade, selectedSection, selectedStatus, filterEnabled]);
+  }, [nameQuery, selectedGrade, selectedSection, selectedStatus, selectedDataGenerated, filterEnabled]);
 
   // ═══════════════════════ ACTIONS ═══════════════════════
 
@@ -273,6 +289,7 @@ const ReportsPage: React.FC = () => {
         if (key === "grade") setSelectedGrade("");
         if (key === "section") setSelectedSection("");
         if (key === "status") setSelectedStatus(new Set());
+        if (key === "dataGenerated") setSelectedDataGenerated(new Set());
       }
       return next;
     });
@@ -284,6 +301,7 @@ const ReportsPage: React.FC = () => {
     setSelectedGrade("");
     setSelectedSection("");
     setSelectedStatus(new Set<string>());
+    setSelectedDataGenerated(new Set<string>());
   };
 
   const handleGenerateReports = async () => {
@@ -579,6 +597,41 @@ const ReportsPage: React.FC = () => {
                       </div>
                     );
                   }
+                  if (item.key === "dataGenerated") {
+                    return (
+                      <div key={item.key} style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
+                        <span style={{ fontSize: "0.7rem", color: "#9ca3af", alignSelf: "center", marginRight: 2 }}>Data:</span>
+                        {[
+                          { value: "yes", label: "Yes", color: "#059669" },
+                          { value: "no", label: "No", color: "#dc2626" },
+                        ].map((opt) => {
+                          const checked = selectedDataGenerated.has(opt.value);
+                          return (
+                            <button
+                              key={opt.value}
+                              onClick={() => {
+                                const next = new Set(selectedDataGenerated);
+                                if (checked) next.delete(opt.value);
+                                else next.add(opt.value);
+                                setSelectedDataGenerated(next);
+                                if (next.size > 0) toggleFilter("dataGenerated", true);
+                                else toggleFilter("dataGenerated", false);
+                              }}
+                              style={{
+                                padding: "4px 10px", borderRadius: 6, fontSize: "0.75rem",
+                                fontWeight: 600, cursor: "pointer",
+                                border: `1.5px solid ${checked ? opt.color : "#e5e7eb"}`,
+                                background: checked ? opt.color + "18" : "#fff",
+                                color: checked ? opt.color : "#6b7280",
+                              }}
+                            >
+                              {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  }
                   return null;
                 })}
                 {filterEnabled.size > 0 && (
@@ -768,6 +821,56 @@ const ReportsPage: React.FC = () => {
                 >
                   {exportingBET ? "Exporting..." : "Export BET Report"}
                 </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={async () => {
+                    if (!selectedAssessment) return;
+                    const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
+                    const selectedVisible = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
+                    // Get students with generated reports
+                    const ids = (selectedVisible.length > 0 ? selectedVisible : displayedStudents.map((s) => s.userStudentId))
+                      .filter((id) => {
+                        const rd = reportDataMap.get(id);
+                        return rd && rd.reportStatus === "generated" && rd.reportUrl;
+                      });
+                    if (ids.length === 0) { alert("No students with generated reports found."); return; }
+                    setDownloadingZip(true);
+                    setZipProgress(null);
+                    try {
+                      const res = await getBetReportUrls(Number(selectedAssessment), ids);
+                      const students = res.data.reports.map((r: any) => ({ userStudentId: r.userStudentId, fileName: r.fileName }));
+                      await downloadReportsAsZip(
+                        students,
+                        `bet_reports_${selectedAssessment}.zip`,
+                        (uid) => downloadBetReport(uid, Number(selectedAssessment)),
+                        (p) => setZipProgress(p),
+                      );
+                    } catch (err: any) {
+                      alert("Download failed: " + (err?.response?.data?.error || err.message));
+                    } finally {
+                      setDownloadingZip(false);
+                      setZipProgress(null);
+                    }
+                  }}
+                  disabled={downloadingZip}
+                  style={{
+                    background: downloadingZip
+                      ? "#6c757d"
+                      : "linear-gradient(135deg, #059669 0%, #047857 100%)",
+                    border: "none", borderRadius: 8, padding: "8px 20px",
+                    fontWeight: 600, color: "white", fontSize: "0.85rem",
+                    boxShadow: downloadingZip ? "none" : "0 4px 12px rgba(5, 150, 105, 0.3)",
+                  }}
+                >
+                  {downloadingZip ? "Preparing ZIP..." : (
+                    <>
+                      Download ZIP (PDF)
+                      {visibleSelectedCount > 0
+                        ? ` (${visibleSelectedCount} selected)`
+                        : ` (All)`}
+                    </>
+                  )}
+                </button>
               </div>
 
               {/* Table */}
@@ -877,18 +980,13 @@ const ReportsPage: React.FC = () => {
                                   <button
                                     onClick={async () => {
                                       try {
-                                        const res = await fetch(reportUrl);
-                                        const blob = await res.blob();
-                                        const url = window.URL.createObjectURL(blob);
-                                        const a = document.createElement("a");
-                                        a.href = url;
-                                        a.download = `${s.name || "report"}_bet_report.html`;
-                                        document.body.appendChild(a);
-                                        a.click();
-                                        document.body.removeChild(a);
-                                        window.URL.revokeObjectURL(url);
-                                      } catch (e) {
+                                        await downloadReportAsPdf(
+                                          () => downloadBetReport(s.userStudentId, Number(selectedAssessment)),
+                                          `${s.name || "report"}_bet_report.pdf`
+                                        );
+                                      } catch (e: any) {
                                         console.error("Download failed", e);
+                                        alert("Download failed: " + (e?.response?.data?.error || e.message));
                                       }
                                     }}
                                     style={{
@@ -897,7 +995,7 @@ const ReportsPage: React.FC = () => {
                                       border: "none", cursor: "pointer",
                                     }}
                                   >
-                                    Download
+                                    Download PDF
                                   </button>
                                 </>
                               )}
@@ -992,6 +1090,37 @@ const ReportsPage: React.FC = () => {
               )}
             </>
           )}
+        </div>
+      )}
+
+      {/* ZIP Progress Modal */}
+      {downloadingZip && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: "32px 40px", minWidth: 380, maxWidth: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+            <h3 style={{ margin: "0 0 16px", fontSize: "1.1rem", fontWeight: 700, color: "#1a1a2e" }}>
+              {zipProgress?.phase === "fetching" ? "Fetching Reports..." : zipProgress?.phase === "converting" ? "Converting to PDF..." : zipProgress?.phase === "zipping" ? "Creating ZIP..." : "Preparing..."}
+            </h3>
+            {zipProgress && (
+              <>
+                <div style={{ background: "#e5e7eb", borderRadius: 8, height: 10, overflow: "hidden", marginBottom: 12 }}>
+                  <div style={{
+                    height: "100%", borderRadius: 8, transition: "width 0.3s ease",
+                    background: zipProgress.phase === "fetching" ? "#3b82f6" : zipProgress.phase === "converting" ? "#8b5cf6" : "#059669",
+                    width: `${Math.round((zipProgress.done / zipProgress.total) * 100)}%`,
+                  }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "#6b7280" }}>
+                  <span>{zipProgress.done} / {zipProgress.total}</span>
+                  <span>{Math.round((zipProgress.done / zipProgress.total) * 100)}%</span>
+                </div>
+                {zipProgress.currentName && (
+                  <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {zipProgress.currentName}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>

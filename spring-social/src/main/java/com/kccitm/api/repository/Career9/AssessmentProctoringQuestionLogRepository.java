@@ -20,6 +20,8 @@ public interface AssessmentProctoringQuestionLogRepository
 
     void deleteByUserStudentUserStudentIdAndAssessmentId(Long userStudentId, Long assessmentId);
 
+    void deleteByUserStudentUserStudentId(Long userStudentId);
+
     /**
      * Fetch all proctoring logs for given student IDs and assessment IDs in a single query.
      * Use this instead of looping per-pair to avoid N+1 queries.

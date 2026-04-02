@@ -138,3 +138,7 @@ export function getAssessmentQuestionnaire(assessmentId: number) {
 export function findAssessmentsBySameQuestionnaire(assessmentId: number) {
   return axios.get(`${API_URL}/assessments/find-by-same-questionnaire/${assessmentId}`);
 }
+
+export function deleteFirebaseStudents(instituteCode: number) {
+  return axios.delete(`${API_URL}/firebase-mapping/delete-firebase-students/${instituteCode}`);
+}

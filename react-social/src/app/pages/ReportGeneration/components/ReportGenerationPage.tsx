@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { downloadReportAsPdf, downloadReportsAsZip, ZipProgress } from "../utils/htmlToPdf";
 import { ReadCollegeList, GetSessionsByInstituteCode } from "../../College/API/College_APIs";
 import {
   getAllAssessments,
@@ -30,6 +31,7 @@ export type ReportGenerationConfig = {
   hasEligibility: boolean;
   hasReset: boolean;
   dataTabExtraColumns?: (rd: ReportData | undefined) => React.ReactNode;
+  dataTabExtraColumnsHeader?: string;
   reportsTabExtraInfo?: (rd: ReportData | undefined) => React.ReactNode;
 
   // API functions
@@ -40,6 +42,8 @@ export type ReportGenerationConfig = {
     generateReports: (assessmentId: number, ids: number[]) => Promise<any>;
     exportOMR: (assessmentId: number) => Promise<any>;
     exportOMRStudent: (assessmentId: number, studentId: number) => Promise<any>;
+    downloadReport: (userStudentId: number, assessmentId: number) => Promise<any>;
+    getReportUrls: (assessmentId: number, userStudentIds: number[]) => Promise<any>;
     resetStudent?: (studentId: number, assessmentId: number) => Promise<any>;
     resetAssessment?: (assessmentId: number) => Promise<any>;
   };
@@ -116,6 +120,8 @@ const ReportGenerationPage: React.FC<{ config: ReportGenerationConfig }> = ({ co
   const [exporting, setExporting] = useState(false);
   const [exportingOMR, setExportingOMR] = useState(false);
   const [generatingReports, setGeneratingReports] = useState(false);
+  const [downloadingZip, setDownloadingZip] = useState(false);
+  const [zipProgress, setZipProgress] = useState<ZipProgress | null>(null);
   const [exportingStudentId, setExportingStudentId] = useState<number | null>(null);
   const [resetting, setResetting] = useState(false);
 
@@ -482,24 +488,50 @@ const ReportGenerationPage: React.FC<{ config: ReportGenerationConfig }> = ({ co
                   )}
 
                   {activeTab === "reports" && (
-                    <button className="btn btn-sm" disabled={displayedStudents.length === 0 || generatingReports}
-                      style={{ background: generatingReports ? "#6c757d" : `linear-gradient(135deg, ${accentColor} 0%, ${accentColor}cc 100%)`, border: "none", borderRadius: 8, padding: "8px 20px", fontWeight: 600, color: "white", fontSize: "0.85rem" }}
-                      onClick={async () => {
-                        let ids = getSelectedOrAllIds().filter((id) => reportDataMap.has(id));
-                        if (config.filterForReportGeneration) ids = ids.filter((id) => config.filterForReportGeneration!(reportDataMap.get(id)!));
-                        if (ids.length === 0) { alert("No eligible students with report data. Generate data first."); return; }
-                        setGeneratingReports(true);
-                        try {
-                          const res = await api.generateReports(Number(selectedAssessment), ids);
-                          const { generated, errors } = res.data;
-                          const errorDetails = errors.length > 0 ? errors.map((e: any) => `Student ${e.userStudentId}: ${e.reason}`).join("\n") : "";
-                          alert(`Generated ${generated} report(s).${errors.length > 0 ? `\n${errors.length} failed:\n${errorDetails}` : ""}`);
-                          await refreshReportData();
-                        } catch (err: any) { alert("Failed: " + (err?.response?.data?.error || err.message)); }
-                        finally { setGeneratingReports(false); }
-                      }}>
-                      {generatingReports ? "Generating..." : `Generate Reports${countLabel(displayedStudents.length)}`}
-                    </button>
+                    <>
+                      <button className="btn btn-sm" disabled={displayedStudents.length === 0 || generatingReports}
+                        style={{ background: generatingReports ? "#6c757d" : `linear-gradient(135deg, ${accentColor} 0%, ${accentColor}cc 100%)`, border: "none", borderRadius: 8, padding: "8px 20px", fontWeight: 600, color: "white", fontSize: "0.85rem" }}
+                        onClick={async () => {
+                          let ids = getSelectedOrAllIds().filter((id) => reportDataMap.has(id));
+                          if (config.filterForReportGeneration) ids = ids.filter((id) => config.filterForReportGeneration!(reportDataMap.get(id)!));
+                          if (ids.length === 0) { alert("No eligible students with report data. Generate data first."); return; }
+                          setGeneratingReports(true);
+                          try {
+                            const res = await api.generateReports(Number(selectedAssessment), ids);
+                            const { generated, errors } = res.data;
+                            const errorDetails = errors.length > 0 ? errors.map((e: any) => `Student ${e.userStudentId}: ${e.reason}`).join("\n") : "";
+                            alert(`Generated ${generated} report(s).${errors.length > 0 ? `\n${errors.length} failed:\n${errorDetails}` : ""}`);
+                            await refreshReportData();
+                          } catch (err: any) { alert("Failed: " + (err?.response?.data?.error || err.message)); }
+                          finally { setGeneratingReports(false); }
+                        }}>
+                        {generatingReports ? "Generating..." : `Generate Reports${countLabel(displayedStudents.length)}`}
+                      </button>
+                      <button className="btn btn-sm" disabled={downloadingZip || displayedStudents.length === 0}
+                        style={{ background: downloadingZip ? "#6c757d" : "linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)", border: "none", borderRadius: 8, padding: "8px 20px", fontWeight: 600, color: "white", fontSize: "0.85rem" }}
+                        onClick={async () => {
+                          let ids = getSelectedOrAllIds().filter((id) => {
+                            const rd = reportDataMap.get(id);
+                            return rd && rd.reportStatus === "generated" && rd.reportUrl;
+                          });
+                          if (ids.length === 0) { alert("No students with generated reports found."); return; }
+                          setDownloadingZip(true);
+                          setZipProgress(null);
+                          try {
+                            const res = await api.getReportUrls(Number(selectedAssessment), ids);
+                            const students = res.data.reports.map((r: any) => ({ userStudentId: r.userStudentId, fileName: r.fileName }));
+                            await downloadReportsAsZip(
+                              students,
+                              `${config.reportFilePrefix}_reports.zip`,
+                              (uid) => api.downloadReport(uid, Number(selectedAssessment)),
+                              (p) => setZipProgress(p),
+                            );
+                          } catch (err: any) { alert("Download failed: " + (err?.response?.data?.error || err.message)); }
+                          finally { setDownloadingZip(false); setZipProgress(null); }
+                        }}>
+                        {downloadingZip ? "Preparing ZIP..." : `Download ZIP (PDF)${countLabel(displayedStudents.length)}`}
+                      </button>
+                    </>
                   )}
 
                   <button className="btn btn-sm btn-info" disabled={exportingOMR} onClick={async () => {
@@ -538,7 +570,7 @@ const ReportGenerationPage: React.FC<{ config: ReportGenerationConfig }> = ({ co
                         <th style={thStyle}>Section</th>
                         {activeTab === "data" && <th style={thStyle}>Status</th>}
                         {activeTab === "data" && config.hasEligibility && <th style={thStyle}>Eligible</th>}
-                        {activeTab === "data" && config.dataTabExtraColumns && <th style={thStyle}>Info</th>}
+                        {activeTab === "data" && config.dataTabExtraColumns && <th style={thStyle}>{config.dataTabExtraColumnsHeader || "Info"}</th>}
                         {activeTab === "reports" && config.hasEligibility && <th style={thStyle}>Eligible</th>}
                         {activeTab === "reports" && <th style={thStyle}>Report</th>}
                         {activeTab === "reports" && <th style={thStyle}>Actions</th>}
@@ -591,8 +623,8 @@ const ReportGenerationPage: React.FC<{ config: ReportGenerationConfig }> = ({ co
                                       {reportUrl && (
                                         <>
                                           <a href={reportUrl} target="_blank" rel="noopener noreferrer" style={{ padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 600, background: "#dbeafe", color: "#2563eb", textDecoration: "none" }}>Preview</a>
-                                          {actionBtn("#f0fdf4", "#059669", "Download", async () => {
-                                            try { const res = await fetch(reportUrl); const blob = await res.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `${s.name || "report"}_${config.reportFilePrefix}.html`; document.body.appendChild(a); a.click(); document.body.removeChild(a); window.URL.revokeObjectURL(url); } catch (e) { console.error("Download failed", e); }
+                                          {actionBtn("#f0fdf4", "#059669", "Download PDF", async () => {
+                                            try { await downloadReportAsPdf(() => api.downloadReport(s.userStudentId, Number(selectedAssessment)), `${s.name || "report"}_${config.reportFilePrefix}.pdf`); } catch (e) { console.error("Download failed", e); alert("Download failed: " + (e instanceof Error ? e.message : "Unknown error")); }
                                           })}
                                         </>
                                       )}
@@ -650,6 +682,37 @@ const ReportGenerationPage: React.FC<{ config: ReportGenerationConfig }> = ({ co
                       <button className="btn btn-sm btn-light" disabled={safeCurrentPage >= totalPages} onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>Next</button>
                       <button className="btn btn-sm btn-light" disabled={safeCurrentPage >= totalPages} onClick={() => setCurrentPage(totalPages)} style={{ padding: "4px 8px", fontSize: "0.8rem" }}>Last</button>
                     </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ZIP Progress Modal */}
+      {downloadingZip && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: "32px 40px", minWidth: 380, maxWidth: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+            <h3 style={{ margin: "0 0 16px", fontSize: "1.1rem", fontWeight: 700, color: "#1a1a2e" }}>
+              {zipProgress?.phase === "fetching" ? "Fetching Reports..." : zipProgress?.phase === "converting" ? "Converting to PDF..." : zipProgress?.phase === "zipping" ? "Creating ZIP..." : "Preparing..."}
+            </h3>
+            {zipProgress && (
+              <>
+                <div style={{ background: "#e5e7eb", borderRadius: 8, height: 10, overflow: "hidden", marginBottom: 12 }}>
+                  <div style={{
+                    height: "100%", borderRadius: 8, transition: "width 0.3s ease",
+                    background: zipProgress.phase === "fetching" ? "#3b82f6" : zipProgress.phase === "converting" ? "#8b5cf6" : "#059669",
+                    width: `${Math.round((zipProgress.done / zipProgress.total) * 100)}%`,
+                  }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "#6b7280" }}>
+                  <span>{zipProgress.done} / {zipProgress.total}</span>
+                  <span>{Math.round((zipProgress.done / zipProgress.total) * 100)}%</span>
+                </div>
+                {zipProgress.currentName && (
+                  <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {zipProgress.currentName}
                   </div>
                 )}
               </>

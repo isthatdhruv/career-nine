@@ -1,8 +1,11 @@
 package com.kccitm.api.service;
 
 import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.util.Base64;
 import java.util.UUID;
+
+import com.amazonaws.services.s3.model.S3Object;
 
 import javax.annotation.PostConstruct;
 
@@ -150,6 +153,26 @@ public class DigitalOceanSpacesService {
         s3Client.putObject(putRequest);
 
         return cdnUrl + "/" + objectKey;
+    }
+
+    /**
+     * Download a file from DigitalOcean Spaces by its full URL.
+     * Returns the file bytes, or null if not found.
+     */
+    public byte[] downloadFileByUrl(String fileUrl) {
+        if (s3Client == null || fileUrl == null || !fileUrl.startsWith(cdnUrl)) {
+            return null;
+        }
+        String objectKey = fileUrl.substring(cdnUrl.length() + 1);
+        try {
+            S3Object s3Object = s3Client.getObject(bucket, objectKey);
+            try (InputStream is = s3Object.getObjectContent()) {
+                return is.readAllBytes();
+            }
+        } catch (Exception e) {
+            logger.error("Failed to download file from Spaces: {}", fileUrl, e);
+            return null;
+        }
     }
 
     /**

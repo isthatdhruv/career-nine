@@ -15,4 +15,6 @@ public interface FirebaseStudentExtraDataRepository extends JpaRepository<Fireba
     List<FirebaseStudentExtraData> findByFirebaseDocId(String firebaseDocId);
 
     List<FirebaseStudentExtraData> findByDataType(String dataType);
+
+    void deleteByUserStudentId(Long userStudentId);
 }

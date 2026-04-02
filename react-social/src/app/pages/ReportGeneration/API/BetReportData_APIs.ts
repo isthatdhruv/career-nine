@@ -75,6 +75,18 @@ export function exportMqtScoresExcel(assessmentId: number, userStudentIds?: numb
   });
 }
 
+export function downloadBetReport(userStudentId: number, assessmentId: number) {
+  return axios.get(`${BASE}/download/${userStudentId}/${assessmentId}`, {
+    responseType: 'blob',
+  });
+}
+
+export function getBetReportUrls(assessmentId: number, userStudentIds: number[]) {
+  return axios.post<{ reports: { userStudentId: number; studentName: string; fileName: string; reportUrl: string }[] }>(
+    `${BASE}/download-zip`, { assessmentId, userStudentIds }
+  );
+}
+
 export function exportGeneralAssessmentExcel(assessmentId: number) {
   return axios.get(`${API_URL}/general-assessment/export-excel/${assessmentId}`, {
     responseType: 'blob',

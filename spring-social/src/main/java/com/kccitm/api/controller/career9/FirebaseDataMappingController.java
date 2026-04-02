@@ -114,6 +114,21 @@ public class FirebaseDataMappingController {
     @Autowired
     private FirebaseQuestionMappingRepository firebaseQuestionMappingRepository;
 
+    @Autowired
+    private com.kccitm.api.repository.Career9.BetReportDataRepository betReportDataRepository;
+
+    @Autowired
+    private com.kccitm.api.repository.Career9.NavigatorReportDataRepository navigatorReportDataRepository;
+
+    @Autowired
+    private com.kccitm.api.repository.Career9.GeneralAssessmentResultRepository generalAssessmentResultRepository;
+
+    @Autowired
+    private com.kccitm.api.repository.Career9.StudentDemographicResponseRepository studentDemographicResponseRepository;
+
+    @Autowired
+    private com.kccitm.api.repository.Career9.AssessmentProctoringQuestionLogRepository assessmentProctoringQuestionLogRepository;
+
     @GetMapping("/getAll")
     public List<FirebaseDataMapping> getAll() {
         return firebaseDataMappingRepository.findAll();
@@ -565,6 +580,114 @@ public class FirebaseDataMappingController {
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body("Firebase is not initialized. Please check server configuration.");
+        }
+    }
+
+    // ========================== DELETE FIREBASE-IMPORTED STUDENTS ==========================
+
+    /**
+     * DELETE /firebase-mapping/delete-firebase-students/{instituteCode}
+     *
+     * Deletes all students imported from Firebase for a given institute.
+     * Cleans up all related data: answers, scores, mappings, reports, etc.
+     */
+    @DeleteMapping("/delete-firebase-students/{instituteCode}")
+    @Transactional
+    public ResponseEntity<?> deleteFirebaseStudents(@PathVariable Integer instituteCode) {
+        try {
+            // 1. Get all UserStudents for this institute
+            List<UserStudent> allStudents = userStudentRepository.findByInstituteInstituteCode(instituteCode);
+            if (allStudents.isEmpty()) {
+                return ResponseEntity.ok(Map.of("deleted", 0, "message", "No students found for this institute"));
+            }
+
+            // 2. Filter to only Firebase-imported students
+            List<UserStudent> firebaseStudents = new ArrayList<>();
+            for (UserStudent us : allStudents) {
+                Optional<FirebaseDataMapping> mapping = firebaseDataMappingRepository
+                        .findByNewEntityIdAndFirebaseType(us.getUserStudentId(), "STUDENT");
+                if (mapping.isPresent()) {
+                    firebaseStudents.add(us);
+                }
+            }
+
+            if (firebaseStudents.isEmpty()) {
+                return ResponseEntity.ok(Map.of("deleted", 0, "message", "No Firebase-imported students found"));
+            }
+
+            int deletedCount = 0;
+            List<Map<String, Object>> errors = new ArrayList<>();
+
+            for (UserStudent us : firebaseStudents) {
+                Long usId = us.getUserStudentId();
+                try {
+                    // Delete all related data in correct order (children first)
+
+                    // Assessment raw scores (linked via StudentAssessmentMapping)
+                    List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
+                            .findByUserStudentUserStudentId(usId);
+                    for (StudentAssessmentMapping sam : mappings) {
+                        assessmentRawScoreRepository
+                                .deleteByStudentAssessmentMappingStudentAssessmentId(sam.getStudentAssessmentId());
+                    }
+
+                    // Assessment answers
+                    assessmentAnswerRepository.deleteByUserStudent_UserStudentId(usId);
+
+                    // Assessment mappings
+                    studentAssessmentMappingRepository.deleteByUserStudentUserStudentId(usId);
+
+                    // Report data
+                    betReportDataRepository.deleteByUserStudentUserStudentId(usId);
+                    navigatorReportDataRepository.deleteByUserStudentUserStudentId(usId);
+                    generalAssessmentResultRepository.deleteByUserStudentId(usId);
+
+                    // Proctoring logs
+                    assessmentProctoringQuestionLogRepository.deleteByUserStudentUserStudentId(usId);
+
+                    // Demographics
+                    studentDemographicResponseRepository.deleteByUserStudentId(usId);
+
+                    // Firebase extra data
+                    firebaseStudentExtraDataRepository.deleteByUserStudentId(usId);
+
+                    // Firebase mapping
+                    Optional<FirebaseDataMapping> fbMapping = firebaseDataMappingRepository
+                            .findByNewEntityIdAndFirebaseType(usId, "STUDENT");
+                    fbMapping.ifPresent(m -> firebaseDataMappingRepository.delete(m));
+
+                    // StudentInfo and User
+                    StudentInfo si = us.getStudentInfo();
+                    Long userId = us.getUserId();
+
+                    // Delete UserStudent
+                    userStudentRepository.delete(us);
+
+                    // Delete StudentInfo
+                    if (si != null) {
+                        studentInfoRepository.deleteById(Long.valueOf(si.getId()));
+                    }
+
+                    // Delete User
+                    if (userId != null) {
+                        userRepository.deleteById(userId);
+                    }
+
+                    deletedCount++;
+                } catch (Exception e) {
+                    errors.add(Map.of("userStudentId", usId, "error", e.getMessage()));
+                }
+            }
+
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("deleted", deletedCount);
+            response.put("total", firebaseStudents.size());
+            response.put("errors", errors);
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to delete students: " + e.getMessage()));
         }
     }
 

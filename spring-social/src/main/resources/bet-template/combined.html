@@ -509,8 +509,16 @@
         font-weight: 400;
         letter-spacing: -0.16px;
         text-align: left;
-        background: url(assets/cover/career.png) center / cover no-repeat;
         padding: 50px 52px 9px 52px;
+      }
+      .page-cover .career-logo {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: -1;
       }
 
       @media screen and (max-width: 576px) {
@@ -1289,7 +1297,10 @@
           <div class="line-bottom"></div>
         </div>
 
-        <div class="career">CAREER</div>
+        <div class="career">
+          <img src="assets/cover/career.png" class="career-logo" />
+          CAREER
+        </div>
       </div>
       <div class="column-a">
         <p class="column-text1">About the tool</p>

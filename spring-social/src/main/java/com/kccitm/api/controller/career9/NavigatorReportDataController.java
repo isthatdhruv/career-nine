@@ -1,13 +1,18 @@
 package com.kccitm.api.controller.career9;
 
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Font;
@@ -218,6 +223,76 @@ public class NavigatorReportDataController {
     public ResponseEntity<?> getIneligibleByAssessment(@PathVariable Long assessmentId) {
         return ResponseEntity.ok(
                 navigatorReportDataRepository.findByAssessmentIdAndEligible(assessmentId, false));
+    }
+
+    // ═══════════════════════ DOWNLOAD REPORT (HTML) ═══════════════════════
+
+    @GetMapping("/download/{userStudentId}/{assessmentId}")
+    public ResponseEntity<?> downloadReport(
+            @PathVariable Long userStudentId,
+            @PathVariable Long assessmentId) {
+        Optional<NavigatorReportData> opt = navigatorReportDataRepository
+                .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+        if (opt.isEmpty() || opt.get().getReportUrl() == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "No generated report found for this student"));
+        }
+        NavigatorReportData rd = opt.get();
+        byte[] htmlBytes = digitalOceanSpacesService.downloadFileByUrl(rd.getReportUrl());
+        if (htmlBytes == null) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to download report file"));
+        }
+        String html = inlineImages(new String(htmlBytes, StandardCharsets.UTF_8));
+
+        String safeName = (rd.getStudentName() != null ? rd.getStudentName() : "report")
+                .replaceAll("[^a-zA-Z0-9_\\- ]", "").replaceAll("\\s+", "_");
+        String fileName = safeName + "_navigator_report.html";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.TEXT_HTML);
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"");
+        return new ResponseEntity<>(html.getBytes(StandardCharsets.UTF_8), headers, HttpStatus.OK);
+    }
+
+    // ═══════════════════════ BATCH DOWNLOAD (report URLs) ═══════════════════════
+
+    /**
+     * POST /navigator-report-data/download-zip
+     * Body: { "assessmentId": 18, "userStudentIds": [1, 2, 3] }
+     *
+     * Returns report URLs for the given students (frontend handles PDF conversion + ZIP).
+     */
+    @PostMapping("/download-zip")
+    public ResponseEntity<?> downloadZipInfo(@RequestBody Map<String, Object> request) {
+        if (!request.containsKey("assessmentId") || !request.containsKey("userStudentIds")) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "assessmentId and userStudentIds are required"));
+        }
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+        @SuppressWarnings("unchecked")
+        List<Number> idList = (List<Number>) request.get("userStudentIds");
+
+        List<Map<String, Object>> reports = new ArrayList<>();
+        for (Number idNum : idList) {
+            Long userStudentId = idNum.longValue();
+            Optional<NavigatorReportData> opt = navigatorReportDataRepository
+                    .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+            if (opt.isEmpty() || opt.get().getReportUrl() == null) continue;
+            NavigatorReportData rd = opt.get();
+            String safeName = (rd.getStudentName() != null ? rd.getStudentName() : "student_" + userStudentId)
+                    .replaceAll("[^a-zA-Z0-9_\\- ]", "").replaceAll("\\s+", "_");
+            reports.add(Map.of(
+                    "userStudentId", userStudentId,
+                    "studentName", safe(rd.getStudentName()),
+                    "fileName", safeName + "_" + userStudentId + "_navigator_report",
+                    "reportUrl", rd.getReportUrl()
+            ));
+        }
+        if (reports.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "No generated reports found"));
+        }
+        return ResponseEntity.ok(Map.of("reports", reports));
     }
 
     // ═══════════════════════ EXCEL EXPORT ═══════════════════════
@@ -808,5 +883,55 @@ public class NavigatorReportDataController {
 
     private String safe(String val) {
         return val != null ? val : "";
+    }
+
+    private String inlineImages(String html) {
+        // Convert <object data="..." type="image/svg+xml"> to <img src="...">
+        html = html.replaceAll(
+                "<object([^>]*?)data=\"([^\"]+)\"([^>]*?)type=\"image/svg\\+xml\"([^>]*?)>\\s*</object>",
+                "<img$1src=\"$2\"$3$4/>");
+        html = html.replaceAll(
+                "<object([^>]*?)type=\"image/svg\\+xml\"([^>]*?)data=\"([^\"]+)\"([^>]*?)>\\s*</object>",
+                "<img$1$2src=\"$3\"$4/>");
+
+        html = inlinePattern(html, Pattern.compile("src=\"(https?://[^\"]+)\""),
+                (url, dataUri) -> "src=\"" + dataUri + "\"");
+        html = inlinePattern(html, Pattern.compile("url\\((\"?)(https?://[^)\"]+)\\1\\)"),
+                (url, dataUri) -> "url(\"" + dataUri + "\")");
+        return html;
+    }
+
+    private String inlinePattern(String html, Pattern pattern,
+            java.util.function.BiFunction<String, String, String> replacer) {
+        Matcher matcher = pattern.matcher(html);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            String imgUrl = matcher.group(matcher.groupCount());
+            try {
+                URL url = new URL(imgUrl);
+                try (InputStream is = url.openStream()) {
+                    byte[] bytes = is.readAllBytes();
+                    String mime = guessMime(imgUrl);
+                    String dataUri = "data:" + mime + ";base64," + Base64.getEncoder().encodeToString(bytes);
+                    matcher.appendReplacement(sb, Matcher.quoteReplacement(replacer.apply(imgUrl, dataUri)));
+                }
+            } catch (Exception e) {
+                matcher.appendReplacement(sb, Matcher.quoteReplacement(matcher.group(0)));
+            }
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
+    private String guessMime(String url) {
+        String lower = url.toLowerCase();
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+        if (lower.endsWith(".webp")) return "image/webp";
+        if (lower.endsWith(".gif")) return "image/gif";
+        if (lower.endsWith(".svg")) return "image/svg+xml";
+        if (lower.endsWith(".ttf")) return "font/ttf";
+        if (lower.endsWith(".woff")) return "font/woff";
+        if (lower.endsWith(".woff2")) return "font/woff2";
+        return "image/png";
     }
 }

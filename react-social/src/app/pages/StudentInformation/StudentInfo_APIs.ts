@@ -17,6 +17,7 @@ export interface StudentInfo {
     assesment_id?: string;
     studentDob?: string;
     schoolSectionId?: number;
+    careerNineRollNumber?: string;
 }
 
 export interface Assessment {

@@ -273,13 +273,18 @@ public class StudentInfoController {
             User user = userRepository.save(new User((int) (Math.random() * 1000),
                     studentInfo.getStudentDob()));
 
-            // Generate and set careerNineRollNumber
-            String rollNumber = rollNumberService.generateNextRollNumber(
-                    studentInfo.getInstituteId(), studentInfo.getSchoolSectionId());
-            if (rollNumber != null) {
-                user.setCareerNineRollNumber(rollNumber);
-                user = userRepository.save(user);
+            // Set careerNineRollNumber: use manual value if provided, otherwise auto-generate
+            String manualRollNumber = studentInfo.getCareerNineRollNumber();
+            if (manualRollNumber != null && !manualRollNumber.trim().isEmpty()) {
+                user.setCareerNineRollNumber(manualRollNumber.trim());
+            } else {
+                String rollNumber = rollNumberService.generateNextRollNumber(
+                        studentInfo.getInstituteId(), studentInfo.getSchoolSectionId());
+                if (rollNumber != null) {
+                    user.setCareerNineRollNumber(rollNumber);
+                }
             }
+            user = userRepository.save(user);
 
             studentInfo.setUser(user);
             Integer instituteId = studentInfo.getInstituteId();

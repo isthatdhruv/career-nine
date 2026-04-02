@@ -16,4 +16,6 @@ public interface GeneralAssessmentResultRepository extends JpaRepository<General
     List<GeneralAssessmentResult> findByUserStudentId(Long userStudentId);
 
     void deleteByUserStudentIdAndAssessmentId(Long userStudentId, Long assessmentId);
+
+    void deleteByUserStudentId(Long userStudentId);
 }

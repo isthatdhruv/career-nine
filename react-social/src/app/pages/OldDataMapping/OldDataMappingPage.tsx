@@ -1,9 +1,142 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import StudentImportWizard from "./StudentImportWizard";
 import ExistingMappingView from "./ExistingMappingView";
+import { deleteFirebaseStudents } from "./API/OldDataMapping_APIs";
+import { ReadCollegeList } from "../College/API/College_APIs";
+
+// ── Delete Firebase Students Panel ──
+const DeleteFirebaseStudentsPanel = ({ onBack }: { onBack: () => void }) => {
+  const [institutes, setInstitutes] = useState<any[]>([]);
+  const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
+  const [loading, setLoading] = useState(false);
+  const [loadingInstitutes, setLoadingInstitutes] = useState(true);
+  const [result, setResult] = useState<any>(null);
+  const [confirmText, setConfirmText] = useState("");
+
+  useEffect(() => {
+    ReadCollegeList()
+      .then((res) => setInstitutes(res.data || []))
+      .catch(() => setInstitutes([]))
+      .finally(() => setLoadingInstitutes(false));
+  }, []);
+
+  const selectedName = institutes.find((i) => i.instituteCode === selectedInstitute)?.instituteName || "";
+
+  const handleDelete = async () => {
+    if (!selectedInstitute || confirmText !== "DELETE") return;
+    setLoading(true);
+    setResult(null);
+    try {
+      const res = await deleteFirebaseStudents(Number(selectedInstitute));
+      setResult(res.data);
+    } catch (err: any) {
+      setResult({ error: err?.response?.data?.error || err.message });
+    } finally {
+      setLoading(false);
+      setConfirmText("");
+    }
+  };
+
+  return (
+    <div className="container mt-8">
+      <div className="row justify-content-center">
+        <div className="col-12 col-md-8">
+          <div className="d-flex align-items-center mb-6">
+            <button className="btn btn-light-primary btn-sm me-4" onClick={onBack}>
+              <i className="bi bi-arrow-left me-1"></i> Back
+            </button>
+            <h2 className="fw-bold text-dark mb-0">Delete Firebase-Imported Students</h2>
+          </div>
+
+          <div className="card shadow-sm">
+            <div className="card-body p-6">
+              <div className="alert alert-danger d-flex align-items-center mb-6">
+                <i className="bi bi-exclamation-triangle-fill fs-3 text-danger me-3"></i>
+                <div>
+                  <strong>Warning:</strong> This will permanently delete all Firebase-imported students
+                  for the selected institute, including their assessment answers, scores, report data,
+                  and user accounts. This cannot be undone.
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="form-label fw-bold">Select Institute</label>
+                {loadingInstitutes ? (
+                  <div className="text-muted">Loading institutes...</div>
+                ) : (
+                  <select
+                    className="form-select form-select-solid"
+                    value={selectedInstitute}
+                    onChange={(e) => { setSelectedInstitute(e.target.value === "" ? "" : Number(e.target.value)); setResult(null); }}
+                  >
+                    <option value="">-- Select an institute --</option>
+                    {institutes.map((inst) => (
+                      <option key={inst.instituteCode} value={inst.instituteCode}>
+                        {inst.instituteName}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {selectedInstitute !== "" && (
+                <div className="mb-4">
+                  <label className="form-label fw-bold">
+                    Type <span className="text-danger">DELETE</span> to confirm deletion for <strong>{selectedName}</strong>
+                  </label>
+                  <input
+                    className="form-control form-control-solid"
+                    value={confirmText}
+                    onChange={(e) => setConfirmText(e.target.value)}
+                    placeholder='Type "DELETE" to confirm'
+                  />
+                </div>
+              )}
+
+              <button
+                className="btn btn-danger"
+                disabled={!selectedInstitute || confirmText !== "DELETE" || loading}
+                onClick={handleDelete}
+              >
+                {loading ? (
+                  <><span className="spinner-border spinner-border-sm me-2"></span>Deleting...</>
+                ) : (
+                  <><i className="bi bi-trash me-2"></i>Delete All Firebase Students</>
+                )}
+              </button>
+
+              {result && (
+                <div className={`alert mt-4 ${result.error ? "alert-danger" : "alert-success"}`}>
+                  {result.error ? (
+                    <><i className="bi bi-x-circle me-2"></i>{result.error}</>
+                  ) : (
+                    <>
+                      <i className="bi bi-check-circle me-2"></i>
+                      Deleted <strong>{result.deleted}</strong> of {result.total} Firebase students.
+                      {result.errors?.length > 0 && (
+                        <div className="mt-2">
+                          <strong>{result.errors.length} errors:</strong>
+                          <ul className="mb-0 mt-1">
+                            {result.errors.map((e: any, i: number) => (
+                              <li key={i}>Student {e.userStudentId}: {e.error}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const OldDataMappingPage = () => {
-  const [mode, setMode] = useState<"select" | "student-import" | "existing-mapping">("select");
+  const [mode, setMode] = useState<"select" | "student-import" | "existing-mapping" | "delete-firebase">("select");
 
   if (mode === "student-import") {
     return <StudentImportWizard onBack={() => setMode("select")} />;
@@ -11,6 +144,10 @@ const OldDataMappingPage = () => {
 
   if (mode === "existing-mapping") {
     return <ExistingMappingView onBack={() => setMode("select")} />;
+  }
+
+  if (mode === "delete-firebase") {
+    return <DeleteFirebaseStudentsPanel onBack={() => setMode("select")} />;
   }
 
   return (
@@ -28,7 +165,7 @@ const OldDataMappingPage = () => {
 
           <div className="row g-6 justify-content-center">
             {/* Student & Score Import */}
-            <div className="col-12 col-md-4">
+            <div className="col-12 col-md-3">
               <div
                 className="card card-hover border border-success border-2 h-100"
                 style={{ cursor: "pointer" }}
@@ -51,7 +188,7 @@ const OldDataMappingPage = () => {
             </div>
 
             {/* Existing Mapping */}
-            <div className="col-12 col-md-4">
+            <div className="col-12 col-md-3">
               <div
                 className="card card-hover border border-primary border-2 h-100"
                 style={{ cursor: "pointer" }}
@@ -73,8 +210,31 @@ const OldDataMappingPage = () => {
               </div>
             </div>
 
+            {/* Delete Firebase Students */}
+            <div className="col-12 col-md-3">
+              <div
+                className="card card-hover border border-danger border-2 h-100"
+                style={{ cursor: "pointer" }}
+                onClick={() => setMode("delete-firebase")}
+              >
+                <div className="card-body p-6 d-flex flex-column align-items-center text-center">
+                  <div className="symbol symbol-60px mb-4 bg-light-danger rounded">
+                    <span className="symbol-label">
+                      <i className="bi bi-trash fs-2x text-danger"></i>
+                    </span>
+                  </div>
+                  <h4 className="fw-bold text-dark mb-2">Delete Firebase Students</h4>
+                  <p className="text-muted fs-7">
+                    Remove all Firebase-imported students from an institute,
+                    including their answers, scores, and report data.
+                  </p>
+                  <button className="btn btn-danger mt-auto">Delete Students</button>
+                </div>
+              </div>
+            </div>
+
             {/* Offline (Coming Soon) */}
-            <div className="col-12 col-md-4">
+            <div className="col-12 col-md-3">
               <div className="card h-100 border border-secondary border-2" style={{ opacity: 0.6 }}>
                 <div className="card-body p-6 d-flex flex-column align-items-center text-center">
                   <div className="symbol symbol-60px mb-4 bg-light-secondary rounded">

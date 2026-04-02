@@ -19,6 +19,8 @@ public interface NavigatorReportDataRepository extends JpaRepository<NavigatorRe
 
     void deleteByUserStudentUserStudentIdAndAssessmentId(Long userStudentId, Long assessmentId);
 
+    void deleteByUserStudentUserStudentId(Long userStudentId);
+
     void deleteByAssessmentId(Long assessmentId);
 
     List<NavigatorReportData> findByAssessmentIdAndEligible(Long assessmentId, boolean eligible);
