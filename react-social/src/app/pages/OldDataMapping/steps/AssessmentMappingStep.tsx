@@ -890,8 +890,8 @@ const AssessmentMappingStep = ({
                 onChange={(e) => setBulkAssessmentId(e.target.value)}
                 disabled={applying}
               >
-                <option value="">{schoolAssessmentsLoading ? "Loading..." : bulkSchoolId ? "-- Select Assessment --" : "-- Select School First --"}</option>
-                {schoolAssessments.map((a: any) => (
+                <option value="">-- Select Assessment --</option>
+                {assessments.map((a: any) => (
                   <option key={a.id} value={a.id}>
                     {a.AssessmentName}
                   </option>
