@@ -809,7 +809,25 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
       processStringArray(sa.subjectsOfInterest, "subjectofinterest", "Subject of Interest");
       processStringArray(sa.values, "values", "Values");
 
-      if (answers.length === 0) continue;
+      if (answers.length === 0) {
+        // Student has no matching answers at all — treat as partial with all questions missing
+        partialStudents++;
+        const allMissingLabels = Array.from(allMappedKeys).map((key) => {
+          const lookup = questionLookup.get(key);
+          return lookup ? lookup.firebaseQuestion : key.split("::")[1] || key;
+        });
+        partialDetails.push({
+          name: sa.name || "Unknown",
+          firebaseDocId: sa.firebaseDocId,
+          userStudentId,
+          assessmentId: sa.assessmentId,
+          answeredCount: 0,
+          totalMapped: allMappedKeys.size,
+          missingQuestions: allMissingLabels,
+        });
+        setApplyProgress(Math.round(((i + 1) / studentAssignments.length) * 100));
+        continue;
+      }
 
       try {
         const res = await importMappedAnswers({
@@ -819,6 +837,26 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
         });
         totalStudents++;
         totalAnswers += answers.length;
+
+        // Check if this student has missing questions (partial answers)
+        const resData = res?.data || {};
+        const missingKeys = Array.from(allMappedKeys).filter((k) => !answeredKeys.has(k));
+        if (resData.status === "ongoing" || missingKeys.length > 0) {
+          partialStudents++;
+          const missingQuestionLabels = missingKeys.map((key) => {
+            const lookup = questionLookup.get(key);
+            return lookup ? lookup.firebaseQuestion : key.split("::")[1] || key;
+          });
+          partialDetails.push({
+            name: sa.name || "Unknown",
+            firebaseDocId: sa.firebaseDocId,
+            userStudentId,
+            assessmentId: sa.assessmentId,
+            answeredCount: answers.length,
+            totalMapped: allMappedKeys.size,
+            missingQuestions: missingQuestionLabels,
+          });
+        }
       } catch (err: any) {
         const msg = err?.response?.data?.error || err?.message || "Unknown error";
         errors.push(`${sa.name}: ${msg}`);
@@ -872,6 +910,8 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
       );
       setShowPartialModal(false);
       setApplyResult((prev) => prev ? { ...prev, partialStudents: 0 } : prev);
+      // Move to Done screen after marking all as completed
+      onDone();
     } catch (err) {
       setError("Failed to force-complete status.");
     } finally {
@@ -1489,14 +1529,14 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
                 Close
               </button>
               <button
-                className="btn btn-primary"
+                className="btn btn-success"
                 onClick={handleForceComplete}
                 disabled={forceCompleting}
               >
                 {forceCompleting ? (
                   <><span className="spinner-border spinner-border-sm me-1"></span>Updating...</>
                 ) : (
-                  <><i className="bi bi-check2-all me-1"></i>Mark All as Completed &amp; Continue</>
+                  <>Next: Mark All as Completed <i className="bi bi-arrow-right ms-1"></i></>
                 )}
               </button>
             </div>
