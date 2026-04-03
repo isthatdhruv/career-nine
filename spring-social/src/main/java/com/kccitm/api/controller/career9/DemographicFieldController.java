@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.career9.DemographicFieldDefinition;
 import com.kccitm.api.model.career9.DemographicFieldOption;
 import com.kccitm.api.repository.Career9.DemographicFieldDefinitionRepository;
@@ -37,9 +38,9 @@ public class DemographicFieldController {
 
     @GetMapping("/get/{id}")
     public ResponseEntity<DemographicFieldDefinition> getById(@PathVariable Long id) {
-        return fieldDefinitionRepository.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        DemographicFieldDefinition field = fieldDefinitionRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("DemographicField", "id", id));
+        return ResponseEntity.ok(field);
     }
 
     @PostMapping("/create")
@@ -58,42 +59,43 @@ public class DemographicFieldController {
     @PutMapping("/update/{id}")
     public ResponseEntity<DemographicFieldDefinition> update(@PathVariable Long id,
             @RequestBody DemographicFieldDefinition fieldUpdate) {
-        return fieldDefinitionRepository.findById(id).map(existing -> {
-            existing.setFieldName(fieldUpdate.getFieldName());
-            existing.setDisplayLabel(fieldUpdate.getDisplayLabel());
-            existing.setFieldSource(fieldUpdate.getFieldSource());
-            existing.setSystemFieldKey(fieldUpdate.getSystemFieldKey());
-            existing.setDataType(fieldUpdate.getDataType());
-            existing.setValidationRegex(fieldUpdate.getValidationRegex());
-            existing.setValidationMessage(fieldUpdate.getValidationMessage());
-            existing.setMinValue(fieldUpdate.getMinValue());
-            existing.setMaxValue(fieldUpdate.getMaxValue());
-            existing.setPlaceholder(fieldUpdate.getPlaceholder());
-            existing.setDefaultValue(fieldUpdate.getDefaultValue());
-            if (fieldUpdate.getIsActive() != null) {
-                existing.setIsActive(fieldUpdate.getIsActive());
-            }
+        DemographicFieldDefinition existing = fieldDefinitionRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("DemographicField", "id", id));
 
-            // Replace options (orphanRemoval handles deletion of old ones)
-            existing.getOptions().clear();
-            if (fieldUpdate.getOptions() != null) {
-                for (DemographicFieldOption option : fieldUpdate.getOptions()) {
-                    option.setFieldDefinition(existing);
-                    existing.getOptions().add(option);
-                }
-            }
+        existing.setFieldName(fieldUpdate.getFieldName());
+        existing.setDisplayLabel(fieldUpdate.getDisplayLabel());
+        existing.setFieldSource(fieldUpdate.getFieldSource());
+        existing.setSystemFieldKey(fieldUpdate.getSystemFieldKey());
+        existing.setDataType(fieldUpdate.getDataType());
+        existing.setValidationRegex(fieldUpdate.getValidationRegex());
+        existing.setValidationMessage(fieldUpdate.getValidationMessage());
+        existing.setMinValue(fieldUpdate.getMinValue());
+        existing.setMaxValue(fieldUpdate.getMaxValue());
+        existing.setPlaceholder(fieldUpdate.getPlaceholder());
+        existing.setDefaultValue(fieldUpdate.getDefaultValue());
+        if (fieldUpdate.getIsActive() != null) {
+            existing.setIsActive(fieldUpdate.getIsActive());
+        }
 
-            return ResponseEntity.ok(fieldDefinitionRepository.save(existing));
-        }).orElse(ResponseEntity.notFound().build());
+        // Replace options (orphanRemoval handles deletion of old ones)
+        existing.getOptions().clear();
+        if (fieldUpdate.getOptions() != null) {
+            for (DemographicFieldOption option : fieldUpdate.getOptions()) {
+                option.setFieldDefinition(existing);
+                existing.getOptions().add(option);
+            }
+        }
+
+        return ResponseEntity.ok(fieldDefinitionRepository.save(existing));
     }
 
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<String> delete(@PathVariable Long id) {
-        return fieldDefinitionRepository.findById(id).map(existing -> {
-            // Soft delete - set isActive to false
-            existing.setIsActive(false);
-            fieldDefinitionRepository.save(existing);
-            return ResponseEntity.ok("Field definition deactivated successfully");
-        }).orElse(ResponseEntity.notFound().build());
+        DemographicFieldDefinition existing = fieldDefinitionRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("DemographicField", "id", id));
+        // Soft delete - set isActive to false
+        existing.setIsActive(false);
+        fieldDefinitionRepository.save(existing);
+        return ResponseEntity.ok("Field definition deactivated successfully");
     }
 }

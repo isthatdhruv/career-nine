@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import '../Counselling.css'
+import { showErrorToast } from '../../../utils/toast'
 import PortalLayout, { MenuItem } from '../../portal/PortalLayout'
 import StatusBadge from '../shared/StatusBadge'
 import NotificationBell from '../shared/NotificationBell'
@@ -132,7 +133,7 @@ const StudentCounsellingPage: React.FC = () => {
         )
       })
       .catch(() => {
-        alert('Could not cancel the session. Please try again.')
+        showErrorToast('Could not cancel the session. Please try again.')
       })
       .finally(() => setCancellingId(null))
   }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { showErrorToast } from '../../../utils/toast';
 import { usePreventReload } from "./usePreventReload";
 
 type DemographicData = {
@@ -171,7 +172,7 @@ const DemographicDetailsPage: React.FC = () => {
     // Get userStudentId from localStorage
     const userStudentId = localStorage.getItem('userStudentId');
     if (!userStudentId) {
-      alert("Session expired. Please login again.");
+      showErrorToast("Session expired. Please login again.");
       navigate("/login");
       return;
     }
@@ -228,7 +229,7 @@ const DemographicDetailsPage: React.FC = () => {
       navigate("/allotted-assessment");
     } catch (error: any) {
       console.error("Error saving demographics:", error);
-      alert(error.response?.data?.error || "Failed to save demographics. Please try again.");
+      showErrorToast(error.response?.data?.error || "Failed to save demographics. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

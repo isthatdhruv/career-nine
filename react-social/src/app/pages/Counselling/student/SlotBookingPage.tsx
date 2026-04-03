@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import '../Counselling.css'
+import { showErrorToast } from '../../../utils/toast'
 import PortalLayout, { MenuItem } from '../../portal/PortalLayout'
 import { getAvailableSlots } from '../API/SlotAPI'
 import { bookSlot } from '../API/AppointmentAPI'
@@ -127,7 +128,7 @@ const SlotBookingPage: React.FC = () => {
         setBooked(true)
       })
       .catch(() => {
-        alert('Could not complete the booking. Please try again.')
+        showErrorToast('Could not complete the booking. Please try again.')
       })
       .finally(() => setLoading(false))
   }

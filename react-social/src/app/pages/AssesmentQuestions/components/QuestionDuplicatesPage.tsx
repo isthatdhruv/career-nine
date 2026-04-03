@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { ReadQuestionsData, DeleteQuestionData } from "../API/Question_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 interface OptionScore {
   scoreId: number;
@@ -161,7 +162,7 @@ const QuestionDuplicatesPage: React.FC = () => {
       setAllQuestions((prev) => prev.filter((q) => q.questionId !== questionId));
     } catch (e) {
       console.error("Delete failed", e);
-      alert("Failed to delete question. Please try again.");
+      showErrorToast("Failed to delete question. Please try again.");
     }
     setDeleting(null);
   };

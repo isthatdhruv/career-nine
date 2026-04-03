@@ -9,6 +9,7 @@ import {
   deleteAssessmentMapping,
   updateAssessmentMapping,
 } from "../../AssessmentMapping/API/AssessmentMapping_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 interface AssessmentMappingModalProps {
   show: boolean;
@@ -72,7 +73,7 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
 
   const handleCreate = async () => {
     if (!selectedAssessment) {
-      alert("Please select an assessment");
+      showErrorToast("Please select an assessment");
       return;
     }
 
@@ -84,20 +85,20 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
 
     if (mappingLevel === "SESSION") {
       if (!selectedSession) {
-        alert("Please select a session");
+        showErrorToast("Please select a session");
         return;
       }
       data.sessionId = Number(selectedSession);
     } else if (mappingLevel === "CLASS") {
       if (!selectedSession || !selectedClass) {
-        alert("Please select a session and class");
+        showErrorToast("Please select a session and class");
         return;
       }
       data.sessionId = Number(selectedSession);
       data.classId = Number(selectedClass);
     } else if (mappingLevel === "SECTION") {
       if (!selectedSession || !selectedClass || !selectedSection) {
-        alert("Please select a session, class, and section");
+        showErrorToast("Please select a session, class, and section");
         return;
       }
       data.sessionId = Number(selectedSession);
@@ -118,7 +119,7 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
       setSelectedSection("");
     } catch (error: any) {
       console.error("Failed to create mapping:", error);
-      alert(
+      showErrorToast(
         "Failed to create mapping: " +
           (error.response?.data || error.message)
       );

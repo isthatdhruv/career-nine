@@ -57,6 +57,8 @@ import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
+import com.kccitm.api.exception.ResourceNotFoundException;
+import com.kccitm.api.exception.ServiceException;
 import com.kccitm.api.repository.UserRepository;
 
 @RestController
@@ -494,252 +496,187 @@ public class StudentInfoController {
 
     @GetMapping("/getDemographics/{userStudentId}")
     public ResponseEntity<?> getDemographics(@PathVariable("userStudentId") Long userStudentId) {
-        try {
-            // Find UserStudent by userStudentId
-            UserStudent userStudent = userStudentRepository.findById(userStudentId)
-                    .orElse(null);
+        UserStudent userStudent = userStudentRepository.findById(userStudentId)
+                .orElseThrow(() -> new ResourceNotFoundException("UserStudent", "id", userStudentId));
 
-            if (userStudent == null) {
-                Map<String, String> error = new HashMap<>();
-                error.put("error", "Student not found with userStudentId: " + userStudentId);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
-            }
+        // Get associated StudentInfo
+        StudentInfo studentInfo = userStudent.getStudentInfo();
 
-            // Get associated StudentInfo
-            StudentInfo studentInfo = userStudent.getStudentInfo();
-
-            if (studentInfo == null) {
-                Map<String, String> error = new HashMap<>();
-                error.put("error", "Student info not found for userStudentId: " + userStudentId);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
-            }
-
-            // Build response with demographic data
-            Map<String, Object> response = new HashMap<>();
-            response.put("name", studentInfo.getName());
-            response.put("gender", studentInfo.getGender());
-            response.put("studentClass", studentInfo.getStudentClass());
-            response.put("schoolBoard", studentInfo.getSchoolBoard());
-            response.put("sibling", studentInfo.getSibling());
-            response.put("family", studentInfo.getFamily());
-            response.put("schoolSectionId", studentInfo.getSchoolSectionId());
-            if (studentInfo.getUser() != null) {
-                response.put("username", studentInfo.getUser().getUsername());
-            }
-
-            // Look up class name and section name from schoolSectionId
-            if (studentInfo.getSchoolSectionId() != null) {
-                schoolSectionsRepository.findById(studentInfo.getSchoolSectionId()).ifPresent(section -> {
-                    response.put("sectionName", section.getSectionName());
-                    if (section.getSchoolClasses() != null) {
-                        response.put("className", section.getSchoolClasses().getClassName());
-                    }
-                });
-            }
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            System.err.println("Error fetching demographics: " + e.getMessage());
-            e.printStackTrace();
-            Map<String, String> error = new HashMap<>();
-            error.put("error", "Failed to fetch demographics: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        if (studentInfo == null) {
+            throw new ResourceNotFoundException("StudentInfo", "userStudentId", userStudentId);
         }
+
+        // Build response with demographic data
+        Map<String, Object> response = new HashMap<>();
+        response.put("name", studentInfo.getName());
+        response.put("gender", studentInfo.getGender());
+        response.put("studentClass", studentInfo.getStudentClass());
+        response.put("schoolBoard", studentInfo.getSchoolBoard());
+        response.put("sibling", studentInfo.getSibling());
+        response.put("family", studentInfo.getFamily());
+        response.put("schoolSectionId", studentInfo.getSchoolSectionId());
+        if (studentInfo.getUser() != null) {
+            response.put("username", studentInfo.getUser().getUsername());
+        }
+
+        // Look up class name and section name from schoolSectionId
+        if (studentInfo.getSchoolSectionId() != null) {
+            schoolSectionsRepository.findById(studentInfo.getSchoolSectionId()).ifPresent(section -> {
+                response.put("sectionName", section.getSectionName());
+                if (section.getSchoolClasses() != null) {
+                    response.put("className", section.getSchoolClasses().getClassName());
+                }
+            });
+        }
+
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/updateDemographics")
     public ResponseEntity<?> updateDemographics(@RequestBody Map<String, Object> request) {
-        try {
-            Long userStudentId = Long.valueOf(request.get("userStudentId").toString());
+        Long userStudentId = Long.valueOf(request.get("userStudentId").toString());
 
-            // Find UserStudent by userStudentId
-            UserStudent userStudent = userStudentRepository.findById(userStudentId)
-                    .orElse(null);
+        // Find UserStudent by userStudentId
+        UserStudent userStudent = userStudentRepository.findById(userStudentId)
+                .orElseThrow(() -> new ResourceNotFoundException("UserStudent", "id", userStudentId));
 
-            if (userStudent == null) {
-                Map<String, String> error = new HashMap<>();
-                error.put("error", "Student not found with userStudentId: " + userStudentId);
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
-            }
+        // Get associated StudentInfo
+        StudentInfo studentInfo = userStudent.getStudentInfo();
 
-            // Get associated StudentInfo
-            StudentInfo studentInfo = userStudent.getStudentInfo();
-
-            // Update fields if present in request
-            if (request.containsKey("name")) {
-                studentInfo.setName(request.get("name").toString());
-            }
-            if (request.containsKey("gender")) {
-                studentInfo.setGender(request.get("gender").toString());
-            }
-            if (request.containsKey("sibling")) {
-                Object siblingVal = request.get("sibling");
-                if (siblingVal != null) {
-                    studentInfo.setSibling(Integer.valueOf(siblingVal.toString()));
-                }
-            }
-            if (request.containsKey("family")) {
-                studentInfo.setFamily(request.get("family").toString());
-            }
-            if (request.containsKey("schoolBoard")) {
-                studentInfo.setSchoolBoard(request.get("schoolBoard").toString());
-            }
-            if (request.containsKey("studentClass")) {
-                Object classVal = request.get("studentClass");
-                if (classVal != null) {
-                    studentInfo.setStudentClass(Integer.valueOf(classVal.toString()));
-                }
-            }
-
-            // Save updated StudentInfo
-            StudentInfo saved = studentInfoRepository.save(studentInfo);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Demographics updated successfully");
-            response.put("studentInfo", saved);
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            System.err.println("Error updating demographics: " + e.getMessage());
-            e.printStackTrace();
-            Map<String, String> error = new HashMap<>();
-            error.put("error", "Failed to update demographics: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        // Update fields if present in request
+        if (request.containsKey("name")) {
+            studentInfo.setName(request.get("name").toString());
         }
+        if (request.containsKey("gender")) {
+            studentInfo.setGender(request.get("gender").toString());
+        }
+        if (request.containsKey("sibling")) {
+            Object siblingVal = request.get("sibling");
+            if (siblingVal != null) {
+                studentInfo.setSibling(Integer.valueOf(siblingVal.toString()));
+            }
+        }
+        if (request.containsKey("family")) {
+            studentInfo.setFamily(request.get("family").toString());
+        }
+        if (request.containsKey("schoolBoard")) {
+            studentInfo.setSchoolBoard(request.get("schoolBoard").toString());
+        }
+        if (request.containsKey("studentClass")) {
+            Object classVal = request.get("studentClass");
+            if (classVal != null) {
+                studentInfo.setStudentClass(Integer.valueOf(classVal.toString()));
+            }
+        }
+
+        // Save updated StudentInfo
+        StudentInfo saved = studentInfoRepository.save(studentInfo);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Demographics updated successfully");
+        response.put("studentInfo", saved);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/resetAssessment")
     @javax.transaction.Transactional
     public ResponseEntity<?> resetAssessment(@RequestBody Map<String, Long> request) {
-        try {
-            Long userStudentId = request.get("userStudentId");
-            Long assessmentId = request.get("assessmentId");
+        Long userStudentId = request.get("userStudentId");
+        Long assessmentId = request.get("assessmentId");
 
-            if (userStudentId == null || assessmentId == null) {
-                Map<String, String> error = new HashMap<>();
-                error.put("error", "userStudentId and assessmentId are required");
-                return ResponseEntity.badRequest().body(error);
-            }
-
-            // Find the mapping
-            java.util.Optional<StudentAssessmentMapping> mappingOpt = studentAssessmentMappingRepository
-                    .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
-
-            if (mappingOpt.isEmpty()) {
-                Map<String, String> error = new HashMap<>();
-                error.put("error", "No assessment mapping found for this student and assessment");
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
-            }
-
-            StudentAssessmentMapping mapping = mappingOpt.get();
-
-            // Delete assessment answers for this student + assessment
-            assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(
-                    userStudentId, assessmentId);
-
-            // Delete raw scores for this mapping
-            assessmentRawScoreRepository.deleteByStudentAssessmentMappingStudentAssessmentId(
-                    mapping.getStudentAssessmentId());
-
-            // Delete proctoring data for this student + assessment
-            assessmentProctoringQuestionLogRepository.deleteByUserStudentUserStudentIdAndAssessmentId(
-                    userStudentId, assessmentId);
-
-            // Clear all Redis state for this student+assessment to prevent:
-            // 1. Auto-flush writing stale partial answers back to MySQL
-            // 2. Retry scheduler re-processing old submitted answers
-            assessmentSessionService.deleteSession(userStudentId, assessmentId);
-            assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
-            assessmentSessionService.deletePartialAnswers(userStudentId, assessmentId);
-            assessmentSessionService.deleteSubmittedAnswers(userStudentId, assessmentId);
-
-            // Reset status to 'notstarted'
-            mapping.setStatus("notstarted");
-            studentAssessmentMappingRepository.save(mapping);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Assessment reset successfully");
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            System.err.println("Error resetting assessment: " + e.getMessage());
-            e.printStackTrace();
+        if (userStudentId == null || assessmentId == null) {
             Map<String, String> error = new HashMap<>();
-            error.put("error", "Failed to reset assessment: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+            error.put("error", "userStudentId and assessmentId are required");
+            return ResponseEntity.badRequest().body(error);
         }
+
+        // Find the mapping
+        StudentAssessmentMapping mapping = studentAssessmentMappingRepository
+                .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("StudentAssessmentMapping", "userStudentId/assessmentId", userStudentId + "/" + assessmentId));
+
+        // Delete assessment answers for this student + assessment
+        assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(
+                userStudentId, assessmentId);
+
+        // Delete raw scores for this mapping
+        assessmentRawScoreRepository.deleteByStudentAssessmentMappingStudentAssessmentId(
+                mapping.getStudentAssessmentId());
+
+        // Delete proctoring data for this student + assessment
+        assessmentProctoringQuestionLogRepository.deleteByUserStudentUserStudentIdAndAssessmentId(
+                userStudentId, assessmentId);
+
+        // Clear all Redis state for this student+assessment to prevent:
+        // 1. Auto-flush writing stale partial answers back to MySQL
+        // 2. Retry scheduler re-processing old submitted answers
+        assessmentSessionService.deleteSession(userStudentId, assessmentId);
+        assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
+        assessmentSessionService.deletePartialAnswers(userStudentId, assessmentId);
+        assessmentSessionService.deleteSubmittedAnswers(userStudentId, assessmentId);
+
+        // Reset status to 'notstarted'
+        mapping.setStatus("notstarted");
+        studentAssessmentMappingRepository.save(mapping);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Assessment reset successfully");
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/getStudentScores")
     public ResponseEntity<?> getStudentScores(
             @RequestParam Long userStudentId,
             @RequestParam Long assessmentId) {
-        try {
-            // Find the student assessment mapping
-            Optional<StudentAssessmentMapping> mappingOpt = studentAssessmentMappingRepository
-                    .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+        // Find the student assessment mapping
+        StudentAssessmentMapping mapping = studentAssessmentMappingRepository
+                .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("StudentAssessmentMapping", "userStudentId/assessmentId", userStudentId + "/" + assessmentId));
 
-            if (mappingOpt.isEmpty()) {
-                Map<String, String> error = new HashMap<>();
-                error.put("error", "No assessment mapping found for this student and assessment");
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
-            }
+        // Get raw scores for this mapping
+        List<AssessmentRawScore> rawScores = assessmentRawScoreRepository
+                .findByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId());
 
-            StudentAssessmentMapping mapping = mappingOpt.get();
+        // Get student info
+        UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
+        StudentInfo studentInfo = userStudent != null ? userStudent.getStudentInfo() : null;
 
-            // Get raw scores for this mapping
-            List<AssessmentRawScore> rawScores = assessmentRawScoreRepository
-                    .findByStudentAssessmentMappingStudentAssessmentId(mapping.getStudentAssessmentId());
+        // Build response
+        Map<String, Object> response = new HashMap<>();
 
-            // Get student info
-            UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
-            StudentInfo studentInfo = userStudent != null ? userStudent.getStudentInfo() : null;
-
-            // Build response
-            Map<String, Object> response = new HashMap<>();
-
-            // Student details
-            Map<String, Object> studentDetails = new HashMap<>();
-            if (studentInfo != null) {
-                studentDetails.put("name", studentInfo.getName());
-                studentDetails.put("rollNumber", studentInfo.getSchoolRollNumber());
-                studentDetails.put("studentClass", studentInfo.getStudentClass());
-                studentDetails.put("dob", studentInfo.getStudentDob());
-            }
-            response.put("student", studentDetails);
-
-            // Scores list
-            List<Map<String, Object>> scoresList = rawScores.stream().map(score -> {
-                Map<String, Object> scoreMap = new HashMap<>();
-                if (score.getMeasuredQualityType() != null) {
-                    scoreMap.put("measuredQualityTypeName", score.getMeasuredQualityType().getMeasuredQualityTypeName());
-                    scoreMap.put("measuredQualityTypeDisplayName",
-                            score.getMeasuredQualityType().getMeasuredQualityTypeDisplayName() != null
-                                    ? score.getMeasuredQualityType().getMeasuredQualityTypeDisplayName()
-                                    : score.getMeasuredQualityType().getMeasuredQualityTypeName());
-                }
-                if (score.getMeasuredQuality() != null) {
-                    scoreMap.put("measuredQualityName", score.getMeasuredQuality().getMeasuredQualityName());
-                }
-                scoreMap.put("rawScore", score.getRawScore());
-                return scoreMap;
-            }).collect(Collectors.toList());
-
-            response.put("scores", scoresList);
-            response.put("status", mapping.getStatus());
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            System.err.println("Error fetching student scores: " + e.getMessage());
-            e.printStackTrace();
-            Map<String, String> error = new HashMap<>();
-            error.put("error", "Failed to fetch student scores: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        // Student details
+        Map<String, Object> studentDetails = new HashMap<>();
+        if (studentInfo != null) {
+            studentDetails.put("name", studentInfo.getName());
+            studentDetails.put("rollNumber", studentInfo.getSchoolRollNumber());
+            studentDetails.put("studentClass", studentInfo.getStudentClass());
+            studentDetails.put("dob", studentInfo.getStudentDob());
         }
+        response.put("student", studentDetails);
+
+        // Scores list
+        List<Map<String, Object>> scoresList = rawScores.stream().map(score -> {
+            Map<String, Object> scoreMap = new HashMap<>();
+            if (score.getMeasuredQualityType() != null) {
+                scoreMap.put("measuredQualityTypeName", score.getMeasuredQualityType().getMeasuredQualityTypeName());
+                scoreMap.put("measuredQualityTypeDisplayName",
+                        score.getMeasuredQualityType().getMeasuredQualityTypeDisplayName() != null
+                                ? score.getMeasuredQualityType().getMeasuredQualityTypeDisplayName()
+                                : score.getMeasuredQualityType().getMeasuredQualityTypeName());
+            }
+            if (score.getMeasuredQuality() != null) {
+                scoreMap.put("measuredQualityName", score.getMeasuredQuality().getMeasuredQualityName());
+            }
+            scoreMap.put("rawScore", score.getRawScore());
+            return scoreMap;
+        }).collect(Collectors.toList());
+
+        response.put("scores", scoresList);
+        response.put("status", mapping.getStatus());
+
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/exportScoresByInstitute/{instituteId}")
@@ -985,184 +922,165 @@ public class StudentInfoController {
     public ResponseEntity<?> getBetReport(
             @PathVariable("instituteId") Integer instituteId,
             @PathVariable("assessmentId") Long assessmentId) {
-        try {
-            // 1. Validate assessment exists and is BET type
-            Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(assessmentId);
-            if (assessmentOpt.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("error", "Assessment not found"));
+        // 1. Validate assessment exists and is BET type
+        AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assessment", "id", assessmentId));
+        if (assessment.getQuestionnaire() == null) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Assessment has no linked questionnaire"));
+        }
+        Boolean qType = assessment.getQuestionnaire().getType();
+        if (qType == null || !qType) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Assessment is not a BET type"));
+        }
+
+        Long questionnaireId = assessment.getQuestionnaire().getQuestionnaireId();
+
+        // 2. Get question structure sorted by section order then question order
+        List<QuestionnaireQuestion> qqList = questionnaireQuestionRepository
+                .findByQuestionnaireIdWithOptions(questionnaireId);
+
+        // Sort by section orderIndex, then by questionnaireQuestionId within section
+        qqList.sort((a, b) -> {
+            String orderA = a.getSection() != null ? a.getSection().getOrder() : "";
+            String orderB = b.getSection() != null ? b.getSection().getOrder() : "";
+            int cmp = (orderA != null ? orderA : "").compareTo(orderB != null ? orderB : "");
+            if (cmp != 0) return cmp;
+            return Long.compare(a.getQuestionnaireQuestionId(), b.getQuestionnaireQuestionId());
+        });
+
+        // 3. Build dynamic columns
+        List<Map<String, Object>> columns = new ArrayList<>();
+        for (QuestionnaireQuestion qq : qqList) {
+            String header = qq.getExcelQuestionHeader();
+            if (header == null || header.isEmpty()) {
+                header = "Q_" + qq.getQuestionnaireQuestionId();
             }
-            AssessmentTable assessment = assessmentOpt.get();
-            if (assessment.getQuestionnaire() == null) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "Assessment has no linked questionnaire"));
+            boolean isMQT = qq.getQuestion() != null
+                    && qq.getQuestion().getIsMQT() != null
+                    && qq.getQuestion().getIsMQT();
+
+            Map<String, Object> col = new LinkedHashMap<>();
+            col.put("key", header);
+            col.put("header", header);
+            col.put("questionId", qq.getQuestionnaireQuestionId());
+            col.put("isMQT", isMQT);
+            columns.add(col);
+        }
+
+        // 4. Get completed students for this institute and assessment
+        List<UserStudent> userStudents = userStudentRepository.findByInstituteInstituteCode(instituteId);
+        String instituteName = "";
+        var instituteList = instituteDetailRepository.findByInstituteCode(instituteId);
+        if (!instituteList.isEmpty()) {
+            instituteName = instituteList.get(0).getInstituteName();
+        }
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+
+        for (UserStudent us : userStudents) {
+            Optional<StudentAssessmentMapping> mappingOpt = studentAssessmentMappingRepository
+                    .findFirstByUserStudentUserStudentIdAndAssessmentId(
+                            us.getUserStudentId(), assessmentId);
+            if (mappingOpt.isEmpty() || !"completed".equals(mappingOpt.get().getStatus())) {
+                continue;
             }
-            Boolean qType = assessment.getQuestionnaire().getType();
-            if (qType == null || !qType) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "Assessment is not a BET type"));
-            }
 
-            Long questionnaireId = assessment.getQuestionnaire().getQuestionnaireId();
+            // 5. Get this student's answers
+            var answers = assessmentAnswerRepository
+                    .findByUserStudentIdAndAssessmentIdWithDetails(
+                            us.getUserStudentId(), assessmentId);
 
-            // 2. Get question structure sorted by section order then question order
-            List<QuestionnaireQuestion> qqList = questionnaireQuestionRepository
-                    .findByQuestionnaireIdWithOptions(questionnaireId);
-
-            // Sort by section orderIndex, then by questionnaireQuestionId within section
-            qqList.sort((a, b) -> {
-                String orderA = a.getSection() != null ? a.getSection().getOrder() : "";
-                String orderB = b.getSection() != null ? b.getSection().getOrder() : "";
-                int cmp = (orderA != null ? orderA : "").compareTo(orderB != null ? orderB : "");
-                if (cmp != 0) return cmp;
-                return Long.compare(a.getQuestionnaireQuestionId(), b.getQuestionnaireQuestionId());
-            });
-
-            // 3. Build dynamic columns
-            List<Map<String, Object>> columns = new ArrayList<>();
-            for (QuestionnaireQuestion qq : qqList) {
-                String header = qq.getExcelQuestionHeader();
-                if (header == null || header.isEmpty()) {
-                    header = "Q_" + qq.getQuestionnaireQuestionId();
+            // Index answers by questionnaireQuestionId (multiple answers possible for isMQT)
+            Map<Long, List<AssessmentAnswer>> answersByQuestionId = new HashMap<>();
+            for (var aa : answers) {
+                if (aa.getQuestionnaireQuestion() != null) {
+                    answersByQuestionId
+                            .computeIfAbsent(aa.getQuestionnaireQuestion().getQuestionnaireQuestionId(),
+                                    k -> new ArrayList<>())
+                            .add(aa);
                 }
-                boolean isMQT = qq.getQuestion() != null
-                        && qq.getQuestion().getIsMQT() != null
-                        && qq.getQuestion().getIsMQT();
-
-                Map<String, Object> col = new LinkedHashMap<>();
-                col.put("key", header);
-                col.put("header", header);
-                col.put("questionId", qq.getQuestionnaireQuestionId());
-                col.put("isMQT", isMQT);
-                columns.add(col);
             }
 
-            // 4. Get completed students for this institute and assessment
-            List<UserStudent> userStudents = userStudentRepository.findByInstituteInstituteCode(instituteId);
-            String instituteName = "";
-            var instituteList = instituteDetailRepository.findByInstituteCode(instituteId);
-            if (!instituteList.isEmpty()) {
-                instituteName = instituteList.get(0).getInstituteName();
-            }
+            // 6. Build row
+            Map<String, Object> row = new LinkedHashMap<>();
+            StudentInfo si = us.getStudentInfo();
+            row.put("name", si != null && si.getName() != null ? si.getName() : "");
+            row.put("institute", instituteName);
 
-            List<Map<String, Object>> rows = new ArrayList<>();
+            for (Map<String, Object> col : columns) {
+                String key = (String) col.get("key");
+                Long questionId = ((Number) col.get("questionId")).longValue();
+                boolean colIsMQT = (Boolean) col.get("isMQT");
 
-            for (UserStudent us : userStudents) {
-                Optional<StudentAssessmentMapping> mappingOpt = studentAssessmentMappingRepository
-                        .findFirstByUserStudentUserStudentIdAndAssessmentId(
-                                us.getUserStudentId(), assessmentId);
-                if (mappingOpt.isEmpty() || !"completed".equals(mappingOpt.get().getStatus())) {
-                    continue;
-                }
+                List<AssessmentAnswer> questionAnswers = answersByQuestionId.get(questionId);
 
-                // 5. Get this student's answers
-                var answers = assessmentAnswerRepository
-                        .findByUserStudentIdAndAssessmentIdWithDetails(
-                                us.getUserStudentId(), assessmentId);
-
-                // Index answers by questionnaireQuestionId (multiple answers possible for isMQT)
-                Map<Long, List<AssessmentAnswer>> answersByQuestionId = new HashMap<>();
-                for (var aa : answers) {
-                    if (aa.getQuestionnaireQuestion() != null) {
-                        answersByQuestionId
-                                .computeIfAbsent(aa.getQuestionnaireQuestion().getQuestionnaireQuestionId(),
-                                        k -> new ArrayList<>())
-                                .add(aa);
+                if (!colIsMQT) {
+                    // Non-MQT: show MQT score of the single selected option
+                    Object value = "";
+                    if (questionAnswers != null && !questionAnswers.isEmpty()) {
+                        AssessmentAnswer aa = questionAnswers.get(0);
+                        if (aa.getOption() != null && aa.getOption().getOptionScores() != null) {
+                            int totalScore = 0;
+                            for (OptionScoreBasedOnMEasuredQualityTypes os : aa.getOption().getOptionScores()) {
+                                if (os.getScore() != null) {
+                                    totalScore += os.getScore();
+                                }
+                            }
+                            value = totalScore;
+                        }
                     }
-                }
-
-                // 6. Build row
-                Map<String, Object> row = new LinkedHashMap<>();
-                StudentInfo si = us.getStudentInfo();
-                row.put("name", si != null && si.getName() != null ? si.getName() : "");
-                row.put("institute", instituteName);
-
-                for (Map<String, Object> col : columns) {
-                    String key = (String) col.get("key");
-                    Long questionId = ((Number) col.get("questionId")).longValue();
-                    boolean colIsMQT = (Boolean) col.get("isMQT");
-
-                    List<AssessmentAnswer> questionAnswers = answersByQuestionId.get(questionId);
-
-                    if (!colIsMQT) {
-                        // Non-MQT: show MQT score of the single selected option
-                        Object value = "";
-                        if (questionAnswers != null && !questionAnswers.isEmpty()) {
-                            AssessmentAnswer aa = questionAnswers.get(0);
+                    row.put(key, value);
+                } else {
+                    // MQT: cumulative score of all selected options
+                    int cumulativeScore = 0;
+                    boolean hasAnswers = false;
+                    if (questionAnswers != null) {
+                        for (AssessmentAnswer aa : questionAnswers) {
                             if (aa.getOption() != null && aa.getOption().getOptionScores() != null) {
-                                int totalScore = 0;
+                                hasAnswers = true;
                                 for (OptionScoreBasedOnMEasuredQualityTypes os : aa.getOption().getOptionScores()) {
                                     if (os.getScore() != null) {
-                                        totalScore += os.getScore();
-                                    }
-                                }
-                                value = totalScore;
-                            }
-                        }
-                        row.put(key, value);
-                    } else {
-                        // MQT: cumulative score of all selected options
-                        int cumulativeScore = 0;
-                        boolean hasAnswers = false;
-                        if (questionAnswers != null) {
-                            for (AssessmentAnswer aa : questionAnswers) {
-                                if (aa.getOption() != null && aa.getOption().getOptionScores() != null) {
-                                    hasAnswers = true;
-                                    for (OptionScoreBasedOnMEasuredQualityTypes os : aa.getOption().getOptionScores()) {
-                                        if (os.getScore() != null) {
-                                            cumulativeScore += os.getScore();
-                                        }
+                                        cumulativeScore += os.getScore();
                                     }
                                 }
                             }
                         }
-                        row.put(key, hasAnswers ? cumulativeScore : "");
                     }
+                    row.put(key, hasAnswers ? cumulativeScore : "");
                 }
-
-                rows.add(row);
             }
 
-            // 7. Build response
-            Map<String, Object> response = new LinkedHashMap<>();
-            response.put("columns", columns);
-            response.put("rows", rows);
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            System.err.println("Error generating BET report: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to generate BET report: " + e.getMessage()));
+            rows.add(row);
         }
+
+        // 7. Build response
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("columns", columns);
+        response.put("rows", rows);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/bulkRemoveAssessment")
     @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<?> bulkRemoveAssessment(@RequestBody List<Map<String, Long>> removals) {
-        try {
-            int removedCount = 0;
-            for (Map<String, Long> removal : removals) {
-                Long userStudentId = removal.get("userStudentId");
-                Long assessmentId = removal.get("assessmentId");
+        int removedCount = 0;
+        for (Map<String, Long> removal : removals) {
+            Long userStudentId = removal.get("userStudentId");
+            Long assessmentId = removal.get("assessmentId");
 
-                if (userStudentId != null && assessmentId != null) {
-                    studentAssessmentMappingRepository.deleteByUserStudentUserStudentIdAndAssessmentId(
-                            userStudentId, assessmentId);
-                    removedCount++;
-                }
+            if (userStudentId != null && assessmentId != null) {
+                studentAssessmentMappingRepository.deleteByUserStudentUserStudentIdAndAssessmentId(
+                        userStudentId, assessmentId);
+                removedCount++;
             }
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("removedCount", removedCount);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            System.err.println("Error removing assessments: " + e.getMessage());
-            Map<String, String> error = new HashMap<>();
-            error.put("error", "Failed to remove assessments: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
         }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("removedCount", removedCount);
+        return ResponseEntity.ok(response);
     }
 
 }

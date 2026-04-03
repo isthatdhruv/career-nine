@@ -186,8 +186,7 @@ public class FirebaseDataMappingController {
     @Transactional
     @PostMapping("/import-mapped-answers")
     public ResponseEntity<?> importMappedAnswers(@RequestBody Map<String, Object> payload) {
-        try {
-            Long userStudentId = getLong(payload, "userStudentId");
+        Long userStudentId = getLong(payload, "userStudentId");
             Long assessmentId = getLong(payload, "assessmentId");
 
             if (userStudentId == null || assessmentId == null) {
@@ -344,36 +343,27 @@ public class FirebaseDataMappingController {
                     ? "Answers imported and scores calculated successfully"
                     : "Partial answers imported (" + saved + "/" + totalQuestions + "), status set to ongoing"
             ));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", e.getMessage()));
-        }
     }
 
     @Transactional
     @PostMapping("/force-complete-status")
     public ResponseEntity<?> forceCompleteStatus(@RequestBody List<Map<String, Object>> payload) {
-        try {
-            int updated = 0;
-            for (Map<String, Object> item : payload) {
-                Long userStudentId = getLong(item, "userStudentId");
-                Long assessmentId = getLong(item, "assessmentId");
-                if (userStudentId == null || assessmentId == null) continue;
+        int updated = 0;
+        for (Map<String, Object> item : payload) {
+            Long userStudentId = getLong(item, "userStudentId");
+            Long assessmentId = getLong(item, "assessmentId");
+            if (userStudentId == null || assessmentId == null) continue;
 
-                Optional<StudentAssessmentMapping> samOpt = studentAssessmentMappingRepository
-                        .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
-                if (samOpt.isPresent()) {
-                    StudentAssessmentMapping sam = samOpt.get();
-                    sam.setStatus("completed");
-                    studentAssessmentMappingRepository.save(sam);
-                    updated++;
-                }
+            Optional<StudentAssessmentMapping> samOpt = studentAssessmentMappingRepository
+                    .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+            if (samOpt.isPresent()) {
+                StudentAssessmentMapping sam = samOpt.get();
+                sam.setStatus("completed");
+                studentAssessmentMappingRepository.save(sam);
+                updated++;
             }
-            return ResponseEntity.ok(Map.of("updated", updated));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", e.getMessage()));
         }
+        return ResponseEntity.ok(Map.of("updated", updated));
     }
 
     @DeleteMapping("/delete/{id}")

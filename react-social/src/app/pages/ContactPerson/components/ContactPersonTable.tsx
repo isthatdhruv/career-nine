@@ -6,6 +6,7 @@ import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { DeleteContactInformationData } from "../API/Contact_Person_APIs";
 import ContactPersonEditModal from "./ContactPersonEditModal";
+import { showErrorToast } from '../../../utils/toast';
 
 type ContactRow = {
   id?: string;
@@ -98,7 +99,7 @@ const ContactPersonTable = (props: {
                   props.setPageLoading(["true"]);
                 } catch (error) {
                   console.error("Delete failed:", error);
-                  alert("Failed to delete contact person. Please try again.");
+                  showErrorToast("Failed to delete contact person. Please try again.");
                 } finally {
                   props.setLoading(false);
                 }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createDemographicField } from '../API/DemographicField_APIs';
+import { showErrorToast } from '../../../utils/toast';
 
 const SYSTEM_FIELD_OPTIONS = [
   { key: 'name', label: 'Student Name', dataType: 'TEXT' },
@@ -74,17 +75,17 @@ const DemographicFieldCreatePage = () => {
     e.preventDefault();
 
     if (!fieldName.trim() || !displayLabel.trim()) {
-      alert('Field name and display label are required');
+      showErrorToast('Field name and display label are required');
       return;
     }
 
     if (fieldSource === 'SYSTEM' && !systemFieldKey) {
-      alert('Please select a system field');
+      showErrorToast('Please select a system field');
       return;
     }
 
     if ((dataType === 'SELECT_SINGLE' || dataType === 'SELECT_MULTI') && options.length === 0) {
-      alert('Select fields must have at least one option');
+      showErrorToast('Select fields must have at least one option');
       return;
     }
 
@@ -113,7 +114,7 @@ const DemographicFieldCreatePage = () => {
       navigate('/demographic-fields');
     } catch (error: any) {
       console.error('Error creating field:', error);
-      alert(error.response?.data?.message || 'Failed to create field');
+      showErrorToast(error.response?.data?.message || 'Failed to create field');
     } finally {
       setSaving(false);
     }

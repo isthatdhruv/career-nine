@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from "react";
+import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import { Modal, Button, Form, Spinner } from "react-bootstrap";
 import { getAssessmentIdNameMap, addStudentInfo, StudentInfo } from "./StudentInfo_APIs";
 import { GetSessionsByInstituteCode } from "../College/API/College_APIs";
@@ -89,11 +90,11 @@ const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, o
   const handleSubmit = async () => {
     // Basic validation
     if (!formData.name || !formData.dob || !formData.selectedAssessmentId || !selectedSectionId) {
-      alert("Please fill in all required fields (Name, DOB, Assessment, Section)");
+      showErrorToast("Please fill in all required fields (Name, DOB, Assessment, Section)");
       return;
     }
     if (!autoGenerateRoll && !formData.careerNineRollNumber.trim()) {
-      alert("Please enter a roll number or switch to auto-generate");
+      showErrorToast("Please enter a roll number or switch to auto-generate");
       return;
     }
 
@@ -117,7 +118,7 @@ const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, o
 
         await addStudentInfo(payload);
 
-        alert("Student added successfully!");
+        showSuccessToast("Student added successfully!");
 
         if (onSave) {
             onSave(payload);
@@ -128,7 +129,7 @@ const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, o
         onHide();
     } catch (error) {
       console.error("Error creating student:", error);
-      alert("Failed to create student");
+      showErrorToast("Failed to create student");
     } finally {
       setSubmitting(false);
     }

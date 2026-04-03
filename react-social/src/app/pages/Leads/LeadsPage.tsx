@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import * as XLSX from "xlsx";
 import { getAllLeads, sendLeadsEmail, Lead } from "./API/Leads_APIs";
+import { showErrorToast } from '../../utils/toast';
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -165,7 +166,7 @@ export default function LeadsPage() {
 
   const handleDownloadExcel = () => {
     if (filteredLeads.length === 0) {
-      alert("No leads to download.");
+      showErrorToast("No leads to download.");
       return;
     }
 
@@ -198,7 +199,7 @@ export default function LeadsPage() {
       XLSX.writeFile(workbook, filename);
     } catch (err) {
       console.error("Error downloading leads:", err);
-      alert("Failed to download. Please try again.");
+      showErrorToast("Failed to download. Please try again.");
     }
   };
 

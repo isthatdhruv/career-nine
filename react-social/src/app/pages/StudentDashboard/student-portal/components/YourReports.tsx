@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { showSuccessToast } from '../../../../utils/toast'
 
 interface YourReportsProps {
   userStudentId: number
@@ -21,7 +22,7 @@ const YourReports: React.FC<YourReportsProps> = ({
       if (handler) {
         handler()
       } else {
-        alert('This feature is coming soon!')
+        showSuccessToast('This feature is coming soon!')
       }
     } finally {
       setTimeout(() => setLoadingReport(null), 500)

@@ -4,6 +4,7 @@ import { GetDeletedMeasuredQualities, RestoreMeasuredQuality, PermanentDeleteMea
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { MdRestorePage } from "react-icons/md";
+import { showErrorToast } from '../../utils/toast';
 
 interface MeasuredQualitiesRecycleBinModalProps {
   show: boolean;
@@ -46,7 +47,7 @@ const MeasuredQualitiesRecycleBinModal = ({
       onRestoreComplete();
     } catch (error) {
       console.error("Error restoring measured quality:", error);
-      alert("Failed to restore measured quality. Please try again.");
+      showErrorToast("Failed to restore measured quality. Please try again.");
     } finally {
       setActionLoading(null);
     }
@@ -62,7 +63,7 @@ const MeasuredQualitiesRecycleBinModal = ({
       setDeletedQualities((prev) => prev.filter((q) => q.measured_quality_id !== id && q.id !== id));
     } catch (error) {
       console.error("Error permanently deleting measured quality:", error);
-      alert("Failed to permanently delete measured quality. Please try again.");
+      showErrorToast("Failed to permanently delete measured quality. Please try again.");
     } finally {
       setActionLoading(null);
     }

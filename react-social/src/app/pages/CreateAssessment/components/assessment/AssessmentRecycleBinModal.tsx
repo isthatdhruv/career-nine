@@ -4,6 +4,7 @@ import { GetDeletedAssessments, RestoreAssessment, PermanentDeleteAssessment } f
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { MdRestorePage } from "react-icons/md";
+import { showErrorToast } from '../../../utils/toast';
 
 interface AssessmentRecycleBinModalProps {
   show: boolean;
@@ -46,7 +47,7 @@ const AssessmentRecycleBinModal = ({
       onRestoreComplete();
     } catch (error) {
       console.error("Error restoring assessment:", error);
-      alert("Failed to restore assessment. Please try again.");
+      showErrorToast("Failed to restore assessment. Please try again.");
     } finally {
       setActionLoading(null);
     }
@@ -62,7 +63,7 @@ const AssessmentRecycleBinModal = ({
       setDeletedAssessments((prev) => prev.filter((a) => (a.id || a.assessmentId) !== id));
     } catch (error) {
       console.error("Error permanently deleting assessment:", error);
-      alert("Failed to permanently delete assessment. Please try again.");
+      showErrorToast("Failed to permanently delete assessment. Please try again.");
     } finally {
       setActionLoading(null);
     }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getAssessmentList, getLiveTracking, getRedisPartials, flushPartialToDb, getRedisPartialDetail, submitFromRedis } from "./API/LiveTracking_APIs";
+import { showErrorToast } from '../../utils/toast';
 
 /* ─── Types ─── */
 
@@ -377,7 +378,7 @@ const LiveTrackingPage = () => {
       setRedisJsonModal({ show: true, studentName: entry.studentName, data: res.data });
     } catch (err) {
       console.error("Failed to fetch Redis detail", err);
-      alert("Failed to load Redis data");
+      showErrorToast("Failed to load Redis data");
     }
   };
 
@@ -390,7 +391,7 @@ const LiveTrackingPage = () => {
     } catch (err: any) {
       console.error("Submit from Redis failed", err);
       const msg = err?.response?.data?.error || err?.response?.data || "Submit failed";
-      alert(typeof msg === "string" ? msg : JSON.stringify(msg));
+      showErrorToast(typeof msg === "string" ? msg : JSON.stringify(msg));
     } finally {
       setSubmittingIds((prev) => {
         const next = new Set(prev);

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { DeleteToolData } from "../API/Tool_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 const ToolTable = (props: {
   data: any;
@@ -67,7 +68,7 @@ const ToolTable = (props: {
                 props.setPageLoading(["true"]);
               } catch (error) {
                 console.error("Delete failed:", error);
-                alert("Failed to delete tool. Please try again.");
+                showErrorToast("Failed to delete tool. Please try again.");
               } finally {
                 props.setLoading(false);
               }

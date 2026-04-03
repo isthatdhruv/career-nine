@@ -10,6 +10,7 @@ import {
   createAccessLevel,
   deleteAccessLevel,
 } from "../API/UserMapping_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 interface UserCollegeMappingModalProps {
   show: boolean;
@@ -84,7 +85,7 @@ const UserCollegeMappingModal = (props: UserCollegeMappingModalProps) => {
       console.error("Failed to map:", error);
       const msg =
         error.response?.data || error.response?.data?.message || error.message;
-      alert("Failed to map: " + msg);
+      showErrorToast("Failed to map: " + msg);
     } finally {
       setMapping(false);
     }
@@ -129,7 +130,7 @@ const UserCollegeMappingModal = (props: UserCollegeMappingModalProps) => {
 
   const handleAddAccess = async () => {
     if (!activeMapping || !selectedSession) {
-      alert("Please select at least a session");
+      showErrorToast("Please select at least a session");
       return;
     }
 
@@ -156,7 +157,7 @@ const UserCollegeMappingModal = (props: UserCollegeMappingModalProps) => {
       setSelectedSection("");
     } catch (error: any) {
       console.error("Failed to add access level:", error);
-      alert(
+      showErrorToast(
         "Failed to add access level: " +
           (error.response?.data || error.message)
       );

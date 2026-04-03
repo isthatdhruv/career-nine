@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
@@ -57,14 +58,11 @@ public class CounsellingAppointmentController {
         Long studentId = Long.valueOf(request.get("studentId").toString());
         String reason = request.containsKey("reason") ? request.get("reason").toString() : null;
 
-        Optional<UserStudent> studentOpt = userStudentRepository.findById(studentId);
-        if (!studentOpt.isPresent()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Student not found with id: " + studentId);
-        }
+        UserStudent student = userStudentRepository.findById(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("UserStudent", "id", studentId));
 
         try {
-            CounsellingAppointment appointment = bookingService.bookSlot(slotId, studentOpt.get(), reason);
+            CounsellingAppointment appointment = bookingService.bookSlot(slotId, student, reason);
             return ResponseEntity.ok(appointment);
         } catch (RuntimeException e) {
             logger.warn("Booking conflict for slot {} student {}: {}", slotId, studentId, e.getMessage());
@@ -82,14 +80,11 @@ public class CounsellingAppointmentController {
         Long counsellorId = Long.valueOf(request.get("counsellorId").toString());
         Long adminUserId = Long.valueOf(request.get("adminUserId").toString());
 
-        Optional<User> adminOpt = userRepository.findById(adminUserId);
-        if (!adminOpt.isPresent()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Admin user not found with id: " + adminUserId);
-        }
+        User admin = userRepository.findById(adminUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", adminUserId));
 
         try {
-            CounsellingAppointment appointment = appointmentService.assign(id, counsellorId, adminOpt.get());
+            CounsellingAppointment appointment = appointmentService.assign(id, counsellorId, admin);
             return ResponseEntity.ok(appointment);
         } catch (RuntimeException e) {
             logger.warn("Assign failed for appointment {}: {}", id, e.getMessage());
@@ -168,10 +163,8 @@ public class CounsellingAppointmentController {
     public ResponseEntity<?> setMeetingLink(@PathVariable Long id, @RequestBody Map<String, Object> request) {
         String link = request.get("link").toString();
 
-        CounsellingAppointment appointment = appointmentRepository.findById(id).orElse(null);
-        if (appointment == null) {
-            return ResponseEntity.notFound().build();
-        }
+        CounsellingAppointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("CounsellingAppointment", "id", id));
 
         meetingLinkService.setManualLink(appointment, link);
         CounsellingAppointment saved = appointmentRepository.save(appointment);

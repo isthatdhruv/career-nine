@@ -1,5 +1,6 @@
 // StudentAnswerExcelModal.tsx
 import React, { useState, useEffect } from "react";
+import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import { Student } from "./StudentsList";
 import { getStudentAnswersWithDetails, StudentAnswerDetail, getStudentScores, StudentScoreDetail } from "./StudentInfo_APIs";
 import * as XLSX from "xlsx";
@@ -168,10 +169,10 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
       const filename = `${student.name.replace(/\s+/g, '_')}_Answers_${Date.now()}.xlsx`;
       XLSX.writeFile(workbook, filename);
 
-      alert(`Download successful for ${student.name}!`);
+      showSuccessToast(`Download successful for ${student.name}!`);
     } catch (error) {
       console.error("Error downloading:", error);
-      alert("Failed to download. Please try again.");
+      showErrorToast("Failed to download. Please try again.");
     } finally {
       setDownloading(false);
     }
@@ -219,10 +220,10 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
       const filename = `${student.name.replace(/\s+/g, '_')}_Scores_${Date.now()}.xlsx`;
       XLSX.writeFile(workbook, filename);
 
-      alert(`Scores download successful for ${student.name}!`);
+      showSuccessToast(`Scores download successful for ${student.name}!`);
     } catch (error) {
       console.error("Error downloading scores:", error);
-      alert("Failed to download scores. Please try again.");
+      showErrorToast("Failed to download scores. Please try again.");
     } finally {
       setDownloading(false);
     }

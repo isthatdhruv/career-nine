@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { showErrorToast, showSuccessToast } from '../../../utils/toast';
 import { downloadReportAsPdf, downloadReportsAsZip, ZipProgress } from "../utils/htmlToPdf";
 import { ReadCollegeList, GetSessionsByInstituteCode } from "../../College/API/College_APIs";
 import {
@@ -456,9 +457,9 @@ const ReportGenerationPage: React.FC<{ config: ReportGenerationConfig }> = ({ co
                           try {
                             const res = await api.generateData(Number(selectedAssessment), getSelectedOrAllIds());
                             const { generated, errors } = res.data;
-                            alert(`Generated data for ${generated} student(s).${errors.length > 0 ? `\n${errors.length} skipped.` : ""}`);
+                            showSuccessToast(`Generated data for ${generated} student(s).${errors.length > 0 ? `\n${errors.length} skipped.` : ""}`);
                             await refreshReportData();
-                          } catch (err: any) { alert("Failed: " + (err?.response?.data?.error || err.message)); }
+                          } catch (err: any) { showErrorToast("Failed: " + (err?.response?.data?.error || err.message)); }
                           finally { setGenerating(false); }
                         }}>
                         {generating ? "Generating..." : `Generate Data${countLabel(displayedStudents.length)}`}
@@ -467,7 +468,7 @@ const ReportGenerationPage: React.FC<{ config: ReportGenerationConfig }> = ({ co
                         onClick={async () => {
                           setExporting(true);
                           try { const res = await api.exportExcel(Number(selectedAssessment)); downloadBlob(res.data, `${config.reportFilePrefix}_data.xlsx`); }
-                          catch (err: any) { alert("Export failed: " + (err?.response?.data?.error || err.message)); }
+                          catch (err: any) { showErrorToast("Export failed: " + (err?.response?.data?.error || err.message)); }
                           finally { setExporting(false); }
                         }}>
                         {exporting ? "Exporting..." : "Export XLSX"}
@@ -477,8 +478,8 @@ const ReportGenerationPage: React.FC<{ config: ReportGenerationConfig }> = ({ co
                           onClick={async () => {
                             if (!window.confirm("Reset ALL report data for this assessment? This cannot be undone.")) return;
                             setResetting(true);
-                            try { await api.resetAssessment!(Number(selectedAssessment)); alert("Report data reset."); await refreshReportData(); }
-                            catch (err: any) { alert("Reset failed: " + (err?.response?.data?.error || err.message)); }
+                            try { await api.resetAssessment!(Number(selectedAssessment)); showSuccessToast("Report data reset."); await refreshReportData(); }
+                            catch (err: any) { showErrorToast("Reset failed: " + (err?.response?.data?.error || err.message)); }
                             finally { setResetting(false); }
                           }}>
                           {resetting ? "Resetting..." : "Reset All Data"}
@@ -494,15 +495,15 @@ const ReportGenerationPage: React.FC<{ config: ReportGenerationConfig }> = ({ co
                         onClick={async () => {
                           let ids = getSelectedOrAllIds().filter((id) => reportDataMap.has(id));
                           if (config.filterForReportGeneration) ids = ids.filter((id) => config.filterForReportGeneration!(reportDataMap.get(id)!));
-                          if (ids.length === 0) { alert("No eligible students with report data. Generate data first."); return; }
+                          if (ids.length === 0) { showErrorToast("No eligible students with report data. Generate data first."); return; }
                           setGeneratingReports(true);
                           try {
                             const res = await api.generateReports(Number(selectedAssessment), ids);
                             const { generated, errors } = res.data;
                             const errorDetails = errors.length > 0 ? errors.map((e: any) => `Student ${e.userStudentId}: ${e.reason}`).join("\n") : "";
-                            alert(`Generated ${generated} report(s).${errors.length > 0 ? `\n${errors.length} failed:\n${errorDetails}` : ""}`);
+                            showSuccessToast(`Generated ${generated} report(s).${errors.length > 0 ? `\n${errors.length} failed:\n${errorDetails}` : ""}`);
                             await refreshReportData();
-                          } catch (err: any) { alert("Failed: " + (err?.response?.data?.error || err.message)); }
+                          } catch (err: any) { showErrorToast("Failed: " + (err?.response?.data?.error || err.message)); }
                           finally { setGeneratingReports(false); }
                         }}>
                         {generatingReports ? "Generating..." : `Generate Reports${countLabel(displayedStudents.length)}`}
@@ -514,7 +515,7 @@ const ReportGenerationPage: React.FC<{ config: ReportGenerationConfig }> = ({ co
                             const rd = reportDataMap.get(id);
                             return rd && rd.reportStatus === "generated" && rd.reportUrl;
                           });
-                          if (ids.length === 0) { alert("No students with generated reports found."); return; }
+                          if (ids.length === 0) { showErrorToast("No students with generated reports found."); return; }
                           setDownloadingZip(true);
                           setZipProgress(null);
                           try {
@@ -526,7 +527,7 @@ const ReportGenerationPage: React.FC<{ config: ReportGenerationConfig }> = ({ co
                               (uid) => api.downloadReport(uid, Number(selectedAssessment)),
                               (p) => setZipProgress(p),
                             );
-                          } catch (err: any) { alert("Download failed: " + (err?.response?.data?.error || err.message)); }
+                          } catch (err: any) { showErrorToast("Download failed: " + (err?.response?.data?.error || err.message)); }
                           finally { setDownloadingZip(false); setZipProgress(null); }
                         }}>
                         {downloadingZip ? "Preparing ZIP..." : `Download ZIP (PDF)${countLabel(displayedStudents.length)}`}
@@ -541,7 +542,7 @@ const ReportGenerationPage: React.FC<{ config: ReportGenerationConfig }> = ({ co
                     try {
                       if (sel.length === 1) { const res = await api.exportOMRStudent(Number(selectedAssessment), sel[0]); downloadBlob(res.data, `general_assessment_${selectedAssessment}_student_${sel[0]}.xlsx`); }
                       else { const res = await api.exportOMR(Number(selectedAssessment)); downloadBlob(res.data, `general_assessment_${selectedAssessment}.xlsx`); }
-                    } catch (err: any) { alert("Export failed: " + (err?.response?.data?.error || err.message)); }
+                    } catch (err: any) { showErrorToast("Export failed: " + (err?.response?.data?.error || err.message)); }
                     finally { setExportingOMR(false); }
                   }}>
                     {exportingOMR ? "Exporting..." : `Export OMR${visibleSelectedCount === 1 ? " (1)" : visibleSelectedCount > 1 ? ` (${visibleSelectedCount})` : " (All)"}`}
@@ -624,20 +625,20 @@ const ReportGenerationPage: React.FC<{ config: ReportGenerationConfig }> = ({ co
                                         <>
                                           <a href={reportUrl} target="_blank" rel="noopener noreferrer" style={{ padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 600, background: "#dbeafe", color: "#2563eb", textDecoration: "none" }}>Preview</a>
                                           {actionBtn("#f0fdf4", "#059669", "Download PDF", async () => {
-                                            try { await downloadReportAsPdf(() => api.downloadReport(s.userStudentId, Number(selectedAssessment)), `${s.name || "report"}_${config.reportFilePrefix}.pdf`); } catch (e) { console.error("Download failed", e); alert("Download failed: " + (e instanceof Error ? e.message : "Unknown error")); }
+                                            try { await downloadReportAsPdf(() => api.downloadReport(s.userStudentId, Number(selectedAssessment)), `${s.name || "report"}_${config.reportFilePrefix}.pdf`); } catch (e) { console.error("Download failed", e); showErrorToast("Download failed: " + (e instanceof Error ? e.message : "Unknown error")); }
                                           })}
                                         </>
                                       )}
                                       {actionBtn("#f0fdfa", "#0d9488", exportingStudentId === s.userStudentId ? "..." : "OMR", async () => {
                                         setExportingStudentId(s.userStudentId);
                                         try { const res = await api.exportOMRStudent(Number(selectedAssessment), s.userStudentId); downloadBlob(res.data, `${(s.name || "student").replace(/\s+/g, "_")}_OMR_${s.userStudentId}.xlsx`); }
-                                        catch (err: any) { alert("Export failed: " + (err?.response?.data?.error || err.message)); }
+                                        catch (err: any) { showErrorToast("Export failed: " + (err?.response?.data?.error || err.message)); }
                                         finally { setExportingStudentId(null); }
                                       }, exportingStudentId === s.userStudentId)}
                                       {config.hasReset && rd && actionBtn("#fee2e2", "#dc2626", "Reset", async () => {
                                         if (!window.confirm(`Reset report data for ${s.name}?`)) return;
                                         try { await api.resetStudent!(s.userStudentId, Number(selectedAssessment)); await refreshReportData(); }
-                                        catch (err: any) { alert("Reset failed: " + (err?.response?.data?.error || err.message)); }
+                                        catch (err: any) { showErrorToast("Reset failed: " + (err?.response?.data?.error || err.message)); }
                                       })}
                                     </div>
                                   </td>

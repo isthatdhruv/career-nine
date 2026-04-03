@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.career9.Career;
 import com.kccitm.api.repository.Career9.CareerRepository;
 
@@ -30,7 +31,8 @@ public class CareerController {
 
     @GetMapping("/get/{id}")
     public Career getCareerById(@PathVariable Long id) {
-        return careerRepository.findById(id).orElse(null);
+        return careerRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Career", "id", id));
     }
 
     @PostMapping("/create")
@@ -40,7 +42,7 @@ public class CareerController {
     @PutMapping("/update/{id}")
     public Career updateCareer(@PathVariable Long id, @RequestBody Career career) {
         Career existingCareer = careerRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Career not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("Career", "id", id));
 
         // Only update simple fields, not relationships
         existingCareer.setTitle(career.getTitle());
@@ -51,10 +53,8 @@ public class CareerController {
     }
     @DeleteMapping("/delete/{id}")
     public org.springframework.http.ResponseEntity<String> deleteCareer(@PathVariable Long id) {
-        Career career = careerRepository.findById(id).orElse(null);
-        if (career == null) {
-            return org.springframework.http.ResponseEntity.notFound().build();
-        }
+        Career career = careerRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Career", "id", id));
         // Remove all mappings to MeasuredQualityTypes (but do not delete the types)
         if (career.getMeasuredQualityTypes() != null) {
             career.getMeasuredQualityTypes().clear();

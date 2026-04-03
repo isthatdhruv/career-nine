@@ -54,6 +54,9 @@ import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.service.AssessmentSessionService;
+import com.kccitm.api.exception.ResourceNotFoundException;
+import com.kccitm.api.exception.BadRequestException;
+import com.kccitm.api.exception.ServiceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -119,32 +122,31 @@ public class AssessmentAnswerController {
 
     @PostMapping(value = "/submit", headers = "Accept=application/json")
     public ResponseEntity<?> submitAssessmentAnswers(@RequestBody Map<String, Object> submissionData) {
+        // 1. Basic Extraction & Validation
+        if (submissionData.get("userStudentId") == null || submissionData.get("assessmentId") == null) {
+            return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
+        }
+        Long userStudentId = ((Number) submissionData.get("userStudentId")).longValue();
+        Long assessmentId = ((Number) submissionData.get("assessmentId")).longValue();
+
+        // Idempotency check — SET NX prevents duplicate processing
+        if (!assessmentSessionService.acquireSubmissionLock(userStudentId, assessmentId)) {
+            Object cachedResult = assessmentSessionService.getSubmissionResult(userStudentId, assessmentId);
+            if (cachedResult != null && !"processing".equals(cachedResult)) {
+                return ResponseEntity.ok(cachedResult);
+            }
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                    "error", "Submission already in progress or completed",
+                    "status", "duplicate"
+            ));
+        }
+
         try {
-            // 1. Basic Extraction & Validation
-            if (submissionData.get("userStudentId") == null || submissionData.get("assessmentId") == null) {
-                return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
-            }
-            Long userStudentId = ((Number) submissionData.get("userStudentId")).longValue();
-            Long assessmentId = ((Number) submissionData.get("assessmentId")).longValue();
+            UserStudent userStudent = userStudentRepository.findById(userStudentId)
+                    .orElseThrow(() -> new ResourceNotFoundException("UserStudent", "id", userStudentId));
 
-            // Idempotency check — SET NX prevents duplicate processing
-            if (!assessmentSessionService.acquireSubmissionLock(userStudentId, assessmentId)) {
-                Object cachedResult = assessmentSessionService.getSubmissionResult(userStudentId, assessmentId);
-                if (cachedResult != null && !"processing".equals(cachedResult)) {
-                    return ResponseEntity.ok(cachedResult);
-                }
-                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
-                        "error", "Submission already in progress or completed",
-                        "status", "duplicate"
-                ));
-            }
-
-            try {
-                UserStudent userStudent = userStudentRepository.findById(userStudentId)
-                        .orElseThrow(() -> new RuntimeException("UserStudent not found"));
-
-                AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
-                        .orElseThrow(() -> new RuntimeException("Assessment not found"));
+            AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Assessment", "id", assessmentId));
 
                 // 2. Extract status if provided
                 String status = submissionData.containsKey("status")
@@ -165,7 +167,7 @@ public class AssessmentAnswerController {
                 } catch (org.springframework.dao.DataIntegrityViolationException e) {
                     mapping = studentAssessmentMappingRepository
                             .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
-                            .orElseThrow(() -> new RuntimeException("Failed to create/find assessment mapping"));
+                            .orElseThrow(() -> new ServiceException("Failed to create/find assessment mapping"));
                 }
 
                 // Update status if provided
@@ -194,10 +196,6 @@ public class AssessmentAnswerController {
                 assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
                 throw e;
             }
-
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error: " + e.getMessage());
-        }
     }
 
     /**
@@ -207,18 +205,14 @@ public class AssessmentAnswerController {
      */
     @PostMapping(value = "/draft-save", headers = "Accept=application/json")
     public ResponseEntity<?> saveDraft(@RequestBody Map<String, Object> draftData) {
-        try {
-            Long studentId = ((Number) draftData.get("userStudentId")).longValue();
-            Long assessmentId = ((Number) draftData.get("assessmentId")).longValue();
+        Long studentId = ((Number) draftData.get("userStudentId")).longValue();
+        Long assessmentId = ((Number) draftData.get("assessmentId")).longValue();
 
-            assessmentSessionService.saveDraft(studentId, assessmentId, draftData);
+        assessmentSessionService.saveDraft(studentId, assessmentId, draftData);
 
-            Map<String, String> response = new HashMap<>();
-            response.put("status", "saved");
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("Draft save failed: " + e.getMessage());
-        }
+        Map<String, String> response = new HashMap<>();
+        response.put("status", "saved");
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -228,18 +222,14 @@ public class AssessmentAnswerController {
      */
     @GetMapping(value = "/draft-restore/{studentId}/{assessmentId}", headers = "Accept=application/json")
     public ResponseEntity<?> restoreDraft(@PathVariable Long studentId, @PathVariable Long assessmentId) {
-        try {
-            Object draft = assessmentSessionService.getDraft(studentId, assessmentId);
+        Object draft = assessmentSessionService.getDraft(studentId, assessmentId);
 
-            if (draft == null) {
-                Map<String, String> response = new HashMap<>();
-                response.put("status", "no_draft");
-                return ResponseEntity.status(404).body(response);
-            }
-            return ResponseEntity.ok(draft);
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("Draft restore failed: " + e.getMessage());
+        if (draft == null) {
+            Map<String, String> response = new HashMap<>();
+            response.put("status", "no_draft");
+            return ResponseEntity.status(404).body(response);
         }
+        return ResponseEntity.ok(draft);
     }
 
     // ============ OFFLINE ASSESSMENT UPLOAD ENDPOINTS ============
@@ -250,9 +240,8 @@ public class AssessmentAnswerController {
      */
     @GetMapping(value = "/offline-mapping/{assessmentId}", headers = "Accept=application/json")
     public ResponseEntity<?> getOfflineMapping(@PathVariable Long assessmentId) {
-        try {
-            AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
-                    .orElseThrow(() -> new RuntimeException("Assessment not found"));
+        AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assessment", "id", assessmentId));
 
             if (assessment.getQuestionnaire() == null) {
                 return ResponseEntity.status(400).body("Assessment has no linked questionnaire");
@@ -355,10 +344,6 @@ public class AssessmentAnswerController {
             result.put("sections", sections);
 
             return ResponseEntity.ok(result);
-
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error: " + e.getMessage());
-        }
     }
 
     /**
@@ -368,11 +353,10 @@ public class AssessmentAnswerController {
     @Transactional
     @PostMapping(value = "/bulk-submit", headers = "Accept=application/json")
     public ResponseEntity<?> bulkSubmitAnswers(@RequestBody Map<String, Object> payload) {
-        try {
-            Long assessmentId = ((Number) payload.get("assessmentId")).longValue();
+        Long assessmentId = ((Number) payload.get("assessmentId")).longValue();
 
-            AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
-                    .orElseThrow(() -> new RuntimeException("Assessment not found"));
+        AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assessment", "id", assessmentId));
 
             List<Map<String, Object>> students = (List<Map<String, Object>>) payload.get("students");
             int successCount = 0;
@@ -383,7 +367,7 @@ public class AssessmentAnswerController {
 
                 try {
                     UserStudent userStudent = userStudentRepository.findById(userStudentId)
-                            .orElseThrow(() -> new RuntimeException("UserStudent not found: " + userStudentId));
+                            .orElseThrow(() -> new ResourceNotFoundException("UserStudent", "id", userStudentId));
 
                     // Find or create mapping
                     StudentAssessmentMapping mapping = studentAssessmentMappingRepository
@@ -491,10 +475,6 @@ public class AssessmentAnswerController {
             result.put("studentsProcessed", successCount);
             result.put("errors", errors);
             return ResponseEntity.ok(result);
-
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error: " + e.getMessage());
-        }
     }
 
     // ============ BULK SUBMIT WITH STUDENT AUTO-CREATION ============
@@ -551,7 +531,7 @@ public class AssessmentAnswerController {
                     new UserStudent(candidates.get(0).getUser(), candidates.get(0), institute)), false);
         }
         if (candidates.size() > 1) {
-            throw new RuntimeException("Multiple students matched by name at this institute. Provide DOB or phone to disambiguate.");
+            throw new BadRequestException("Multiple students matched by name at this institute. Provide DOB or phone to disambiguate.");
         }
 
         // No match: create new student
@@ -585,15 +565,14 @@ public class AssessmentAnswerController {
     @Transactional
     @PostMapping(value = "/bulk-submit-with-students", headers = "Accept=application/json")
     public ResponseEntity<?> bulkSubmitWithStudents(@RequestBody Map<String, Object> payload) {
-        try {
-            Long assessmentId = ((Number) payload.get("assessmentId")).longValue();
-            Integer instituteId = ((Number) payload.get("instituteId")).intValue();
+        Long assessmentId = ((Number) payload.get("assessmentId")).longValue();
+        Integer instituteId = ((Number) payload.get("instituteId")).intValue();
 
-            AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
-                    .orElseThrow(() -> new RuntimeException("Assessment not found"));
+        AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assessment", "id", assessmentId));
 
-            InstituteDetail institute = instituteDetailRepository.findById(instituteId)
-                    .orElseThrow(() -> new RuntimeException("Institute not found"));
+        InstituteDetail institute = instituteDetailRepository.findById(instituteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Institute", "id", instituteId));
 
             List<Map<String, Object>> students = (List<Map<String, Object>>) payload.get("students");
             int successCount = 0;
@@ -608,7 +587,7 @@ public class AssessmentAnswerController {
                 try {
                     String name = studentName.trim();
                     if (name.isEmpty()) {
-                        throw new RuntimeException("Student name is required");
+                        throw new BadRequestException("Student name is required");
                     }
 
                     String dobStr = studentData.get("dob") != null
@@ -751,10 +730,6 @@ public class AssessmentAnswerController {
             result.put("matchSummary", matchSummary);
 
             return ResponseEntity.ok(result);
-
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error: " + e.getMessage());
-        }
     }
 
     // ============ BULK SUBMIT BY ROLL NUMBER ============
@@ -766,15 +741,14 @@ public class AssessmentAnswerController {
     @Transactional
     @PostMapping(value = "/bulk-submit-by-rollnumber", headers = "Accept=application/json")
     public ResponseEntity<?> bulkSubmitByRollNumber(@RequestBody Map<String, Object> payload) {
-        try {
-            Long assessmentId = ((Number) payload.get("assessmentId")).longValue();
-            Integer instituteId = ((Number) payload.get("instituteId")).intValue();
+        Long assessmentId = ((Number) payload.get("assessmentId")).longValue();
+        Integer instituteId = ((Number) payload.get("instituteId")).intValue();
 
-            AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
-                    .orElseThrow(() -> new RuntimeException("Assessment not found"));
+        AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assessment", "id", assessmentId));
 
-            InstituteDetail institute = instituteDetailRepository.findById(instituteId)
-                    .orElseThrow(() -> new RuntimeException("Institute not found"));
+        InstituteDetail institute = instituteDetailRepository.findById(instituteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Institute", "id", instituteId));
 
             List<Map<String, Object>> students = (List<Map<String, Object>>) payload.get("students");
             int successCount = 0;
@@ -788,13 +762,13 @@ public class AssessmentAnswerController {
 
                 try {
                     if (rollNumber.isEmpty()) {
-                        throw new RuntimeException("Roll number is required");
+                        throw new BadRequestException("Roll number is required");
                     }
 
                     // Find user by careerNineRollNumber
                     Optional<User> userOpt = userRepository.findByCareerNineRollNumber(rollNumber);
                     if (!userOpt.isPresent()) {
-                        throw new RuntimeException("No student found with roll number: " + rollNumber);
+                        throw new ResourceNotFoundException("User", "rollNumber", rollNumber);
                     }
 
                     User user = userOpt.get();
@@ -802,7 +776,7 @@ public class AssessmentAnswerController {
                     // Find StudentInfo for this user
                     StudentInfo studentInfo = studentInfoRepository.findByUser(user);
                     if (studentInfo == null) {
-                        throw new RuntimeException("No student info found for roll number: " + rollNumber);
+                        throw new ResourceNotFoundException("StudentInfo", "rollNumber", rollNumber);
                     }
 
                     // Find or create UserStudent
@@ -933,10 +907,6 @@ public class AssessmentAnswerController {
             result.put("matchSummary", matchSummary);
 
             return ResponseEntity.ok(result);
-
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error: " + e.getMessage());
-        }
     }
 
     // ============ TEXT RESPONSE MAPPING ENDPOINTS ============
@@ -946,9 +916,8 @@ public class AssessmentAnswerController {
      */
     @GetMapping(value = "/text-responses/{assessmentId}", headers = "Accept=application/json")
     public ResponseEntity<?> getTextResponsesByAssessment(@PathVariable Long assessmentId) {
-        try {
-            List<AssessmentAnswer> textAnswers = assessmentAnswerRepository
-                    .findByAssessment_IdAndTextResponseIsNotNull(assessmentId);
+        List<AssessmentAnswer> textAnswers = assessmentAnswerRepository
+                .findByAssessment_IdAndTextResponseIsNotNull(assessmentId);
 
             // Deduplicate: group by questionnaireQuestionId + textResponse
             // Key: "questionnaireQuestionId|textResponse"
@@ -1025,9 +994,6 @@ public class AssessmentAnswerController {
             }
 
             return ResponseEntity.ok(new ArrayList<>(uniqueMap.values()));
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error: " + e.getMessage());
-        }
     }
 
     /**
@@ -1035,15 +1001,14 @@ public class AssessmentAnswerController {
      */
     @PutMapping(value = "/map-text-response", headers = "Accept=application/json")
     public ResponseEntity<?> mapTextResponse(@RequestBody Map<String, Object> requestData) {
-        try {
-            Long assessmentAnswerId = ((Number) requestData.get("assessmentAnswerId")).longValue();
-            Long optionId = ((Number) requestData.get("optionId")).longValue();
+        Long assessmentAnswerId = ((Number) requestData.get("assessmentAnswerId")).longValue();
+        Long optionId = ((Number) requestData.get("optionId")).longValue();
 
-            AssessmentAnswer answer = assessmentAnswerRepository.findById(assessmentAnswerId)
-                    .orElseThrow(() -> new RuntimeException("AssessmentAnswer not found"));
+        AssessmentAnswer answer = assessmentAnswerRepository.findById(assessmentAnswerId)
+                .orElseThrow(() -> new ResourceNotFoundException("AssessmentAnswer", "id", assessmentAnswerId));
 
-            AssessmentQuestionOptions option = assessmentQuestionOptionsRepository.findById(optionId)
-                    .orElseThrow(() -> new RuntimeException("Option not found"));
+        AssessmentQuestionOptions option = assessmentQuestionOptionsRepository.findById(optionId)
+                .orElseThrow(() -> new ResourceNotFoundException("AssessmentQuestionOptions", "id", optionId));
 
             // Apply mapping to ALL answers with the same question + textResponse
             String textResponse = answer.getTextResponse();
@@ -1072,9 +1037,6 @@ public class AssessmentAnswerController {
 
             return ResponseEntity.ok(Map.of("status", "success", "assessmentAnswerId", assessmentAnswerId,
                     "mappedOptionId", optionId, "totalMapped", mappedCount));
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error: " + e.getMessage());
-        }
     }
 
     /**
@@ -1084,9 +1046,8 @@ public class AssessmentAnswerController {
     @Transactional
     @PostMapping(value = "/recalculate-scores/{assessmentId}", headers = "Accept=application/json")
     public ResponseEntity<?> recalculateScores(@PathVariable Long assessmentId) {
-        try {
-            AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
-                    .orElseThrow(() -> new RuntimeException("Assessment not found"));
+        AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assessment", "id", assessmentId));
 
             // Get all mappings for this assessment
             List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
@@ -1162,9 +1123,6 @@ public class AssessmentAnswerController {
             }
 
             return ResponseEntity.ok(Map.of("status", "success", "studentsProcessed", studentsProcessed));
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error: " + e.getMessage());
-        }
     }
 
     /**
@@ -1174,8 +1132,7 @@ public class AssessmentAnswerController {
     @Transactional
     @PostMapping(value = "/recalculate-all-scores", headers = "Accept=application/json")
     public ResponseEntity<?> recalculateAllScores() {
-        try {
-            List<StudentAssessmentMapping> allMappings = studentAssessmentMappingRepository.findAll();
+        List<StudentAssessmentMapping> allMappings = studentAssessmentMappingRepository.findAll();
             int studentsProcessed = 0;
             int errors = 0;
 
@@ -1254,9 +1211,6 @@ public class AssessmentAnswerController {
                     "totalMappings", allMappings.size(),
                     "studentsProcessed", studentsProcessed,
                     "errors", errors));
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error: " + e.getMessage());
-        }
     }
 
     /**
@@ -1279,20 +1233,19 @@ public class AssessmentAnswerController {
     @Transactional
     @PostMapping(value = "/dashboard", headers = "Accept=application/json")
     public ResponseEntity<?> getStudentDashboard(@RequestBody Map<String, Object> requestData) {
-        try {
-            // 1. Extract and validate userStudentId from request body
-            if (!requestData.containsKey("userStudentId")) {
-                return ResponseEntity.status(400).body(Map.of(
-                    "error", "Missing required field",
-                    "message", "userStudentId is required in request body"
-                ));
-            }
+        // 1. Extract and validate userStudentId from request body
+        if (!requestData.containsKey("userStudentId")) {
+            return ResponseEntity.status(400).body(Map.of(
+                "error", "Missing required field",
+                "message", "userStudentId is required in request body"
+            ));
+        }
 
-            Long userStudentId = ((Number) requestData.get("userStudentId")).longValue();
+        Long userStudentId = ((Number) requestData.get("userStudentId")).longValue();
 
-            // 2. Fetch and validate student
-            UserStudent userStudent = userStudentRepository.findById(userStudentId)
-                    .orElseThrow(() -> new RuntimeException("UserStudent not found with ID: " + userStudentId));
+        // 2. Fetch and validate student
+        UserStudent userStudent = userStudentRepository.findById(userStudentId)
+                .orElseThrow(() -> new ResourceNotFoundException("UserStudent", "id", userStudentId));
 
             // 3. Build student basic info
             StudentBasicInfo studentInfo = new StudentBasicInfo();
@@ -1475,13 +1428,6 @@ public class AssessmentAnswerController {
             response.setAssessments(assessmentDataList);
 
             return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of(
-                "error", "Failed to fetch student dashboard data",
-                "message", e.getMessage()
-            ));
-        }
     }
 
     /**
@@ -1494,12 +1440,11 @@ public class AssessmentAnswerController {
     @Transactional
     @PostMapping(value = "/save-partial", headers = "Accept=application/json")
     public ResponseEntity<?> savePartialAnswers(@RequestBody Map<String, Object> submissionData) {
-        try {
-            if (submissionData.get("userStudentId") == null || submissionData.get("assessmentId") == null) {
-                return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
-            }
-            Long userStudentId = ((Number) submissionData.get("userStudentId")).longValue();
-            Long assessmentId = ((Number) submissionData.get("assessmentId")).longValue();
+        if (submissionData.get("userStudentId") == null || submissionData.get("assessmentId") == null) {
+            return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
+        }
+        Long userStudentId = ((Number) submissionData.get("userStudentId")).longValue();
+        Long assessmentId = ((Number) submissionData.get("assessmentId")).longValue();
 
             UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
             AssessmentTable assessment = assessmentTableRepository.findById(assessmentId).orElse(null);
@@ -1614,11 +1559,6 @@ public class AssessmentAnswerController {
                     "skipped", skippedCount,
                     "storage", "mysql"
             ));
-
-        } catch (Exception e) {
-            logger.error("Partial save failed for student", e);
-            return ResponseEntity.status(500).body("Partial save failed: " + e.getMessage());
-        }
     }
 
     /**
@@ -1629,25 +1569,20 @@ public class AssessmentAnswerController {
     @GetMapping(value = "/redis-partials")
     public ResponseEntity<?> getRedisPartials(
             @RequestParam(value = "assessmentId", required = false) Long assessmentId) {
-        try {
-            List<Map<String, Object>> entries = assessmentSessionService.getAllPartialAnswerEntries(assessmentId);
+        List<Map<String, Object>> entries = assessmentSessionService.getAllPartialAnswerEntries(assessmentId);
 
-            // Enrich with student names
-            for (Map<String, Object> entry : entries) {
-                Long studentId = ((Number) entry.get("userStudentId")).longValue();
-                UserStudent student = userStudentRepository.findById(studentId).orElse(null);
-                if (student != null) {
-                    entry.put("studentName", student.getStudentInfo().getName() + " " + student.getStudentInfo().getFamily());
-                } else {
-                    entry.put("studentName", "Unknown");
-                }
+        // Enrich with student names
+        for (Map<String, Object> entry : entries) {
+            Long studentId = ((Number) entry.get("userStudentId")).longValue();
+            UserStudent student = userStudentRepository.findById(studentId).orElse(null);
+            if (student != null) {
+                entry.put("studentName", student.getStudentInfo().getName() + " " + student.getStudentInfo().getFamily());
+            } else {
+                entry.put("studentName", "Unknown");
             }
-
-            return ResponseEntity.ok(entries);
-        } catch (Exception e) {
-            logger.error("Failed to fetch Redis partials", e);
-            return ResponseEntity.status(500).body("Failed to fetch Redis partials: " + e.getMessage());
         }
+
+        return ResponseEntity.ok(entries);
     }
 
     /**
@@ -1657,16 +1592,11 @@ public class AssessmentAnswerController {
     public ResponseEntity<?> getRedisPartialDetail(
             @RequestParam("userStudentId") Long userStudentId,
             @RequestParam("assessmentId") Long assessmentId) {
-        try {
-            Map<String, Object> data = assessmentSessionService.getPartialAnswers(userStudentId, assessmentId);
-            if (data == null) {
-                return ResponseEntity.notFound().build();
-            }
-            return ResponseEntity.ok(data);
-        } catch (Exception e) {
-            logger.error("Failed to fetch Redis partial detail", e);
-            return ResponseEntity.status(500).body("Failed: " + e.getMessage());
+        Map<String, Object> data = assessmentSessionService.getPartialAnswers(userStudentId, assessmentId);
+        if (data == null) {
+            return ResponseEntity.notFound().build();
         }
+        return ResponseEntity.ok(data);
     }
 
     /**
@@ -1676,79 +1606,73 @@ public class AssessmentAnswerController {
     @SuppressWarnings("unchecked")
     @PostMapping(value = "/submit-from-redis")
     public ResponseEntity<?> submitFromRedis(@RequestBody Map<String, Object> requestData) {
+        if (requestData.get("userStudentId") == null || requestData.get("assessmentId") == null) {
+            return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
+        }
+        Long userStudentId = ((Number) requestData.get("userStudentId")).longValue();
+        Long assessmentId = ((Number) requestData.get("assessmentId")).longValue();
+
+        // Read partial answers from Redis
+        Map<String, Object> partial = assessmentSessionService.getPartialAnswers(userStudentId, assessmentId);
+        if (partial == null || partial.get("answers") == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No partial answers found in Redis");
+        }
+
+        List<Map<String, Object>> answers = (List<Map<String, Object>>) partial.get("answers");
+        if (answers.isEmpty()) {
+            return ResponseEntity.badRequest().body("Partial answers are empty");
+        }
+
+        // Acquire submission lock (idempotency)
+        if (!assessmentSessionService.acquireSubmissionLock(userStudentId, assessmentId)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                    "error", "Submission already in progress or completed",
+                    "status", "duplicate"
+            ));
+        }
+
         try {
-            if (requestData.get("userStudentId") == null || requestData.get("assessmentId") == null) {
-                return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
-            }
-            Long userStudentId = ((Number) requestData.get("userStudentId")).longValue();
-            Long assessmentId = ((Number) requestData.get("assessmentId")).longValue();
+            UserStudent userStudent = userStudentRepository.findById(userStudentId)
+                    .orElseThrow(() -> new ResourceNotFoundException("UserStudent", "id", userStudentId));
 
-            // Read partial answers from Redis
-            Map<String, Object> partial = assessmentSessionService.getPartialAnswers(userStudentId, assessmentId);
-            if (partial == null || partial.get("answers") == null) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No partial answers found in Redis");
-            }
+            AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Assessment", "id", assessmentId));
 
-            List<Map<String, Object>> answers = (List<Map<String, Object>>) partial.get("answers");
-            if (answers.isEmpty()) {
-                return ResponseEntity.badRequest().body("Partial answers are empty");
-            }
-
-            // Acquire submission lock (idempotency)
-            if (!assessmentSessionService.acquireSubmissionLock(userStudentId, assessmentId)) {
-                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
-                        "error", "Submission already in progress or completed",
-                        "status", "duplicate"
-                ));
-            }
-
+            // Find/create mapping and set status completed
+            StudentAssessmentMapping mapping;
             try {
-                UserStudent userStudent = userStudentRepository.findById(userStudentId)
-                        .orElseThrow(() -> new RuntimeException("UserStudent not found"));
-
-                AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
-                        .orElseThrow(() -> new RuntimeException("Assessment not found"));
-
-                // Find/create mapping and set status completed
-                StudentAssessmentMapping mapping;
-                try {
-                    mapping = studentAssessmentMappingRepository
-                            .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
-                            .orElseGet(() -> {
-                                StudentAssessmentMapping newMapping = new StudentAssessmentMapping();
-                                newMapping.setUserStudent(userStudent);
-                                newMapping.setAssessmentId(assessmentId);
-                                return studentAssessmentMappingRepository.save(newMapping);
-                            });
-                } catch (org.springframework.dao.DataIntegrityViolationException e) {
-                    mapping = studentAssessmentMappingRepository
-                            .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
-                            .orElseThrow(() -> new RuntimeException("Failed to create/find assessment mapping"));
-                }
-                mapping.setStatus("completed");
-                studentAssessmentMappingRepository.save(mapping);
-
-                // Build submission payload and save to Redis for async processing
-                Map<String, Object> submissionData = new HashMap<>();
-                submissionData.put("userStudentId", userStudentId);
-                submissionData.put("assessmentId", assessmentId);
-                submissionData.put("status", "completed");
-                submissionData.put("answers", answers);
-
-                assessmentSessionService.saveSubmittedAnswers(userStudentId, assessmentId, submissionData);
-                submissionProcessorService.processSubmissionAsync(userStudentId, assessmentId);
-
-                logger.info("Admin submit-from-redis accepted for student={} assessment={}", userStudentId, assessmentId);
-                return ResponseEntity.ok(Map.of("status", "accepted"));
-
-            } catch (Exception e) {
-                assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
-                throw e;
+                mapping = studentAssessmentMappingRepository
+                        .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                        .orElseGet(() -> {
+                            StudentAssessmentMapping newMapping = new StudentAssessmentMapping();
+                            newMapping.setUserStudent(userStudent);
+                            newMapping.setAssessmentId(assessmentId);
+                            return studentAssessmentMappingRepository.save(newMapping);
+                        });
+            } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                mapping = studentAssessmentMappingRepository
+                        .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                        .orElseThrow(() -> new ServiceException("Failed to create/find assessment mapping"));
             }
+            mapping.setStatus("completed");
+            studentAssessmentMappingRepository.save(mapping);
+
+            // Build submission payload and save to Redis for async processing
+            Map<String, Object> submissionData = new HashMap<>();
+            submissionData.put("userStudentId", userStudentId);
+            submissionData.put("assessmentId", assessmentId);
+            submissionData.put("status", "completed");
+            submissionData.put("answers", answers);
+
+            assessmentSessionService.saveSubmittedAnswers(userStudentId, assessmentId, submissionData);
+            submissionProcessorService.processSubmissionAsync(userStudentId, assessmentId);
+
+            logger.info("Admin submit-from-redis accepted for student={} assessment={}", userStudentId, assessmentId);
+            return ResponseEntity.ok(Map.of("status", "accepted"));
 
         } catch (Exception e) {
-            logger.error("Submit from Redis failed", e);
-            return ResponseEntity.status(500).body("Submit failed: " + e.getMessage());
+            assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
+            throw e;
         }
     }
 
@@ -1760,42 +1684,36 @@ public class AssessmentAnswerController {
     @Transactional
     @PostMapping(value = "/flush-partial-to-db")
     public ResponseEntity<?> flushPartialToDb(@RequestBody Map<String, Object> requestData) {
-        try {
-            if (requestData.get("assessmentId") == null) {
-                return ResponseEntity.badRequest().body("assessmentId is required");
-            }
-            Long assessmentId = ((Number) requestData.get("assessmentId")).longValue();
-            AssessmentTable assessment = assessmentTableRepository.findById(assessmentId).orElse(null);
-            if (assessment == null) {
-                return ResponseEntity.badRequest().body("Invalid assessmentId");
-            }
+        if (requestData.get("assessmentId") == null) {
+            return ResponseEntity.badRequest().body("assessmentId is required");
+        }
+        Long assessmentId = ((Number) requestData.get("assessmentId")).longValue();
+        AssessmentTable assessment = assessmentTableRepository.findById(assessmentId).orElse(null);
+        if (assessment == null) {
+            return ResponseEntity.badRequest().body("Invalid assessmentId");
+        }
 
-            // Determine which students to flush and flush via service
-            int totalFlushed = 0;
-            if (requestData.get("userStudentId") != null) {
-                Long studentId = ((Number) requestData.get("userStudentId")).longValue();
+        // Determine which students to flush and flush via service
+        int totalFlushed = 0;
+        if (requestData.get("userStudentId") != null) {
+            Long studentId = ((Number) requestData.get("userStudentId")).longValue();
+            if (partialAnswerFlushService.flushOneStudent(studentId, assessmentId)) {
+                totalFlushed++;
+            }
+        } else {
+            List<Map<String, Object>> allEntries = assessmentSessionService.getAllPartialAnswerEntries(assessmentId);
+            for (Map<String, Object> meta : allEntries) {
+                Long studentId = ((Number) meta.get("userStudentId")).longValue();
                 if (partialAnswerFlushService.flushOneStudent(studentId, assessmentId)) {
                     totalFlushed++;
                 }
-            } else {
-                List<Map<String, Object>> allEntries = assessmentSessionService.getAllPartialAnswerEntries(assessmentId);
-                for (Map<String, Object> meta : allEntries) {
-                    Long studentId = ((Number) meta.get("userStudentId")).longValue();
-                    if (partialAnswerFlushService.flushOneStudent(studentId, assessmentId)) {
-                        totalFlushed++;
-                    }
-                }
             }
-
-            return ResponseEntity.ok(Map.of(
-                    "status", "success",
-                    "flushed", totalFlushed
-            ));
-
-        } catch (Exception e) {
-            logger.error("Failed to flush partial answers to DB", e);
-            return ResponseEntity.status(500).body("Flush failed: " + e.getMessage());
         }
+
+        return ResponseEntity.ok(Map.of(
+                "status", "success",
+                "flushed", totalFlushed
+        ));
     }
 
     /**
@@ -1806,51 +1724,73 @@ public class AssessmentAnswerController {
      */
     @GetMapping(value = "/score-debug/{userStudentId}/{assessmentId}", headers = "Accept=application/json")
     public ResponseEntity<?> scoreDebug(@PathVariable Long userStudentId, @PathVariable Long assessmentId) {
-        try {
-            Optional<UserStudent> usOpt = userStudentRepository.findById(userStudentId);
-            if (!usOpt.isPresent()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "UserStudent not found"));
-            }
-            Optional<AssessmentTable> atOpt = assessmentTableRepository.findById(assessmentId);
-            if (!atOpt.isPresent()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Assessment not found"));
-            }
+        Optional<UserStudent> usOpt = userStudentRepository.findById(userStudentId);
+        if (!usOpt.isPresent()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "UserStudent not found"));
+        }
+        Optional<AssessmentTable> atOpt = assessmentTableRepository.findById(assessmentId);
+        if (!atOpt.isPresent()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Assessment not found"));
+        }
 
-            List<AssessmentAnswer> answers = assessmentAnswerRepository
-                    .findByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
+        List<AssessmentAnswer> answers = assessmentAnswerRepository
+                .findByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
 
-            // Per-answer detail rows
-            List<Map<String, Object>> rows = new ArrayList<>();
-            // Accumulate totals per MQT
-            Map<Long, Map<String, Object>> mqtTotals = new LinkedHashMap<>();
+        // Per-answer detail rows
+        List<Map<String, Object>> rows = new ArrayList<>();
+        // Accumulate totals per MQT
+        Map<Long, Map<String, Object>> mqtTotals = new LinkedHashMap<>();
 
-            for (AssessmentAnswer ans : answers) {
-                AssessmentQuestionOptions opt = ans.getOption();
-                if (opt == null) continue;
+        for (AssessmentAnswer ans : answers) {
+            AssessmentQuestionOptions opt = ans.getOption();
+            if (opt == null) continue;
 
-                // Get question text
-                String questionText = "";
-                Long questionId = null;
-                Long qqId = null;
-                String sectionName = "";
-                if (ans.getQuestionnaireQuestion() != null) {
-                    QuestionnaireQuestion qq = ans.getQuestionnaireQuestion();
-                    qqId = qq.getQuestionnaireQuestionId();
-                    if (qq.getQuestion() != null) {
-                        questionText = qq.getQuestion().getQuestionText();
-                        questionId = qq.getQuestion().getQuestionId();
-                        if (qq.getQuestion().getSection() != null) {
-                            sectionName = qq.getQuestion().getSection().getSectionName();
-                        }
+            // Get question text
+            String questionText = "";
+            Long questionId = null;
+            Long qqId = null;
+            String sectionName = "";
+            if (ans.getQuestionnaireQuestion() != null) {
+                QuestionnaireQuestion qq = ans.getQuestionnaireQuestion();
+                qqId = qq.getQuestionnaireQuestionId();
+                if (qq.getQuestion() != null) {
+                    questionText = qq.getQuestion().getQuestionText();
+                    questionId = qq.getQuestion().getQuestionId();
+                    if (qq.getQuestion().getSection() != null) {
+                        sectionName = qq.getQuestion().getSection().getSectionName();
                     }
                 }
+            }
 
-                // Get option scores (MQT breakdown)
-                List<OptionScoreBasedOnMEasuredQualityTypes> optionScores =
-                        optionScoreRepository.findByOptionId(opt.getOptionId());
+            // Get option scores (MQT breakdown)
+            List<OptionScoreBasedOnMEasuredQualityTypes> optionScores =
+                    optionScoreRepository.findByOptionId(opt.getOptionId());
 
-                if (optionScores.isEmpty()) {
-                    // Still include the answer row even with no MQT scores
+            if (optionScores.isEmpty()) {
+                // Still include the answer row even with no MQT scores
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("qqId", qqId);
+                row.put("questionId", questionId);
+                row.put("questionText", questionText);
+                row.put("sectionName", sectionName);
+                row.put("optionId", opt.getOptionId());
+                row.put("optionText", opt.getOptionText());
+                row.put("rankOrder", ans.getRankOrder());
+                row.put("textResponse", ans.getTextResponse());
+                row.put("mqtId", null);
+                row.put("mqtName", null);
+                row.put("mqId", null);
+                row.put("mqName", null);
+                row.put("score", 0);
+                rows.add(row);
+            } else {
+                for (OptionScoreBasedOnMEasuredQualityTypes os : optionScores) {
+                    MeasuredQualityTypes mqt = os.getMeasuredQualityType();
+                    if (mqt == null) continue;
+
+                    MeasuredQualities mq = mqt.getMeasuredQuality();
+                    int score = os.getScore() != null ? os.getScore() : 0;
+
                     Map<String, Object> row = new LinkedHashMap<>();
                     row.put("qqId", qqId);
                     row.put("questionId", questionId);
@@ -1860,85 +1800,56 @@ public class AssessmentAnswerController {
                     row.put("optionText", opt.getOptionText());
                     row.put("rankOrder", ans.getRankOrder());
                     row.put("textResponse", ans.getTextResponse());
-                    row.put("mqtId", null);
-                    row.put("mqtName", null);
-                    row.put("mqId", null);
-                    row.put("mqName", null);
-                    row.put("score", 0);
+                    row.put("mqtId", mqt.getMeasuredQualityTypeId());
+                    row.put("mqtName", mqt.getMeasuredQualityTypeName());
+                    row.put("mqId", mq != null ? mq.getMeasuredQualityId() : null);
+                    row.put("mqName", mq != null ? mq.getMeasuredQualityName() : null);
+                    row.put("score", score);
                     rows.add(row);
-                } else {
-                    for (OptionScoreBasedOnMEasuredQualityTypes os : optionScores) {
-                        MeasuredQualityTypes mqt = os.getMeasuredQualityType();
-                        if (mqt == null) continue;
 
-                        MeasuredQualities mq = mqt.getMeasuredQuality();
-                        int score = os.getScore() != null ? os.getScore() : 0;
-
-                        Map<String, Object> row = new LinkedHashMap<>();
-                        row.put("qqId", qqId);
-                        row.put("questionId", questionId);
-                        row.put("questionText", questionText);
-                        row.put("sectionName", sectionName);
-                        row.put("optionId", opt.getOptionId());
-                        row.put("optionText", opt.getOptionText());
-                        row.put("rankOrder", ans.getRankOrder());
-                        row.put("textResponse", ans.getTextResponse());
-                        row.put("mqtId", mqt.getMeasuredQualityTypeId());
-                        row.put("mqtName", mqt.getMeasuredQualityTypeName());
-                        row.put("mqId", mq != null ? mq.getMeasuredQualityId() : null);
-                        row.put("mqName", mq != null ? mq.getMeasuredQualityName() : null);
-                        row.put("score", score);
-                        rows.add(row);
-
-                        // Accumulate MQT totals
-                        Long mqtId = mqt.getMeasuredQualityTypeId();
-                        Map<String, Object> tot = mqtTotals.computeIfAbsent(mqtId, k -> {
-                            Map<String, Object> m = new LinkedHashMap<>();
-                            m.put("mqtId", mqtId);
-                            m.put("mqtName", mqt.getMeasuredQualityTypeName());
-                            m.put("mqId", mq != null ? mq.getMeasuredQualityId() : null);
-                            m.put("mqName", mq != null ? mq.getMeasuredQualityName() : null);
-                            m.put("calculatedTotal", 0);
-                            return m;
-                        });
-                        tot.put("calculatedTotal", (int) tot.get("calculatedTotal") + score);
-                    }
+                    // Accumulate MQT totals
+                    Long mqtId = mqt.getMeasuredQualityTypeId();
+                    Map<String, Object> tot = mqtTotals.computeIfAbsent(mqtId, k -> {
+                        Map<String, Object> m = new LinkedHashMap<>();
+                        m.put("mqtId", mqtId);
+                        m.put("mqtName", mqt.getMeasuredQualityTypeName());
+                        m.put("mqId", mq != null ? mq.getMeasuredQualityId() : null);
+                        m.put("mqName", mq != null ? mq.getMeasuredQualityName() : null);
+                        m.put("calculatedTotal", 0);
+                        return m;
+                    });
+                    tot.put("calculatedTotal", (int) tot.get("calculatedTotal") + score);
                 }
             }
-
-            // Get stored raw scores for comparison
-            Optional<StudentAssessmentMapping> samOpt = studentAssessmentMappingRepository
-                    .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
-            List<Map<String, Object>> storedScores = new ArrayList<>();
-            if (samOpt.isPresent()) {
-                List<AssessmentRawScore> rawScores = assessmentRawScoreRepository
-                        .findByStudentAssessmentMappingStudentAssessmentId(samOpt.get().getStudentAssessmentId());
-                for (AssessmentRawScore rs : rawScores) {
-                    Map<String, Object> s = new LinkedHashMap<>();
-                    s.put("mqtId", rs.getMeasuredQualityType() != null ? rs.getMeasuredQualityType().getMeasuredQualityTypeId() : null);
-                    s.put("mqtName", rs.getMeasuredQualityType() != null ? rs.getMeasuredQualityType().getMeasuredQualityTypeName() : null);
-                    s.put("mqId", rs.getMeasuredQuality() != null ? rs.getMeasuredQuality().getMeasuredQualityId() : null);
-                    s.put("mqName", rs.getMeasuredQuality() != null ? rs.getMeasuredQuality().getMeasuredQualityName() : null);
-                    s.put("storedRawScore", rs.getRawScore());
-                    storedScores.add(s);
-                }
-            }
-
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("userStudentId", userStudentId);
-            result.put("assessmentId", assessmentId);
-            result.put("studentName", usOpt.get().getStudentInfo() != null ? usOpt.get().getStudentInfo().getName() : null);
-            result.put("assessmentName", atOpt.get().getAssessmentName());
-            result.put("totalAnswers", answers.size());
-            result.put("answerDetails", rows);
-            result.put("calculatedTotals", new ArrayList<>(mqtTotals.values()));
-            result.put("storedRawScores", storedScores);
-            return ResponseEntity.ok(result);
-
-        } catch (Exception e) {
-            logger.error("Score debug failed", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage()));
         }
+
+        // Get stored raw scores for comparison
+        Optional<StudentAssessmentMapping> samOpt = studentAssessmentMappingRepository
+                .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+        List<Map<String, Object>> storedScores = new ArrayList<>();
+        if (samOpt.isPresent()) {
+            List<AssessmentRawScore> rawScores = assessmentRawScoreRepository
+                    .findByStudentAssessmentMappingStudentAssessmentId(samOpt.get().getStudentAssessmentId());
+            for (AssessmentRawScore rs : rawScores) {
+                Map<String, Object> s = new LinkedHashMap<>();
+                s.put("mqtId", rs.getMeasuredQualityType() != null ? rs.getMeasuredQualityType().getMeasuredQualityTypeId() : null);
+                s.put("mqtName", rs.getMeasuredQualityType() != null ? rs.getMeasuredQualityType().getMeasuredQualityTypeName() : null);
+                s.put("mqId", rs.getMeasuredQuality() != null ? rs.getMeasuredQuality().getMeasuredQualityId() : null);
+                s.put("mqName", rs.getMeasuredQuality() != null ? rs.getMeasuredQuality().getMeasuredQualityName() : null);
+                s.put("storedRawScore", rs.getRawScore());
+                storedScores.add(s);
+            }
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("userStudentId", userStudentId);
+        result.put("assessmentId", assessmentId);
+        result.put("studentName", usOpt.get().getStudentInfo() != null ? usOpt.get().getStudentInfo().getName() : null);
+        result.put("assessmentName", atOpt.get().getAssessmentName());
+        result.put("totalAnswers", answers.size());
+        result.put("answerDetails", rows);
+        result.put("calculatedTotals", new ArrayList<>(mqtTotals.values()));
+        result.put("storedRawScores", storedScores);
+        return ResponseEntity.ok(result);
     }
 }
