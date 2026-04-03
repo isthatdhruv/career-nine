@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import { ReadCollegeData } from "../College/API/College_APIs";
 import { getAssessmentMappingsByInstitute, getAssessmentSummaryList } from "../AssessmentMapping/API/AssessmentMapping_APIs";
 import { getOfflineMapping, bulkSubmitByRollNumber, bulkSubmitWithStudents, getSavedOmrMapping, saveOmrMapping, getSavedOmrMappingByQuestionnaire, getAllOmrMappings } from "./API/OfflineUpload_APIs";
+import { showErrorToast, showSuccessToast } from '../../utils/toast';
 
 // ============ Types ============
 
@@ -390,7 +391,7 @@ const OMRDataUploadPage = () => {
         }
       }
     } catch {
-      alert("Failed to load assessment mapping.");
+      showErrorToast("Failed to load assessment mapping.");
     } finally {
       setLoadingMapping(false);
     }
@@ -421,7 +422,7 @@ const OMRDataUploadPage = () => {
         applyMappingFromJson(saved, excelHeaders);
       }
     } catch {
-      alert("No saved mapping found.");
+      showErrorToast("No saved mapping found.");
     } finally {
       setLoadingSavedMapping(false);
     }
@@ -439,9 +440,9 @@ const OMRDataUploadPage = () => {
       });
       savedMappingJsonRef.current = { ...fieldToHeader };
       setSavedMappingExists(true);
-      alert("Mapping saved successfully!");
+      showSuccessToast("Mapping saved successfully!");
     } catch {
-      alert("Failed to save mapping.");
+      showErrorToast("Failed to save mapping.");
     } finally {
       setSavingMapping(false);
     }
@@ -494,7 +495,7 @@ const OMRDataUploadPage = () => {
         worker.terminate();
         URL.revokeObjectURL(workerUrl);
 
-        if (jsonData.length === 0) { alert("Excel file is empty."); setParsingFile(false); return; }
+        if (jsonData.length === 0) { showErrorToast("Excel file is empty."); setParsingFile(false); return; }
 
         const headers = Object.keys(jsonData[0]).filter(
           (h) => h && !h.startsWith("__EMPTY")
@@ -522,7 +523,7 @@ const OMRDataUploadPage = () => {
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const jsonData: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
 
-        if (jsonData.length === 0) { alert("Excel file is empty."); setParsingFile(false); return; }
+        if (jsonData.length === 0) { showErrorToast("Excel file is empty."); setParsingFile(false); return; }
 
         const headers = Object.keys(jsonData[0]).filter(
           (h) => h && !h.startsWith("__EMPTY")
@@ -749,13 +750,13 @@ const OMRDataUploadPage = () => {
     if (uploadMode === "rollnumber") {
       const noRoll = parsedStudents.filter((s) => !s.rollNumber.trim());
       if (noRoll.length > 0) {
-        alert(`${noRoll.length} row(s) have no roll number.`);
+        showErrorToast(`${noRoll.length} row(s) have no roll number.`);
         return;
       }
     } else {
       const noName = parsedStudents.filter((s) => !s.name.trim());
       if (noName.length > 0) {
-        alert(`${noName.length} row(s) have no name.`);
+        showErrorToast(`${noName.length} row(s) have no name.`);
         return;
       }
     }

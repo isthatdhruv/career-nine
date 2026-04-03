@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Modal, Button } from "react-bootstrap";
 import { GetDeletedQuestionSections, RestoreQuestionSection, PermanentDeleteQuestionSection } from "../API/Question_Section_APIs";
+import { showErrorToast } from '../../../utils/toast';
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { MdRestorePage } from "react-icons/md";
@@ -46,7 +47,7 @@ const QuestionSectionRecycleBinModal = ({
       onRestoreComplete();
     } catch (error) {
       console.error("Error restoring section:", error);
-      alert("Failed to restore section. Please try again.");
+      showErrorToast("Failed to restore section. Please try again.");
     } finally {
       setActionLoading(null);
     }
@@ -62,7 +63,7 @@ const QuestionSectionRecycleBinModal = ({
       setDeletedSections((prev) => prev.filter((s) => s.sectionId !== id && s.id !== id));
     } catch (error) {
       console.error("Error permanently deleting section:", error);
-      alert("Failed to permanently delete section. Please try again.");
+      showErrorToast("Failed to permanently delete section. Please try again.");
     } finally {
       setActionLoading(null);
     }

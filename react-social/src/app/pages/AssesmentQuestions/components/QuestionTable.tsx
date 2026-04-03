@@ -1,5 +1,6 @@
 import { MDBDataTableV5 } from "mdbreact";
 import { useEffect, useState } from "react";
+import { showErrorToast } from '../../../utils/toast';
 import { AiFillEdit } from "react-icons/ai";
 import { FaLightbulb, FaFileDownload } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
@@ -101,7 +102,7 @@ const QuestionTable = (props: {
       await ExportQuestionsToExcel();
     } catch (error) {
       console.error("Error exporting questions to Excel:", error);
-      alert("Failed to export questions. Please try again.");
+      showErrorToast("Failed to export questions. Please try again.");
     } finally {
       setExporting(false);
     }
@@ -303,7 +304,7 @@ const QuestionTable = (props: {
                 props.setPageLoading(["true"]);
               } catch (error) {
                 console.error("Delete failed:", error);
-                alert("Failed to delete question. Please try again.");
+                showErrorToast("Failed to delete question. Please try again.");
               } finally {
                 // props.setLoading(false);
               }

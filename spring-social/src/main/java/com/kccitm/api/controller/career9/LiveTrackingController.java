@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.StudentInfo;
@@ -49,10 +50,8 @@ public class LiveTrackingController {
     @GetMapping("/{assessmentId}/live-tracking")
     public ResponseEntity<?> getLiveTracking(@PathVariable Long assessmentId) {
         // 1. Get the assessment
-        AssessmentTable assessment = assessmentTableRepository.findById(assessmentId).orElse(null);
-        if (assessment == null) {
-            return ResponseEntity.notFound().build();
-        }
+        AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
+            .orElseThrow(() -> new ResourceNotFoundException("AssessmentTable", "id", assessmentId));
 
         // 2. Get total question count from the linked questionnaire
         int totalQuestions = 0;

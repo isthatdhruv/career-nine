@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.career9.AssessmentQuestionOptions;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
@@ -68,7 +69,7 @@ public class GeneralAssessmentExportService {
 
         // ── 1. Validate assessment and get questionnaire ──────────────
         AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
-                .orElseThrow(() -> new RuntimeException("Assessment not found: " + assessmentId));
+                .orElseThrow(() -> new ResourceNotFoundException("Assessment", "id", assessmentId));
         Long questionnaireId = (assessment.getQuestionnaire() != null)
                 ? assessment.getQuestionnaire().getQuestionnaireId() : null;
 
@@ -78,8 +79,8 @@ public class GeneralAssessmentExportService {
             targetStudents = mappingRepository
                     .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
                     .map(Collections::singletonList)
-                    .orElseThrow(() -> new RuntimeException(
-                            "No mapping found for student " + userStudentId + " assessment " + assessmentId));
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "StudentAssessmentMapping", "studentId/assessmentId", userStudentId + "/" + assessmentId));
         } else {
             // Include both "completed" and "ongoing" students so Firebase-imported
             // students (which may remain "ongoing" if their questionnaire has more
@@ -89,7 +90,7 @@ public class GeneralAssessmentExportService {
                               || "ongoing".equalsIgnoreCase(m.getStatus()))
                     .collect(Collectors.toList());
             if (targetStudents.isEmpty()) {
-                throw new RuntimeException("No students found for assessment " + assessmentId);
+                throw new ResourceNotFoundException("StudentAssessmentMapping", "assessmentId", assessmentId);
             }
         }
 

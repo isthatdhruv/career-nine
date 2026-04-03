@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Modal, Button, Dropdown } from "react-bootstrap";
 import * as XLSX from "xlsx";
 import { CreateQuestionData, ReadMeasuredQualityTypes } from "../API/Question_APIs";
+import { showErrorToast, showSuccessToast } from '../../../utils/toast';
 
 // Type definitions
 interface ParsedQuestion {
@@ -205,7 +206,7 @@ const QuestionBulkUploadModal: React.FC<QuestionBulkUploadModalProps> = ({
       !selectedFile.name.endsWith(".xlsx") &&
       !selectedFile.name.endsWith(".xls")
     ) {
-      alert("Please select a valid Excel file (.xlsx or .xls)");
+      showErrorToast("Please select a valid Excel file (.xlsx or .xls)");
       return;
     }
 
@@ -224,7 +225,7 @@ const QuestionBulkUploadModal: React.FC<QuestionBulkUploadModalProps> = ({
       const parsedQuestions = await parseExcelFile(selectedFile);
 
       if (parsedQuestions.length === 0) {
-        alert("No valid questions found in Excel file");
+        showErrorToast("No valid questions found in Excel file");
         setFile(null);
         return;
       }
@@ -245,10 +246,10 @@ const QuestionBulkUploadModal: React.FC<QuestionBulkUploadModalProps> = ({
       });
       setOptionMeasuredQualities(initialMQ);
 
-      alert(`Successfully parsed ${parsedQuestions.length} questions from Excel file`);
+      showSuccessToast(`Successfully parsed ${parsedQuestions.length} questions from Excel file`);
     } catch (error: any) {
       console.error("Error parsing Excel:", error);
-      alert(`Failed to parse Excel file: ${error.message}`);
+      showErrorToast(`Failed to parse Excel file: ${error.message}`);
       setFile(null);
     } finally {
       setParsing(false);
@@ -397,7 +398,7 @@ const QuestionBulkUploadModal: React.FC<QuestionBulkUploadModalProps> = ({
   const removeOption = (index: number) => {
     const currentQuestion = questions[currentIndex];
     if (currentQuestion.options.length <= 1) {
-      alert("At least one option is required");
+      showErrorToast("At least one option is required");
       return;
     }
 

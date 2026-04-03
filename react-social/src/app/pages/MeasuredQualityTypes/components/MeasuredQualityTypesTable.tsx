@@ -7,6 +7,7 @@ import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { ReadMeasuredQualitiesData } from "../../MeasuredQualities/API/Measured_Qualities_APIs";
 import { AssignMeasuredQualityTypeToQuality, DeleteMeasuredQualityTypesData, RemoveMeasuredQualityTypeFromQuality } from "../API/Measured_Quality_Types_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 const MeasuredQualityTypesTable = (props: {
   data: any;
@@ -64,7 +65,7 @@ const MeasuredQualityTypesTable = (props: {
       setSelectedQualityByType(prev => ({ ...prev, [typeId]: qualityId }));
 
     } catch (error) {
-      alert('Failed to update quality assignment. Please try again.');
+      showErrorToast('Failed to update quality assignment. Please try again.');
       // Revert the change
       setSelectedQualityByType(prev => ({ ...prev, [typeId]: selectedQualityByType[typeId] }));
     }
@@ -155,7 +156,7 @@ const MeasuredQualityTypesTable = (props: {
                 props.setPageLoading(["true"]);
               } catch (error) {
                 console.error("Delete failed:", error);
-                alert("Failed to delete measured quality type. Please try again.");
+                showErrorToast("Failed to delete measured quality type. Please try again.");
               } finally {
                 props.setLoading(false);
               }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../../modules/auth'
+import { showErrorToast } from '../../../utils/toast'
 import { getSlotsByCounsellor, deleteSlot } from '../API/SlotAPI'
 import { getCounsellorByUserId } from '../API/CounsellorAPI'
 import axios from 'axios'
@@ -81,7 +82,7 @@ const AvailabilityManagerPage: React.FC = () => {
       await deleteSlot(id)
       handleRefresh()
     } catch {
-      alert('Failed to delete slot.')
+      showErrorToast('Failed to delete slot.')
     }
   }
 

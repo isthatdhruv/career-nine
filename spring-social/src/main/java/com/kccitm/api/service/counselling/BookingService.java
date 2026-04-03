@@ -12,6 +12,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.kccitm.api.exception.BadRequestException;
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
 import com.kccitm.api.model.career9.counselling.CounsellingSlot;
@@ -55,10 +57,10 @@ public class BookingService {
         logger.info("Student {} attempting to book slot {}", student.getUserStudentId(), slotId);
 
         CounsellingSlot slot = slotRepository.findById(slotId)
-                .orElseThrow(() -> new RuntimeException("Slot not found with id: " + slotId));
+                .orElseThrow(() -> new ResourceNotFoundException("Slot", "id", slotId));
 
         if (!"AVAILABLE".equals(slot.getStatus())) {
-            throw new RuntimeException(
+            throw new BadRequestException(
                     "Slot " + slotId + " is not available for booking. Current status: " + slot.getStatus());
         }
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "react-bootstrap";
 import { IconContext } from "react-icons";
+import { showSuccessToast } from '../../../utils/toast';
 import { MdQuestionAnswer } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
@@ -19,7 +20,7 @@ const AssessmentQuestionsPage = () => {
   const fetchQuestions = async () => {
     setLoading(true);
     try {
-      alert("Fetching Questions List");
+      showSuccessToast("Fetching Questions List");
       const response = await ReadQuestionsDataList();
       setQuestionsData(response.data);
     } catch (error) {

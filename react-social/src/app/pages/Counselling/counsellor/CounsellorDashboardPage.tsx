@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../modules/auth'
+import { showErrorToast } from '../../../utils/toast'
 import StatusBadge from '../shared/StatusBadge'
 import ScheduleCard from './components/ScheduleCard'
 import {
@@ -76,7 +77,7 @@ const CounsellorDashboardPage: React.FC = () => {
       await confirmAppointment(appointmentId, userId)
       await refreshAppointments()
     } catch {
-      alert('Failed to confirm appointment.')
+      showErrorToast('Failed to confirm appointment.')
     }
   }
 
@@ -88,7 +89,7 @@ const CounsellorDashboardPage: React.FC = () => {
       await declineAppointment(appointmentId, userId, reason)
       await refreshAppointments()
     } catch {
-      alert('Failed to decline appointment.')
+      showErrorToast('Failed to decline appointment.')
     }
   }
 
@@ -100,7 +101,7 @@ const CounsellorDashboardPage: React.FC = () => {
       await cancelAppointment(appointmentId, userId, reason)
       await refreshAppointments()
     } catch {
-      alert('Failed to cancel appointment.')
+      showErrorToast('Failed to cancel appointment.')
     }
   }
 

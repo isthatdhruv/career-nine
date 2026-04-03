@@ -4,6 +4,7 @@ import { AiFillEdit } from "react-icons/ai";
 import { FiTrash2 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { DeleteListData } from "../API/List_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 type Props = {
   data: any[];
@@ -52,7 +53,7 @@ const ListTable: React.FC<Props> = ({ data = [], setLoading, setPageLoading }) =
                 setPageLoading(true);
               } catch (err) {
                 console.error("Delete failed:", err);
-                alert("Failed to delete.");
+                showErrorToast("Failed to delete.");
               } finally {
                 setLoading(false);
               }

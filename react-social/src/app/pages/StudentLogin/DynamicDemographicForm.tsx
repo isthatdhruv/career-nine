@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAssessment } from './AssessmentContext';
 import { usePreventReload } from './usePreventReload';
+import { showErrorToast } from '../../utils/toast';
 import { getFieldsForAssessment, submitDemographics } from './API/StudentDemographic_APIs';
 
 type DemographicField = {
@@ -221,9 +222,9 @@ const DynamicDemographicForm: React.FC = () => {
       console.error('Error submitting demographics:', error);
       const errorData = error.response?.data;
       if (errorData?.validationErrors) {
-        alert('Validation errors:\n' + errorData.validationErrors.join('\n'));
+        showErrorToast('Validation errors:\n' + errorData.validationErrors.join('\n'));
       } else {
-        alert(errorData?.error || 'Failed to submit demographics. Please try again.');
+        showErrorToast(errorData?.error || 'Failed to submit demographics. Please try again.');
       }
     } finally {
       setIsSubmitting(false);

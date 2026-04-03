@@ -2,6 +2,7 @@ import clsx from "clsx";
 import { useFormik } from "formik";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { showErrorToast } from '../../../../utils/toast';
 import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
@@ -154,7 +155,7 @@ const AssessmentEditPage = (props?: {
 
       } catch (error) {
         const errorMessage = (error as any)?.response?.data?.message || (error as any)?.message || "Unknown error occurred";
-        alert(`Failed to ${isEditMode ? "update" : "create"} assessment: ${errorMessage}`);
+        showErrorToast(`Failed to ${isEditMode ? "update" : "create"} assessment: ${errorMessage}`);
       } finally {
         setLoading(false);
       }

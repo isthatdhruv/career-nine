@@ -15,6 +15,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kccitm.api.exception.ServiceException;
 import com.kccitm.api.model.career9.Lead;
 import com.kccitm.api.model.career9.OdooSyncStatus;
 import com.kccitm.api.repository.Career9.LeadRepository;
@@ -145,12 +146,12 @@ public class OdooLeadService {
         JsonNode root = objectMapper.readTree(responseBody);
 
         if (root.has("error")) {
-            throw new RuntimeException("Odoo create failed: " + extractError(root));
+            throw new ServiceException("Odoo create failed: " + extractError(root));
         }
 
         JsonNode result = root.get("result");
         if (result == null || result.isNull()) {
-            throw new RuntimeException("Odoo create: no result in response");
+            throw new ServiceException("Odoo create: no result in response");
         }
 
         return result.asLong();
@@ -169,7 +170,7 @@ public class OdooLeadService {
                     .bodyToMono(String.class)
                     .block();
         } catch (WebClientResponseException e) {
-            throw new RuntimeException("Odoo HTTP error " + e.getStatusCode() + ": " + e.getResponseBodyAsString());
+            throw new ServiceException("Odoo HTTP error " + e.getStatusCode() + ": " + e.getResponseBodyAsString());
         }
     }
 

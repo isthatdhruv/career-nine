@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { AssignToolToQuality, DeleteMeasuredQualitiesData, GetToolsForQuality, ReadToolsData, RemoveToolFromQuality } from "../API/Measured_Qualities_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 // Define your API base URL here or import it from your config
 
@@ -90,7 +91,7 @@ const MeasuredQualitiesTable = (props: {
       
     } catch (error) {
       console.error('Error updating tool assignments:', error);
-      alert('Failed to update tool assignments. Please try again.');
+      showErrorToast('Failed to update tool assignments. Please try again.');
       
       // Revert to previous state on error
       setSelectedToolsByQuality(prev => ({
@@ -181,7 +182,7 @@ const MeasuredQualitiesTable = (props: {
                 props.setPageLoading(["true"]);
               } catch (error) {
                 console.error("Delete failed:", error);
-                alert("Failed to delete measured quality. Please try again.");
+                showErrorToast("Failed to delete measured quality. Please try again.");
               } finally {
                 props.setLoading(false);
               }

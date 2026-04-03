@@ -7,17 +7,11 @@ const CareerLibrary: React.FC = () => {
     <div className='sp-card sp-library-card'>
       <div className='sp-card-title'>Explore Career Library</div>
 
-      <div className='sp-qr-placeholder'>
-        <svg width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='#6B7A8D' strokeWidth='1.5'>
-          <rect x='3' y='3' width='7' height='7' rx='1' />
-          <rect x='14' y='3' width='7' height='7' rx='1' />
-          <rect x='3' y='14' width='7' height='7' rx='1' />
-          <rect x='14' y='14' width='3' height='3' />
-          <rect x='18' y='14' width='3' height='3' />
-          <rect x='14' y='18' width='3' height='3' />
-          <rect x='18' y='18' width='3' height='3' />
-        </svg>
-      </div>
+      <img
+        src='/media/logos/library-qr-code.png'
+        alt='Scan to visit Career-9 Library'
+        style={{ width: 120, height: 120, borderRadius: 8, margin: '0 auto 12px', display: 'block' }}
+      />
 
       <div className='sp-library-desc'>
         Scan to visit the Career-9 Library &mdash; explore 200+ career paths, college options, and

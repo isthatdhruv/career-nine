@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import { getAllAssessments, resetAssessment } from "./StudentInfo_APIs";
 import axios from "axios";
 
@@ -78,13 +79,13 @@ export default function ResetAssessmentModal({
     setResetting(confirmAssessment.assessmentId);
     try {
       await resetAssessment(userStudentId, confirmAssessment.assessmentId);
-      alert("Assessment reset successfully!");
+      showSuccessToast("Assessment reset successfully!");
       setConfirmAssessment(null);
       fetchAssessments(); // Refresh the list
       onResetSuccess();
     } catch (error: any) {
       console.error("Error resetting assessment:", error);
-      alert(error.response?.data?.error || "Failed to reset assessment");
+      showErrorToast(error.response?.data?.error || "Failed to reset assessment");
     } finally {
       setResetting(null);
     }

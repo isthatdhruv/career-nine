@@ -7,6 +7,7 @@ import java.net.http.HttpResponse;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kccitm.api.exception.ServiceException;
 
 import javax.annotation.PostConstruct;
 
@@ -133,7 +134,7 @@ public class NavigatorAISummaryService {
 
     private String callOpenAI(String prompt) {
         if (openaiApiKey == null || openaiApiKey.isEmpty()) {
-            throw new RuntimeException("OpenAI API key not configured. Set OPENAI_API_KEY in .env or app.openai.api-key in application.yml");
+            throw new ServiceException("OpenAI API key not configured. Set OPENAI_API_KEY in .env or app.openai.api-key in application.yml");
         }
 
         for (int attempt = 1; attempt <= 3; attempt++) {
