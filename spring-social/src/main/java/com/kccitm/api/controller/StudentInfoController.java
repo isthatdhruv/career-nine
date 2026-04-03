@@ -117,17 +117,25 @@ public class StudentInfoController {
                     }
                     row.put("questionText", questionText);
 
-                    // Option ID and text
-                    row.put("optionId", aa.getOption() != null ? aa.getOption().getOptionId() : null);
-                    row.put("optionText", aa.getOption() != null ? aa.getOption().getOptionText() : "");
+                    // Option ID and text — check option, then mappedOption, then textResponse
+                    AssessmentQuestionOptions effectiveOption = aa.getOption() != null ? aa.getOption() : aa.getMappedOption();
+                    row.put("optionId", effectiveOption != null ? effectiveOption.getOptionId() : null);
+
+                    String optionText = "";
+                    if (effectiveOption != null && effectiveOption.getOptionText() != null && !effectiveOption.getOptionText().trim().isEmpty()) {
+                        optionText = effectiveOption.getOptionText();
+                    } else if (aa.getTextResponse() != null && !aa.getTextResponse().trim().isEmpty()) {
+                        optionText = aa.getTextResponse();
+                    }
+                    row.put("optionText", optionText);
 
                     // Option number (1-based index) - useful when option is an image
                     int optionNumber = 0;
                     boolean isImageOption = false;
-                    if (aa.getOption() != null && aa.getQuestionnaireQuestion() != null
+                    if (effectiveOption != null && aa.getQuestionnaireQuestion() != null
                             && aa.getQuestionnaireQuestion().getQuestion() != null
                             && aa.getQuestionnaireQuestion().getQuestion().getOptions() != null) {
-                        Long selectedOptionId = aa.getOption().getOptionId();
+                        Long selectedOptionId = effectiveOption.getOptionId();
                         var allOptions = aa.getQuestionnaireQuestion().getQuestion().getOptions();
                         for (int i = 0; i < allOptions.size(); i++) {
                             if (allOptions.get(i).getOptionId().equals(selectedOptionId)) {
@@ -135,10 +143,10 @@ public class StudentInfoController {
                                 break;
                             }
                         }
-                        isImageOption = (aa.getOption().getOptionText() == null
-                                || aa.getOption().getOptionText().trim().isEmpty())
-                                && aa.getOption().getOptionImage() != null
-                                && aa.getOption().getOptionImage().length > 0;
+                        isImageOption = (effectiveOption.getOptionText() == null
+                                || effectiveOption.getOptionText().trim().isEmpty())
+                                && effectiveOption.getOptionImage() != null
+                                && effectiveOption.getOptionImage().length > 0;
                     }
                     row.put("optionNumber", optionNumber);
                     row.put("isImageOption", isImageOption);
