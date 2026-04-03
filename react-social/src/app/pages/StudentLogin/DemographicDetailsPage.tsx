@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { showErrorToast } from '../../../utils/toast';
+import { showErrorToast } from '../../utils/toast';
 import { usePreventReload } from "./usePreventReload";
 
 type DemographicData = {

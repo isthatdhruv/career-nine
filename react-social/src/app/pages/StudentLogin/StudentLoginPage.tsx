@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { showErrorToast } from '../../../utils/toast';
+import { showErrorToast } from '../../utils/toast';
 import { usePreventReload } from './usePreventReload';
 
 const StudentLoginPage: React.FC = () => {

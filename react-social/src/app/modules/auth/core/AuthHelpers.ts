@@ -65,7 +65,7 @@ export function setupAxios(axios: any) {
     (response: any) => response,
     (error: any) => {
       if (!error.response) {
-        const { showErrorToast } = require('../../utils/toast');
+        const { showErrorToast } = require('../../../utils/toast');
         showErrorToast('Connection issue, check your internet');
         return Promise.reject(error);
       }
@@ -74,7 +74,7 @@ export function setupAxios(axios: any) {
       const message = error.response?.data?.message || '';
 
       if (status === 401) {
-        const { showErrorToast } = require('../../utils/toast');
+        const { showErrorToast } = require('../../../utils/toast');
         showErrorToast('Session expired, please log in again');
         removeAuth();
         window.location.href = '/auth';
@@ -82,13 +82,13 @@ export function setupAxios(axios: any) {
       }
 
       if (status === 403) {
-        const { showErrorToast } = require('../../utils/toast');
+        const { showErrorToast } = require('../../../utils/toast');
         showErrorToast(message || 'You don\'t have permission for this action');
         return Promise.reject(error);
       }
 
       if (status >= 500) {
-        const { showErrorToast } = require('../../utils/toast');
+        const { showErrorToast } = require('../../../utils/toast');
         showErrorToast(message || 'Something went wrong, please try again');
         return Promise.reject(error);
       }

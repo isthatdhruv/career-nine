@@ -8,7 +8,7 @@ import {
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { MdRestorePage } from "react-icons/md";
-import { showErrorToast } from '../../../utils/toast';
+import { showErrorToast } from '../../../../utils/toast';
 
 interface QuestionnaireRecycleBinModalProps {
   show: boolean;
