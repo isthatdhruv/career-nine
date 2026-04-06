@@ -3,8 +3,9 @@ import { useState, useEffect } from "react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import clsx from "clsx";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { PasswordMeterComponent } from "../../../../_metronic/assets/ts/components";
+import { showErrorToast, showSuccessToast } from "../../../utils/toast";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -62,11 +63,11 @@ const registrationSchema = Yup.object().shape({
 
 export function Registration() {
   const [loading] = useState(false);
+  const navigate = useNavigate();
   const formik = useFormik({
     initialValues,
     validationSchema: registrationSchema,
-    onSubmit: async (values, { setStatus, setSubmitting }) => {
-      setStatus(undefined);
+    onSubmit: async (values, { setSubmitting }) => {
       try {
         const payload = {
           name: `${values.firstname} ${values.lastname}`,
@@ -87,15 +88,14 @@ export function Registration() {
         const data = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-          // server-side validation or error message
-          const msg = data && (data.message || data.error) ? (data.message || data.error) : 'Registration failed';
-          setStatus(msg);
+          const msg = data?.message || data?.error || 'Registration failed. Please try again.';
+          showErrorToast(msg);
         } else {
-          // success - redirect to login
-          window.location.href = '/auth/login';
+          showSuccessToast('Account created successfully! Please wait for admin approval.');
+          navigate('/auth/login');
         }
-      } catch (err: any) {
-        setStatus(err && err.message ? err.message : 'Unexpected error');
+      } catch {
+        showErrorToast('Unable to connect to server. Please try again later.');
       } finally {
         setSubmitting(false);
       }
@@ -130,12 +130,6 @@ export function Registration() {
         {/* end::Link */}
       </div>
       {/* end::Heading */}
-
-      {formik.status && (
-        <div className="mb-lg-15 alert alert-danger">
-          <div className="alert-text font-weight-bold">{formik.status}</div>
-        </div>
-      )}
 
       {/* begin::Form group Firstname */}
       <div className="row fv-row mb-7">

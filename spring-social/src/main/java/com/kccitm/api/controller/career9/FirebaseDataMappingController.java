@@ -61,6 +61,7 @@ import com.kccitm.api.repository.Career9.School.FirebaseQuestionMappingRepositor
 import com.kccitm.api.repository.Career9.School.FirebaseStudentExtraDataRepository;
 import com.kccitm.api.model.career9.school.FirebaseQuestionMapping;
 import com.kccitm.api.service.FirebaseService;
+import com.kccitm.api.service.FirebaseStudentDeletionService;
 
 @RestController
 @RequestMapping("/firebase-mapping")
@@ -128,6 +129,9 @@ public class FirebaseDataMappingController {
 
     @Autowired
     private com.kccitm.api.repository.Career9.AssessmentProctoringQuestionLogRepository assessmentProctoringQuestionLogRepository;
+
+    @Autowired
+    private FirebaseStudentDeletionService firebaseStudentDeletionService;
 
     @GetMapping("/getAll")
     public List<FirebaseDataMapping> getAll() {
@@ -608,7 +612,6 @@ public class FirebaseDataMappingController {
      * Cleans up all related data: answers, scores, mappings, reports, etc.
      */
     @DeleteMapping("/delete-firebase-students/{instituteCode}")
-    @Transactional
     public ResponseEntity<?> deleteFirebaseStudents(@PathVariable Integer instituteCode) {
         try {
             // 1. Get all UserStudents for this institute
@@ -635,63 +638,13 @@ public class FirebaseDataMappingController {
             List<Map<String, Object>> errors = new ArrayList<>();
 
             for (UserStudent us : firebaseStudents) {
-                Long usId = us.getUserStudentId();
                 try {
-                    // Delete all related data in correct order (children first)
-
-                    // Assessment raw scores (linked via StudentAssessmentMapping)
-                    List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
-                            .findByUserStudentUserStudentId(usId);
-                    for (StudentAssessmentMapping sam : mappings) {
-                        assessmentRawScoreRepository
-                                .deleteByStudentAssessmentMappingStudentAssessmentId(sam.getStudentAssessmentId());
-                    }
-
-                    // Assessment answers
-                    assessmentAnswerRepository.deleteByUserStudent_UserStudentId(usId);
-
-                    // Assessment mappings
-                    studentAssessmentMappingRepository.deleteByUserStudentUserStudentId(usId);
-
-                    // Report data
-                    betReportDataRepository.deleteByUserStudentUserStudentId(usId);
-                    navigatorReportDataRepository.deleteByUserStudentUserStudentId(usId);
-                    generalAssessmentResultRepository.deleteByUserStudentId(usId);
-
-                    // Proctoring logs
-                    assessmentProctoringQuestionLogRepository.deleteByUserStudentUserStudentId(usId);
-
-                    // Demographics
-                    studentDemographicResponseRepository.deleteByUserStudentId(usId);
-
-                    // Firebase extra data
-                    firebaseStudentExtraDataRepository.deleteByUserStudentId(usId);
-
-                    // Firebase mapping
-                    Optional<FirebaseDataMapping> fbMapping = firebaseDataMappingRepository
-                            .findByNewEntityIdAndFirebaseType(usId, "STUDENT");
-                    fbMapping.ifPresent(m -> firebaseDataMappingRepository.delete(m));
-
-                    // StudentInfo and User
-                    StudentInfo si = us.getStudentInfo();
-                    Long userId = us.getUserId();
-
-                    // Delete UserStudent
-                    userStudentRepository.delete(us);
-
-                    // Delete StudentInfo
-                    if (si != null) {
-                        studentInfoRepository.deleteById(Long.valueOf(si.getId()));
-                    }
-
-                    // Delete User
-                    if (userId != null) {
-                        userRepository.deleteById(userId);
-                    }
-
+                    // Each student deletion runs in its own transaction (REQUIRES_NEW)
+                    // so a failure on one student won't roll back the others
+                    firebaseStudentDeletionService.deleteSingleStudent(us);
                     deletedCount++;
                 } catch (Exception e) {
-                    errors.add(Map.of("userStudentId", usId, "error", e.getMessage()));
+                    errors.add(Map.of("userStudentId", us.getUserStudentId(), "error", e.getMessage()));
                 }
             }
 
