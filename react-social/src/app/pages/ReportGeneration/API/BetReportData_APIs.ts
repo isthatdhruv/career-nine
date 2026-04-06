@@ -98,3 +98,20 @@ export function exportGeneralAssessmentExcelForStudent(assessmentId: number, use
     responseType: 'blob',
   });
 }
+
+// ── Email Recipients & Send Report Email ──
+
+export interface EmailRecipient {
+  email: string;
+  name: string;
+  role: string;
+  designation?: string;
+}
+
+export function getEmailRecipientsForStudent(userStudentId: number) {
+  return axios.get<EmailRecipient[]>(`${API_URL}/contact-person/email-recipients/${userStudentId}`);
+}
+
+export function sendReportEmail(payload: { emails: string[]; subject: string; htmlContent: string; fromName?: string }) {
+  return axios.post(`${API_URL}/contact-person/send-report-email`, payload);
+}

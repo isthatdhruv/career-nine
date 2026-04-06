@@ -18,6 +18,7 @@ import {
   generateBetReportOneClick,
   generateNavigatorReportOneClick,
 } from "../StudentInformation/StudentInfo_APIs";
+import { getEmailRecipientsForStudent, sendReportEmail, EmailRecipient } from "../ReportGeneration/API/BetReportData_APIs";
 import * as XLSX from "xlsx";
 
 type Student = {
@@ -97,6 +98,19 @@ export default function GroupStudentPage() {
 
   // Report generation (one-click)
   const [reportGeneratingFor, setReportGeneratingFor] = useState<number | null>(null); // assessmentId being generated
+  const [generatedReportUrls, setGeneratedReportUrls] = useState<Map<string, string>>(new Map()); // key: "userStudentId-assessmentId" -> reportUrl
+
+  // ── Send Email modal state ──
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailModalStudent, setEmailModalStudent] = useState<Student | null>(null);
+  const [emailRecipients, setEmailRecipients] = useState<EmailRecipient[]>([]);
+  const [emailRecipientsLoading, setEmailRecipientsLoading] = useState(false);
+  const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set());
+  const [extraEmails, setExtraEmails] = useState<string[]>([]);
+  const [extraEmailInput, setExtraEmailInput] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailAssessmentName, setEmailAssessmentName] = useState("");
+  const [emailReportUrl, setEmailReportUrl] = useState<string | null>(null);
 
   // ── Convenience aliases for backward compatibility ──
   const showAssessmentModal = modal.type === "assessment";
@@ -2670,6 +2684,25 @@ export default function GroupStudentPage() {
                         </button>
                         {assessment.status === "completed" && (
                           <>
+                          {generatedReportUrls.has(`${modalStudent.userStudentId}-${assessment.assessmentId}`) ? (
+                          <button
+                            className="btn btn-success btn-sm d-flex align-items-center gap-1"
+                            onClick={() => {
+                              const url = generatedReportUrls.get(`${modalStudent.userStudentId}-${assessment.assessmentId}`);
+                              if (url) window.open(url, "_blank");
+                            }}
+                            style={{
+                              borderRadius: "8px",
+                              padding: "6px 12px",
+                              fontWeight: 500,
+                              fontSize: "0.8rem",
+                              transition: "all 0.2s",
+                            }}
+                          >
+                            <i className="bi bi-eye"></i>
+                            Show Report
+                          </button>
+                          ) : (
                           <button
                             className="btn btn-outline-success btn-sm d-flex align-items-center gap-1"
                             disabled={reportGeneratingFor === assessment.assessmentId}
@@ -2687,7 +2720,7 @@ export default function GroupStudentPage() {
 
                                 const reportUrl = res.data.reportUrl;
                                 if (reportUrl) {
-                                  window.open(reportUrl, "_blank");
+                                  setGeneratedReportUrls(prev => new Map(prev).set(`${modalStudent.userStudentId}-${assessment.assessmentId}`, reportUrl));
                                 }
                               } catch (err: any) {
                                 showErrorToast("Report generation failed: " + (err?.response?.data?.error || err.message));
@@ -2706,6 +2739,7 @@ export default function GroupStudentPage() {
                             <i className={reportGeneratingFor === assessment.assessmentId ? "bi bi-hourglass-split" : "bi bi-file-earmark-arrow-down"}></i>
                             {reportGeneratingFor === assessment.assessmentId ? "Generating..." : "Report"}
                           </button>
+                          )}
                           <button
                             className="btn btn-outline-warning btn-sm d-flex align-items-center gap-1"
                             disabled={reportGeneratingFor === assessment.assessmentId}
@@ -2724,7 +2758,7 @@ export default function GroupStudentPage() {
 
                                 const reportUrl = res.data.reportUrl;
                                 if (reportUrl) {
-                                  window.open(reportUrl, "_blank");
+                                  setGeneratedReportUrls(prev => new Map(prev).set(`${modalStudent.userStudentId}-${assessment.assessmentId}`, reportUrl));
                                 }
                               } catch (err: any) {
                                 showErrorToast("Report generation failed: " + (err?.response?.data?.error || err.message));
@@ -2743,6 +2777,43 @@ export default function GroupStudentPage() {
                             <i className="bi bi-arrow-clockwise"></i>
                             {reportGeneratingFor === assessment.assessmentId ? "" : "Regenerate"}
                           </button>
+                          {generatedReportUrls.has(`${modalStudent.userStudentId}-${assessment.assessmentId}`) && (
+                          <button
+                            className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1"
+                            title="Send report via email"
+                            onClick={async () => {
+                              if (!modalStudent) return;
+                              setEmailModalStudent(modalStudent);
+                              setEmailAssessmentName(assessment.assessmentName);
+                              setEmailReportUrl(generatedReportUrls.get(`${modalStudent.userStudentId}-${assessment.assessmentId}`) || null);
+                              setSelectedEmails(new Set());
+                              setExtraEmails([]);
+                              setExtraEmailInput("");
+                              setShowEmailModal(true);
+                              setEmailRecipientsLoading(true);
+
+                              // Fetch email recipients
+                              try {
+                                const res = await getEmailRecipientsForStudent(modalStudent.userStudentId);
+                                setEmailRecipients(res.data || []);
+                              } catch {
+                                setEmailRecipients([]);
+                              } finally {
+                                setEmailRecipientsLoading(false);
+                              }
+                            }}
+                            style={{
+                              borderRadius: "8px",
+                              padding: "6px 12px",
+                              fontWeight: 500,
+                              fontSize: "0.8rem",
+                              transition: "all 0.2s",
+                            }}
+                          >
+                            <i className="bi bi-envelope"></i>
+                            Send Email
+                          </button>
+                          )}
                           </>
                         )}
                       </div>
@@ -3912,6 +3983,210 @@ export default function GroupStudentPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* Send Email Modal */}
+      {showEmailModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 10100, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 560, maxHeight: "90vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+            {/* Header */}
+            <div style={{ background: "linear-gradient(135deg, #4361ee 0%, #1a1a2e 100%)", padding: "1.25rem 1.5rem", borderRadius: "16px 16px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <h5 style={{ margin: 0, color: "#fff", fontWeight: 700, fontSize: "1.05rem" }}>
+                  <i className="bi bi-envelope me-2"></i>Send Report via Email
+                </h5>
+                {emailModalStudent && (
+                  <p style={{ margin: "4px 0 0", color: "rgba(255,255,255,0.85)", fontSize: "0.82rem" }}>
+                    {emailModalStudent.name}{emailAssessmentName ? ` — ${emailAssessmentName}` : ""}
+                  </p>
+                )}
+              </div>
+              <button type="button" style={{ background: "none", border: "none", color: "#fff", fontSize: "1.4rem", cursor: "pointer", padding: 4, lineHeight: 1 }} onClick={() => setShowEmailModal(false)}>&times;</button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: "1.25rem 1.5rem", overflowY: "auto", flex: 1 }}>
+              {emailRecipientsLoading ? (
+                <div style={{ textAlign: "center", padding: "2rem 0" }}>
+                  <div className="spinner-border spinner-border-sm text-primary" role="status" />
+                  <p style={{ marginTop: 8, color: "#6b7280", fontSize: "0.85rem" }}>Loading recipients...</p>
+                </div>
+              ) : (
+                <>
+                  {/* Select All */}
+                  {emailRecipients.length > 0 && (
+                    <div style={{ marginBottom: 12, paddingBottom: 10, borderBottom: "1px solid #e5e7eb" }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontWeight: 600, fontSize: "0.88rem", color: "#374151" }}>
+                        <input
+                          type="checkbox"
+                          checked={emailRecipients.length > 0 && emailRecipients.every((r) => selectedEmails.has(r.email))}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedEmails(new Set([...selectedEmails, ...emailRecipients.map((r) => r.email)]));
+                            } else {
+                              const recipientEmails = new Set(emailRecipients.map((r) => r.email));
+                              setSelectedEmails(new Set([...selectedEmails].filter((em) => !recipientEmails.has(em))));
+                            }
+                          }}
+                          style={{ width: 16, height: 16, accentColor: "#4361ee" }}
+                        />
+                        Select All
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Recipient list */}
+                  {emailRecipients.length === 0 && (
+                    <p style={{ color: "#9ca3af", fontSize: "0.85rem", textAlign: "center", padding: "1rem 0" }}>No recipients found for this student.</p>
+                  )}
+                  {emailRecipients.map((r, i) => (
+                    <label key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", padding: "8px 0", borderBottom: i < emailRecipients.length - 1 ? "1px solid #f3f4f6" : "none" }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedEmails.has(r.email)}
+                        onChange={(e) => {
+                          const next = new Set(selectedEmails);
+                          if (e.target.checked) next.add(r.email);
+                          else next.delete(r.email);
+                          setSelectedEmails(next);
+                        }}
+                        style={{ width: 16, height: 16, marginTop: 2, accentColor: "#4361ee" }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: "0.85rem", color: "#1f2937" }}>{r.name}</div>
+                        <div style={{ fontSize: "0.78rem", color: "#6b7280" }}>{r.email}</div>
+                        <span style={{
+                          display: "inline-block", marginTop: 2, padding: "1px 8px", borderRadius: 4, fontSize: "0.7rem", fontWeight: 600,
+                          background: r.role === "Student" ? "#dbeafe" : r.role === "Assigned Contact Person" ? "#dcfce7" : "#f3e8ff",
+                          color: r.role === "Student" ? "#2563eb" : r.role === "Assigned Contact Person" ? "#059669" : "#7c3aed",
+                        }}>
+                          {r.role}{r.designation ? ` — ${r.designation}` : ""}
+                        </span>
+                      </div>
+                    </label>
+                  ))}
+
+                  {/* Extra emails input */}
+                  <div style={{ marginTop: 16, borderTop: "1px solid #e5e7eb", paddingTop: 14 }}>
+                    <div style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151", marginBottom: 8 }}>Add extra email addresses</div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input
+                        type="email"
+                        placeholder="Enter email and press Enter or Add"
+                        value={extraEmailInput}
+                        onChange={(e) => setExtraEmailInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === ",") {
+                            e.preventDefault();
+                            const email = extraEmailInput.trim().replace(/,$/,"");
+                            if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && !extraEmails.includes(email)) {
+                              setExtraEmails([...extraEmails, email]);
+                              setSelectedEmails(new Set([...selectedEmails, email]));
+                              setExtraEmailInput("");
+                            }
+                          }
+                        }}
+                        style={{ flex: 1, padding: "6px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: "0.85rem", outline: "none" }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const email = extraEmailInput.trim();
+                          if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && !extraEmails.includes(email)) {
+                            setExtraEmails([...extraEmails, email]);
+                            setSelectedEmails(new Set([...selectedEmails, email]));
+                            setExtraEmailInput("");
+                          }
+                        }}
+                        style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#4361ee", color: "#fff", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer" }}
+                      >
+                        Add
+                      </button>
+                    </div>
+                    {/* Extra email chips */}
+                    {extraEmails.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+                        {extraEmails.map((email, i) => (
+                          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 20, background: "#f3f4f6", fontSize: "0.78rem", color: "#374151" }}>
+                            {email}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setExtraEmails(extraEmails.filter((_, j) => j !== i));
+                                const next = new Set(selectedEmails);
+                                next.delete(email);
+                                setSelectedEmails(next);
+                              }}
+                              style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", padding: 0, fontSize: "0.9rem", lineHeight: 1 }}
+                            >
+                              &times;
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{ borderTop: "1px solid #e0e0e0", padding: "1rem 1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>{selectedEmails.size} recipient(s) selected</span>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button className="btn btn-sm" onClick={() => setShowEmailModal(false)} style={{ borderRadius: 8, padding: "8px 20px" }}>Cancel</button>
+                <button
+                  className="btn btn-sm"
+                  disabled={selectedEmails.size === 0 || sendingEmail}
+                  onClick={async () => {
+                    if (selectedEmails.size === 0 || !emailModalStudent) return;
+                    setSendingEmail(true);
+                    try {
+                      const studentName = emailModalStudent.name || "Student";
+                      const reportLink = emailReportUrl || "";
+                      const subject = `Assessment Report – ${studentName}${emailAssessmentName ? ` (${emailAssessmentName})` : ""}`;
+                      const htmlContent = `<p>Dear <strong>${studentName}</strong>,</p>`
+                        + `<p>Greetings from Career-9!</p>`
+                        + `<p>Thank you for completing the <strong>${emailAssessmentName || "assessment"}</strong> assessment. Your report has been generated and is ready for you to view.</p>`
+                        + `<p>Please click the button below to access your report:</p>`
+                        + (reportLink
+                          ? `<p><a href="${reportLink}" style="display:inline-block;padding:12px 28px;background:#4361ee;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:1em;">View Report</a></p>`
+                            + `<p style="font-size:0.9em;color:#6b7280;">You can also access your report using this link:<br/><a href="${reportLink}" style="color:#4361ee;">${reportLink}</a></p>`
+                          : "")
+                        + `<p>Our team will be in touch with you shortly to guide you through the next steps, including your personalised counselling session.</p>`
+                        + `<p>For any queries or assistance, feel free to reach out to us:<br/>`
+                        + `<strong>Email:</strong> <a href="mailto:support@career-9.com" style="color:#4361ee;">support@career-9.com</a><br/>`
+                        + `<strong>Phone:</strong> +91 7000070256</p>`
+                        + `<p style="margin-top:24px;">Warm regards,<br/><strong>Career-9 Team</strong><br/><em>Ensuring Career Success</em></p>`;
+                      await sendReportEmail({
+                        emails: Array.from(selectedEmails),
+                        subject,
+                        htmlContent,
+                        fromName: "Career-9",
+                      });
+                      showSuccessToast(`Email sent to ${selectedEmails.size} recipient(s)`);
+                      setShowEmailModal(false);
+                    } catch (err: any) {
+                      showErrorToast("Failed to send email: " + (err?.response?.data?.message || err?.response?.data || err?.message || "Unknown error"));
+                    } finally {
+                      setSendingEmail(false);
+                    }
+                  }}
+                  style={{
+                    background: selectedEmails.size > 0 ? "#4361ee" : "#e0e0e0",
+                    color: selectedEmails.size > 0 ? "#fff" : "#999",
+                    border: "none",
+                    borderRadius: 8,
+                    padding: "8px 24px",
+                    fontWeight: 600,
+                  }}
+                >
+                  {sendingEmail ? <><span className="spinner-border spinner-border-sm me-2" />Sending...</> : <><i className="bi bi-send me-1"></i>Send</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
