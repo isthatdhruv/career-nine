@@ -242,6 +242,7 @@ public class FirebaseDataMappingController {
             Map<Long, MeasuredQualityTypes> mqtCache = new LinkedHashMap<>();
 
             int saved = 0;
+            Set<Long> uniqueQuestionsAnswered = new LinkedHashSet<>();
             for (Map<String, Object> ans : answers) {
                 Long optionId = getLong(ans, "optionId");
                 Long questionId = getLong(ans, "questionId");
@@ -300,6 +301,9 @@ public class FirebaseDataMappingController {
 
                 assessmentAnswerRepository.save(answer);
                 saved++;
+                if (questionId != null) {
+                    uniqueQuestionsAnswered.add(questionId);
+                }
             }
 
             // Save accumulated raw scores
@@ -320,19 +324,19 @@ public class FirebaseDataMappingController {
                 }
             }
 
-            // Determine completeness: compare saved answers against total questions in questionnaire
+            // Determine completeness: compare unique questions this student answered
+            // against the total mapped questions sent from the frontend (allMappedKeys.size).
+            // This is the total number of mapped questions from the Excel, not the full
+            // questionnaire count, so students who answered everything mapped get "completed".
             String status = "ongoing";
-            int totalQuestions = 0;
-            if (questionnaireId != null) {
-                List<QuestionnaireQuestion> allQQ = questionnaireQuestionRepository
-                        .findByQuestionnaireIdWithOptions(questionnaireId);
-                totalQuestions = allQQ.size();
-                if (totalQuestions > 0 && saved >= totalQuestions) {
-                    status = "completed";
-                }
-            } else if (saved > 0) {
-                // No questionnaire linked — can't determine total, mark ongoing
-                status = "ongoing";
+            int questionsAnswered = uniqueQuestionsAnswered.size();
+            Long totalMappedFromPayload = getLong(payload, "totalMappedQuestions");
+            int totalMappedQuestions = (totalMappedFromPayload != null)
+                    ? totalMappedFromPayload.intValue()
+                    : uniqueQuestionsAnswered.size(); // fallback: treat as complete if not provided
+
+            if (totalMappedQuestions > 0 && questionsAnswered >= totalMappedQuestions) {
+                status = "completed";
             }
 
             sam.setStatus(status);
@@ -340,12 +344,13 @@ public class FirebaseDataMappingController {
 
             return ResponseEntity.ok(Map.of(
                 "saved", saved,
+                "questionsAnswered", questionsAnswered,
                 "scoresCalculated", scoresCalculated,
-                "totalQuestions", totalQuestions,
+                "totalMappedQuestions", totalMappedQuestions,
                 "status", status,
-                "message", saved >= totalQuestions
+                "message", questionsAnswered >= totalMappedQuestions
                     ? "Answers imported and scores calculated successfully"
-                    : "Partial answers imported (" + saved + "/" + totalQuestions + "), status set to ongoing"
+                    : "Partial answers imported (" + questionsAnswered + "/" + totalMappedQuestions + " questions), status set to ongoing"
             ));
     }
 
@@ -486,13 +491,22 @@ public class FirebaseDataMappingController {
      * ]
      */
     @GetMapping("/fetch-school-data")
-    public ResponseEntity<?> fetchSchoolData() {
+    public ResponseEntity<?> fetchSchoolData(@RequestParam(value = "tenant", required = false) String tenant) {
         try {
             // Collection is "users" (lowercase) — confirmed from Firebase console
             List<Map<String, Object>> users = firebaseService.getAllDocuments("users");
             if (users.isEmpty()) {
                 // Fallback: try capitalized
                 users = firebaseService.getAllDocuments("Users");
+            }
+
+            // Filter by tenant if provided
+            if (tenant != null && !tenant.trim().isEmpty()) {
+                String tenantLower = tenant.trim().toLowerCase();
+                users.removeIf(user -> {
+                    Object t = user.get("tenant");
+                    return t == null || !t.toString().trim().toLowerCase().equals(tenantLower);
+                });
             }
 
             // school -> session -> grade -> sections
@@ -667,19 +681,28 @@ public class FirebaseDataMappingController {
      * assessment responses, scores, etc.) for the student import wizard.
      */
     @GetMapping("/fetch-user-data")
-    public ResponseEntity<?> fetchUserData() {
+    public ResponseEntity<?> fetchUserData(@RequestParam(value = "tenant", required = false) String tenant) {
         try {
             List<Map<String, Object>> users = firebaseService.getAllDocuments("users");
             if (users.isEmpty()) {
                 users = firebaseService.getAllDocuments("Users");
             }
 
+            // Filter by tenant if provided
+            if (tenant != null && !tenant.trim().isEmpty()) {
+                String tenantLower = tenant.trim().toLowerCase();
+                users.removeIf(user -> {
+                    Object t = user.get("tenant");
+                    return t == null || !t.toString().trim().toLowerCase().equals(tenantLower);
+                });
+            }
+
             List<Map<String, Object>> result = new ArrayList<>();
             for (Map<String, Object> user : users) {
                 Map<String, Object> userMap = new LinkedHashMap<>();
 
-                // Document ID
-                userMap.put("docId", user.get("__docId__") != null ? user.get("__docId__") : user.get("id"));
+                // Document ID (set by FirebaseService.getAllDocuments as "id")
+                userMap.put("docId", user.get("id"));
 
                 // Personal data
                 Object personalObj = user.get("personal");
@@ -710,6 +733,7 @@ public class FirebaseDataMappingController {
 
                 // Metadata
                 userMap.put("createdAt", user.get("createdAt"));
+                userMap.put("tenant", user.get("tenant"));
 
                 result.add(userMap);
             }
@@ -731,11 +755,20 @@ public class FirebaseDataMappingController {
      * Groups them by assessment type (ability, MI, personality).
      */
     @GetMapping("/fetch-unique-questions")
-    public ResponseEntity<?> fetchUniqueQuestions() {
+    public ResponseEntity<?> fetchUniqueQuestions(@RequestParam(value = "tenant", required = false) String tenant) {
         try {
             List<Map<String, Object>> users = firebaseService.getAllDocuments("users");
             if (users.isEmpty()) {
                 users = firebaseService.getAllDocuments("Users");
+            }
+
+            // Filter by tenant if provided
+            if (tenant != null && !tenant.trim().isEmpty()) {
+                String tenantLower = tenant.trim().toLowerCase();
+                users.removeIf(user -> {
+                    Object t = user.get("tenant");
+                    return t == null || !t.toString().trim().toLowerCase().equals(tenantLower);
+                });
             }
 
             Set<String> abilityQuestions = new LinkedHashSet<>();
@@ -848,15 +881,7 @@ public class FirebaseDataMappingController {
                                     if (email != null) existingUser.setEmail(email);
                                     if (phone != null) existingUser.setPhone(phone);
                                     if (dobStr != null && !dobStr.trim().isEmpty()) {
-                                        try {
-                                            SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
-                                            existingUser.setDobDate(sdf.parse(dobStr.trim()));
-                                        } catch (Exception e1) {
-                                            try {
-                                                SimpleDateFormat sdf2 = new SimpleDateFormat("yyyy-MM-dd");
-                                                existingUser.setDobDate(sdf2.parse(dobStr.trim()));
-                                            } catch (Exception ignored) {}
-                                        }
+                                        existingUser.setDobDate(parseDob(dobStr.trim()));
                                     }
                                     userRepository.save(existingUser);
                                 }
@@ -949,18 +974,7 @@ public class FirebaseDataMappingController {
                 user.setProvider(AuthProvider.custom_student);
                 user.setIsActive(true);
                 if (dobStr != null && !dobStr.trim().isEmpty()) {
-                    try {
-                        SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
-                        Date dob = sdf.parse(dobStr.trim());
-                        user.setDobDate(dob);
-                    } catch (Exception e) {
-                        // Try other formats
-                        try {
-                            SimpleDateFormat sdf2 = new SimpleDateFormat("yyyy-MM-dd");
-                            Date dob = sdf2.parse(dobStr.trim());
-                            user.setDobDate(dob);
-                        } catch (Exception ignored) {}
-                    }
+                    user.setDobDate(parseDob(dobStr.trim()));
                 }
                 user = userRepository.save(user);
 
@@ -1194,6 +1208,24 @@ public class FirebaseDataMappingController {
             }
         } catch (Exception ignored) {}
         return "Unknown Session";
+    }
+
+    /**
+     * Parses a DOB string trying multiple formats: dd/MM/yyyy, dd-MM-yyyy, yyyy-MM-dd, MM/dd/yyyy.
+     * Returns null if none match.
+     */
+    private Date parseDob(String dobStr) {
+        if (dobStr == null || dobStr.trim().isEmpty()) return null;
+        String s = dobStr.trim();
+        String[] formats = { "dd/MM/yyyy", "dd-MM-yyyy", "yyyy-MM-dd", "MM/dd/yyyy" };
+        for (String fmt : formats) {
+            try {
+                SimpleDateFormat sdf = new SimpleDateFormat(fmt);
+                sdf.setLenient(false);
+                return sdf.parse(s);
+            } catch (Exception ignored) {}
+        }
+        return null;
     }
 
     private String getString(Map<String, Object> map, String key) {

@@ -180,6 +180,22 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
           return mapping[key] || key;
         };
 
+        // Normalize old question labels for string array categories
+        // e.g. "Career Aspiration" (singular from old wizard) → "Career Aspirations" (plural)
+        const normalizeQuestionLabel = (question: string, category: string): string => {
+          const labelMap: Record<string, Record<string, string>> = {
+            careeraspirations: { "career aspiration": "Career Aspirations", "career aspirations": "Career Aspirations" },
+            subjectofinterest: { "subject of interest": "Subject of Interest" },
+            values: { "values": "Values", "value": "Values" },
+          };
+          const catMap = labelMap[category];
+          if (catMap) {
+            const normalized = question.toLowerCase().trim();
+            if (catMap[normalized]) return catMap[normalized];
+          }
+          return question;
+        };
+
         // Group by firebaseQuestion + category
         const groupMap = new Map<string, {
           firebaseQuestion: string;
@@ -190,10 +206,11 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
 
         saved.forEach((s: any) => {
           const cat = normalizeCat(s.category);
-          const key = `${cat}::${s.firebaseQuestion}`;
+          const fbQuestion = normalizeQuestionLabel(s.firebaseQuestion || "", cat);
+          const key = `${cat}::${fbQuestion}`;
           if (!groupMap.has(key)) {
             groupMap.set(key, {
-              firebaseQuestion: s.firebaseQuestion,
+              firebaseQuestion: fbQuestion,
               category: cat,
               systemQuestionId: s.systemQuestionId || null,
               answers: new Map(),
@@ -415,9 +432,23 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
           const saved: any[] = res.data || [];
           if (saved.length > 0) {
             const normalize = (s: string) => (s || "").toLowerCase().trim().replace(/\s+/g, " ");
+            // Normalize old DB category keys to match current lowercase format
+            const normCat = (cat: string): string => {
+              const map: Record<string, string> = {
+                multipleintelligence: "multipleintelligence",
+                multipleIntelligence: "multipleintelligence",
+                careeraspirations: "careeraspirations",
+                careerAspiration: "careeraspirations",
+                subjectofinterest: "subjectofinterest",
+                subjectOfInterest: "subjectofinterest",
+                values: "values",
+                value: "values",
+              };
+              return map[cat] || cat;
+            };
             const applied = newMappings.map((m) => {
               const savedForQ = saved.filter(
-                (s: any) => normalize(s.firebaseQuestion) === normalize(m.firebaseQuestion) && s.category === m.category
+                (s: any) => normalize(s.firebaseQuestion) === normalize(m.firebaseQuestion) && normCat(s.category) === m.category
               );
               if (savedForQ.length === 0) return m;
 
@@ -566,16 +597,29 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
     return bestScore >= 0.7 ? best : null;
   };
 
+  const normText = (s: string) =>
+    (s || "").replace(/[^\x00-\x7F]/g, " ").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+
   const findBestOption = (answerText: string, options: SystemOption[]): SystemOption | null => {
     if (!answerText || !options?.length) return null;
-    const al = answerText.toLowerCase().trim();
-    const exact = options.find((o) => (o.optionText || "").toLowerCase().trim() === al);
+    const al = normText(answerText);
+    // Pass 1: normalized exact match
+    const exact = options.find((o) => normText(o.optionText || "") === al);
     if (exact) return exact;
+    // Pass 2: one contains the other (normalized)
     const contains = options.find((o) => {
-      const ol = (o.optionText || "").toLowerCase().trim();
+      const ol = normText(o.optionText || "");
       return ol.includes(al) || al.includes(ol);
     });
-    return contains || null;
+    if (contains) return contains;
+    // Pass 3: word overlap similarity (handles minor wording differences)
+    let bestOpt: SystemOption | null = null;
+    let bestScore = 0;
+    for (const o of options) {
+      const score = textSimilarity(answerText, o.optionText || "");
+      if (score > bestScore) { bestScore = score; bestOpt = o; }
+    }
+    return bestScore >= 0.8 ? bestOpt : null;
   };
 
   const handleMapAll = () => {
@@ -722,15 +766,25 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
       answerMap: Map<string, number | null>;
     }>();
 
-    const normQ = (s: string) => (s || "").toLowerCase().trim().replace(/\s+/g, " ");
+    // Normalize: lowercase, replace non-ASCII and non-alphanumeric with space, collapse whitespace
+    const normQ = (s: string) =>
+      (s || "")
+        .replace(/[^\x00-\x7F]/g, " ") // replace non-ASCII with space (smart quotes, ellipsis, etc.)
+        .toLowerCase()
+        .replace(/[^a-z0-9 ]/g, " ")   // replace punctuation with space
+        .replace(/\s+/g, " ")
+        .trim();
 
     // All mapped question keys for tracking what each student answered
     const allMappedKeys = new Set<string>();
+    // Unique systemQuestionIds for sending to backend (matches backend's uniqueQuestionsAnswered count)
+    const allMappedQuestionIds = new Set<number>();
 
     mappings.forEach((m) => {
       if (!m.systemQuestionId) return;
       const key = `${m.category}::${normQ(m.firebaseQuestion)}`;
       allMappedKeys.add(key);
+      allMappedQuestionIds.add(m.systemQuestionId);
       const answerMap = new Map<string, number | null>();
       m.answerMappings.forEach((am) => {
         if (am.firebaseAnswer) {
@@ -787,13 +841,15 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
       processResponses(sa.multipleIntelligenceResponses, "multipleintelligence");
       processResponses(sa.personalityDetailedResponses, "personality");
 
-      // Multi-select categories
-      const processStringArray = (arr: string[] | undefined, category: string, questionLabel: string) => {
+      // Multi-select categories: find mapping by category prefix, not hardcoded label,
+      // because the mapping's firebaseQuestion may differ (e.g. "Career Aspiration" vs "Career Aspirations")
+      const processStringArray = (arr: string[] | undefined, category: string) => {
         if (!arr || !Array.isArray(arr)) return;
-        const key = `${category}::${normQ(questionLabel)}`;
-        const mapping = questionLookup.get(key);
-        if (!mapping) return;
-        answeredKeys.add(key);
+        // Find the mapping key that matches this category (there should be exactly one)
+        const matchingKey = Array.from(questionLookup.keys()).find((k) => k.startsWith(category + "::"));
+        if (!matchingKey) return;
+        const mapping = questionLookup.get(matchingKey)!;
+        answeredKeys.add(matchingKey);
         arr.forEach((val) => {
           if (!val) return;
           const optionId = mapping.answerMap.get(normQ(val)) ?? null;
@@ -805,9 +861,9 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
         });
       };
 
-      processStringArray(sa.careerAspirations, "careeraspirations", "Career Aspirations");
-      processStringArray(sa.subjectsOfInterest, "subjectofinterest", "Subject of Interest");
-      processStringArray(sa.values, "values", "Values");
+      processStringArray(sa.careerAspirations, "careeraspirations");
+      processStringArray(sa.subjectsOfInterest, "subjectofinterest");
+      processStringArray(sa.values, "values");
 
       if (answers.length === 0) {
         // Student has no matching answers at all — treat as partial with all questions missing
@@ -834,6 +890,7 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
           userStudentId,
           assessmentId: sa.assessmentId,
           answers,
+          totalMappedQuestions: allMappedQuestionIds.size,
         });
         totalStudents++;
         totalAnswers += answers.length;
@@ -1528,17 +1585,29 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
               <button className="btn btn-light" onClick={() => setShowPartialModal(false)}>
                 Close
               </button>
-              <button
-                className="btn btn-success"
-                onClick={handleForceComplete}
-                disabled={forceCompleting}
-              >
-                {forceCompleting ? (
-                  <><span className="spinner-border spinner-border-sm me-1"></span>Updating...</>
-                ) : (
-                  <>Next: Mark All as Completed <i className="bi bi-arrow-right ms-1"></i></>
-                )}
-              </button>
+              <div className="d-flex gap-2">
+                <button
+                  className="btn btn-warning"
+                  onClick={() => {
+                    setShowPartialModal(false);
+                    onDone();
+                  }}
+                  disabled={forceCompleting}
+                >
+                  Skip These Students & Continue <i className="bi bi-arrow-right ms-1"></i>
+                </button>
+                <button
+                  className="btn btn-success"
+                  onClick={handleForceComplete}
+                  disabled={forceCompleting}
+                >
+                  {forceCompleting ? (
+                    <><span className="spinner-border spinner-border-sm me-1"></span>Updating...</>
+                  ) : (
+                    <>Next: Mark All as Completed <i className="bi bi-arrow-right ms-1"></i></>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

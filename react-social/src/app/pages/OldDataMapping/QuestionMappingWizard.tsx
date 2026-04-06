@@ -192,7 +192,7 @@ const QuestionMappingWizard = ({ onBack }: Props) => {
       };
 
       addResponses(fbUser.abilityDetailedResponses, "ability");
-      addResponses(fbUser.multipleIntelligenceResponses, "multipleIntelligence");
+      addResponses(fbUser.multipleIntelligenceResponses, "multipleintelligence");
       addResponses(fbUser.personalityDetailedResponses, "personality");
 
       // Multi-select categories: Firebase stores these as plain string arrays
@@ -212,9 +212,9 @@ const QuestionMappingWizard = ({ onBack }: Props) => {
         });
       };
 
-      addStringArray(fbUser.careerAspirations, "careerAspiration", "Career Aspiration");
-      addStringArray(fbUser.subjectsOfInterest, "subjectOfInterest", "Subject of Interest");
-      addStringArray(fbUser.values, "value", "Values");
+      addStringArray(fbUser.careerAspirations, "careeraspirations", "Career Aspirations");
+      addStringArray(fbUser.subjectsOfInterest, "subjectofinterest", "Subject of Interest");
+      addStringArray(fbUser.values, "values", "Values");
 
       setMappings(newMappings);
       setActiveCategory(newMappings.length > 0 ? newMappings[0].category : "ability");
@@ -254,11 +254,11 @@ const QuestionMappingWizard = ({ onBack }: Props) => {
 
   const categoryLabels: Record<string, string> = {
     ability: "Ability",
-    multipleIntelligence: "Multiple Intelligence",
+    multipleintelligence: "Multiple Intelligence",
     personality: "Personality",
-    careerAspiration: "Career Aspiration",
-    subjectOfInterest: "Subject of Interest",
-    value: "Values",
+    careeraspirations: "Career Aspirations",
+    subjectofinterest: "Subject of Interest",
+    values: "Values",
   };
 
   const categoryCounts = useMemo(() => {

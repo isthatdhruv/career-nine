@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.ContactPerson;
@@ -405,6 +406,131 @@ public class ContactPersonController {
         }
 
         return ResponseEntity.ok(result);
+    }
+
+    // ============ EMAIL RECIPIENTS FOR STUDENT ============
+
+    /**
+     * Get all email recipients related to a student:
+     * 1. Student's own email (from StudentInfo, fallback to User)
+     * 2. Contact persons directly assigned to this student
+     * 3. All contact persons of the student's institute
+     */
+    @Transactional(readOnly = true)
+    @GetMapping("/email-recipients/{userStudentId}")
+    public ResponseEntity<?> getEmailRecipients(@PathVariable Long userStudentId) {
+        var userStudentOpt = userStudentRepository.findById(userStudentId);
+        if (!userStudentOpt.isPresent()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Student not found");
+        }
+        var userStudent = userStudentOpt.get();
+
+        List<Map<String, Object>> recipients = new ArrayList<>();
+        java.util.Set<String> addedEmails = new java.util.HashSet<>();
+
+        // 1. Student email (try StudentInfo.email first, then User.email as fallback)
+        if (userStudent.getStudentInfo() != null) {
+            String studentEmail = userStudent.getStudentInfo().getEmail();
+            String studentName = userStudent.getStudentInfo().getName();
+
+            if ((studentEmail == null || studentEmail.isEmpty()) && userStudent.getStudentInfo().getUser() != null) {
+                studentEmail = userStudent.getStudentInfo().getUser().getEmail();
+            }
+            if ((studentName == null || studentName.isEmpty()) && userStudent.getStudentInfo().getUser() != null) {
+                studentName = userStudent.getStudentInfo().getUser().getName();
+            }
+
+            if (studentEmail != null && !studentEmail.isEmpty()) {
+                Map<String, Object> entry = new HashMap<>();
+                entry.put("email", studentEmail);
+                entry.put("name", studentName != null ? studentName : "Student");
+                entry.put("role", "Student");
+                recipients.add(entry);
+                addedEmails.add(studentEmail.toLowerCase());
+            }
+        }
+
+        // 2. Contact persons assigned to this student
+        List<StudentContactAssignment> assignments = studentContactAssignmentRepository.findByUserStudentId(userStudentId);
+        java.util.Set<Long> addedContactPersonIds = new java.util.HashSet<>();
+        for (StudentContactAssignment sca : assignments) {
+            Long cpId = sca.getContactPersonId();
+            if (cpId != null && !addedContactPersonIds.contains(cpId)) {
+                contactPersonRepository.findById(cpId).ifPresent(cp -> {
+                    if (cp.getEmail() != null && !cp.getEmail().isEmpty()
+                            && !addedEmails.contains(cp.getEmail().toLowerCase())) {
+                        Map<String, Object> entry = new HashMap<>();
+                        entry.put("email", cp.getEmail());
+                        entry.put("name", cp.getName() != null ? cp.getName() : "Contact Person");
+                        entry.put("role", "Assigned Contact Person");
+                        entry.put("designation", cp.getDesignation());
+                        recipients.add(entry);
+                        addedEmails.add(cp.getEmail().toLowerCase());
+                    }
+                });
+                addedContactPersonIds.add(cpId);
+            }
+        }
+
+        // 3. All contact persons of the student's institute
+        if (userStudent.getInstitute() != null) {
+            int instituteCode = userStudent.getInstitute().getInstituteCode();
+            List<ContactPerson> allCps = contactPersonRepository.findByInstitute_InstituteCode(instituteCode);
+            for (ContactPerson cp : allCps) {
+                if (!addedContactPersonIds.contains(cp.getId())
+                        && cp.getEmail() != null && !cp.getEmail().isEmpty()
+                        && !addedEmails.contains(cp.getEmail().toLowerCase())) {
+                    Map<String, Object> entry = new HashMap<>();
+                    entry.put("email", cp.getEmail());
+                    entry.put("name", cp.getName() != null ? cp.getName() : "Contact Person");
+                    entry.put("role", "School Contact Person");
+                    entry.put("designation", cp.getDesignation());
+                    recipients.add(entry);
+                    addedContactPersonIds.add(cp.getId());
+                    addedEmails.add(cp.getEmail().toLowerCase());
+                }
+            }
+        }
+
+        return ResponseEntity.ok(recipients);
+    }
+
+    // ============ SEND REPORT EMAIL ============
+
+    /**
+     * Send a report email to selected recipients.
+     * Body: { emails: [String...], subject: String, htmlContent: String, fromName: String (optional) }
+     */
+    @PostMapping("/send-report-email")
+    public ResponseEntity<?> sendReportEmail(@RequestBody Map<String, Object> payload) {
+        @SuppressWarnings("unchecked")
+        List<String> emails = (List<String>) payload.get("emails");
+        String subject = (String) payload.get("subject");
+        String htmlContent = (String) payload.get("htmlContent");
+        String fromName = (String) payload.get("fromName");
+
+        if (emails == null || emails.isEmpty()) {
+            return ResponseEntity.badRequest().body("At least one email is required");
+        }
+        if (subject == null || subject.isEmpty()) {
+            return ResponseEntity.badRequest().body("Subject is required");
+        }
+        if (htmlContent == null || htmlContent.isEmpty()) {
+            return ResponseEntity.badRequest().body("Email content is required");
+        }
+
+        SmtpEmailRequest request = new SmtpEmailRequest();
+        request.setTo(emails);
+        request.setSubject(subject);
+        request.setHtmlContent(htmlContent);
+        request.setFromName(fromName != null && !fromName.isEmpty() ? fromName : "Career-9");
+        request.setFromEmail("notifications@career-9.com");
+        odooEmailService.sendEmail(request);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Email sent successfully");
+        response.put("recipientCount", emails.size());
+        return ResponseEntity.ok(response);
     }
 
     // ============ SEND REPORTS TO CONTACT PERSON ============
