@@ -1991,106 +1991,116 @@ export default function GroupStudentAdminPage() {
                   </p>
                 </div>
               ) : (
-                <div className="table-responsive" style={{ overflowX: "auto" }}>
-                  <table className="table align-middle mb-0" style={{ minWidth: "1400px" }}>
+                <div className="table-responsive">
+                  <table className="table align-middle mb-0" style={{ width: "100%", tableLayout: "auto", fontSize: "0.85rem" }}>
                     <thead>
                       <tr style={{ background: "#f8f9fa" }}>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           User ID
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Username
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Roll Number
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Control Number
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Student Name
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Allotted Assessment
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Phone Number
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           DOB
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Assessments
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Actions
@@ -2108,7 +2118,7 @@ export default function GroupStudentAdminPage() {
                         >
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2117,10 +2127,10 @@ export default function GroupStudentAdminPage() {
                               style={{
                                 background: "rgba(67, 97, 238, 0.1)",
                                 color: "#4361ee",
-                                padding: "6px 12px",
-                                borderRadius: "8px",
+                                padding: "4px 8px",
+                                borderRadius: "6px",
                                 fontWeight: 600,
-                                fontSize: "0.85rem",
+                                fontSize: "0.8rem",
                               }}
                             >
                               #{student.userStudentId}
@@ -2128,7 +2138,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2141,7 +2151,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2151,7 +2161,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2161,7 +2171,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2174,7 +2184,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2185,11 +2195,12 @@ export default function GroupStudentAdminPage() {
                                 background: "rgba(67, 97, 238, 0.1)",
                                 color: "#4361ee",
                                 border: "1px solid rgba(67, 97, 238, 0.3)",
-                                padding: "6px 12px",
-                                borderRadius: "8px",
+                                padding: "4px 8px",
+                                borderRadius: "6px",
                                 fontWeight: 500,
-                                fontSize: "0.85rem",
+                                fontSize: "0.78rem",
                                 transition: "all 0.2s",
+                                whiteSpace: "nowrap",
                               }}
                             >
                               <i className="bi bi-list-ul"></i>
@@ -2198,7 +2209,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2223,7 +2234,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2248,7 +2259,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2262,8 +2273,8 @@ export default function GroupStudentAdminPage() {
                               }
                               style={{
                                 width: "100%",
-                                minWidth: "200px",
-                                padding: "10px 12px",
+                                minWidth: "150px",
+                                padding: "6px 8px",
                                 borderRadius: "8px",
                                 border: "2px solid #e0e0e0",
                                 background: student.selectedAssessment
@@ -2271,7 +2282,7 @@ export default function GroupStudentAdminPage() {
                                   : "#fff",
                                 cursor: "pointer",
                                 fontWeight: 500,
-                                fontSize: "0.9rem",
+                                fontSize: "0.8rem",
                               }}
                             >
                               <option value="">-- Select Assessment --</option>
@@ -2300,7 +2311,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2311,12 +2322,13 @@ export default function GroupStudentAdminPage() {
                                 background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
                                 color: "#fff",
                                 border: "none",
-                                padding: "8px 16px",
-                                borderRadius: "8px",
+                                padding: "5px 10px",
+                                borderRadius: "6px",
                                 fontWeight: 600,
-                                fontSize: "0.85rem",
+                                fontSize: "0.78rem",
                                 transition: "all 0.2s",
                                 boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
+                                whiteSpace: "nowrap",
                               }}
                             >
                               <i className="bi bi-speedometer2"></i>
