@@ -116,13 +116,23 @@ public class NavigatorReportDataController {
                 String fileName = safeName + "_" + userStudentId + "_" + reportType + ".html";
                 String folder = "navigator-reports/assessment-" + assessmentId;
 
-                String reportUrl = digitalOceanSpacesService.uploadBytes(
-                        filledHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8),
-                        "text/html", folder, fileName);
+                try {
+                    String reportUrl = digitalOceanSpacesService.uploadBytes(
+                            filledHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                            "text/html", folder, fileName);
 
-                report.setReportStatus("generated");
-                report.setReportUrl(reportUrl);
-                navigatorReportDataRepository.save(report);
+                    report.setReportStatus("generated");
+                    report.setReportUrl(reportUrl);
+                    navigatorReportDataRepository.save(report);
+                } catch (Exception uploadEx) {
+                    // DO Spaces upload failed — return HTML directly for download
+                    byte[] htmlBytes = filledHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    HttpHeaders headers = new HttpHeaders();
+                    headers.setContentType(MediaType.TEXT_HTML);
+                    headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"");
+                    headers.setContentLength(htmlBytes.length);
+                    return new ResponseEntity<>(htmlBytes, headers, HttpStatus.OK);
+                }
             }
 
             return ResponseEntity.ok(Map.of(
@@ -531,22 +541,34 @@ public class NavigatorReportDataController {
                     String fileName = safeName + "_" + userStudentId + "_" + reportType + ".html";
                     String folder = "navigator-reports/assessment-" + assessmentId;
 
-                    String reportUrl = digitalOceanSpacesService.uploadBytes(
-                            filledHtml.getBytes(StandardCharsets.UTF_8),
-                            "text/html",
-                            folder,
-                            fileName
-                    );
+                    try {
+                        String reportUrl = digitalOceanSpacesService.uploadBytes(
+                                filledHtml.getBytes(StandardCharsets.UTF_8),
+                                "text/html",
+                                folder,
+                                fileName
+                        );
 
-                    report.setReportStatus("generated");
-                    report.setReportUrl(reportUrl);
-                    navigatorReportDataRepository.save(report);
+                        report.setReportStatus("generated");
+                        report.setReportUrl(reportUrl);
+                        navigatorReportDataRepository.save(report);
 
-                    results.add(Map.of(
-                            "userStudentId", userStudentId,
-                            "studentName", safe(report.getStudentName()),
-                            "reportUrl", reportUrl
-                    ));
+                        results.add(Map.of(
+                                "userStudentId", userStudentId,
+                                "studentName", safe(report.getStudentName()),
+                                "reportUrl", reportUrl
+                        ));
+                    } catch (Exception uploadEx) {
+                        // DO Spaces upload failed — encode HTML as data URI for direct download
+                        String dataUri = "data:text/html;base64," + Base64.getEncoder().encodeToString(filledHtml.getBytes(StandardCharsets.UTF_8));
+                        results.add(Map.of(
+                                "userStudentId", userStudentId,
+                                "studentName", safe(report.getStudentName()),
+                                "reportUrl", dataUri,
+                                "fileName", fileName,
+                                "downloadFallback", true
+                        ));
+                    }
                 } catch (Exception e) {
                     errors.add(Map.of("userStudentId", userStudentId,
                             "reason", e.getMessage()));

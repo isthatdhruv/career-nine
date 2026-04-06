@@ -498,9 +498,21 @@ const ReportGenerationPage: React.FC<{ config: ReportGenerationConfig }> = ({ co
                           setGeneratingReports(true);
                           try {
                             const res = await api.generateReports(Number(selectedAssessment), ids);
-                            const { generated, errors } = res.data;
+                            const { generated, errors, reports } = res.data;
+                            // Auto-download any reports that failed DO Spaces upload
+                            const fallbacks = (reports || []).filter((r: any) => r.downloadFallback);
+                            for (const fb of fallbacks) {
+                              const a = document.createElement("a");
+                              a.href = fb.reportUrl;
+                              a.download = fb.fileName || `report_${fb.userStudentId}.html`;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                            }
+                            const uploaded = generated - fallbacks.length;
                             const errorDetails = errors.length > 0 ? errors.map((e: any) => `Student ${e.userStudentId}: ${e.reason}`).join("\n") : "";
-                            alert(`Generated ${generated} report(s).${errors.length > 0 ? `\n${errors.length} failed:\n${errorDetails}` : ""}`);
+                            const fallbackMsg = fallbacks.length > 0 ? `\n${fallbacks.length} downloaded directly (cloud upload unavailable).` : "";
+                            alert(`Generated ${generated} report(s).${fallbackMsg}${errors.length > 0 ? `\n${errors.length} failed:\n${errorDetails}` : ""}`);
                             await refreshReportData();
                           } catch (err: any) { alert("Failed: " + (err?.response?.data?.error || err.message)); }
                           finally { setGeneratingReports(false); }

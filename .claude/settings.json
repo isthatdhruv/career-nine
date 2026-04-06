@@ -8,7 +8,13 @@
       "Read(//home/kccsw/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills/brainstorming/**)",
       "Bash(/home/kccsw/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills/brainstorming/scripts/start-server.sh --project-dir /home/kccsw/Projects/career-nine)",
       "Read(//home/kccsw/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills/subagent-driven-development/**)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(grep -oP '.{0,600}answeredCount.{0,100}' react-social/build/static/js/7158.49f49085.chunk.js)",
+      "Bash(grep -oP 'totalMapped.{0,20}answeredCount|answeredCount.{0,20}totalMapped' react-social/build/static/js/7158.49f49085.chunk.js)",
+      "Bash(grep -oP '.{0,300}answeredCount:.{0,300}' react-social/build/static/js/7158.49f49085.chunk.js)",
+      "Bash(grep -oP '.{0,400}answeredCount.{0,400}' react-social/build/static/js/7158.49f49085.chunk.js)",
+      "Bash(git -C /root/project/career-nine log --oneline --all -- react-social/src/app/pages/OldDataMapping/steps/QuestionMappingStep.tsx)",
+      "Bash(git -C /root/project/career-nine show 6cd7a7d0 -- react-social/src/app/pages/OldDataMapping/steps/QuestionMappingStep.tsx)"
     ]
   },
   "hooks": {
