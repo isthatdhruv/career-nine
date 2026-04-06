@@ -46,6 +46,8 @@ public class NavigatorReportDataController {
     @Autowired private NavigatorReportDataRepository navigatorReportDataRepository;
     @Autowired private NavigatorReportGenerationService navigatorReportGenerationService;
     @Autowired private DigitalOceanSpacesService digitalOceanSpacesService;
+    @Autowired private com.kccitm.api.repository.Career9.GeneratedReportRepository generatedReportRepository;
+    @Autowired private com.kccitm.api.repository.Career9.UserStudentRepository userStudentRepository;
 
     // ═══════════════════════ CRUD ═══════════════════════
 
@@ -123,6 +125,7 @@ public class NavigatorReportDataController {
                 report.setReportStatus("generated");
                 report.setReportUrl(reportUrl);
                 navigatorReportDataRepository.save(report);
+                syncGeneratedReport(userStudentId, assessmentId, "generated", reportUrl);
                 } catch (Exception uploadEx) {
                     // DO Spaces upload failed — return HTML directly for download
                     byte[] htmlBytes = filledHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8);
@@ -534,6 +537,7 @@ public class NavigatorReportDataController {
                     report.setReportStatus("generated");
                     report.setReportUrl(reportUrl);
                     navigatorReportDataRepository.save(report);
+                    syncGeneratedReport(userStudentId, assessmentId, "generated", reportUrl);
 
                     results.add(Map.of(
                             "userStudentId", userStudentId,
@@ -876,6 +880,25 @@ public class NavigatorReportDataController {
 
     private String safe(String val) {
         return val != null ? val : "";
+    }
+
+    private void syncGeneratedReport(Long userStudentId, Long assessmentId, String status, String reportUrl) {
+        try {
+            com.kccitm.api.model.career9.GeneratedReport gr = generatedReportRepository
+                    .findByUserStudentUserStudentIdAndAssessmentIdAndTypeOfReport(userStudentId, assessmentId, "navigator")
+                    .orElseGet(() -> {
+                        com.kccitm.api.model.career9.GeneratedReport newGr = new com.kccitm.api.model.career9.GeneratedReport();
+                        newGr.setUserStudent(userStudentRepository.findById(userStudentId).orElse(null));
+                        newGr.setAssessmentId(assessmentId);
+                        newGr.setTypeOfReport("navigator");
+                        return newGr;
+                    });
+            gr.setReportStatus(status);
+            gr.setReportUrl(reportUrl);
+            generatedReportRepository.save(gr);
+        } catch (Exception e) {
+            // Non-critical — don't fail the main flow
+        }
     }
 
     private String inlineImages(String html) {

@@ -87,6 +87,7 @@ public class BetReportDataController {
     @Autowired private QuestionnaireQuestionRepository questionnaireQuestionRepository;
     @Autowired private FirebaseService firebaseService;
     @Autowired private DigitalOceanSpacesService digitalOceanSpacesService;
+    @Autowired private com.kccitm.api.repository.Career9.GeneratedReportRepository generatedReportRepository;
 
     // ═══════════════════════ ONE-CLICK REPORT ═══════════════════════
 
@@ -146,6 +147,7 @@ public class BetReportDataController {
                 report.setReportStatus("generated");
                 report.setReportUrl(reportUrl);
                 betReportDataRepository.save(report);
+                syncGeneratedReport(userStudentId, assessmentId, "generated", reportUrl);
                 } catch (Exception uploadEx) {
                     // DO Spaces upload failed — return HTML directly for download
                     byte[] htmlBytes = filledHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8);
@@ -803,6 +805,7 @@ public class BetReportDataController {
                 report.setReportStatus("generated");
                 report.setReportUrl(reportUrl);
                 betReportDataRepository.save(report);
+                syncGeneratedReport(userStudentId, assessmentId, "generated", reportUrl);
 
                     results.add(Map.of(
                             "userStudentId", userStudentId,
@@ -1529,6 +1532,25 @@ public class BetReportDataController {
 
     private String safe(String value) {
         return value != null ? value : "";
+    }
+
+    private void syncGeneratedReport(Long userStudentId, Long assessmentId, String status, String reportUrl) {
+        try {
+            com.kccitm.api.model.career9.GeneratedReport gr = generatedReportRepository
+                    .findByUserStudentUserStudentIdAndAssessmentIdAndTypeOfReport(userStudentId, assessmentId, "bet")
+                    .orElseGet(() -> {
+                        com.kccitm.api.model.career9.GeneratedReport newGr = new com.kccitm.api.model.career9.GeneratedReport();
+                        newGr.setUserStudent(userStudentRepository.findById(userStudentId).orElse(null));
+                        newGr.setAssessmentId(assessmentId);
+                        newGr.setTypeOfReport("bet");
+                        return newGr;
+                    });
+            gr.setReportStatus(status);
+            gr.setReportUrl(reportUrl);
+            generatedReportRepository.save(gr);
+        } catch (Exception e) {
+            // Non-critical — don't fail the main flow
+        }
     }
 
     /**

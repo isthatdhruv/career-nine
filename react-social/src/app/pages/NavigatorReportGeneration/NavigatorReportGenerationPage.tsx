@@ -19,6 +19,7 @@ const navigatorConfig: ReportGenerationConfig = {
   accentColor: "#0d9488",
   placeholderIcon: "&#x1F9ED;",
   reportFilePrefix: "navigator_report",
+  typeOfReport: "navigator",
 
   hasEligibility: true,
   hasReset: true,

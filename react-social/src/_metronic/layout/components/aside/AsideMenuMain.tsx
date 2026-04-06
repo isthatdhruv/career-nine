@@ -437,6 +437,14 @@ export function AsideMenuMain() {
               fontIcon="bi-compass"
             />
           )}
+          {allowed("/reports") && (
+            <AsideMenuItem
+              to="/unified-report-management"
+              icon="/media/icons/duotune/graphs/gra010.svg"
+              title="Unified Report Management"
+              fontIcon="bi-grid-3x3-gap"
+            />
+          )}
         </>
       )}
 
