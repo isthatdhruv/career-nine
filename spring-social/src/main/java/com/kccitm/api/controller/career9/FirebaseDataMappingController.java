@@ -320,22 +320,19 @@ public class FirebaseDataMappingController {
                 }
             }
 
-            // Determine completeness: compare unique questions answered against total questions
-            // in questionnaire. Use unique question count (not answer rows) because multi-select
-            // questions produce multiple answer rows for a single question.
+            // Determine completeness: compare unique questions this student answered
+            // against the total mapped questions sent from the frontend (allMappedKeys.size).
+            // This is the total number of mapped questions from the Excel, not the full
+            // questionnaire count, so students who answered everything mapped get "completed".
             String status = "ongoing";
-            int totalQuestions = 0;
             int questionsAnswered = uniqueQuestionsAnswered.size();
-            if (questionnaireId != null) {
-                List<QuestionnaireQuestion> allQQ = questionnaireQuestionRepository
-                        .findByQuestionnaireIdWithOptions(questionnaireId);
-                totalQuestions = allQQ.size();
-                if (totalQuestions > 0 && questionsAnswered >= totalQuestions) {
-                    status = "completed";
-                }
-            } else if (saved > 0) {
-                // No questionnaire linked — can't determine total, mark ongoing
-                status = "ongoing";
+            Long totalMappedFromPayload = getLong(payload, "totalMappedQuestions");
+            int totalMappedQuestions = (totalMappedFromPayload != null)
+                    ? totalMappedFromPayload.intValue()
+                    : uniqueQuestionsAnswered.size(); // fallback: treat as complete if not provided
+
+            if (totalMappedQuestions > 0 && questionsAnswered >= totalMappedQuestions) {
+                status = "completed";
             }
 
             sam.setStatus(status);
@@ -345,11 +342,11 @@ public class FirebaseDataMappingController {
                 "saved", saved,
                 "questionsAnswered", questionsAnswered,
                 "scoresCalculated", scoresCalculated,
-                "totalQuestions", totalQuestions,
+                "totalMappedQuestions", totalMappedQuestions,
                 "status", status,
-                "message", questionsAnswered >= totalQuestions
+                "message", questionsAnswered >= totalMappedQuestions
                     ? "Answers imported and scores calculated successfully"
-                    : "Partial answers imported (" + questionsAnswered + "/" + totalQuestions + " questions), status set to ongoing"
+                    : "Partial answers imported (" + questionsAnswered + "/" + totalMappedQuestions + " questions), status set to ongoing"
             ));
     }
 

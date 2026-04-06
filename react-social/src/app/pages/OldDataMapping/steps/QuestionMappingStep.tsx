@@ -777,11 +777,14 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
 
     // All mapped question keys for tracking what each student answered
     const allMappedKeys = new Set<string>();
+    // Unique systemQuestionIds for sending to backend (matches backend's uniqueQuestionsAnswered count)
+    const allMappedQuestionIds = new Set<number>();
 
     mappings.forEach((m) => {
       if (!m.systemQuestionId) return;
       const key = `${m.category}::${normQ(m.firebaseQuestion)}`;
       allMappedKeys.add(key);
+      allMappedQuestionIds.add(m.systemQuestionId);
       const answerMap = new Map<string, number | null>();
       m.answerMappings.forEach((am) => {
         if (am.firebaseAnswer) {
@@ -887,6 +890,7 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
           userStudentId,
           assessmentId: sa.assessmentId,
           answers,
+          totalMappedQuestions: allMappedQuestionIds.size,
         });
         totalStudents++;
         totalAnswers += answers.length;
@@ -1581,17 +1585,29 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
               <button className="btn btn-light" onClick={() => setShowPartialModal(false)}>
                 Close
               </button>
-              <button
-                className="btn btn-success"
-                onClick={handleForceComplete}
-                disabled={forceCompleting}
-              >
-                {forceCompleting ? (
-                  <><span className="spinner-border spinner-border-sm me-1"></span>Updating...</>
-                ) : (
-                  <>Next: Mark All as Completed <i className="bi bi-arrow-right ms-1"></i></>
-                )}
-              </button>
+              <div className="d-flex gap-2">
+                <button
+                  className="btn btn-warning"
+                  onClick={() => {
+                    setShowPartialModal(false);
+                    onDone();
+                  }}
+                  disabled={forceCompleting}
+                >
+                  Skip These Students & Continue <i className="bi bi-arrow-right ms-1"></i>
+                </button>
+                <button
+                  className="btn btn-success"
+                  onClick={handleForceComplete}
+                  disabled={forceCompleting}
+                >
+                  {forceCompleting ? (
+                    <><span className="spinner-border spinner-border-sm me-1"></span>Updating...</>
+                  ) : (
+                    <>Next: Mark All as Completed <i className="bi bi-arrow-right ms-1"></i></>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

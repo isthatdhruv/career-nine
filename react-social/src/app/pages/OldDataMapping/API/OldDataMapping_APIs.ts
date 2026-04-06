@@ -92,7 +92,7 @@ export function importStudents(payload: any) {
 
 
 // Import mapped question-answer pairs as AssessmentAnswer records
-export function importMappedAnswers(payload: { userStudentId: number; assessmentId: number; answers: { questionId: number | null; optionId: number | null; textResponse: string }[] }) {
+export function importMappedAnswers(payload: { userStudentId: number; assessmentId: number; answers: { questionId: number | null; optionId: number | null; textResponse: string }[]; totalMappedQuestions?: number }) {
   return axios.post(`${API_URL}/firebase-mapping/import-mapped-answers`, payload);
 }
 
