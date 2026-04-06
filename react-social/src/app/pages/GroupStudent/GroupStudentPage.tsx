@@ -4145,19 +4145,57 @@ export default function GroupStudentPage() {
                       const studentName = emailModalStudent.name || "Student";
                       const reportLink = emailReportUrl || "";
                       const subject = `Assessment Report – ${studentName}${emailAssessmentName ? ` (${emailAssessmentName})` : ""}`;
-                      const htmlContent = `<p>Dear <strong>${studentName}</strong>,</p>`
-                        + `<p>Greetings from Career-9!</p>`
-                        + `<p>Thank you for completing the <strong>${emailAssessmentName || "assessment"}</strong> assessment. Your report has been generated and is ready for you to view.</p>`
-                        + `<p>Please click the button below to access your report:</p>`
+                      const assessmentLabel = emailAssessmentName || "assessment";
+                      const htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>`
+                        + `<body style="margin:0;padding:0;background-color:#f4f6f9;font-family:Arial,Helvetica,sans-serif;">`
+                        + `<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f9;padding:32px 0;"><tr><td align="center">`
+                        + `<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">`
+                        // Header
+                        + `<tr><td style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);padding:32px 40px;text-align:center;">`
+                        + `<h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:0.5px;">Career-9</h1>`
+                        + `<p style="margin:6px 0 0;color:#a8b5cc;font-size:13px;">Ensuring Career Success</p>`
+                        + `</td></tr>`
+                        // Body
+                        + `<tr><td style="padding:36px 40px;">`
+                        + `<p style="margin:0 0 20px;font-size:16px;color:#1a1a2e;">Dear <strong>${studentName}</strong>,</p>`
+                        + `<p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">Greetings from Career-9!</p>`
+                        + `<p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">Thank you for completing the <strong>${assessmentLabel}</strong> assessment. Your report has been generated and is ready for you to view.</p>`
+                        // Report details card
+                        + `<div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:20px 24px;margin-bottom:24px;">`
+                        + `<p style="margin:0 0 12px;font-size:14px;color:#6b7280;">Report Details</p>`
+                        + `<table cellpadding="4" cellspacing="0" style="font-size:14px;color:#1a1a2e;">`
+                        + `<tr><td style="padding:4px 16px 4px 0;color:#6b7280;font-weight:600;">Student:</td><td style="font-weight:600;">${studentName}</td></tr>`
+                        + `<tr><td style="padding:4px 16px 4px 0;color:#6b7280;font-weight:600;">Assessment:</td><td style="font-weight:600;">${assessmentLabel}</td></tr>`
+                        + `</table></div>`
+                        // View report button
+                        + `<p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">Please click the button below to access your report:</p>`
                         + (reportLink
-                          ? `<p><a href="${reportLink}" style="display:inline-block;padding:12px 28px;background:#4361ee;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:1em;">View Report</a></p>`
-                            + `<p style="font-size:0.9em;color:#6b7280;">You can also access your report using this link:<br/><a href="${reportLink}" style="color:#4361ee;">${reportLink}</a></p>`
+                          ? `<p style="margin:0 0 16px;"><a href="${reportLink}" style="display:inline-block;padding:12px 28px;background:linear-gradient(135deg,#4361ee 0%,#3a0ca3 100%);color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">View Report</a></p>`
+                            + `<p style="margin:0 0 24px;font-size:13px;color:#6b7280;">You can also access your report using this link:<br/><a href="${reportLink}" style="color:#4361ee;text-decoration:none;">${reportLink}</a></p>`
                           : "")
-                        + `<p>Our team will be in touch with you shortly to guide you through the next steps, including your personalised counselling session.</p>`
-                        + `<p>For any queries or assistance, feel free to reach out to us:<br/>`
-                        + `<strong>Email:</strong> <a href="mailto:support@career-9.com" style="color:#4361ee;">support@career-9.com</a><br/>`
-                        + `<strong>Phone:</strong> +91 7000070256</p>`
-                        + `<p style="margin-top:24px;">Warm regards,<br/><strong>Career-9 Team</strong><br/><em>Ensuring Career Success</em></p>`;
+                        // Counselling note
+                        + `<p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">Our team will be in touch with you shortly to guide you through the next steps, including your personalised counselling session.</p>`
+                        // Divider
+                        + `<hr style="border:none;border-top:1px solid #e5e7eb;margin:28px 0;">`
+                        // Contact
+                        + `<p style="margin:0 0 12px;font-size:14px;color:#374151;line-height:1.6;">For any queries or assistance, feel free to reach us:</p>`
+                        + `<table cellpadding="2" cellspacing="0" style="font-size:14px;color:#374151;">`
+                        + `<tr><td style="padding:2px 12px 2px 0;color:#6b7280;">Email:</td><td><a href="mailto:support@career-9.com" style="color:#4361ee;text-decoration:none;font-weight:500;">support@career-9.com</a></td></tr>`
+                        + `<tr><td style="padding:2px 12px 2px 0;color:#6b7280;">Phone:</td><td style="font-weight:500;">+91 70000 70256</td></tr>`
+                        + `</table>`
+                        // Sign-off
+                        + `<div style="margin-top:28px;">`
+                        + `<p style="margin:0 0 4px;font-size:14px;color:#374151;">Warm Regards,</p>`
+                        + `<p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#1a1a2e;">Career-9 Team</p>`
+                        + `<p style="margin:0;font-size:13px;color:#6b7280;font-style:italic;">Ensuring Career Success</p>`
+                        + `</div>`
+                        + `</td></tr>`
+                        // Footer
+                        + `<tr><td style="background:#f8fafc;padding:20px 40px;text-align:center;border-top:1px solid #e5e7eb;">`
+                        + `<p style="margin:0 0 4px;font-size:12px;color:#9ca3af;">This is an automated email from Career-9.</p>`
+                        + `<p style="margin:0;font-size:12px;color:#9ca3af;">Please do not reply directly to this email.</p>`
+                        + `</td></tr>`
+                        + `</table></td></tr></table></body></html>`;
                       await sendReportEmail({
                         emails: Array.from(selectedEmails),
                         subject,
