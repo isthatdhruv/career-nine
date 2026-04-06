@@ -7,6 +7,7 @@ import StudentProfileCard from './components/StudentProfileCard'
 import AppointmentCalendar from './components/AppointmentCalendar'
 import SessionNotes from './components/SessionNotes'
 import MessagesPanel from './components/MessagesPanel'
+import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
 import './CounsellorPortal.css'
 
 const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
@@ -31,6 +32,11 @@ const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
     icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><path d='M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7'/><path d='M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z'/></svg>,
   },
   {
+    label: 'Availability',
+    path: '/counsellor/availability',
+    icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><circle cx='12' cy='12' r='10'/><polyline points='12 6 12 12 16 14'/></svg>,
+  },
+  {
     label: 'Messages',
     path: '/counsellor/messages',
     icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><path d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/></svg>,
@@ -48,6 +54,7 @@ const CounsellorPortalDashboard: React.FC = () => {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
+  const [counsellorId, setCounsellorId] = useState<number | null>(null)
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null)
 
   useEffect(() => {
@@ -60,7 +67,14 @@ const CounsellorPortalDashboard: React.FC = () => {
     try {
       const userStr = localStorage.getItem('counsellorPortalUser')
       if (userStr) {
-        setUser(JSON.parse(userStr))
+        const parsedUser = JSON.parse(userStr)
+        setUser(parsedUser)
+        // Resolve counsellorId from user
+        if (parsedUser.id) {
+          getCounsellorByUserId(parsedUser.id)
+            .then((res) => setCounsellorId(res.data?.id || null))
+            .catch(() => setCounsellorId(null))
+        }
       }
     } catch {
       navigate('/counsellor/login')
@@ -100,6 +114,7 @@ const CounsellorPortalDashboard: React.FC = () => {
       {/* Main Layout: Student List + Detail */}
       <div className='cp-layout'>
         <StudentListPanel
+          counsellorId={counsellorId}
           selectedStudentId={selectedStudentId}
           onSelectStudent={setSelectedStudentId}
         />
@@ -121,8 +136,8 @@ const CounsellorPortalDashboard: React.FC = () => {
 
       {/* Bottom Row: Calendar + Notes + Messages */}
       <div className='cp-grid-3'>
-        <AppointmentCalendar />
-        <SessionNotes />
+        <AppointmentCalendar counsellorId={counsellorId} />
+        <SessionNotes counsellorId={counsellorId} />
         <MessagesPanel />
       </div>
     </PortalLayout>

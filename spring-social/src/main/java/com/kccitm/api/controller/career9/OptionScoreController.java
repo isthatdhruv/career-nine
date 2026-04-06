@@ -2,11 +2,8 @@ package com.kccitm.api.controller.career9;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.career9.AssessmentQuestionOptions;
 import com.kccitm.api.model.career9.MeasuredQualityTypes;
 import com.kccitm.api.model.career9.OptionScoreBasedOnMEasuredQualityTypes;
@@ -47,8 +45,9 @@ public class OptionScoreController {
 
     @GetMapping("/get/{id}")
     public ResponseEntity<OptionScoreBasedOnMEasuredQualityTypes> getOptionScoreById(@PathVariable Long id) {
-        Optional<OptionScoreBasedOnMEasuredQualityTypes> score = optionScoreRepository.findById(id);
-        return score.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+        OptionScoreBasedOnMEasuredQualityTypes score = optionScoreRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("OptionScore", "id", id));
+        return ResponseEntity.ok(score);
     }
 
     @PostMapping("/create")
@@ -114,7 +113,7 @@ public class OptionScoreController {
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<String> deleteOptionScore(@PathVariable Long id) {
         if (!optionScoreRepository.existsById(id)) {
-            return ResponseEntity.notFound().build();
+            throw new ResourceNotFoundException("OptionScore", "id", id);
         }
 
         optionScoreRepository.deleteById(id);

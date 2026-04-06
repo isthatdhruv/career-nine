@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import * as Yup from "yup";
 import { UpdateCareerData } from "../API/Career_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 const validationSchema = Yup.object().shape({
   title: Yup.string().required("Title is required"),
@@ -32,7 +33,7 @@ const CareerEditPage = (props?: { setPageLoading?: any }) => {
       setLoading(true);
       try {
         if (!values.career_id) {
-          alert("No career ID found. Please try navigating back and selecting the career again.");
+          showErrorToast("No career ID found. Please try navigating back and selecting the career again.");
           return;
         }
         const updatePayload = {
@@ -45,7 +46,7 @@ const CareerEditPage = (props?: { setPageLoading?: any }) => {
           props.setPageLoading(["true"]);
         }
       } catch (error) {
-        alert("Failed to update career. Please try again.");
+        showErrorToast("Failed to update career. Please try again.");
       } finally {
         setLoading(false);
       }

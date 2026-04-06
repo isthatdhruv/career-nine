@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import { downloadReportAsPdf, downloadReportsAsZip, ZipProgress } from "../ReportGeneration/utils/htmlToPdf";
 import { ReadCollegeList, GetSessionsByInstituteCode } from "../College/API/College_APIs";
 import {
@@ -314,7 +315,7 @@ const ReportsPage: React.FC = () => {
     // Only include students that have report data
     const idsWithData = ids.filter((id) => reportDataMap.has(id));
     if (idsWithData.length === 0) {
-      alert("No students with generated report data found. Generate report data first from the Report Generation page.");
+      showErrorToast("No students with generated report data found. Generate report data first from the Report Generation page.");
       return;
     }
 
@@ -326,7 +327,7 @@ const ReportsPage: React.FC = () => {
       if (errors.length > 0) {
         msg += `\n${errors.length} failed: ${errors.map((e) => e.reason).join(", ")}`;
       }
-      alert(msg);
+      showSuccessToast(msg);
 
       // Refresh report data
       const refreshRes = await getBetReportDataByAssessment(Number(selectedAssessment));
@@ -338,7 +339,7 @@ const ReportsPage: React.FC = () => {
       }
       setReportDataMap(map);
     } catch (err: any) {
-      alert("Failed: " + (err?.response?.data?.error || err.message));
+      showErrorToast("Failed: " + (err?.response?.data?.error || err.message));
     } finally {
       setGenerating(false);
     }
@@ -717,7 +718,7 @@ const ReportsPage: React.FC = () => {
                         window.URL.revokeObjectURL(url);
                       }
                     } catch (err: any) {
-                      alert("Export failed: " + (err?.response?.data?.error || err.message));
+                      showErrorToast("Export failed: " + (err?.response?.data?.error || err.message));
                     } finally {
                       setExportingOMR(false);
                     }
@@ -764,7 +765,7 @@ const ReportsPage: React.FC = () => {
                       a.remove();
                       window.URL.revokeObjectURL(url);
                     } catch (err: any) {
-                      alert("Export failed: " + (err?.response?.data?.error || err.message));
+                      showErrorToast("Export failed: " + (err?.response?.data?.error || err.message));
                     } finally {
                       setExportingMQT(false);
                     }
@@ -804,7 +805,7 @@ const ReportsPage: React.FC = () => {
                       a.remove();
                       window.URL.revokeObjectURL(url);
                     } catch (err: any) {
-                      alert("Export failed: " + (err?.response?.data?.error || err.message));
+                      showErrorToast("Export failed: " + (err?.response?.data?.error || err.message));
                     } finally {
                       setExportingBET(false);
                     }
@@ -833,7 +834,7 @@ const ReportsPage: React.FC = () => {
                         const rd = reportDataMap.get(id);
                         return rd && rd.reportStatus === "generated" && rd.reportUrl;
                       });
-                    if (ids.length === 0) { alert("No students with generated reports found."); return; }
+                    if (ids.length === 0) { showErrorToast("No students with generated reports found."); return; }
                     setDownloadingZip(true);
                     setZipProgress(null);
                     try {
@@ -846,7 +847,7 @@ const ReportsPage: React.FC = () => {
                         (p) => setZipProgress(p),
                       );
                     } catch (err: any) {
-                      alert("Download failed: " + (err?.response?.data?.error || err.message));
+                      showErrorToast("Download failed: " + (err?.response?.data?.error || err.message));
                     } finally {
                       setDownloadingZip(false);
                       setZipProgress(null);
@@ -986,7 +987,7 @@ const ReportsPage: React.FC = () => {
                                         );
                                       } catch (e: any) {
                                         console.error("Download failed", e);
-                                        alert("Download failed: " + (e?.response?.data?.error || e.message));
+                                        showErrorToast("Download failed: " + (e?.response?.data?.error || e.message));
                                       }
                                     }}
                                     style={{
@@ -1016,7 +1017,7 @@ const ReportsPage: React.FC = () => {
                                     a.remove();
                                     window.URL.revokeObjectURL(url);
                                   } catch (err: any) {
-                                    alert("Export failed: " + (err?.response?.data?.error || err.message));
+                                    showErrorToast("Export failed: " + (err?.response?.data?.error || err.message));
                                   } finally {
                                     setExportingStudentId(null);
                                   }

@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.career9.counselling.CounsellingSlot;
 import com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository;
 import com.kccitm.api.service.counselling.BookingService;
@@ -65,10 +66,8 @@ public class CounsellingSlotController {
 
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<?> delete(@PathVariable Long id) {
-        CounsellingSlot slot = slotRepository.findById(id).orElse(null);
-        if (slot == null) {
-            return ResponseEntity.notFound().build();
-        }
+        CounsellingSlot slot = slotRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("CounsellingSlot", "id", id));
         boolean isDeletable = "AVAILABLE".equals(slot.getStatus()) || Boolean.TRUE.equals(slot.getIsBlocked());
         if (!isDeletable) {
             logger.warn("Cannot delete slot {} with status {}", id, slot.getStatus());

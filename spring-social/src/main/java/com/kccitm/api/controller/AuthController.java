@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import com.kccitm.api.exception.BadRequestException;
+import com.kccitm.api.exception.DuplicateResourceException;
 import com.kccitm.api.model.AuthProvider;
 import com.kccitm.api.model.User;
 import com.kccitm.api.payload.ApiResponse;
@@ -93,13 +94,13 @@ public class AuthController {
     public ResponseEntity<?> registerUser(@Valid @RequestBody SignUpRequest signUpRequest) {
         
         if (userRepository.existsByEmail(signUpRequest.getEmail())) {
-            throw new BadRequestException("Email address already in use.");
+            throw new DuplicateResourceException("Email address already in use.");
         }
         if (signUpRequest.getPhone() == null || signUpRequest.getPhone().trim().isEmpty()) {
             throw new BadRequestException("Phone number is required.");
         }
         if (userRepository.existsByPhone(signUpRequest.getPhone())) {
-            throw new BadRequestException("Phone nusmber already in use.");
+            throw new DuplicateResourceException("Phone number already in use.");
         }
         // if (signUpRequest.getAcceptTerms() == null || !signUpRequest.getAcceptTerms()) {
         //     throw new BadRequestException("You must accept the terms and conditions.");

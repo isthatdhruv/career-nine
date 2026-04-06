@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
 import { CreateCareerData } from "../API/Career_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 const validationSchema = Yup.object().shape({
   title: Yup.string().required("Title is required"),
@@ -28,7 +29,7 @@ const CareerCreatePage = (props?: { setPageLoading?: any }) => {
           props.setPageLoading(["true"]);
         }
       } catch (error) {
-        alert("Failed to create career. Please try again.");
+        showErrorToast("Failed to create career. Please try again.");
       } finally {
         setLoading(false);
       }

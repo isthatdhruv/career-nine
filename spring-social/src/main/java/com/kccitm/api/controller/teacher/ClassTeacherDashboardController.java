@@ -27,14 +27,8 @@ public class ClassTeacherDashboardController {
      */
     @GetMapping("/class-overview/{teacherId}")
     public ResponseEntity<?> getClassOverview(@PathVariable Long teacherId) {
-        try {
-            Map<String, Object> overview = dashboardService.getClassOverview(teacherId);
-            return ResponseEntity.ok(overview);
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(error);
-        }
+        Map<String, Object> overview = dashboardService.getClassOverview(teacherId);
+        return ResponseEntity.ok(overview);
     }
 
     /**
@@ -45,14 +39,8 @@ public class ClassTeacherDashboardController {
     public ResponseEntity<?> getStudentPerformance(
             @PathVariable Long teacherId,
             @RequestParam(required = false) Long assessmentId) {
-        try {
-            Map<String, Object> performance = dashboardService.getStudentPerformance(teacherId, assessmentId);
-            return ResponseEntity.ok(performance);
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(error);
-        }
+        Map<String, Object> performance = dashboardService.getStudentPerformance(teacherId, assessmentId);
+        return ResponseEntity.ok(performance);
     }
 
     /**
@@ -61,14 +49,8 @@ public class ClassTeacherDashboardController {
      */
     @GetMapping("/assessment-completion/{teacherId}")
     public ResponseEntity<?> getAssessmentCompletion(@PathVariable Long teacherId) {
-        try {
-            Map<String, Object> completion = dashboardService.getAssessmentCompletion(teacherId);
-            return ResponseEntity.ok(completion);
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(error);
-        }
+        Map<String, Object> completion = dashboardService.getAssessmentCompletion(teacherId);
+        return ResponseEntity.ok(completion);
     }
 
     /**
@@ -77,14 +59,8 @@ public class ClassTeacherDashboardController {
      */
     @GetMapping("/cognitive-trends/{teacherId}")
     public ResponseEntity<?> getCognitiveTrends(@PathVariable Long teacherId) {
-        try {
-            Map<String, Object> trends = dashboardService.getCognitiveTrends(teacherId);
-            return ResponseEntity.ok(trends);
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(error);
-        }
+        Map<String, Object> trends = dashboardService.getCognitiveTrends(teacherId);
+        return ResponseEntity.ok(trends);
     }
 
     /**
@@ -95,19 +71,13 @@ public class ClassTeacherDashboardController {
     public ResponseEntity<?> getCompleteDashboard(
             @PathVariable Long teacherId,
             @RequestParam(required = false) Long assessmentId) {
-        try {
-            Map<String, Object> dashboard = new HashMap<>();
-            dashboard.put("overview", dashboardService.getClassOverview(teacherId));
-            dashboard.put("studentPerformance", dashboardService.getStudentPerformance(teacherId, assessmentId));
-            dashboard.put("assessmentCompletion", dashboardService.getAssessmentCompletion(teacherId));
-            dashboard.put("cognitiveTrends", dashboardService.getCognitiveTrends(teacherId));
+        Map<String, Object> dashboard = new HashMap<>();
+        dashboard.put("overview", dashboardService.getClassOverview(teacherId));
+        dashboard.put("studentPerformance", dashboardService.getStudentPerformance(teacherId, assessmentId));
+        dashboard.put("assessmentCompletion", dashboardService.getAssessmentCompletion(teacherId));
+        dashboard.put("cognitiveTrends", dashboardService.getCognitiveTrends(teacherId));
 
-            return ResponseEntity.ok(dashboard);
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(error);
-        }
+        return ResponseEntity.ok(dashboard);
     }
 
     /**
@@ -116,13 +86,7 @@ public class ClassTeacherDashboardController {
      */
     @GetMapping("/assessments")
     public ResponseEntity<?> getAllAssessments() {
-        try {
-            List<Map<String, Object>> assessments = dashboardService.getAllAssessments();
-            return ResponseEntity.ok(assessments);
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(error);
-        }
+        List<Map<String, Object>> assessments = dashboardService.getAllAssessments();
+        return ResponseEntity.ok(assessments);
     }
 }

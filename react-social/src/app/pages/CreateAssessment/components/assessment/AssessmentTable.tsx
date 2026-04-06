@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { showErrorToast } from '../../../../utils/toast';
 import { MDBDataTableV5 } from "mdbreact";
 import { AiFillEdit } from "react-icons/ai";
 import { FaLock, FaLockOpen, FaFileDownload, FaRecycle ,FaFilePdf } from "react-icons/fa";
@@ -30,7 +31,7 @@ const AssessmentTable = (props: {
       await generateQuestionnairePDF(id, name);
     } catch (error) {
       console.error("Questionnaire PDF generation failed:", error);
-      alert("Failed to generate questionnaire PDF. Please try again.");
+      showErrorToast("Failed to generate questionnaire PDF. Please try again.");
     } finally {
       setPdfLoading(null);
     }
@@ -44,7 +45,7 @@ const AssessmentTable = (props: {
       await generateOMRSheet(id, name);
     } catch (error) {
       console.error("OMR generation failed:", error);
-      alert("Failed to generate OMR sheet. Please try again.");
+      showErrorToast("Failed to generate OMR sheet. Please try again.");
     } finally {
       setOmrLoading(null);
     }
@@ -69,7 +70,7 @@ const AssessmentTable = (props: {
       props.setPageLoading(["true"]);
     } catch (error) {
       console.error("Lock/unlock failed:", error);
-      alert("Failed to update lock status. Please try again.");
+      showErrorToast("Failed to update lock status. Please try again.");
     } finally {
       props.setLoading(false);
     }
@@ -139,7 +140,7 @@ const AssessmentTable = (props: {
                 props.setPageLoading(["true"]);
               } catch (error) {
                 console.error("Delete failed:", error);
-                alert("Failed to delete assessment. Please try again.");
+                showErrorToast("Failed to delete assessment. Please try again.");
               } finally {
                 props.setLoading(false);
               }

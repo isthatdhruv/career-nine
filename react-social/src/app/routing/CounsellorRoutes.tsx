@@ -7,6 +7,15 @@ const CounsellorDashboardLogin = lazy(
 const CounsellorPortalDashboard = lazy(
   () => import('../pages/CounsellorDashboard/CounsellorPortalDashboard')
 )
+const CounsellorAppointmentsPage = lazy(
+  () => import('../pages/CounsellorDashboard/CounsellorAppointmentsPage')
+)
+const CounsellorNotesPage = lazy(
+  () => import('../pages/CounsellorDashboard/CounsellorNotesPage')
+)
+const CounsellorAvailabilityPage = lazy(
+  () => import('../pages/CounsellorDashboard/CounsellorAvailabilityPage')
+)
 
 const CounsellorFallback: FC = () => (
   <div
@@ -95,10 +104,10 @@ const CounsellorRoutes: FC = () => {
         {/* Protected */}
         <Route element={<CounsellorAuthGuard />}>
           <Route path='dashboard' element={<CounsellorPortalDashboard />} />
-          {/* Future routes — all render dashboard for now */}
           <Route path='students' element={<CounsellorPortalDashboard />} />
-          <Route path='appointments' element={<CounsellorPortalDashboard />} />
-          <Route path='notes' element={<CounsellorPortalDashboard />} />
+          <Route path='appointments' element={<CounsellorAppointmentsPage />} />
+          <Route path='notes' element={<CounsellorNotesPage />} />
+          <Route path='availability' element={<CounsellorAvailabilityPage />} />
           <Route path='messages' element={<CounsellorPortalDashboard />} />
           <Route path='reports' element={<CounsellorPortalDashboard />} />
         </Route>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { deleteDemographicField } from '../API/DemographicField_APIs';
+import { showErrorToast } from '../../../utils/toast';
 
 type FieldDefinition = {
   fieldId: number;
@@ -30,7 +31,7 @@ const DemographicFieldTable = ({ data, setPageLoading, refreshData }: Props) => 
       refreshData();
     } catch (error) {
       console.error('Error deleting field:', error);
-      alert('Failed to delete field');
+      showErrorToast('Failed to delete field');
     } finally {
       setPageLoading(false);
       setDeleteConfirm(null);

@@ -9,6 +9,7 @@ import {
   ReadMeasuredQualitiesData,
   UpdateMeasuredQualitiesData,
 } from "../API/Measured_Qualities_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 const validationSchema = Yup.object().shape({
   measuredQualityName: Yup.string().required("Quality name is required"),
@@ -45,7 +46,7 @@ const MeasuredQualitiesEditPage = (props?: { setPageLoading?: any }) => {
       setLoading(true);
       try {
         if (!values.measuredQualityId) {
-          alert(
+          showErrorToast(
             "No question ID found. Please try navigating back and selecting the question again."
           );
           return;
@@ -76,9 +77,9 @@ const MeasuredQualitiesEditPage = (props?: { setPageLoading?: any }) => {
             (error as any).response?.data?.message ||
             (error as any).message ||
             "Unknown error occurred";
-          alert(`Failed to update question: ${errorMessage}`);
+          showErrorToast(`Failed to update question: ${errorMessage}`);
         } else {
-          alert("Failed to update question: Unknown error occurred");
+          showErrorToast("Failed to update question: Unknown error occurred");
         }
       } finally {
         setLoading(false);

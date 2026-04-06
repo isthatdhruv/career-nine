@@ -23,6 +23,7 @@ import com.kccitm.api.model.ContactPersonAccessLevel;
 import com.kccitm.api.model.StudentContactAssignment;
 import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.school.InstituteDetail;
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.repository.ContactPersonAccessLevelRepository;
 import com.kccitm.api.repository.ContactPersonRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
@@ -70,15 +71,15 @@ public class ContactPersonController {
 
     @GetMapping("/get/{id}")
     public ResponseEntity<ContactPerson> getContactPersonById(@PathVariable("id") Long contactPersonId) {
-        return contactPersonRepository.findById(contactPersonId)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        ContactPerson contactPerson = contactPersonRepository.findById(contactPersonId)
+                .orElseThrow(() -> new ResourceNotFoundException("ContactPerson", "id", contactPersonId));
+        return ResponseEntity.ok(contactPerson);
     }
 
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<Void> deleteContactPerson(@PathVariable("id") Long id) {
         if (!contactPersonRepository.existsById(id)) {
-            return ResponseEntity.notFound().build();
+            throw new ResourceNotFoundException("ContactPerson", "id", id);
         }
         contactPersonRepository.deleteById(id);
         return ResponseEntity.noContent().build();
@@ -186,7 +187,7 @@ public class ContactPersonController {
     @DeleteMapping("/unmap/{contactPersonId}")
     public ResponseEntity<?> unmapUserFromCollege(@PathVariable Long contactPersonId) {
         if (!contactPersonRepository.existsById(contactPersonId)) {
-            return ResponseEntity.notFound().build();
+            throw new ResourceNotFoundException("ContactPerson", "id", contactPersonId);
         }
 
         // Delete access levels first
@@ -232,7 +233,7 @@ public class ContactPersonController {
     @DeleteMapping("/access-level/delete/{id}")
     public ResponseEntity<Void> deleteAccessLevel(@PathVariable Long id) {
         if (!accessLevelRepository.existsById(id)) {
-            return ResponseEntity.notFound().build();
+            throw new ResourceNotFoundException("ContactPersonAccessLevel", "id", id);
         }
         accessLevelRepository.deleteById(id);
         return ResponseEntity.noContent().build();

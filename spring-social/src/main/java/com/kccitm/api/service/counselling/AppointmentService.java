@@ -13,6 +13,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.kccitm.api.exception.BadRequestException;
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.counselling.Counsellor;
 import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
@@ -90,10 +92,10 @@ public class AppointmentService {
     @Transactional
     public CounsellingAppointment assign(Long appointmentId, Long counsellorId, User admin) {
         CounsellingAppointment appointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new RuntimeException("Appointment not found with id: " + appointmentId));
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", appointmentId));
 
         Counsellor counsellor = counsellorRepository.findById(counsellorId)
-                .orElseThrow(() -> new RuntimeException("Counsellor not found with id: " + counsellorId));
+                .orElseThrow(() -> new ResourceNotFoundException("Counsellor", "id", counsellorId));
 
         appointment.setCounsellor(counsellor);
         appointment.setAssignedBy(admin);
@@ -137,7 +139,7 @@ public class AppointmentService {
     @Transactional
     public CounsellingAppointment confirm(Long appointmentId, User counsellorUser) {
         CounsellingAppointment appointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new RuntimeException("Appointment not found with id: " + appointmentId));
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", appointmentId));
 
         appointment.setStatus("CONFIRMED");
 
@@ -188,7 +190,7 @@ public class AppointmentService {
     @Transactional
     public CounsellingAppointment decline(Long appointmentId, User counsellorUser, String reason) {
         CounsellingAppointment appointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new RuntimeException("Appointment not found with id: " + appointmentId));
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", appointmentId));
 
         appointment.setStatus("PENDING");
         appointment.setCounsellor(null);
@@ -217,14 +219,14 @@ public class AppointmentService {
     @Transactional
     public CounsellingAppointment cancel(Long appointmentId, User cancelledBy, String reason) {
         CounsellingAppointment appointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new RuntimeException("Appointment not found with id: " + appointmentId));
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", appointmentId));
 
         CounsellingSlot slot = appointment.getSlot();
 
         // Enforce 4-hour cancellation window
         LocalDateTime sessionTime = LocalDateTime.of(slot.getDate(), slot.getStartTime());
         if (LocalDateTime.now().plusHours(CANCELLATION_WINDOW_HOURS).isAfter(sessionTime)) {
-            throw new RuntimeException(
+            throw new BadRequestException(
                     "Cannot cancel: session starts within " + CANCELLATION_WINDOW_HOURS
                             + " hours. Please contact support directly.");
         }
@@ -315,23 +317,23 @@ public class AppointmentService {
     @Transactional
     public CounsellingAppointment reschedule(Long appointmentId, Long newSlotId, User counsellorUser) {
         CounsellingAppointment oldAppointment = appointmentRepository.findById(appointmentId)
-                .orElseThrow(() -> new RuntimeException("Appointment not found with id: " + appointmentId));
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", appointmentId));
 
         CounsellingSlot oldSlot = oldAppointment.getSlot();
 
         // Enforce 4-hour window on old slot
         LocalDateTime oldSessionTime = LocalDateTime.of(oldSlot.getDate(), oldSlot.getStartTime());
         if (LocalDateTime.now().plusHours(CANCELLATION_WINDOW_HOURS).isAfter(oldSessionTime)) {
-            throw new RuntimeException(
+            throw new BadRequestException(
                     "Cannot reschedule: session starts within " + CANCELLATION_WINDOW_HOURS
                             + " hours. Please contact support directly.");
         }
 
         CounsellingSlot newSlot = slotRepository.findById(newSlotId)
-                .orElseThrow(() -> new RuntimeException("New slot not found with id: " + newSlotId));
+                .orElseThrow(() -> new ResourceNotFoundException("Slot", "id", newSlotId));
 
         if (!"AVAILABLE".equals(newSlot.getStatus())) {
-            throw new RuntimeException(
+            throw new BadRequestException(
                     "New slot " + newSlotId + " is not available. Current status: " + newSlot.getStatus());
         }
 

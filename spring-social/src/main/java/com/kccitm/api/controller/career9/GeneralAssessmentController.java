@@ -49,15 +49,8 @@ public class GeneralAssessmentController {
     public ResponseEntity<?> processStudent(
             @PathVariable Long userStudentId,
             @PathVariable Long assessmentId) {
-        try {
-            GeneralAssessmentResult result = processingService.processStudent(userStudentId, assessmentId);
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            logger.error("Error processing student {} assessment {}: {}", userStudentId, assessmentId, e.getMessage(), e);
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
-        }
+        GeneralAssessmentResult result = processingService.processStudent(userStudentId, assessmentId);
+        return ResponseEntity.ok(result);
     }
 
     /**
@@ -65,43 +58,38 @@ public class GeneralAssessmentController {
      */
     @PostMapping("/process-batch/{assessmentId}")
     public ResponseEntity<?> processBatch(@PathVariable Long assessmentId) {
-        try {
-            List<StudentAssessmentMapping> mappings = mappingRepository.findAllByAssessmentId(assessmentId);
-            List<Map<String, Object>> results = new ArrayList<>();
-            int success = 0;
-            int failed = 0;
+        List<StudentAssessmentMapping> mappings = mappingRepository.findAllByAssessmentId(assessmentId);
+        List<Map<String, Object>> results = new ArrayList<>();
+        int success = 0;
+        int failed = 0;
 
-            for (StudentAssessmentMapping mapping : mappings) {
-                try {
-                    Long studentId = mapping.getUserStudent().getUserStudentId();
-                    processingService.processStudent(studentId, assessmentId);
-                    Map<String, Object> r = new HashMap<>();
-                    r.put("userStudentId", studentId);
-                    r.put("status", "success");
-                    results.add(r);
-                    success++;
-                } catch (Exception e) {
-                    Map<String, Object> r = new HashMap<>();
-                    r.put("userStudentId", mapping.getUserStudent().getUserStudentId());
-                    r.put("status", "failed");
-                    r.put("error", e.getMessage());
-                    results.add(r);
-                    failed++;
-                    logger.warn("Failed to process student {}: {}", mapping.getUserStudent().getUserStudentId(), e.getMessage());
-                }
+        for (StudentAssessmentMapping mapping : mappings) {
+            try {
+                Long studentId = mapping.getUserStudent().getUserStudentId();
+                processingService.processStudent(studentId, assessmentId);
+                Map<String, Object> r = new HashMap<>();
+                r.put("userStudentId", studentId);
+                r.put("status", "success");
+                results.add(r);
+                success++;
+            } catch (Exception e) {
+                Map<String, Object> r = new HashMap<>();
+                r.put("userStudentId", mapping.getUserStudent().getUserStudentId());
+                r.put("status", "failed");
+                r.put("error", e.getMessage());
+                results.add(r);
+                failed++;
+                logger.warn("Failed to process student {}: {}", mapping.getUserStudent().getUserStudentId(), e.getMessage());
             }
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("assessmentId", assessmentId);
-            response.put("totalStudents", mappings.size());
-            response.put("success", success);
-            response.put("failed", failed);
-            response.put("details", results);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            logger.error("Error in batch processing assessment {}: {}", assessmentId, e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
         }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("assessmentId", assessmentId);
+        response.put("totalStudents", mappings.size());
+        response.put("success", success);
+        response.put("failed", failed);
+        response.put("details", results);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -156,23 +144,17 @@ public class GeneralAssessmentController {
      * in the old 167-column OMR format (Sec_A_1 through Sec_F_24).
      */
     @GetMapping("/export-excel/{assessmentId}")
-    public ResponseEntity<?> exportExcel(@PathVariable Long assessmentId) {
-        try {
-            byte[] excelBytes = exportService.exportToOldFormat(assessmentId);
+    public ResponseEntity<?> exportExcel(@PathVariable Long assessmentId) throws Exception {
+        byte[] excelBytes = exportService.exportToOldFormat(assessmentId);
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.parseMediaType(
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
-            headers.setContentDispositionFormData("attachment",
-                    "general_assessment_" + assessmentId + ".xlsx");
-            headers.setContentLength(excelBytes.length);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentDispositionFormData("attachment",
+                "general_assessment_" + assessmentId + ".xlsx");
+        headers.setContentLength(excelBytes.length);
 
-            return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
-        } catch (Exception e) {
-            logger.error("Export failed for assessment {}: {}", assessmentId, e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Export failed: " + e.getMessage()));
-        }
+        return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
     }
 
     /**
@@ -181,22 +163,16 @@ public class GeneralAssessmentController {
     @GetMapping("/export-excel/{assessmentId}/student/{userStudentId}")
     public ResponseEntity<?> exportExcelForStudent(
             @PathVariable Long assessmentId,
-            @PathVariable Long userStudentId) {
-        try {
-            byte[] excelBytes = exportService.exportToOldFormat(assessmentId, userStudentId);
+            @PathVariable Long userStudentId) throws Exception {
+        byte[] excelBytes = exportService.exportToOldFormat(assessmentId, userStudentId);
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.parseMediaType(
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
-            headers.setContentDispositionFormData("attachment",
-                    "general_assessment_" + assessmentId + "_student_" + userStudentId + ".xlsx");
-            headers.setContentLength(excelBytes.length);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentDispositionFormData("attachment",
+                "general_assessment_" + assessmentId + "_student_" + userStudentId + ".xlsx");
+        headers.setContentLength(excelBytes.length);
 
-            return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
-        } catch (Exception e) {
-            logger.error("Export failed for student {} assessment {}: {}", userStudentId, assessmentId, e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Export failed: " + e.getMessage()));
-        }
+        return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
     }
 }

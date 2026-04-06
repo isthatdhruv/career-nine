@@ -1,4 +1,5 @@
 import React from 'react'
+import { showSuccessToast } from '../../../utils/toast'
 
 const DEMO_MESSAGES = [
   { from: 'Principal', body: 'Please prepare the career guidance report for Grade 10 by end of this week. Board review meeting on Monday.', time: '2 hours ago', unread: true },
@@ -30,7 +31,7 @@ const MessagesPanel: React.FC = () => {
       <button
         className='cp-action-btn'
         style={{ width: '100%', marginTop: 8, textAlign: 'center' }}
-        onClick={() => alert('Messaging coming soon!')}
+        onClick={() => showSuccessToast('Messaging coming soon!')}
       >
         View All Messages
       </button>

@@ -13,6 +13,7 @@ import { DeleteCollegeData } from "../API/College_APIs";
 import CollegeEditModal from "./CollegeEditModal";
 import CollegeInfoModal from "./CollegeInfoModal";
 import CollegeAssignRoleModal from "../components/CollegeAssignRoleModal";
+import { showErrorToast } from '../../../utils/toast';
 import CollegeDetailModal from "./CollegeSectionSessionGradeModal";
 import AssessmentMappingModal from "./AssessmentMappingModal";
 
@@ -156,7 +157,7 @@ const CollegeTable = (props: {
                     console.error(
                       "No 'id' or 'instituteCode' found on this row. Cannot call DeleteCollegeData."
                     );
-                    alert("Cannot delete: no valid ID found for this record.");
+                    showErrorToast("Cannot delete: no valid ID found for this record.");
                     return;
                   }
 
@@ -169,7 +170,7 @@ const CollegeTable = (props: {
                   props.setPageLoading((p: any) => !p);
                 } catch (err) {
                   console.error("Delete failed:", err);
-                  alert("Delete failed. Check console for details.");
+                  showErrorToast("Delete failed. Check console for details.");
                 } finally {
                   props.setLoading(false);
                 }

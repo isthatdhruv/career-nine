@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.counselling.SessionNotes;
 import com.kccitm.api.repository.UserRepository;
@@ -34,19 +35,11 @@ public class SessionNotesController {
 
     @PostMapping("/create")
     public ResponseEntity<?> create(@RequestBody SessionNotes notes, @RequestParam Long userId) {
-        try {
-            Optional<User> userOpt = userRepository.findById(userId);
-            if (!userOpt.isPresent()) {
-                return ResponseEntity.badRequest().body("User not found with id: " + userId);
-            }
-            User user = userOpt.get();
-            SessionNotes created = sessionNotesService.create(notes, user);
-            logger.info("Session notes created for userId: {}", userId);
-            return ResponseEntity.ok(created);
-        } catch (Exception e) {
-            logger.error("Error creating session notes for userId {}: {}", userId, e.getMessage());
-            return ResponseEntity.badRequest().body("Error creating session notes: " + e.getMessage());
-        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+        SessionNotes created = sessionNotesService.create(notes, user);
+        logger.info("Session notes created for userId: {}", userId);
+        return ResponseEntity.ok(created);
     }
 
     @GetMapping("/get/{appointmentId}")
@@ -59,9 +52,8 @@ public class SessionNotesController {
         } else {
             result = sessionNotesService.getByAppointmentId(appointmentId);
         }
-        return result
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        return ResponseEntity.ok(result
+                .orElseThrow(() -> new ResourceNotFoundException("SessionNotes", "appointmentId", appointmentId)));
     }
 
     @PutMapping("/update/{id}")

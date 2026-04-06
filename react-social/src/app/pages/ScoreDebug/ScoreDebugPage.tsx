@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
+import { showErrorToast } from '../../utils/toast';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -136,7 +137,7 @@ const ScoreDebugPage: React.FC = () => {
         { headers: { Accept: "application/json" } }
       )
       .then((res) => setDebugData(res.data))
-      .catch((err) => alert("Error: " + (err.response?.data?.error || err.message)))
+      .catch((err) => showErrorToast("Error: " + (err.response?.data?.error || err.message)))
       .finally(() => setLoading(false));
 
     // Also fetch Firebase scores

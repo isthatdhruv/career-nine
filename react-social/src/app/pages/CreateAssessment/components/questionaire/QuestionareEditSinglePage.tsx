@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as Yup from "yup";
 import { Button, Modal, Spinner } from "react-bootstrap";
+import { showErrorToast, showSuccessToast } from '../../../../utils/toast';
 
 // API imports
 import { ReadCollegeData } from "../../../College/API/College_APIs";
@@ -97,7 +98,7 @@ const QuestionareEditSinglePage: React.FC = () => {
       setQuestionnaireData(response.data);
     } catch (error) {
       console.error("Error fetching questionnaire:", error);
-      alert("Failed to load questionnaire data");
+      showErrorToast("Failed to load questionnaire data");
       navigate("/questionaire/List");
     } finally {
       setLoadingStates(prev => ({ ...prev, questionnaire: false }));
@@ -518,7 +519,7 @@ const QuestionareEditSinglePage: React.FC = () => {
       
       const response = await UpdateQuestionaire(String(id), completePayload); // change it to complete payload afterwards
       if (response.status === 200 || response.status === 201) {
-        alert("✅ Questionnaire updated successfully!");
+        showSuccessToast("✅ Questionnaire updated successfully!");
         navigate("/questionaire/List");
       } else {
         throw new Error("Failed to update questionnaire");
@@ -526,7 +527,7 @@ const QuestionareEditSinglePage: React.FC = () => {
       
     } catch (error) {
       console.error("Error updating questionnaire:", error);
-      alert("❌ Error updating questionnaire. Please try again.");
+      showErrorToast("❌ Error updating questionnaire. Please try again.");
     } finally {
       setLoading(false);
     }

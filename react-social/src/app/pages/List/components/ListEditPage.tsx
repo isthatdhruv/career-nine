@@ -6,6 +6,7 @@ import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
 import { ReadListByIdData, UpdateListData } from "../API/List_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 const validationSchema = Yup.object().shape({
   listName: Yup.string().required("List name is required"),
@@ -84,7 +85,7 @@ const ListEditPage = (props?: {
       setLoading(true);
       try {
         if (!values.id) {
-          alert("No list ID found. Please try navigating back and selecting the list again.");
+          showErrorToast("No list ID found. Please try navigating back and selecting the list again.");
           return;
         }
 
@@ -112,9 +113,9 @@ const ListEditPage = (props?: {
           console.error("Error data:", (error as any).response?.data);
 
           const errorMessage = (error as any).response?.data?.message || (error as any).message || "Unknown error occurred";
-          alert(`Failed to update list: ${errorMessage}`);
+          showErrorToast(`Failed to update list: ${errorMessage}`);
         } else {
-          alert("Failed to update list: Unknown error occurred");
+          showErrorToast("Failed to update list: Unknown error occurred");
         }
       } finally {
         setLoading(false);

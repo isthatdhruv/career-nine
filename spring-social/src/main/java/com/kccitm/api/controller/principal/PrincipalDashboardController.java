@@ -28,22 +28,16 @@ public class PrincipalDashboardController {
     public ResponseEntity<Map<String, Object>> getDashboardData(
             @PathVariable Long principalId,
             @RequestParam(required = false) Long assessmentId) {
-        try {
-            Map<String, Object> dashboardData = new HashMap<>();
+        Map<String, Object> dashboardData = new HashMap<>();
 
-            // Fetch all dashboard sections
-            dashboardData.put("overview", principalDashboardService.getInstituteOverview());
-            dashboardData.put("assessmentPerformance", principalDashboardService.getAssessmentPerformance(assessmentId));
-            dashboardData.put("classwisePerformance", principalDashboardService.getClasswisePerformance());
-            dashboardData.put("teacherActivity", principalDashboardService.getTeacherActivity());
-            dashboardData.put("enrollmentTrends", principalDashboardService.getEnrollmentTrends());
+        // Fetch all dashboard sections
+        dashboardData.put("overview", principalDashboardService.getInstituteOverview());
+        dashboardData.put("assessmentPerformance", principalDashboardService.getAssessmentPerformance(assessmentId));
+        dashboardData.put("classwisePerformance", principalDashboardService.getClasswisePerformance());
+        dashboardData.put("teacherActivity", principalDashboardService.getTeacherActivity());
+        dashboardData.put("enrollmentTrends", principalDashboardService.getEnrollmentTrends());
 
-            return ResponseEntity.ok(dashboardData);
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("error", "Failed to fetch dashboard data: " + e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
-        }
+        return ResponseEntity.ok(dashboardData);
     }
 
     /**
@@ -51,13 +45,7 @@ public class PrincipalDashboardController {
      */
     @GetMapping("/overview/{principalId}")
     public ResponseEntity<Map<String, Object>> getOverview(@PathVariable Long principalId) {
-        try {
-            return ResponseEntity.ok(principalDashboardService.getInstituteOverview());
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
-        }
+        return ResponseEntity.ok(principalDashboardService.getInstituteOverview());
     }
 
     /**
@@ -67,13 +55,7 @@ public class PrincipalDashboardController {
     public ResponseEntity<Map<String, Object>> getAssessmentPerformance(
             @PathVariable Long principalId,
             @RequestParam(required = false) Long assessmentId) {
-        try {
-            return ResponseEntity.ok(principalDashboardService.getAssessmentPerformance(assessmentId));
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
-        }
+        return ResponseEntity.ok(principalDashboardService.getAssessmentPerformance(assessmentId));
     }
 
     /**
@@ -81,13 +63,7 @@ public class PrincipalDashboardController {
      */
     @GetMapping("/classwise-performance/{principalId}")
     public ResponseEntity<Map<String, Object>> getClasswisePerformance(@PathVariable Long principalId) {
-        try {
-            return ResponseEntity.ok(principalDashboardService.getClasswisePerformance());
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
-        }
+        return ResponseEntity.ok(principalDashboardService.getClasswisePerformance());
     }
 
     /**
@@ -95,13 +71,7 @@ public class PrincipalDashboardController {
      */
     @GetMapping("/teacher-activity/{principalId}")
     public ResponseEntity<Map<String, Object>> getTeacherActivity(@PathVariable Long principalId) {
-        try {
-            return ResponseEntity.ok(principalDashboardService.getTeacherActivity());
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
-        }
+        return ResponseEntity.ok(principalDashboardService.getTeacherActivity());
     }
 
     /**
@@ -109,13 +79,7 @@ public class PrincipalDashboardController {
      */
     @GetMapping("/enrollment-trends/{principalId}")
     public ResponseEntity<Map<String, Object>> getEnrollmentTrends(@PathVariable Long principalId) {
-        try {
-            return ResponseEntity.ok(principalDashboardService.getEnrollmentTrends());
-        } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(errorResponse);
-        }
+        return ResponseEntity.ok(principalDashboardService.getEnrollmentTrends());
     }
 
     /**
@@ -123,10 +87,6 @@ public class PrincipalDashboardController {
      */
     @GetMapping("/assessments")
     public ResponseEntity<List<Map<String, Object>>> getAllAssessments() {
-        try {
-            return ResponseEntity.ok(principalDashboardService.getAllAssessments());
-        } catch (Exception e) {
-            return ResponseEntity.status(500).build();
-        }
+        return ResponseEntity.ok(principalDashboardService.getAllAssessments());
     }
 }

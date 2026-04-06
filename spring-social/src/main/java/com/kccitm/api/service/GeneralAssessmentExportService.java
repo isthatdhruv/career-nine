@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.career9.AssessmentQuestionOptions;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
@@ -68,7 +69,7 @@ public class GeneralAssessmentExportService {
 
         // ── 1. Validate assessment and get questionnaire ──────────────
         AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
-                .orElseThrow(() -> new RuntimeException("Assessment not found: " + assessmentId));
+                .orElseThrow(() -> new ResourceNotFoundException("Assessment", "id", assessmentId));
         Long questionnaireId = (assessment.getQuestionnaire() != null)
                 ? assessment.getQuestionnaire().getQuestionnaireId() : null;
 
@@ -78,14 +79,14 @@ public class GeneralAssessmentExportService {
             targetStudents = mappingRepository
                     .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
                     .map(Collections::singletonList)
-                    .orElseThrow(() -> new RuntimeException(
-                            "No mapping found for student " + userStudentId + " assessment " + assessmentId));
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "StudentAssessmentMapping", "studentId/assessmentId", userStudentId + "/" + assessmentId));
         } else {
             targetStudents = mappingRepository.findAllByAssessmentId(assessmentId).stream()
                     .filter(m -> "completed".equalsIgnoreCase(m.getStatus()))
                     .collect(Collectors.toList());
             if (targetStudents.isEmpty()) {
-                throw new RuntimeException("No completed students found for assessment " + assessmentId);
+                throw new ResourceNotFoundException("StudentAssessmentMapping", "assessmentId (completed)", assessmentId);
             }
         }
 
@@ -276,7 +277,7 @@ public class GeneralAssessmentExportService {
 
             List<AssessmentAnswer> studentAnswers = answersByStudent.getOrDefault(
                     us.getUserStudentId(), Collections.emptyList());
-            writeAnswerColumns(row, studentAnswers, sectionMappings);
+            writeAnswerColumns(row, studentAnswers, sectionMappings, optionIdToText);
         }
 
         for (int i = 0; i < DEMO_COLS; i++) {
@@ -294,7 +295,7 @@ public class GeneralAssessmentExportService {
     // ══════════════════════════════════════════════════════════════════
 
     private void writeAnswerColumns(Row row, List<AssessmentAnswer> answers,
-            List<SectionMapping> sectionMappings) {
+            List<SectionMapping> sectionMappings, Map<Long, String> optionIdToText) {
         for (SectionMapping sm : sectionMappings) {
             switch (sm.type) {
                 case MULTI_SELECT:
@@ -302,12 +303,14 @@ public class GeneralAssessmentExportService {
                     for (Integer col : sm.optionIdToCol.values()) {
                         row.createCell(col).setCellValue("BLANK");
                     }
-                    // Overwrite selected options with "1" (option FK present)
+                    // Overwrite selected options with "1" (option or mappedOption FK present)
                     for (AssessmentAnswer a : answers) {
-                        if (a.getQuestionnaireQuestion() == null || a.getOption() == null) continue;
+                        if (a.getQuestionnaireQuestion() == null) continue;
+                        AssessmentQuestionOptions msOpt = a.getOption() != null ? a.getOption() : a.getMappedOption();
+                        if (msOpt == null) continue;
                         if (!a.getQuestionnaireQuestion().getQuestionnaireQuestionId().equals(sm.singleQuestionQQId))
                             continue;
-                        Integer col = sm.optionIdToCol.get(a.getOption().getOptionId());
+                        Integer col = sm.optionIdToCol.get(msOpt.getOptionId());
                         if (col != null) {
                             row.createCell(col).setCellValue("1");
                         }
@@ -315,7 +318,7 @@ public class GeneralAssessmentExportService {
                     // Fallback: text-based answers (imported from Firebase without optionId)
                     if (!sm.textToCol.isEmpty()) {
                         for (AssessmentAnswer a : answers) {
-                            if (a.getQuestionnaireQuestion() == null || a.getOption() != null) continue;
+                            if (a.getQuestionnaireQuestion() == null || a.getOption() != null || a.getMappedOption() != null) continue;
                             if (!a.getQuestionnaireQuestion().getQuestionnaireQuestionId().equals(sm.singleQuestionQQId))
                                 continue;
                             String txt = a.getTextResponse();
@@ -352,12 +355,22 @@ public class GeneralAssessmentExportService {
 
                 case SINGLE_ANSWER:
                     for (AssessmentAnswer a : answers) {
-                        if (a.getQuestionnaireQuestion() == null || a.getOption() == null) continue;
+                        if (a.getQuestionnaireQuestion() == null) continue;
+                        // Resolve effective option: option → mappedOption → null
+                        AssessmentQuestionOptions effectiveOpt = a.getOption() != null ? a.getOption() : a.getMappedOption();
                         Long qqId = a.getQuestionnaireQuestion().getQuestionnaireQuestionId();
                         Integer col = sm.questionIdToCol.get(qqId);
                         if (col != null) {
-                            String label = deriveLabel(a.getOption(), sm.questionOptionOrder.get(qqId));
-                            row.createCell(col).setCellValue(label);
+                            if (effectiveOpt != null) {
+                                String label = deriveLabel(effectiveOpt, sm.questionOptionOrder.get(qqId));
+                                row.createCell(col).setCellValue(label);
+                            } else if (a.getTextResponse() != null && !a.getTextResponse().trim().isEmpty()) {
+                                // Text-only answer (Firebase import) — try to match to an option label
+                                String txt = a.getTextResponse().trim();
+                                List<Long> optOrder = sm.questionOptionOrder.get(qqId);
+                                String label = deriveLabelFromText(txt, optOrder, optionIdToText);
+                                row.createCell(col).setCellValue(label);
+                            }
                         }
                     }
                     break;
@@ -379,6 +392,61 @@ public class GeneralAssessmentExportService {
             }
         }
         return text;
+    }
+
+    private String deriveLabelFromText(String text, List<Long> sortedOptionIds, Map<Long, String> optionIdToText) {
+        if (text == null || text.isEmpty()) return "";
+        // If text is already a standard label, use directly
+        if (text.matches("(?i)^[A-D]$") || text.matches("(?i)^(YES|NO|Y|N)$")) {
+            return text.toUpperCase();
+        }
+        // Try to match text against option texts to find position-based label
+        if (sortedOptionIds != null && optionIdToText != null) {
+            String txtLower = text.toLowerCase().trim();
+
+            // Pass 1: exact match
+            for (int i = 0; i < sortedOptionIds.size(); i++) {
+                String optText = safe(optionIdToText.get(sortedOptionIds.get(i))).toLowerCase().trim();
+                if (!optText.isEmpty() && optText.equals(txtLower)) {
+                    if (sortedOptionIds.size() == 2) return i == 0 ? "YES" : "NO";
+                    return String.valueOf((char) ('A' + i));
+                }
+            }
+
+            // Pass 2: contains match (one contains the other)
+            for (int i = 0; i < sortedOptionIds.size(); i++) {
+                String optText = safe(optionIdToText.get(sortedOptionIds.get(i))).toLowerCase().trim();
+                if (!optText.isEmpty() && (optText.contains(txtLower) || txtLower.contains(optText))) {
+                    if (sortedOptionIds.size() == 2) return i == 0 ? "YES" : "NO";
+                    return String.valueOf((char) ('A' + i));
+                }
+            }
+
+            // Pass 3: best prefix/similarity match — compare first N chars
+            int bestIdx = -1;
+            int bestOverlap = 0;
+            for (int i = 0; i < sortedOptionIds.size(); i++) {
+                String optText = safe(optionIdToText.get(sortedOptionIds.get(i))).toLowerCase().trim();
+                if (optText.isEmpty()) continue;
+                // Count matching prefix characters
+                int overlap = 0;
+                int minLen = Math.min(optText.length(), txtLower.length());
+                for (int c = 0; c < minLen; c++) {
+                    if (optText.charAt(c) == txtLower.charAt(c)) overlap++;
+                    else break;
+                }
+                if (overlap > bestOverlap && overlap >= 10) {
+                    bestOverlap = overlap;
+                    bestIdx = i;
+                }
+            }
+            if (bestIdx >= 0) {
+                if (sortedOptionIds.size() == 2) return bestIdx == 0 ? "YES" : "NO";
+                return String.valueOf((char) ('A' + bestIdx));
+            }
+        }
+        // Fallback: return BLANK — don't output raw text in OMR export
+        return "BLANK";
     }
 
     private static int parseInt(String s) {

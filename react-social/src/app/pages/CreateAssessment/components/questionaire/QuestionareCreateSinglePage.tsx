@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
 import { Button, Modal, Spinner } from "react-bootstrap";
+import { showErrorToast, showSuccessToast } from '../../../../utils/toast';
 
 // API imports
 import { ReadCollegeData } from "../../../College/API/College_APIs";
@@ -410,7 +411,7 @@ const QuestionareCreateSinglePage: React.FC = () => {
 
       const response = await CreateQuestionaire(completePayload);
       if (response.status === 200 || response.status === 201) {
-        alert("✅ Questionare created successfully!");
+        showSuccessToast("✅ Questionare created successfully!");
         navigate("/questionaire/List");
       } else {
         throw new Error("Failed to create questionare");
@@ -418,7 +419,7 @@ const QuestionareCreateSinglePage: React.FC = () => {
       
     } catch (error) {
       console.error("Error creating questionare:", error);
-      alert("❌ Error creating questionare. Please try again.");
+      showErrorToast("❌ Error creating questionare. Please try again.");
     } finally {
       setLoading(false);
     }

@@ -29,14 +29,14 @@ public class QuestionMediaController {
      */
     @PostMapping("/upload")
     public ResponseEntity<Map<String, String>> uploadMedia(@RequestBody Map<String, String> request) {
+        String base64Data = request.get("base64Data");
+        String mediaType = request.getOrDefault("mediaType", "image");
+
+        if (base64Data == null || base64Data.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "base64Data is required"));
+        }
+
         try {
-            String base64Data = request.get("base64Data");
-            String mediaType = request.getOrDefault("mediaType", "image");
-
-            if (base64Data == null || base64Data.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "base64Data is required"));
-            }
-
             String folder = "question-media/" + mediaType + "s";
             String url = spacesService.uploadBase64File(base64Data, folder, null);
 
@@ -46,9 +46,6 @@ public class QuestionMediaController {
         } catch (IllegalStateException e) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(Map.of("error", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to upload media: " + e.getMessage()));
         }
     }
 
@@ -58,12 +55,7 @@ public class QuestionMediaController {
      */
     @DeleteMapping("/delete")
     public ResponseEntity<Map<String, String>> deleteMedia(@RequestParam String url) {
-        try {
-            spacesService.deleteFileByUrl(url);
-            return ResponseEntity.ok(Map.of("status", "deleted"));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to delete media: " + e.getMessage()));
-        }
+        spacesService.deleteFileByUrl(url);
+        return ResponseEntity.ok(Map.of("status", "deleted"));
     }
 }

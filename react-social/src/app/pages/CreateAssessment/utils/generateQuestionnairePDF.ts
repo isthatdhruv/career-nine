@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import { ReadQuestionnaireByAssessmentId } from "../API/Create_Assessment_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -97,7 +98,7 @@ export async function generateQuestionnairePDF(assessmentId: number, assessmentN
   const qSectionList = questionnaire?.section || questionnaire?.sections || [];
 
   if (!questionnaire || qSectionList.length === 0) {
-    alert("This assessment has no questionnaire/sections configured.");
+    showErrorToast("This assessment has no questionnaire/sections configured.");
     return;
   }
 

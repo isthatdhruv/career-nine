@@ -1,7 +1,6 @@
 package com.kccitm.api.controller.career9;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.career9.Career;
 import com.kccitm.api.model.career9.MeasuredQualities;
 import com.kccitm.api.model.career9.MeasuredQualityTypes;
@@ -52,7 +52,8 @@ public class MeasuredQualityTypesController {
 
     @GetMapping("/get/{id}")
     public MeasuredQualityTypes getMeasuredQualityTypesById(@PathVariable Long id) {
-        return measuredQualityTypesRepository.findById(id).orElse(null);
+        return measuredQualityTypesRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("MeasuredQualityType", "id", id));
     }
 
     @CacheEvict(value = "measuredQualityTypes", allEntries = true)
@@ -64,7 +65,7 @@ public class MeasuredQualityTypesController {
     @PutMapping("/update/{id}")
     public MeasuredQualityTypes updateMeasuredQualityTypes(@PathVariable Long id, @RequestBody MeasuredQualityTypes measuredQualityTypes) {
         MeasuredQualityTypes existingType = measuredQualityTypesRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("MeasuredQualityType not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("MeasuredQualityType", "id", id));
 
         // Only update simple fields, not relationships
         existingType.setMeasuredQualityTypeName(measuredQualityTypes.getMeasuredQualityTypeName());
@@ -77,10 +78,8 @@ public class MeasuredQualityTypesController {
     @CacheEvict(value = "measuredQualityTypes", allEntries = true)
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<String> deleteMeasuredQualityTypes(@PathVariable Long id) {
-        MeasuredQualityTypes type = measuredQualityTypesRepository.findById(id).orElse(null);
-        if (type == null) {
-            return ResponseEntity.notFound().build();
-        }
+        MeasuredQualityTypes type = measuredQualityTypesRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("MeasuredQualityType", "id", id));
         // Nullify measuredQualityType in all related OptionScoreBasedOnMEasuredQualityTypes
         if (type.getOptionScores() != null) {
             for (var score : type.getOptionScores()) {
@@ -101,9 +100,8 @@ public class MeasuredQualityTypesController {
     @CacheEvict(value = "measuredQualityTypes", allEntries = true)
     @PutMapping("/restore/{id}")
     public ResponseEntity<String> restoreMeasuredQualityTypes(@PathVariable Long id) {
-        Optional<MeasuredQualityTypes> opt = measuredQualityTypesRepository.findById(id);
-        if (!opt.isPresent()) return ResponseEntity.notFound().build();
-        MeasuredQualityTypes mqt = opt.get();
+        MeasuredQualityTypes mqt = measuredQualityTypesRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("MeasuredQualityType", "id", id));
         mqt.setIsDeleted(false);
         measuredQualityTypesRepository.save(mqt);
         return ResponseEntity.ok("Restored successfully.");
@@ -121,12 +119,10 @@ public class MeasuredQualityTypesController {
     // Career relationships
     @PostMapping("/{typeId}/careers/{careerId}")
     public ResponseEntity<String> addCareerToMeasuredQualityType(@PathVariable Long typeId, @PathVariable Long careerId) {
-        MeasuredQualityTypes measurementType = measuredQualityTypesRepository.findById(typeId).orElse(null);
-        Career career = careerRepository.findById(careerId).orElse(null);
-        
-        if (measurementType == null || career == null) {
-            return ResponseEntity.badRequest().body("MeasuredQualityType or Career not found");
-        }
+        MeasuredQualityTypes measurementType = measuredQualityTypesRepository.findById(typeId)
+            .orElseThrow(() -> new ResourceNotFoundException("MeasuredQualityType", "id", typeId));
+        Career career = careerRepository.findById(careerId)
+            .orElseThrow(() -> new ResourceNotFoundException("Career", "id", careerId));
         
         measurementType.addCareer(career);
         measuredQualityTypesRepository.save(measurementType);
@@ -136,12 +132,10 @@ public class MeasuredQualityTypesController {
     
     @DeleteMapping("/{typeId}/careers/{careerId}")
     public ResponseEntity<String> removeCareerFromMeasuredQualityType(@PathVariable Long typeId, @PathVariable Long careerId) {
-        MeasuredQualityTypes measurementType = measuredQualityTypesRepository.findById(typeId).orElse(null);
-        Career career = careerRepository.findById(careerId).orElse(null);
-        
-        if (measurementType == null || career == null) {
-            return ResponseEntity.badRequest().body("MeasuredQualityType or Career not found");
-        }
+        MeasuredQualityTypes measurementType = measuredQualityTypesRepository.findById(typeId)
+            .orElseThrow(() -> new ResourceNotFoundException("MeasuredQualityType", "id", typeId));
+        Career career = careerRepository.findById(careerId)
+            .orElseThrow(() -> new ResourceNotFoundException("Career", "id", careerId));
         
         measurementType.removeCareer(career);
         measuredQualityTypesRepository.save(measurementType);
@@ -151,27 +145,18 @@ public class MeasuredQualityTypesController {
     
     @GetMapping("/{typeId}/careers")
     public ResponseEntity<Set<Career>> getMeasuredQualityTypeCareers(@PathVariable Long typeId) {
-        MeasuredQualityTypes measurementType = measuredQualityTypesRepository.findById(typeId).orElse(null);
-        
-        if (measurementType == null) {
-            return ResponseEntity.notFound().build();
-        }
-        
+        MeasuredQualityTypes measurementType = measuredQualityTypesRepository.findById(typeId)
+            .orElseThrow(() -> new ResourceNotFoundException("MeasuredQualityType", "id", typeId));
         return ResponseEntity.ok(measurementType.getCareers());
     }
     
     // One-to-Many relationship: MeasuredQualities to MeasuredQualityTypes
     @PutMapping("/{typeId}/assign-quality/{qualityId}")
     public ResponseEntity<String> assignMeasuredQualityTypeToQuality(@PathVariable Long typeId, @PathVariable Long qualityId) {
-        MeasuredQualityTypes MQType = measuredQualityTypesRepository.findById(typeId).orElse(null);
-        MeasuredQualities mQuality = measuredQualitiesRepository.findById(qualityId).orElse(null);
-
-        if (MQType == null) {
-            return ResponseEntity.status(404).body("MeasuredQualityType not found");
-        }
-        if (mQuality == null) {
-            return ResponseEntity.status(404).body("MeasuredQuality not found");
-        }
+        MeasuredQualityTypes MQType = measuredQualityTypesRepository.findById(typeId)
+            .orElseThrow(() -> new ResourceNotFoundException("MeasuredQualityType", "id", typeId));
+        MeasuredQualities mQuality = measuredQualitiesRepository.findById(qualityId)
+            .orElseThrow(() -> new ResourceNotFoundException("MeasuredQuality", "id", qualityId));
 
         MQType.setMeasuredQuality(mQuality);
         measuredQualityTypesRepository.save(MQType);
@@ -181,11 +166,8 @@ public class MeasuredQualityTypesController {
     
     @PutMapping("/{typeId}/remove-quality")
     public ResponseEntity<String> removeMeasuredQualityTypeFromQuality(@PathVariable Long typeId) {
-        MeasuredQualityTypes measurementType = measuredQualityTypesRepository.findById(typeId).orElse(null);
-        
-        if (measurementType == null) {
-            return ResponseEntity.badRequest().body("MeasuredQualityType not found");
-        }
+        MeasuredQualityTypes measurementType = measuredQualityTypesRepository.findById(typeId)
+            .orElseThrow(() -> new ResourceNotFoundException("MeasuredQualityType", "id", typeId));
         
         // Remove the association (set to null)
         measurementType.setMeasuredQuality(null);
