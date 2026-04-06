@@ -53,6 +53,7 @@ import AssignedStudentsPage from "../pages/GroupStudent/AssignedStudentsPage";
 import ReportGenerationPage from "../pages/ReportGeneration/ReportGenerationPage";
 import BetReportGenerationPage from "../pages/ReportGeneration/BetReportGenerationPage";
 import NavigatorReportGenerationPage from "../pages/NavigatorReportGeneration/NavigatorReportGenerationPage";
+import SendReportsPage from "../pages/SendReports/SendReportsPage";
 import GamePage from "../pages/Games/GamePage";
 import DemographicFieldsPage from "../pages/DemographicFields/DemographicFieldsPage";
 import DemographicFieldCreatePage from "../pages/DemographicFields/components/DemographicFieldCreatePage";
@@ -961,6 +962,14 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <NavigatorReportGenerationPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/send-reports"
+          element={
+            <SuspensedView>
+              <SendReportsPage />
             </SuspensedView>
           }
         />

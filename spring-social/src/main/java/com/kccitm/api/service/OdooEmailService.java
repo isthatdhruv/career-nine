@@ -215,6 +215,8 @@ public class OdooEmailService {
 
         if (emailFrom != null) {
             vals.put("email_from", emailFrom);
+        } else {
+            vals.put("email_from", "\"Career-9\" <" + odooUsername + ">");
         }
         if (emailCc != null && !emailCc.isEmpty()) {
             vals.put("email_cc", emailCc);

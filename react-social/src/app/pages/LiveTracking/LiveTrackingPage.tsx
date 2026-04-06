@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getAssessmentList, getLiveTracking, getRedisPartials, flushPartialToDb, getRedisPartialDetail, submitFromRedis } from "./API/LiveTracking_APIs";
+import { getAssessmentList, getLiveTracking, getLiveTrackingLite, getRedisPartials, flushPartialToDb, getRedisPartialDetail, submitFromRedis } from "./API/LiveTracking_APIs";
 
 /* ─── Types ─── */
 
 interface StudentEntry {
   userStudentId: number;
   studentName: string;
+  email?: string;
   instituteName: string;
   status: string;
   answeredCount: number;
@@ -33,7 +34,7 @@ interface TrackingData {
 
 interface AssessmentOption {
   id: number;
-  AssessmentName: string;
+  assessmentName: string;
   isActive: boolean;
 }
 
@@ -214,12 +215,55 @@ const LiveTrackingPage = () => {
       .catch(() => setError("Failed to load assessments"));
   }, []);
 
-  // Fetch tracking data
+  // Track whether we've already loaded lite data for the current assessment
+  const liteLoadedRef = useRef<number | null>(null);
+
+  // Fetch tracking data: lite first (instant), then full in background
   const fetchData = useCallback(async () => {
     if (!selectedId) return;
+
+    // On first load for this assessment, fetch lite data instantly
+    if (liteLoadedRef.current !== selectedId) {
+      try {
+        const liteRes = await getLiveTrackingLite(selectedId);
+        const lite = liteRes.data;
+        // Build a TrackingData with lite fields — no progress/position yet
+        const liteData: TrackingData = {
+          assessmentId: lite.assessmentId,
+          assessmentName: lite.assessmentName,
+          totalQuestions: 0,
+          students: (lite.students || []).map((s: any) => ({
+            userStudentId: s.userStudentId,
+            studentName: s.studentName,
+            email: s.email || "",
+            instituteName: "",
+            status: s.status || "notstarted",
+            answeredCount: 0,
+          })),
+          summary: lite.summary || { total: 0, notStarted: 0, ongoing: 0, completed: 0 },
+        };
+        setData(liteData);
+        setLoading(false);
+        liteLoadedRef.current = selectedId;
+      } catch {
+        // If lite fails, fall through to full fetch
+      }
+    }
+
+    // Then fetch full data (with progress, heartbeats, answer counts)
     try {
       const res = await getLiveTracking(selectedId);
       const newData: TrackingData = res.data;
+
+      // Preserve email from lite data if full response doesn't include it
+      if (data) {
+        const emailMap = new Map(data.students.map(s => [s.userStudentId, s.email]));
+        for (const s of newData.students) {
+          if (!s.email && emailMap.has(s.userStudentId)) {
+            s.email = emailMap.get(s.userStudentId);
+          }
+        }
+      }
 
       // High watermark logic for ongoing students:
       // - Progress never drops (answers are in localStorage until submission)
@@ -265,8 +309,8 @@ const LiveTrackingPage = () => {
       setLastUpdated(new Date());
       setError(null);
     } catch (err: any) {
-      // Don't clear existing data on transient errors (important for flaky connections)
-      if (!data) {
+      // Don't show error if lite data already loaded (user can see names/emails)
+      if (liteLoadedRef.current !== selectedId) {
         setError("Failed to load tracking data. Check your connection.");
       }
     } finally {
@@ -315,6 +359,7 @@ const LiveTrackingPage = () => {
     prevDataRef.current = "";
     progressHighWaterRef.current = {};
     positionCacheRef.current = {};
+    liteLoadedRef.current = null;
     setFilterStatus("all");
     setFilterInstitute("all");
     setSearchQuery("");
@@ -435,6 +480,7 @@ const LiveTrackingPage = () => {
       list = list.filter(
         (s) =>
           s.studentName?.toLowerCase().includes(q) ||
+          s.email?.toLowerCase().includes(q) ||
           s.instituteName?.toLowerCase().includes(q) ||
           String(s.userStudentId).includes(q)
       );
@@ -505,7 +551,7 @@ const LiveTrackingPage = () => {
               <option value="">-- Choose Assessment --</option>
               {assessments.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.AssessmentName} {a.isActive ? "(Active)" : ""}
+                  {a.assessmentName} {a.isActive ? "(Active)" : ""}
                 </option>
               ))}
             </select>
@@ -636,6 +682,7 @@ const LiveTrackingPage = () => {
                   <tr>
                     <th style={{ width: 60 }}>#</th>
                     <th>Student</th>
+                    <th>Email</th>
                     <th>Institute</th>
                     <th style={{ width: 130 }}>Status</th>
                     <th style={{ width: 150 }}>Current Page</th>
@@ -645,7 +692,7 @@ const LiveTrackingPage = () => {
                 <tbody>
                   {filteredStudents.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center text-muted py-4">
+                      <td colSpan={7} className="text-center text-muted py-4">
                         No students match the current filter
                       </td>
                     </tr>
@@ -658,6 +705,9 @@ const LiveTrackingPage = () => {
                           <small className="text-muted">
                             ID: {s.userStudentId}
                           </small>
+                        </td>
+                        <td>
+                          <small>{s.email || ""}</small>
                         </td>
                         <td>
                           <small>{s.instituteName}</small>

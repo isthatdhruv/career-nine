@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import * as Yup from "yup";
 import axios from "axios";
 import { CreateContactInformationData } from "../API/Contact_Person_APIs";
+import { ReadCollegeList } from "../../College/API/College_APIs";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -52,6 +53,8 @@ const emptyPerson = {
 const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [institutes, setInstitutes] = useState<any[]>([]);
+  const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -59,6 +62,10 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
       .get<UserRow[]>(`${API_URL}/user/registered-users`)
       .then(({ data }) => setUsers(data))
       .catch((err) => console.error("Failed to fetch users", err));
+
+    ReadCollegeList()
+      .then((res) => setInstitutes(res.data || []))
+      .catch((err) => console.error("Failed to fetch institutes", err));
   }, []);
 
   const initialValues = {
@@ -80,7 +87,10 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
             setLoading(true);
             try {
               for (const person of values.contactPersons) {
-                await CreateContactInformationData(person);
+                await CreateContactInformationData(
+                  person,
+                  selectedInstitute !== "" ? Number(selectedInstitute) : undefined
+                );
               }
 
               resetForm();
@@ -147,6 +157,35 @@ const ContactPersonCreatePage = ({ setPageLoading }: { setPageLoading?: any }) =
             return (
               <Form className="form w-100 fv-plugins-bootstrap5 fv-plugins-framework">
                 <div className="card-body">
+                  {/* Institute Selection */}
+                  <div className="mb-4">
+                    <div className="row gx-3">
+                      <div className="col-md-6">
+                        <div className="p-3" style={{ background: "#f8fafc", borderRadius: 6 }}>
+                          <label className="required fs-6 fw-bold mb-1">
+                            School / Institute :
+                          </label>
+                          <select
+                            value={selectedInstitute}
+                            onChange={(e) =>
+                              setSelectedInstitute(
+                                e.target.value === "" ? "" : Number(e.target.value)
+                              )
+                            }
+                            className="form-select form-select-lg form-select-solid mt-2"
+                          >
+                            <option value="">-- Select an institute --</option>
+                            {institutes.map((inst: any) => (
+                              <option key={inst.instituteCode} value={inst.instituteCode}>
+                                {inst.instituteName}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   {values.contactPersons.map((person: any, index: number) => {
                     const t = (touched as any).contactPersons?.[index] || {};
                     const e = (errors as any).contactPersons?.[index] || {};

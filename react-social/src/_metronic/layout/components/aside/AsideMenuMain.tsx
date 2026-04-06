@@ -60,7 +60,7 @@ export function AsideMenuMain() {
     allowed("/assessment-questions") || allowed("/question-sections") ||
     allowed("/text-response-mapping") || allowed("/live-tracking");
 
-  const showReports = allowed("/reports") || allowed("/report-generation");
+  const showReports = allowed("/reports") || allowed("/report-generation") || allowed("/send-reports");
 
   const showTeacherDashboards =
     allowed("/teacher/class-dashboard") || allowed("/principal/dashboard");
@@ -431,6 +431,14 @@ export function AsideMenuMain() {
               icon="/media/icons/duotune/maps/map001.svg"
               title="Navigator Report Generation"
               fontIcon="bi-compass"
+            />
+          )}
+          {(allowed("/reports") || allowed("/send-reports")) && (
+            <AsideMenuItem
+              to="/send-reports"
+              icon="/media/icons/duotune/general/gen016.svg"
+              title="Send Reports to Contact"
+              fontIcon="bi-envelope"
             />
           )}
         </>
