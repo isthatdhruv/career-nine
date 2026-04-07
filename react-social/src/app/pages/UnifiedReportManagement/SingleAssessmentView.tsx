@@ -19,7 +19,12 @@ import {
   exportOMRStudent,
   ReportType,
 } from "./API/UnifiedReport_APIs";
-import { createOrUpdateGeneratedReport } from "../ReportGeneration/API/GeneratedReport_APIs";
+import {
+  createOrUpdateGeneratedReport,
+  getGeneratedReportsByAssessment,
+  toggleReportVisibility,
+  GeneratedReport,
+} from "../ReportGeneration/API/GeneratedReport_APIs";
 
 // ═══════════════════════ TYPES ═══════════════════════
 
@@ -79,6 +84,11 @@ const SingleAssessmentView: React.FC<Props> = ({ instituteCode, instituteName, a
   const [selectedGrade, setSelectedGrade] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
 
+  // ── Visibility (from GeneratedReport table) ──
+  // Map: userStudentId → { generatedReportId, visibleToStudent }
+  const [visibilityMap, setVisibilityMap] = useState<Map<number, { id: number; visible: boolean }>>(new Map());
+  const [togglingVisibility, setTogglingVisibility] = useState(false);
+
   // ── Loading ──
   const [generating, setGenerating] = useState(false);
   const [downloadingZip, setDownloadingZip] = useState(false);
@@ -130,7 +140,26 @@ const SingleAssessmentView: React.FC<Props> = ({ instituteCode, instituteName, a
     }
   }, [assessment]);
 
+  const refreshVisibility = useCallback(async () => {
+    try {
+      const res = await getGeneratedReportsByAssessment(assessment.id);
+      const map = new Map<number, { id: number; visible: boolean }>();
+      for (const gr of res.data || []) {
+        if (gr.typeOfReport === reportType) {
+          map.set(gr.userStudent.userStudentId, {
+            id: gr.generatedReportId,
+            visible: gr.visibleToStudent ?? false,
+          });
+        }
+      }
+      setVisibilityMap(map);
+    } catch {
+      setVisibilityMap(new Map());
+    }
+  }, [assessment.id, reportType]);
+
   useEffect(() => { refreshReportData(); }, [refreshReportData]);
+  useEffect(() => { refreshVisibility(); }, [refreshVisibility]);
 
   // ═══════════════════════ FILTERING ═══════════════════════
 
@@ -211,6 +240,47 @@ const SingleAssessmentView: React.FC<Props> = ({ instituteCode, instituteName, a
     document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url);
   };
 
+  // ═══════════════════════ VISIBILITY TOGGLE ═══════════════════════
+
+  const handleToggleVisibility = async (studentId: number) => {
+    const entry = visibilityMap.get(studentId);
+    if (!entry) return;
+    const newVisible = !entry.visible;
+    try {
+      await toggleReportVisibility([entry.id], newVisible);
+      setVisibilityMap((prev) => {
+        const next = new Map(prev);
+        next.set(studentId, { ...entry, visible: newVisible });
+        return next;
+      });
+    } catch {
+      showErrorToast("Failed to update visibility");
+    }
+  };
+
+  const handleBulkVisibility = async (visible: boolean) => {
+    const ids = getSelectedOrAllIds()
+      .map((sid) => visibilityMap.get(sid))
+      .filter((e): e is { id: number; visible: boolean } => !!e && e.visible !== visible)
+      .map((e) => e.id);
+
+    if (ids.length === 0) {
+      showSuccessToast(`All selected reports are already ${visible ? "released" : "hidden"}`);
+      return;
+    }
+
+    setTogglingVisibility(true);
+    try {
+      await toggleReportVisibility(ids, visible);
+      await refreshVisibility();
+      showSuccessToast(`${ids.length} report(s) ${visible ? "released" : "hidden"}`);
+    } catch {
+      showErrorToast("Failed to update visibility");
+    } finally {
+      setTogglingVisibility(false);
+    }
+  };
+
   // ═══════════════════════ COMBINED GENERATE ═══════════════════════
 
   const handleGenerate = async () => {
@@ -274,6 +344,7 @@ const SingleAssessmentView: React.FC<Props> = ({ instituteCode, instituteName, a
       const errMsg = allErrors.length > 0 ? `\n${allErrors.length} error(s).` : "";
       showSuccessToast(`Data: ${dataGenerated} | Reports: ${reportsGenerated}${errMsg}`);
       await refreshReportData();
+      await refreshVisibility();
     } catch (err: any) {
       showErrorToast("Failed: " + (err?.response?.data?.error || err.message));
     } finally {
@@ -385,6 +456,24 @@ const SingleAssessmentView: React.FC<Props> = ({ instituteCode, instituteName, a
                   {downloadingZip ? "Preparing ZIP..." : `Download ZIP`}
                 </button>
 
+                <button className="btn btn-sm" disabled={togglingVisibility || reportStats.generated === 0}
+                  style={{
+                    background: togglingVisibility ? "#6c757d" : "linear-gradient(135deg, #059669 0%, #047857 100%)",
+                    border: "none", borderRadius: 8, padding: "8px 20px", fontWeight: 600, color: "white", fontSize: "0.85rem",
+                  }}
+                  onClick={() => handleBulkVisibility(true)}>
+                  {togglingVisibility ? "..." : `Release${countLabel(displayedStudents.length)}`}
+                </button>
+
+                <button className="btn btn-sm" disabled={togglingVisibility || reportStats.generated === 0}
+                  style={{
+                    background: togglingVisibility ? "#6c757d" : "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)",
+                    border: "none", borderRadius: 8, padding: "8px 20px", fontWeight: 600, color: "white", fontSize: "0.85rem",
+                  }}
+                  onClick={() => handleBulkVisibility(false)}>
+                  {togglingVisibility ? "..." : "Hide"}
+                </button>
+
                 <button className="btn btn-sm btn-outline-secondary" disabled={exporting}
                   onClick={async () => {
                     setExporting(true);
@@ -427,6 +516,7 @@ const SingleAssessmentView: React.FC<Props> = ({ instituteCode, instituteName, a
                     <th style={thStyle}>Section</th>
                     <th style={thStyle}>Assessment Status</th>
                     <th style={thStyle}>Report</th>
+                    <th style={thStyle}>Visible</th>
                     <th style={thStyle}>Preview / Download</th>
                   </tr>
                 </thead>
@@ -459,6 +549,28 @@ const SingleAssessmentView: React.FC<Props> = ({ instituteCode, instituteName, a
                         <td style={tdStyle}>{sectionInfo?.sectionName || "-"}</td>
                         <td style={tdStyle}>{statusBadge(asc.bg, asc.color, asmtStatus)}</td>
                         <td style={tdStyle}>{statusBadge(rsc.bg, rsc.color, reportStatus === "generated" ? "Generated" : "Not Generated")}</td>
+                        <td style={tdStyle}>
+                          {visibilityMap.has(s.userStudentId) ? (
+                            <label style={{ position: "relative", display: "inline-block", width: 36, height: 20, cursor: "pointer" }}>
+                              <input type="checkbox" checked={visibilityMap.get(s.userStudentId)!.visible}
+                                onChange={() => handleToggleVisibility(s.userStudentId)}
+                                style={{ opacity: 0, width: 0, height: 0, position: "absolute" }} />
+                              <span style={{
+                                position: "absolute", top: 0, left: 0, right: 0, bottom: 0, borderRadius: 10,
+                                background: visibilityMap.get(s.userStudentId)!.visible ? "#059669" : "#d1d5db",
+                                transition: "background 0.2s",
+                              }}>
+                                <span style={{
+                                  position: "absolute", left: visibilityMap.get(s.userStudentId)!.visible ? 18 : 2, top: 2,
+                                  width: 16, height: 16, borderRadius: "50%", background: "#fff",
+                                  transition: "left 0.2s", boxShadow: "0 1px 2px rgba(0,0,0,0.15)",
+                                }} />
+                              </span>
+                            </label>
+                          ) : (
+                            <span style={{ color: "#d1d5db", fontSize: "0.75rem" }}>-</span>
+                          )}
+                        </td>
                         <td style={tdStyle}>
                           {reportUrl ? (
                             <div style={{ display: "flex", gap: 4 }}>
@@ -497,7 +609,7 @@ const SingleAssessmentView: React.FC<Props> = ({ instituteCode, instituteName, a
                     );
                   })}
                   {paginatedStudents.length === 0 && (
-                    <tr><td colSpan={9} style={{ ...tdStyle, textAlign: "center", color: "#9ca3af", padding: 32 }}>No students found</td></tr>
+                    <tr><td colSpan={10} style={{ ...tdStyle, textAlign: "center", color: "#9ca3af", padding: 32 }}>No students found</td></tr>
                   )}
                 </tbody>
               </table>

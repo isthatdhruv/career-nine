@@ -100,6 +100,43 @@ public class GeneratedReportController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    // ═══════════════════════ STUDENT-FACING (visibility-filtered) ═══════════════════════
+
+    @GetMapping("/student/{userStudentId}")
+    public ResponseEntity<List<GeneratedReport>> getVisibleReportsForStudent(@PathVariable Long userStudentId) {
+        return ResponseEntity.ok(
+                generatedReportRepository.findByUserStudentUserStudentIdAndVisibleToStudent(userStudentId, true));
+    }
+
+    // ═══════════════════════ ADMIN: TOGGLE VISIBILITY ═══════════════════════
+
+    /**
+     * PUT /generated-reports/toggle-visibility
+     * Body: { "ids": [1, 2, 3], "visible": true }
+     */
+    @SuppressWarnings("unchecked")
+    @PutMapping("/toggle-visibility")
+    public ResponseEntity<?> toggleVisibility(@RequestBody Map<String, Object> body) {
+        List<Number> idNums = (List<Number>) body.get("ids");
+        Boolean visible = (Boolean) body.get("visible");
+        if (idNums == null || idNums.isEmpty() || visible == null) {
+            return ResponseEntity.badRequest().body("ids (list) and visible (boolean) are required");
+        }
+
+        List<Long> ids = new ArrayList<>();
+        for (Number n : idNums) {
+            ids.add(n.longValue());
+        }
+
+        List<GeneratedReport> reports = generatedReportRepository.findAllById(ids);
+        for (GeneratedReport r : reports) {
+            r.setVisibleToStudent(visible);
+        }
+        generatedReportRepository.saveAll(reports);
+
+        return ResponseEntity.ok(Map.of("updated", reports.size()));
+    }
+
     // ═══════════════════════ CREATE / UPSERT ═══════════════════════
 
     /**
@@ -136,6 +173,9 @@ public class GeneratedReportController {
 
         report.setReportStatus(reportStatus);
         report.setReportUrl(reportUrl);
+        if (body.containsKey("visibleToStudent")) {
+            report.setVisibleToStudent((Boolean) body.get("visibleToStudent"));
+        }
 
         return ResponseEntity.ok(generatedReportRepository.save(report));
     }
@@ -154,6 +194,7 @@ public class GeneratedReportController {
         GeneratedReport report = opt.get();
         if (body.containsKey("reportStatus")) report.setReportStatus((String) body.get("reportStatus"));
         if (body.containsKey("reportUrl")) report.setReportUrl((String) body.get("reportUrl"));
+        if (body.containsKey("visibleToStudent")) report.setVisibleToStudent((Boolean) body.get("visibleToStudent"));
 
         return ResponseEntity.ok(generatedReportRepository.save(report));
     }
