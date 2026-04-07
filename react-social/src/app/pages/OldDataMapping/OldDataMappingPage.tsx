@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import StudentImportWizard from "./StudentImportWizard";
 import ExistingMappingView from "./ExistingMappingView";
+import FirebaseMappingOverview from "./FirebaseMappingOverview";
 import { deleteFirebaseStudents } from "./API/OldDataMapping_APIs";
 import { ReadCollegeList } from "../College/API/College_APIs";
 
@@ -136,7 +137,7 @@ const DeleteFirebaseStudentsPanel = ({ onBack }: { onBack: () => void }) => {
 };
 
 const OldDataMappingPage = () => {
-  const [mode, setMode] = useState<"select" | "student-import" | "existing-mapping" | "delete-firebase">("select");
+  const [mode, setMode] = useState<"select" | "student-import" | "existing-mapping" | "mapping-overview" | "delete-firebase">("select");
 
   if (mode === "student-import") {
     return <StudentImportWizard onBack={() => setMode("select")} />;
@@ -144,6 +145,10 @@ const OldDataMappingPage = () => {
 
   if (mode === "existing-mapping") {
     return <ExistingMappingView onBack={() => setMode("select")} />;
+  }
+
+  if (mode === "mapping-overview") {
+    return <FirebaseMappingOverview onBack={() => setMode("select")} />;
   }
 
   if (mode === "delete-firebase") {
@@ -187,7 +192,7 @@ const OldDataMappingPage = () => {
               </div>
             </div>
 
-            {/* Existing Mapping */}
+            {/* Edit Mappings */}
             <div className="col-12 col-md-3">
               <div
                 className="card card-hover border border-primary border-2 h-100"
@@ -197,15 +202,38 @@ const OldDataMappingPage = () => {
                 <div className="card-body p-6 d-flex flex-column align-items-center text-center">
                   <div className="symbol symbol-60px mb-4 bg-light-primary rounded">
                     <span className="symbol-label">
-                      <i className="bi bi-diagram-3 fs-2x text-primary"></i>
+                      <i className="bi bi-pencil-square fs-2x text-primary"></i>
                     </span>
                   </div>
-                  <h4 className="fw-bold text-dark mb-2">Existing Mapping</h4>
+                  <h4 className="fw-bold text-dark mb-2">Edit Mappings</h4>
                   <p className="text-muted fs-7">
-                    View and edit saved question &amp; option mappings for each assessment.
-                    Mappings are auto-reused across schools.
+                    Create, edit, or update question &amp; option mappings per assessment.
+                    Copy mappings to similar assessments.
                   </p>
-                  <button className="btn btn-primary mt-auto">View Mappings</button>
+                  <button className="btn btn-primary mt-auto">Edit Mappings</button>
+                </div>
+              </div>
+            </div>
+
+            {/* View Mapping Report */}
+            <div className="col-12 col-md-3">
+              <div
+                className="card card-hover border border-info border-2 h-100"
+                style={{ cursor: "pointer" }}
+                onClick={() => setMode("mapping-overview")}
+              >
+                <div className="card-body p-6 d-flex flex-column align-items-center text-center">
+                  <div className="symbol symbol-60px mb-4 bg-light-info rounded">
+                    <span className="symbol-label">
+                      <i className="bi bi-file-earmark-bar-graph fs-2x text-info"></i>
+                    </span>
+                  </div>
+                  <h4 className="fw-bold text-dark mb-2">Mapping Report</h4>
+                  <p className="text-muted fs-7">
+                    Read-only overview of all Firebase-to-system question mappings
+                    by questionnaire. Download as Excel.
+                  </p>
+                  <button className="btn btn-info mt-auto">View Report</button>
                 </div>
               </div>
             </div>
