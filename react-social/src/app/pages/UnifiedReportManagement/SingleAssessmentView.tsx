@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
-import { downloadReportsAsZip, ZipProgress } from "../ReportGeneration/utils/htmlToPdf";
+import { downloadReportAsPdf, downloadReportsAsZip, ZipProgress } from "../ReportGeneration/utils/htmlToPdf";
 import {
   getStudentsWithMappingByInstituteId,
   Assessment,
@@ -85,6 +85,7 @@ const SingleAssessmentView: React.FC<Props> = ({ instituteCode, instituteName, a
   const [zipProgress, setZipProgress] = useState<ZipProgress | null>(null);
   const [exportingOMR, setExportingOMR] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [downloadingStudentId, setDownloadingStudentId] = useState<number | null>(null);
 
   // ═══════════════════════ DATA LOADING ═══════════════════════
 
@@ -466,14 +467,26 @@ const SingleAssessmentView: React.FC<Props> = ({ instituteCode, instituteName, a
                                 Preview
                               </a>
                               <button
-                                style={{ padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 600, background: "#f0fdf4", color: "#059669", border: "none", cursor: "pointer" }}
+                                disabled={downloadingStudentId === s.userStudentId}
+                                style={{
+                                  padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 600,
+                                  background: downloadingStudentId === s.userStudentId ? "#d1d5db" : "#f0fdf4",
+                                  color: downloadingStudentId === s.userStudentId ? "#6b7280" : "#059669",
+                                  border: "none", cursor: downloadingStudentId === s.userStudentId ? "not-allowed" : "pointer",
+                                }}
                                 onClick={async () => {
+                                  setDownloadingStudentId(s.userStudentId);
                                   try {
-                                    const res = await downloadReport(assessment, s.userStudentId);
-                                    downloadBlob(res.data, `${reportType}_report_${s.userStudentId}.pdf`);
+                                    const safeName = (s.name || "student").replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_");
+                                    const reportLabel = isBet ? "BET_Report" : "Career_Navigator";
+                                    await downloadReportAsPdf(
+                                      () => downloadReport(assessment, s.userStudentId),
+                                      `${safeName}_${reportLabel}.pdf`
+                                    );
                                   } catch { showErrorToast("Download failed"); }
+                                  finally { setDownloadingStudentId(null); }
                                 }}>
-                                Download
+                                {downloadingStudentId === s.userStudentId ? "Downloading..." : "Download"}
                               </button>
                             </div>
                           ) : (

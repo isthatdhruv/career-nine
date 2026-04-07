@@ -5,10 +5,12 @@ import {
   Assessment,
 } from "../StudentInformation/StudentInfo_APIs";
 import { GetSessionsByInstituteCode } from "../College/API/College_APIs";
+import { downloadReportAsPdf } from "../ReportGeneration/utils/htmlToPdf";
 import {
   getReportType,
   generateDataForAssessment,
   generateReportsForAssessment,
+  downloadReport as downloadReportApi,
 } from "./API/UnifiedReport_APIs";
 import {
   generateAllReportsOneClick,
@@ -65,6 +67,7 @@ const AllAssessmentsView: React.FC<Props> = ({ instituteCode, instituteName, ass
   // ── Loading states ──
   const [generating, setGenerating] = useState(false);
   const [oneClickStudentId, setOneClickStudentId] = useState<number | null>(null);
+  const [downloadingReportId, setDownloadingReportId] = useState<number | null>(null);
 
   // ═══════════════════════ DATA LOADING ═══════════════════════
 
@@ -432,26 +435,56 @@ const AllAssessmentsView: React.FC<Props> = ({ instituteCode, instituteName, ass
                             <span style={{ color: "#d1d5db", fontSize: "0.7rem" }}>No completed</span>
                           )}
                         </td>
-                        <td style={{ ...tdStyle, whiteSpace: "normal", minWidth: 140 }}>
+                        <td style={{ ...tdStyle, whiteSpace: "normal", minWidth: 180 }}>
                           <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                             {(reportsMap.get(s.userStudentId) || [])
                               .filter((r) => r.reportStatus === "generated" && r.reportUrl)
-                              .map((r) => (
-                                <a
-                                  key={r.generatedReportId}
-                                  href={r.reportUrl!}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  title={`Preview ${r.typeOfReport.toUpperCase()} Report`}
-                                  style={{
-                                    padding: "3px 8px", borderRadius: 6, fontSize: "0.65rem", fontWeight: 600,
-                                    background: r.typeOfReport === "bet" ? "#dbeafe" : "#ccfbf1",
-                                    color: r.typeOfReport === "bet" ? "#2563eb" : "#0d9488",
-                                    textDecoration: "none",
-                                  }}>
-                                  {r.typeOfReport === "bet" ? "BET" : "NAV"}
-                                </a>
-                              ))}
+                              .map((r) => {
+                                const isBetR = r.typeOfReport === "bet";
+                                const label = isBetR ? "BET" : "NAV";
+                                const assessmentObj = assessments.find((a) => a.id === r.assessmentId);
+                                return (
+                                  <span key={r.generatedReportId} style={{ display: "inline-flex", gap: 2 }}>
+                                    <a
+                                      href={r.reportUrl!}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      title={`Preview ${label} Report`}
+                                      style={{
+                                        padding: "3px 8px", borderRadius: "6px 0 0 6px", fontSize: "0.6rem", fontWeight: 600,
+                                        background: isBetR ? "#dbeafe" : "#ccfbf1",
+                                        color: isBetR ? "#2563eb" : "#0d9488",
+                                        textDecoration: "none",
+                                      }}>
+                                      {label}
+                                    </a>
+                                    <button
+                                      disabled={downloadingReportId === r.generatedReportId}
+                                      title={`Download ${label} Report`}
+                                      style={{
+                                        padding: "3px 6px", borderRadius: "0 6px 6px 0", fontSize: "0.6rem", fontWeight: 600,
+                                        background: downloadingReportId === r.generatedReportId ? "#d1d5db" : "#f0fdf4",
+                                        color: downloadingReportId === r.generatedReportId ? "#6b7280" : "#059669",
+                                        border: "none", cursor: downloadingReportId === r.generatedReportId ? "not-allowed" : "pointer",
+                                      }}
+                                      onClick={async () => {
+                                        if (!assessmentObj) return;
+                                        setDownloadingReportId(r.generatedReportId);
+                                        try {
+                                          const safeName = (s.name || "student").replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_");
+                                          const reportLabel = isBetR ? "BET_Report" : "Career_Navigator";
+                                          await downloadReportAsPdf(
+                                            () => downloadReportApi(assessmentObj, s.userStudentId),
+                                            `${safeName}_${reportLabel}.pdf`
+                                          );
+                                        } catch { showErrorToast("Download failed"); }
+                                        finally { setDownloadingReportId(null); }
+                                      }}>
+                                      {downloadingReportId === r.generatedReportId ? "..." : "\u2B07"}
+                                    </button>
+                                  </span>
+                                );
+                              })}
                             {generated === 0 && (
                               <span style={{ color: "#d1d5db", fontSize: "0.7rem" }}>-</span>
                             )}
