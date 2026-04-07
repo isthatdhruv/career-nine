@@ -59,7 +59,7 @@ public class GeneratedReport implements Serializable {
     @Column(name = "report_status", nullable = false, length = 50)
     private String reportStatus = "notGenerated";
 
-    @Column(name = "report_url", length = 1024)
+    @Column(name = "report_url", length = 4096)
     private String reportUrl;
 
     @Column(name = "visible_to_student", nullable = false, columnDefinition = "boolean default false")

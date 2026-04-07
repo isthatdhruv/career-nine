@@ -102,7 +102,7 @@ const StudentLoginPage: React.FC = () => {
     { value: '11', label: 'Nov' }, { value: '12', label: 'Dec' },
   ];
 
-  const years = Array.from({ length: 31 }, (_, i) => String(2015 - i));
+  const years = Array.from({ length: 40 }, (_, i) => String(2024 - i));
   const days = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0'));
 
   const handleSubmit = async (e: React.FormEvent) => {
