@@ -63,8 +63,7 @@ const AllAssessmentsView: React.FC<Props> = ({ instituteCode, instituteName, ass
   const [selectedGrade, setSelectedGrade] = useState("");
 
   // ── Loading states ──
-  const [generatingData, setGeneratingData] = useState(false);
-  const [generatingReports, setGeneratingReports] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [oneClickStudentId, setOneClickStudentId] = useState<number | null>(null);
 
   // ═══════════════════════ DATA LOADING ═══════════════════════
@@ -179,10 +178,14 @@ const AllAssessmentsView: React.FC<Props> = ({ instituteCode, instituteName, ass
   };
 
   const getStudentReportCount = (studentId: number) => {
+    const student = students.find((s) => s.userStudentId === studentId);
+    const completedCount = assessments.filter((a) => {
+      const status = student ? getStudentAssessmentStatus(student, a.id) : "notstarted";
+      return status === "completed";
+    }).length;
     const reports = reportsMap.get(studentId) || [];
     const generated = reports.filter((r) => r.reportStatus === "generated").length;
-    const total = assessments.length;
-    return { generated, total };
+    return { generated, total: completedCount };
   };
 
   const visibleSelectedCount = useMemo(() => {
@@ -192,80 +195,67 @@ const AllAssessmentsView: React.FC<Props> = ({ instituteCode, instituteName, ass
 
   const countLabel = (n: number) => visibleSelectedCount > 0 ? ` (${visibleSelectedCount})` : ` (All ${n})`;
 
-  // ═══════════════════════ ACTIONS ═══════════════════════
+  // ═══════════════════════ COMBINED GENERATE (DATA + REPORTS) ═══════════════════════
 
-  const handleGenerateAllData = async () => {
+  const handleGenerate = async () => {
     const ids = getSelectedOrAllIds();
     if (ids.length === 0) return;
-    setGeneratingData(true);
-    let totalGenerated = 0;
+    setGenerating(true);
+    let totalDataGenerated = 0;
+    let totalReportsGenerated = 0;
     const allErrors: string[] = [];
 
     try {
       for (const assessment of assessments) {
-        // Only students who are assigned to this assessment and completed it
-        const relevantIds = ids.filter((id) => {
+        // Step 1: Generate data — only for completed & assigned students
+        const dataIds = ids.filter((id) => {
           const s = students.find((s) => s.userStudentId === id);
           if (!s) return false;
           const status = getStudentAssessmentStatus(s, assessment.id);
           return status === "completed" && (s.assignedAssessmentIds || []).includes(assessment.id);
         });
-        if (relevantIds.length === 0) continue;
 
+        if (dataIds.length === 0) continue;
+
+        let successDataIds: number[] = [];
         try {
-          const res = await generateDataForAssessment(assessment, relevantIds);
-          totalGenerated += res.data.generated || 0;
-          for (const err of res.data.errors || []) {
-            allErrors.push(`${assessment.assessmentName}: Student ${err.userStudentId} - ${err.reason}`);
+          const dataRes = await generateDataForAssessment(assessment, dataIds);
+          totalDataGenerated += dataRes.data.generated || 0;
+          // Use the actual saved records to determine which students succeeded
+          const savedIds = new Set<number>(
+            (dataRes.data.data || []).map((d: any) => d.userStudent?.userStudentId).filter(Boolean)
+          );
+          successDataIds = savedIds.size > 0
+            ? dataIds.filter((id) => savedIds.has(id))
+            : []; // if no saved records returned, don't attempt report generation
+          for (const err of dataRes.data.errors || []) {
+            allErrors.push(`${assessment.assessmentName} [data]: Student ${err.userStudentId} - ${err.reason}`);
           }
         } catch (err: any) {
-          allErrors.push(`${assessment.assessmentName}: ${err?.response?.data?.error || err.message}`);
+          allErrors.push(`${assessment.assessmentName} [data]: ${err?.response?.data?.error || err.message}`);
+          continue; // skip report generation if data call itself failed
+        }
+
+        // Step 2: Generate reports only for students whose data succeeded
+        if (successDataIds.length === 0) continue;
+        try {
+          const reportRes = await generateReportsForAssessment(assessment, successDataIds);
+          totalReportsGenerated += reportRes.data.generated || 0;
+          for (const err of reportRes.data.errors || []) {
+            allErrors.push(`${assessment.assessmentName} [report]: Student ${err.userStudentId} - ${err.reason}`);
+          }
+        } catch (err: any) {
+          allErrors.push(`${assessment.assessmentName} [report]: ${err?.response?.data?.error || err.message}`);
         }
       }
 
-      const msg = `Generated data for ${totalGenerated} student-assessment pair(s).`;
       const errMsg = allErrors.length > 0 ? `\n${allErrors.length} error(s).` : "";
-      showSuccessToast(msg + errMsg);
-    } finally {
-      setGeneratingData(false);
-    }
-  };
-
-  const handleGenerateAllReports = async () => {
-    const ids = getSelectedOrAllIds();
-    if (ids.length === 0) return;
-    setGeneratingReports(true);
-    let totalGenerated = 0;
-    const allErrors: string[] = [];
-
-    try {
-      for (const assessment of assessments) {
-        const relevantIds = ids.filter((id) => {
-          const s = students.find((s) => s.userStudentId === id);
-          if (!s) return false;
-          return (s.assignedAssessmentIds || []).includes(assessment.id);
-        });
-        if (relevantIds.length === 0) continue;
-
-        try {
-          const res = await generateReportsForAssessment(assessment, relevantIds);
-          totalGenerated += res.data.generated || 0;
-          for (const err of res.data.errors || []) {
-            allErrors.push(`${assessment.assessmentName}: Student ${err.userStudentId} - ${err.reason}`);
-          }
-        } catch (err: any) {
-          allErrors.push(`${assessment.assessmentName}: ${err?.response?.data?.error || err.message}`);
-        }
-      }
-
-      const msg = `Generated ${totalGenerated} report(s) across all assessments.`;
-      const errMsg = allErrors.length > 0 ? `\n${allErrors.length} error(s).` : "";
-      showSuccessToast(msg + errMsg);
-
-      // Refresh reports
+      showSuccessToast(`Data: ${totalDataGenerated} | Reports: ${totalReportsGenerated}${errMsg}`);
       await loadReports(ids);
+    } catch (err: any) {
+      showErrorToast("Failed: " + (err?.response?.data?.error || err.message));
     } finally {
-      setGeneratingReports(false);
+      setGenerating(false);
     }
   };
 
@@ -348,21 +338,13 @@ const AllAssessmentsView: React.FC<Props> = ({ instituteCode, instituteName, ass
                 {visibleSelectedCount > 0 && <span style={{ fontWeight: 600, color: accentColor, marginLeft: 8 }}>({visibleSelectedCount} selected)</span>}
               </span>
               <div style={{ display: "flex", gap: 8 }}>
-                <button className="btn btn-sm" disabled={displayedStudents.length === 0 || generatingData}
+                <button className="btn btn-sm" disabled={displayedStudents.length === 0 || generating}
                   style={{
-                    background: generatingData ? "#6c757d" : `linear-gradient(135deg, ${accentColor} 0%, ${accentColor}cc 100%)`,
+                    background: generating ? "#6c757d" : `linear-gradient(135deg, ${accentColor} 0%, ${accentColor}cc 100%)`,
                     border: "none", borderRadius: 8, padding: "8px 20px", fontWeight: 600, color: "white", fontSize: "0.85rem",
                   }}
-                  onClick={handleGenerateAllData}>
-                  {generatingData ? "Generating Data..." : `Generate All Data${countLabel(displayedStudents.length)}`}
-                </button>
-                <button className="btn btn-sm" disabled={displayedStudents.length === 0 || generatingReports}
-                  style={{
-                    background: generatingReports ? "#6c757d" : "linear-gradient(135deg, #0d9488 0%, #065f46 100%)",
-                    border: "none", borderRadius: 8, padding: "8px 20px", fontWeight: 600, color: "white", fontSize: "0.85rem",
-                  }}
-                  onClick={handleGenerateAllReports}>
-                  {generatingReports ? "Generating Reports..." : `Generate All Reports${countLabel(displayedStudents.length)}`}
+                  onClick={handleGenerate}>
+                  {generating ? "Generating..." : `Generate All${countLabel(displayedStudents.length)}`}
                 </button>
               </div>
             </div>
@@ -383,7 +365,6 @@ const AllAssessmentsView: React.FC<Props> = ({ instituteCode, instituteName, ass
                     </th>
                     <th style={thStyle}>#</th>
                     <th style={thStyle}>Name</th>
-                    <th style={thStyle}>Roll No.</th>
                     <th style={thStyle}>Grade</th>
                     {assessments.map((a) => (
                       <th key={a.id} style={{ ...thStyle, fontSize: "0.7rem", maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis" }}
@@ -397,6 +378,7 @@ const AllAssessmentsView: React.FC<Props> = ({ instituteCode, instituteName, ass
                     ))}
                     <th style={thStyle}>Reports</th>
                     <th style={thStyle}>Actions</th>
+                    <th style={thStyle}>Preview / Download</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -417,7 +399,6 @@ const AllAssessmentsView: React.FC<Props> = ({ instituteCode, instituteName, ass
                         </td>
                         <td style={tdStyle}>{(safeCurrentPage - 1) * pageSize + idx + 1}</td>
                         <td style={{ ...tdStyle, fontWeight: 600 }}>{s.name}</td>
-                        <td style={tdStyle}>{s.schoolRollNumber || "-"}</td>
                         <td style={tdStyle}>{sectionInfo?.className || "-"}</td>
                         {assessments.map((a) => {
                           const status = getStudentAssessmentStatus(s, a.id);
@@ -435,17 +416,46 @@ const AllAssessmentsView: React.FC<Props> = ({ instituteCode, instituteName, ass
                           </span>
                         </td>
                         <td style={tdStyle}>
-                          <button
-                            className="btn btn-sm"
-                            disabled={oneClickStudentId === s.userStudentId}
-                            style={{
-                              background: oneClickStudentId === s.userStudentId ? "#6c757d" : "linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)",
-                              border: "none", borderRadius: 6, padding: "4px 12px",
-                              fontWeight: 600, color: "white", fontSize: "0.7rem",
-                            }}
-                            onClick={() => handleOneClick(s.userStudentId)}>
-                            {oneClickStudentId === s.userStudentId ? "Generating..." : "One-Click All"}
-                          </button>
+                          {total > 0 ? (
+                            <button
+                              className="btn btn-sm"
+                              disabled={oneClickStudentId === s.userStudentId}
+                              style={{
+                                background: oneClickStudentId === s.userStudentId ? "#6c757d" : "linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)",
+                                border: "none", borderRadius: 6, padding: "4px 10px",
+                                fontWeight: 600, color: "white", fontSize: "0.65rem",
+                              }}
+                              onClick={() => handleOneClick(s.userStudentId)}>
+                              {oneClickStudentId === s.userStudentId ? "..." : "Generate"}
+                            </button>
+                          ) : (
+                            <span style={{ color: "#d1d5db", fontSize: "0.7rem" }}>No completed</span>
+                          )}
+                        </td>
+                        <td style={{ ...tdStyle, whiteSpace: "normal", minWidth: 140 }}>
+                          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                            {(reportsMap.get(s.userStudentId) || [])
+                              .filter((r) => r.reportStatus === "generated" && r.reportUrl)
+                              .map((r) => (
+                                <a
+                                  key={r.generatedReportId}
+                                  href={r.reportUrl!}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title={`Preview ${r.typeOfReport.toUpperCase()} Report`}
+                                  style={{
+                                    padding: "3px 8px", borderRadius: 6, fontSize: "0.65rem", fontWeight: 600,
+                                    background: r.typeOfReport === "bet" ? "#dbeafe" : "#ccfbf1",
+                                    color: r.typeOfReport === "bet" ? "#2563eb" : "#0d9488",
+                                    textDecoration: "none",
+                                  }}>
+                                  {r.typeOfReport === "bet" ? "BET" : "NAV"}
+                                </a>
+                              ))}
+                            {generated === 0 && (
+                              <span style={{ color: "#d1d5db", fontSize: "0.7rem" }}>-</span>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );

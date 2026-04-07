@@ -1,81 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
-import ReportGenerationPage, { ReportGenerationConfig, ReportData } from "../ReportGeneration/components/ReportGenerationPage";
+import SingleAssessmentView from "./SingleAssessmentView";
 import AllAssessmentsView from "./AllAssessmentsView";
 import { ReadCollegeList } from "../College/API/College_APIs";
 import { getAllAssessments, Assessment } from "../StudentInformation/StudentInfo_APIs";
 import { getAssessmentMappingsByInstitute } from "../AssessmentMapping/API/AssessmentMapping_APIs";
-import {
-  getReportType,
-  generateDataForAssessment,
-  getReportDataByAssessment,
-  exportReportExcel,
-  generateReportsForAssessment,
-  downloadReport,
-  getReportUrls,
-  exportOMR,
-  exportOMRStudent,
-  resetStudent,
-  resetAssessment,
-} from "./API/UnifiedReport_APIs";
-
-// ═══════════════════════ DYNAMIC CONFIG BUILDER ═══════════════════════
-
-function buildConfig(assessment: Assessment): ReportGenerationConfig {
-  const type = getReportType(assessment);
-  const isBet = type === "bet";
-
-  return {
-    title: isBet ? "BET Report Generation" : "Navigator Report Generation",
-    subtitle: isBet
-      ? "Generate report data, export, and create HTML reports for BET assessments"
-      : "Generate career navigator reports for general assessments (Classes 6-12)",
-    accentColor: isBet ? "#4361ee" : "#0d9488",
-    placeholderIcon: isBet ? "&#x1F4CB;" : "&#x1F9ED;",
-    reportFilePrefix: isBet ? "bet_report" : "navigator_report",
-    typeOfReport: type,
-
-    hasEligibility: !isBet,
-    hasReset: !isBet,
-
-    dataTabExtraColumnsHeader: isBet ? "Data Generated" : undefined,
-    dataTabExtraColumns: isBet
-      ? (rd: ReportData | undefined) => {
-          const hasData = !!rd;
-          return (
-            <span style={{
-              background: hasData ? "#dcfce7" : "#fee2e2",
-              color: hasData ? "#059669" : "#dc2626",
-              padding: "3px 10px", borderRadius: 6,
-              fontWeight: 600, fontSize: "0.75rem",
-            }}>
-              {hasData ? "Yes" : "No"}
-            </span>
-          );
-        }
-      : (rd: ReportData | undefined) => (
-          <span style={{ fontSize: "0.8rem", color: "#374151" }}>
-            {rd?.pathway1 || "-"}
-          </span>
-        ),
-
-    filterForReportGeneration: isBet ? undefined : (rd: ReportData) => rd.eligible === true,
-
-    api: {
-      generateData: (assessmentId, ids) => generateDataForAssessment(assessment, ids),
-      getByAssessment: (_assessmentId) => getReportDataByAssessment(assessment),
-      exportExcel: (_assessmentId) => exportReportExcel(assessment),
-      generateReports: (assessmentId, ids) => generateReportsForAssessment(assessment, ids),
-      exportOMR: (assessmentId) => exportOMR(assessmentId),
-      exportOMRStudent: (assessmentId, studentId) => exportOMRStudent(assessmentId, studentId),
-      downloadReport: (userStudentId, assessmentId) => downloadReport(assessment, userStudentId),
-      getReportUrls: (assessmentId, userStudentIds) => getReportUrls(assessment, userStudentIds),
-      ...(isBet ? {} : {
-        resetStudent: (studentId: number, assessmentId: number) => resetStudent(assessment, studentId),
-        resetAssessment: (_assessmentId: number) => resetAssessment(assessment),
-      }),
-    },
-  };
-}
+import { getReportType } from "./API/UnifiedReport_APIs";
 
 // ═══════════════════════ COMPONENT ═══════════════════════
 
@@ -142,12 +71,6 @@ const UnifiedReportManagementPage: React.FC = () => {
     if (selectedAssessment === "" || selectedAssessment === "all") return null;
     return assessments.find((a) => a.id === Number(selectedAssessment)) || null;
   }, [assessments, selectedAssessment]);
-
-  // ── Dynamic config for single-assessment mode ──
-  const dynamicConfig = useMemo(() => {
-    if (!selectedAssessmentObj) return null;
-    return buildConfig(selectedAssessmentObj);
-  }, [selectedAssessmentObj]);
 
   const selectedInstituteName = institutes.find((i) => i.instituteCode === selectedInstitute)?.instituteName || "";
 
@@ -226,12 +149,12 @@ const UnifiedReportManagementPage: React.FC = () => {
       )}
 
       {/* Single Assessment Mode */}
-      {selectedAssessment !== "" && selectedAssessment !== "all" && dynamicConfig && selectedInstitute !== "" && (
-        <ReportGenerationPage
+      {selectedAssessment !== "" && selectedAssessment !== "all" && selectedAssessmentObj && selectedInstitute !== "" && (
+        <SingleAssessmentView
           key={`${selectedInstitute}-${selectedAssessment}`}
-          config={dynamicConfig}
-          externalInstitute={Number(selectedInstitute)}
-          externalAssessment={Number(selectedAssessment)}
+          instituteCode={Number(selectedInstitute)}
+          instituteName={selectedInstituteName}
+          assessment={selectedAssessmentObj}
         />
       )}
 
