@@ -62,9 +62,15 @@ import com.kccitm.api.repository.Career9.School.FirebaseStudentExtraDataReposito
 import com.kccitm.api.model.career9.school.FirebaseQuestionMapping;
 import com.kccitm.api.service.FirebaseService;
 
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+
 @RestController
 @RequestMapping("/firebase-mapping")
 public class FirebaseDataMappingController {
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Autowired
     private FirebaseDataMappingRepository firebaseDataMappingRepository;
@@ -128,6 +134,9 @@ public class FirebaseDataMappingController {
 
     @Autowired
     private com.kccitm.api.repository.Career9.AssessmentProctoringQuestionLogRepository assessmentProctoringQuestionLogRepository;
+
+    @Autowired
+    private com.kccitm.api.repository.StudentContactAssignmentRepository studentContactAssignmentRepository;
 
     @GetMapping("/getAll")
     public List<FirebaseDataMapping> getAll() {
@@ -205,14 +214,16 @@ public class FirebaseDataMappingController {
             }
             AssessmentTable assessment = atOpt.get();
 
-            // Find or create StudentAssessmentMapping
+            // Find or create StudentAssessmentMapping (Issue 5: use managed entity, not detached ID proxy)
             Optional<StudentAssessmentMapping> samOpt = studentAssessmentMappingRepository
                     .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
             StudentAssessmentMapping sam;
             if (samOpt.isPresent()) {
                 sam = samOpt.get();
             } else {
-                sam = new StudentAssessmentMapping(userStudentId, assessmentId);
+                sam = new StudentAssessmentMapping();
+                sam.setUserStudent(userStudent);
+                sam.setAssessmentId(assessmentId);
                 sam.setStatus("ongoing");
                 sam = studentAssessmentMappingRepository.save(sam);
             }
@@ -623,7 +634,9 @@ public class FirebaseDataMappingController {
      */
     @DeleteMapping("/delete-firebase-students/{instituteCode}")
     @Transactional
-    public ResponseEntity<?> deleteFirebaseStudents(@PathVariable Integer instituteCode) {
+    public ResponseEntity<?> deleteFirebaseStudents(
+            @PathVariable Integer instituteCode,
+            @RequestParam(value = "forceAll", defaultValue = "false") boolean forceAll) {
         try {
             // 1. Get all UserStudents for this institute
             List<UserStudent> allStudents = userStudentRepository.findByInstituteInstituteCode(instituteCode);
@@ -631,88 +644,107 @@ public class FirebaseDataMappingController {
                 return ResponseEntity.ok(Map.of("deleted", 0, "message", "No students found for this institute"));
             }
 
-            // 2. Filter to only Firebase-imported students
-            List<UserStudent> firebaseStudents = new ArrayList<>();
-            for (UserStudent us : allStudents) {
-                Optional<FirebaseDataMapping> mapping = firebaseDataMappingRepository
-                        .findByNewEntityIdAndFirebaseType(us.getUserStudentId(), "STUDENT");
-                if (mapping.isPresent()) {
-                    firebaseStudents.add(us);
+            // 2. Filter to Firebase-imported students OR all students if forceAll
+            List<UserStudent> targetStudents;
+            if (forceAll) {
+                // Delete ALL students for this institute (handles orphans from failed previous deletes)
+                targetStudents = allStudents;
+            } else {
+                targetStudents = new ArrayList<>();
+                for (UserStudent us : allStudents) {
+                    Optional<FirebaseDataMapping> mapping = firebaseDataMappingRepository
+                            .findByNewEntityIdAndFirebaseType(us.getUserStudentId(), "STUDENT");
+                    if (mapping.isPresent()) {
+                        targetStudents.add(us);
+                    }
                 }
             }
 
-            if (firebaseStudents.isEmpty()) {
-                return ResponseEntity.ok(Map.of("deleted", 0, "message", "No Firebase-imported students found"));
+            if (targetStudents.isEmpty()) {
+                Map<String, Object> resp = new LinkedHashMap<>();
+                resp.put("deleted", 0);
+                resp.put("remainingStudents", allStudents.size());
+                resp.put("message", allStudents.isEmpty()
+                        ? "No students found for this institute"
+                        : "No Firebase-imported students found, but " + allStudents.size() + " students still exist in this institute.");
+                return ResponseEntity.ok(resp);
             }
 
-            int deletedCount = 0;
-            List<Map<String, Object>> errors = new ArrayList<>();
+            // 3. Collect all IDs for bulk operations
+            List<Long> userStudentIds = new ArrayList<>();
+            List<Long> userIds = new ArrayList<>();
+            List<Integer> studentInfoIds = new ArrayList<>();
 
-            for (UserStudent us : firebaseStudents) {
-                Long usId = us.getUserStudentId();
-                try {
-                    // Delete all related data in correct order (children first)
+            for (UserStudent us : targetStudents) {
+                userStudentIds.add(us.getUserStudentId());
+                if (us.getUserId() != null) userIds.add(us.getUserId());
+                if (us.getStudentInfo() != null) studentInfoIds.add(us.getStudentInfo().getId());
+            }
 
-                    // Assessment raw scores (linked via StudentAssessmentMapping)
-                    List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
-                            .findByUserStudentUserStudentId(usId);
-                    for (StudentAssessmentMapping sam : mappings) {
-                        assessmentRawScoreRepository
-                                .deleteByStudentAssessmentMappingStudentAssessmentId(sam.getStudentAssessmentId());
-                    }
+            // 4. Get all StudentAssessmentMapping IDs for these students (needed for raw scores)
+            List<Long> samIds = entityManager.createQuery(
+                    "SELECT sam.studentAssessmentId FROM StudentAssessmentMapping sam WHERE sam.userStudent.userStudentId IN :ids", Long.class)
+                    .setParameter("ids", userStudentIds)
+                    .getResultList();
 
-                    // Assessment answers
-                    assessmentAnswerRepository.deleteByUserStudent_UserStudentId(usId);
+            // 5. Disable FK checks, bulk delete all related tables, re-enable FK checks.
+            //    This handles known tables AND legacy/orphan tables (e.g. generated_report)
+            //    that may have FK constraints to user_student but no JPA entity.
+            entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 0").executeUpdate();
 
-                    // Assessment mappings
-                    studentAssessmentMappingRepository.deleteByUserStudentUserStudentId(usId);
+            try {
+                // Child tables referencing user_student_id
+                entityManager.createNativeQuery("DELETE FROM bet_report_data WHERE user_student_id IN :ids")
+                        .setParameter("ids", userStudentIds).executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM navigator_report_data WHERE user_student_id IN :ids")
+                        .setParameter("ids", userStudentIds).executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM general_assessment_result WHERE user_student_id IN :ids")
+                        .setParameter("ids", userStudentIds).executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM generated_report WHERE user_student_id IN :ids")
+                        .setParameter("ids", userStudentIds).executeUpdate();
 
-                    // Report data
-                    betReportDataRepository.deleteByUserStudentUserStudentId(usId);
-                    navigatorReportDataRepository.deleteByUserStudentUserStudentId(usId);
-                    generalAssessmentResultRepository.deleteByUserStudentId(usId);
-
-                    // Proctoring logs
-                    assessmentProctoringQuestionLogRepository.deleteByUserStudentUserStudentId(usId);
-
-                    // Demographics
-                    studentDemographicResponseRepository.deleteByUserStudentId(usId);
-
-                    // Firebase extra data
-                    firebaseStudentExtraDataRepository.deleteByUserStudentId(usId);
-
-                    // Firebase mapping
-                    Optional<FirebaseDataMapping> fbMapping = firebaseDataMappingRepository
-                            .findByNewEntityIdAndFirebaseType(usId, "STUDENT");
-                    fbMapping.ifPresent(m -> firebaseDataMappingRepository.delete(m));
-
-                    // StudentInfo and User
-                    StudentInfo si = us.getStudentInfo();
-                    Long userId = us.getUserId();
-
-                    // Delete UserStudent
-                    userStudentRepository.delete(us);
-
-                    // Delete StudentInfo
-                    if (si != null) {
-                        studentInfoRepository.deleteById(Long.valueOf(si.getId()));
-                    }
-
-                    // Delete User
-                    if (userId != null) {
-                        userRepository.deleteById(userId);
-                    }
-
-                    deletedCount++;
-                } catch (Exception e) {
-                    errors.add(Map.of("userStudentId", usId, "error", e.getMessage()));
+                // Assessment raw scores (FK to student_assessment_mapping)
+                if (!samIds.isEmpty()) {
+                    entityManager.createNativeQuery("DELETE FROM assessment_raw_score WHERE student_assessment_id IN :ids")
+                            .setParameter("ids", samIds).executeUpdate();
                 }
+
+                entityManager.createNativeQuery("DELETE FROM assessment_answer WHERE user_student_id IN :ids")
+                        .setParameter("ids", userStudentIds).executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM student_assessment_mapping WHERE user_student_id IN :ids")
+                        .setParameter("ids", userStudentIds).executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM assessment_proctoring_question_log WHERE user_student_id IN :ids")
+                        .setParameter("ids", userStudentIds).executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM student_demographic_response WHERE user_student_id IN :ids")
+                        .setParameter("ids", userStudentIds).executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM student_contact_assignment WHERE user_student_id IN :ids")
+                        .setParameter("ids", userStudentIds).executeUpdate();
+                entityManager.createNativeQuery("DELETE FROM firebase_student_extra_data WHERE user_student_id IN :ids")
+                        .setParameter("ids", userStudentIds).executeUpdate();
+
+                // Firebase mapping
+                entityManager.createNativeQuery("DELETE FROM firebase_data_mapping WHERE new_entity_id IN :ids AND firebase_type = 'STUDENT'")
+                        .setParameter("ids", userStudentIds).executeUpdate();
+
+                // Core records
+                entityManager.createNativeQuery("DELETE FROM user_student WHERE user_student_id IN :ids")
+                        .setParameter("ids", userStudentIds).executeUpdate();
+                if (!studentInfoIds.isEmpty()) {
+                    entityManager.createNativeQuery("DELETE FROM student_info WHERE id IN :ids")
+                            .setParameter("ids", studentInfoIds).executeUpdate();
+                }
+                if (!userIds.isEmpty()) {
+                    entityManager.createNativeQuery("DELETE FROM student_user WHERE id IN :ids")
+                            .setParameter("ids", userIds).executeUpdate();
+                }
+            } finally {
+                entityManager.createNativeQuery("SET FOREIGN_KEY_CHECKS = 1").executeUpdate();
             }
 
             Map<String, Object> response = new LinkedHashMap<>();
-            response.put("deleted", deletedCount);
-            response.put("total", firebaseStudents.size());
-            response.put("errors", errors);
+            response.put("deleted", targetStudents.size());
+            response.put("total", targetStudents.size());
+            response.put("errors", new ArrayList<>());
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
@@ -874,6 +906,103 @@ public class FirebaseDataMappingController {
     }
 
     /**
+     * GET /firebase-mapping/detect-unmapped-questions/{assessmentId}
+     *
+     * Compares ALL unique firebase questions (from Firestore) against existing
+     * mappings for the given assessment. Returns questions that exist in Firebase
+     * user data but have no mapping in this assessment.
+     */
+    @GetMapping("/detect-unmapped-questions/{assessmentId}")
+    public ResponseEntity<?> detectUnmappedQuestions(
+            @PathVariable Long assessmentId,
+            @RequestParam(value = "tenant", required = false) String tenant) {
+        try {
+            // 1. Get all existing mappings for this assessment
+            List<FirebaseQuestionMapping> existingMappings =
+                    firebaseQuestionMappingRepository.findByAssessmentId(assessmentId);
+            Set<String> mappedQuestions = new LinkedHashSet<>();
+            for (FirebaseQuestionMapping m : existingMappings) {
+                if (m.getFirebaseQuestion() != null) {
+                    mappedQuestions.add(m.getFirebaseQuestion().trim());
+                }
+            }
+
+            // 2. Fetch all unique firebase questions from Firestore
+            List<Map<String, Object>> users = firebaseService.getAllDocuments("users");
+            if (users.isEmpty()) users = firebaseService.getAllDocuments("Users");
+
+            if (tenant != null && !tenant.trim().isEmpty()) {
+                String tenantLower = tenant.trim().toLowerCase();
+                users.removeIf(user -> {
+                    Object t = user.get("tenant");
+                    return t == null || !t.toString().trim().toLowerCase().equals(tenantLower);
+                });
+            }
+
+            // 3. Collect all firebase questions with category + answer options + student count
+            // Key: category::question
+            Map<String, Map<String, Object>> allFirebaseQuestions = new LinkedHashMap<>();
+
+            for (Map<String, Object> user : users) {
+                processFirebaseResponses(user, "abilityDetailedResponses", "ability", allFirebaseQuestions);
+                processFirebaseResponses(user, "multipleIntelligenceResponses", "multipleintelligence", allFirebaseQuestions);
+                processFirebaseResponses(user, "personalityDetailedResponses", "personality", allFirebaseQuestions);
+            }
+
+            // 4. Filter to unmapped only
+            List<Map<String, Object>> unmapped = new ArrayList<>();
+            for (Map.Entry<String, Map<String, Object>> entry : allFirebaseQuestions.entrySet()) {
+                String question = (String) entry.getValue().get("question");
+                if (!mappedQuestions.contains(question)) {
+                    unmapped.add(entry.getValue());
+                }
+            }
+
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("assessmentId", assessmentId);
+            response.put("totalFirebaseQuestions", allFirebaseQuestions.size());
+            response.put("totalMapped", mappedQuestions.size());
+            response.put("totalUnmapped", unmapped.size());
+            response.put("unmappedQuestions", unmapped);
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to detect unmapped questions: " + e.getMessage()));
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void processFirebaseResponses(Map<String, Object> user, String field, String category,
+            Map<String, Map<String, Object>> allQuestions) {
+        Object obj = user.get(field);
+        if (!(obj instanceof List)) return;
+        List<Map<String, Object>> responses = (List<Map<String, Object>>) obj;
+        for (Map<String, Object> resp : responses) {
+            String qRaw = getString(resp, "question");
+            if (qRaw == null || qRaw.trim().isEmpty()) continue;
+            final String q = qRaw.trim();
+            String key = category + "::" + q;
+            String answer = getString(resp, "selectedOption");
+            if (answer == null) answer = getString(resp, "answer");
+            if (answer == null) answer = getString(resp, "selectedAnswer");
+
+            Map<String, Object> qInfo = allQuestions.computeIfAbsent(key, k -> {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("question", q);
+                m.put("category", category);
+                m.put("answers", new LinkedHashSet<String>());
+                m.put("studentCount", 0);
+                return m;
+            });
+            if (answer != null && !answer.trim().isEmpty()) {
+                ((Set<String>) qInfo.get("answers")).add(answer.trim());
+            }
+            qInfo.put("studentCount", ((int) qInfo.get("studentCount")) + 1);
+        }
+    }
+
+    /**
      * Bulk import students from Firebase data.
      * Creates User + StudentInfo + UserStudent for each student.
      * Saves FirebaseDataMapping with type=STUDENT.
@@ -881,6 +1010,7 @@ public class FirebaseDataMappingController {
      * Request body: { "students": [ { "firebaseDocId", "name", "email", "dob", "gender",
      *   "phone", "instituteCode", "schoolSectionId", "studentClass" } ] }
      */
+    @Transactional // Issue 2: entire import is atomic — partial imports can't leave orphan data
     @PostMapping("/import-students")
     public ResponseEntity<?> importStudents(@RequestBody Map<String, Object> payload) {
         try {
@@ -916,7 +1046,6 @@ public class FirebaseDataMappingController {
                     if (existing.isPresent()) {
                         Long existingUserStudentId = existing.get().getNewEntityId();
                         try {
-                            // Update existing UserStudent's related records
                             Optional<UserStudent> usOpt = userStudentRepository.findById(existingUserStudentId);
                             if (usOpt.isPresent()) {
                                 UserStudent us = usOpt.get();
@@ -956,15 +1085,16 @@ public class FirebaseDataMappingController {
                                     }
                                 }
 
-                                // Create StudentAssessmentMapping if not exists (ongoing until answers are imported)
+                                // Issue 5: Use managed entity reference instead of detached ID-only proxy
                                 Long assessmentId = getLong(student, "assessmentId");
                                 if (assessmentId != null && assessmentId > 0) {
                                     Optional<StudentAssessmentMapping> existingSam = studentAssessmentMappingRepository
                                             .findFirstByUserStudentUserStudentIdAndAssessmentId(
                                                     us.getUserStudentId(), assessmentId);
                                     if (!existingSam.isPresent()) {
-                                        StudentAssessmentMapping sam = new StudentAssessmentMapping(
-                                                (long) us.getUserStudentId(), assessmentId);
+                                        StudentAssessmentMapping sam = new StudentAssessmentMapping();
+                                        sam.setUserStudent(us);
+                                        sam.setAssessmentId(assessmentId);
                                         sam.setStatus("ongoing");
                                         studentAssessmentMappingRepository.save(sam);
                                     }
@@ -985,7 +1115,6 @@ public class FirebaseDataMappingController {
                             // Fall through to create new if update fails
                         }
 
-                        // If UserStudent not found, still return the mapping
                         resultMap.put("status", "updated");
                         resultMap.put("reason", "Mapping exists");
                         resultMap.put("userStudentId", existingUserStudentId);
@@ -1012,6 +1141,9 @@ public class FirebaseDataMappingController {
                     skipped++;
                     continue;
                 }
+
+                // Issue 4: Create User -> StudentInfo -> UserStudent atomically
+                // (all within the same @Transactional — if any fails, all roll back)
 
                 // 1. Create User
                 User user = new User();
@@ -1046,30 +1178,30 @@ public class FirebaseDataMappingController {
                 UserStudent userStudent = new UserStudent(user, studentInfo, instituteOpt.get());
                 userStudent = userStudentRepository.save(userStudent);
 
-                // 4. Create StudentAssessmentMapping if assessmentId provided (ongoing until answers are imported)
+                // Issue 5: Use the managed UserStudent entity directly
                 Long assessmentId = getLong(student, "assessmentId");
                 if (assessmentId != null && assessmentId > 0) {
                     Optional<StudentAssessmentMapping> existingSam = studentAssessmentMappingRepository
                             .findFirstByUserStudentUserStudentIdAndAssessmentId(
                                     userStudent.getUserStudentId(), assessmentId);
                     if (!existingSam.isPresent()) {
-                        StudentAssessmentMapping sam = new StudentAssessmentMapping(
-                                (long) userStudent.getUserStudentId(), assessmentId);
+                        StudentAssessmentMapping sam = new StudentAssessmentMapping();
+                        sam.setUserStudent(userStudent);
+                        sam.setAssessmentId(assessmentId);
                         sam.setStatus("ongoing");
                         studentAssessmentMappingRepository.save(sam);
                     }
                 }
 
-                // 5. Save firebase mapping
-                if (firebaseDocId != null) {
-                    FirebaseDataMapping mapping = new FirebaseDataMapping();
-                    mapping.setFirebaseId(firebaseDocId);
-                    mapping.setFirebaseName(name);
-                    mapping.setFirebaseType("STUDENT");
-                    mapping.setNewEntityId(userStudent.getUserStudentId());
-                    mapping.setNewEntityName(name);
-                    firebaseDataMappingRepository.save(mapping);
-                }
+                // Issue 1: ALWAYS create FirebaseDataMapping — use userStudentId as fallback ID
+                // so the delete method can always find and clean up these students
+                FirebaseDataMapping mapping = new FirebaseDataMapping();
+                mapping.setFirebaseId(firebaseDocId != null ? firebaseDocId : "auto_" + userStudent.getUserStudentId());
+                mapping.setFirebaseName(name);
+                mapping.setFirebaseType("STUDENT");
+                mapping.setNewEntityId(userStudent.getUserStudentId());
+                mapping.setNewEntityName(name);
+                firebaseDataMappingRepository.save(mapping);
 
                 resultMap.put("status", "created");
                 resultMap.put("userId", user.getId());
@@ -1123,13 +1255,17 @@ public class FirebaseDataMappingController {
 
                 if (userStudentId == null || assessmentId == null) continue;
 
-                // Find or create StudentAssessmentMapping
+                // Find or create StudentAssessmentMapping (use managed entity, not detached ID proxy)
                 Optional<StudentAssessmentMapping> mappingOpt = studentAssessmentMappingRepository
                     .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
                 StudentAssessmentMapping mapping;
 
                 if (!mappingOpt.isPresent()) {
-                    mapping = new StudentAssessmentMapping(userStudentId, assessmentId);
+                    Optional<UserStudent> usOpt = userStudentRepository.findById(userStudentId);
+                    if (!usOpt.isPresent()) continue;
+                    mapping = new StudentAssessmentMapping();
+                    mapping.setUserStudent(usOpt.get());
+                    mapping.setAssessmentId(assessmentId);
                     mapping.setStatus("completed");
                     mapping = studentAssessmentMappingRepository.save(mapping);
                     totalMappings++;

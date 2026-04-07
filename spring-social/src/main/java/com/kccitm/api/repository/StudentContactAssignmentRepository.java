@@ -15,4 +15,6 @@ public interface StudentContactAssignmentRepository extends JpaRepository<Studen
     List<StudentContactAssignment> findByUserStudentId(Long userStudentId);
 
     void deleteByUserStudentIdInAndContactPersonId(List<Long> userStudentIds, Long contactPersonId);
+
+    void deleteByUserStudentId(Long userStudentId);
 }

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import StudentImportWizard from "./StudentImportWizard";
 import ExistingMappingView from "./ExistingMappingView";
 import FirebaseMappingOverview from "./FirebaseMappingOverview";
+import UnmappedQuestionsTool from "./UnmappedQuestionsTool";
 import { deleteFirebaseStudents } from "./API/OldDataMapping_APIs";
 import { ReadCollegeList } from "../College/API/College_APIs";
 
@@ -13,6 +14,8 @@ const DeleteFirebaseStudentsPanel = ({ onBack }: { onBack: () => void }) => {
   const [loadingInstitutes, setLoadingInstitutes] = useState(true);
   const [result, setResult] = useState<any>(null);
   const [confirmText, setConfirmText] = useState("");
+  const [showOrphanPrompt, setShowOrphanPrompt] = useState(false);
+  const [orphanCount, setOrphanCount] = useState(0);
 
   useEffect(() => {
     ReadCollegeList()
@@ -23,18 +26,45 @@ const DeleteFirebaseStudentsPanel = ({ onBack }: { onBack: () => void }) => {
 
   const selectedName = institutes.find((i) => i.instituteCode === selectedInstitute)?.instituteName || "";
 
+  // Step 1: Delete firebase-tagged students only
   const handleDelete = async () => {
     if (!selectedInstitute || confirmText !== "DELETE") return;
     setLoading(true);
     setResult(null);
+    setShowOrphanPrompt(false);
     try {
-      const res = await deleteFirebaseStudents(Number(selectedInstitute));
-      setResult(res.data);
+      const res = await deleteFirebaseStudents(Number(selectedInstitute), false);
+      const data = res.data;
+
+      if (data.deleted === 0 && (data.remainingStudents > 0 || (data.message && data.message.includes("still exist")))) {
+        // No firebase students found, but orphans exist — prompt user
+        setOrphanCount(data.remainingStudents || 0);
+        setShowOrphanPrompt(true);
+      } else if (data.deleted > 0) {
+        setResult(data);
+      } else {
+        setResult({ deleted: 0, message: data.message || "No students found for this institute." });
+      }
     } catch (err: any) {
       setResult({ error: err?.response?.data?.error || err.message });
     } finally {
       setLoading(false);
       setConfirmText("");
+    }
+  };
+
+  // Step 2: Force delete all remaining (orphan) students
+  const handleForceDeleteOrphans = async () => {
+    setLoading(true);
+    setShowOrphanPrompt(false);
+    setResult(null);
+    try {
+      const res = await deleteFirebaseStudents(Number(selectedInstitute), true);
+      setResult(res.data);
+    } catch (err: any) {
+      setResult({ error: err?.response?.data?.error || err.message });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -68,7 +98,11 @@ const DeleteFirebaseStudentsPanel = ({ onBack }: { onBack: () => void }) => {
                   <select
                     className="form-select form-select-solid"
                     value={selectedInstitute}
-                    onChange={(e) => { setSelectedInstitute(e.target.value === "" ? "" : Number(e.target.value)); setResult(null); }}
+                    onChange={(e) => {
+                      setSelectedInstitute(e.target.value === "" ? "" : Number(e.target.value));
+                      setResult(null);
+                      setShowOrphanPrompt(false);
+                    }}
                   >
                     <option value="">-- Select an institute --</option>
                     {institutes.map((inst) => (
@@ -80,7 +114,7 @@ const DeleteFirebaseStudentsPanel = ({ onBack }: { onBack: () => void }) => {
                 )}
               </div>
 
-              {selectedInstitute !== "" && (
+              {selectedInstitute !== "" && !showOrphanPrompt && (
                 <div className="mb-4">
                   <label className="form-label fw-bold">
                     Type <span className="text-danger">DELETE</span> to confirm deletion for <strong>{selectedName}</strong>
@@ -94,18 +128,59 @@ const DeleteFirebaseStudentsPanel = ({ onBack }: { onBack: () => void }) => {
                 </div>
               )}
 
-              <button
-                className="btn btn-danger"
-                disabled={!selectedInstitute || confirmText !== "DELETE" || loading}
-                onClick={handleDelete}
-              >
-                {loading ? (
-                  <><span className="spinner-border spinner-border-sm me-2"></span>Deleting...</>
-                ) : (
-                  <><i className="bi bi-trash me-2"></i>Delete All Firebase Students</>
-                )}
-              </button>
+              {!showOrphanPrompt && (
+                <button
+                  className="btn btn-danger"
+                  disabled={!selectedInstitute || confirmText !== "DELETE" || loading}
+                  onClick={handleDelete}
+                >
+                  {loading ? (
+                    <><span className="spinner-border spinner-border-sm me-2"></span>Deleting...</>
+                  ) : (
+                    <><i className="bi bi-trash me-2"></i>Delete All Firebase Students</>
+                  )}
+                </button>
+              )}
 
+              {/* Orphan students prompt */}
+              {showOrphanPrompt && (
+                <div className="alert alert-warning mt-4">
+                  <div className="d-flex align-items-start gap-3">
+                    <i className="bi bi-exclamation-triangle-fill fs-3 text-warning mt-1"></i>
+                    <div style={{ flex: 1 }}>
+                      <h6 className="fw-bold mb-2">No Firebase-tagged students found</h6>
+                      <p className="mb-3">
+                        There are <strong>{orphanCount} students</strong> still in <strong>{selectedName}</strong> that
+                        don't have Firebase mapping records (likely orphans from a previous failed delete).
+                      </p>
+                      <p className="mb-3 text-muted" style={{ fontSize: "0.85rem" }}>
+                        Do you want to delete all remaining students for this institute?
+                      </p>
+                      <div className="d-flex gap-3">
+                        <button
+                          className="btn btn-danger btn-sm"
+                          disabled={loading}
+                          onClick={handleForceDeleteOrphans}
+                        >
+                          {loading ? (
+                            <><span className="spinner-border spinner-border-sm me-2"></span>Deleting...</>
+                          ) : (
+                            <><i className="bi bi-trash me-1"></i>Yes, Delete All {orphanCount} Students</>
+                          )}
+                        </button>
+                        <button
+                          className="btn btn-light btn-sm"
+                          onClick={() => setShowOrphanPrompt(false)}
+                        >
+                          No, Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Result display */}
               {result && (
                 <div className={`alert mt-4 ${result.error ? "alert-danger" : "alert-success"}`}>
                   {result.error ? (
@@ -113,7 +188,7 @@ const DeleteFirebaseStudentsPanel = ({ onBack }: { onBack: () => void }) => {
                   ) : (
                     <>
                       <i className="bi bi-check-circle me-2"></i>
-                      Deleted <strong>{result.deleted}</strong> of {result.total} Firebase students.
+                      Deleted <strong>{result.deleted}</strong> of {result.total} students.
                       {result.errors?.length > 0 && (
                         <div className="mt-2">
                           <strong>{result.errors.length} errors:</strong>
@@ -137,7 +212,7 @@ const DeleteFirebaseStudentsPanel = ({ onBack }: { onBack: () => void }) => {
 };
 
 const OldDataMappingPage = () => {
-  const [mode, setMode] = useState<"select" | "student-import" | "existing-mapping" | "mapping-overview" | "delete-firebase">("select");
+  const [mode, setMode] = useState<"select" | "student-import" | "existing-mapping" | "mapping-overview" | "unmapped-tool" | "delete-firebase">("select");
 
   if (mode === "student-import") {
     return <StudentImportWizard onBack={() => setMode("select")} />;
@@ -149,6 +224,10 @@ const OldDataMappingPage = () => {
 
   if (mode === "mapping-overview") {
     return <FirebaseMappingOverview onBack={() => setMode("select")} />;
+  }
+
+  if (mode === "unmapped-tool") {
+    return <UnmappedQuestionsTool onBack={() => setMode("select")} />;
   }
 
   if (mode === "delete-firebase") {
@@ -234,6 +313,29 @@ const OldDataMappingPage = () => {
                     by questionnaire. Download as Excel.
                   </p>
                   <button className="btn btn-info mt-auto">View Report</button>
+                </div>
+              </div>
+            </div>
+
+            {/* Detect Unmapped Questions */}
+            <div className="col-12 col-md-3">
+              <div
+                className="card card-hover border border-warning border-2 h-100"
+                style={{ cursor: "pointer" }}
+                onClick={() => setMode("unmapped-tool")}
+              >
+                <div className="card-body p-6 d-flex flex-column align-items-center text-center">
+                  <div className="symbol symbol-60px mb-4 bg-light-warning rounded">
+                    <span className="symbol-label">
+                      <i className="bi bi-search fs-2x text-warning"></i>
+                    </span>
+                  </div>
+                  <h4 className="fw-bold text-dark mb-2">Detect Unmapped</h4>
+                  <p className="text-muted fs-7">
+                    Find Firebase questions not yet mapped in an assessment
+                    and map them to system questions.
+                  </p>
+                  <button className="btn btn-warning mt-auto">Detect & Map</button>
                 </div>
               </div>
             </div>
