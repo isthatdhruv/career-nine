@@ -2032,16 +2032,15 @@ export default function GroupStudentPage() {
                 </div>
               ) : (
                 <div className="table-responsive">
-                  <table className="table align-middle mb-0" style={{ tableLayout: "auto", width: "100%" }}>
+                  <table className="table align-middle mb-0" style={{ width: "100%", tableLayout: "auto", fontSize: "0.85rem" }}>
                     <thead>
                       <tr style={{ background: "#f8f9fa" }}>
                         <th
                           style={{
-                            padding: "10px 10px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
-                            fontSize: "0.82rem",
                             whiteSpace: "nowrap",
                           }}
                         >
@@ -2049,11 +2048,10 @@ export default function GroupStudentPage() {
                         </th>
                         <th
                           style={{
-                            padding: "10px 10px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
-                            fontSize: "0.82rem",
                             whiteSpace: "nowrap",
                           }}
                         >
@@ -2061,11 +2059,10 @@ export default function GroupStudentPage() {
                         </th>
                         <th
                           style={{
-                            padding: "10px 10px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
-                            fontSize: "0.82rem",
                             whiteSpace: "nowrap",
                           }}
                         >
@@ -2073,11 +2070,10 @@ export default function GroupStudentPage() {
                         </th>
                         <th
                           style={{
-                            padding: "10px 10px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
-                            fontSize: "0.82rem",
                             whiteSpace: "nowrap",
                           }}
                         >
@@ -2085,11 +2081,10 @@ export default function GroupStudentPage() {
                         </th>
                         <th
                           style={{
-                            padding: "10px 10px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
-                            fontSize: "0.82rem",
                             whiteSpace: "nowrap",
                           }}
                         >
@@ -2097,11 +2092,10 @@ export default function GroupStudentPage() {
                         </th>
                         <th
                           style={{
-                            padding: "10px 10px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
-                            fontSize: "0.82rem",
                             whiteSpace: "nowrap",
                           }}
                         >
@@ -2109,11 +2103,10 @@ export default function GroupStudentPage() {
                         </th>
                         <th
                           style={{
-                            padding: "10px 10px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
-                            fontSize: "0.82rem",
                             whiteSpace: "nowrap",
                           }}
                         >
@@ -2121,11 +2114,10 @@ export default function GroupStudentPage() {
                         </th>
                         <th
                           style={{
-                            padding: "10px 10px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
-                            fontSize: "0.82rem",
                             whiteSpace: "nowrap",
                           }}
                         >
@@ -2133,11 +2125,10 @@ export default function GroupStudentPage() {
                         </th>
                         <th
                           style={{
-                            padding: "10px 10px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
-                            fontSize: "0.82rem",
                             whiteSpace: "nowrap",
                           }}
                         >
@@ -2145,11 +2136,10 @@ export default function GroupStudentPage() {
                         </th>
                         <th
                           style={{
-                            padding: "10px 10px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
-                            fontSize: "0.82rem",
                             whiteSpace: "nowrap",
                           }}
                         >
@@ -2168,7 +2158,7 @@ export default function GroupStudentPage() {
                         >
                           <td
                             style={{
-                              padding: "8px 10px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                               fontSize: "0.85rem",
                             }}
@@ -2178,10 +2168,10 @@ export default function GroupStudentPage() {
                               style={{
                                 background: "rgba(67, 97, 238, 0.1)",
                                 color: "#4361ee",
-                                padding: "3px 8px",
+                                padding: "4px 8px",
                                 borderRadius: "6px",
                                 fontWeight: 600,
-                                fontSize: "0.78rem",
+                                fontSize: "0.8rem",
                               }}
                             >
                               #{student.userStudentId}
@@ -2189,7 +2179,7 @@ export default function GroupStudentPage() {
                           </td>
                           <td
                             style={{
-                              padding: "8px 10px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                               fontSize: "0.85rem",
                             }}
@@ -2203,7 +2193,7 @@ export default function GroupStudentPage() {
                           </td>
                           <td
                             style={{
-                              padding: "8px 10px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                               fontSize: "0.85rem",
                             }}
@@ -2214,7 +2204,7 @@ export default function GroupStudentPage() {
                           </td>
                           <td
                             style={{
-                              padding: "8px 10px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                               fontSize: "0.85rem",
                             }}
@@ -2225,7 +2215,7 @@ export default function GroupStudentPage() {
                           </td>
                           <td
                             style={{
-                              padding: "8px 10px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                               fontSize: "0.85rem",
                             }}
@@ -2239,7 +2229,7 @@ export default function GroupStudentPage() {
                           </td>
                           <td
                             style={{
-                              padding: "8px 10px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                               fontSize: "0.85rem",
                             }}
@@ -2265,7 +2255,7 @@ export default function GroupStudentPage() {
                           </td>
                           <td
                             style={{
-                              padding: "8px 10px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                               fontSize: "0.85rem",
                             }}
@@ -2291,7 +2281,7 @@ export default function GroupStudentPage() {
                           </td>
                           <td
                             style={{
-                              padding: "8px 10px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                               fontSize: "0.85rem",
                             }}
@@ -2317,7 +2307,7 @@ export default function GroupStudentPage() {
                           </td>
                           <td
                             style={{
-                              padding: "8px 10px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                               fontSize: "0.85rem",
                             }}
@@ -2332,10 +2322,10 @@ export default function GroupStudentPage() {
                               }
                               style={{
                                 width: "100%",
-                                minWidth: "140px",
+                                minWidth: "150px",
                                 padding: "6px 8px",
-                                borderRadius: "6px",
-                                border: "1.5px solid #e0e0e0",
+                                borderRadius: "8px",
+                                border: "2px solid #e0e0e0",
                                 background: student.selectedAssessment
                                   ? "rgba(67, 97, 238, 0.05)"
                                   : "#fff",
@@ -2370,7 +2360,7 @@ export default function GroupStudentPage() {
                           </td>
                           <td
                             style={{
-                              padding: "8px 10px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                               fontSize: "0.85rem",
                             }}
@@ -2387,6 +2377,7 @@ export default function GroupStudentPage() {
                                 fontWeight: 600,
                                 fontSize: "0.78rem",
                                 transition: "all 0.2s",
+                                boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
                                 whiteSpace: "nowrap",
                               }}
                             >

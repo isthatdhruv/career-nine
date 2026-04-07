@@ -53,12 +53,18 @@ export function AsideMenuMain() {
   const showQualities =
     allowed("/measured-qualities") || allowed("/measured-quality-types");
 
-  const showRegistration = allowed("/user-registrations");
-
   const showAssessment =
     allowed("/assessments") || allowed("/assessment-sections") ||
     allowed("/assessment-questions") || allowed("/question-sections") ||
-    allowed("/text-response-mapping") || allowed("/live-tracking");
+    allowed("/text-response-mapping");
+
+  const showAssessmentManagement = showQuestionnaire || showQualities || showAssessment;
+
+  const showRegistration = allowed("/user-registrations");
+
+  const showDataUpload =
+    allowed("/offline-assessment-upload") || allowed("/omr-data-upload") ||
+    allowed("/live-tracking");
 
   const showReports = allowed("/reports") || allowed("/report-generation") || allowed("/send-reports");
 
@@ -176,108 +182,6 @@ export function AsideMenuMain() {
         </>
       )}
 
-      {showQuestionnaire && (
-        <>
-          <div className="menu-item">
-            <div className="menu-content pt-8 pb-2">
-              <span className="menu-section text-muted text-uppercase fs-8 ls-1">
-                QUESTIONNAIRE
-              </span>
-            </div>
-          </div>
-
-          <AsideMenuItemWithSub
-            to=""
-            title="Questionnaire Management"
-            fontIcon="bi-app-indicator"
-            icon="/media/icons/duotune/communication/com006.svg"
-          >
-            {allowed("/questionare/create") && (
-              <AsideMenuItem
-                to="/questionare/create"
-                icon="/media/icons/duotune/general/gen044.svg"
-                title="Create Questionnaire"
-                fontIcon="bi-app-indicator"
-              />
-            )}
-            {allowed("/questionaire/List") && (
-              <AsideMenuItem
-                to="/questionaire/List"
-                icon="/media/icons/duotune/general/gen044.svg"
-                title="Questionare List"
-                fontIcon="bi-app-indicator"
-              />
-            )}
-            {allowed("/tools") && (
-              <AsideMenuItem
-                to="/tools"
-                icon="/media/icons/duotune/general/gen044.svg"
-                title="Tools"
-                fontIcon="bi-app-indicator"
-              />
-            )}
-            {allowed("/game-list") && (
-              <AsideMenuItem
-                to="/game-list"
-                icon="/media/icons/duotune/general/gen044.svg"
-                title="Game List"
-                fontIcon="bi-app-indicator"
-              />
-            )}
-          </AsideMenuItemWithSub>
-        </>
-      )}
-
-      {showQualities && (
-        <>
-          <div className="menu-item">
-            <div className="menu-content pt-8 pb-2">
-              <span className="menu-section text-muted text-uppercase fs-8 ls-1">
-                QUALITIES
-              </span>
-            </div>
-          </div>
-
-          <AsideMenuItemWithSub
-            to=""
-            title="Qualities"
-            fontIcon="bi-app-indicator"
-            icon="/media/icons/duotune/communication/com006.svg"
-          >
-            {allowed("/measured-qualities") && (
-              <AsideMenuItem
-                to="/measured-qualities"
-                icon="/media/icons/duotune/general/gen044.svg"
-                title="Measured Qualities"
-                fontIcon="bi-app-indicator"
-              />
-            )}
-            {allowed("/measured-quality-types") && (
-              <AsideMenuItem
-                to="/measured-quality-types"
-                icon="/media/icons/duotune/general/gen044.svg"
-                title="Measured Quality Types"
-                fontIcon="bi-app-indicator"
-              />
-            )}
-          </AsideMenuItemWithSub>
-        </>
-      )}
-
-      {/* <AsideMenuItem
-        to="/list"
-        icon="/media/icons/duotune/general/gen044.svg"
-        title="List"
-        fontIcon="bi-app-indicator"
-      /> */}
-
-      {/* <AsideMenuItem
-        to="/section"
-        icon="/media/icons/duotune/finance/fin001.svg"
-        title="Section"
-        fontIcon="bi-app-indicator"
-      /> */}
-
       {showRegistration && (
         <>
           <div className="menu-item">
@@ -305,60 +209,150 @@ export function AsideMenuMain() {
         </>
       )}
 
-      {showAssessment && (
+      {showAssessmentManagement && (
         <>
           <div className="menu-item">
             <div className="menu-content pt-8 pb-2">
               <span className="menu-section text-muted text-uppercase fs-8 ls-1">
-                Assessment Section
+                Assessment Management
+              </span>
+            </div>
+          </div>
+
+          {showQuestionnaire && (
+            <AsideMenuItemWithSub
+              to=""
+              title="Questionnaire Management"
+              fontIcon="bi-app-indicator"
+              icon="/media/icons/duotune/communication/com006.svg"
+            >
+              {allowed("/questionare/create") && (
+                <AsideMenuItem
+                  to="/questionare/create"
+                  icon="/media/icons/duotune/general/gen044.svg"
+                  title="Create Questionnaire"
+                  fontIcon="bi-app-indicator"
+                />
+              )}
+              {allowed("/questionaire/List") && (
+                <AsideMenuItem
+                  to="/questionaire/List"
+                  icon="/media/icons/duotune/general/gen044.svg"
+                  title="Questionare List"
+                  fontIcon="bi-app-indicator"
+                />
+              )}
+              {allowed("/tools") && (
+                <AsideMenuItem
+                  to="/tools"
+                  icon="/media/icons/duotune/general/gen044.svg"
+                  title="Tools"
+                  fontIcon="bi-app-indicator"
+                />
+              )}
+              {allowed("/game-list") && (
+                <AsideMenuItem
+                  to="/game-list"
+                  icon="/media/icons/duotune/general/gen044.svg"
+                  title="Game List"
+                  fontIcon="bi-app-indicator"
+                />
+              )}
+            </AsideMenuItemWithSub>
+          )}
+
+          {showQualities && (
+            <AsideMenuItemWithSub
+              to=""
+              title="Qualities"
+              fontIcon="bi-app-indicator"
+              icon="/media/icons/duotune/communication/com006.svg"
+            >
+              {allowed("/measured-qualities") && (
+                <AsideMenuItem
+                  to="/measured-qualities"
+                  icon="/media/icons/duotune/general/gen044.svg"
+                  title="Measured Qualities"
+                  fontIcon="bi-app-indicator"
+                />
+              )}
+              {allowed("/measured-quality-types") && (
+                <AsideMenuItem
+                  to="/measured-quality-types"
+                  icon="/media/icons/duotune/general/gen044.svg"
+                  title="Measured Quality Types"
+                  fontIcon="bi-app-indicator"
+                />
+              )}
+            </AsideMenuItemWithSub>
+          )}
+
+          {showAssessment && (
+            <AsideMenuItemWithSub
+              to=""
+              title="Assessment Section"
+              fontIcon="bi-app-indicator"
+              icon="/media/icons/duotune/communication/com006.svg"
+            >
+              {allowed("/assessments") && (
+                <AsideMenuItem
+                  to="/assessments"
+                  icon="/media/icons/duotune/general/gen044.svg"
+                  title="Assessments"
+                  fontIcon="bi-app-indicator"
+                />
+              )}
+              {allowed("/assessment-questions") && (
+                <AsideMenuItem
+                  to="/assessment-questions"
+                  icon="/media/icons/duotune/general/gen044.svg"
+                  title="Assessment Questions"
+                  fontIcon="bi-app-indicator"
+                />
+              )}
+              {allowed("/question-sections") && (
+                <AsideMenuItem
+                  to="/question-sections"
+                  icon="/media/icons/duotune/general/gen044.svg"
+                  title="Assessment Sections"
+                  fontIcon="bi-app-indicator"
+                />
+              )}
+              <AsideMenuItem
+                to="/demographic-fields"
+                icon="/media/icons/duotune/general/gen019.svg"
+                title="Demographic Fields"
+                fontIcon="bi-app-indicator"
+              />
+              {allowed("/text-response-mapping") && (
+                <AsideMenuItem
+                  to="/text-response-mapping"
+                  icon="/media/icons/duotune/general/gen005.svg"
+                  title="Text Response Mapping"
+                  fontIcon="bi-card-text"
+                />
+              )}
+            </AsideMenuItemWithSub>
+          )}
+        </>
+      )}
+
+      {showDataUpload && (
+        <>
+          <div className="menu-item">
+            <div className="menu-content pt-8 pb-2">
+              <span className="menu-section text-muted text-uppercase fs-8 ls-1">
+                Data Upload & Tracking
               </span>
             </div>
           </div>
 
           <AsideMenuItemWithSub
             to=""
-            title="Assessment Section"
-            fontIcon="bi-app-indicator"
-            icon="/media/icons/duotune/communication/com006.svg"
+            title="Upload & Tracking"
+            fontIcon="bi-cloud-upload"
+            icon="/media/icons/duotune/files/fil003.svg"
           >
-            {allowed("/assessments") && (
-              <AsideMenuItem
-                to="/assessments"
-                icon="/media/icons/duotune/general/gen044.svg"
-                title="Assessments"
-                fontIcon="bi-app-indicator"
-              />
-            )}
-            {/* {allowed("/assessment-sections") && (
-              <AsideMenuItem
-                to="/assessment-sections"
-                title="Assessment Section List"
-                icon="/media/icons/duotune/general/gen044.svg"
-                fontIcon="bi-app-indicator"
-              />
-            )} */}
-            {allowed("/assessment-questions") && (
-              <AsideMenuItem
-                to="/assessment-questions"
-                icon="/media/icons/duotune/general/gen044.svg"
-                title="Assessment Questions"
-                fontIcon="bi-app-indicator"
-              />
-            )}
-            {allowed("/question-sections") && (
-              <AsideMenuItem
-                to="/question-sections"
-                icon="/media/icons/duotune/general/gen044.svg"
-                title="Assessment Sections"
-                fontIcon="bi-app-indicator"
-              />
-            )}
-            <AsideMenuItem
-              to="/demographic-fields"
-              icon="/media/icons/duotune/general/gen019.svg"
-              title="Demographic Fields"
-              fontIcon="bi-app-indicator"
-            />
             {allowed("/offline-assessment-upload") && (
               <AsideMenuItem
                 to="/offline-assessment-upload"
@@ -373,14 +367,6 @@ export function AsideMenuMain() {
                 icon="/media/icons/duotune/general/gen044.svg"
                 title="OMR Data Upload"
                 fontIcon="bi-upc-scan"
-              />
-            )}
-            {allowed("/text-response-mapping") && (
-              <AsideMenuItem
-                to="/text-response-mapping"
-                icon="/media/icons/duotune/general/gen005.svg"
-                title="Text Response Mapping"
-                fontIcon="bi-card-text"
               />
             )}
             {allowed("/live-tracking") && (
