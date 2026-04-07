@@ -132,14 +132,6 @@ export function AsideMenuMain() {
                 fontIcon="bi-app-indicator"
               />
             )}
-            {allowed("/admin/group-student") && (
-              <AsideMenuItem
-                to="/admin/group-student"
-                icon="/media/icons/duotune/general/gen044.svg"
-                title="Group Student Information Admin"
-                fontIcon="bi-app-indicator"
-              />
-            )}
             {showSchoolGroupStudent && allowed("/school/group-student") && (
               <AsideMenuItem
                 to={`/school/group-student?instituteId=${schoolGroupStudentInstituteId}`}
