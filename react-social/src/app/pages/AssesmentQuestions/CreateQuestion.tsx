@@ -1,8 +1,4 @@
 import { useEffect, useState } from "react";
-import { Button } from "react-bootstrap";
-import { IconContext } from "react-icons";
-import { MdQuestionAnswer } from "react-icons/md";
-import { FaRecycle } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { ReadQuestionSectionData } from "../QuestionSections/API/Question_Section_APIs";
 import { ReadQuestionsDataList } from "./API/Question_APIs";
@@ -12,11 +8,10 @@ import QuestionRecycleBinModal from "./components/QuestionRecycleBinModal";
 const AssessmentQuestionsPage = () => {
   const [questionsData, setQuestionsData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [sections, setSections] = useState<any[]>([]); 
+  const [sections, setSections] = useState<any[]>([]);
   const [pageLoading, setPageLoading] = useState(["false"]);
   const [showRecycleBinModal, setShowRecycleBinModal] = useState(false);
   const navigate = useNavigate();
-
 
   const fetchQuestions = async () => {
     setLoading(true);
@@ -31,88 +26,146 @@ const AssessmentQuestionsPage = () => {
   };
 
   useEffect(() => {
-      const fetchSections = async () => {
-        setLoading(true);
-        try {
-          const response = await ReadQuestionSectionData();
-          setSections(response.data);
-        } catch (error) {
-          console.error("Error fetching sections:", error);
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchSections();
-    }, []);
+    const fetchSections = async () => {
+      setLoading(true);
+      try {
+        const response = await ReadQuestionSectionData();
+        setSections(response.data);
+      } catch (error) {
+        console.error("Error fetching sections:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSections();
+  }, []);
 
   useEffect(() => {
     fetchQuestions();
-    
     if (pageLoading[0] === "true") {
       setPageLoading(["false"]);
     }
-  }, [pageLoading[0]]); 
-
+  }, [pageLoading[0]]);
 
   return (
-    <div className="card">
-      {loading && (
-        <span className="indicator-progress m-5" style={{ display: "block" }}>
-          Please wait...{" "}
-          <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
-        </span>
-      )}
-
-      {!loading && (
-        <div className="card-header border-0 pt-6">
-          <div className="card-title">
-            <h1>Assessment Questions</h1>
-          </div>
-
-          <div className="card-toolbar">
-            <div className="d-flex justify-content-end gap-2">
-              <Button
-                variant="outline-warning"
-                className="d-flex align-items-center"
-                onClick={() => navigate("/assessment-questions/duplicates")}
-              >
-                Find Duplicates
-              </Button>
-              <Button
-                variant="outline-danger"
-                className="d-flex align-items-center"
-                onClick={() => setShowRecycleBinModal(true)}
-              >
-                <FaRecycle size={18} className="me-2" />
-                Recycle Bin
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => {
-                  navigate("/assessment-questions/create");
+    <div
+      className="min-vh-100"
+      style={{
+        background: "linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%)",
+        padding: "1rem 1.25rem",
+      }}
+    >
+      {/* Header Card */}
+      <div
+        className="card border-0 shadow-sm mb-3"
+        style={{ borderRadius: "12px" }}
+      >
+        <div className="card-body p-3">
+          <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div className="d-flex align-items-center gap-3">
+              <div
+                style={{
+                  width: "42px",
+                  height: "42px",
+                  borderRadius: "10px",
+                  background: "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
                 }}
               >
-                <IconContext.Provider
-                  value={{ style: { paddingBottom: "4px" } }}
-                >
-                  <div>
-                    Add Question <MdQuestionAnswer size={21} />
-                  </div>
-                </IconContext.Provider>
-              </Button>
+                <i className="bi bi-question-circle-fill text-white" style={{ fontSize: "1.2rem" }}></i>
+              </div>
+              <div>
+                <h5 className="mb-0 fw-bold" style={{ color: "#1a1a2e" }}>
+                  Assessment Questions
+                </h5>
+                <p className="text-muted mb-0" style={{ fontSize: "0.82rem" }}>
+                  {loading ? "Loading..." : `${questionsData.length} questions · ${sections.length} sections`}
+                </p>
+              </div>
             </div>
+
+            <div className="d-flex gap-2 flex-wrap">
+              <button
+                className="btn btn-sm d-flex align-items-center gap-1"
+                onClick={() => navigate("/assessment-questions/duplicates")}
+                style={{
+                  background: "rgba(245, 158, 11, 0.1)",
+                  color: "#d97706",
+                  border: "1px solid rgba(245, 158, 11, 0.2)",
+                  borderRadius: "8px",
+                  padding: "6px 12px",
+                  fontWeight: 600,
+                  fontSize: "0.82rem",
+                }}
+              >
+                <i className="bi bi-files"></i>
+                Find Duplicates
+              </button>
+              <button
+                className="btn btn-sm d-flex align-items-center gap-1"
+                onClick={() => setShowRecycleBinModal(true)}
+                style={{
+                  background: "rgba(220, 38, 38, 0.1)",
+                  color: "#dc2626",
+                  border: "1px solid rgba(220, 38, 38, 0.2)",
+                  borderRadius: "8px",
+                  padding: "6px 12px",
+                  fontWeight: 600,
+                  fontSize: "0.82rem",
+                }}
+              >
+                <i className="bi bi-recycle"></i>
+                Recycle Bin
+              </button>
+              <button
+                className="btn btn-sm d-flex align-items-center gap-1"
+                onClick={() => navigate("/assessment-questions/create")}
+                style={{
+                  background: "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "8px",
+                  padding: "6px 14px",
+                  fontWeight: 600,
+                  fontSize: "0.82rem",
+                }}
+              >
+                <i className="bi bi-plus-lg"></i>
+                Add Question
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Loading State */}
+      {loading && (
+        <div className="card border-0 shadow-sm" style={{ borderRadius: "12px" }}>
+          <div className="card-body text-center py-5">
+            <div className="spinner-border text-primary" role="status">
+              <span className="visually-hidden">Loading...</span>
+            </div>
+            <p className="mt-3 text-muted">Loading questions...</p>
           </div>
         </div>
       )}
 
+      {/* Table Card */}
       {!loading && (
-        <div className="card-body pt-5">
-          <QuestionTable
-            data={questionsData}
-            sections={sections}
-            // setLoading={true}
-            setPageLoading={setPageLoading}
-          />
+        <div
+          className="card border-0 shadow-sm"
+          style={{ borderRadius: "12px", overflow: "hidden" }}
+        >
+          <div className="card-body p-3">
+            <QuestionTable
+              data={questionsData}
+              sections={sections}
+              setPageLoading={setPageLoading}
+            />
+          </div>
         </div>
       )}
 
