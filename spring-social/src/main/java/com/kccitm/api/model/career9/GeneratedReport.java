@@ -62,6 +62,9 @@ public class GeneratedReport implements Serializable {
     @Column(name = "report_url", length = 1024)
     private String reportUrl;
 
+    @Column(name = "visible_to_student", nullable = false, columnDefinition = "boolean default false")
+    private Boolean visibleToStudent = false;
+
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "created_at", updatable = false)
     private Date createdAt;
@@ -146,5 +149,13 @@ public class GeneratedReport implements Serializable {
 
     public void setUpdatedAt(Date updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Boolean getVisibleToStudent() {
+        return visibleToStudent;
+    }
+
+    public void setVisibleToStudent(Boolean visibleToStudent) {
+        this.visibleToStudent = visibleToStudent;
     }
 }

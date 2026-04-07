@@ -27,6 +27,8 @@ public interface GeneratedReportRepository extends JpaRepository<GeneratedReport
     void deleteByUserStudentUserStudentIdAndAssessmentIdAndTypeOfReport(
             Long userStudentId, Long assessmentId, String typeOfReport);
 
+    List<GeneratedReport> findByUserStudentUserStudentIdAndVisibleToStudent(Long userStudentId, Boolean visibleToStudent);
+
     void deleteByUserStudentUserStudentId(Long userStudentId);
 
     void deleteByAssessmentIdAndTypeOfReport(Long assessmentId, String typeOfReport);

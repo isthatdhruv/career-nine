@@ -10,6 +10,7 @@ export interface GeneratedReport {
   typeOfReport: string; // "bet" | "navigator"
   reportStatus: string; // "notGenerated" | "generated" | "failed"
   reportUrl: string | null;
+  visibleToStudent: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -54,6 +55,18 @@ export function getGeneratedReportByStudentAssessmentType(
   return axios.get<GeneratedReport>(
     `${BASE}/by-student/${userStudentId}/assessment/${assessmentId}/type/${typeOfReport}`
   );
+}
+
+// ═══════════════════════ STUDENT-FACING (visibility-filtered) ═══════════════════════
+
+export function getVisibleReportsForStudent(userStudentId: number) {
+  return axios.get<GeneratedReport[]>(`${BASE}/student/${userStudentId}`);
+}
+
+// ═══════════════════════ ADMIN: TOGGLE VISIBILITY ═══════════════════════
+
+export function toggleReportVisibility(ids: number[], visible: boolean) {
+  return axios.put<{ updated: number }>(`${BASE}/toggle-visibility`, { ids, visible });
 }
 
 // ═══════════════════════ CREATE / UPDATE ═══════════════════════
