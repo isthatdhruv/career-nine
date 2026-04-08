@@ -14,17 +14,20 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.AuthProvider;
@@ -32,39 +35,36 @@ import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.AssessmentQuestionOptions;
 import com.kccitm.api.model.career9.AssessmentRawScore;
 import com.kccitm.api.model.career9.AssessmentTable;
-import com.kccitm.api.model.career9.Questionaire.AssessmentAnswer;
-import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
-import com.kccitm.api.model.career9.Questionaire.QuestionnaireSection;
-import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.model.career9.MeasuredQualities;
 import com.kccitm.api.model.career9.MeasuredQualityTypes;
 import com.kccitm.api.model.career9.OptionScoreBasedOnMEasuredQualityTypes;
+import com.kccitm.api.model.career9.Questionaire.AssessmentAnswer;
+import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
+import com.kccitm.api.model.career9.Questionaire.QuestionnaireSection;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.school.FirebaseDataMapping;
+import com.kccitm.api.model.career9.school.FirebaseQuestionMapping;
 import com.kccitm.api.model.career9.school.FirebaseStudentExtraData;
 import com.kccitm.api.model.career9.school.InstituteDetail;
 import com.kccitm.api.repository.AssessmentRawScoreRepository;
 import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
-import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.AssessmentQuestionOptionsRepository;
-import com.kccitm.api.repository.InstituteDetailRepository;
-import com.kccitm.api.repository.StudentAssessmentMappingRepository;
-import com.kccitm.api.repository.UserRepository;
+import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.MeasuredQualityTypesRepository;
 import com.kccitm.api.repository.Career9.OptionScoreBasedOnMeasuredQualityTypesRepository;
-import com.kccitm.api.repository.Career9.StudentInfoRepository;
-import com.kccitm.api.repository.Career9.UserStudentRepository;
+import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.Career9.School.FirebaseDataMappingRepository;
 import com.kccitm.api.repository.Career9.School.FirebaseQuestionMappingRepository;
 import com.kccitm.api.repository.Career9.School.FirebaseStudentExtraDataRepository;
-import com.kccitm.api.model.career9.school.FirebaseQuestionMapping;
+import com.kccitm.api.repository.Career9.StudentInfoRepository;
+import com.kccitm.api.repository.Career9.UserStudentRepository;
+import com.kccitm.api.repository.InstituteDetailRepository;
+import com.kccitm.api.repository.StudentAssessmentMappingRepository;
+import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.service.FirebaseService;
 import com.kccitm.api.service.FirebaseStudentDeletionService;
-
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
 
 @RestController
 @RequestMapping("/firebase-mapping")
@@ -138,6 +138,9 @@ public class FirebaseDataMappingController {
 
     @Autowired
     private com.kccitm.api.repository.StudentContactAssignmentRepository studentContactAssignmentRepository;
+
+    @Autowired
+    private FirebaseStudentDeletionService firebaseStudentDeletionService;
 
     @GetMapping("/getAll")
     public List<FirebaseDataMapping> getAll() {
