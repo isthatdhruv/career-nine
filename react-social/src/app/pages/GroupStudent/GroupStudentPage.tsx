@@ -1060,14 +1060,19 @@ export default function GroupStudentPage() {
   const handleProctoringDownloadClick = async () => {
     setProctoringDownloading(true);
     try {
-      // Build pairs from filtered students
+      // Build pairs from filtered students — include ALL assessments (active or not)
       const hasAssessmentFilterApplied = appliedEnabled.has("assessment") && appliedAssessmentIds.size > 0;
       const pairs: { userStudentId: number; assessmentId: number }[] = [];
       for (const student of filteredStudents) {
+        if (!student.userStudentId) continue;
         const studentAssessments = (student.assessments || []).filter(
-          (a: any) => hasAssessmentFilterApplied
-            ? appliedAssessmentIds.has(Number(a.assessmentId))
-            : activeAssessmentIds.has(Number(a.assessmentId))
+          (a: any) => {
+            const aid = Number(a.assessmentId);
+            if (isNaN(aid) || aid <= 0) return false;
+            return hasAssessmentFilterApplied
+              ? appliedAssessmentIds.has(aid)
+              : true; // include all assessments when no filter is applied
+          }
         );
         const seen = new Set<number>();
         for (const a of studentAssessments) {
@@ -1080,12 +1085,18 @@ export default function GroupStudentPage() {
       }
 
       if (pairs.length === 0) {
-        showErrorToast("No student-assessment pairs to export.");
+        showErrorToast("No student-assessment pairs to export. Make sure students have assessments assigned.");
         return;
       }
 
       // Single backend call — generates Excel server-side
       const response = await exportProctoringExcel(pairs);
+
+      // Verify we got actual data back
+      if (!response.data || (response.data instanceof Blob && response.data.size === 0)) {
+        showErrorToast("No proctoring data found for the selected students.");
+        return;
+      }
 
       // Download the blob as .xlsx file
       const instituteName = getSelectedInstituteName().replace(/\s+/g, "_");
@@ -1102,6 +1113,8 @@ export default function GroupStudentPage() {
       a.remove();
       URL.revokeObjectURL(url);
 
+      showSuccessToast("Proctoring data downloaded successfully!");
+
     } catch (error: any) {
       console.error("Error downloading proctoring Excel:", error);
       let msg = error?.message || String(error);
@@ -1111,6 +1124,8 @@ export default function GroupStudentPage() {
           const parsed = JSON.parse(text);
           if (parsed.error) msg = parsed.error;
         } catch (_) {}
+      } else if (error?.response?.data?.message) {
+        msg = error.response.data.message;
       }
       showErrorToast(`Failed to download proctoring data: ${msg}`);
     } finally {
@@ -1216,7 +1231,7 @@ export default function GroupStudentPage() {
       className="min-vh-100"
       style={{
         background: "linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%)",
-        padding: "2rem",
+        padding: "1rem 1.25rem",
       }}
     >
       <style>{`
@@ -1250,8 +1265,8 @@ export default function GroupStudentPage() {
         }
 
         .institute-dropdown-container {
-          max-width: 350px;
-          margin-bottom: 1.5rem;
+          max-width: 320px;
+          margin-bottom: 1rem;
         }
       `}</style>
 
@@ -1292,19 +1307,19 @@ export default function GroupStudentPage() {
         <>
           {/* Header Card */}
           <div
-            className="card border-0 shadow-sm mb-4"
-            style={{ borderRadius: "16px" }}
+            className="card border-0 shadow-sm mb-3"
+            style={{ borderRadius: "12px" }}
           >
-            <div className="card-body p-4">
-              <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
+            <div className="card-body p-3">
+              <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div>
-                  <h2 className="mb-1 fw-bold" style={{ color: "#1a1a2e" }}>
+                  <h5 className="mb-1 fw-bold" style={{ color: "#1a1a2e" }}>
                     <i
                       className="bi bi-people-fill me-2"
                       style={{ color: "#4361ee" }}
                     ></i>
                     Students List
-                  </h2>
+                  </h5>
                   <p className="text-muted mb-0">
                     View all students enrolled in {getSelectedInstituteName()}
                   </p>
@@ -1314,7 +1329,7 @@ export default function GroupStudentPage() {
           </div>
 
           {/* Filter Icon + Active Filter Tags */}
-          <div className="d-flex align-items-center gap-3 flex-wrap mb-4">
+          <div className="d-flex align-items-center gap-2 flex-wrap mb-3">
             <button
               className="btn btn-sm d-flex align-items-center gap-2"
               onClick={() => {
@@ -1436,7 +1451,7 @@ export default function GroupStudentPage() {
           {/* Filter Panel (toggleable) */}
           {showFilterPanel && (
             <div
-              className="card border-0 shadow-sm mb-4"
+              className="card border-0 shadow-sm mb-3"
               style={{ borderRadius: "16px", border: "2px solid rgba(67, 97, 238, 0.2)" }}
             >
               <div
@@ -1846,11 +1861,11 @@ export default function GroupStudentPage() {
 
           {/* Search Bar */}
           <div
-            className="card border-0 shadow-sm mb-4"
-            style={{ borderRadius: "16px" }}
+            className="card border-0 shadow-sm mb-3"
+            style={{ borderRadius: "12px" }}
           >
-            <div className="card-body p-4">
-              <div className="d-flex align-items-center gap-3 flex-wrap">
+            <div className="card-body p-3">
+              <div className="d-flex align-items-center gap-2 flex-wrap">
                 <div
                   className="position-relative flex-grow-1"
                   style={{ maxWidth: "400px" }}
@@ -1902,7 +1917,7 @@ export default function GroupStudentPage() {
                     </span>
                   )}
                   <button
-                    className="btn btn-success d-flex align-items-center gap-2"
+                    className="btn btn-sm d-flex align-items-center gap-1"
                     onClick={handleDownloadStudentList}
                     disabled={filteredStudents.length === 0}
                     style={{
@@ -1910,22 +1925,20 @@ export default function GroupStudentPage() {
                         ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
                         : "#e0e0e0",
                       border: "none",
-                      borderRadius: "10px",
-                      padding: "0.6rem 1.2rem",
+                      borderRadius: "8px",
+                      padding: "0.45rem 0.8rem",
                       fontWeight: 600,
+                      fontSize: "0.82rem",
                       color: filteredStudents.length > 0 ? "#fff" : "#9e9e9e",
                       cursor: filteredStudents.length > 0 ? "pointer" : "not-allowed",
                       transition: "all 0.3s ease",
-                      boxShadow: filteredStudents.length > 0
-                        ? "0 4px 15px rgba(16, 185, 129, 0.3)"
-                        : "none",
                     }}
                   >
                     <i className="bi bi-download"></i>
-                    Download List
+                    Student List
                   </button>
                   <button
-                    className="btn d-flex align-items-center gap-2"
+                    className="btn btn-sm d-flex align-items-center gap-1"
                     onClick={handleBulkDownloadClick}
                     disabled={filteredStudents.length === 0}
                     style={{
@@ -1933,22 +1946,20 @@ export default function GroupStudentPage() {
                         ? "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)"
                         : "#e0e0e0",
                       border: "none",
-                      borderRadius: "10px",
-                      padding: "0.6rem 1.2rem",
+                      borderRadius: "8px",
+                      padding: "0.45rem 0.8rem",
                       fontWeight: 600,
+                      fontSize: "0.82rem",
                       color: filteredStudents.length > 0 ? "#fff" : "#9e9e9e",
                       cursor: filteredStudents.length > 0 ? "pointer" : "not-allowed",
                       transition: "all 0.3s ease",
-                      boxShadow: filteredStudents.length > 0
-                        ? "0 4px 15px rgba(67, 97, 238, 0.3)"
-                        : "none",
                     }}
                   >
                     <i className="bi bi-file-earmark-spreadsheet"></i>
                     Download All Answers
                   </button>
                   <button
-                    className="btn d-flex align-items-center gap-2"
+                    className="btn btn-sm d-flex align-items-center gap-1"
                     onClick={handleProctoringDownloadClick}
                     disabled={filteredStudents.length === 0 || proctoringDownloading}
                     style={{
@@ -1956,15 +1967,13 @@ export default function GroupStudentPage() {
                         ? "linear-gradient(135deg, #e63946 0%, #a4133c 100%)"
                         : "#e0e0e0",
                       border: "none",
-                      borderRadius: "10px",
-                      padding: "0.6rem 1.2rem",
+                      borderRadius: "8px",
+                      padding: "0.45rem 0.8rem",
                       fontWeight: 600,
+                      fontSize: "0.82rem",
                       color: filteredStudents.length > 0 && !proctoringDownloading ? "#fff" : "#9e9e9e",
                       cursor: filteredStudents.length > 0 && !proctoringDownloading ? "pointer" : "not-allowed",
                       transition: "all 0.3s ease",
-                      boxShadow: filteredStudents.length > 0 && !proctoringDownloading
-                        ? "0 4px 15px rgba(230, 57, 70, 0.3)"
-                        : "none",
                     }}
                   >
                     {proctoringDownloading ? (
@@ -1975,7 +1984,7 @@ export default function GroupStudentPage() {
                     ) : (
                       <>
                         <i className="bi bi-shield-exclamation"></i>
-                        Download All Data
+                        Download Proctored Data
                       </>
                     )}
                   </button>
@@ -1987,7 +1996,7 @@ export default function GroupStudentPage() {
           {/* Table Card */}
           <div
             className="card border-0 shadow-sm"
-            style={{ borderRadius: "16px", overflow: "hidden" }}
+            style={{ borderRadius: "12px", overflow: "hidden" }}
           >
             <div className="card-body p-0">
               {loading ? (
@@ -2151,6 +2160,7 @@ export default function GroupStudentPage() {
                             style={{
                               padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
+                              fontSize: "0.85rem",
                             }}
                           >
                             <span
@@ -2171,6 +2181,7 @@ export default function GroupStudentPage() {
                             style={{
                               padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
+                              fontSize: "0.85rem",
                             }}
                           >
                             <span
@@ -2184,6 +2195,7 @@ export default function GroupStudentPage() {
                             style={{
                               padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
+                              fontSize: "0.85rem",
                             }}
                           >
                             <span style={{ fontWeight: 500, color: "#555" }}>
@@ -2194,6 +2206,7 @@ export default function GroupStudentPage() {
                             style={{
                               padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
+                              fontSize: "0.85rem",
                             }}
                           >
                             <span style={{ fontWeight: 500, color: "#555" }}>
@@ -2204,6 +2217,7 @@ export default function GroupStudentPage() {
                             style={{
                               padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
+                              fontSize: "0.85rem",
                             }}
                           >
                             <span
@@ -2217,6 +2231,7 @@ export default function GroupStudentPage() {
                             style={{
                               padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
+                              fontSize: "0.85rem",
                             }}
                           >
                             <button
@@ -2242,6 +2257,7 @@ export default function GroupStudentPage() {
                             style={{
                               padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
+                              fontSize: "0.85rem",
                             }}
                           >
                             {student.phoneNumber ? (
@@ -2267,6 +2283,7 @@ export default function GroupStudentPage() {
                             style={{
                               padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
+                              fontSize: "0.85rem",
                             }}
                           >
                             {student.studentDob ? (
@@ -2292,6 +2309,7 @@ export default function GroupStudentPage() {
                             style={{
                               padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
+                              fontSize: "0.85rem",
                             }}
                           >
                             <select
@@ -2344,6 +2362,7 @@ export default function GroupStudentPage() {
                             style={{
                               padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
+                              fontSize: "0.85rem",
                             }}
                           >
                             <button
@@ -2538,10 +2557,10 @@ export default function GroupStudentPage() {
           <div
             style={{
               backgroundColor: "white",
-              borderRadius: "20px",
-              maxWidth: "600px",
-              width: "90%",
-              maxHeight: "80vh",
+              borderRadius: "16px",
+              maxWidth: "860px",
+              width: "94%",
+              maxHeight: "85vh",
               overflow: "hidden",
               boxShadow: "0 25px 50px rgba(0, 0, 0, 0.15)",
             }}
@@ -2552,45 +2571,58 @@ export default function GroupStudentPage() {
               style={{
                 background:
                   "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
-                padding: "1rem 1.25rem",
+                padding: "1rem 1.5rem",
                 display: "flex",
                 justifyContent: "space-between",
-                alignItems: "flex-start",
+                alignItems: "center",
               }}
             >
-              <div>
-                <h5
-                  className="mb-0 text-white fw-bold"
-                  style={{ fontSize: "1.1rem" }}
+              <div className="d-flex align-items-center gap-3">
+                <div
+                  style={{
+                    width: "40px",
+                    height: "40px",
+                    borderRadius: "10px",
+                    background: "rgba(255,255,255,0.2)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
                 >
-                  <i className="bi bi-journal-bookmark me-2"></i>
-                  Assigned Assessments
-                </h5>
-                <p
-                  className="mb-0 text-white mt-1"
-                  style={{ fontSize: "0.85rem", opacity: 0.9 }}
-                >
-                  {modalStudent.name}
-                </p>
+                  <i className="bi bi-journal-bookmark text-white" style={{ fontSize: "1.2rem" }}></i>
+                </div>
+                <div>
+                  <h5
+                    className="mb-0 text-white fw-bold"
+                    style={{ fontSize: "1.05rem" }}
+                  >
+                    Assigned Assessments
+                  </h5>
+                  <p
+                    className="mb-0 text-white"
+                    style={{ fontSize: "0.82rem", opacity: 0.85 }}
+                  >
+                    {modalStudent.name} &middot; ID #{modalStudent.userStudentId}
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 className="btn-close btn-close-white"
                 onClick={() => setShowAssessmentModal(false)}
-                style={{ marginTop: "2px" }}
               ></button>
             </div>
 
             {/* Modal Body */}
             <div
               style={{
-                padding: "1rem",
-                maxHeight: "60vh",
+                padding: "1rem 1.5rem",
+                maxHeight: "65vh",
                 overflowY: "auto",
               }}
             >
               {studentAssessments.length === 0 ? (
-                <div className="text-center py-4">
+                <div className="text-center py-5">
                   <i
                     className="bi bi-inbox text-muted"
                     style={{ fontSize: "2.5rem", opacity: 0.5 }}
@@ -2600,37 +2632,84 @@ export default function GroupStudentPage() {
                   </p>
                 </div>
               ) : (
-                <div className="d-flex flex-column gap-2">
-                  {studentAssessments.map((assessment) => (
+                <div className="d-flex flex-column gap-3">
+                  {studentAssessments.map((assessment) => {
+                    const isCompleted = assessment.status === "completed";
+                    const reportKey = `${modalStudent.userStudentId}-${assessment.assessmentId}`;
+                    const hasReport = generatedReportUrls.has(reportKey);
+                    const isGenerating = reportGeneratingFor === assessment.assessmentId;
+
+                    return (
                     <div
                       key={assessment.assessmentId}
-                      className="d-flex align-items-center justify-content-between p-3"
                       style={{
                         backgroundColor: "#f8fafc",
                         borderRadius: "12px",
                         border: "1px solid #e2e8f0",
+                        overflow: "hidden",
                       }}
                     >
-                      <div style={{ flex: 1 }}>
-                        <h6
-                          className="mb-1 fw-semibold"
-                          style={{ color: "#1a1a2e", fontSize: "0.95rem" }}
-                        >
-                          {assessment.assessmentName}
-                        </h6>
-                        <div className="d-flex align-items-center gap-2">
-                          {getStatusBadge(assessment.status)}
-                          <span
-                            className="text-muted"
-                            style={{ fontSize: "0.75rem" }}
-                          >
-                            ID: {assessment.assessmentId}
-                          </span>
+                      {/* Assessment info row */}
+                      <div
+                        className="d-flex align-items-center justify-content-between"
+                        style={{ padding: "12px 16px" }}
+                      >
+                        <div className="d-flex align-items-center gap-3" style={{ flex: 1 }}>
+                          <div>
+                            <h6
+                              className="mb-0 fw-semibold"
+                              style={{ color: "#1a1a2e", fontSize: "0.92rem" }}
+                            >
+                              {assessment.assessmentName}
+                            </h6>
+                            <span
+                              className="text-muted"
+                              style={{ fontSize: "0.72rem" }}
+                            >
+                              Assessment ID: {assessment.assessmentId}
+                            </span>
+                          </div>
                         </div>
+                        {getStatusBadge(assessment.status)}
                       </div>
-                      <div className="d-flex gap-2 flex-wrap">
+
+                      {/* Actions row */}
+                      <div
+                        style={{
+                          padding: "10px 16px",
+                          borderTop: "1px solid #e9ecef",
+                          background: "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        {/* Data actions group */}
+                        <span style={{ fontSize: "0.7rem", color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", marginRight: "2px" }}>Data</span>
                         <button
-                          className="btn btn-outline-info btn-sm d-flex align-items-center gap-1"
+                          className="btn btn-sm d-flex align-items-center gap-1"
+                          onClick={() =>
+                            handleDownloadClick(
+                              modalStudent,
+                              assessment.assessmentId
+                            )
+                          }
+                          style={{
+                            borderRadius: "6px",
+                            padding: "5px 10px",
+                            fontWeight: 500,
+                            fontSize: "0.78rem",
+                            background: "rgba(67, 97, 238, 0.1)",
+                            color: "#4361ee",
+                            border: "1px solid rgba(67, 97, 238, 0.2)",
+                          }}
+                        >
+                          <i className="bi bi-download"></i>
+                          Answers
+                        </button>
+                        <button
+                          className="btn btn-sm d-flex align-items-center gap-1"
                           onClick={() =>
                             handleViewDemographics(
                               modalStudent,
@@ -2639,37 +2718,20 @@ export default function GroupStudentPage() {
                             )
                           }
                           style={{
-                            borderRadius: "8px",
-                            padding: "6px 12px",
+                            borderRadius: "6px",
+                            padding: "5px 10px",
                             fontWeight: 500,
-                            fontSize: "0.8rem",
-                            transition: "all 0.2s",
+                            fontSize: "0.78rem",
+                            background: "rgba(8, 145, 178, 0.1)",
+                            color: "#0891b2",
+                            border: "1px solid rgba(8, 145, 178, 0.2)",
                           }}
                         >
                           <i className="bi bi-person-lines-fill"></i>
                           Demographics
                         </button>
                         <button
-                          className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1"
-                          onClick={() =>
-                            handleDownloadClick(
-                              modalStudent,
-                              assessment.assessmentId
-                            )
-                          }
-                          style={{
-                            borderRadius: "8px",
-                            padding: "6px 12px",
-                            fontWeight: 500,
-                            fontSize: "0.8rem",
-                            transition: "all 0.2s",
-                          }}
-                        >
-                          <i className="bi bi-download"></i>
-                          Download
-                        </button>
-                        <button
-                          className="btn btn-outline-warning btn-sm d-flex align-items-center gap-1"
+                          className="btn btn-sm d-flex align-items-center gap-1"
                           onClick={() =>
                             handleResetClick(
                               modalStudent,
@@ -2684,153 +2746,174 @@ export default function GroupStudentPage() {
                               : "Reset this assessment"
                           }
                           style={{
-                            borderRadius: "8px",
-                            padding: "6px 12px",
+                            borderRadius: "6px",
+                            padding: "5px 10px",
                             fontWeight: 500,
-                            fontSize: "0.8rem",
-                            transition: "all 0.2s",
+                            fontSize: "0.78rem",
+                            background: assessment.status === "notstarted" ? "#f1f5f9" : "rgba(245, 158, 11, 0.1)",
+                            color: assessment.status === "notstarted" ? "#94a3b8" : "#d97706",
+                            border: `1px solid ${assessment.status === "notstarted" ? "#e2e8f0" : "rgba(245, 158, 11, 0.2)"}`,
                           }}
                         >
                           <i className="bi bi-arrow-counterclockwise"></i>
                           Reset
                         </button>
-                        {assessment.status === "completed" && (
+
+                        {/* Report actions group — only for completed */}
+                        {isCompleted && (
                           <>
-                          {generatedReportUrls.has(`${modalStudent.userStudentId}-${assessment.assessmentId}`) ? (
-                          <button
-                            className="btn btn-success btn-sm d-flex align-items-center gap-1"
-                            onClick={() => {
-                              const url = generatedReportUrls.get(`${modalStudent.userStudentId}-${assessment.assessmentId}`);
-                              if (url) window.open(url, "_blank");
-                            }}
-                            style={{
-                              borderRadius: "8px",
-                              padding: "6px 12px",
-                              fontWeight: 500,
-                              fontSize: "0.8rem",
-                              transition: "all 0.2s",
-                            }}
-                          >
-                            <i className="bi bi-eye"></i>
-                            Show Report
-                          </button>
-                          ) : (
-                          <button
-                            className="btn btn-outline-success btn-sm d-flex align-items-center gap-1"
-                            disabled={reportGeneratingFor === assessment.assessmentId}
-                            onClick={async () => {
-                              if (!modalStudent) return;
-                              setReportGeneratingFor(assessment.assessmentId);
-                              try {
-                                const fullAssessment = assessments.find((a: any) => a.id === assessment.assessmentId) as any;
-                                const isBet = fullAssessment?.questionnaire?.type === true
-                                  || (fullAssessment?.questionnaire?.type == null && (assessment.assessmentName || '').toUpperCase().includes('BET'));
+                            <div style={{ width: "100%", height: 0 }}></div>
+                            <span style={{ fontSize: "0.7rem", color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", marginRight: "2px" }}>Report</span>
 
-                                const res = isBet
-                                  ? await generateBetReportOneClick(assessment.assessmentId, modalStudent.userStudentId)
-                                  : await generateNavigatorReportOneClick(assessment.assessmentId, modalStudent.userStudentId);
+                            {hasReport ? (
+                              <button
+                                className="btn btn-sm d-flex align-items-center gap-1"
+                                onClick={() => {
+                                  const url = generatedReportUrls.get(reportKey);
+                                  if (url) window.open(url, "_blank");
+                                }}
+                                style={{
+                                  borderRadius: "6px",
+                                  padding: "5px 10px",
+                                  fontWeight: 600,
+                                  fontSize: "0.78rem",
+                                  background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                                  color: "#fff",
+                                  border: "none",
+                                }}
+                              >
+                                <i className="bi bi-eye"></i>
+                                View Report
+                              </button>
+                            ) : (
+                              <button
+                                className="btn btn-sm d-flex align-items-center gap-1"
+                                disabled={isGenerating}
+                                onClick={async () => {
+                                  if (!modalStudent) return;
+                                  setReportGeneratingFor(assessment.assessmentId);
+                                  try {
+                                    const fullAssessment = assessments.find((a: any) => a.id === assessment.assessmentId) as any;
+                                    const isBet = fullAssessment?.questionnaire?.type === true
+                                      || (fullAssessment?.questionnaire?.type == null && (assessment.assessmentName || '').toUpperCase().includes('BET'));
 
-                                const reportUrl = res.data.reportUrl;
-                                if (reportUrl) {
-                                  setGeneratedReportUrls(prev => new Map(prev).set(`${modalStudent.userStudentId}-${assessment.assessmentId}`, reportUrl));
+                                    const res = isBet
+                                      ? await generateBetReportOneClick(assessment.assessmentId, modalStudent.userStudentId)
+                                      : await generateNavigatorReportOneClick(assessment.assessmentId, modalStudent.userStudentId);
+
+                                    const reportUrl = res.data.reportUrl;
+                                    if (reportUrl) {
+                                      setGeneratedReportUrls(prev => new Map(prev).set(reportKey, reportUrl));
+                                    }
+                                  } catch (err: any) {
+                                    showErrorToast("Report generation failed: " + (err?.response?.data?.error || err.message));
+                                  } finally {
+                                    setReportGeneratingFor(null);
+                                  }
+                                }}
+                                style={{
+                                  borderRadius: "6px",
+                                  padding: "5px 10px",
+                                  fontWeight: 500,
+                                  fontSize: "0.78rem",
+                                  background: isGenerating ? "#f1f5f9" : "rgba(16, 185, 129, 0.1)",
+                                  color: isGenerating ? "#94a3b8" : "#059669",
+                                  border: `1px solid ${isGenerating ? "#e2e8f0" : "rgba(16, 185, 129, 0.2)"}`,
+                                }}
+                              >
+                                <i className={isGenerating ? "bi bi-hourglass-split" : "bi bi-file-earmark-arrow-down"}></i>
+                                {isGenerating ? "Generating..." : "Generate"}
+                              </button>
+                            )}
+
+                            <button
+                              className="btn btn-sm d-flex align-items-center gap-1"
+                              disabled={isGenerating}
+                              title="Force regenerate report from latest data"
+                              onClick={async () => {
+                                if (!modalStudent) return;
+                                setReportGeneratingFor(assessment.assessmentId);
+                                try {
+                                  const fullAssessment = assessments.find((a: any) => a.id === assessment.assessmentId) as any;
+                                  const isBet = fullAssessment?.questionnaire?.type === true
+                                    || (fullAssessment?.questionnaire?.type == null && (assessment.assessmentName || '').toUpperCase().includes('BET'));
+
+                                  const res = isBet
+                                    ? await generateBetReportOneClick(assessment.assessmentId, modalStudent.userStudentId, true)
+                                    : await generateNavigatorReportOneClick(assessment.assessmentId, modalStudent.userStudentId, true);
+
+                                  const reportUrl = res.data.reportUrl;
+                                  if (reportUrl) {
+                                    setGeneratedReportUrls(prev => new Map(prev).set(reportKey, reportUrl));
+                                  }
+                                } catch (err: any) {
+                                  showErrorToast("Report generation failed: " + (err?.response?.data?.error || err.message));
+                                } finally {
+                                  setReportGeneratingFor(null);
                                 }
-                              } catch (err: any) {
-                                showErrorToast("Report generation failed: " + (err?.response?.data?.error || err.message));
-                              } finally {
-                                setReportGeneratingFor(null);
-                              }
-                            }}
-                            style={{
-                              borderRadius: "8px",
-                              padding: "6px 12px",
-                              fontWeight: 500,
-                              fontSize: "0.8rem",
-                              transition: "all 0.2s",
-                            }}
-                          >
-                            <i className={reportGeneratingFor === assessment.assessmentId ? "bi bi-hourglass-split" : "bi bi-file-earmark-arrow-down"}></i>
-                            {reportGeneratingFor === assessment.assessmentId ? "Generating..." : "Report"}
-                          </button>
-                          )}
-                          <button
-                            className="btn btn-outline-warning btn-sm d-flex align-items-center gap-1"
-                            disabled={reportGeneratingFor === assessment.assessmentId}
-                            title="Force regenerate report from latest data"
-                            onClick={async () => {
-                              if (!modalStudent) return;
-                              setReportGeneratingFor(assessment.assessmentId);
-                              try {
-                                const fullAssessment = assessments.find((a: any) => a.id === assessment.assessmentId) as any;
-                                const isBet = fullAssessment?.questionnaire?.type === true
-                                  || (fullAssessment?.questionnaire?.type == null && (assessment.assessmentName || '').toUpperCase().includes('BET'));
+                              }}
+                              style={{
+                                borderRadius: "6px",
+                                padding: "5px 10px",
+                                fontWeight: 500,
+                                fontSize: "0.78rem",
+                                background: isGenerating ? "#f1f5f9" : "rgba(245, 158, 11, 0.1)",
+                                color: isGenerating ? "#94a3b8" : "#d97706",
+                                border: `1px solid ${isGenerating ? "#e2e8f0" : "rgba(245, 158, 11, 0.2)"}`,
+                              }}
+                            >
+                              <i className="bi bi-arrow-clockwise"></i>
+                              Regenerate
+                            </button>
 
-                                const res = isBet
-                                  ? await generateBetReportOneClick(assessment.assessmentId, modalStudent.userStudentId, true)
-                                  : await generateNavigatorReportOneClick(assessment.assessmentId, modalStudent.userStudentId, true);
+                            {hasReport && (
+                              <>
+                              <div style={{ width: "100%", height: 0 }}></div>
+                              <span style={{ fontSize: "0.7rem", color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", marginRight: "2px" }}>Share</span>
+                              <button
+                                className="btn btn-sm d-flex align-items-center gap-1"
+                                title="Send report via email"
+                                onClick={async () => {
+                                  if (!modalStudent) return;
+                                  setEmailModalStudent(modalStudent);
+                                  setEmailAssessmentName(assessment.assessmentName);
+                                  setEmailReportUrl(generatedReportUrls.get(reportKey) || null);
+                                  setSelectedEmails(new Set());
+                                  setExtraEmails([]);
+                                  setExtraEmailInput("");
+                                  setShowEmailModal(true);
+                                  setEmailRecipientsLoading(true);
 
-                                const reportUrl = res.data.reportUrl;
-                                if (reportUrl) {
-                                  setGeneratedReportUrls(prev => new Map(prev).set(`${modalStudent.userStudentId}-${assessment.assessmentId}`, reportUrl));
-                                }
-                              } catch (err: any) {
-                                showErrorToast("Report generation failed: " + (err?.response?.data?.error || err.message));
-                              } finally {
-                                setReportGeneratingFor(null);
-                              }
-                            }}
-                            style={{
-                              borderRadius: "8px",
-                              padding: "6px 12px",
-                              fontWeight: 500,
-                              fontSize: "0.8rem",
-                              transition: "all 0.2s",
-                            }}
-                          >
-                            <i className="bi bi-arrow-clockwise"></i>
-                            {reportGeneratingFor === assessment.assessmentId ? "" : "Regenerate"}
-                          </button>
-                          {generatedReportUrls.has(`${modalStudent.userStudentId}-${assessment.assessmentId}`) && (
-                          <button
-                            className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1"
-                            title="Send report via email"
-                            onClick={async () => {
-                              if (!modalStudent) return;
-                              setEmailModalStudent(modalStudent);
-                              setEmailAssessmentName(assessment.assessmentName);
-                              setEmailReportUrl(generatedReportUrls.get(`${modalStudent.userStudentId}-${assessment.assessmentId}`) || null);
-                              setSelectedEmails(new Set());
-                              setExtraEmails([]);
-                              setExtraEmailInput("");
-                              setShowEmailModal(true);
-                              setEmailRecipientsLoading(true);
-
-                              // Fetch email recipients
-                              try {
-                                const res = await getEmailRecipientsForStudent(modalStudent.userStudentId);
-                                setEmailRecipients(res.data || []);
-                              } catch {
-                                setEmailRecipients([]);
-                              } finally {
-                                setEmailRecipientsLoading(false);
-                              }
-                            }}
-                            style={{
-                              borderRadius: "8px",
-                              padding: "6px 12px",
-                              fontWeight: 500,
-                              fontSize: "0.8rem",
-                              transition: "all 0.2s",
-                            }}
-                          >
-                            <i className="bi bi-envelope"></i>
-                            Send Email
-                          </button>
-                          )}
+                                  try {
+                                    const res = await getEmailRecipientsForStudent(modalStudent.userStudentId);
+                                    setEmailRecipients(res.data || []);
+                                  } catch {
+                                    setEmailRecipients([]);
+                                  } finally {
+                                    setEmailRecipientsLoading(false);
+                                  }
+                                }}
+                                style={{
+                                  borderRadius: "6px",
+                                  padding: "5px 10px",
+                                  fontWeight: 500,
+                                  fontSize: "0.78rem",
+                                  background: "rgba(100, 116, 139, 0.1)",
+                                  color: "#475569",
+                                  border: "1px solid rgba(100, 116, 139, 0.2)",
+                                }}
+                              >
+                                <i className="bi bi-envelope"></i>
+                                Email
+                              </button>
+                              </>
+                            )}
                           </>
                         )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -2838,14 +2921,15 @@ export default function GroupStudentPage() {
             {/* Modal Footer */}
             <div
               style={{
-                padding: "0.75rem 1rem",
+                padding: "0.75rem 1.5rem",
                 borderTop: "1px solid #e2e8f0",
+                background: "#fafbfc",
               }}
             >
               <button
                 className="btn btn-secondary w-100"
                 onClick={() => setShowAssessmentModal(false)}
-                style={{ borderRadius: "10px" }}
+                style={{ borderRadius: "8px", fontWeight: 500 }}
               >
                 Close
               </button>

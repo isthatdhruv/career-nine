@@ -47,7 +47,7 @@ import StudentsList from "../pages/StudentInformation/StudentsList";
 import GroupCreatePage from "../pages/dashboard/widgets/CreateNewGroup";
 import StudentCreatePage from "../pages/dashboard/widgets/CreateNewStudent";
 import GroupStudentPage from "../pages/GroupStudent/GroupStudentPage";
-import GroupStudentAdminPage from "../pages/GroupStudent/GroupStudentAdminPage";
+// GroupStudentAdminPage removed — consolidated into Data Download (/group-student)
 import GroupStudentSchoolPage from "../pages/GroupStudent/GroupStudentSchoolPage";
 import AssignedStudentsPage from "../pages/GroupStudent/AssignedStudentsPage";
 import ReportGenerationPage from "../pages/ReportGeneration/ReportGenerationPage";
@@ -324,12 +324,6 @@ const PrivateRoutes = () => {
         <Route path="/group-student" element={
           <SuspensedView>
             <GroupStudentPage />
-          </SuspensedView>
-        } />
-
-        <Route path="/admin/group-student" element={
-          <SuspensedView>
-            <GroupStudentAdminPage />
           </SuspensedView>
         } />
 

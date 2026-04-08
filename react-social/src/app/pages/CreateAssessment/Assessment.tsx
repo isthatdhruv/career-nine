@@ -1,7 +1,4 @@
 import { useEffect, useState } from "react";
-import { Button } from "react-bootstrap";
-import { IconContext } from "react-icons";
-import { MdQuestionAnswer } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { ReadAssessmentList } from "./API/Create_Assessment_APIs";
 import { AssessmentTable } from "./components";
@@ -16,7 +13,6 @@ const AssessmentPage = () => {
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Initial load
   useEffect(() => {
     const fetchData = async () => {
       setIsDataLoading(true);
@@ -33,7 +29,6 @@ const AssessmentPage = () => {
     fetchData();
   }, []);
 
-  // Refresh when pageLoading is set to true
   useEffect(() => {
     if (pageLoading[0] === "true") {
       const fetchData = async () => {
@@ -52,52 +47,85 @@ const AssessmentPage = () => {
     }
   }, [pageLoading]);
 
-
   return (
-    <div className="card">
-      {(loading || isDataLoading) && (
-        <span className="indicator-progress m-5" style={{ display: "block" }}>
-          Please wait...{" "}
-          <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
-        </span>
-      )}
-
-      {!loading && !isDataLoading && (
-        <div className="card-header border-0 pt-6">
-          <div className="card-title">
-            <h1>Assessments</h1>
-          </div>
-
-          <div className="card-toolbar">
-            <div className="d-flex justify-content-end">
-              <Button
-                variant="primary"
-                onClick={() => navigate("/assessments/create")}
+    <div
+      className="min-vh-100"
+      style={{
+        background: "linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%)",
+        padding: "1rem 1.25rem",
+      }}
+    >
+      {/* Header Card */}
+      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: "12px" }}>
+        <div className="card-body p-3">
+          <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div className="d-flex align-items-center gap-3">
+              <div
+                style={{
+                  width: "42px",
+                  height: "42px",
+                  borderRadius: "10px",
+                  background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
               >
-                <IconContext.Provider
-                  value={{ style: { paddingBottom: "4px" } }}
-                >
-                  <div>
-                    Create Assessment <MdQuestionAnswer size={21} />
-                  </div>
-                </IconContext.Provider>
-              </Button>
+                <i className="bi bi-clipboard-data-fill text-white" style={{ fontSize: "1.2rem" }}></i>
+              </div>
+              <div>
+                <h5 className="mb-0 fw-bold" style={{ color: "#1a1a2e" }}>Assessments</h5>
+                <p className="text-muted mb-0" style={{ fontSize: "0.82rem" }}>
+                  {(loading || isDataLoading) ? "Loading..." : `${assessmentData.length} assessments`}
+                </p>
+              </div>
             </div>
+            <button
+              className="btn btn-sm d-flex align-items-center gap-1"
+              onClick={() => navigate("/assessments/create")}
+              style={{
+                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                color: "#fff",
+                border: "none",
+                borderRadius: "8px",
+                padding: "6px 14px",
+                fontWeight: 600,
+                fontSize: "0.82rem",
+              }}
+            >
+              <i className="bi bi-plus-lg"></i>
+              Create Assessment
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Loading */}
+      {(loading || isDataLoading) && (
+        <div className="card border-0 shadow-sm" style={{ borderRadius: "12px" }}>
+          <div className="card-body text-center py-5">
+            <div className="spinner-border text-primary" role="status">
+              <span className="visually-hidden">Loading...</span>
+            </div>
+            <p className="mt-3 text-muted">Loading assessments...</p>
           </div>
         </div>
       )}
 
+      {/* Table */}
       {!loading && !isDataLoading && (
-        <div className="card-body pt-5">
-          <AssessmentTable
-            data={assessmentData}
-            setLoading={setLoading}
-            setPageLoading={setPageLoading}
-          />
+        <div className="card border-0 shadow-sm" style={{ borderRadius: "12px", overflow: "hidden" }}>
+          <div className="card-body p-3">
+            <AssessmentTable
+              data={assessmentData}
+              setLoading={setLoading}
+              setPageLoading={setPageLoading}
+            />
+          </div>
         </div>
       )}
 
-      {/* Creation Modal */}
       <AssessmentCreateModal
         show={showCreateModal}
         onHide={() => setShowCreateModal(false)}

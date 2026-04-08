@@ -154,6 +154,10 @@ export function getBulkProctoringData(pairs: { userStudentId: number; assessment
 export function exportProctoringExcel(pairs: { userStudentId: number; assessmentId: number }[]) {
     return axios.post(`${API_URL}/assessment-proctoring/export-excel`, pairs, {
         responseType: 'blob',
+        headers: {
+            'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json',
+            'Content-Type': 'application/json',
+        },
     });
 }
 
