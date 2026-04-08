@@ -57,7 +57,10 @@ const ReportsPage: React.FC = () => {
   const [nameQuery, setNameQuery] = useState("");
   const [selectedGrade, setSelectedGrade] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
-
+  const [exportingBET, setExportingBET] = useState(false);
+  const [downloadingZip, setDownloadingZip] = useState(false);
+  const [zipProgress, setZipProgress] = useState<{ completed: number; total: number } | null>(null);
+  const [reportDataMap, setReportDataMap] = useState<Map<number, { reportStatus: string; reportUrl?: string }>>(new Map()); 
   // ── Generate ──
   const [generating, setGenerating] = useState(false);
   const [exportingMQT, setExportingMQT] = useState(false);

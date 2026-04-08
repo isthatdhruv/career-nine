@@ -22,6 +22,12 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setLoading(true);
     setError(null);
 
+    // Clear old assessment data before fetching new
+    setAssessmentData(null);
+    setAssessmentConfig(null);
+    sessionStorage.removeItem('assessmentData');
+    sessionStorage.removeItem('assessmentConfig');
+
     try {
       // Fetch both questionnaire data and assessment config in parallel
       // assessmentApi automatically injects session headers (X-Assessment-Session, etc.)
