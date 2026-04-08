@@ -60,6 +60,7 @@ import DemographicFieldsPage from "../pages/DemographicFields/DemographicFieldsP
 import DemographicFieldCreatePage from "../pages/DemographicFields/components/DemographicFieldCreatePage";
 import DemographicFieldEditPage from "../pages/DemographicFields/components/DemographicFieldEditPage";
 // import QuestionareEditSinglePage from "../pages/CreateAssessment/components/questionaire/QuestionareEditSinglePage";
+import CareerSuggestionPage from "../pages/CareerSuggestion/CareerSuggestionPage";
 import DashboardAdminPage from "../pages/demo-dashboard-v2/dashboard-admin";
 import InstituteDashboard from "../pages/dashboard/InstituteDashboard";
 import ActivityLogPage from "../pages/ActivityLog/ActivityLogPage";
