@@ -27,3 +27,32 @@ export function sendNudgeEmail(transactionId: number) {
 export function resendWelcomeEmail(transactionId: number) {
   return axios.post(`${API_URL}/payment/${transactionId}/resend-welcome`);
 }
+
+// Send payment link via email
+export function sendPaymentLinkEmail(
+  transactionId: number,
+  email: string,
+  studentName?: string
+) {
+  return axios.post(`${API_URL}/payment/${transactionId}/send-email`, {
+    email,
+    studentName: studentName || "Student",
+  });
+}
+
+// Generate WhatsApp send URL for payment link
+export function sendPaymentLinkWhatsApp(
+  transactionId: number,
+  phone: string,
+  studentName?: string
+) {
+  return axios.post(`${API_URL}/payment/${transactionId}/send-whatsapp`, {
+    phone,
+    studentName: studentName || "Student",
+  });
+}
+
+// Get notification logs for a transaction
+export function getNotificationLogs(transactionId: number) {
+  return axios.get(`${API_URL}/payment/${transactionId}/notifications`);
+}

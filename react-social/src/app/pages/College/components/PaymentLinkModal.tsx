@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Modal, Button, Form, Spinner } from "react-bootstrap";
-import { MdContentCopy, MdQrCode, MdPayment } from "react-icons/md";
+import { MdContentCopy, MdQrCode, MdPayment, MdEmail, MdWhatsapp } from "react-icons/md";
 import { QRCodeCanvas } from "qrcode.react";
-import { generatePaymentLink } from "../../PaymentTracking/API/Payment_APIs";
+import { generatePaymentLink, sendPaymentLinkEmail, sendPaymentLinkWhatsApp } from "../../PaymentTracking/API/Payment_APIs";
 
 interface PaymentLinkModalProps {
   show: boolean;
@@ -30,6 +30,11 @@ const PaymentLinkModal = ({
   const [copySuccess, setCopySuccess] = useState<string>("");
   const [showQrFor, setShowQrFor] = useState<string | null>(null);
   const [error, setError] = useState<string>("");
+  const [sendEmail, setSendEmail] = useState("");
+  const [sendPhone, setSendPhone] = useState("");
+  const [sendName, setSendName] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendSuccess, setSendSuccess] = useState<string>("");
 
   const handleGenerate = async () => {
     const amountNum = Number(amount);
@@ -72,6 +77,39 @@ const PaymentLinkModal = ({
     setError("");
     setShowQrFor(null);
     onHide();
+  };
+
+  const handleSendEmail = async (link: GeneratedLink) => {
+    if (!sendEmail) return;
+    setSending(true);
+    try {
+      await sendPaymentLinkEmail(link.transactionId, sendEmail, sendName || undefined);
+      setSendSuccess("email");
+      setTimeout(() => setSendSuccess(""), 3000);
+      setSendEmail("");
+      setSendName("");
+    } catch (err: any) {
+      setError(err.response?.data || "Failed to send email");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleSendWhatsApp = async (link: GeneratedLink) => {
+    if (!sendPhone) return;
+    setSending(true);
+    try {
+      const res = await sendPaymentLinkWhatsApp(link.transactionId, sendPhone, sendName || undefined);
+      window.open(res.data.whatsappUrl, "_blank");
+      setSendSuccess("whatsapp");
+      setTimeout(() => setSendSuccess(""), 3000);
+      setSendPhone("");
+      setSendName("");
+    } catch (err: any) {
+      setError(err.response?.data || "Failed to generate WhatsApp link");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -314,6 +352,72 @@ const PaymentLinkModal = ({
                       />
                     </div>
                   )}
+
+                  {/* Send via Email / WhatsApp */}
+                  <div style={{ marginTop: 12, padding: "12px 0", borderTop: "1px solid #f1f5f9" }}>
+                    <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "#475569", marginBottom: 8 }}>
+                      Send to Student
+                    </div>
+                    <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                      <Form.Control
+                        type="text"
+                        placeholder="Student name"
+                        value={sendName}
+                        onChange={(e) => setSendName(e.target.value)}
+                        style={{ padding: "6px 10px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: "0.82rem", flex: 1 }}
+                      />
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <Form.Control
+                        type="email"
+                        placeholder="Email address"
+                        value={sendEmail}
+                        onChange={(e) => setSendEmail(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleSendEmail(link)}
+                        style={{ padding: "6px 10px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: "0.82rem", flex: 1 }}
+                      />
+                      <button
+                        onClick={() => handleSendEmail(link)}
+                        disabled={sending || !sendEmail}
+                        style={{
+                          display: "inline-flex", alignItems: "center", gap: 4,
+                          padding: "6px 12px", borderRadius: 8,
+                          border: sendSuccess === "email" ? "1.5px solid #059669" : "1.5px solid #e2e8f0",
+                          background: sendSuccess === "email" ? "#dcfce7" : "#fff",
+                          color: sendSuccess === "email" ? "#059669" : "#475569",
+                          fontWeight: 600, fontSize: "0.75rem", cursor: "pointer",
+                        }}
+                      >
+                        <MdEmail size={14} />
+                        {sendSuccess === "email" ? "Sent!" : "Email"}
+                      </button>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                      <Form.Control
+                        type="tel"
+                        placeholder="Phone (e.g. 9876543210)"
+                        value={sendPhone}
+                        onChange={(e) => setSendPhone(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleSendWhatsApp(link)}
+                        style={{ padding: "6px 10px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: "0.82rem", flex: 1 }}
+                      />
+                      <button
+                        onClick={() => handleSendWhatsApp(link)}
+                        disabled={sending || !sendPhone}
+                        style={{
+                          display: "inline-flex", alignItems: "center", gap: 4,
+                          padding: "6px 12px", borderRadius: 8,
+                          border: sendSuccess === "whatsapp" ? "1.5px solid #25D366" : "1.5px solid #e2e8f0",
+                          background: sendSuccess === "whatsapp" ? "#dcfce7" : "#fff",
+                          color: sendSuccess === "whatsapp" ? "#25D366" : "#475569",
+                          fontWeight: 600, fontSize: "0.75rem", cursor: "pointer",
+                        }}
+                      >
+                        <MdWhatsapp size={14} />
+                        {sendSuccess === "whatsapp" ? "Opened!" : "WhatsApp"}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>

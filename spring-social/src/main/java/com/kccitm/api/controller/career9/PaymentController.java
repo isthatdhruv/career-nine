@@ -20,12 +20,20 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.career9.AssessmentInstituteMapping;
+import com.kccitm.api.model.career9.PaymentNotificationLog;
 import com.kccitm.api.model.career9.PaymentTransaction;
 import com.kccitm.api.repository.Career9.AssessmentInstituteMappingRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
+import com.kccitm.api.repository.Career9.PaymentNotificationLogRepository;
 import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
+import com.kccitm.api.security.UserPrincipal;
 import com.kccitm.api.service.RazorpayService;
 import com.kccitm.api.service.SmtpEmailService;
+
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/payment")
@@ -47,6 +55,9 @@ public class PaymentController {
 
     @Autowired
     private SmtpEmailService emailService;
+
+    @Autowired
+    private PaymentNotificationLogRepository notificationLogRepository;
 
     @Value("${app.razorpay.callback-base-url:}")
     private String callbackBaseUrl;
@@ -236,5 +247,142 @@ public class PaymentController {
         } catch (Exception e) {
             logger.error("Failed to send welcome email to: {}", txn.getStudentEmail(), e);
         }
+    }
+
+    @PostMapping("/{transactionId}/send-email")
+    public ResponseEntity<?> sendPaymentLinkEmail(
+            @PathVariable Long transactionId,
+            @RequestBody Map<String, String> request,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+
+        Optional<PaymentTransaction> txnOpt = paymentTransactionRepository.findById(transactionId);
+        if (!txnOpt.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        PaymentTransaction txn = txnOpt.get();
+        String email = request.get("email");
+        String studentName = request.getOrDefault("studentName", "Student");
+
+        if (email == null || email.isEmpty()) {
+            return ResponseEntity.badRequest().body("Email is required");
+        }
+
+        String assessmentName = assessmentTableRepository.findById(txn.getAssessmentId())
+                .map(a -> a.getAssessmentName()).orElse("Assessment");
+
+        PaymentNotificationLog log = new PaymentNotificationLog();
+        log.setTransactionId(transactionId);
+        log.setChannel("email");
+        log.setRecipient(email);
+        log.setPaymentLinkUrl(txn.getShortUrl());
+        log.setAmount(txn.getAmount());
+        log.setSentBy(currentUser != null ? currentUser.getName() : "admin");
+
+        try {
+            sendPaymentLinkEmailAsync(email, studentName, txn, assessmentName);
+            log.setStatus("sent");
+            notificationLogRepository.save(log);
+
+            if (txn.getStudentEmail() == null || txn.getStudentEmail().isEmpty()) {
+                txn.setStudentEmail(email);
+                txn.setStudentName(studentName);
+                paymentTransactionRepository.save(txn);
+            }
+
+            return ResponseEntity.ok(Map.of("message", "Payment link sent via email", "logId", log.getLogId()));
+        } catch (Exception e) {
+            log.setStatus("failed");
+            log.setErrorMessage(e.getMessage());
+            notificationLogRepository.save(log);
+            return ResponseEntity.internalServerError().body("Failed to send email: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/{transactionId}/send-whatsapp")
+    public ResponseEntity<?> sendPaymentLinkWhatsApp(
+            @PathVariable Long transactionId,
+            @RequestBody Map<String, String> request,
+            @AuthenticationPrincipal UserPrincipal currentUser) {
+
+        Optional<PaymentTransaction> txnOpt = paymentTransactionRepository.findById(transactionId);
+        if (!txnOpt.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        PaymentTransaction txn = txnOpt.get();
+        String phone = request.get("phone");
+        String studentName = request.getOrDefault("studentName", "Student");
+
+        if (phone == null || phone.isEmpty()) {
+            return ResponseEntity.badRequest().body("Phone number is required");
+        }
+
+        String cleanPhone = phone.replaceAll("[^0-9]", "");
+        if (cleanPhone.length() == 10) {
+            cleanPhone = "91" + cleanPhone;
+        }
+
+        String assessmentName = assessmentTableRepository.findById(txn.getAssessmentId())
+                .map(a -> a.getAssessmentName()).orElse("Assessment");
+
+        long amountRupees = txn.getAmount() / 100;
+        String message = "Hi " + studentName + ",\n\n"
+                + "Please complete your payment of INR " + amountRupees + " for " + assessmentName + ".\n\n"
+                + "Payment Link: " + txn.getShortUrl() + "\n\n"
+                + "Thank you!";
+
+        String encodedMessage = URLEncoder.encode(message, StandardCharsets.UTF_8);
+        String whatsappUrl = "https://wa.me/" + cleanPhone + "?text=" + encodedMessage;
+
+        PaymentNotificationLog log = new PaymentNotificationLog();
+        log.setTransactionId(transactionId);
+        log.setChannel("whatsapp");
+        log.setRecipient(cleanPhone);
+        log.setPaymentLinkUrl(txn.getShortUrl());
+        log.setAmount(txn.getAmount());
+        log.setSentBy(currentUser != null ? currentUser.getName() : "admin");
+        log.setStatus("sent");
+        notificationLogRepository.save(log);
+
+        if (txn.getStudentPhone() == null || txn.getStudentPhone().isEmpty()) {
+            txn.setStudentPhone(phone);
+            txn.setStudentName(studentName);
+            paymentTransactionRepository.save(txn);
+        }
+
+        return ResponseEntity.ok(Map.of(
+            "whatsappUrl", whatsappUrl,
+            "message", "WhatsApp link generated",
+            "logId", log.getLogId()
+        ));
+    }
+
+    @GetMapping("/{transactionId}/notifications")
+    public ResponseEntity<List<PaymentNotificationLog>> getNotificationLogs(@PathVariable Long transactionId) {
+        return ResponseEntity.ok(
+                notificationLogRepository.findByTransactionIdOrderByCreatedAtDesc(transactionId));
+    }
+
+    @Async
+    void sendPaymentLinkEmailAsync(String email, String studentName, PaymentTransaction txn, String assessmentName) {
+        long amountRupees = txn.getAmount() / 100;
+        String subject = "Payment Link - " + assessmentName + " (INR " + amountRupees + ")";
+        String htmlContent = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>"
+                + "<div style='background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%); padding: 24px; border-radius: 12px 12px 0 0; color: white;'>"
+                + "<h2 style='margin: 0;'>Assessment Payment</h2>"
+                + "</div>"
+                + "<div style='padding: 24px; background: #ffffff; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 12px 12px;'>"
+                + "<p>Dear <strong>" + studentName + "</strong>,</p>"
+                + "<p>Please complete your payment of <strong>INR " + amountRupees + "</strong> for <strong>" + assessmentName + "</strong>.</p>"
+                + "<div style='text-align: center; margin: 28px 0;'>"
+                + "<a href='" + txn.getShortUrl() + "' style='background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%); color: white; padding: 14px 36px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 1.1em; display: inline-block;'>Pay Now</a>"
+                + "</div>"
+                + "<p style='color: #666; font-size: 0.85em;'>Or copy this link: <a href='" + txn.getShortUrl() + "'>" + txn.getShortUrl() + "</a></p>"
+                + "<p style='color: #999; font-size: 0.8em; margin-top: 24px;'>This is an automated email. Please do not reply.</p>"
+                + "</div></div>";
+
+        emailService.sendHtmlEmail(email, subject, htmlContent);
+        logger.info("Payment link email sent to: {} for transaction: {}", email, txn.getTransactionId());
     }
 }
