@@ -99,6 +99,40 @@ export function exportGeneralAssessmentExcelForStudent(assessmentId: number, use
   });
 }
 
+// ── School Report ──
+
+export interface SchoolReportMqtStat {
+  mqtId: number;
+  mqtName: string;
+  average: number;
+  min: number;
+  max: number;
+  sum: number;
+  count: number;
+  gradeWise: Record<string, { average: number; count: number }>;
+}
+
+export interface SchoolReportMqGroup {
+  mqName: string;
+  mqts: SchoolReportMqtStat[];
+}
+
+export interface SchoolReportData {
+  assessmentId: number;
+  totalStudents: number;
+  studentsWithScores: number;
+  grades: string[];
+  gradeStudentCounts: Record<string, number>;
+  mqGroups: SchoolReportMqGroup[];
+}
+
+export function getSchoolReport(assessmentId: number, userStudentIds?: number[]) {
+  return axios.post<SchoolReportData>(`${BASE}/school-report`, {
+    assessmentId,
+    userStudentIds: userStudentIds || [],
+  });
+}
+
 // ── Email Recipients & Send Report Email ──
 
 export interface EmailRecipient {

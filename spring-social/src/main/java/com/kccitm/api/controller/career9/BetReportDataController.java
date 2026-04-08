@@ -491,6 +491,162 @@ public class BetReportDataController {
         return new ResponseEntity<>(out.toByteArray(), responseHeaders, HttpStatus.OK);
     }
 
+    // ═══════════════════════ SCHOOL REPORT ═══════════════════════
+
+    /**
+     * POST /bet-report-data/school-report
+     * Body: { "assessmentId": 123, "userStudentIds": [1, 2, 3] }
+     * If userStudentIds is empty or absent, uses all students for the assessment.
+     *
+     * Returns aggregated MQ/MQT statistics for a school-level report.
+     */
+    @PostMapping("/school-report")
+    public ResponseEntity<?> schoolReport(@RequestBody Map<String, Object> request) {
+        if (!request.containsKey("assessmentId")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "assessmentId is required"));
+        }
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+
+        // 1. Get student mappings
+        List<StudentAssessmentMapping> allMappings = studentAssessmentMappingRepository.findAllByAssessmentId(assessmentId);
+        if (allMappings.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "No student mappings found for this assessment"));
+        }
+
+        // 2. Filter by selected student IDs if provided
+        @SuppressWarnings("unchecked")
+        List<Number> selectedIds = (List<Number>) request.get("userStudentIds");
+        if (selectedIds != null && !selectedIds.isEmpty()) {
+            java.util.Set<Long> selectedSet = selectedIds.stream()
+                    .map(Number::longValue).collect(Collectors.toSet());
+            allMappings = allMappings.stream()
+                    .filter(m -> selectedSet.contains(m.getUserStudent().getUserStudentId()))
+                    .collect(Collectors.toList());
+        }
+
+        if (allMappings.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "No matching students found"));
+        }
+
+        // 3. Get all active MQTs grouped by parent MQ
+        List<MeasuredQualityTypes> allMqts = measuredQualityTypesRepository.findByIsDeletedFalseOrIsDeletedIsNull();
+        LinkedHashMap<String, List<MeasuredQualityTypes>> mqToMqts = new LinkedHashMap<>();
+        for (MeasuredQualityTypes mqt : allMqts) {
+            String mqName = mqt.getMeasuredQuality() != null
+                    ? safe(mqt.getMeasuredQuality().getQualityDisplayName() != null
+                        ? mqt.getMeasuredQuality().getQualityDisplayName()
+                        : mqt.getMeasuredQuality().getMeasuredQualityName())
+                    : "Ungrouped";
+            mqToMqts.computeIfAbsent(mqName, k -> new ArrayList<>()).add(mqt);
+        }
+
+        // 4. Bulk-fetch all raw scores
+        List<Long> mappingIds = allMappings.stream()
+                .map(StudentAssessmentMapping::getStudentAssessmentId)
+                .collect(Collectors.toList());
+        List<AssessmentRawScore> allScores = assessmentRawScoreRepository
+                .findByStudentAssessmentMappingStudentAssessmentIdIn(mappingIds);
+
+        // Index: mappingId -> mqtId -> rawScore
+        Map<Long, Map<Long, Integer>> scoreIndex = new HashMap<>();
+        for (AssessmentRawScore score : allScores) {
+            Long mapId = score.getStudentAssessmentMapping().getStudentAssessmentId();
+            Long mqtId = score.getMeasuredQualityType() != null
+                    ? score.getMeasuredQualityType().getMeasuredQualityTypeId() : null;
+            if (mqtId != null) {
+                scoreIndex.computeIfAbsent(mapId, k -> new HashMap<>())
+                        .put(mqtId, score.getRawScore());
+            }
+        }
+
+        // 5. Build grade-wise student info
+        Map<String, List<Long>> gradeToMappingIds = new LinkedHashMap<>();
+        Map<Long, String> mappingToGrade = new HashMap<>();
+        for (StudentAssessmentMapping mapping : allMappings) {
+            StudentInfo si = mapping.getUserStudent().getStudentInfo();
+            String grade = resolveGrade(si);
+            if (grade.isEmpty()) grade = "Unknown";
+            gradeToMappingIds.computeIfAbsent(grade, k -> new ArrayList<>())
+                    .add(mapping.getStudentAssessmentId());
+            mappingToGrade.put(mapping.getStudentAssessmentId(), grade);
+        }
+
+        // 6. Aggregate stats per MQ and MQT
+        List<Map<String, Object>> mqGroups = new ArrayList<>();
+        for (Map.Entry<String, List<MeasuredQualityTypes>> entry : mqToMqts.entrySet()) {
+            String mqName = entry.getKey();
+            List<Map<String, Object>> mqtStats = new ArrayList<>();
+
+            for (MeasuredQualityTypes mqt : entry.getValue()) {
+                Long mqtId = mqt.getMeasuredQualityTypeId();
+                String mqtName = mqt.getMeasuredQualityTypeDisplayName() != null
+                        ? mqt.getMeasuredQualityTypeDisplayName()
+                        : mqt.getMeasuredQualityTypeName();
+
+                // Collect all scores for this MQT
+                List<Integer> scores = new ArrayList<>();
+                for (StudentAssessmentMapping mapping : allMappings) {
+                    Map<Long, Integer> studentScores = scoreIndex.getOrDefault(
+                            mapping.getStudentAssessmentId(), Map.of());
+                    Integer sc = studentScores.get(mqtId);
+                    if (sc != null) scores.add(sc);
+                }
+
+                double avg = scores.stream().mapToInt(Integer::intValue).average().orElse(0);
+                int min = scores.stream().mapToInt(Integer::intValue).min().orElse(0);
+                int max = scores.stream().mapToInt(Integer::intValue).max().orElse(0);
+                double sum = scores.stream().mapToInt(Integer::intValue).sum();
+
+                // Grade-wise averages
+                Map<String, Object> gradeAvgs = new LinkedHashMap<>();
+                for (Map.Entry<String, List<Long>> ge : gradeToMappingIds.entrySet()) {
+                    List<Integer> gradeScores = new ArrayList<>();
+                    for (Long mid : ge.getValue()) {
+                        Map<Long, Integer> gs = scoreIndex.getOrDefault(mid, Map.of());
+                        Integer sc = gs.get(mqtId);
+                        if (sc != null) gradeScores.add(sc);
+                    }
+                    double gradeAvg = gradeScores.stream().mapToInt(Integer::intValue).average().orElse(0);
+                    gradeAvgs.put(ge.getKey(), Map.of(
+                            "average", Math.round(gradeAvg * 100.0) / 100.0,
+                            "count", gradeScores.size()
+                    ));
+                }
+
+                mqtStats.add(Map.of(
+                        "mqtId", mqtId,
+                        "mqtName", safe(mqtName),
+                        "average", Math.round(avg * 100.0) / 100.0,
+                        "min", min,
+                        "max", max,
+                        "sum", (int) sum,
+                        "count", scores.size(),
+                        "gradeWise", gradeAvgs
+                ));
+            }
+
+            mqGroups.add(Map.of(
+                    "mqName", mqName,
+                    "mqts", mqtStats
+            ));
+        }
+
+        // 7. Build response
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("assessmentId", assessmentId);
+        response.put("totalStudents", allMappings.size());
+        response.put("studentsWithScores", scoreIndex.size());
+        response.put("grades", new ArrayList<>(gradeToMappingIds.keySet()));
+        response.put("gradeStudentCounts", gradeToMappingIds.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size(),
+                        (a, b) -> a, LinkedHashMap::new)));
+        response.put("mqGroups", mqGroups);
+
+        return ResponseEntity.ok(response);
+    }
+
     // ═══════════════════════ GENERATE & SAVE ═══════════════════════
 
     /**

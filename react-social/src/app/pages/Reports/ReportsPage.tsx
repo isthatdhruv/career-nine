@@ -19,6 +19,7 @@ import {
   exportMqtScoresExcel,
   exportBetReportExcel,
 } from "../ReportGeneration/API/BetReportData_APIs";
+import SchoolReportModal from "./SchoolReportModal";
 
 type StudentRow = {
   userStudentId: number;
@@ -84,6 +85,7 @@ const ReportsPage: React.FC = () => {
   const [downloadingZip, setDownloadingZip] = useState(false);
   const [zipProgress, setZipProgress] = useState<ZipProgress | null>(null);
   const [exportingStudentId, setExportingStudentId] = useState<number | null>(null);
+  const [schoolReportOpen, setSchoolReportOpen] = useState(false);
 
   // ═══════════════════════ DATA LOADING ═══════════════════════
 
@@ -824,6 +826,18 @@ const ReportsPage: React.FC = () => {
                 </button>
                 <button
                   className="btn btn-sm"
+                  onClick={() => setSchoolReportOpen(true)}
+                  style={{
+                    background: "linear-gradient(135deg, #1e3a5f 0%, #2d5a8e 100%)",
+                    border: "none", borderRadius: 8, padding: "8px 20px",
+                    fontWeight: 600, color: "white", fontSize: "0.85rem",
+                    boxShadow: "0 4px 12px rgba(30, 58, 95, 0.3)",
+                  }}
+                >
+                  School Report
+                </button>
+                <button
+                  className="btn btn-sm"
                   onClick={async () => {
                     if (!selectedAssessment) return;
                     const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
@@ -1093,6 +1107,22 @@ const ReportsPage: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* School Report Modal */}
+      <SchoolReportModal
+        open={schoolReportOpen}
+        onClose={() => setSchoolReportOpen(false)}
+        assessmentId={Number(selectedAssessment) || 0}
+        assessmentName={selectedAssessmentName}
+        instituteName={selectedInstituteName}
+        userStudentIds={
+          (() => {
+            const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
+            const selectedVisible = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
+            return selectedVisible.length > 0 ? selectedVisible : undefined;
+          })()
+        }
+      />
 
       {/* ZIP Progress Modal */}
       {downloadingZip && (
