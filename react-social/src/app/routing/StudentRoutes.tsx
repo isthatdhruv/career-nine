@@ -13,6 +13,9 @@ const StudentAssessments = lazy(
 const StudentInfoForm = lazy(
   () => import('../pages/StudentDashboard/student-portal/StudentInfoForm')
 )
+const StudentReports = lazy(
+  () => import('../pages/StudentDashboard/student-portal/StudentReports')
+)
 const StudentCounsellingPage = lazy(() => import('../pages/Counselling/student/StudentCounsellingPage'))
 const SlotBookingPage = lazy(() => import('../pages/Counselling/student/SlotBookingPage'))
 
@@ -111,7 +114,7 @@ const StudentRoutes: FC = () => {
           <Route element={<StudentInfoGuard />}>
             <Route path='dashboard' element={<StudentPortalDashboard />} />
             <Route path='assessments' element={<StudentAssessments />} />
-            <Route path='reports' element={<StudentPortalDashboard />} />
+            <Route path='reports' element={<StudentReports />} />
             <Route path='counselling' element={<StudentCounsellingPage />} />
             <Route path='counselling/book' element={<SlotBookingPage />} />
           </Route>

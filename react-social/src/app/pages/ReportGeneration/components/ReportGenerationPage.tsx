@@ -8,6 +8,7 @@ import {
   Assessment,
 } from "../../StudentInformation/StudentInfo_APIs";
 import { getAssessmentMappingsByInstitute } from "../../AssessmentMapping/API/AssessmentMapping_APIs";
+import { createOrUpdateGeneratedReport } from "../API/GeneratedReport_APIs";
 import { getEmailRecipientsForStudent, sendReportEmail, EmailRecipient } from "../API/BetReportData_APIs";
 
 // ═══════════════════════ CONFIG TYPE ═══════════════════════
@@ -28,6 +29,9 @@ export type ReportGenerationConfig = {
   accentColor: string; // e.g., "#4361ee" or "#0d9488"
   placeholderIcon: string; // e.g., "&#x1F4CB;" or "&#x1F9ED;"
   reportFilePrefix: string; // e.g., "bet_report" or "navigator_report"
+
+  // Report type tag for centralized tracking
+  typeOfReport: string; // "bet" | "navigator"
 
   // Features
   hasEligibility: boolean;
@@ -82,20 +86,33 @@ const FILTER_ITEMS: { key: FilterKey; label: string }[] = [
 
 // ═══════════════════════ COMPONENT ═══════════════════════
 
-const ReportGenerationPage: React.FC<{ config: ReportGenerationConfig }> = ({ config }) => {
+const ReportGenerationPage: React.FC<{
+  config: ReportGenerationConfig;
+  externalInstitute?: number;
+  externalAssessment?: number;
+}> = ({ config, externalInstitute, externalAssessment }) => {
   const { api, accentColor } = config;
+  const hideSelectors = externalInstitute !== undefined && externalAssessment !== undefined;
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("data");
 
   // ── Core selections ──
   const [institutes, setInstitutes] = useState<any[]>([]);
-  const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
+  const [selectedInstitute, setSelectedInstitute] = useState<number | "">(externalInstitute ?? "");
   const [institutesLoading, setInstitutesLoading] = useState(false);
 
   const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
-  const [selectedAssessment, setSelectedAssessment] = useState<number | "">("");
+  const [selectedAssessment, setSelectedAssessment] = useState<number | "">(externalAssessment ?? "");
   const [assessmentsLoading, setAssessmentsLoading] = useState(false);
+
+  // Sync from external props when they change
+  useEffect(() => {
+    if (externalInstitute !== undefined) setSelectedInstitute(externalInstitute);
+  }, [externalInstitute]);
+  useEffect(() => {
+    if (externalAssessment !== undefined) setSelectedAssessment(externalAssessment);
+  }, [externalAssessment]);
 
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [sectionLookup, setSectionLookup] = useState<Map<number, SectionInfo>>(new Map());
@@ -339,14 +356,17 @@ const ReportGenerationPage: React.FC<{ config: ReportGenerationConfig }> = ({ co
   // ═══════════════════════ RENDER ═══════════════════════
 
   return (
-    <div style={{ padding: "24px 32px", maxWidth: 1400, margin: "0 auto" }}>
+    <div style={{ padding: hideSelectors ? 0 : "24px 32px", maxWidth: 1400, margin: "0 auto" }}>
       {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontWeight: 800, fontSize: "1.5rem", color: "#1a1a2e", margin: 0 }}>{config.title}</h2>
-        <p style={{ color: "#6b7280", fontSize: "0.9rem", margin: "4px 0 0" }}>{config.subtitle}</p>
-      </div>
+      {!hideSelectors && (
+        <div style={{ marginBottom: 24 }}>
+          <h2 style={{ fontWeight: 800, fontSize: "1.5rem", color: "#1a1a2e", margin: 0 }}>{config.title}</h2>
+          <p style={{ color: "#6b7280", fontSize: "0.9rem", margin: "4px 0 0" }}>{config.subtitle}</p>
+        </div>
+      )}
 
       {/* Selection Row */}
+      {!hideSelectors && (
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24, background: "#fff", padding: 20, borderRadius: 12, border: "1px solid #e5e7eb", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
         <div>
           <label style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151", marginBottom: 6, display: "block" }}>School / Institute</label>
@@ -369,8 +389,9 @@ const ReportGenerationPage: React.FC<{ config: ReportGenerationConfig }> = ({ co
           )}
         </div>
       </div>
+      )}
 
-      {!ready && (
+      {!ready && !hideSelectors && (
         <div style={{ padding: 48, textAlign: "center", color: "#9ca3af", border: "2px dashed #e5e7eb", borderRadius: 12, background: "#fff" }}>
           <div style={{ fontSize: "2rem", marginBottom: 8, opacity: 0.4 }} dangerouslySetInnerHTML={{ __html: config.placeholderIcon }} />
           <div>Select a school and assessment to get started</div>
@@ -511,9 +532,41 @@ const ReportGenerationPage: React.FC<{ config: ReportGenerationConfig }> = ({ co
                           setGeneratingReports(true);
                           try {
                             const res = await api.generateReports(Number(selectedAssessment), ids);
-                            const { generated, errors } = res.data;
+                            const { generated, errors, reports } = res.data;
+                            // Sync successful reports to centralized generated_report table
+                            const successReports = (reports || []).filter((r: any) => r.reportUrl);
+                            for (const r of successReports) {
+                              createOrUpdateGeneratedReport({
+                                userStudentId: r.userStudentId,
+                                assessmentId: Number(selectedAssessment),
+                                typeOfReport: config.typeOfReport,
+                                reportStatus: "generated",
+                                reportUrl: r.reportUrl,
+                              }).catch(() => {}); // fire-and-forget, don't block UI
+                            }
+                            // Track failed ones too
+                            for (const e of errors || []) {
+                              createOrUpdateGeneratedReport({
+                                userStudentId: e.userStudentId,
+                                assessmentId: Number(selectedAssessment),
+                                typeOfReport: config.typeOfReport,
+                                reportStatus: "failed",
+                              }).catch(() => {});
+                            }
+                            // Auto-download any reports that failed DO Spaces upload
+                            const fallbacks = (reports || []).filter((r: any) => r.downloadFallback);
+                            for (const fb of fallbacks) {
+                              const a = document.createElement("a");
+                              a.href = fb.reportUrl;
+                              a.download = fb.fileName || `report_${fb.userStudentId}.html`;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                            }
+                            const uploaded = generated - fallbacks.length;
                             const errorDetails = errors.length > 0 ? errors.map((e: any) => `Student ${e.userStudentId}: ${e.reason}`).join("\n") : "";
-                            showSuccessToast(`Generated ${generated} report(s).${errors.length > 0 ? `\n${errors.length} failed:\n${errorDetails}` : ""}`);
+                            const fallbackMsg = fallbacks.length > 0 ? `\n${fallbacks.length} downloaded directly (cloud upload unavailable).` : "";
+                            showSuccessToast(`Generated ${generated} report(s).${fallbackMsg}${errors.length > 0 ? `\n${errors.length} failed:\n${errorDetails}` : ""}`);
                             await refreshReportData();
                           } catch (err: any) { showErrorToast("Failed: " + (err?.response?.data?.error || err.message)); }
                           finally { setGeneratingReports(false); }

@@ -402,7 +402,7 @@ public class NavigatorReportData implements Serializable {
     @Column(name = "report_status", nullable = false)
     private String reportStatus = "notGenerated";
 
-    @Column(name = "report_url")
+    @Column(name = "report_url", length = 4096)
     private String reportUrl;
 
     @Temporal(TemporalType.TIMESTAMP)

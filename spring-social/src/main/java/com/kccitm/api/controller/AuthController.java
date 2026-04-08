@@ -100,7 +100,7 @@ public class AuthController {
             throw new BadRequestException("Phone number is required.");
         }
         if (userRepository.existsByPhone(signUpRequest.getPhone())) {
-            throw new BadRequestException("Phone nusmber already in use.");
+            throw new DuplicateResourceException("Phone number already in use.");
         }
         // if (signUpRequest.getAcceptTerms() == null || !signUpRequest.getAcceptTerms()) {
         //     throw new BadRequestException("You must accept the terms and conditions.");

@@ -73,6 +73,9 @@ public class AssessmentSubmissionProcessorService {
     @Autowired
     private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
 
+    @Autowired
+    private AssessmentCompletionEmailService assessmentCompletionEmailService;
+
     /**
      * Async entry point — called by /submit controller after saving to Redis.
      * Reads submission from Redis, processes answers + scores, persists to MySQL.
@@ -268,6 +271,10 @@ public class AssessmentSubmissionProcessorService {
 
             assessmentSessionService.markSubmissionComplete(studentId, assessmentId, result);
             assessmentSessionService.updateSubmittedStatus(studentId, assessmentId, "completed");
+
+            // Send completion email to student
+            assessmentCompletionEmailService.sendCompletionEmail(
+                    userStudent, assessment, answersToSave.size(), rawScoresToSave.size());
 
             logger.info("Async processing completed for student={} assessment={}: {} answers, {} scores",
                     studentId, assessmentId, answersToSave.size(), rawScoresToSave.size());

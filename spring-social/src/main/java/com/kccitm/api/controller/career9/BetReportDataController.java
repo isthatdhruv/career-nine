@@ -87,6 +87,7 @@ public class BetReportDataController {
     @Autowired private QuestionnaireQuestionRepository questionnaireQuestionRepository;
     @Autowired private FirebaseService firebaseService;
     @Autowired private DigitalOceanSpacesService digitalOceanSpacesService;
+    @Autowired private com.kccitm.api.repository.Career9.GeneratedReportRepository generatedReportRepository;
 
     // ═══════════════════════ ONE-CLICK REPORT ═══════════════════════
 
@@ -138,13 +139,24 @@ public class BetReportDataController {
             String fileName = safeName + "_" + userStudentId + "_bet_report.html";
             String folder = "bet-reports/assessment-" + assessmentId;
 
-            String reportUrl = digitalOceanSpacesService.uploadBytes(
-                    filledHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8),
-                    "text/html", folder, fileName);
+                try {
+                String reportUrl = digitalOceanSpacesService.uploadBytes(
+                        filledHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                        "text/html", folder, fileName);
 
-            report.setReportStatus("generated");
-            report.setReportUrl(reportUrl);
-            betReportDataRepository.save(report);
+                report.setReportStatus("generated");
+                report.setReportUrl(reportUrl);
+                betReportDataRepository.save(report);
+                syncGeneratedReport(userStudentId, assessmentId, "generated", reportUrl);
+                } catch (Exception uploadEx) {
+                    // DO Spaces upload failed — return HTML directly for download
+                    byte[] htmlBytes = filledHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    HttpHeaders headers = new HttpHeaders();
+                    headers.setContentType(MediaType.TEXT_HTML);
+                    headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"");
+                    headers.setContentLength(htmlBytes.length);
+                    return new ResponseEntity<>(htmlBytes, headers, HttpStatus.OK);
+                }
         }
 
         return ResponseEntity.ok(Map.of(
@@ -781,23 +793,35 @@ public class BetReportDataController {
                 String fileName = safeName + "_" + userStudentId + "_bet_report.html";
                 String folder = "bet-reports/assessment-" + assessmentId;
 
-                String reportUrl = digitalOceanSpacesService.uploadBytes(
-                        filledHtml.getBytes(StandardCharsets.UTF_8),
-                        "text/html",
-                        folder,
-                        fileName
-                );
+                    try {
+                    String reportUrl = digitalOceanSpacesService.uploadBytes(
+                            filledHtml.getBytes(StandardCharsets.UTF_8),
+                            "text/html",
+                            folder,
+                            fileName
+                    );
 
                 // Update report status
                 report.setReportStatus("generated");
                 report.setReportUrl(reportUrl);
                 betReportDataRepository.save(report);
+                syncGeneratedReport(userStudentId, assessmentId, "generated", reportUrl);
 
-                results.add(Map.of(
-                        "userStudentId", userStudentId,
-                        "studentName", safe(report.getStudentName()),
-                        "reportUrl", reportUrl
-                ));
+                    results.add(Map.of(
+                            "userStudentId", userStudentId,
+                            "studentName", safe(report.getStudentName()),
+                            "reportUrl", reportUrl
+                    ));
+                    } catch (Exception uploadEx) {
+                        String dataUri = "data:text/html;base64," + Base64.getEncoder().encodeToString(filledHtml.getBytes(StandardCharsets.UTF_8));
+                        results.add(Map.of(
+                                "userStudentId", userStudentId,
+                                "studentName", safe(report.getStudentName()),
+                                "reportUrl", dataUri,
+                                "fileName", fileName,
+                                "downloadFallback", true
+                        ));
+                    }
             } catch (Exception e) {
                 errors.add(Map.of("userStudentId", userStudentId,
                         "reason", e.getMessage()));
@@ -1508,6 +1532,25 @@ public class BetReportDataController {
 
     private String safe(String value) {
         return value != null ? value : "";
+    }
+
+    private void syncGeneratedReport(Long userStudentId, Long assessmentId, String status, String reportUrl) {
+        try {
+            com.kccitm.api.model.career9.GeneratedReport gr = generatedReportRepository
+                    .findByUserStudentUserStudentIdAndAssessmentIdAndTypeOfReport(userStudentId, assessmentId, "bet")
+                    .orElseGet(() -> {
+                        com.kccitm.api.model.career9.GeneratedReport newGr = new com.kccitm.api.model.career9.GeneratedReport();
+                        newGr.setUserStudent(userStudentRepository.findById(userStudentId).orElse(null));
+                        newGr.setAssessmentId(assessmentId);
+                        newGr.setTypeOfReport("bet");
+                        return newGr;
+                    });
+            gr.setReportStatus(status);
+            gr.setReportUrl(reportUrl);
+            generatedReportRepository.save(gr);
+        } catch (Exception e) {
+            // Non-critical — don't fail the main flow
+        }
     }
 
     /**

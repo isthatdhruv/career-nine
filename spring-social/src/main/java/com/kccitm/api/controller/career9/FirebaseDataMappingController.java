@@ -61,6 +61,7 @@ import com.kccitm.api.repository.Career9.School.FirebaseQuestionMappingRepositor
 import com.kccitm.api.repository.Career9.School.FirebaseStudentExtraDataRepository;
 import com.kccitm.api.model.career9.school.FirebaseQuestionMapping;
 import com.kccitm.api.service.FirebaseService;
+import com.kccitm.api.service.FirebaseStudentDeletionService;
 
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;

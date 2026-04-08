@@ -26,6 +26,7 @@ export interface Assessment {
     isActive?: boolean;
     starDate?: string;
     endDate?: string;
+    questionnaire?: { type?: boolean | null; questionnaireId?: number };
 }
 
 export interface BulkAssessmentAssignment {

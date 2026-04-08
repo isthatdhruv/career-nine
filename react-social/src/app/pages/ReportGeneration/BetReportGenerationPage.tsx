@@ -17,6 +17,7 @@ const betConfig: ReportGenerationConfig = {
   accentColor: "#4361ee",
   placeholderIcon: "&#x1F4CB;",
   reportFilePrefix: "bet_report",
+  typeOfReport: "bet",
 
   hasEligibility: false,
   hasReset: false,
