@@ -13,6 +13,7 @@ import javax.persistence.JoinTable;
 import javax.persistence.ManyToMany;
 import javax.persistence.ManyToOne;
 import javax.persistence.OneToMany;
+import javax.persistence.Column;
 import javax.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -33,6 +34,9 @@ public class MeasuredQualityTypes implements Serializable {
     private String measured_quality_type_description;
 
     private String measured_quality_type_display_name;
+
+    @Column(name = "is_deleted")
+    private Boolean isDeleted = false;
 
     // Many-to-One relationship with MeasuredQualities
     @ManyToOne
@@ -140,5 +144,13 @@ public MeasuredQualityTypes() {
     }
 
     // REMOVED: add/removeAssessmentQuestion
+
+    public Boolean getIsDeleted() {
+        return isDeleted;
+    }
+
+    public void setIsDeleted(Boolean isDeleted) {
+        this.isDeleted = isDeleted;
+    }
 
 }

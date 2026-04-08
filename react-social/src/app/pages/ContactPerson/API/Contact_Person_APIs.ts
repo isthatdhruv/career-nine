@@ -15,8 +15,11 @@ export function ReadContactInformationByIdData(id: any) {
   return axios.get(readContactInformationById + id);
 }
 
-export function CreateContactInformationData(values: any) {
-  return axios.post(createContactInformation, values);
+export function CreateContactInformationData(values: any, instituteCode?: number) {
+  const url = instituteCode
+    ? `${createContactInformation}?instituteCode=${instituteCode}`
+    : createContactInformation;
+  return axios.post(url, values);
 }
 
 export function UpdateContactInformationData(id: any, values: any) {
@@ -25,4 +28,48 @@ export function UpdateContactInformationData(id: any, values: any) {
 
 export function DeleteContactInformationData(id: any) {
   return axios.delete(deleteContactInformation + id);
+}
+
+export function GetReportStatus(contactPersonId: number, assessmentId: number, reportType: string) {
+  return axios.get(
+    `${API_URL}/contact-person/${contactPersonId}/report-status/${assessmentId}?reportType=${reportType}`
+  );
+}
+
+export function SendReportsToContactPerson(
+  contactPersonId: number,
+  assessmentId: number,
+  reportType: string
+) {
+  return axios.post(`${API_URL}/contact-person/send-reports`, {
+    contactPersonId,
+    assessmentId,
+    reportType,
+  });
+}
+
+export function GetReportStatusByInstitute(
+  instituteCode: number,
+  assessmentId: number,
+  reportType: string
+) {
+  return axios.get(
+    `${API_URL}/contact-person/report-status-by-institute/${instituteCode}/${assessmentId}?reportType=${reportType}`
+  );
+}
+
+export function SendReportsByInstitute(
+  contactPersonId: number,
+  instituteCode: number,
+  assessmentId: number,
+  reportType: string,
+  selectedStudentIds?: number[]
+) {
+  return axios.post(`${API_URL}/contact-person/send-reports-by-institute`, {
+    contactPersonId,
+    instituteCode,
+    assessmentId,
+    reportType,
+    selectedStudentIds,
+  });
 }

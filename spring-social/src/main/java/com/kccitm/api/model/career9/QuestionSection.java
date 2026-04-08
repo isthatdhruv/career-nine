@@ -12,6 +12,7 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.OneToMany;
+import javax.persistence.Column;
 import javax.persistence.Table;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -29,6 +30,9 @@ public class QuestionSection implements Serializable {
     private Long sectionId;
     private String sectionName;
     private String sectionDescription;
+
+    @Column(name = "is_deleted")
+    private Boolean isDeleted = false;
 
     //1 Section to Many Questions (section question mapping)
     @OneToMany(mappedBy = "section", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
@@ -86,6 +90,14 @@ public QuestionSection() {
                 .map(AssessmentQuestions::getQuestionId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
+    }
+
+    public Boolean getIsDeleted() {
+        return isDeleted;
+    }
+
+    public void setIsDeleted(Boolean isDeleted) {
+        this.isDeleted = isDeleted;
     }
 
     @Override

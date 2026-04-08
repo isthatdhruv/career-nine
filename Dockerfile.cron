@@ -1,0 +1,10 @@
+FROM alpine:3.19
+
+RUN apk add --no-cache mysql-client bash
+
+COPY sync-master-to-staging.sh /usr/local/bin/sync-master-to-staging.sh
+RUN chmod +x /usr/local/bin/sync-master-to-staging.sh
+
+COPY crontab /etc/crontabs/root
+
+CMD ["crond", "-f", "-l", "2"]

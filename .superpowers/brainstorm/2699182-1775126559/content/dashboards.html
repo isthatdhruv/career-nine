@@ -1,0 +1,318 @@
+<h2>Dashboard & UI Design</h2>
+<p class="subtitle">Three role-based views: Student, Counsellor, Admin</p>
+
+<div class="section">
+  <h3>Student Dashboard — Counselling Tab</h3>
+  <div class="mockup">
+    <div class="mockup-header">Student Portal → Counselling Section</div>
+    <div class="mockup-body" style="padding: 0;">
+      <!-- Top bar -->
+      <div style="background: #1a1a2e; padding: 16px 24px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <span style="color: #64ffda; font-weight: 600; font-size: 18px;">My Counselling</span>
+        </div>
+        <div style="display: flex; gap: 12px; align-items: center;">
+          <div style="position: relative; cursor: pointer;">
+            <span style="font-size: 20px;">🔔</span>
+            <span style="position: absolute; top: -4px; right: -6px; background: #ff6b6b; color: white; font-size: 10px; border-radius: 50%; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center;">3</span>
+          </div>
+          <button style="background: #64ffda; color: #1a1a2e; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer;">Book Session</button>
+        </div>
+      </div>
+
+      <!-- Upcoming Session Card -->
+      <div style="padding: 24px;">
+        <div style="background: #16213e; border: 1px solid #0f3460; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <span style="background: #064e3b; color: #6ee7b7; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 600;">CONFIRMED</span>
+              <h4 style="color: #e0e0e0; margin: 12px 0 4px 0;">Upcoming Session</h4>
+              <p style="color: #888; margin: 0; font-size: 14px;">📅 April 10, 2026 &nbsp; ⏰ 10:00 AM - 10:30 AM</p>
+              <p style="color: #888; margin: 4px 0 0 0; font-size: 14px;">🔗 <a href="#" style="color: #64b5f6;">Join Google Meet</a></p>
+            </div>
+            <div style="text-align: right;">
+              <p style="color: #888; font-size: 13px;">Joining in</p>
+              <p style="color: #ffd93d; font-size: 24px; font-weight: 700; margin: 4px 0;">2d 14h</p>
+              <button style="background: transparent; border: 1px solid #ff6b6b; color: #ff6b6b; padding: 6px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; margin-top: 8px;">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div style="display: flex; gap: 0; margin-bottom: 20px; border-bottom: 1px solid #333;">
+          <div style="padding: 10px 20px; color: #64ffda; border-bottom: 2px solid #64ffda; font-weight: 600; font-size: 14px;">Upcoming</div>
+          <div style="padding: 10px 20px; color: #888; font-size: 14px;">Past Sessions</div>
+          <div style="padding: 10px 20px; color: #888; font-size: 14px;">Pending Requests</div>
+        </div>
+
+        <!-- Past Session Example (hidden under tab but shown for reference) -->
+        <div style="background: #16213e; border: 1px solid #333; border-radius: 8px; padding: 16px; margin-bottom: 12px; opacity: 0.7;">
+          <div style="display: flex; justify-content: space-between;">
+            <div>
+              <span style="background: #1e3a5f; color: #64b5f6; padding: 3px 8px; border-radius: 4px; font-size: 11px;">COMPLETED</span>
+              <p style="color: #ccc; margin: 8px 0 4px 0; font-size: 14px;">📅 March 28, 2026 &nbsp; ⏰ 11:00 AM</p>
+            </div>
+            <button style="background: transparent; border: 1px solid #64ffda; color: #64ffda; padding: 4px 12px; border-radius: 4px; font-size: 12px; cursor: pointer;">View Remarks</button>
+          </div>
+          <div style="margin-top: 12px; padding: 12px; background: #0d1b2a; border-radius: 6px;">
+            <p style="color: #aaa; font-size: 12px; margin: 0 0 4px 0; font-weight: 600;">Counsellor Remarks:</p>
+            <p style="color: #ccc; font-size: 13px; margin: 0;"><strong>Key Points:</strong> Discussed career options in data science. Student shows strong analytical aptitude.</p>
+            <p style="color: #ccc; font-size: 13px; margin: 4px 0 0 0;"><strong>Action Items:</strong> Complete Python certification by April 15. Research 3 companies in target domain.</p>
+            <p style="color: #ccc; font-size: 13px; margin: 4px 0 0 0;"><strong>Follow-up:</strong> Recommended in 2 weeks</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Slot Booking Modal (Student View)</h3>
+  <div class="mockup">
+    <div class="mockup-header">Book a Counselling Session — Anonymous Slot Picker</div>
+    <div class="mockup-body" style="padding: 24px;">
+      <!-- Calendar Week View -->
+      <div style="margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <button style="background: #16213e; border: 1px solid #333; color: #ccc; padding: 6px 12px; border-radius: 4px; cursor: pointer;">← Prev Week</button>
+          <span style="color: #e0e0e0; font-weight: 600;">April 7 - April 11, 2026</span>
+          <button style="background: #16213e; border: 1px solid #333; color: #ccc; padding: 6px 12px; border-radius: 4px; cursor: pointer;">Next Week →</button>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px;">
+          <!-- Monday -->
+          <div style="background: #16213e; border-radius: 8px; padding: 12px; text-align: center;">
+            <p style="color: #888; font-size: 12px; margin: 0;">MON</p>
+            <p style="color: #e0e0e0; font-weight: 600; margin: 4px 0 12px 0;">Apr 7</p>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <div style="background: #064e3b; color: #6ee7b7; padding: 6px; border-radius: 4px; font-size: 12px; cursor: pointer;">10:00 AM</div>
+              <div style="background: #064e3b; color: #6ee7b7; padding: 6px; border-radius: 4px; font-size: 12px; cursor: pointer;">10:30 AM</div>
+              <div style="background: #064e3b; color: #6ee7b7; padding: 6px; border-radius: 4px; font-size: 12px; cursor: pointer;">11:00 AM</div>
+              <div style="background: #1e3a5f; border: 2px solid #64b5f6; color: #64b5f6; padding: 6px; border-radius: 4px; font-size: 12px; cursor: pointer;">11:30 AM ✓</div>
+            </div>
+          </div>
+          <!-- Tuesday -->
+          <div style="background: #16213e; border-radius: 8px; padding: 12px; text-align: center;">
+            <p style="color: #888; font-size: 12px; margin: 0;">TUE</p>
+            <p style="color: #e0e0e0; font-weight: 600; margin: 4px 0 12px 0;">Apr 8</p>
+            <p style="color: #555; font-size: 13px; margin-top: 20px;">No slots</p>
+          </div>
+          <!-- Wednesday -->
+          <div style="background: #16213e; border-radius: 8px; padding: 12px; text-align: center;">
+            <p style="color: #888; font-size: 12px; margin: 0;">WED</p>
+            <p style="color: #e0e0e0; font-weight: 600; margin: 4px 0 12px 0;">Apr 9</p>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <div style="background: #064e3b; color: #6ee7b7; padding: 6px; border-radius: 4px; font-size: 12px; cursor: pointer;">10:00 AM</div>
+              <div style="background: #064e3b; color: #6ee7b7; padding: 6px; border-radius: 4px; font-size: 12px; cursor: pointer;">10:30 AM</div>
+            </div>
+          </div>
+          <!-- Thursday -->
+          <div style="background: #16213e; border-radius: 8px; padding: 12px; text-align: center;">
+            <p style="color: #888; font-size: 12px; margin: 0;">THU</p>
+            <p style="color: #e0e0e0; font-weight: 600; margin: 4px 0 12px 0;">Apr 10</p>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <div style="background: #064e3b; color: #6ee7b7; padding: 6px; border-radius: 4px; font-size: 12px; cursor: pointer;">2:00 PM</div>
+              <div style="background: #064e3b; color: #6ee7b7; padding: 6px; border-radius: 4px; font-size: 12px; cursor: pointer;">2:30 PM</div>
+              <div style="background: #064e3b; color: #6ee7b7; padding: 6px; border-radius: 4px; font-size: 12px; cursor: pointer;">3:00 PM</div>
+            </div>
+          </div>
+          <!-- Friday -->
+          <div style="background: #16213e; border-radius: 8px; padding: 12px; text-align: center;">
+            <p style="color: #888; font-size: 12px; margin: 0;">FRI</p>
+            <p style="color: #e0e0e0; font-weight: 600; margin: 4px 0 12px 0;">Apr 11</p>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <div style="background: #064e3b; color: #6ee7b7; padding: 6px; border-radius: 4px; font-size: 12px; cursor: pointer;">10:00 AM</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Booking Form -->
+      <div style="background: #0d1b2a; border: 1px solid #333; border-radius: 8px; padding: 16px; margin-top: 16px;">
+        <p style="color: #e0e0e0; margin: 0 0 12px 0; font-weight: 600;">Selected: Monday Apr 7, 11:30 AM (30 min)</p>
+        <label style="color: #aaa; font-size: 13px;">Reason for counselling:</label>
+        <textarea style="width: 100%; background: #16213e; border: 1px solid #333; color: #ccc; padding: 10px; border-radius: 6px; margin-top: 6px; min-height: 60px; box-sizing: border-box; resize: vertical;" placeholder="Briefly describe what you'd like to discuss..."></textarea>
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px;">
+          <button style="background: transparent; border: 1px solid #555; color: #aaa; padding: 8px 20px; border-radius: 6px; cursor: pointer;">Cancel</button>
+          <button style="background: #64ffda; color: #1a1a2e; border: none; padding: 8px 20px; border-radius: 6px; font-weight: 600; cursor: pointer;">Book Slot</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Counsellor Dashboard</h3>
+  <div class="mockup">
+    <div class="mockup-header">Counsellor Portal — Schedule & Sessions</div>
+    <div class="mockup-body" style="padding: 0;">
+      <!-- Nav tabs -->
+      <div style="background: #1a1a2e; display: flex; border-bottom: 1px solid #333;">
+        <div style="padding: 14px 24px; color: #64ffda; border-bottom: 2px solid #64ffda; font-weight: 600; font-size: 14px;">My Schedule</div>
+        <div style="padding: 14px 24px; color: #888; font-size: 14px;">Availability</div>
+        <div style="padding: 14px 24px; color: #888; font-size: 14px;">Session History</div>
+        <div style="padding: 14px 24px; color: #888; font-size: 14px; position: relative;">
+          Pending
+          <span style="background: #ff6b6b; color: white; font-size: 10px; padding: 2px 6px; border-radius: 8px; margin-left: 4px;">2</span>
+        </div>
+      </div>
+
+      <div style="padding: 24px;">
+        <!-- Today's Schedule -->
+        <h4 style="color: #e0e0e0; margin: 0 0 16px 0;">Today — April 2, 2026</h4>
+
+        <!-- Session Card -->
+        <div style="background: #16213e; border-left: 4px solid #64ffda; border-radius: 0 8px 8px 0; padding: 16px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <span style="background: #064e3b; color: #6ee7b7; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">CONFIRMED</span>
+              <p style="color: #e0e0e0; margin: 8px 0 4px 0; font-weight: 600;">10:00 AM - 10:30 AM</p>
+              <p style="color: #888; font-size: 13px; margin: 0;">Student: Rahul Sharma (B.Tech CS, 3rd Year)</p>
+              <p style="color: #888; font-size: 13px; margin: 4px 0 0 0;">Reason: Career guidance for data science domain</p>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
+              <a href="#" style="background: #1e3a5f; color: #64b5f6; padding: 6px 12px; border-radius: 4px; font-size: 12px; text-decoration: none;">🔗 Join Meet</a>
+              <button style="background: transparent; border: 1px solid #ffd93d; color: #ffd93d; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer;">Reschedule</button>
+              <button style="background: transparent; border: 1px solid #ff6b6b; color: #ff6b6b; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer;">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Completed Session needing notes -->
+        <div style="background: #16213e; border-left: 4px solid #ffd93d; border-radius: 0 8px 8px 0; padding: 16px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <span style="background: #78350f; color: #fcd34d; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">NEEDS NOTES</span>
+              <p style="color: #e0e0e0; margin: 8px 0 4px 0; font-weight: 600;">9:00 AM - 9:30 AM (completed)</p>
+              <p style="color: #888; font-size: 13px; margin: 0;">Student: Priya Patel (B.Com, 2nd Year)</p>
+            </div>
+            <button style="background: #ffd93d; color: #1a1a2e; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 12px; cursor: pointer;">Add Notes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Admin Queue Dashboard</h3>
+  <div class="mockup">
+    <div class="mockup-header">Admin → Counselling Request Queue</div>
+    <div class="mockup-body" style="padding: 0;">
+      <!-- Stats bar -->
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border-bottom: 1px solid #333;">
+        <div style="padding: 16px; text-align: center; border-right: 1px solid #333;">
+          <p style="color: #888; font-size: 12px; margin: 0;">Pending</p>
+          <p style="color: #ff6b6b; font-size: 28px; font-weight: 700; margin: 4px 0 0 0;">5</p>
+        </div>
+        <div style="padding: 16px; text-align: center; border-right: 1px solid #333;">
+          <p style="color: #888; font-size: 12px; margin: 0;">Assigned Today</p>
+          <p style="color: #ffd93d; font-size: 28px; font-weight: 700; margin: 4px 0 0 0;">3</p>
+        </div>
+        <div style="padding: 16px; text-align: center; border-right: 1px solid #333;">
+          <p style="color: #888; font-size: 12px; margin: 0;">Confirmed</p>
+          <p style="color: #6ee7b7; font-size: 28px; font-weight: 700; margin: 4px 0 0 0;">12</p>
+        </div>
+        <div style="padding: 16px; text-align: center;">
+          <p style="color: #888; font-size: 12px; margin: 0;">This Week</p>
+          <p style="color: #64b5f6; font-size: 28px; font-weight: 700; margin: 4px 0 0 0;">20</p>
+        </div>
+      </div>
+
+      <!-- Queue Table -->
+      <div style="padding: 24px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <thead>
+            <tr style="border-bottom: 1px solid #333;">
+              <th style="text-align: left; padding: 10px; color: #888; font-weight: 600;">Student</th>
+              <th style="text-align: left; padding: 10px; color: #888; font-weight: 600;">Requested Slot</th>
+              <th style="text-align: left; padding: 10px; color: #888; font-weight: 600;">Reason</th>
+              <th style="text-align: left; padding: 10px; color: #888; font-weight: 600;">Status</th>
+              <th style="text-align: left; padding: 10px; color: #888; font-weight: 600;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding: 12px; color: #e0e0e0;">Rahul Sharma<br><span style="color: #666; font-size: 11px;">B.Tech CS, 3rd Year</span></td>
+              <td style="padding: 12px; color: #ccc;">Apr 10, 10:00 AM<br><span style="color: #666; font-size: 11px;">30 min</span></td>
+              <td style="padding: 12px; color: #aaa; max-width: 200px;">Career guidance for data science</td>
+              <td style="padding: 12px;"><span style="background: #7f1d1d; color: #fca5a5; padding: 3px 8px; border-radius: 4px; font-size: 11px;">PENDING</span></td>
+              <td style="padding: 12px;">
+                <select style="background: #16213e; border: 1px solid #333; color: #ccc; padding: 6px 10px; border-radius: 4px; font-size: 12px;">
+                  <option>Select Counsellor</option>
+                  <option>Dr. Mehra (Career)</option>
+                  <option>Ms. Kapoor (Academic)</option>
+                  <option>Mr. Singh (Psychology)</option>
+                </select>
+                <button style="background: #64ffda; color: #1a1a2e; border: none; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; margin-left: 6px; cursor: pointer;">Assign</button>
+              </td>
+            </tr>
+            <tr style="border-bottom: 1px solid #222;">
+              <td style="padding: 12px; color: #e0e0e0;">Ananya Gupta<br><span style="color: #666; font-size: 11px;">BBA, 1st Year</span></td>
+              <td style="padding: 12px; color: #ccc;">Apr 11, 2:00 PM<br><span style="color: #666; font-size: 11px;">45 min</span></td>
+              <td style="padding: 12px; color: #aaa;">Feeling stressed about placements</td>
+              <td style="padding: 12px;"><span style="background: #78350f; color: #fcd34d; padding: 3px 8px; border-radius: 4px; font-size: 11px;">ASSIGNED</span></td>
+              <td style="padding: 12px; color: #aaa; font-size: 12px;">→ Ms. Kapoor<br><span style="color: #666; font-size: 11px;">Awaiting confirmation</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Counsellor Availability Manager</h3>
+  <div class="mockup">
+    <div class="mockup-header">Counsellor → Manage Availability (Hybrid: Templates + Manual)</div>
+    <div class="mockup-body" style="padding: 24px;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+        <!-- Recurring Templates -->
+        <div>
+          <h4 style="color: #64ffda; margin: 0 0 12px 0;">Recurring Weekly Schedule</h4>
+          <div style="background: #0d1b2a; border-radius: 8px; padding: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #222;">
+              <span style="color: #ccc; font-size: 14px;">Monday</span>
+              <span style="color: #6ee7b7; font-size: 13px;">10:00 AM - 1:00 PM (30 min slots)</span>
+              <span style="color: #888; font-size: 12px; cursor: pointer;">✏️ Edit</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #222;">
+              <span style="color: #ccc; font-size: 14px;">Wednesday</span>
+              <span style="color: #6ee7b7; font-size: 13px;">10:00 AM - 1:00 PM (30 min slots)</span>
+              <span style="color: #888; font-size: 12px; cursor: pointer;">✏️ Edit</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #222;">
+              <span style="color: #ccc; font-size: 14px;">Friday</span>
+              <span style="color: #6ee7b7; font-size: 13px;">2:00 PM - 4:00 PM (45 min slots)</span>
+              <span style="color: #888; font-size: 12px; cursor: pointer;">✏️ Edit</span>
+            </div>
+            <button style="background: transparent; border: 1px dashed #555; color: #888; padding: 8px; width: 100%; border-radius: 4px; margin-top: 12px; cursor: pointer;">+ Add Day</button>
+          </div>
+        </div>
+        <!-- Manual Overrides -->
+        <div>
+          <h4 style="color: #ffd93d; margin: 0 0 12px 0;">Manual Overrides & Extra Slots</h4>
+          <div style="background: #0d1b2a; border-radius: 8px; padding: 16px;">
+            <div style="padding: 8px 0; border-bottom: 1px solid #222;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: #ff6b6b; font-size: 13px;">🚫 Apr 14 (Mon) — Blocked</span>
+                <span style="color: #888; font-size: 12px; cursor: pointer;">✕ Remove</span>
+              </div>
+              <span style="color: #666; font-size: 11px;">Reason: Public holiday</span>
+            </div>
+            <div style="padding: 8px 0; border-bottom: 1px solid #222;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: #6ee7b7; font-size: 13px;">➕ Apr 12 (Sat) 10:00-11:00 AM</span>
+                <span style="color: #888; font-size: 12px; cursor: pointer;">✕ Remove</span>
+              </div>
+              <span style="color: #666; font-size: 11px;">Extra slot (manually added)</span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 12px;">
+              <button style="background: transparent; border: 1px dashed #6ee7b7; color: #6ee7b7; padding: 8px; flex: 1; border-radius: 4px; cursor: pointer; font-size: 12px;">+ Add Extra Slot</button>
+              <button style="background: transparent; border: 1px dashed #ff6b6b; color: #ff6b6b; padding: 8px; flex: 1; border-radius: 4px; cursor: pointer; font-size: 12px;">+ Block Date</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

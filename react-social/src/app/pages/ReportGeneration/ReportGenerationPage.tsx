@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import { ReadCollegeList, GetSessionsByInstituteCode } from "../College/API/College_APIs";
 import {
   getAllAssessments,
   getStudentsWithMappingByInstituteId,
   Assessment,
 } from "../StudentInformation/StudentInfo_APIs";
-import { generateBetReportData, exportBetReportExcel } from "./API/BetReportData_APIs";
+import { generateBetReportData, exportBetReportExcel, exportGeneralAssessmentExcel, exportGeneralAssessmentExcelForStudent } from "./API/BetReportData_APIs";
 
 type StudentRow = {
   userStudentId: number;
@@ -59,6 +60,7 @@ const ReportGenerationPage: React.FC = () => {
   // ── Generate / Export ──
   const [generating, setGenerating] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingOMR, setExportingOMR] = useState(false);
 
   // ═══════════════════════ DATA LOADING ═══════════════════════
 
@@ -489,9 +491,9 @@ const ReportGenerationPage: React.FC = () => {
                       if (errors.length > 0) {
                         msg += `\n${errors.length} skipped (no completed assessment or error).`;
                       }
-                      alert(msg);
+                      showSuccessToast(msg);
                     } catch (err: any) {
-                      alert("Failed: " + (err?.response?.data?.error || err.message));
+                      showErrorToast("Failed: " + (err?.response?.data?.error || err.message));
                     } finally {
                       setGenerating(false);
                     }
@@ -522,7 +524,7 @@ const ReportGenerationPage: React.FC = () => {
                       a.remove();
                       window.URL.revokeObjectURL(url);
                     } catch (err: any) {
-                      alert("Export failed: " + (err?.response?.data?.error || err.message));
+                      showErrorToast("Export failed: " + (err?.response?.data?.error || err.message));
                     } finally {
                       setExporting(false);
                     }
@@ -530,6 +532,55 @@ const ReportGenerationPage: React.FC = () => {
                   disabled={exporting}
                 >
                   {exporting ? "Exporting..." : "Export XLSX"}
+                </button>
+                <button
+                  className="btn btn-sm btn-info"
+                  onClick={async () => {
+                    const visibleIds = new Set(displayedStudents.map((s: any) => s.userStudentId));
+                    const selectedVisible = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
+                    setExportingOMR(true);
+                    try {
+                      if (selectedVisible.length === 1) {
+                        const res = await exportGeneralAssessmentExcelForStudent(
+                          Number(selectedAssessment), selectedVisible[0]
+                        );
+                        const url = window.URL.createObjectURL(new Blob([res.data]));
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `general_assessment_${selectedAssessment}_student_${selectedVisible[0]}.xlsx`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        window.URL.revokeObjectURL(url);
+                      } else {
+                        const res = await exportGeneralAssessmentExcel(Number(selectedAssessment));
+                        const url = window.URL.createObjectURL(new Blob([res.data]));
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `general_assessment_${selectedAssessment}.xlsx`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        window.URL.revokeObjectURL(url);
+                      }
+                    } catch (err: any) {
+                      showErrorToast("Export failed: " + (err?.response?.data?.error || err.message));
+                    } finally {
+                      setExportingOMR(false);
+                    }
+                  }}
+                  disabled={exportingOMR}
+                >
+                  {exportingOMR ? "Exporting..." : (
+                    <>
+                      Export OMR Data
+                      {visibleSelectedCount === 1
+                        ? ` (1 selected)`
+                        : visibleSelectedCount > 1
+                        ? ` (${visibleSelectedCount} selected)`
+                        : ` (All)`}
+                    </>
+                  )}
                 </button>
               </div>
 

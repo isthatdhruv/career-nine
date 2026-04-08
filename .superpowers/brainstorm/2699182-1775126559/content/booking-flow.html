@@ -1,0 +1,154 @@
+<h2>Booking Flow & Status Lifecycle</h2>
+<p class="subtitle">End-to-end flow from slot creation to session completion</p>
+
+<div class="section">
+  <h3>Complete Booking Flow</h3>
+  <div class="mockup">
+    <div class="mockup-header">Flow: Student Books → Admin Assigns → Counsellor Confirms → Session Happens</div>
+    <div class="mockup-body" style="padding: 24px; font-family: monospace; font-size: 12px; line-height: 1.5;">
+      <pre style="margin:0; white-space: pre-wrap; color: #e0e0e0;">
+ COUNSELLOR                    SYSTEM                      ADMIN                       STUDENT
+ ──────────                    ──────                      ─────                       ───────
+     │                            │                           │                           │
+     │  Sets recurring template   │                           │                           │
+     │  (Mon/Wed 10AM-1PM, 30min) │                           │                           │
+     │──────────────────────────▶│                           │                           │
+     │                            │                           │                           │
+     │                     ┌──────┴──────┐                    │                           │
+     │                     │  Daily Cron  │                    │                           │
+     │                     │  Materializes│                    │                           │
+     │                     │  Slots (4wks)│                    │                           │
+     │                     └──────┬──────┘                    │                           │
+     │                            │                           │                           │
+     │  Can also manually add     │                           │      Views available      │
+     │  individual slots          │                           │      slots (anonymous,    │
+     │──────────────────────────▶│                           │      no counsellor names) │
+     │                            │◀──────────────────────────┼───────────────────────────│
+     │                            │                           │                           │
+     │                            │                           │      Selects a slot &     │
+     │                            │                           │      provides reason      │
+     │                            │◀──────────────────────────┼───────────────────────────│
+     │                            │                           │                           │
+     │                     ┌──────┴──────┐                    │                           │
+     │                     │ Slot status  │                    │                    ┌──────┴──────┐
+     │                     │ → REQUESTED  │                    │                    │📧 "Request  │
+     │                     │ Appointment  │                    │                    │  Received"  │
+     │                     │ → PENDING    │                    │                    │  email sent │
+     │                     └──────┬──────┘                    │                    └──────┬──────┘
+     │                            │                           │                           │
+     │                            │    Shows in admin queue   │                           │
+     │                            │──────────────────────────▶│                           │
+     │                            │                           │                           │
+     │                            │    Admin assigns          │                           │
+     │                            │    counsellor to request  │                           │
+     │                            │◀──────────────────────────│                           │
+     │                            │                           │                           │
+     │                     ┌──────┴──────┐                    │                           │
+     │                     │ Slot status  │                    │                           │
+     │              ┌──────│ → ASSIGNED   │                    │                           │
+     │              │      │ Appointment  │                    │                           │
+     │       ┌──────┴──────┐ → ASSIGNED  │                    │                           │
+     │       │📧 "New      │└─────────────┘                    │                           │
+     │       │  Session    │                                   │                           │
+     │       │  Assigned"  │                                   │                           │
+     │       │  email sent │                                   │                           │
+     │       └──────┬──────┘                                   │                           │
+     │              │                                          │                           │
+     │  Confirms    │                                          │                           │
+     │  the session │                                          │                           │
+     │──────────────┼────────▶│                                │                           │
+     │                        │                                │                           │
+     │                 ┌──────┴──────┐                         │                           │
+     │                 │ Auto-generate│                         │                    ┌──────┴──────┐
+     │                 │ Google Meet  │                         │                    │📧 "Session  │
+     │                 │ Slot →       │                         │                    │  Confirmed" │
+     │                 │  CONFIRMED   │                         │                    │  + Meet link│
+     │                 │ Appt →       │                         │                    │  + date/time│
+     │                 │  CONFIRMED   │                         │                    └──────┬──────┘
+     │                 └──────┬──────┘                         │                           │
+     │                        │                                │                           │
+     │                        │         ── SESSION DAY ──      │                           │
+     │                        │                                │                           │
+     │                 ┌──────┴──────┐                         │                           │
+     │                 │📧 24hr      │                         │                    ┌──────┴──────┐
+     │          ┌──────│  reminder   │─────────────────────────┼───────────────────▶│📧 24hr      │
+     │   ┌──────┴──────┐            │                         │                    │  reminder   │
+     │   │📧 1hr       └────────────┘                         │                    └─────────────┘
+     │   │  reminder   │──────────────────────────────────────┼───────────────────▶│📧 1hr       │
+     │   └─────────────┘                                      │                    │  reminder   │
+     │                        │                                │                    └─────────────┘
+     │    Session happens     │                                │                           │
+     │    via Meet link       │◀───────────────────────────────┼───────────────────────────│
+     │                        │                                │                           │
+     │  Fills session notes   │                                │                           │
+     │  (public + private)    │                                │                           │
+     │───────────────────────▶│                                │                           │
+     │                        │                                │                           │
+     │                 ┌──────┴──────┐                         │                           │
+     │                 │ Slot →       │                         │                    ┌──────┴──────┐
+     │                 │  COMPLETED   │                         │                    │ Can view    │
+     │                 │ Appt →       │                         │                    │ public      │
+     │                 │  COMPLETED   │                         │                    │ remarks on  │
+     │                 └─────────────┘                         │                    │ dashboard   │
+     │                                                         │                    └─────────────┘
+      </pre>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Status Lifecycles</h3>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">Slot Status</div>
+      <div class="mockup-body" style="padding: 20px; font-family: monospace; font-size: 13px;">
+        <pre style="margin:0; color: #e0e0e0;">
+  AVAILABLE ──▶ REQUESTED ──▶ ASSIGNED ──▶ CONFIRMED ──▶ COMPLETED
+      │              │             │             │
+      │              │             │             │
+      ▼              ▼             ▼             ▼
+  CANCELLED      CANCELLED    CANCELLED     CANCELLED
+  (by counsellor  (student     (any party)   (4hr rule
+   removes slot)   cancels)                   enforced)
+        </pre>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">Appointment Status</div>
+      <div class="mockup-body" style="padding: 20px; font-family: monospace; font-size: 13px;">
+        <pre style="margin:0; color: #e0e0e0;">
+  PENDING ──▶ ASSIGNED ──▶ CONFIRMED ──▶ COMPLETED
+     │            │             │
+     │            │             │
+     ▼            ▼             ▼
+  CANCELLED   CANCELLED    CANCELLED
+                  │
+                  ▼
+             RESCHEDULED
+             (counsellor proposes
+              new slot, new appt
+              created, old one
+              marked RESCHEDULED)
+        </pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Cancellation & Reschedule Rules</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+    <div style="background: #1a1a2e; border: 1px solid #333; border-radius: 8px; padding: 16px;">
+      <h4 style="color: #ff6b6b; margin-top: 0;">🚫 4-Hour Rule</h4>
+      <p style="color: #aaa; font-size: 14px;">No cancellations within 4 hours of session start time. Enforced server-side for all roles.</p>
+    </div>
+    <div style="background: #1a1a2e; border: 1px solid #333; border-radius: 8px; padding: 16px;">
+      <h4 style="color: #ffd93d; margin-top: 0;">🔄 Reschedule</h4>
+      <p style="color: #aaa; font-size: 14px;">Counsellor proposes new slot directly. Old appointment → RESCHEDULED. New appointment created and auto-CONFIRMED. Audit log captures both.</p>
+    </div>
+    <div style="background: #1a1a2e; border: 1px solid #333; border-radius: 8px; padding: 16px;">
+      <h4 style="color: #64ffda; margin-top: 0;">📧 Notifications</h4>
+      <p style="color: #aaa; font-size: 14px;">Every cancel/reschedule triggers email to all other parties + in-app notification. Audit log records who did it and why.</p>
+    </div>
+  </div>
+</div>

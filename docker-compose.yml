@@ -17,6 +17,12 @@ services:
       resources:
         limits:
           memory: 2g
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pCareer-qCsfeuECc3MW"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - career_shared_net
 
@@ -55,8 +61,13 @@ services:
       - 8080:8080
     command: ["java", "-Xms1g", "-Xmx2g", "-jar", "/usr/local/lib/demo.jar"]
     restart: always
+    volumes:
+      - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
     env_file:
       - .env
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
     deploy:
       resources:
         limits:
@@ -68,7 +79,55 @@ services:
         condition: service_healthy
     networks:
       - career_shared_net
+      
+  mysql_db_staging:
+    image: mysql:latest
+    restart: always
+    environment:
+      MYSQL_DATABASE: 'career-9'
+      MYSQL_USER: 'user'
+      MYSQL_PASSWORD: 'Career-qCsfeuECc3MW'
+      MYSQL_ROOT_PASSWORD: 'Career-qCsfeuECc3MW'
+    ports:
+      - '3307:3306'
+    volumes:
+      - mysql_staging_data:/var/lib/mysql
+      - ./mysql-custom.cnf:/etc/mysql/conf.d/custom.cnf
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pCareer-qCsfeuECc3MW"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - career_shared_net
 
+  sync_cron:
+    build:
+      context: .
+      dockerfile: Dockerfile.cron
+    restart: always
+    environment:
+      MASTER_HOST: 'mysql_db_api'
+      STAGING_HOST: 'mysql_db_staging'
+      DB_NAME: 'career-9'
+      DB_USER: 'root'
+      DB_PASSWORD: 'Career-qCsfeuECc3MW'
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    depends_on:
+      mysql_db_api:
+        condition: service_healthy
+      mysql_db_staging:
+        condition: service_healthy
+    networks:
+      - career_shared_net
   # redisinsight:
   #   image: redis/redisinsight:latest
   #   restart: always
@@ -86,10 +145,45 @@ services:
   #   volumes:
   #     - redisinsight_data:/data
 
+  backup_cron:
+    image: mysql:latest
+    restart: always
+    volumes:
+      - ./backup.sh:/backup.sh:ro
+      - backup_data:/backups
+    entrypoint: /bin/bash
+    command: >
+      -c "
+      apt-get update -qq && apt-get install -y -qq cron python3 python3-pip > /dev/null 2>&1;
+      pip3 install requests --break-system-packages -q 2>/dev/null || pip3 install requests -q;
+      echo '0 2 * * * /bin/bash /backup.sh >> /backups/backup.log 2>&1' | crontab -;
+      echo 'Backup cron started — runs daily at 2 AM UTC';
+      cron -f
+      "
+    environment:
+      DB_HOST: mysql_db_api
+      DB_PORT: '3306'
+      DB_NAME: career-9
+      DB_USER: root
+      DB_PASSWORD: Career-qCsfeuECc3MW
+      DO_SPACES_ACCESS_KEY: ${DO_SPACES_ACCESS_KEY:-DO801TH68APHQF8DFA4J}
+      DO_SPACES_SECRET_KEY: ${DO_SPACES_SECRET_KEY:-sr6jJMFt83bI9nyA8jaQDVjhFKt9ltQPJEWejDNLgAA}
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    depends_on:
+      mysql_db_api:
+        condition: service_healthy
+    networks:
+      - career_shared_net
+
 volumes:
   mysql_data:
+  mysql_staging_data:
   redis_data:
   redisinsight_data:
+  backup_data:
 
 networks:
   career_shared_net:

@@ -60,6 +60,43 @@ export function setupAxios(axios: any) {
     },
     (err: any) => Promise.reject(err)
   );
+
+  axios.interceptors.response.use(
+    (response: any) => response,
+    (error: any) => {
+      if (!error.response) {
+        const { showErrorToast } = require('../../../utils/toast');
+        showErrorToast('Connection issue, check your internet');
+        return Promise.reject(error);
+      }
+
+      const status = error.response.status;
+      const message = error.response?.data?.message || '';
+
+      if (status === 401) {
+        const { showErrorToast } = require('../../../utils/toast');
+        showErrorToast('Session expired, please log in again');
+        removeAuth();
+        window.location.href = '/auth';
+        return Promise.reject(error);
+      }
+
+      if (status === 403) {
+        const { showErrorToast } = require('../../../utils/toast');
+        showErrorToast(message || 'You don\'t have permission for this action');
+        return Promise.reject(error);
+      }
+
+      if (status >= 500) {
+        const { showErrorToast } = require('../../../utils/toast');
+        showErrorToast(message || 'Something went wrong, please try again');
+        return Promise.reject(error);
+      }
+
+      // 400, 409, and other client errors pass through to the component
+      return Promise.reject(error);
+    }
+  );
 }
 
 export { getAuth, setAuth, removeAuth, AUTH_LOCAL_STORAGE_KEY };

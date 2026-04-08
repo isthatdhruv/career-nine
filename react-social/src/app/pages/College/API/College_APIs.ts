@@ -47,6 +47,14 @@ export function DeleteCollegeData(id: any) {
   return axios.get(deleteCollege + id);
 }
 
+export function GetDeletedInstitutes() {
+  return axios.get(`${API_URL}/instituteDetail/deleted`);
+}
+
+export function RestoreInstitute(id: any) {
+  return axios.get(`${API_URL}/instituteDetail/restore/${id}`);
+}
+
 export function MapContactsAndBoards(instituteCode: number | string, contactPersonIds: number[], boardIds: number[]) {
   return axios.post(`${API_URL}/instituteDetail/map-contacts-boards`, {
     instituteCode: Number(instituteCode),

@@ -4,11 +4,13 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.career9.LanguageOption;
 import com.kccitm.api.repository.Career9.LanguageOptionRepository;
 
@@ -25,8 +27,9 @@ public class LanguageOptionsController {
     }
 
     @GetMapping("/get/{id}")
-    public LanguageOption getOptionsById(Long id){
-       return languageoption.findById(id).orElse(null);
+    public LanguageOption getOptionsById(@PathVariable Long id){
+       return languageoption.findById(id)
+           .orElseThrow(() -> new ResourceNotFoundException("LanguageOption", "id", id));
     }
     @PostMapping("/create")
     public LanguageOption createLanguageOption(@RequestBody LanguageOption langoption){

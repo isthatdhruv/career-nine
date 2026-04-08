@@ -1,3 +1,6 @@
+# Local secrets (never commit)
+**/application-local.yml
+
 # Dependencies
 node_modules/
 npm-debug.log*
@@ -215,14 +218,14 @@ coverage/
 **/.project
 **/.classpath
 **/.settings/
-
+application.yml
 # Webpack and bundler cache
 **/.cache/
 **/webpack-stats.json
-
+**/**/**/application.yml
 # TypeScript
 **/*.tsbuildinfo
-
+spring-social/src/main/resources/application.yml
 # ESLint cache
 **/.eslintcache
 
@@ -233,3 +236,4 @@ coverage/
 # docker-compose.yml files are important and should be committed
 # !docker-compose.yml
 # !**/docker-compose.yml
+./Dump20260324.sql

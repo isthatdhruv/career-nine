@@ -7,6 +7,7 @@ import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
 import { ReadAssessmentByIdData, UpdateAssessmentData } from "../../API/Create_Assessment_APIs";
 import { ReadQuestionaireData } from "../../API/Create_Questionaire_APIs";
+import { showErrorToast } from '../../../../utils/toast';
 
 const AssessmentEditPage = (props?: {
   setPageLoading?: any;
@@ -119,7 +120,7 @@ const AssessmentEditPage = (props?: {
         }
       } catch (error) {
         const errorMessage = (error as any)?.response?.data?.message || (error as any)?.message || "Unknown error occurred";
-        alert(`Failed to update assessment: ${errorMessage}`);
+        showErrorToast(`Failed to update assessment: ${errorMessage}`);
       } finally {
         setLoading(false);
       }

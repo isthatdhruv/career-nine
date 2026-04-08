@@ -18,4 +18,6 @@ public interface BetReportDataRepository extends JpaRepository<BetReportData, Lo
     List<BetReportData> findByUserStudentUserStudentId(Long userStudentId);
 
     void deleteByUserStudentUserStudentIdAndAssessmentId(Long userStudentId, Long assessmentId);
+
+    void deleteByUserStudentUserStudentId(Long userStudentId);
 }

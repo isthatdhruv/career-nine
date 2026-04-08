@@ -17,6 +17,7 @@ export interface StudentInfo {
     assesment_id?: string;
     studentDob?: string;
     schoolSectionId?: number;
+    careerNineRollNumber?: string;
 }
 
 export interface Assessment {
@@ -25,6 +26,7 @@ export interface Assessment {
     isActive?: boolean;
     starDate?: string;
     endDate?: string;
+    questionnaire?: { type?: boolean | null; questionnaireId?: number };
 }
 
 export interface BulkAssessmentAssignment {
@@ -225,4 +227,28 @@ export function getBetReport(instituteId: number, assessmentId: number) {
     return axios.get<BetReportResponse>(
         `${STUDENT_INFO_BASE}/bet-report/${instituteId}/${assessmentId}`
     );
+}
+
+// ── One-click report generation (generates data + HTML + returns URL) ──
+
+export interface OneClickReportResponse {
+    reportUrl: string;
+    studentName: string;
+    status: string;
+}
+
+export function generateBetReportOneClick(assessmentId: number, userStudentId: number, force = false) {
+    return axios.post<OneClickReportResponse>(`${API_URL}/bet-report-data/one-click-report`, {
+        assessmentId,
+        userStudentId,
+        force,
+    }, { timeout: 120000 }); // 2 min timeout for report generation
+}
+
+export function generateNavigatorReportOneClick(assessmentId: number, userStudentId: number, force = false) {
+    return axios.post<OneClickReportResponse>(`${API_URL}/navigator-report-data/one-click-report`, {
+        assessmentId,
+        userStudentId,
+        force,
+    }, { timeout: 120000 }); // 2 min timeout for report generation + AI
 }

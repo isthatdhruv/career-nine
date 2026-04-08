@@ -51,6 +51,9 @@ public class AssessmentTable implements java.io.Serializable {
     @Column(name = "save_later", columnDefinition = "BOOLEAN DEFAULT TRUE")
     private Boolean saveLater = true;
 
+    @Column(name = "is_deleted", columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private Boolean isDeleted = false;
+
 
     public Long getId() {
         return id;
@@ -141,6 +144,14 @@ public class AssessmentTable implements java.io.Serializable {
 
     public void setSaveLater(Boolean saveLater) {
         this.saveLater = saveLater;
+    }
+
+    public Boolean getIsDeleted() {
+        return isDeleted;
+    }
+
+    public void setIsDeleted(Boolean isDeleted) {
+        this.isDeleted = isDeleted;
     }
 
 }

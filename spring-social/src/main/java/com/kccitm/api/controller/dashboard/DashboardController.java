@@ -26,21 +26,8 @@ public class DashboardController {
      */
     @GetMapping("/student/getbyid/{studentId}")
     public ResponseEntity<?> getStudentBasicInfo(@PathVariable Long studentId) {
-        try {
-            Map<String, Object> studentInfo = dashboardService.getStudentBasicInfo(studentId);
-            return ResponseEntity.ok(studentInfo);
-        } catch (RuntimeException e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            error.put("details", e.getClass().getName());
-            return ResponseEntity.status(404).body(error);
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            error.put("stackTrace", e.toString());
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(error);
-        }
+        Map<String, Object> studentInfo = dashboardService.getStudentBasicInfo(studentId);
+        return ResponseEntity.ok(studentInfo);
     }
 
     /**
@@ -51,14 +38,8 @@ public class DashboardController {
     public ResponseEntity<?> getGameResults(
             @PathVariable Long studentId,
             @org.springframework.web.bind.annotation.RequestParam(required = false) Long assessmentId) {
-        try {
-            Map<String, Object> gameResults = dashboardService.getGameResults(studentId, assessmentId);
-            return ResponseEntity.ok(gameResults);
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(error);
-        }
+        Map<String, Object> gameResults = dashboardService.getGameResults(studentId, assessmentId);
+        return ResponseEntity.ok(gameResults);
     }
 
     /**
@@ -69,14 +50,8 @@ public class DashboardController {
     public ResponseEntity<?> getAssessmentScores(
             @PathVariable Long studentId,
             @org.springframework.web.bind.annotation.RequestParam(required = false) Long assessmentId) {
-        try {
-            Map<String, Object> assessmentScores = dashboardService.getAssessmentScores(studentId, assessmentId);
-            return ResponseEntity.ok(assessmentScores);
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(error);
-        }
+        Map<String, Object> assessmentScores = dashboardService.getAssessmentScores(studentId, assessmentId);
+        return ResponseEntity.ok(assessmentScores);
     }
 
     /**
@@ -87,14 +62,8 @@ public class DashboardController {
     public ResponseEntity<?> getSelfManagement(
             @PathVariable Long studentId,
             @org.springframework.web.bind.annotation.RequestParam(required = false) Long assessmentId) {
-        try {
-            Map<String, Object> selfManagement = dashboardService.getSelfManagement(studentId, assessmentId);
-            return ResponseEntity.ok(selfManagement);
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(error);
-        }
+        Map<String, Object> selfManagement = dashboardService.getSelfManagement(studentId, assessmentId);
+        return ResponseEntity.ok(selfManagement);
     }
 
     /**
@@ -103,18 +72,12 @@ public class DashboardController {
      */
     @GetMapping("/dashboard/{studentId}")
     public ResponseEntity<?> getCompleteDashboard(@PathVariable Long studentId,@RequestParam Long assessmentId) {
-        try {
-            Map<String, Object> dashboard = new HashMap<>();
-            dashboard.put("student", dashboardService.getStudentBasicInfo(studentId));
-            dashboard.put("cognitive", dashboardService.getGameResults(studentId, assessmentId));
-            dashboard.put("social", dashboardService.getAssessmentScores(studentId,assessmentId));
-            dashboard.put("selfManagement", dashboardService.getSelfManagement(studentId,assessmentId));
+        Map<String, Object> dashboard = new HashMap<>();
+        dashboard.put("student", dashboardService.getStudentBasicInfo(studentId));
+        dashboard.put("cognitive", dashboardService.getGameResults(studentId, assessmentId));
+        dashboard.put("social", dashboardService.getAssessmentScores(studentId,assessmentId));
+        dashboard.put("selfManagement", dashboardService.getSelfManagement(studentId,assessmentId));
 
-            return ResponseEntity.ok(dashboard);
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return ResponseEntity.status(500).body(error);
-        }
+        return ResponseEntity.ok(dashboard);
     }
 }

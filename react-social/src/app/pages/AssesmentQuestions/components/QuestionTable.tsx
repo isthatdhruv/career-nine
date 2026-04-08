@@ -1,5 +1,6 @@
 import { MDBDataTableV5 } from "mdbreact";
 import { useEffect, useState } from "react";
+import { showErrorToast } from '../../../utils/toast';
 import { AiFillEdit } from "react-icons/ai";
 import { FaLightbulb, FaFileDownload } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
@@ -8,7 +9,8 @@ import trash from "react-useanimations/lib/trash";
 import {
   DeleteQuestionData,
   ReadMeasuredQualityTypes,
-  ExportQuestionsToExcel, // Import the new export function
+  ExportQuestionsToExcel,
+  GetMqtCountsPerQuestion,
 } from "../API/Question_APIs";
 import QuestionLanguageModal from "./QuestionLanguageModal";  // ✅ import modal
 import QuestionBulkUploadModal from "./QuestionBulkUploadModal";
@@ -23,6 +25,8 @@ const QuestionTable = (props: {
   const navigate = useNavigate();
   const [selectedMeasuredQualityTypesByQuestion, setSelectedMeasuredQualityTypesByQuestion] = useState<{ [key: number]: any[] }>({});
   const [measuredQualityTypes, setMeasuredQualityTypes] = useState<any[]>([]);
+  const [mqtCounts, setMqtCounts] = useState<Record<number, number>>({});
+  const [mqtSortDir, setMqtSortDir] = useState<"none" | "asc" | "desc">("none");
   const [searchText, setSearchText] = useState("");
   const [selectedSection, setSelectedSection] = useState<string>(
     () => sessionStorage.getItem("questionTableSectionFilter") || ""
@@ -47,6 +51,13 @@ const QuestionTable = (props: {
     };
     fetchMeasuredQualityTypes();
   }, []);
+
+  // Fetch MQT counts per question
+  useEffect(() => {
+    GetMqtCountsPerQuestion()
+      .then((res) => setMqtCounts(res.data || {}))
+      .catch(() => {});
+  }, [props.data]);
 
   // Load existing selections when component mounts
   // useEffect(() => {
@@ -91,7 +102,7 @@ const QuestionTable = (props: {
       await ExportQuestionsToExcel();
     } catch (error) {
       console.error("Error exporting questions to Excel:", error);
-      alert("Failed to export questions. Please try again.");
+      showErrorToast("Failed to export questions. Please try again.");
     } finally {
       setExporting(false);
     }
@@ -225,16 +236,33 @@ const QuestionTable = (props: {
       { label: "Question Type", field: "questionType", width: 150 },
       { label: "Section", field: "sectionType", width: 150 },
       // { label: "Section", field: "sectionType", sort: "asc", width: 150 },
+      { label: "MQTs Mapped", field: "mqtCount", sort: "disabled", width: 120 },
       { label: "Actions", field: "actions", sort: "disabled", width: 200 },
     ],
 
-    rows: filteredData.map((data: any, index: number) => ({
+    rows: (mqtSortDir === "none" ? filteredData : [...filteredData].sort((a, b) => {
+      const ca = mqtCounts[a.id] ?? 0;
+      const cb = mqtCounts[b.id] ?? 0;
+      return mqtSortDir === "asc" ? ca - cb : cb - ca;
+    })).map((data: any, index: number) => {
+      const mqtCount = mqtCounts[data.id] ?? 0;
+
+      return ({
       serialNo: <div>{index + 1}</div>,
       questionText: <div>{data.questionText}</div>,
       questionType: <div>{data.questionType}</div>,
       sectionType: (
         <div>
-          {props.sections.find(section => section.sectionId === (data.section?.sectionId ?? data.sectionId))?.sectionName ?? "Unknown"}
+          {props.sections.find((section: any) => section.sectionId === (data.section?.sectionId ?? data.sectionId))?.sectionName ?? "Unknown"}
+        </div>
+      ),
+      mqtCount: (
+        <div>
+          {mqtCount > 0 ? (
+            <span className="badge badge-light-success fs-7">{mqtCount} MQT{mqtCount !== 1 ? "s" : ""}</span>
+          ) : (
+            <span className="badge badge-light-danger fs-7">None</span>
+          )}
         </div>
       ),
       actions: (
@@ -276,7 +304,7 @@ const QuestionTable = (props: {
                 props.setPageLoading(["true"]);
               } catch (error) {
                 console.error("Delete failed:", error);
-                alert("Failed to delete question. Please try again.");
+                showErrorToast("Failed to delete question. Please try again.");
               } finally {
                 // props.setLoading(false);
               }
@@ -287,7 +315,8 @@ const QuestionTable = (props: {
           </button>
         </div>
       ),
-    })),
+    });
+    }),
   };
   
   return (
@@ -351,6 +380,18 @@ const QuestionTable = (props: {
             </option>
           ))}
         </select>
+
+        {/* MQT sort toggle */}
+        <button
+          className={`btn d-flex align-items-center gap-1 ${mqtSortDir !== "none" ? "btn-primary" : "btn-outline-secondary"}`}
+          title="Sort by MQTs Mapped"
+          onClick={() => setMqtSortDir(d => d === "none" ? "desc" : d === "desc" ? "asc" : "none")}
+        >
+          MQTs
+          {mqtSortDir === "desc" && <span>↓</span>}
+          {mqtSortDir === "asc" && <span>↑</span>}
+          {mqtSortDir === "none" && <span style={{ opacity: 0.4 }}>↕</span>}
+        </button>
 
         {/* Search input for filtering questions */}
         <input

@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { Field, Form, Formik } from 'formik';
 import { useEffect, useState, useRef } from 'react';
+import { showErrorToast } from '../../../../utils/toast';
 import * as Yup from 'yup';
 import { Modal, Button } from 'react-bootstrap';
 import { ReadCollegeData } from '../../../College/API/College_APIs';
@@ -112,7 +113,7 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
                     } catch (error) {
                         console.error('Error submitting assessment:', error);
                         // Instead of redirecting to error page, you might want to show a toast/alert
-                        alert('Error creating assessment. Please try again.');
+                        showErrorToast('Error creating assessment. Please try again.');
                     } finally {
                         setLoading(false);
                     }

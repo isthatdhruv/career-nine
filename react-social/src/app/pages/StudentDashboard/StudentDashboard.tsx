@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetchAllDashboardData, getDashboardDataFromCache, getStudentAssessments, exportBetAssessmentToExcel, DashboardData, DashboardApiResponse } from "./API/Dashboard_APIs";
+import GeneralDashboard from "./components/GeneralDashboard";
 import "./StudentDashboard.css";
 import {
   RadarChart,
@@ -246,15 +247,9 @@ const StudentDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* General Assessment Placeholder */}
-      {!isBetAssessment && (
-        <div className="dashboard-content">
-          <div className="alert alert-info" style={{ margin: '2rem', padding: '2rem', textAlign: 'center' }}>
-            <i className="bi bi-info-circle me-2" style={{ fontSize: '1.5rem' }}></i>
-            <h4>General Assessment Dashboard</h4>
-            <p>Dashboard visualization for general assessments is coming soon.</p>
-          </div>
-        </div>
+      {/* General Assessment Dashboard */}
+      {!isBetAssessment && selectedAssessmentId && (
+        <GeneralDashboard studentId={Number(studentId)} assessmentId={selectedAssessmentId} />
       )}
 
       {/* OVERVIEW VIEW */}
@@ -935,7 +930,7 @@ const StudentDashboard: React.FC = () => {
                     <XAxis type="number" domain={[0, social.values.length]} />
                     <YAxis dataKey="name" type="category" style={{ fontSize: '13px' }} />
                     <Tooltip
-                      formatter={(value: any, name: string | undefined, props: any) => [
+                      formatter={(value: any, name: any, props: any) => [
                         `Rank ${props.payload.rank}`,
                         'Priority Level'
                       ]}

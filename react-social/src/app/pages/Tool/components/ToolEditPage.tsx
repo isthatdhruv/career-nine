@@ -6,6 +6,7 @@ import UseAnimations from "react-useanimations";
 import menu2 from "react-useanimations/lib/menu2";
 import * as Yup from "yup";
 import { ReadToolByIdData, UpdateToolData } from "../API/Tool_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 const validationSchema = Yup.object().shape({
   toolName: Yup.string().required("Tool name is required"),
@@ -84,7 +85,7 @@ const ToolEditPage = (props?: {
       setLoading(true);
       try {
         if (!values.id) {
-          alert("No tool ID found. Please try navigating back and selecting the tool again.");
+          showErrorToast("No tool ID found. Please try navigating back and selecting the tool again.");
           return;
         }
 
@@ -112,9 +113,9 @@ const ToolEditPage = (props?: {
           console.error("Error data:", (error as any).response?.data);
 
           const errorMessage = (error as any).response?.data?.message || (error as any).message || "Unknown error occurred";
-          alert(`Failed to update tool: ${errorMessage}`);
+          showErrorToast(`Failed to update tool: ${errorMessage}`);
         } else {
-          alert("Failed to update tool: Unknown error occurred");
+          showErrorToast("Failed to update tool: Unknown error occurred");
         }
       } finally {
         setLoading(false);

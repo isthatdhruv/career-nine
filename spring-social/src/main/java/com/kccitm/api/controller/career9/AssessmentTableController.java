@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -33,8 +34,10 @@ import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.service.AssessmentSessionService;
 import com.kccitm.api.model.career9.Questionaire.Questionnaire;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
+import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
 import com.kccitm.api.repository.Career9.AssessmentQuestionRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
+import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireRepository;
 
 @RestController
@@ -60,6 +63,12 @@ public class AssessmentTableController {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private AssessmentAnswerRepository assessmentAnswerRepository;
+
+    @Autowired
+    private QuestionnaireQuestionRepository questionnaireQuestionRepository;
 
     @Autowired
     private AssessmentSessionService assessmentSessionService;
@@ -146,13 +155,24 @@ public class AssessmentTableController {
 
     @GetMapping("/getAll")
     public ResponseEntity<List<AssessmentTable>> getAllAssessments() {
-        List<AssessmentTable> assessments = assessmentTableRepository.findAll();
+        List<AssessmentTable> assessments = assessmentTableRepository.findByIsDeletedFalseOrIsDeletedIsNull();
         return ResponseEntity.ok(assessments);
     }
 
     @GetMapping("/get/list")
     public List<AssessmentTable> getAllAssessment() {
-        return assessmentTableRepository.findAll();
+        return assessmentTableRepository.findByIsDeletedFalseOrIsDeletedIsNull();
+    }
+
+    @GetMapping("/get/by-institute/{instituteCode}")
+    public ResponseEntity<List<AssessmentTable>> getAssessmentsByInstitute(@PathVariable Integer instituteCode) {
+        List<Long> assessmentIds = studentAssessmentMappingRepository
+                .findDistinctAssessmentIdsByInstituteCode(instituteCode);
+        if (assessmentIds.isEmpty()) {
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+        List<AssessmentTable> assessments = assessmentTableRepository.findAllById(assessmentIds);
+        return ResponseEntity.ok(assessments);
     }
 
     @GetMapping("/{id}")
@@ -382,12 +402,61 @@ public class AssessmentTableController {
         return ResponseEntity.ok(updatedAssessment);
     }
 
+    // Soft-delete: sets isDeleted to true (moves to recycle bin)
     @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true) })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteAssessment(@PathVariable Long id) {
-        if (!assessmentTableRepository.existsById(id)) {
+        Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
+        if (assessmentOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
+        AssessmentTable assessment = assessmentOpt.get();
+        assessment.setIsDeleted(true);
+        assessmentTableRepository.save(assessment);
+        return ResponseEntity.noContent().build();
+    }
+
+    // Get all soft-deleted assessments (recycle bin)
+    @GetMapping("/deleted")
+    public ResponseEntity<List<AssessmentTable>> getDeletedAssessments() {
+        return ResponseEntity.ok(assessmentTableRepository.findByIsDeletedTrue());
+    }
+
+    // Restore a soft-deleted assessment
+    @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true) })
+    @PutMapping("/restore/{id}")
+    public ResponseEntity<AssessmentTable> restoreAssessment(@PathVariable Long id) {
+        Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
+        if (assessmentOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        AssessmentTable assessment = assessmentOpt.get();
+        assessment.setIsDeleted(false);
+        return ResponseEntity.ok(assessmentTableRepository.save(assessment));
+    }
+
+    // Permanently delete an assessment (from recycle bin only)
+    @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true) })
+    @org.springframework.transaction.annotation.Transactional
+    @DeleteMapping("/permanent-delete/{id}")
+    public ResponseEntity<Void> permanentDeleteAssessment(@PathVariable Long id) {
+        Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
+        if (assessmentOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        AssessmentTable assessment = assessmentOpt.get();
+        if (!Boolean.TRUE.equals(assessment.getIsDeleted())) {
+            return ResponseEntity.badRequest().build(); // Can only permanently delete from recycle bin
+        }
+        // Deallot all students from this assessment
+        List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository.findAllByAssessmentId(id);
+        if (!mappings.isEmpty()) {
+            studentAssessmentMappingRepository.deleteAll(mappings);
+            logger.info("Deallotted {} students from assessment #{}", mappings.size(), id);
+        }
+        // Unlink questionnaire reference (don't delete the questionnaire itself)
+        assessment.setQuestionnaire(null);
+        assessmentTableRepository.save(assessment);
         assessmentTableRepository.deleteById(id);
         deleteLockedSnapshot(id);
         return ResponseEntity.noContent().build();
@@ -395,13 +464,13 @@ public class AssessmentTableController {
 
     @GetMapping("/get/list-summary")
     public List<AssessmentTableRepository.AssessmentSummary> getAssessmentSummaryList() {
-        return assessmentTableRepository.findAssessmentSummaryList();
+        return assessmentTableRepository.findAssessmentSummaryListNotDeleted();
     }
 
     @GetMapping("/get/list-ids")
     public HashMap<Long, String> getAllAssessmentIds() {
         HashMap<Long, String> assessmentIdandName = new HashMap<>();
-        assessmentTableRepository.findAll()
+        assessmentTableRepository.findByIsDeletedFalseOrIsDeletedIsNull()
                 .forEach(assessment -> assessmentIdandName.put(assessment.getId(), assessment.getAssessmentName()));
         return assessmentIdandName;
     }
@@ -642,6 +711,100 @@ public class AssessmentTableController {
         }
 
         return ResponseEntity.ok(bundle);
+    }
+
+    /**
+     * Returns all assessments that share the same questionnaire as the given assessment (excluding itself).
+     * Used to copy Firebase question mappings to other assessments with the same questionnaire.
+     */
+    @GetMapping("/find-by-same-questionnaire/{assessmentId}")
+    public ResponseEntity<?> findBySameQuestionnaire(@PathVariable Long assessmentId) {
+        Optional<AssessmentTable> opt = assessmentTableRepository.findById(assessmentId);
+        if (opt.isEmpty()) return ResponseEntity.notFound().build();
+
+        AssessmentTable source = opt.get();
+        if (source.getQuestionnaire() == null) {
+            return ResponseEntity.ok(java.util.Collections.emptyList());
+        }
+
+        Long questionnaireId = source.getQuestionnaire().getQuestionnaireId();
+        List<AssessmentTable> similar = assessmentTableRepository.findByQuestionnaireQuestionnaireId(questionnaireId);
+
+        // Return only id + name, excluding the source assessment itself
+        List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
+        for (AssessmentTable a : similar) {
+            if (!a.getId().equals(assessmentId)) {
+                java.util.Map<String, Object> item = new java.util.HashMap<>();
+                item.put("id", a.getId());
+                item.put("assessmentName", a.getAssessmentName());
+                item.put("questionnaireId", questionnaireId);
+                result.add(item);
+            }
+        }
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Fixes student assessment mapping statuses by checking if students have
+     * actually answered all questions. Students marked as "completed" who haven't
+     * answered all questions will be set back to "ongoing".
+     */
+    @org.springframework.transaction.annotation.Transactional
+    @PutMapping("/{assessmentId}/fix-completion-status")
+    public ResponseEntity<HashMap<String, Object>> fixCompletionStatus(@PathVariable Long assessmentId) {
+        HashMap<String, Object> response = new HashMap<>();
+
+        Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(assessmentId);
+        if (assessmentOpt.isEmpty()) {
+            response.put("error", "Assessment not found");
+            return ResponseEntity.status(404).body(response);
+        }
+
+        AssessmentTable assessment = assessmentOpt.get();
+        if (assessment.getQuestionnaire() == null) {
+            response.put("error", "Assessment has no questionnaire linked");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        Long questionnaireId = assessment.getQuestionnaire().getQuestionnaireId();
+        Long totalQuestions = questionnaireQuestionRepository.countByQuestionnaireId(questionnaireId);
+
+        List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
+                .findAllByAssessmentId(assessmentId);
+
+        int correctedCount = 0;
+        java.util.ArrayList<HashMap<String, Object>> correctedStudents = new java.util.ArrayList<>();
+
+        for (StudentAssessmentMapping mapping : mappings) {
+            if (!"completed".equals(mapping.getStatus()) && !"submitted".equals(mapping.getStatus())) {
+                continue;
+            }
+
+            Long answeredCount = assessmentAnswerRepository
+                    .countByUserStudent_UserStudentIdAndAssessment_Id(
+                            mapping.getUserStudent().getUserStudentId(), assessmentId);
+
+            if (answeredCount < totalQuestions) {
+                String oldStatus = mapping.getStatus();
+                mapping.setStatus("ongoing");
+                studentAssessmentMappingRepository.save(mapping);
+                correctedCount++;
+
+                HashMap<String, Object> studentInfo = new HashMap<>();
+                studentInfo.put("userStudentId", mapping.getUserStudent().getUserStudentId());
+                studentInfo.put("previousStatus", oldStatus);
+                studentInfo.put("answeredQuestions", answeredCount);
+                studentInfo.put("totalQuestions", totalQuestions);
+                correctedStudents.add(studentInfo);
+            }
+        }
+
+        response.put("assessmentId", assessmentId);
+        response.put("totalQuestions", totalQuestions);
+        response.put("totalMappings", mappings.size());
+        response.put("correctedCount", correctedCount);
+        response.put("correctedStudents", correctedStudents);
+        return ResponseEntity.ok(response);
     }
 
 }

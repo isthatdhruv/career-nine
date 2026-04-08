@@ -51,7 +51,10 @@ import GroupStudentAdminPage from "../pages/GroupStudent/GroupStudentAdminPage";
 import GroupStudentSchoolPage from "../pages/GroupStudent/GroupStudentSchoolPage";
 import AssignedStudentsPage from "../pages/GroupStudent/AssignedStudentsPage";
 import ReportGenerationPage from "../pages/ReportGeneration/ReportGenerationPage";
-import CareerSuggestionPage from "../pages/CareerSuggestion/CareerSuggestionPage";
+import BetReportGenerationPage from "../pages/ReportGeneration/BetReportGenerationPage";
+import NavigatorReportGenerationPage from "../pages/NavigatorReportGeneration/NavigatorReportGenerationPage";
+import UnifiedReportManagementPage from "../pages/UnifiedReportManagement/UnifiedReportManagementPage";
+import SendReportsPage from "../pages/SendReports/SendReportsPage";
 import GamePage from "../pages/Games/GamePage";
 import DemographicFieldsPage from "../pages/DemographicFields/DemographicFieldsPage";
 import DemographicFieldCreatePage from "../pages/DemographicFields/components/DemographicFieldCreatePage";
@@ -181,14 +184,23 @@ const PrivateRoutes = () => {
   const QuestionEditPage = lazy(
     () => import("../pages/AssesmentQuestions/components/QuestionEditPage")
   );
+  const QuestionDuplicatesPage = lazy(
+    () => import("../pages/AssesmentQuestions/components/QuestionDuplicatesPage")
+  );
   const OfflineAssessmentUpload = lazy(
     () => import("../pages/OfflineAssessmentUpload/OfflineAssessmentUploadPage")
+  );
+  const OMRDataUpload = lazy(
+    () => import("../pages/OfflineAssessmentUpload/OMRDataUploadPage")
   );
   const TextResponseMapping = lazy(
     () => import("../pages/TextResponseMapping/TextResponseMappingPage")
   );
   const OldDataMappingPage = lazy(
     () => import("../pages/OldDataMapping/OldDataMappingPage")
+  );
+  const ScoreDebugPage = lazy(
+    () => import("../pages/ScoreDebug/ScoreDebugPage")
   );
   const Board = lazy(() => import("../pages/Board/BoardPage"));
   const Section = lazy(() => import("../pages/Section/SectionPage"));
@@ -205,6 +217,11 @@ const PrivateRoutes = () => {
   const UniversityResultDashboard = lazy(
     () => import("../pages/UniversityResult/UniversityResultDashboard")
   );
+  const CounsellorDashboardPage = lazy(() => import("../pages/Counselling/counsellor/CounsellorDashboardPage"));
+  const AvailabilityManagerPage = lazy(() => import("../pages/Counselling/counsellor/AvailabilityManagerPage"));
+  const SessionNotesPage = lazy(() => import("../pages/Counselling/counsellor/SessionNotesPage"));
+  const AdminCounsellingQueuePage = lazy(() => import("../pages/Counselling/admin/AdminCounsellingQueuePage"));
+  const CounsellorManagementPage = lazy(() => import("../pages/Counselling/admin/CounsellorManagementPage"));
   // const UniversityAllResultDashboard = lazy(
   //   () => import("../pages/UniversityResult/UniversityAllResultDashboard")
   // );
@@ -608,10 +625,26 @@ const PrivateRoutes = () => {
           }
         />
         <Route
+          path="/assessment-questions/duplicates"
+          element={
+            <SuspensedView>
+              <QuestionDuplicatesPage />
+            </SuspensedView>
+          }
+        />
+        <Route
           path="/offline-assessment-upload"
           element={
             <SuspensedView>
               <OfflineAssessmentUpload />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/omr-data-upload"
+          element={
+            <SuspensedView>
+              <OMRDataUpload />
             </SuspensedView>
           }
         />
@@ -929,6 +962,38 @@ const PrivateRoutes = () => {
           }
         />
         <Route
+          path="/bet-report-generation"
+          element={
+            <SuspensedView>
+              <BetReportGenerationPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/navigator-report-generation"
+          element={
+            <SuspensedView>
+              <NavigatorReportGenerationPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/unified-report-management"
+          element={
+            <SuspensedView>
+              <UnifiedReportManagementPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/send-reports"
+          element={
+            <SuspensedView>
+              <SendReportsPage />
+            </SuspensedView>
+          }
+        />
+        <Route
           path="/activity-log"
           element={
             <SuspensedView>
@@ -960,6 +1025,56 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <OldDataMappingPage />
+            </SuspensedView>
+          }
+        />
+
+        <Route
+          path="/score-debug"
+          element={
+            <SuspensedView>
+              <ScoreDebugPage />
+            </SuspensedView>
+          }
+        />
+
+        <Route
+          path="/counsellor/dashboard"
+          element={
+            <SuspensedView>
+              <CounsellorDashboardPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/counsellor/availability"
+          element={
+            <SuspensedView>
+              <AvailabilityManagerPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/counsellor/session-notes/:id"
+          element={
+            <SuspensedView>
+              <SessionNotesPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/admin/counselling-queue"
+          element={
+            <SuspensedView>
+              <AdminCounsellingQueuePage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/admin/counsellors"
+          element={
+            <SuspensedView>
+              <CounsellorManagementPage />
             </SuspensedView>
           }
         />

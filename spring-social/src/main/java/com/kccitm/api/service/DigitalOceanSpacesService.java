@@ -1,13 +1,11 @@
 package com.kccitm.api.service;
 
 import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.io.InputStream;
 import java.util.Base64;
-import java.util.List;
 import java.util.UUID;
+
+import com.amazonaws.services.s3.model.S3Object;
 
 import javax.annotation.PostConstruct;
 
@@ -33,43 +31,33 @@ public class DigitalOceanSpacesService {
     @Value("${app.digitalocean.spaces.bucket:storage-c9}")
     private String bucket;
 
-    @Value("${app.digitalocean.spaces.region:sgp1}")
+    @Value("${app.digitalocean.spaces.region:${DO_SPACES_REGION:sgp1}}")
     private String region;
 
-    @Value("${app.digitalocean.spaces.cdn-url:https://storage-c9.sgp1.digitaloceanspaces.com}")
+    @Value("${app.digitalocean.spaces.cdn-url:${DO_SPACES_CDN_URL:https://storage-c9.sgp1.digitaloceanspaces.com}}")
     private String cdnUrl;
+
+    @Value("${app.digitalocean.spaces.access-key:${DO_SPACES_ACCESS_KEY:}}")
+    private String accessKey;
+
+    @Value("${app.digitalocean.spaces.secret-key:${DO_SPACES_SECRET_KEY:}}")
+    private String secretKey;
+
+    @Value("${app.digitalocean.spaces.endpoint:${DO_SPACES_ENDPOINT:https://sgp1.digitaloceanspaces.com}}")
+    private String endpoint;
 
     private AmazonS3 s3Client;
 
     @PostConstruct
     public void init() {
-        // Read credentials from download.txt file
-        String accessKey = null;
-        String secretKey = null;
-        String endpoint = "https://sgp1.digitaloceanspaces.com";
-
-        try {
-            // Look for download.txt in project root (parent of spring-social)
-            Path downloadFile = findDownloadTxt();
-            if (downloadFile != null && Files.exists(downloadFile)) {
-                List<String> lines = Files.readAllLines(downloadFile);
-                for (String line : lines) {
-                    line = line.trim();
-                    if (line.contains("aws_access_key_id")) {
-                        accessKey = line.substring(line.lastIndexOf(" ") + 1).trim();
-                    } else if (line.contains("aws_secret_access_key")) {
-                        secretKey = line.substring(line.lastIndexOf(" ") + 1).trim();
-                    } else if (line.contains("endpoint_url")) {
-                        endpoint = line.substring(line.lastIndexOf(" ") + 1).trim();
-                    }
-                }
-                logger.info("DO Spaces credentials loaded from download.txt");
-            } else {
-                logger.warn("download.txt not found. DigitalOcean Spaces will not be available.");
-            }
-        } catch (Exception e) {
-            logger.error("Failed to read download.txt: " + e.getMessage());
-        }
+        logger.info("========== DigitalOcean Spaces Configuration ==========");
+        logger.info("  Bucket:     {}", bucket);
+        logger.info("  Region:     {}", region);
+        logger.info("  Endpoint:   {}", endpoint);
+        logger.info("  CDN URL:    {}", cdnUrl);
+        logger.info("  Access Key: {}", accessKey != null && accessKey.length() > 4
+                ? accessKey.substring(0, 4) + "****" : "(not set)");
+        logger.info("  Secret Key: {}", secretKey != null && !secretKey.isEmpty() ? "****configured****" : "(not set)");
 
         if (accessKey != null && !accessKey.isEmpty() && secretKey != null && !secretKey.isEmpty()) {
             BasicAWSCredentials credentials = new BasicAWSCredentials(accessKey, secretKey);
@@ -77,32 +65,11 @@ public class DigitalOceanSpacesService {
                     .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(endpoint, region))
                     .withCredentials(new AWSStaticCredentialsProvider(credentials))
                     .build();
+            logger.info("  Status:     READY");
+        } else {
+            logger.warn("  Status:     NOT CONFIGURED - Set DO_SPACES_ACCESS_KEY and DO_SPACES_SECRET_KEY");
         }
-    }
-
-    private Path findDownloadTxt() {
-        // Try multiple locations to find download.txt
-        String[] searchPaths = {
-            "../download.txt",           // relative to spring-social (project root)
-            "download.txt",              // current working directory
-            "../../download.txt",        // if running from deeper directory
-        };
-
-        // First try relative paths
-        for (String p : searchPaths) {
-            Path path = Paths.get(p).toAbsolutePath().normalize();
-            if (Files.exists(path)) {
-                return path;
-            }
-        }
-
-        // Also try user home directory
-        Path homePath = Paths.get(System.getProperty("user.home"), "Desktop", "career-nine", "download.txt");
-        if (Files.exists(homePath)) {
-            return homePath;
-        }
-
-        return null;
+        logger.info("=======================================================");
     }
 
     /**
@@ -186,6 +153,26 @@ public class DigitalOceanSpacesService {
         s3Client.putObject(putRequest);
 
         return cdnUrl + "/" + objectKey;
+    }
+
+    /**
+     * Download a file from DigitalOcean Spaces by its full URL.
+     * Returns the file bytes, or null if not found.
+     */
+    public byte[] downloadFileByUrl(String fileUrl) {
+        if (s3Client == null || fileUrl == null || !fileUrl.startsWith(cdnUrl)) {
+            return null;
+        }
+        String objectKey = fileUrl.substring(cdnUrl.length() + 1);
+        try {
+            S3Object s3Object = s3Client.getObject(bucket, objectKey);
+            try (InputStream is = s3Object.getObjectContent()) {
+                return is.readAllBytes();
+            }
+        } catch (Exception e) {
+            logger.error("Failed to download file from Spaces: {}", fileUrl, e);
+            return null;
+        }
     }
 
     /**

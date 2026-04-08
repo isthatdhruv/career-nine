@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import { ReadCollegeData } from "../College/API/College_APIs";
 import { getAssessmentMappingsByInstitute, getAssessmentSummaryList } from "../AssessmentMapping/API/AssessmentMapping_APIs";
 import { getOfflineMapping, bulkSubmitByRollNumber } from "./API/OfflineUpload_APIs";
+import { showErrorToast } from '../../utils/toast';
 
 // ============ Interfaces ============
 
@@ -308,7 +309,7 @@ const OfflineAssessmentUploadPage = () => {
       setMappingData(mappingRes.data);
     } catch (error) {
       console.error("Failed to load mapping:", error);
-      alert("Failed to load assessment mapping. Make sure the assessment has a linked questionnaire.");
+      showErrorToast("Failed to load assessment mapping. Make sure the assessment has a linked questionnaire.");
     } finally {
       setLoadingMapping(false);
     }
@@ -345,7 +346,7 @@ const OfflineAssessmentUploadPage = () => {
       const jsonData: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
 
       if (jsonData.length === 0) {
-        alert("The Excel file is empty or has no data rows.");
+        showErrorToast("The Excel file is empty or has no data rows.");
         return;
       }
 
@@ -474,7 +475,7 @@ const OfflineAssessmentUploadPage = () => {
 
     const rowsWithNoRoll = parsedRows.filter((r) => !r.rollNumber.trim());
     if (rowsWithNoRoll.length > 0) {
-      alert(`${rowsWithNoRoll.length} row(s) have no roll number. Please fix before submitting.`);
+      showErrorToast(`${rowsWithNoRoll.length} row(s) have no roll number. Please fix before submitting.`);
       return;
     }
 

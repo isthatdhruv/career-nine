@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import { ReadCollegeList, GetSessionsByInstituteCode, GetInstituteMappings } from "../College/API/College_APIs";
 import {
   getStudentsWithMappingByInstituteId,
@@ -318,14 +319,14 @@ export default function GroupStudentSchoolPage() {
       }));
 
     if (assignments.length === 0) {
-      alert("No new assessments to save.");
+      showErrorToast("No new assessments to save.");
       return;
     }
 
     setSaving(true);
     try {
       await bulkAlotAssessment(assignments);
-      alert(`${assignments.length} assessment(s) saved successfully!`);
+      showSuccessToast(`${assignments.length} assessment(s) saved successfully!`);
       setHasChanges(false);
 
       // Refresh data
@@ -364,7 +365,7 @@ export default function GroupStudentSchoolPage() {
       }
     } catch (error) {
       console.error("Error saving assessments:", error);
-      alert("Failed to save assessments. Please try again.");
+      showErrorToast("Failed to save assessments. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -430,14 +431,14 @@ export default function GroupStudentSchoolPage() {
       // Download file
       XLSX.writeFile(workbook, filename);
 
-      alert(`Download successful for ${downloadStudent.name}!`);
+      showSuccessToast(`Download successful for ${downloadStudent.name}!`);
       setShowDownloadModal(false);
       setDownloadStudent(null);
       setDownloadAssessmentId(null);
       setDownloadAnswers([]);
     } catch (error) {
       console.error("Error downloading:", error);
-      alert("Failed to download. Please try again.");
+      showErrorToast("Failed to download. Please try again.");
     } finally {
       setDownloading(false);
     }
@@ -456,7 +457,7 @@ export default function GroupStudentSchoolPage() {
     setResetting(true);
     try {
       await resetAssessment(resetStudent.userStudentId, resetAssessmentId);
-      alert("Assessment reset successfully!");
+      showSuccessToast("Assessment reset successfully!");
       setShowResetConfirm(false);
       setShowResetModal(false);
 
@@ -511,7 +512,7 @@ export default function GroupStudentSchoolPage() {
       setResetAssessmentName("");
     } catch (error: any) {
       console.error("Error resetting assessment:", error);
-      alert(error.response?.data?.error || "Failed to reset assessment");
+      showErrorToast(error.response?.data?.error || "Failed to reset assessment");
     } finally {
       setResetting(false);
     }
@@ -669,7 +670,7 @@ export default function GroupStudentSchoolPage() {
 
   const handleDownloadStudentList = () => {
     if (filteredStudents.length === 0) {
-      alert("No students to download.");
+      showErrorToast("No students to download.");
       return;
     }
 
@@ -731,10 +732,10 @@ export default function GroupStudentSchoolPage() {
       // Download file
       XLSX.writeFile(workbook, filename);
 
-      alert(`Student list downloaded successfully!`);
+      showSuccessToast(`Student list downloaded successfully!`);
     } catch (error) {
       console.error("Error downloading student list:", error);
-      alert("Failed to download student list. Please try again.");
+      showErrorToast("Failed to download student list. Please try again.");
     }
   };
 
@@ -1001,12 +1002,12 @@ export default function GroupStudentSchoolPage() {
       const filename = `${instituteName}_All_Answers_${Date.now()}.xlsx`;
       XLSX.writeFile(workbook, filename);
 
-      alert("Download successful!");
+      showSuccessToast("Download successful!");
       setShowBulkDownloadModal(false);
       setBulkDownloadAnswers([]);
     } catch (error) {
       console.error("Error downloading:", error);
-      alert("Failed to download. Please try again.");
+      showErrorToast("Failed to download. Please try again.");
     } finally {
       setBulkDownloading(false);
     }
@@ -1037,7 +1038,7 @@ export default function GroupStudentSchoolPage() {
       }
 
       if (pairs.length === 0) {
-        alert("No student-assessment pairs to export.");
+        showErrorToast("No student-assessment pairs to export.");
         return;
       }
 
@@ -1069,7 +1070,7 @@ export default function GroupStudentSchoolPage() {
           if (parsed.error) msg = parsed.error;
         } catch (_) {}
       }
-      alert(`Failed to download proctoring data: ${msg}`);
+      showErrorToast(`Failed to download proctoring data: ${msg}`);
     } finally {
       setProctoringDownloading(false);
     }
@@ -2144,7 +2145,7 @@ export default function GroupStudentSchoolPage() {
                       setSelectedStudents(new Set());
                     } catch (err: any) {
                       const msg = err?.response?.data?.message || err?.response?.data || err?.message || "Unknown error";
-                      alert("Failed to assign students: " + msg);
+                      showErrorToast("Failed to assign students: " + msg);
                     } finally {
                       setGroupAssigning(false);
                     }

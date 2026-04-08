@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { showErrorToast, showSuccessToast } from '../../../../utils/toast';
 import { getActiveDemographicFields } from '../../../DemographicFields/API/DemographicField_APIs';
 import {
   getDemographicsByAssessment,
@@ -128,10 +129,10 @@ const AssessmentDemographicConfig = ({ assessmentId }: Props) => {
       };
 
       await saveDemographicMapping(payload);
-      alert('Demographic configuration saved successfully!');
+      showSuccessToast('Demographic configuration saved successfully!');
     } catch (error) {
       console.error('Error saving config:', error);
-      alert('Failed to save demographic configuration');
+      showErrorToast('Failed to save demographic configuration');
     } finally {
       setSaving(false);
     }

@@ -735,3 +735,310 @@
     padding: 1rem !important;
   }
 }
+
+/* ========== GAME SCREENS - MOBILE ========== */
+
+/* All games use full-screen containers - ensure they're scrollable on small screens */
+.game-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Game info panels (player name, timer, controls) at top of screen */
+.game-top-left,
+.game-top-center,
+.game-top-right {
+  position: absolute;
+  z-index: 20;
+}
+
+.game-top-left { top: 16px; left: 12px; }
+.game-top-center { top: 16px; left: 50%; transform: translateX(-50%); }
+.game-top-right { top: 16px; right: 12px; z-index: 50; }
+
+.game-stats-panel {
+  position: absolute;
+  z-index: 20;
+}
+
+/* Game modal cards (results, trial complete, etc.) */
+.game-modal-card {
+  max-width: 420px;
+  width: 92%;
+  border-radius: 20px;
+  padding: 24px;
+}
+
+.game-modal-card h1 {
+  font-size: 24px;
+}
+
+/* Hydro Tube tile grid - responsive sizing */
+.hydro-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  width: min(340px, 85vw);
+  aspect-ratio: 1;
+}
+
+.hydro-tile {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+/* Jungle Spot image container - responsive */
+.jungle-image-container {
+  width: min(300px, 70vw);
+  height: min(300px, 70vw);
+}
+
+@media (max-width: 575.98px) {
+  /* Game top panels - compact on mobile */
+  .game-top-left {
+    top: 10px;
+    left: 8px;
+    padding: 6px 10px !important;
+    border-radius: 10px !important;
+  }
+
+  .game-top-left .player-name {
+    font-size: 12px !important;
+  }
+
+  .game-top-left .player-label {
+    font-size: 8px !important;
+  }
+
+  .game-top-left .player-icon {
+    font-size: 16px !important;
+  }
+
+  .game-top-center {
+    top: 10px;
+    padding: 6px 14px !important;
+    border-radius: 10px !important;
+  }
+
+  .game-top-right {
+    top: 10px;
+    right: 8px;
+  }
+
+  .game-top-right button {
+    padding: 6px !important;
+    font-size: 14px !important;
+    border-radius: 8px !important;
+  }
+
+  /* Game stats panel - horizontal on mobile, below header */
+  .game-stats-panel {
+    top: auto !important;
+    bottom: 10px !important;
+    left: 8px !important;
+    right: 8px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 6px !important;
+  }
+
+  .game-stats-panel > div {
+    flex: 1;
+    padding: 6px 8px !important;
+    border-radius: 8px !important;
+  }
+
+  .game-stats-panel .stat-value {
+    font-size: 16px !important;
+  }
+
+  .game-stats-panel .stat-label {
+    font-size: 8px !important;
+  }
+
+  /* Game modal cards */
+  .game-modal-card {
+    padding: 20px;
+    border-radius: 16px;
+  }
+
+  .game-modal-card h1 {
+    font-size: 22px;
+  }
+
+  .game-modal-card .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .game-modal-card .stats-grid .stat-value {
+    font-size: 20px !important;
+  }
+
+  .game-modal-card .stats-grid .stat-label {
+    font-size: 9px !important;
+  }
+
+  .game-modal-card .icon-circle {
+    width: 60px !important;
+    height: 60px !important;
+  }
+
+  .game-modal-card .icon-circle span {
+    font-size: 30px !important;
+  }
+
+  /* Hydro Tube tile grid */
+  .hydro-grid {
+    width: min(300px, 82vw);
+  }
+
+  .hydro-tile {
+    border-radius: 6px;
+  }
+
+  /* Jungle Spot image */
+  .jungle-image-container {
+    width: min(250px, 65vw);
+    height: min(250px, 65vw);
+  }
+
+  /* Jungle Spot instruction card below image */
+  .jungle-instruction-card {
+    padding: 10px 16px !important;
+    border-radius: 12px !important;
+  }
+
+  .jungle-instruction-card .lion-emoji {
+    font-size: 28px !important;
+  }
+
+  .jungle-instruction-card .lion-text {
+    font-size: 22px !important;
+  }
+
+  .jungle-instruction-card .tap-emoji {
+    font-size: 28px !important;
+  }
+
+  /* Game video containers */
+  .game-video-card {
+    padding: 16px !important;
+    border-radius: 16px !important;
+    max-width: 90vw !important;
+  }
+
+  .game-video-card h1 {
+    font-size: 20px !important;
+  }
+
+  .game-video-card video {
+    max-height: 200px !important;
+  }
+
+  .game-video-card button {
+    padding: 12px 20px !important;
+    font-size: 14px !important;
+  }
+
+  /* Rabbit Path game */
+  .rabbit-game-container {
+    padding: 8px !important;
+  }
+
+  /* Game frame padding reduction on mobile */
+  .game-frame {
+    padding: 8px !important;
+    border-radius: 14px !important;
+    border-width: 3px !important;
+  }
+
+  .game-frame-inner {
+    padding: 4px !important;
+    border-radius: 10px !important;
+  }
+
+  /* Bottom phase info bar */
+  .game-phase-bar {
+    bottom: 12px !important;
+    padding: 8px 20px !important;
+    border-radius: 12px !important;
+  }
+
+  .game-phase-bar .phase-timer {
+    font-size: 18px !important;
+  }
+
+  .game-phase-bar .phase-icon {
+    font-size: 18px !important;
+  }
+
+  /* Question page - inline style overrides */
+
+  /* Make question text smaller on mobile */
+  [data-proctoring="question-text"] {
+    font-size: 1rem !important;
+    line-height: 1.5 !important;
+    gap: 12px !important;
+    margin-bottom: 16px !important;
+  }
+
+  [data-proctoring="question-text"] > div > div {
+    font-size: 1rem !important;
+    line-height: 1.5 !important;
+  }
+
+  /* Option text smaller on mobile */
+  [data-proctoring-option-id] {
+    font-size: 1rem !important;
+  }
+
+  [data-proctoring-option-id] span {
+    font-size: 1rem !important;
+  }
+
+  /* Game launcher button in question page */
+  [data-proctoring-option-id] button {
+    padding: 8px 16px !important;
+    font-size: 12px !important;
+    margin-left: 8px !important;
+  }
+}
+
+/* Very small phones (320px) */
+@media (max-width: 374.98px) {
+  .hydro-grid {
+    width: min(280px, 90vw);
+  }
+
+  .jungle-image-container {
+    width: min(220px, 70vw);
+    height: min(220px, 70vw);
+  }
+
+  .game-modal-card {
+    padding: 16px;
+  }
+
+  .game-modal-card h1 {
+    font-size: 20px;
+  }
+
+  .game-top-left {
+    display: none !important;
+  }
+
+  .game-video-card {
+    padding: 12px !important;
+  }
+}

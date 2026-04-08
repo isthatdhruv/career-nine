@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import { ReadQuestionnaireByAssessmentId } from "../API/Create_Assessment_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -74,7 +75,7 @@ export async function generateOMRSheet(assessmentId: number, assessmentName: str
   const questionnaire = Array.isArray(raw) ? raw[0] : raw;
   const qSectionList = questionnaire?.section || questionnaire?.sections || [];
   if (!questionnaire || qSectionList.length === 0) {
-    alert("This assessment has no questionnaire/sections configured.");
+    showErrorToast("This assessment has no questionnaire/sections configured.");
     return;
   }
 

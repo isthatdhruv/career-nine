@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useReducer, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import { ReadCollegeList, GetSessionsByInstituteCode } from "../College/API/College_APIs";
 import {
   getStudentsWithMappingByInstituteId,
@@ -14,7 +15,10 @@ import {
   getDemographicFieldsForStudent,
   getBulkDemographicData,
   exportProctoringExcel,
+  generateBetReportOneClick,
+  generateNavigatorReportOneClick,
 } from "../StudentInformation/StudentInfo_APIs";
+import { getEmailRecipientsForStudent, sendReportEmail, EmailRecipient } from "../ReportGeneration/API/BetReportData_APIs";
 import * as XLSX from "xlsx";
 
 type Student = {
@@ -53,25 +57,28 @@ export default function GroupStudentPage() {
   const [hasChanges, setHasChanges] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Modal state
-  const [showAssessmentModal, setShowAssessmentModal] = useState(false);
-  const [modalStudent, setModalStudent] = useState<Student | null>(null);
-  const [studentAssessments, setStudentAssessments] = useState<
-    StudentAssessmentInfo[]
-  >([]);
+  // ── Modal manager (consolidates 5 modals into one state object) ──
+  type ModalState = {
+    type: "none" | "assessment" | "download" | "bulkDownload" | "reset" | "demographics";
+    student: Student | null;
+    assessmentId: number | null;
+    assessmentName: string;
+    showConfirm: boolean;
+  };
+  const [modal, setModal] = useState<ModalState>({ type: "none", student: null, assessmentId: null, assessmentName: "", showConfirm: false });
+  const closeModal = useCallback(() => setModal({ type: "none", student: null, assessmentId: null, assessmentName: "", showConfirm: false }), []);
 
-  // Download modal state
-  const [showDownloadModal, setShowDownloadModal] = useState(false);
-  const [downloadStudent, setDownloadStudent] = useState<Student | null>(null);
-  const [downloadAssessmentId, setDownloadAssessmentId] = useState<number | null>(null);
+  // Assessment modal data
+  const [studentAssessments, setStudentAssessments] = useState<StudentAssessmentInfo[]>([]);
+
+  // Download modal data
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [downloadAnswers, setDownloadAnswers] = useState<StudentAnswerDetail[]>([]);
   const [downloadError, setDownloadError] = useState<string>("");
   const [downloading, setDownloading] = useState(false);
   const [showStudentUsernameDownload, setShowStudentUsernameDownload] = useState(false);
 
-  // Bulk download all answers state
-  const [showBulkDownloadModal, setShowBulkDownloadModal] = useState(false);
+  // Bulk download data
   const [bulkDownloadLoading, setBulkDownloadLoading] = useState(false);
   const [bulkDownloadAnswers, setBulkDownloadAnswers] = useState<any[]>([]);
   const [bulkDownloadError, setBulkDownloadError] = useState<string>("");
@@ -79,47 +86,94 @@ export default function GroupStudentPage() {
   const [bulkGameResults, setBulkGameResults] = useState<Map<string, any>>(new Map());
   const [bulkDemographicData, setBulkDemographicData] = useState<any[]>([]);
 
-  // Proctoring download state
-  const [proctoringDownloading, setProctoringDownloading] = useState(false);
-
-  // Filter panel state
-  const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const [hierarchyData, setHierarchyData] = useState<any[]>([]);
-
-  // Pending filter selections (inside the panel, before "Apply")
-  const [pendingAssessmentIds, setPendingAssessmentIds] = useState<Set<number>>(new Set());
-  const [pendingSessions, setPendingSessions] = useState<Set<string>>(new Set());
-  const [pendingGrades, setPendingGrades] = useState<Set<string>>(new Set());
-  const [pendingSections, setPendingSections] = useState<Set<string>>(new Set());
-  const [pendingStatuses, setPendingStatuses] = useState<Set<string>>(new Set());
-  const [pendingEnabled, setPendingEnabled] = useState<Set<string>>(new Set());
-
-  // Applied filter selections (what actually filters the data)
-  const [appliedAssessmentIds, setAppliedAssessmentIds] = useState<Set<number>>(new Set());
-  const [appliedSessions, setAppliedSessions] = useState<Set<string>>(new Set());
-  const [appliedGrades, setAppliedGrades] = useState<Set<string>>(new Set());
-  const [appliedSections, setAppliedSections] = useState<Set<string>>(new Set());
-  const [appliedStatuses, setAppliedStatuses] = useState<Set<string>>(new Set());
-  const [appliedEnabled, setAppliedEnabled] = useState<Set<string>>(new Set());
-
-  // Which category is selected on the left to show its options on the right
-  const [activeFilterCategory, setActiveFilterCategory] = useState<string>("assessment");
-
-  // Reset modal state
-  const [showResetModal, setShowResetModal] = useState(false);
-  const [resetStudent, setResetStudent] = useState<Student | null>(null);
-  const [resetAssessmentId, setResetAssessmentId] = useState<number | null>(null);
-  const [resetAssessmentName, setResetAssessmentName] = useState<string>("");
-  const [resetting, setResetting] = useState(false);
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
-
-  // Demographics modal state
-  const [showDemographicsModal, setShowDemographicsModal] = useState(false);
-  const [demographicsStudent, setDemographicsStudent] = useState<Student | null>(null);
-  const [demographicsAssessmentId, setDemographicsAssessmentId] = useState<number | null>(null);
-  const [demographicsAssessmentName, setDemographicsAssessmentName] = useState<string>("");
+  // Demographics data
   const [demographicsData, setDemographicsData] = useState<any[]>([]);
   const [demographicsLoading, setDemographicsLoading] = useState(false);
+
+  // Reset state
+  const [resetting, setResetting] = useState(false);
+
+  // Proctoring
+  const [proctoringDownloading, setProctoringDownloading] = useState(false);
+
+  // Report generation (one-click)
+  const [reportGeneratingFor, setReportGeneratingFor] = useState<number | null>(null); // assessmentId being generated
+  const [generatedReportUrls, setGeneratedReportUrls] = useState<Map<string, string>>(new Map()); // key: "userStudentId-assessmentId" -> reportUrl
+
+  // ── Send Email modal state ──
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailModalStudent, setEmailModalStudent] = useState<Student | null>(null);
+  const [emailRecipients, setEmailRecipients] = useState<EmailRecipient[]>([]);
+  const [emailRecipientsLoading, setEmailRecipientsLoading] = useState(false);
+  const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set());
+  const [extraEmails, setExtraEmails] = useState<string[]>([]);
+  const [extraEmailInput, setExtraEmailInput] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailAssessmentName, setEmailAssessmentName] = useState("");
+  const [emailReportUrl, setEmailReportUrl] = useState<string | null>(null);
+
+  // ── Convenience aliases for backward compatibility ──
+  const showAssessmentModal = modal.type === "assessment";
+  const modalStudent = modal.student;
+  const showDownloadModal = modal.type === "download";
+  const downloadStudent = modal.student;
+  const downloadAssessmentId = modal.assessmentId;
+  const showBulkDownloadModal = modal.type === "bulkDownload";
+  const showResetModal = modal.type === "reset";
+  const resetStudent = modal.student;
+  const resetAssessmentId = modal.assessmentId;
+  const resetAssessmentName = modal.assessmentName;
+  const showResetConfirm = modal.showConfirm;
+  const showDemographicsModal = modal.type === "demographics";
+  const demographicsStudent = modal.student;
+  const demographicsAssessmentId = modal.assessmentId;
+  const demographicsAssessmentName = modal.assessmentName;
+
+  // ── Setter aliases (map old setters to new modal state) ──
+  const setShowAssessmentModal = (v: boolean) => v ? undefined : closeModal();
+  const setModalStudent = (s: Student | null) => setModal((m) => ({ ...m, student: s }));
+  const setShowDownloadModal = (v: boolean) => v ? undefined : closeModal();
+  const setShowBulkDownloadModal = (v: boolean) => v ? setModal({ type: "bulkDownload", student: null, assessmentId: null, assessmentName: "", showConfirm: false }) : closeModal();
+  const setShowResetModal = (v: boolean) => v ? undefined : closeModal();
+  const setShowResetConfirm = (v: boolean) => setModal((m) => ({ ...m, showConfirm: v }));
+  const setShowDemographicsModal = (v: boolean) => v ? undefined : closeModal();
+
+  // ── Filter state (consolidated into one object) ──
+  type FilterSet = { assessmentIds: Set<number>; sessions: Set<string>; grades: Set<string>; sections: Set<string>; statuses: Set<string>; enabled: Set<string>; };
+  const emptyFilters = (): FilterSet => ({ assessmentIds: new Set(), sessions: new Set(), grades: new Set(), sections: new Set(), statuses: new Set(), enabled: new Set() });
+  const [pending, setPending] = useState<FilterSet>(emptyFilters());
+  const [applied, setApplied] = useState<FilterSet>(emptyFilters());
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [hierarchyData, setHierarchyData] = useState<any[]>([]);
+  const [activeFilterCategory, setActiveFilterCategory] = useState<string>("assessment");
+
+  // ── Filter aliases for backward compatibility ──
+  const pendingAssessmentIds = pending.assessmentIds;
+  const pendingSessions = pending.sessions;
+  const pendingGrades = pending.grades;
+  const pendingSections = pending.sections;
+  const pendingStatuses = pending.statuses;
+  const pendingEnabled = pending.enabled;
+  const appliedAssessmentIds = applied.assessmentIds;
+  const appliedSessions = applied.sessions;
+  const appliedGrades = applied.grades;
+  const appliedSections = applied.sections;
+  const appliedStatuses = applied.statuses;
+  const appliedEnabled = applied.enabled;
+
+  // Setter helpers for filters
+  const setPendingAssessmentIds = (v: Set<number> | ((p: Set<number>) => Set<number>)) => setPending((p) => ({ ...p, assessmentIds: typeof v === "function" ? v(p.assessmentIds) : v }));
+  const setPendingSessions = (v: Set<string> | ((p: Set<string>) => Set<string>)) => setPending((p) => ({ ...p, sessions: typeof v === "function" ? v(p.sessions) : v }));
+  const setPendingGrades = (v: Set<string> | ((p: Set<string>) => Set<string>)) => setPending((p) => ({ ...p, grades: typeof v === "function" ? v(p.grades) : v }));
+  const setPendingSections = (v: Set<string> | ((p: Set<string>) => Set<string>)) => setPending((p) => ({ ...p, sections: typeof v === "function" ? v(p.sections) : v }));
+  const setPendingStatuses = (v: Set<string> | ((p: Set<string>) => Set<string>)) => setPending((p) => ({ ...p, statuses: typeof v === "function" ? v(p.statuses) : v }));
+  const setPendingEnabled = (v: Set<string> | ((p: Set<string>) => Set<string>)) => setPending((p) => ({ ...p, enabled: typeof v === "function" ? v(p.enabled) : v }));
+  const setAppliedAssessmentIds = (v: Set<number>) => setApplied((a) => ({ ...a, assessmentIds: v }));
+  const setAppliedSessions = (v: Set<string>) => setApplied((a) => ({ ...a, sessions: v }));
+  const setAppliedGrades = (v: Set<string>) => setApplied((a) => ({ ...a, grades: v }));
+  const setAppliedSections = (v: Set<string>) => setApplied((a) => ({ ...a, sections: v }));
+  const setAppliedStatuses = (v: Set<string>) => setApplied((a) => ({ ...a, statuses: v }));
+  const setAppliedEnabled = (v: Set<string>) => setApplied((a) => ({ ...a, enabled: v }));
 
   const normalizeAnswers = (data: any): StudentAnswerDetail[] => {
     const rawList = Array.isArray(data)
@@ -310,14 +364,14 @@ export default function GroupStudentPage() {
       }));
 
     if (assignments.length === 0) {
-      alert("No new assessments to save.");
+      showErrorToast("No new assessments to save.");
       return;
     }
 
     setSaving(true);
     try {
       await bulkAlotAssessment(assignments);
-      alert(`${assignments.length} assessment(s) saved successfully!`);
+      showSuccessToast(`${assignments.length} assessment(s) saved successfully!`);
       setHasChanges(false);
 
       // Refresh data
@@ -356,16 +410,14 @@ export default function GroupStudentPage() {
       }
     } catch (error) {
       console.error("Error saving assessments:", error);
-      alert("Failed to save assessments. Please try again.");
+      showErrorToast("Failed to save assessments. Please try again.");
     } finally {
       setSaving(false);
     }
   };
 
   const handleDownloadClick = async (student: Student, assessmentId: number) => {
-    setDownloadStudent(student);
-    setDownloadAssessmentId(assessmentId);
-    setShowDownloadModal(true);
+    setModal({ type: "download", student, assessmentId, assessmentName: "", showConfirm: false });
     setDownloadLoading(true);
     setDownloadError("");
 
@@ -422,24 +474,19 @@ export default function GroupStudentPage() {
       // Download file
       XLSX.writeFile(workbook, filename);
 
-      alert(`Download successful for ${downloadStudent.name}!`);
-      setShowDownloadModal(false);
-      setDownloadStudent(null);
-      setDownloadAssessmentId(null);
+      showSuccessToast(`Download successful for ${downloadStudent.name}!`);
+      closeModal();
       setDownloadAnswers([]);
     } catch (error) {
       console.error("Error downloading:", error);
-      alert("Failed to download. Please try again.");
+      showErrorToast("Failed to download. Please try again.");
     } finally {
       setDownloading(false);
     }
   };
 
   const handleResetClick = (student: Student, assessmentId: number, assessmentName: string) => {
-    setResetStudent(student);
-    setResetAssessmentId(assessmentId);
-    setResetAssessmentName(assessmentName);
-    setShowResetModal(true);
+    setModal({ type: "reset", student, assessmentId, assessmentName, showConfirm: false });
   };
 
   const handleConfirmReset = async () => {
@@ -448,9 +495,8 @@ export default function GroupStudentPage() {
     setResetting(true);
     try {
       await resetAssessment(resetStudent.userStudentId, resetAssessmentId);
-      alert("Assessment reset successfully!");
-      setShowResetConfirm(false);
-      setShowResetModal(false);
+      showSuccessToast("Assessment reset successfully!");
+      closeModal();
 
       // Refresh student data
       if (selectedInstitute) {
@@ -498,12 +544,10 @@ export default function GroupStudentPage() {
         }
       }
 
-      setResetStudent(null);
-      setResetAssessmentId(null);
-      setResetAssessmentName("");
+      closeModal();
     } catch (error: any) {
       console.error("Error resetting assessment:", error);
-      alert(error.response?.data?.error || "Failed to reset assessment");
+      showErrorToast(error.response?.data?.error || "Failed to reset assessment");
     } finally {
       setResetting(false);
     }
@@ -538,18 +582,8 @@ export default function GroupStudentPage() {
       setHierarchyData([]);
     }
     // Reset all filters when institute changes
-    setAppliedEnabled(new Set());
-    setAppliedAssessmentIds(new Set());
-    setAppliedSessions(new Set());
-    setAppliedGrades(new Set());
-    setAppliedSections(new Set());
-    setAppliedStatuses(new Set());
-    setPendingEnabled(new Set());
-    setPendingAssessmentIds(new Set());
-    setPendingSessions(new Set());
-    setPendingGrades(new Set());
-    setPendingSections(new Set());
-    setPendingStatuses(new Set());
+    setApplied(emptyFilters());
+    setPending(emptyFilters());
     setShowFilterPanel(false);
   }, [selectedInstitute]);
 
@@ -559,12 +593,6 @@ export default function GroupStudentPage() {
       getStudentsWithMappingByInstituteId(Number(selectedInstitute))
         .then((response) => {
           const studentData = response.data.map((student: any) => {
-            const assessmentId = student.assessmentId
-              ? String(student.assessmentId)
-              : "";
-            const assessment = assessments.find(
-              (a) => a.id === Number(assessmentId)
-            );
             const assignedIds = Array.isArray(student.assignedAssessmentIds)
               ? student.assignedAssessmentIds
               : [];
@@ -578,7 +606,7 @@ export default function GroupStudentPage() {
               controlNumber: student.controlNumber ?? undefined,
               selectedAssessment: "",
               userStudentId: student.userStudentId,
-              assessmentName: assessment?.assessmentName || "",
+              assessmentName: "",
               username: student.username || "",
               schoolSectionId: student.schoolSectionId ?? undefined,
               assessments: student.assessments || [],
@@ -592,10 +620,28 @@ export default function GroupStudentPage() {
         })
         .finally(() => setLoading(false));
     }
-  }, [selectedInstitute, assessments]);
+  }, [selectedInstitute]);
 
-  // Set of active assessment IDs — used to hide deactivated assessments everywhere
-  const activeAssessmentIds = new Set(assessments.map((a) => a.id));
+  // Set of active assessment IDs — memoized
+  const activeAssessmentIds = useMemo(() => new Set(assessments.map((a) => a.id)), [assessments]);
+
+  // Pre-compute per-student active assessment count
+  const studentAssessmentCounts = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const s of students) {
+      const count = new Set(
+        (s.assessments || [])
+          .filter(a => activeAssessmentIds.has(Number(a.assessmentId)))
+          .map(a => Number(a.assessmentId))
+      ).size;
+      map.set(s.userStudentId, count);
+    }
+    return map;
+  }, [students, activeAssessmentIds]);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   const filteredStudents = useMemo(() => {
     return students.filter((s) => {
@@ -645,6 +691,18 @@ export default function GroupStudentPage() {
     });
   }, [students, query, filteredSectionIds, hasAssessmentFilter, appliedAssessmentIds, hasStatusFilter, appliedStatuses, activeAssessmentIds]);
 
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedStudents = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredStudents.slice(start, start + pageSize);
+  }, [filteredStudents, safeCurrentPage, pageSize]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, filteredSectionIds, appliedAssessmentIds, appliedStatuses]);
+
   const getSelectedInstituteName = () => {
     const institute = institutes.find(
       (inst) => inst.instituteCode === selectedInstitute
@@ -654,7 +712,7 @@ export default function GroupStudentPage() {
 
   const handleDownloadStudentList = () => {
     if (filteredStudents.length === 0) {
-      alert("No students to download.");
+      showErrorToast("No students to download.");
       return;
     }
 
@@ -716,10 +774,10 @@ export default function GroupStudentPage() {
       // Download file
       XLSX.writeFile(workbook, filename);
 
-      alert(`Student list downloaded successfully!`);
+      showSuccessToast(`Student list downloaded successfully!`);
     } catch (error) {
       console.error("Error downloading student list:", error);
-      alert("Failed to download student list. Please try again.");
+      showErrorToast("Failed to download student list. Please try again.");
     }
   };
 
@@ -986,12 +1044,12 @@ export default function GroupStudentPage() {
       const filename = `${instituteName}_All_Answers_${Date.now()}.xlsx`;
       XLSX.writeFile(workbook, filename);
 
-      alert("Download successful!");
+      showSuccessToast("Download successful!");
       setShowBulkDownloadModal(false);
       setBulkDownloadAnswers([]);
     } catch (error) {
       console.error("Error downloading:", error);
-      alert("Failed to download. Please try again.");
+      showErrorToast("Failed to download. Please try again.");
     } finally {
       setBulkDownloading(false);
     }
@@ -1022,7 +1080,7 @@ export default function GroupStudentPage() {
       }
 
       if (pairs.length === 0) {
-        alert("No student-assessment pairs to export.");
+        showErrorToast("No student-assessment pairs to export.");
         return;
       }
 
@@ -1054,7 +1112,7 @@ export default function GroupStudentPage() {
           if (parsed.error) msg = parsed.error;
         } catch (_) {}
       }
-      alert(`Failed to download proctoring data: ${msg}`);
+      showErrorToast(`Failed to download proctoring data: ${msg}`);
     } finally {
       setProctoringDownloading(false);
     }
@@ -1098,8 +1156,7 @@ export default function GroupStudentPage() {
   };
 
   const handleViewAssessments = (student: Student) => {
-    setModalStudent(student);
-    setShowAssessmentModal(true);
+    setModal({ type: "assessment", student, assessmentId: null, assessmentName: "", showConfirm: false });
     // Filter out deactivated assessments and deduplicate by assessmentId
     const activeOnly = (student.assessments || []).filter(
       (a) => activeAssessmentIds.has(Number(a.assessmentId))
@@ -1115,10 +1172,7 @@ export default function GroupStudentPage() {
   };
 
   const handleViewDemographics = async (student: Student, assessmentId: number, assessmentName: string) => {
-    setDemographicsStudent(student);
-    setDemographicsAssessmentId(assessmentId);
-    setDemographicsAssessmentName(assessmentName);
-    setShowDemographicsModal(true);
+    setModal({ type: "demographics", student, assessmentId, assessmentName, showConfirm: false });
     setDemographicsLoading(true);
     setDemographicsData([]);
 
@@ -1968,106 +2022,116 @@ export default function GroupStudentPage() {
                   </p>
                 </div>
               ) : (
-                <div className="table-responsive" style={{ overflowX: "auto" }}>
-                  <table className="table align-middle mb-0" style={{ minWidth: "1400px" }}>
+                <div className="table-responsive">
+                  <table className="table align-middle mb-0" style={{ width: "100%", tableLayout: "auto", fontSize: "0.85rem" }}>
                     <thead>
                       <tr style={{ background: "#f8f9fa" }}>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           User ID
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Username
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Roll Number
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Control Number
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Student Name
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Allotted Assessment
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Phone Number
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           DOB
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Assessments
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Actions
@@ -2075,7 +2139,7 @@ export default function GroupStudentPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredStudents.map((student, index) => (
+                      {paginatedStudents.map((student, index) => (
                         <tr
                           key={student.userStudentId}
                           style={{
@@ -2085,7 +2149,7 @@ export default function GroupStudentPage() {
                         >
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2094,10 +2158,10 @@ export default function GroupStudentPage() {
                               style={{
                                 background: "rgba(67, 97, 238, 0.1)",
                                 color: "#4361ee",
-                                padding: "6px 12px",
-                                borderRadius: "8px",
+                                padding: "4px 8px",
+                                borderRadius: "6px",
                                 fontWeight: 600,
-                                fontSize: "0.85rem",
+                                fontSize: "0.8rem",
                               }}
                             >
                               #{student.userStudentId}
@@ -2105,7 +2169,7 @@ export default function GroupStudentPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2118,7 +2182,7 @@ export default function GroupStudentPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2128,7 +2192,7 @@ export default function GroupStudentPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2138,7 +2202,7 @@ export default function GroupStudentPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2151,7 +2215,7 @@ export default function GroupStudentPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2162,20 +2226,21 @@ export default function GroupStudentPage() {
                                 background: "rgba(67, 97, 238, 0.1)",
                                 color: "#4361ee",
                                 border: "1px solid rgba(67, 97, 238, 0.3)",
-                                padding: "6px 12px",
-                                borderRadius: "8px",
+                                padding: "4px 8px",
+                                borderRadius: "6px",
                                 fontWeight: 500,
-                                fontSize: "0.85rem",
+                                fontSize: "0.78rem",
                                 transition: "all 0.2s",
+                                whiteSpace: "nowrap",
                               }}
                             >
                               <i className="bi bi-list-ul"></i>
-                              View ({new Set((student.assessments || []).filter(a => activeAssessmentIds.has(Number(a.assessmentId))).map(a => Number(a.assessmentId))).size})
+                              View ({studentAssessmentCounts.get(student.userStudentId) || 0})
                             </button>
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2200,7 +2265,7 @@ export default function GroupStudentPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2225,7 +2290,7 @@ export default function GroupStudentPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2239,8 +2304,8 @@ export default function GroupStudentPage() {
                               }
                               style={{
                                 width: "100%",
-                                minWidth: "200px",
-                                padding: "10px 12px",
+                                minWidth: "150px",
+                                padding: "6px 8px",
                                 borderRadius: "8px",
                                 border: "2px solid #e0e0e0",
                                 background: student.selectedAssessment
@@ -2248,7 +2313,7 @@ export default function GroupStudentPage() {
                                   : "#fff",
                                 cursor: "pointer",
                                 fontWeight: 500,
-                                fontSize: "0.9rem",
+                                fontSize: "0.8rem",
                               }}
                             >
                               <option value="">-- Select Assessment --</option>
@@ -2277,7 +2342,7 @@ export default function GroupStudentPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2288,12 +2353,13 @@ export default function GroupStudentPage() {
                                 background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
                                 color: "#fff",
                                 border: "none",
-                                padding: "8px 16px",
-                                borderRadius: "8px",
+                                padding: "5px 10px",
+                                borderRadius: "6px",
                                 fontWeight: 600,
-                                fontSize: "0.85rem",
+                                fontSize: "0.78rem",
                                 transition: "all 0.2s",
                                 boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
+                                whiteSpace: "nowrap",
                               }}
                             >
                               <i className="bi bi-speedometer2"></i>
@@ -2304,6 +2370,56 @@ export default function GroupStudentPage() {
                       ))}
                     </tbody>
                   </table>
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "12px 24px", borderTop: "1px solid #e5e7eb", flexWrap: "wrap", gap: 8,
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
+                          {(safeCurrentPage - 1) * pageSize + 1}-{Math.min(safeCurrentPage * pageSize, filteredStudents.length)} of {filteredStudents.length}
+                        </span>
+                        <select
+                          className="form-select form-select-sm form-select-solid"
+                          style={{ width: 72, fontSize: "0.85rem" }}
+                          value={pageSize}
+                          onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                        >
+                          {[25, 50, 100, 200].map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <button className="btn btn-sm btn-light" disabled={safeCurrentPage <= 1}
+                          onClick={() => setCurrentPage(1)} style={{ padding: "4px 10px", fontSize: "0.85rem" }}>First</button>
+                        <button className="btn btn-sm btn-light" disabled={safeCurrentPage <= 1}
+                          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} style={{ padding: "4px 10px", fontSize: "0.85rem" }}>Prev</button>
+                        {(() => {
+                          const pages: (number | string)[] = [];
+                          const maxV = 5;
+                          let start = Math.max(1, safeCurrentPage - Math.floor(maxV / 2));
+                          let end = Math.min(totalPages, start + maxV - 1);
+                          if (end - start + 1 < maxV) start = Math.max(1, end - maxV + 1);
+                          if (start > 1) { pages.push(1); if (start > 2) pages.push("..."); }
+                          for (let i = start; i <= end; i++) pages.push(i);
+                          if (end < totalPages) { if (end < totalPages - 1) pages.push("..."); pages.push(totalPages); }
+                          return pages.map((p, i) =>
+                            typeof p === "string" ? (
+                              <span key={`e-${i}`} style={{ padding: "4px 6px", color: "#9ca3af", fontSize: "0.85rem" }}>...</span>
+                            ) : (
+                              <button key={p} className={`btn btn-sm ${p === safeCurrentPage ? "btn-primary" : "btn-light"}`}
+                                onClick={() => setCurrentPage(p)} style={{ padding: "4px 12px", fontSize: "0.85rem", minWidth: 36 }}>{p}</button>
+                            )
+                          );
+                        })()}
+                        <button className="btn btn-sm btn-light" disabled={safeCurrentPage >= totalPages}
+                          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} style={{ padding: "4px 10px", fontSize: "0.85rem" }}>Next</button>
+                        <button className="btn btn-sm btn-light" disabled={safeCurrentPage >= totalPages}
+                          onClick={() => setCurrentPage(totalPages)} style={{ padding: "4px 10px", fontSize: "0.85rem" }}>Last</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2578,6 +2694,140 @@ export default function GroupStudentPage() {
                           <i className="bi bi-arrow-counterclockwise"></i>
                           Reset
                         </button>
+                        {assessment.status === "completed" && (
+                          <>
+                          {generatedReportUrls.has(`${modalStudent.userStudentId}-${assessment.assessmentId}`) ? (
+                          <button
+                            className="btn btn-success btn-sm d-flex align-items-center gap-1"
+                            onClick={() => {
+                              const url = generatedReportUrls.get(`${modalStudent.userStudentId}-${assessment.assessmentId}`);
+                              if (url) window.open(url, "_blank");
+                            }}
+                            style={{
+                              borderRadius: "8px",
+                              padding: "6px 12px",
+                              fontWeight: 500,
+                              fontSize: "0.8rem",
+                              transition: "all 0.2s",
+                            }}
+                          >
+                            <i className="bi bi-eye"></i>
+                            Show Report
+                          </button>
+                          ) : (
+                          <button
+                            className="btn btn-outline-success btn-sm d-flex align-items-center gap-1"
+                            disabled={reportGeneratingFor === assessment.assessmentId}
+                            onClick={async () => {
+                              if (!modalStudent) return;
+                              setReportGeneratingFor(assessment.assessmentId);
+                              try {
+                                const fullAssessment = assessments.find((a: any) => a.id === assessment.assessmentId) as any;
+                                const isBet = fullAssessment?.questionnaire?.type === true
+                                  || (fullAssessment?.questionnaire?.type == null && (assessment.assessmentName || '').toUpperCase().includes('BET'));
+
+                                const res = isBet
+                                  ? await generateBetReportOneClick(assessment.assessmentId, modalStudent.userStudentId)
+                                  : await generateNavigatorReportOneClick(assessment.assessmentId, modalStudent.userStudentId);
+
+                                const reportUrl = res.data.reportUrl;
+                                if (reportUrl) {
+                                  setGeneratedReportUrls(prev => new Map(prev).set(`${modalStudent.userStudentId}-${assessment.assessmentId}`, reportUrl));
+                                }
+                              } catch (err: any) {
+                                showErrorToast("Report generation failed: " + (err?.response?.data?.error || err.message));
+                              } finally {
+                                setReportGeneratingFor(null);
+                              }
+                            }}
+                            style={{
+                              borderRadius: "8px",
+                              padding: "6px 12px",
+                              fontWeight: 500,
+                              fontSize: "0.8rem",
+                              transition: "all 0.2s",
+                            }}
+                          >
+                            <i className={reportGeneratingFor === assessment.assessmentId ? "bi bi-hourglass-split" : "bi bi-file-earmark-arrow-down"}></i>
+                            {reportGeneratingFor === assessment.assessmentId ? "Generating..." : "Report"}
+                          </button>
+                          )}
+                          <button
+                            className="btn btn-outline-warning btn-sm d-flex align-items-center gap-1"
+                            disabled={reportGeneratingFor === assessment.assessmentId}
+                            title="Force regenerate report from latest data"
+                            onClick={async () => {
+                              if (!modalStudent) return;
+                              setReportGeneratingFor(assessment.assessmentId);
+                              try {
+                                const fullAssessment = assessments.find((a: any) => a.id === assessment.assessmentId) as any;
+                                const isBet = fullAssessment?.questionnaire?.type === true
+                                  || (fullAssessment?.questionnaire?.type == null && (assessment.assessmentName || '').toUpperCase().includes('BET'));
+
+                                const res = isBet
+                                  ? await generateBetReportOneClick(assessment.assessmentId, modalStudent.userStudentId, true)
+                                  : await generateNavigatorReportOneClick(assessment.assessmentId, modalStudent.userStudentId, true);
+
+                                const reportUrl = res.data.reportUrl;
+                                if (reportUrl) {
+                                  setGeneratedReportUrls(prev => new Map(prev).set(`${modalStudent.userStudentId}-${assessment.assessmentId}`, reportUrl));
+                                }
+                              } catch (err: any) {
+                                showErrorToast("Report generation failed: " + (err?.response?.data?.error || err.message));
+                              } finally {
+                                setReportGeneratingFor(null);
+                              }
+                            }}
+                            style={{
+                              borderRadius: "8px",
+                              padding: "6px 12px",
+                              fontWeight: 500,
+                              fontSize: "0.8rem",
+                              transition: "all 0.2s",
+                            }}
+                          >
+                            <i className="bi bi-arrow-clockwise"></i>
+                            {reportGeneratingFor === assessment.assessmentId ? "" : "Regenerate"}
+                          </button>
+                          {generatedReportUrls.has(`${modalStudent.userStudentId}-${assessment.assessmentId}`) && (
+                          <button
+                            className="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1"
+                            title="Send report via email"
+                            onClick={async () => {
+                              if (!modalStudent) return;
+                              setEmailModalStudent(modalStudent);
+                              setEmailAssessmentName(assessment.assessmentName);
+                              setEmailReportUrl(generatedReportUrls.get(`${modalStudent.userStudentId}-${assessment.assessmentId}`) || null);
+                              setSelectedEmails(new Set());
+                              setExtraEmails([]);
+                              setExtraEmailInput("");
+                              setShowEmailModal(true);
+                              setEmailRecipientsLoading(true);
+
+                              // Fetch email recipients
+                              try {
+                                const res = await getEmailRecipientsForStudent(modalStudent.userStudentId);
+                                setEmailRecipients(res.data || []);
+                              } catch {
+                                setEmailRecipients([]);
+                              } finally {
+                                setEmailRecipientsLoading(false);
+                              }
+                            }}
+                            style={{
+                              borderRadius: "8px",
+                              padding: "6px 12px",
+                              fontWeight: 500,
+                              fontSize: "0.8rem",
+                              transition: "all 0.2s",
+                            }}
+                          >
+                            <i className="bi bi-envelope"></i>
+                            Send Email
+                          </button>
+                          )}
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -2741,8 +2991,7 @@ export default function GroupStudentPage() {
             className="modal-backdrop fade show"
             onClick={() => {
               setShowDownloadModal(false);
-              setDownloadStudent(null);
-              setDownloadAssessmentId(null);
+              closeModal();
               setDownloadAnswers([]);
             }}
             style={{ zIndex: 10040 }}
@@ -2789,8 +3038,7 @@ export default function GroupStudentPage() {
                     className="btn-close"
                     onClick={() => {
                       setShowDownloadModal(false);
-                      setDownloadStudent(null);
-                      setDownloadAssessmentId(null);
+                      closeModal();
                       setDownloadAnswers([]);
                     }}
                     disabled={downloading}
@@ -3070,8 +3318,7 @@ export default function GroupStudentPage() {
                     className="btn btn-outline-secondary"
                     onClick={() => {
                       setShowDownloadModal(false);
-                      setDownloadStudent(null);
-                      setDownloadAssessmentId(null);
+                      closeModal();
                       setDownloadAnswers([]);
                     }}
                     disabled={downloading}
@@ -3690,9 +3937,7 @@ export default function GroupStudentPage() {
               style={{ backgroundColor: "rgba(0,0,0,0.5)", zIndex: 10050 }}
               onClick={() => {
                 setShowResetModal(false);
-                setResetStudent(null);
-                setResetAssessmentId(null);
-                setResetAssessmentName("");
+                closeModal();
               }}
             >
               <div
@@ -3732,9 +3977,7 @@ export default function GroupStudentPage() {
                         className="btn btn-outline-secondary px-4"
                         onClick={() => {
                           setShowResetModal(false);
-                          setResetStudent(null);
-                          setResetAssessmentId(null);
-                          setResetAssessmentName("");
+                          closeModal();
                         }}
                       >
                         Cancel
@@ -3752,6 +3995,248 @@ export default function GroupStudentPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* Send Email Modal */}
+      {showEmailModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 10100, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 560, maxHeight: "90vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+            {/* Header */}
+            <div style={{ background: "linear-gradient(135deg, #4361ee 0%, #1a1a2e 100%)", padding: "1.25rem 1.5rem", borderRadius: "16px 16px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <h5 style={{ margin: 0, color: "#fff", fontWeight: 700, fontSize: "1.05rem" }}>
+                  <i className="bi bi-envelope me-2"></i>Send Report via Email
+                </h5>
+                {emailModalStudent && (
+                  <p style={{ margin: "4px 0 0", color: "rgba(255,255,255,0.85)", fontSize: "0.82rem" }}>
+                    {emailModalStudent.name}{emailAssessmentName ? ` — ${emailAssessmentName}` : ""}
+                  </p>
+                )}
+              </div>
+              <button type="button" style={{ background: "none", border: "none", color: "#fff", fontSize: "1.4rem", cursor: "pointer", padding: 4, lineHeight: 1 }} onClick={() => setShowEmailModal(false)}>&times;</button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: "1.25rem 1.5rem", overflowY: "auto", flex: 1 }}>
+              {emailRecipientsLoading ? (
+                <div style={{ textAlign: "center", padding: "2rem 0" }}>
+                  <div className="spinner-border spinner-border-sm text-primary" role="status" />
+                  <p style={{ marginTop: 8, color: "#6b7280", fontSize: "0.85rem" }}>Loading recipients...</p>
+                </div>
+              ) : (
+                <>
+                  {/* Select All */}
+                  {emailRecipients.length > 0 && (
+                    <div style={{ marginBottom: 12, paddingBottom: 10, borderBottom: "1px solid #e5e7eb" }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontWeight: 600, fontSize: "0.88rem", color: "#374151" }}>
+                        <input
+                          type="checkbox"
+                          checked={emailRecipients.length > 0 && emailRecipients.every((r) => selectedEmails.has(r.email))}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedEmails(new Set([...selectedEmails, ...emailRecipients.map((r) => r.email)]));
+                            } else {
+                              const recipientEmails = new Set(emailRecipients.map((r) => r.email));
+                              setSelectedEmails(new Set([...selectedEmails].filter((em) => !recipientEmails.has(em))));
+                            }
+                          }}
+                          style={{ width: 16, height: 16, accentColor: "#4361ee" }}
+                        />
+                        Select All
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Recipient list */}
+                  {emailRecipients.length === 0 && (
+                    <p style={{ color: "#9ca3af", fontSize: "0.85rem", textAlign: "center", padding: "1rem 0" }}>No recipients found for this student.</p>
+                  )}
+                  {emailRecipients.map((r, i) => (
+                    <label key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", padding: "8px 0", borderBottom: i < emailRecipients.length - 1 ? "1px solid #f3f4f6" : "none" }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedEmails.has(r.email)}
+                        onChange={(e) => {
+                          const next = new Set(selectedEmails);
+                          if (e.target.checked) next.add(r.email);
+                          else next.delete(r.email);
+                          setSelectedEmails(next);
+                        }}
+                        style={{ width: 16, height: 16, marginTop: 2, accentColor: "#4361ee" }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: "0.85rem", color: "#1f2937" }}>{r.name}</div>
+                        <div style={{ fontSize: "0.78rem", color: "#6b7280" }}>{r.email}</div>
+                        <span style={{
+                          display: "inline-block", marginTop: 2, padding: "1px 8px", borderRadius: 4, fontSize: "0.7rem", fontWeight: 600,
+                          background: r.role === "Student" ? "#dbeafe" : r.role === "Assigned Contact Person" ? "#dcfce7" : "#f3e8ff",
+                          color: r.role === "Student" ? "#2563eb" : r.role === "Assigned Contact Person" ? "#059669" : "#7c3aed",
+                        }}>
+                          {r.role}{r.designation ? ` — ${r.designation}` : ""}
+                        </span>
+                      </div>
+                    </label>
+                  ))}
+
+                  {/* Extra emails input */}
+                  <div style={{ marginTop: 16, borderTop: "1px solid #e5e7eb", paddingTop: 14 }}>
+                    <div style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151", marginBottom: 8 }}>Add extra email addresses</div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input
+                        type="email"
+                        placeholder="Enter email and press Enter or Add"
+                        value={extraEmailInput}
+                        onChange={(e) => setExtraEmailInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === ",") {
+                            e.preventDefault();
+                            const email = extraEmailInput.trim().replace(/,$/,"");
+                            if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && !extraEmails.includes(email)) {
+                              setExtraEmails([...extraEmails, email]);
+                              setSelectedEmails(new Set([...selectedEmails, email]));
+                              setExtraEmailInput("");
+                            }
+                          }
+                        }}
+                        style={{ flex: 1, padding: "6px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: "0.85rem", outline: "none" }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const email = extraEmailInput.trim();
+                          if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && !extraEmails.includes(email)) {
+                            setExtraEmails([...extraEmails, email]);
+                            setSelectedEmails(new Set([...selectedEmails, email]));
+                            setExtraEmailInput("");
+                          }
+                        }}
+                        style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#4361ee", color: "#fff", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer" }}
+                      >
+                        Add
+                      </button>
+                    </div>
+                    {/* Extra email chips */}
+                    {extraEmails.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+                        {extraEmails.map((email, i) => (
+                          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 20, background: "#f3f4f6", fontSize: "0.78rem", color: "#374151" }}>
+                            {email}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setExtraEmails(extraEmails.filter((_, j) => j !== i));
+                                const next = new Set(selectedEmails);
+                                next.delete(email);
+                                setSelectedEmails(next);
+                              }}
+                              style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", padding: 0, fontSize: "0.9rem", lineHeight: 1 }}
+                            >
+                              &times;
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{ borderTop: "1px solid #e0e0e0", padding: "1rem 1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>{selectedEmails.size} recipient(s) selected</span>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button className="btn btn-sm" onClick={() => setShowEmailModal(false)} style={{ borderRadius: 8, padding: "8px 20px" }}>Cancel</button>
+                <button
+                  className="btn btn-sm"
+                  disabled={selectedEmails.size === 0 || sendingEmail}
+                  onClick={async () => {
+                    if (selectedEmails.size === 0 || !emailModalStudent) return;
+                    setSendingEmail(true);
+                    try {
+                      const studentName = emailModalStudent.name || "Student";
+                      const reportLink = emailReportUrl || "";
+                      const subject = `Assessment Report – ${studentName}${emailAssessmentName ? ` (${emailAssessmentName})` : ""}`;
+                      const assessmentLabel = emailAssessmentName || "assessment";
+                      const htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>`
+                        + `<body style="margin:0;padding:0;background-color:#f4f6f9;font-family:Arial,Helvetica,sans-serif;">`
+                        + `<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f9;padding:32px 0;"><tr><td align="center">`
+                        + `<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">`
+                        // Header
+                        + `<tr><td style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);padding:32px 40px;text-align:center;">`
+                        + `<h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:0.5px;">Career-9</h1>`
+                        + `<p style="margin:6px 0 0;color:#a8b5cc;font-size:13px;">Ensuring Career Success</p>`
+                        + `</td></tr>`
+                        // Body
+                        + `<tr><td style="padding:36px 40px;">`
+                        + `<p style="margin:0 0 20px;font-size:16px;color:#1a1a2e;">Dear <strong>${studentName}</strong>,</p>`
+                        + `<p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">Greetings from Career-9!</p>`
+                        + `<p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">Thank you for completing the <strong>${assessmentLabel}</strong> assessment. Your report has been generated and is ready for you to view.</p>`
+                        // Report details card
+                        + `<div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:20px 24px;margin-bottom:24px;">`
+                        + `<p style="margin:0 0 12px;font-size:14px;color:#6b7280;">Report Details</p>`
+                        + `<table cellpadding="4" cellspacing="0" style="font-size:14px;color:#1a1a2e;">`
+                        + `<tr><td style="padding:4px 16px 4px 0;color:#6b7280;font-weight:600;">Student:</td><td style="font-weight:600;">${studentName}</td></tr>`
+                        + `<tr><td style="padding:4px 16px 4px 0;color:#6b7280;font-weight:600;">Assessment:</td><td style="font-weight:600;">${assessmentLabel}</td></tr>`
+                        + `</table></div>`
+                        // View report button
+                        + `<p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">Please click the button below to access your report:</p>`
+                        + (reportLink
+                          ? `<p style="margin:0 0 16px;"><a href="${reportLink}" style="display:inline-block;padding:12px 28px;background:linear-gradient(135deg,#4361ee 0%,#3a0ca3 100%);color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;">View Report</a></p>`
+                            + `<p style="margin:0 0 24px;font-size:13px;color:#6b7280;">You can also access your report using this link:<br/><a href="${reportLink}" style="color:#4361ee;text-decoration:none;">${reportLink}</a></p>`
+                          : "")
+                        // Counselling note
+                        + `<p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">Our team will be in touch with you shortly to guide you through the next steps, including your personalised counselling session.</p>`
+                        // Divider
+                        + `<hr style="border:none;border-top:1px solid #e5e7eb;margin:28px 0;">`
+                        // Contact
+                        + `<p style="margin:0 0 12px;font-size:14px;color:#374151;line-height:1.6;">For any queries or assistance, feel free to reach us:</p>`
+                        + `<table cellpadding="2" cellspacing="0" style="font-size:14px;color:#374151;">`
+                        + `<tr><td style="padding:2px 12px 2px 0;color:#6b7280;">Email:</td><td><a href="mailto:support@career-9.com" style="color:#4361ee;text-decoration:none;font-weight:500;">support@career-9.com</a></td></tr>`
+                        + `<tr><td style="padding:2px 12px 2px 0;color:#6b7280;">Phone:</td><td style="font-weight:500;">+91 70000 70256</td></tr>`
+                        + `</table>`
+                        // Sign-off
+                        + `<div style="margin-top:28px;">`
+                        + `<p style="margin:0 0 4px;font-size:14px;color:#374151;">Warm Regards,</p>`
+                        + `<p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#1a1a2e;">Career-9 Team</p>`
+                        + `<p style="margin:0;font-size:13px;color:#6b7280;font-style:italic;">Ensuring Career Success</p>`
+                        + `</div>`
+                        + `</td></tr>`
+                        // Footer
+                        + `<tr><td style="background:#f8fafc;padding:20px 40px;text-align:center;border-top:1px solid #e5e7eb;">`
+                        + `<p style="margin:0 0 4px;font-size:12px;color:#9ca3af;">This is an automated email from Career-9.</p>`
+                        + `<p style="margin:0;font-size:12px;color:#9ca3af;">Please do not reply directly to this email.</p>`
+                        + `</td></tr>`
+                        + `</table></td></tr></table></body></html>`;
+                      await sendReportEmail({
+                        emails: Array.from(selectedEmails),
+                        subject,
+                        htmlContent,
+                        fromName: "Career-9",
+                      });
+                      showSuccessToast(`Email sent to ${selectedEmails.size} recipient(s)`);
+                      setShowEmailModal(false);
+                    } catch (err: any) {
+                      showErrorToast("Failed to send email: " + (err?.response?.data?.message || err?.response?.data || err?.message || "Unknown error"));
+                    } finally {
+                      setSendingEmail(false);
+                    }
+                  }}
+                  style={{
+                    background: selectedEmails.size > 0 ? "#4361ee" : "#e0e0e0",
+                    color: selectedEmails.size > 0 ? "#fff" : "#999",
+                    border: "none",
+                    borderRadius: 8,
+                    padding: "8px 24px",
+                    fontWeight: 600,
+                  }}
+                >
+                  {sendingEmail ? <><span className="spinner-border spinner-border-sm me-2" />Sending...</> : <><i className="bi bi-send me-1"></i>Send</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

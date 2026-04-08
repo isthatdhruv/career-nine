@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import { ReadCollegeList, GetSessionsByInstituteCode } from "../College/API/College_APIs";
 import {
   getStudentsWithMappingByInstituteId,
@@ -14,6 +15,8 @@ import {
   getDemographicFieldsForStudent,
   getBulkDemographicData,
   exportProctoringExcel,
+  generateBetReportOneClick,
+  generateNavigatorReportOneClick,
 } from "../StudentInformation/StudentInfo_APIs";
 import * as XLSX from "xlsx";
 
@@ -81,6 +84,7 @@ export default function GroupStudentAdminPage() {
 
   // Proctoring download state
   const [proctoringDownloading, setProctoringDownloading] = useState(false);
+  const [reportGeneratingFor, setReportGeneratingFor] = useState<number | null>(null);
 
   // Filter panel state
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -305,14 +309,14 @@ export default function GroupStudentAdminPage() {
       }));
 
     if (assignments.length === 0) {
-      alert("No new assessments to save.");
+      showErrorToast("No new assessments to save.");
       return;
     }
 
     setSaving(true);
     try {
       await bulkAlotAssessment(assignments);
-      alert(`${assignments.length} assessment(s) saved successfully!`);
+      showSuccessToast(`${assignments.length} assessment(s) saved successfully!`);
       setHasChanges(false);
 
       // Refresh data
@@ -351,7 +355,7 @@ export default function GroupStudentAdminPage() {
       }
     } catch (error) {
       console.error("Error saving assessments:", error);
-      alert("Failed to save assessments. Please try again.");
+      showErrorToast("Failed to save assessments. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -417,14 +421,14 @@ export default function GroupStudentAdminPage() {
       // Download file
       XLSX.writeFile(workbook, filename);
 
-      alert(`Download successful for ${downloadStudent.name}!`);
+      showSuccessToast(`Download successful for ${downloadStudent.name}!`);
       setShowDownloadModal(false);
       setDownloadStudent(null);
       setDownloadAssessmentId(null);
       setDownloadAnswers([]);
     } catch (error) {
       console.error("Error downloading:", error);
-      alert("Failed to download. Please try again.");
+      showErrorToast("Failed to download. Please try again.");
     } finally {
       setDownloading(false);
     }
@@ -443,7 +447,7 @@ export default function GroupStudentAdminPage() {
     setResetting(true);
     try {
       await resetAssessment(resetStudent.userStudentId, resetAssessmentId);
-      alert("Assessment reset successfully!");
+      showSuccessToast("Assessment reset successfully!");
       setShowResetConfirm(false);
       setShowResetModal(false);
 
@@ -498,7 +502,7 @@ export default function GroupStudentAdminPage() {
       setResetAssessmentName("");
     } catch (error: any) {
       console.error("Error resetting assessment:", error);
-      alert(error.response?.data?.error || "Failed to reset assessment");
+      showErrorToast(error.response?.data?.error || "Failed to reset assessment");
     } finally {
       setResetting(false);
     }
@@ -554,12 +558,6 @@ export default function GroupStudentAdminPage() {
       getStudentsWithMappingByInstituteId(Number(selectedInstitute))
         .then((response) => {
           const studentData = response.data.map((student: any) => {
-            const assessmentId = student.assessmentId
-              ? String(student.assessmentId)
-              : "";
-            const assessment = assessments.find(
-              (a) => a.id === Number(assessmentId)
-            );
             const assignedIds = Array.isArray(student.assignedAssessmentIds)
               ? student.assignedAssessmentIds
               : [];
@@ -573,7 +571,7 @@ export default function GroupStudentAdminPage() {
               controlNumber: student.controlNumber ?? undefined,
               selectedAssessment: "",
               userStudentId: student.userStudentId,
-              assessmentName: assessment?.assessmentName || "",
+              assessmentName: "",
               username: student.username || "",
               schoolSectionId: student.schoolSectionId ?? undefined,
               assessments: student.assessments || [],
@@ -587,10 +585,28 @@ export default function GroupStudentAdminPage() {
         })
         .finally(() => setLoading(false));
     }
-  }, [selectedInstitute, assessments]);
+  }, [selectedInstitute]);
 
-  // Set of active assessment IDs — used to hide deactivated assessments everywhere
-  const activeAssessmentIds = new Set(assessments.map((a) => a.id));
+  // Set of active assessment IDs — memoized to prevent re-creation on every render
+  const activeAssessmentIds = useMemo(() => new Set(assessments.map((a) => a.id)), [assessments]);
+
+  // Pre-compute per-student active assessment count (avoids Set creation per row per render)
+  const studentAssessmentCounts = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const s of students) {
+      const count = new Set(
+        (s.assessments || [])
+          .filter(a => activeAssessmentIds.has(Number(a.assessmentId)))
+          .map(a => Number(a.assessmentId))
+      ).size;
+      map.set(s.userStudentId, count);
+    }
+    return map;
+  }, [students, activeAssessmentIds]);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   const filteredStudents = useMemo(() => {
     return students.filter((s) => {
@@ -640,6 +656,19 @@ export default function GroupStudentAdminPage() {
     });
   }, [students, query, filteredSectionIds, hasAssessmentFilter, appliedAssessmentIds, hasStatusFilter, appliedStatuses, activeAssessmentIds]);
 
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedStudents = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredStudents.slice(start, start + pageSize);
+  }, [filteredStudents, safeCurrentPage, pageSize]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, filteredSectionIds, appliedAssessmentIds, appliedStatuses]);
+
   const getSelectedInstituteName = () => {
     const institute = institutes.find(
       (inst) => inst.instituteCode === selectedInstitute
@@ -649,7 +678,7 @@ export default function GroupStudentAdminPage() {
 
   const handleDownloadStudentList = () => {
     if (filteredStudents.length === 0) {
-      alert("No students to download.");
+      showErrorToast("No students to download.");
       return;
     }
 
@@ -711,10 +740,10 @@ export default function GroupStudentAdminPage() {
       // Download file
       XLSX.writeFile(workbook, filename);
 
-      alert(`Student list downloaded successfully!`);
+      showSuccessToast(`Student list downloaded successfully!`);
     } catch (error) {
       console.error("Error downloading student list:", error);
-      alert("Failed to download student list. Please try again.");
+      showErrorToast("Failed to download student list. Please try again.");
     }
   };
 
@@ -981,12 +1010,12 @@ export default function GroupStudentAdminPage() {
       const filename = `${instituteName}_All_Answers_${Date.now()}.xlsx`;
       XLSX.writeFile(workbook, filename);
 
-      alert("Download successful!");
+      showSuccessToast("Download successful!");
       setShowBulkDownloadModal(false);
       setBulkDownloadAnswers([]);
     } catch (error) {
       console.error("Error downloading:", error);
-      alert("Failed to download. Please try again.");
+      showErrorToast("Failed to download. Please try again.");
     } finally {
       setBulkDownloading(false);
     }
@@ -1017,7 +1046,7 @@ export default function GroupStudentAdminPage() {
       }
 
       if (pairs.length === 0) {
-        alert("No student-assessment pairs to export.");
+        showErrorToast("No student-assessment pairs to export.");
         return;
       }
 
@@ -1049,7 +1078,7 @@ export default function GroupStudentAdminPage() {
           if (parsed.error) msg = parsed.error;
         } catch (_) {}
       }
-      alert(`Failed to download proctoring data: ${msg}`);
+      showErrorToast(`Failed to download proctoring data: ${msg}`);
     } finally {
       setProctoringDownloading(false);
     }
@@ -1963,106 +1992,116 @@ export default function GroupStudentAdminPage() {
                   </p>
                 </div>
               ) : (
-                <div className="table-responsive" style={{ overflowX: "auto" }}>
-                  <table className="table align-middle mb-0" style={{ minWidth: "1400px" }}>
+                <div className="table-responsive">
+                  <table className="table align-middle mb-0" style={{ width: "100%", tableLayout: "auto", fontSize: "0.85rem" }}>
                     <thead>
                       <tr style={{ background: "#f8f9fa" }}>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           User ID
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Username
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Roll Number
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Control Number
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Student Name
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Allotted Assessment
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Phone Number
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           DOB
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Assessments
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Actions
@@ -2070,7 +2109,7 @@ export default function GroupStudentAdminPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredStudents.map((student, index) => (
+                      {paginatedStudents.map((student, index) => (
                         <tr
                           key={student.userStudentId}
                           style={{
@@ -2080,7 +2119,7 @@ export default function GroupStudentAdminPage() {
                         >
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2089,10 +2128,10 @@ export default function GroupStudentAdminPage() {
                               style={{
                                 background: "rgba(67, 97, 238, 0.1)",
                                 color: "#4361ee",
-                                padding: "6px 12px",
-                                borderRadius: "8px",
+                                padding: "4px 8px",
+                                borderRadius: "6px",
                                 fontWeight: 600,
-                                fontSize: "0.85rem",
+                                fontSize: "0.8rem",
                               }}
                             >
                               #{student.userStudentId}
@@ -2100,7 +2139,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2113,7 +2152,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2123,7 +2162,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2133,7 +2172,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2146,7 +2185,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2157,20 +2196,21 @@ export default function GroupStudentAdminPage() {
                                 background: "rgba(67, 97, 238, 0.1)",
                                 color: "#4361ee",
                                 border: "1px solid rgba(67, 97, 238, 0.3)",
-                                padding: "6px 12px",
-                                borderRadius: "8px",
+                                padding: "4px 8px",
+                                borderRadius: "6px",
                                 fontWeight: 500,
-                                fontSize: "0.85rem",
+                                fontSize: "0.78rem",
                                 transition: "all 0.2s",
+                                whiteSpace: "nowrap",
                               }}
                             >
                               <i className="bi bi-list-ul"></i>
-                              View ({new Set((student.assessments || []).filter(a => activeAssessmentIds.has(Number(a.assessmentId))).map(a => Number(a.assessmentId))).size})
+                              View ({studentAssessmentCounts.get(student.userStudentId) || 0})
                             </button>
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2195,7 +2235,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2220,7 +2260,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2234,8 +2274,8 @@ export default function GroupStudentAdminPage() {
                               }
                               style={{
                                 width: "100%",
-                                minWidth: "200px",
-                                padding: "10px 12px",
+                                minWidth: "150px",
+                                padding: "6px 8px",
                                 borderRadius: "8px",
                                 border: "2px solid #e0e0e0",
                                 background: student.selectedAssessment
@@ -2243,7 +2283,7 @@ export default function GroupStudentAdminPage() {
                                   : "#fff",
                                 cursor: "pointer",
                                 fontWeight: 500,
-                                fontSize: "0.9rem",
+                                fontSize: "0.8rem",
                               }}
                             >
                               <option value="">-- Select Assessment --</option>
@@ -2272,7 +2312,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2283,12 +2323,13 @@ export default function GroupStudentAdminPage() {
                                 background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
                                 color: "#fff",
                                 border: "none",
-                                padding: "8px 16px",
-                                borderRadius: "8px",
+                                padding: "5px 10px",
+                                borderRadius: "6px",
                                 fontWeight: 600,
-                                fontSize: "0.85rem",
+                                fontSize: "0.78rem",
                                 transition: "all 0.2s",
                                 boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
+                                whiteSpace: "nowrap",
                               }}
                             >
                               <i className="bi bi-speedometer2"></i>
@@ -2299,6 +2340,56 @@ export default function GroupStudentAdminPage() {
                       ))}
                     </tbody>
                   </table>
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "12px 24px", borderTop: "1px solid #e5e7eb", flexWrap: "wrap", gap: 8,
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <span style={{ fontSize: "0.85rem", color: "#6b7280" }}>
+                          {(safeCurrentPage - 1) * pageSize + 1}-{Math.min(safeCurrentPage * pageSize, filteredStudents.length)} of {filteredStudents.length}
+                        </span>
+                        <select
+                          className="form-select form-select-sm form-select-solid"
+                          style={{ width: 72, fontSize: "0.85rem" }}
+                          value={pageSize}
+                          onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                        >
+                          {[25, 50, 100, 200].map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <button className="btn btn-sm btn-light" disabled={safeCurrentPage <= 1}
+                          onClick={() => setCurrentPage(1)} style={{ padding: "4px 10px", fontSize: "0.85rem" }}>First</button>
+                        <button className="btn btn-sm btn-light" disabled={safeCurrentPage <= 1}
+                          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} style={{ padding: "4px 10px", fontSize: "0.85rem" }}>Prev</button>
+                        {(() => {
+                          const pages: (number | string)[] = [];
+                          const maxV = 5;
+                          let start = Math.max(1, safeCurrentPage - Math.floor(maxV / 2));
+                          let end = Math.min(totalPages, start + maxV - 1);
+                          if (end - start + 1 < maxV) start = Math.max(1, end - maxV + 1);
+                          if (start > 1) { pages.push(1); if (start > 2) pages.push("..."); }
+                          for (let i = start; i <= end; i++) pages.push(i);
+                          if (end < totalPages) { if (end < totalPages - 1) pages.push("..."); pages.push(totalPages); }
+                          return pages.map((p, i) =>
+                            typeof p === "string" ? (
+                              <span key={`e-${i}`} style={{ padding: "4px 6px", color: "#9ca3af", fontSize: "0.85rem" }}>...</span>
+                            ) : (
+                              <button key={p} className={`btn btn-sm ${p === safeCurrentPage ? "btn-primary" : "btn-light"}`}
+                                onClick={() => setCurrentPage(p)} style={{ padding: "4px 12px", fontSize: "0.85rem", minWidth: 36 }}>{p}</button>
+                            )
+                          );
+                        })()}
+                        <button className="btn btn-sm btn-light" disabled={safeCurrentPage >= totalPages}
+                          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} style={{ padding: "4px 10px", fontSize: "0.85rem" }}>Next</button>
+                        <button className="btn btn-sm btn-light" disabled={safeCurrentPage >= totalPages}
+                          onClick={() => setCurrentPage(totalPages)} style={{ padding: "4px 10px", fontSize: "0.85rem" }}>Last</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2573,6 +2664,79 @@ export default function GroupStudentAdminPage() {
                           <i className="bi bi-arrow-counterclockwise"></i>
                           Reset
                         </button>
+                        {assessment.status === "completed" && (
+                          <>
+                          <button
+                            className="btn btn-outline-success btn-sm d-flex align-items-center gap-1"
+                            disabled={reportGeneratingFor === assessment.assessmentId}
+                            onClick={async () => {
+                              if (!modalStudent) return;
+                              setReportGeneratingFor(assessment.assessmentId);
+                              try {
+                                const fullAssessment = assessments.find((a: any) => a.id === assessment.assessmentId) as any;
+                                const isBet = fullAssessment?.questionnaire?.type === true
+                                  || (fullAssessment?.questionnaire?.type == null && (assessment.assessmentName || '').toUpperCase().includes('BET'));
+                                const res = isBet
+                                  ? await generateBetReportOneClick(assessment.assessmentId, modalStudent.userStudentId)
+                                  : await generateNavigatorReportOneClick(assessment.assessmentId, modalStudent.userStudentId);
+                                const reportUrl = res.data.reportUrl;
+                                if (reportUrl) {
+                                  window.open(reportUrl, "_blank");
+                                }
+                              } catch (err: any) {
+                                showErrorToast("Report generation failed: " + (err?.response?.data?.error || err.message));
+                              } finally {
+                                setReportGeneratingFor(null);
+                              }
+                            }}
+                            style={{
+                              borderRadius: "8px",
+                              padding: "6px 12px",
+                              fontWeight: 500,
+                              fontSize: "0.8rem",
+                              transition: "all 0.2s",
+                            }}
+                          >
+                            <i className={reportGeneratingFor === assessment.assessmentId ? "bi bi-hourglass-split" : "bi bi-file-earmark-arrow-down"}></i>
+                            {reportGeneratingFor === assessment.assessmentId ? "Generating..." : "Report"}
+                          </button>
+                          <button
+                            className="btn btn-outline-warning btn-sm d-flex align-items-center gap-1"
+                            disabled={reportGeneratingFor === assessment.assessmentId}
+                            title="Force regenerate report from latest data"
+                            onClick={async () => {
+                              if (!modalStudent) return;
+                              setReportGeneratingFor(assessment.assessmentId);
+                              try {
+                                const fullAssessment = assessments.find((a: any) => a.id === assessment.assessmentId) as any;
+                                const isBet = fullAssessment?.questionnaire?.type === true
+                                  || (fullAssessment?.questionnaire?.type == null && (assessment.assessmentName || '').toUpperCase().includes('BET'));
+                                const res = isBet
+                                  ? await generateBetReportOneClick(assessment.assessmentId, modalStudent.userStudentId, true)
+                                  : await generateNavigatorReportOneClick(assessment.assessmentId, modalStudent.userStudentId, true);
+                                const reportUrl = res.data.reportUrl;
+                                if (reportUrl) {
+                                  window.open(reportUrl, "_blank");
+                                }
+                              } catch (err: any) {
+                                showErrorToast("Report generation failed: " + (err?.response?.data?.error || err.message));
+                              } finally {
+                                setReportGeneratingFor(null);
+                              }
+                            }}
+                            style={{
+                              borderRadius: "8px",
+                              padding: "6px 12px",
+                              fontWeight: 500,
+                              fontSize: "0.8rem",
+                              transition: "all 0.2s",
+                            }}
+                          >
+                            <i className="bi bi-arrow-clockwise"></i>
+                            {reportGeneratingFor === assessment.assessmentId ? "" : "Regenerate"}
+                          </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}

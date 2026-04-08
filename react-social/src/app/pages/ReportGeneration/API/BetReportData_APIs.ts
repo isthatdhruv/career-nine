@@ -65,3 +65,53 @@ export function generateHtmlReports(assessmentId: number, userStudentIds: number
     userStudentIds,
   });
 }
+
+export function exportMqtScoresExcel(assessmentId: number, userStudentIds?: number[]) {
+  return axios.post(`${BASE}/export-mqt-scores`, {
+    assessmentId,
+    userStudentIds: userStudentIds || [],
+  }, {
+    responseType: 'blob',
+  });
+}
+
+export function downloadBetReport(userStudentId: number, assessmentId: number) {
+  return axios.get(`${BASE}/download/${userStudentId}/${assessmentId}`, {
+    responseType: 'blob',
+  });
+}
+
+export function getBetReportUrls(assessmentId: number, userStudentIds: number[]) {
+  return axios.post<{ reports: { userStudentId: number; studentName: string; fileName: string; reportUrl: string }[] }>(
+    `${BASE}/download-zip`, { assessmentId, userStudentIds }
+  );
+}
+
+export function exportGeneralAssessmentExcel(assessmentId: number) {
+  return axios.get(`${API_URL}/general-assessment/export-excel/${assessmentId}`, {
+    responseType: 'blob',
+  });
+}
+
+export function exportGeneralAssessmentExcelForStudent(assessmentId: number, userStudentId: number) {
+  return axios.get(`${API_URL}/general-assessment/export-excel/${assessmentId}/student/${userStudentId}`, {
+    responseType: 'blob',
+  });
+}
+
+// ── Email Recipients & Send Report Email ──
+
+export interface EmailRecipient {
+  email: string;
+  name: string;
+  role: string;
+  designation?: string;
+}
+
+export function getEmailRecipientsForStudent(userStudentId: number) {
+  return axios.get<EmailRecipient[]>(`${API_URL}/contact-person/email-recipients/${userStudentId}`);
+}
+
+export function sendReportEmail(payload: { emails: string[]; subject: string; htmlContent: string; fromName?: string }) {
+  return axios.post(`${API_URL}/contact-person/send-report-email`, payload);
+}
