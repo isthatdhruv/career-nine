@@ -7,6 +7,7 @@ import {
 import { getAssessmentSummariesByInstitute } from "../AssessmentMapping/API/AssessmentMapping_APIs";
 import { generateAndExportNavigatorExcel } from "../NavigatorReportGeneration/API/NavigatorReportData_APIs";
 import { exportMqtScoresExcel } from "../ReportGeneration/API/BetReportData_APIs";
+import SchoolReportModal from "./SchoolReportModal";
 
 type StudentRow = {
   userStudentId: number;
@@ -60,6 +61,7 @@ const ReportsPage: React.FC = () => {
   // ── Generate ──
   const [generating, setGenerating] = useState(false);
   const [exportingMQT, setExportingMQT] = useState(false);
+  const [schoolReportOpen, setSchoolReportOpen] = useState(false);
 
   // ═══════════════════════ DATA LOADING ═══════════════════════
 
@@ -527,7 +529,102 @@ const ReportsPage: React.FC = () => {
                 >
                   {exportingMQT ? "Exporting..." : (
                     <>
-                      Export MQ &amp; MQT Scores
+                      Export MQ/MQT Scores
+                      {visibleSelectedCount > 0
+                        ? ` (${visibleSelectedCount} selected)`
+                        : ` (All)`}
+                    </>
+                  )}
+                </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={async () => {
+                    if (!selectedAssessment) return;
+                    setExportingBET(true);
+                    try {
+                      const res = await exportBetReportExcel(Number(selectedAssessment));
+                      const url = window.URL.createObjectURL(new Blob([res.data]));
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `bet_report_data_${selectedAssessment}.xlsx`;
+                      document.body.appendChild(a);
+                      a.click();
+                      a.remove();
+                      window.URL.revokeObjectURL(url);
+                    } catch (err: any) {
+                      showErrorToast("Export failed: " + (err?.response?.data?.error || err.message));
+                    } finally {
+                      setExportingBET(false);
+                    }
+                  }}
+                  disabled={exportingBET}
+                  style={{
+                    background: exportingBET
+                      ? "#6c757d"
+                      : "linear-gradient(135deg, #e67e22 0%, #d35400 100%)",
+                    border: "none", borderRadius: 8, padding: "8px 20px",
+                    fontWeight: 600, color: "white", fontSize: "0.85rem",
+                    boxShadow: exportingBET ? "none" : "0 4px 12px rgba(230, 126, 34, 0.3)",
+                  }}
+                >
+                  {exportingBET ? "Exporting..." : "Export BET Report"}
+                </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => setSchoolReportOpen(true)}
+                  style={{
+                    background: "linear-gradient(135deg, #1e3a5f 0%, #2d5a8e 100%)",
+                    border: "none", borderRadius: 8, padding: "8px 20px",
+                    fontWeight: 600, color: "white", fontSize: "0.85rem",
+                    boxShadow: "0 4px 12px rgba(30, 58, 95, 0.3)",
+                  }}
+                >
+                  School Report
+                </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={async () => {
+                    if (!selectedAssessment) return;
+                    const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
+                    const selectedVisible = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
+                    // Get students with generated reports
+                    const ids = (selectedVisible.length > 0 ? selectedVisible : displayedStudents.map((s) => s.userStudentId))
+                      .filter((id) => {
+                        const rd = reportDataMap.get(id);
+                        return rd && rd.reportStatus === "generated" && rd.reportUrl;
+                      });
+                    if (ids.length === 0) { showErrorToast("No students with generated reports found."); return; }
+                    setDownloadingZip(true);
+                    setZipProgress(null);
+                    try {
+                      const res = await getBetReportUrls(Number(selectedAssessment), ids);
+                      const students = res.data.reports.map((r: any) => ({ userStudentId: r.userStudentId, fileName: r.fileName }));
+                      await downloadReportsAsZip(
+                        students,
+                        `bet_reports_${selectedAssessment}.zip`,
+                        (uid) => downloadBetReport(uid, Number(selectedAssessment)),
+                        (p) => setZipProgress(p),
+                      );
+                    } catch (err: any) {
+                      showErrorToast("Download failed: " + (err?.response?.data?.error || err.message));
+                    } finally {
+                      setDownloadingZip(false);
+                      setZipProgress(null);
+                    }
+                  }}
+                  disabled={downloadingZip}
+                  style={{
+                    background: downloadingZip
+                      ? "#6c757d"
+                      : "linear-gradient(135deg, #059669 0%, #047857 100%)",
+                    border: "none", borderRadius: 8, padding: "8px 20px",
+                    fontWeight: 600, color: "white", fontSize: "0.85rem",
+                    boxShadow: downloadingZip ? "none" : "0 4px 12px rgba(5, 150, 105, 0.3)",
+                  }}
+                >
+                  {downloadingZip ? "Preparing ZIP..." : (
+                    <>
+                      Download ZIP (PDF)
                       {visibleSelectedCount > 0
                         ? ` (${visibleSelectedCount} selected)`
                         : ` (All)`}
@@ -669,6 +766,23 @@ const ReportsPage: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* School Report Modal */}
+      <SchoolReportModal
+        open={schoolReportOpen}
+        onClose={() => setSchoolReportOpen(false)}
+        assessmentId={Number(selectedAssessment) || 0}
+        assessmentName={selectedAssessmentName}
+        instituteName={selectedInstituteName}
+        instituteCode={Number(selectedInstitute) || 0}
+        userStudentIds={
+          (() => {
+            const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
+            const selectedVisible = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
+            return selectedVisible.length > 0 ? selectedVisible : undefined;
+          })()
+        }
+      />
     </div>
   );
 };

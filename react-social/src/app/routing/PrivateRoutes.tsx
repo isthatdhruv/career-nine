@@ -348,7 +348,7 @@ const PrivateRoutes = () => {
 
         <Route path="/career-suggestion" element={
           <SuspensedView>
-            <CareerSuggestionPage />
+            {/* <CareerSuggestionPage /> */}
           </SuspensedView>
         } />
 

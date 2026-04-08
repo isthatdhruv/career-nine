@@ -427,7 +427,7 @@ export function AsideMenuMain() {
             <AsideMenuItem
               to="/send-reports"
               icon="/media/icons/duotune/general/gen016.svg"
-              title="Send Reports to Contact"
+              title="Send Reports"
               fontIcon="bi-envelope"
             />
           )}

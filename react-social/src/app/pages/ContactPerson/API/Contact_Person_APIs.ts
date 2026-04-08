@@ -73,3 +73,39 @@ export function SendReportsByInstitute(
     selectedStudentIds,
   });
 }
+
+export function SendReportEmail(
+  emails: string[],
+  subject: string,
+  htmlContent: string,
+  fromName?: string
+) {
+  return axios.post(`${API_URL}/contact-person/send-report-email`, {
+    emails,
+    subject,
+    htmlContent,
+    fromName,
+  });
+}
+
+export function SendWhatsApp(
+  phoneNumber: string,
+  templateName: string,
+  templateParams: string[]
+) {
+  return axios.post(`${API_URL}/contact-person/send-whatsapp`, {
+    phoneNumber,
+    templateName,
+    templateParams,
+  });
+}
+
+export function SendWhatsAppBulk(
+  templateName: string,
+  recipients: { phoneNumber: string; templateParams: string[] }[]
+) {
+  return axios.post(`${API_URL}/contact-person/send-whatsapp-bulk`, {
+    templateName,
+    recipients,
+  });
+}
