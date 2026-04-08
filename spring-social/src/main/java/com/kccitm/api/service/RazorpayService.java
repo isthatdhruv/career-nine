@@ -69,7 +69,7 @@ public class RazorpayService {
 
         PaymentLink paymentLink = client.paymentLink.create(request);
 
-        logger.info("Razorpay payment link created: {}", paymentLink.get("id"));
+        logger.info("Razorpay payment link created: {}", String.valueOf(paymentLink.get("id")));
 
         return Map.of(
             "linkId", paymentLink.get("id").toString(),
