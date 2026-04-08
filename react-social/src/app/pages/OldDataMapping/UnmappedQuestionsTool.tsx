@@ -23,6 +23,9 @@ interface UnmappedQuestion {
   category: string;
   answers: string[];
   studentCount: number;
+  insightCount: number;
+  subjectCount: number;
+  careerCount: number;
 }
 
 interface MappingDraft {
@@ -148,6 +151,9 @@ export default function UnmappedQuestionsTool({ onBack }: { onBack: () => void }
           category: q.category,
           answers: Array.isArray(q.answers) ? q.answers : Array.from(q.answers || []),
           studentCount: q.studentCount || 0,
+          insightCount: q.insightCount || 0,
+          subjectCount: q.subjectCount || 0,
+          careerCount: q.careerCount || 0,
         }));
         setUnmappedQuestions(unmapped);
 
@@ -543,8 +549,25 @@ export default function UnmappedQuestionsTool({ onBack }: { onBack: () => void }
                               {CATEGORY_LABELS[uq.category] || uq.category}
                             </span>
                             <span style={{ fontSize: "0.7rem", color: "#9ca3af" }}>
-                              {uq.studentCount} student{uq.studentCount !== 1 ? "s" : ""} · {uq.answers.length} answer{uq.answers.length !== 1 ? "s" : ""}
+                              {uq.studentCount} total · {uq.answers.length} answer{uq.answers.length !== 1 ? "s" : ""}
                             </span>
+                          </div>
+                          <div className="d-flex gap-2" style={{ fontSize: "0.68rem" }}>
+                            {uq.insightCount > 0 && (
+                              <span style={{ padding: "1px 6px", borderRadius: "4px", background: "rgba(8, 145, 178, 0.1)", color: "#0891b2", fontWeight: 600 }}>
+                                Insight (6-8): {uq.insightCount}
+                              </span>
+                            )}
+                            {uq.subjectCount > 0 && (
+                              <span style={{ padding: "1px 6px", borderRadius: "4px", background: "rgba(124, 58, 237, 0.1)", color: "#7c3aed", fontWeight: 600 }}>
+                                Subject (9-10): {uq.subjectCount}
+                              </span>
+                            )}
+                            {uq.careerCount > 0 && (
+                              <span style={{ padding: "1px 6px", borderRadius: "4px", background: "rgba(245, 158, 11, 0.1)", color: "#d97706", fontWeight: 600 }}>
+                                Career (11-12): {uq.careerCount}
+                              </span>
+                            )}
                           </div>
                           <p className="mb-0 fw-semibold text-dark" style={{ fontSize: "0.88rem" }}>
                             {uq.question}

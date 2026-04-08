@@ -939,14 +939,24 @@ public class FirebaseDataMappingController {
                 });
             }
 
-            // 3. Collect all firebase questions with category + answer options + student count
+            // 3. Collect all firebase questions with category + answer options + student count + navigator breakdown
             // Key: category::question
             Map<String, Map<String, Object>> allFirebaseQuestions = new LinkedHashMap<>();
 
             for (Map<String, Object> user : users) {
-                processFirebaseResponses(user, "abilityDetailedResponses", "ability", allFirebaseQuestions);
-                processFirebaseResponses(user, "multipleIntelligenceResponses", "multipleintelligence", allFirebaseQuestions);
-                processFirebaseResponses(user, "personalityDetailedResponses", "personality", allFirebaseQuestions);
+                // Determine navigator type based on student class
+                String studentClass = null;
+                Object eduObj = user.get("educational");
+                if (eduObj instanceof Map) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> edu = (Map<String, Object>) eduObj;
+                    studentClass = getString(edu, "studentClass");
+                }
+                String navigator = classToNavigator(studentClass);
+
+                processFirebaseResponses(user, "abilityDetailedResponses", "ability", allFirebaseQuestions, navigator);
+                processFirebaseResponses(user, "multipleIntelligenceResponses", "multipleintelligence", allFirebaseQuestions, navigator);
+                processFirebaseResponses(user, "personalityDetailedResponses", "personality", allFirebaseQuestions, navigator);
             }
 
             // 4. Filter to unmapped only
@@ -972,9 +982,26 @@ public class FirebaseDataMappingController {
         }
     }
 
+    /**
+     * Determine navigator type from student class.
+     * Career Navigator: 11-12, Insight Navigator: 6-8, Subject Navigator: 9-10
+     */
+    private String classToNavigator(String studentClass) {
+        if (studentClass == null || studentClass.trim().isEmpty()) return "unknown";
+        try {
+            int cls = Integer.parseInt(studentClass.trim());
+            if (cls >= 11) return "career";
+            if (cls >= 9) return "subject";
+            if (cls >= 6) return "insight";
+            return "unknown";
+        } catch (NumberFormatException e) {
+            return "unknown";
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private void processFirebaseResponses(Map<String, Object> user, String field, String category,
-            Map<String, Map<String, Object>> allQuestions) {
+            Map<String, Map<String, Object>> allQuestions, String navigator) {
         Object obj = user.get(field);
         if (!(obj instanceof List)) return;
         List<Map<String, Object>> responses = (List<Map<String, Object>>) obj;
@@ -993,12 +1020,22 @@ public class FirebaseDataMappingController {
                 m.put("category", category);
                 m.put("answers", new LinkedHashSet<String>());
                 m.put("studentCount", 0);
+                m.put("insightCount", 0);
+                m.put("subjectCount", 0);
+                m.put("careerCount", 0);
                 return m;
             });
             if (answer != null && !answer.trim().isEmpty()) {
                 ((Set<String>) qInfo.get("answers")).add(answer.trim());
             }
             qInfo.put("studentCount", ((int) qInfo.get("studentCount")) + 1);
+            if ("insight".equals(navigator)) {
+                qInfo.put("insightCount", ((int) qInfo.get("insightCount")) + 1);
+            } else if ("subject".equals(navigator)) {
+                qInfo.put("subjectCount", ((int) qInfo.get("subjectCount")) + 1);
+            } else if ("career".equals(navigator)) {
+                qInfo.put("careerCount", ((int) qInfo.get("careerCount")) + 1);
+            }
         }
     }
 
