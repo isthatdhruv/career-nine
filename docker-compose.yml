@@ -138,7 +138,7 @@ services:
     image: mysql:latest
     restart: always
     environment:
-      MYSQL_DATABASE: 'career-9'
+      MYSQL_DATABASE: 'career-9-staging'
       MYSQL_USER: 'user'
       MYSQL_PASSWORD: 'Career-qCsfeuECc3MW'
       MYSQL_ROOT_PASSWORD: 'Career-qCsfeuECc3MW'
@@ -169,6 +169,7 @@ services:
       MASTER_HOST: 'mysql_db_api'
       STAGING_HOST: 'mysql_db_staging'
       DB_NAME: 'career-9'
+      STAGING_DB_NAME: 'career-9-staging'
       DB_USER: 'root'
       DB_PASSWORD: 'Career-qCsfeuECc3MW'
     deploy:
