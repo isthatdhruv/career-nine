@@ -15,6 +15,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.Row;
@@ -88,6 +90,7 @@ public class BetReportDataController {
     @Autowired private FirebaseService firebaseService;
     @Autowired private DigitalOceanSpacesService digitalOceanSpacesService;
     @Autowired private com.kccitm.api.repository.Career9.GeneratedReportRepository generatedReportRepository;
+    @Autowired private com.kccitm.api.repository.Career9.SchoolReportRepository schoolReportRepository;
 
     // ═══════════════════════ ONE-CLICK REPORT ═══════════════════════
 
@@ -643,6 +646,118 @@ public class BetReportDataController {
                 .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().size(),
                         (a, b) -> a, LinkedHashMap::new)));
         response.put("mqGroups", mqGroups);
+
+        return ResponseEntity.ok(response);
+    }
+
+    // ═══════════════════════ SCHOOL REPORT DB PERSISTENCE ═══════════════════════
+
+    /**
+     * POST /bet-report-data/school-report/save
+     * Saves or updates a school report in the database.
+     * Body: { "instituteCode": 1, "assessmentId": 5, "instituteName": "...",
+     *         "assessmentName": "...", "reportData": {...}, "aiInsights": {...} }
+     */
+    @PostMapping("/school-report/save")
+    public ResponseEntity<?> saveSchoolReport(@RequestBody Map<String, Object> request) {
+        if (!request.containsKey("instituteCode") || !request.containsKey("assessmentId")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "instituteCode and assessmentId are required"));
+        }
+
+        Long instituteCode = ((Number) request.get("instituteCode")).longValue();
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+
+        com.kccitm.api.model.career9.SchoolReport report = schoolReportRepository
+                .findByInstituteCodeAndAssessmentId(instituteCode, assessmentId)
+                .orElseGet(com.kccitm.api.model.career9.SchoolReport::new);
+
+        report.setInstituteCode(instituteCode);
+        report.setAssessmentId(assessmentId);
+
+        if (request.containsKey("instituteName")) {
+            report.setInstituteName((String) request.get("instituteName"));
+        }
+        if (request.containsKey("assessmentName")) {
+            report.setAssessmentName((String) request.get("assessmentName"));
+        }
+
+        // Store reportData and aiInsights as JSON strings
+        ObjectMapper mapper = new ObjectMapper();
+        try {
+            if (request.containsKey("reportData")) {
+                Object rd = request.get("reportData");
+                report.setReportData(rd instanceof String ? (String) rd : mapper.writeValueAsString(rd));
+            }
+            if (request.containsKey("aiInsights")) {
+                Object ai = request.get("aiInsights");
+                report.setAiInsights(ai instanceof String ? (String) ai : mapper.writeValueAsString(ai));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to serialize data: " + e.getMessage()));
+        }
+
+        if (request.containsKey("totalStudents")) {
+            report.setTotalStudents(((Number) request.get("totalStudents")).intValue());
+        }
+        if (request.containsKey("studentsWithScores")) {
+            report.setStudentsWithScores(((Number) request.get("studentsWithScores")).intValue());
+        }
+
+        report.setStatus("generated");
+        schoolReportRepository.save(report);
+
+        return ResponseEntity.ok(Map.of(
+                "schoolReportId", report.getSchoolReportId(),
+                "status", "saved"
+        ));
+    }
+
+    /**
+     * GET /bet-report-data/school-report/get/{instituteCode}/{assessmentId}
+     * Retrieves a saved school report from the database.
+     */
+    @GetMapping("/school-report/get/{instituteCode}/{assessmentId}")
+    public ResponseEntity<?> getSchoolReportFromDb(
+            @PathVariable Long instituteCode,
+            @PathVariable Long assessmentId) {
+
+        Optional<com.kccitm.api.model.career9.SchoolReport> opt =
+                schoolReportRepository.findByInstituteCodeAndAssessmentId(instituteCode, assessmentId);
+
+        if (opt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "No saved school report found"));
+        }
+
+        com.kccitm.api.model.career9.SchoolReport report = opt.get();
+
+        // Parse reportData and aiInsights back to objects
+        ObjectMapper mapper = new ObjectMapper();
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("schoolReportId", report.getSchoolReportId());
+        response.put("instituteCode", report.getInstituteCode());
+        response.put("assessmentId", report.getAssessmentId());
+        response.put("instituteName", report.getInstituteName());
+        response.put("assessmentName", report.getAssessmentName());
+        response.put("totalStudents", report.getTotalStudents());
+        response.put("studentsWithScores", report.getStudentsWithScores());
+        response.put("status", report.getStatus());
+        response.put("createdAt", report.getCreatedAt());
+        response.put("updatedAt", report.getUpdatedAt());
+
+        try {
+            if (report.getReportData() != null && !report.getReportData().isEmpty()) {
+                response.put("reportData", mapper.readValue(report.getReportData(), Object.class));
+            }
+            if (report.getAiInsights() != null && !report.getAiInsights().isEmpty()) {
+                response.put("aiInsights", mapper.readValue(report.getAiInsights(), Object.class));
+            }
+        } catch (Exception e) {
+            // Return raw strings if parsing fails
+            response.put("reportData", report.getReportData());
+            response.put("aiInsights", report.getAiInsights());
+        }
 
         return ResponseEntity.ok(response);
     }

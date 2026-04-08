@@ -133,6 +133,40 @@ export function getSchoolReport(assessmentId: number, userStudentIds?: number[])
   });
 }
 
+// ── School Report DB Persistence ──
+
+export interface SavedSchoolReport {
+  schoolReportId: number;
+  instituteCode: number;
+  assessmentId: number;
+  instituteName: string;
+  assessmentName: string;
+  totalStudents: number;
+  studentsWithScores: number;
+  status: string;
+  reportData: SchoolReportData | null;
+  aiInsights: Record<string, any> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function saveSchoolReport(payload: {
+  instituteCode: number;
+  assessmentId: number;
+  instituteName: string;
+  assessmentName: string;
+  reportData: SchoolReportData;
+  aiInsights?: Record<string, any>;
+  totalStudents: number;
+  studentsWithScores: number;
+}) {
+  return axios.post(`${BASE}/school-report/save`, payload);
+}
+
+export function getSavedSchoolReport(instituteCode: number, assessmentId: number) {
+  return axios.get<SavedSchoolReport>(`${BASE}/school-report/get/${instituteCode}/${assessmentId}`);
+}
+
 // ── Email Recipients & Send Report Email ──
 
 export interface EmailRecipient {

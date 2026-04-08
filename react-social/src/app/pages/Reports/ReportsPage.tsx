@@ -1115,6 +1115,7 @@ const ReportsPage: React.FC = () => {
         assessmentId={Number(selectedAssessment) || 0}
         assessmentName={selectedAssessmentName}
         instituteName={selectedInstituteName}
+        instituteCode={Number(selectedInstitute) || 0}
         userStudentIds={
           (() => {
             const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
