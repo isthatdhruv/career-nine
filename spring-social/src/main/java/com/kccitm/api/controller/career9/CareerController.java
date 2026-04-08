@@ -47,6 +47,9 @@ public class CareerController {
         // Only update simple fields, not relationships
         existingCareer.setTitle(career.getTitle());
         existingCareer.setDescription(career.getDescription());
+        existingCareer.setPersonalityCode1(career.getPersonalityCode1());
+        existingCareer.setPersonalityCode2(career.getPersonalityCode2());
+        existingCareer.setPersonalityCode3(career.getPersonalityCode3());
         // Do NOT update measuredQualityTypes here
 
         return careerRepository.save(existingCareer);
