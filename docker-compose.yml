@@ -160,29 +160,29 @@ services:
     networks:
       - career_shared_net
 
-  sync_cron:
-    build:
-      context: .
-      dockerfile: Dockerfile.cron
-    restart: always
-    environment:
-      MASTER_HOST: 'mysql_db_api'
-      STAGING_HOST: 'mysql_db_staging'
-      DB_NAME: 'career-9'
-      STAGING_DB_NAME: 'career-9-staging'
-      DB_USER: 'root'
-      DB_PASSWORD: 'Career-qCsfeuECc3MW'
-    deploy:
-      resources:
-        limits:
-          memory: 256m
-    depends_on:
-      mysql_db_api:
-        condition: service_healthy
-      mysql_db_staging:
-        condition: service_healthy
-    networks:
-      - career_shared_net
+  # sync_cron:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.cron
+  #   restart: always
+  #   environment:
+  #     MASTER_HOST: 'mysql_db_api'
+  #     STAGING_HOST: 'mysql_db_staging'
+  #     DB_NAME: 'career-9'
+  #     STAGING_DB_NAME: 'career-9-staging'
+  #     DB_USER: 'root'
+  #     DB_PASSWORD: 'Career-qCsfeuECc3MW'
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 256m
+  #   depends_on:
+  #     mysql_db_api:
+  #       condition: service_healthy
+  #     mysql_db_staging:
+  #       condition: service_healthy
+  #   networks:
+  #     - career_shared_net
   # redisinsight:
   #   image: redis/redisinsight:latest
   #   restart: always
