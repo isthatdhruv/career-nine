@@ -3,11 +3,15 @@ import axios from "axios";
 const API_URL = process.env.REACT_APP_API_URL;
 
 export function getAssessmentList() {
-  return axios.get(`${API_URL}/assessments/get/list`);
+  return axios.get(`${API_URL}/assessments/get/list-summary`);
 }
 
 export function getLiveTracking(assessmentId: number) {
   return axios.get(`${API_URL}/assessments/${assessmentId}/live-tracking`);
+}
+
+export function getLiveTrackingLite(assessmentId: number) {
+  return axios.get(`${API_URL}/assessments/${assessmentId}/live-tracking-lite`);
 }
 
 export function getRedisPartials(assessmentId?: number) {

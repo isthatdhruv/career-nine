@@ -89,22 +89,16 @@ public class AssessmentInstituteMappingController {
 
     @PostMapping("/create")
     public ResponseEntity<?> createMapping(@RequestBody AssessmentInstituteMapping mapping) {
-        try {
-            // Validate assessment exists
-            if (!assessmentTableRepository.existsById(mapping.getAssessmentId())) {
-                return ResponseEntity.badRequest().body("Assessment not found");
-            }
-
-            // Generate UUID token
-            mapping.setToken(UUID.randomUUID().toString());
-
-            AssessmentInstituteMapping saved = mappingRepository.save(mapping);
-            return ResponseEntity.ok(saved);
-        } catch (Exception e) {
-            logger.error("Error creating assessment mapping", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error creating mapping: " + e.getMessage());
+        // Validate assessment exists
+        if (!assessmentTableRepository.existsById(mapping.getAssessmentId())) {
+            return ResponseEntity.badRequest().body("Assessment not found");
         }
+
+        // Generate UUID token
+        mapping.setToken(UUID.randomUUID().toString());
+
+        AssessmentInstituteMapping saved = mappingRepository.save(mapping);
+        return ResponseEntity.ok(saved);
     }
 
     @GetMapping("/getAll")
@@ -115,6 +109,11 @@ public class AssessmentInstituteMappingController {
     @GetMapping("/getByInstitute/{instituteCode}")
     public List<AssessmentInstituteMapping> getByInstitute(@PathVariable Integer instituteCode) {
         return mappingRepository.findByInstituteCode(instituteCode);
+    }
+
+    @GetMapping("/getByInstitute/{instituteCode}/assessments")
+    public List<AssessmentTableRepository.AssessmentSummary> getAssessmentsByInstitute(@PathVariable Integer instituteCode) {
+        return assessmentTableRepository.findAssessmentSummariesByInstitute(instituteCode);
     }
 
     @GetMapping("/get/{id}")
@@ -218,135 +217,128 @@ public class AssessmentInstituteMappingController {
     @Transactional
     public ResponseEntity<?> registerStudentByToken(@PathVariable String token,
             @RequestBody Map<String, Object> studentData) {
-        try {
-            // 1. Find mapping by token
-            Optional<AssessmentInstituteMapping> mappingOpt = mappingRepository.findByTokenAndIsActive(token, true);
-            if (!mappingOpt.isPresent()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Invalid or expired assessment link");
-            }
-
-            AssessmentInstituteMapping mapping = mappingOpt.get();
-            Long assessmentId = mapping.getAssessmentId();
-            Integer instituteCode = mapping.getInstituteCode();
-
-            // 2. Extract student data from request
-            String name = (String) studentData.get("name");
-            String email = (String) studentData.get("email");
-            String dobStr = (String) studentData.get("dob");
-            String phone = (String) studentData.get("phone");
-            String gender = (String) studentData.get("gender");
-
-            if (name == null || email == null || dobStr == null) {
-                return ResponseEntity.badRequest().body("Name, email, and date of birth are required");
-            }
-
-            // Parse DOB
-            SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
-            Date dob;
-            try {
-                dob = sdf.parse(dobStr);
-            } catch (Exception e) {
-                return ResponseEntity.badRequest().body("Invalid date format. Use dd-MM-yyyy");
-            }
-
-            // 3. Resolve class info based on mapping level
-            Integer studentClass = null;
-            Integer schoolSectionId = null;
-
-            if ("SECTION".equals(mapping.getMappingLevel())) {
-                schoolSectionId = mapping.getSectionId();
-                if (mapping.getClassId() != null) {
-                    studentClass = parseClassNumber(mapping.getClassId());
-                }
-            } else if ("CLASS".equals(mapping.getMappingLevel())) {
-                studentClass = parseClassNumber(mapping.getClassId());
-                // Section is optional from request
-                if (studentData.get("schoolSectionId") != null) {
-                    schoolSectionId = Integer.valueOf(studentData.get("schoolSectionId").toString());
-                }
-            } else if ("SESSION".equals(mapping.getMappingLevel())) {
-                // Class and section come from request
-                if (studentData.get("classId") != null) {
-                    Integer classId = Integer.valueOf(studentData.get("classId").toString());
-                    studentClass = parseClassNumber(classId);
-                }
-                if (studentData.get("schoolSectionId") != null) {
-                    schoolSectionId = Integer.valueOf(studentData.get("schoolSectionId").toString());
-                }
-            }
-
-            // 4. Duplicate check by EMAIL
-            List<StudentInfo> byEmail = studentInfoRepository.findByEmailAndInstituteId(email, instituteCode);
-            if (!byEmail.isEmpty()) {
-                return handleExistingStudent(byEmail.get(0), assessmentId, instituteCode);
-            }
-
-            // 5. Duplicate check by DOB + institute + class + name
-            if (studentClass != null) {
-                List<StudentInfo> byDob = studentInfoRepository
-                        .findByStudentDobAndInstituteIdAndStudentClassAndNameIgnoreCase(dob, instituteCode, studentClass, name);
-                if (!byDob.isEmpty()) {
-                    return handleExistingStudent(byDob.get(0), assessmentId, instituteCode);
-                }
-            }
-
-            // 6. No existing student found — create new one
-            // Create User (same pattern as StudentInfoController.addStudentInfo)
-            User user = new User((int) (Math.random() * 100000), dob);
-            user.setName(name);
-            user.setEmail(email);
-            user.setPhone(phone);
-            user = userRepository.save(user);
-
-            // Generate and set careerNineRollNumber
-            String rollNumber = rollNumberService.generateNextRollNumber(instituteCode, schoolSectionId);
-            if (rollNumber != null) {
-                user.setCareerNineRollNumber(rollNumber);
-                user = userRepository.save(user);
-            }
-
-            // Create StudentInfo
-            StudentInfo studentInfo = new StudentInfo();
-            studentInfo.setName(name);
-            studentInfo.setEmail(email);
-            studentInfo.setStudentDob(dob);
-            studentInfo.setPhoneNumber(phone);
-            studentInfo.setGender(gender);
-            studentInfo.setInstituteId(instituteCode);
-            studentInfo.setStudentClass(studentClass);
-            studentInfo.setSchoolSectionId(schoolSectionId);
-            studentInfo.setUser(user);
-            studentInfo = studentInfoRepository.save(studentInfo);
-
-            // Create UserStudent
-            InstituteDetail institute = instituteDetailRepository.findById(instituteCode.intValue());
-            UserStudent userStudent = new UserStudent(user, studentInfo, institute);
-            userStudent = userStudentRepository.save(userStudent);
-
-            // Create StudentAssessmentMapping
-            StudentAssessmentMapping sam = new StudentAssessmentMapping(
-                    userStudent.getUserStudentId(), assessmentId);
-            studentAssessmentMappingRepository.save(sam);
-
-            // Build response
-            Map<String, Object> response = new HashMap<>();
-            response.put("status", "success");
-            response.put("message", "Registration successful! Please save your login credentials.");
-            response.put("username", user.getUsername());
-            response.put("dob", dobStr);
-
-            // Send registration email with credentials
-            String assessmentName = assessmentTableRepository.findById(assessmentId)
-                    .map(a -> a.getAssessmentName()).orElse("Assessment");
-            sendRegistrationEmail(email, name, user.getUsername(), dobStr, assessmentName);
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            logger.error("Error during student registration", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Registration failed: " + e.getMessage());
+        // 1. Find mapping by token
+        Optional<AssessmentInstituteMapping> mappingOpt = mappingRepository.findByTokenAndIsActive(token, true);
+        if (!mappingOpt.isPresent()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Invalid or expired assessment link");
         }
+
+        AssessmentInstituteMapping mapping = mappingOpt.get();
+        Long assessmentId = mapping.getAssessmentId();
+        Integer instituteCode = mapping.getInstituteCode();
+
+        // 2. Extract student data from request
+        String name = (String) studentData.get("name");
+        String email = (String) studentData.get("email");
+        String dobStr = (String) studentData.get("dob");
+        String phone = (String) studentData.get("phone");
+        String gender = (String) studentData.get("gender");
+
+        if (name == null || email == null || dobStr == null) {
+            return ResponseEntity.badRequest().body("Name, email, and date of birth are required");
+        }
+
+        // Parse DOB
+        SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
+        Date dob;
+        try {
+            dob = sdf.parse(dobStr);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Invalid date format. Use dd-MM-yyyy");
+        }
+
+        // 3. Resolve class info based on mapping level
+        Integer studentClass = null;
+        Integer schoolSectionId = null;
+
+        if ("SECTION".equals(mapping.getMappingLevel())) {
+            schoolSectionId = mapping.getSectionId();
+            if (mapping.getClassId() != null) {
+                studentClass = parseClassNumber(mapping.getClassId());
+            }
+        } else if ("CLASS".equals(mapping.getMappingLevel())) {
+            studentClass = parseClassNumber(mapping.getClassId());
+            // Section is optional from request
+            if (studentData.get("schoolSectionId") != null) {
+                schoolSectionId = Integer.valueOf(studentData.get("schoolSectionId").toString());
+            }
+        } else if ("SESSION".equals(mapping.getMappingLevel())) {
+            // Class and section come from request
+            if (studentData.get("classId") != null) {
+                Integer classId = Integer.valueOf(studentData.get("classId").toString());
+                studentClass = parseClassNumber(classId);
+            }
+            if (studentData.get("schoolSectionId") != null) {
+                schoolSectionId = Integer.valueOf(studentData.get("schoolSectionId").toString());
+            }
+        }
+
+        // 4. Duplicate check by EMAIL
+        List<StudentInfo> byEmail = studentInfoRepository.findByEmailAndInstituteId(email, instituteCode);
+        if (!byEmail.isEmpty()) {
+            return handleExistingStudent(byEmail.get(0), assessmentId, instituteCode);
+        }
+
+        // 5. Duplicate check by DOB + institute + class + name
+        if (studentClass != null) {
+            List<StudentInfo> byDob = studentInfoRepository
+                    .findByStudentDobAndInstituteIdAndStudentClassAndNameIgnoreCase(dob, instituteCode, studentClass, name);
+            if (!byDob.isEmpty()) {
+                return handleExistingStudent(byDob.get(0), assessmentId, instituteCode);
+            }
+        }
+
+        // 6. No existing student found — create new one
+        // Create User (same pattern as StudentInfoController.addStudentInfo)
+        User user = new User((int) (Math.random() * 100000), dob);
+        user.setName(name);
+        user.setEmail(email);
+        user.setPhone(phone);
+        user = userRepository.save(user);
+
+        // Generate and set careerNineRollNumber
+        String rollNumber = rollNumberService.generateNextRollNumber(instituteCode, schoolSectionId);
+        if (rollNumber != null) {
+            user.setCareerNineRollNumber(rollNumber);
+            user = userRepository.save(user);
+        }
+
+        // Create StudentInfo
+        StudentInfo studentInfo = new StudentInfo();
+        studentInfo.setName(name);
+        studentInfo.setEmail(email);
+        studentInfo.setStudentDob(dob);
+        studentInfo.setPhoneNumber(phone);
+        studentInfo.setGender(gender);
+        studentInfo.setInstituteId(instituteCode);
+        studentInfo.setStudentClass(studentClass);
+        studentInfo.setSchoolSectionId(schoolSectionId);
+        studentInfo.setUser(user);
+        studentInfo = studentInfoRepository.save(studentInfo);
+
+        // Create UserStudent
+        InstituteDetail institute = instituteDetailRepository.findById(instituteCode.intValue());
+        UserStudent userStudent = new UserStudent(user, studentInfo, institute);
+        userStudent = userStudentRepository.save(userStudent);
+
+        // Create StudentAssessmentMapping
+        StudentAssessmentMapping sam = new StudentAssessmentMapping(
+                userStudent.getUserStudentId(), assessmentId);
+        studentAssessmentMappingRepository.save(sam);
+
+        // Build response
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("message", "Registration successful! Please save your login credentials.");
+        response.put("username", user.getUsername());
+        response.put("dob", dobStr);
+
+        // Send registration email with credentials
+        String assessmentName = assessmentTableRepository.findById(assessmentId)
+                .map(a -> a.getAssessmentName()).orElse("Assessment");
+        sendRegistrationEmail(email, name, user.getUsername(), dobStr, assessmentName);
+
+        return ResponseEntity.ok(response);
     }
 
     /**

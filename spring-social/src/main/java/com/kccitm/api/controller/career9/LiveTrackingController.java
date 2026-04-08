@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.StudentInfo;
@@ -42,6 +43,57 @@ public class LiveTrackingController {
     private AssessmentSessionService assessmentSessionService;
 
     /**
+     * Lightweight endpoint: returns only student id, name, email, status.
+     * Single JPQL query — no Redis, no answer counts, no N+1.
+     */
+    @GetMapping("/{assessmentId}/live-tracking-lite")
+    public ResponseEntity<?> getLiveTrackingLite(@PathVariable Long assessmentId) {
+        AssessmentTable assessment = assessmentTableRepository.findById(assessmentId).orElse(null);
+        if (assessment == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        List<Object[]> rows = studentAssessmentMappingRepository.findLiteByAssessmentId(assessmentId);
+
+        int notStarted = 0, ongoing = 0, completed = 0;
+        List<Map<String, Object>> students = new ArrayList<>();
+
+        for (Object[] row : rows) {
+            Long userStudentId = (Long) row[0];
+            String name = (String) row[1];
+            String email = (String) row[2];
+            String status = row[3] != null ? (String) row[3] : "notstarted";
+
+            switch (status) {
+                case "ongoing": ongoing++; break;
+                case "completed": completed++; break;
+                default: notStarted++; break;
+            }
+
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("userStudentId", userStudentId);
+            entry.put("studentName", name != null ? name : "Unknown");
+            entry.put("email", email != null ? email : "");
+            entry.put("status", status);
+            students.add(entry);
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("assessmentId", assessmentId);
+        response.put("assessmentName", assessment.getAssessmentName());
+        response.put("students", students);
+
+        Map<String, Integer> summary = new HashMap<>();
+        summary.put("total", rows.size());
+        summary.put("notStarted", notStarted);
+        summary.put("ongoing", ongoing);
+        summary.put("completed", completed);
+        response.put("summary", summary);
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * Single efficient endpoint for live tracking.
      * Returns assessment info, total questions, all student statuses, and answer counts
      * in one response — optimized for low-bandwidth polling.
@@ -49,10 +101,8 @@ public class LiveTrackingController {
     @GetMapping("/{assessmentId}/live-tracking")
     public ResponseEntity<?> getLiveTracking(@PathVariable Long assessmentId) {
         // 1. Get the assessment
-        AssessmentTable assessment = assessmentTableRepository.findById(assessmentId).orElse(null);
-        if (assessment == null) {
-            return ResponseEntity.notFound().build();
-        }
+        AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
+            .orElseThrow(() -> new ResourceNotFoundException("AssessmentTable", "id", assessmentId));
 
         // 2. Get total question count from the linked questionnaire
         int totalQuestions = 0;
@@ -92,9 +142,10 @@ public class LiveTrackingController {
             entry.put("userStudentId", us.getUserStudentId());
             entry.put("status", status);
 
-            // Student name from StudentInfo
+            // Student name and email from StudentInfo
             StudentInfo si = us.getStudentInfo();
             entry.put("studentName", si != null ? si.getName() : "Unknown");
+            entry.put("email", si != null && si.getEmail() != null ? si.getEmail() : "");
             entry.put("instituteName",
                     us.getInstitute() != null ? us.getInstitute().getInstituteName() : "");
 

@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import { ReadCollegeData } from "../College/API/College_APIs";
 import { getAssessmentMappingsByInstitute, getAssessmentSummaryList } from "../AssessmentMapping/API/AssessmentMapping_APIs";
 import { getOfflineMapping, bulkSubmitByRollNumber, bulkSubmitWithStudents, getSavedOmrMapping, saveOmrMapping, getSavedOmrMappingByQuestionnaire, getAllOmrMappings } from "./API/OfflineUpload_APIs";
+import { showErrorToast, showSuccessToast } from '../../utils/toast';
 
 // ============ Types ============
 
@@ -87,7 +88,7 @@ function resolveMultiQuestionAnswer(
   options: OptionInfo[]
 ): { optionId: number | null; warning?: string } {
   const val = String(cellValue).trim();
-  if (val === "" || val === "BLANK" || val === "blank") return { optionId: null };
+  if (val === "" || val === "BLANK" || val === "blank" || val === "0") return { optionId: null };
 
   if (val.startsWith("(") && val.includes(",")) {
     // Extract first answer from "(Yes,No)" or "(A,B)" format
@@ -390,7 +391,7 @@ const OMRDataUploadPage = () => {
         }
       }
     } catch {
-      alert("Failed to load assessment mapping.");
+      showErrorToast("Failed to load assessment mapping.");
     } finally {
       setLoadingMapping(false);
     }
@@ -421,7 +422,7 @@ const OMRDataUploadPage = () => {
         applyMappingFromJson(saved, excelHeaders);
       }
     } catch {
-      alert("No saved mapping found.");
+      showErrorToast("No saved mapping found.");
     } finally {
       setLoadingSavedMapping(false);
     }
@@ -439,9 +440,9 @@ const OMRDataUploadPage = () => {
       });
       savedMappingJsonRef.current = { ...fieldToHeader };
       setSavedMappingExists(true);
-      alert("Mapping saved successfully!");
+      showSuccessToast("Mapping saved successfully!");
     } catch {
-      alert("Failed to save mapping.");
+      showErrorToast("Failed to save mapping.");
     } finally {
       setSavingMapping(false);
     }
@@ -458,6 +459,8 @@ const OMRDataUploadPage = () => {
 
   // ============ File Upload ============
 
+  const [parsingFile, setParsingFile] = useState(false);
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !mappingData) return;
@@ -466,33 +469,82 @@ const OMRDataUploadPage = () => {
     setSubmitResult(null);
     setMappingApplied(false);
     setParsedStudents([]);
+    setParsingFile(true);
 
     const reader = new FileReader();
     reader.onload = (evt) => {
-      const data = evt.target?.result;
-      const workbook = XLSX.read(data, { type: "binary", cellDates: true });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
+      const arrayBuffer = evt.target?.result as ArrayBuffer;
 
-      if (jsonData.length === 0) { alert("Excel file is empty."); return; }
+      // Parse Excel in a Web Worker to avoid blocking the UI
+      const workerCode = `
+        importScripts("https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js");
+        self.onmessage = function(e) {
+          var data = new Uint8Array(e.data);
+          var workbook = XLSX.read(data, { type: "array", cellDates: true });
+          var sheet = workbook.Sheets[workbook.SheetNames[0]];
+          var jsonData = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
+          self.postMessage(jsonData);
+        };
+      `;
+      const blob = new Blob([workerCode], { type: "application/javascript" });
+      const workerUrl = URL.createObjectURL(blob);
+      const worker = new Worker(workerUrl);
 
-      const headers = Object.keys(jsonData[0]).filter(
-        (h) => h && !h.startsWith("__EMPTY")
-      );
-      setExcelHeaders(headers);
-      setRawExcelData(jsonData);
-      setAutoLoadedMapping(false);
+      worker.onmessage = (workerEvt) => {
+        const jsonData: any[] = workerEvt.data;
+        worker.terminate();
+        URL.revokeObjectURL(workerUrl);
 
-      // Auto-apply saved mapping if available (normalized matching, skip identity fields)
-      if (savedMappingJsonRef.current) {
-        const matched = matchMappingToHeaders(savedMappingJsonRef.current, headers);
-        setFieldToHeader(matched);
-        setAutoLoadedMapping(Object.keys(matched).length > 0);
-      } else {
-        setFieldToHeader({});
-      }
+        if (jsonData.length === 0) { showErrorToast("Excel file is empty."); setParsingFile(false); return; }
+
+        const headers = Object.keys(jsonData[0]).filter(
+          (h) => h && !h.startsWith("__EMPTY")
+        );
+        setExcelHeaders(headers);
+        setRawExcelData(jsonData);
+        setAutoLoadedMapping(false);
+        setParsingFile(false);
+
+        // Auto-apply saved mapping if available (normalized matching, skip identity fields)
+        if (savedMappingJsonRef.current) {
+          const matched = matchMappingToHeaders(savedMappingJsonRef.current, headers);
+          setFieldToHeader(matched);
+          setAutoLoadedMapping(Object.keys(matched).length > 0);
+        } else {
+          setFieldToHeader({});
+        }
+      };
+
+      worker.onerror = () => {
+        worker.terminate();
+        URL.revokeObjectURL(workerUrl);
+        // Fallback: parse on main thread if worker fails
+        const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: "array", cellDates: true });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
+
+        if (jsonData.length === 0) { showErrorToast("Excel file is empty."); setParsingFile(false); return; }
+
+        const headers = Object.keys(jsonData[0]).filter(
+          (h) => h && !h.startsWith("__EMPTY")
+        );
+        setExcelHeaders(headers);
+        setRawExcelData(jsonData);
+        setAutoLoadedMapping(false);
+        setParsingFile(false);
+
+        if (savedMappingJsonRef.current) {
+          const matched = matchMappingToHeaders(savedMappingJsonRef.current, headers);
+          setFieldToHeader(matched);
+          setAutoLoadedMapping(Object.keys(matched).length > 0);
+        } else {
+          setFieldToHeader({});
+        }
+      };
+
+      worker.postMessage(arrayBuffer);
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   // ============ Section toggle ============
@@ -527,66 +579,104 @@ const OMRDataUploadPage = () => {
 
   // ============ Apply Mapping & Parse ============
 
+  const [parsing, setParsing] = useState(false);
+
   const handleApplyMapping = () => {
     if (!mappingData || rawExcelData.length === 0) return;
 
+    setParsing(true);
+
+    // Pre-compute everything outside the row loop
     const sortedSections = [...mappingData.sections].sort(
       (a, b) => parseInt(a.sectionOrder || "0") - parseInt(b.sectionOrder || "0")
     );
 
-    const students: ParsedStudent[] = rawExcelData.map((row, rowIdx) => {
+    // Pre-build section metadata to avoid recomputation per row
+    const sectionMeta = sortedSections.map((section, si) => {
+      const sLetter = String.fromCharCode(65 + si);
+      const isMerged = section.questions.length === 1;
+
+      if (isMerged) {
+        const q = section.questions[0];
+        // Pre-resolve option headers
+        const optMappings: { optionId: number; header: string }[] = [];
+        for (const opt of q.options) {
+          const header = fieldToHeader[`opt_${q.questionnaireQuestionId}_${opt.optionId}`];
+          if (header) optMappings.push({ optionId: opt.optionId, header });
+        }
+        return { isMerged: true as const, sLetter, questionnaireQuestionId: q.questionnaireQuestionId, optMappings };
+      } else {
+        const qMappings = section.questions.map((q, qi) => {
+          const header = fieldToHeader[`q_${q.questionnaireQuestionId}`];
+          return { questionnaireQuestionId: q.questionnaireQuestionId, header, options: q.options, qi, sLetter };
+        }).filter((qm) => qm.header);
+        return { isMerged: false as const, sLetter, qMappings };
+      }
+    });
+
+    // Pre-resolve identity field headers
+    const rollHeader = fieldToHeader["id_rollNumber"] || "";
+    const nameHeader = fieldToHeader["id_name"] || "";
+    const mobileHeader = fieldToHeader["id_mobile"] || "";
+    const dobHeader = fieldToHeader["id_dob"] || "";
+    const classHeader = fieldToHeader["id_class"] || "";
+
+    // Process a single row
+    const parseRow = (row: any, rowIdx: number): ParsedStudent => {
       const warnings: string[] = [];
       const answers: ParsedAnswer[] = [];
 
-      const rollNumber = fieldToHeader["id_rollNumber"] ? String(row[fieldToHeader["id_rollNumber"]] ?? "").trim() : "";
-      const name = fieldToHeader["id_name"] ? String(row[fieldToHeader["id_name"]] ?? "").trim() : "";
-      const mobile = fieldToHeader["id_mobile"] ? String(row[fieldToHeader["id_mobile"]] ?? "").trim() : "";
-      const dob = fieldToHeader["id_dob"] ? String(row[fieldToHeader["id_dob"]] ?? "").trim() : "";
-      const studentClass = fieldToHeader["id_class"] ? String(row[fieldToHeader["id_class"]] ?? "").trim() : "";
+      const rollNumber = rollHeader ? String(row[rollHeader] ?? "").trim() : "";
+      const name = nameHeader ? String(row[nameHeader] ?? "").trim() : "";
+      const mobile = mobileHeader ? String(row[mobileHeader] ?? "").trim() : "";
+      const dob = dobHeader ? String(row[dobHeader] ?? "").trim() : "";
+      const studentClass = classHeader ? String(row[classHeader] ?? "").trim() : "";
 
-      for (let si = 0; si < sortedSections.length; si++) {
-        const section = sortedSections[si];
-        const sLetter = String.fromCharCode(65 + si);
-        const isMerged = section.questions.length === 1;
-
-        if (isMerged) {
-          const q = section.questions[0];
-          // Collect which options are selected (value = "1")
-          const selectedOptionIds: number[] = [];
-          for (const opt of q.options) {
-            const mapKey = `opt_${q.questionnaireQuestionId}_${opt.optionId}`;
-            const header = fieldToHeader[mapKey];
-            if (!header) continue;
-            const val = String(row[header] ?? "").trim();
-            if (val === "1") selectedOptionIds.push(opt.optionId);
+      for (const meta of sectionMeta) {
+        if (meta.isMerged) {
+          for (const om of meta.optMappings) {
+            const val = String(row[om.header] ?? "").trim();
+            if (val === "1") {
+              answers.push({ questionnaireQuestionId: meta.questionnaireQuestionId, optionId: om.optionId });
+            }
           }
-
-          for (const optId of selectedOptionIds) {
-            answers.push({ questionnaireQuestionId: q.questionnaireQuestionId, optionId: optId });
-          }
-          // length === 0 means unanswered, no warning needed
         } else {
-          for (let qi = 0; qi < section.questions.length; qi++) {
-            const q = section.questions[qi];
-            const mapKey = `q_${q.questionnaireQuestionId}`;
-            const header = fieldToHeader[mapKey];
-            if (!header) continue;
-
-            const cellValue = String(row[header] ?? "").trim();
-            const result = resolveMultiQuestionAnswer(cellValue, q.options);
-            if (result.warning) warnings.push(`${sLetter}-Q${qi + 1}: ${result.warning}`);
+          for (const qm of meta.qMappings) {
+            const cellValue = String(row[qm.header!] ?? "").trim();
+            const result = resolveMultiQuestionAnswer(cellValue, qm.options);
+            if (result.warning) warnings.push(`${qm.sLetter}-Q${qm.qi + 1}: ${result.warning}`);
             if (result.optionId) {
-              answers.push({ questionnaireQuestionId: q.questionnaireQuestionId, optionId: result.optionId });
+              answers.push({ questionnaireQuestionId: qm.questionnaireQuestionId, optionId: result.optionId });
             }
           }
         }
       }
 
       return { rowIndex: rowIdx, rollNumber, name, mobile, dob, studentClass, answers, warnings };
-    });
+    };
 
-    setParsedStudents(students);
-    setMappingApplied(true);
+    // Process in batches to avoid blocking the UI
+    const BATCH_SIZE = 20;
+    const allStudents: ParsedStudent[] = [];
+    let offset = 0;
+
+    const processBatch = () => {
+      const end = Math.min(offset + BATCH_SIZE, rawExcelData.length);
+      for (let i = offset; i < end; i++) {
+        allStudents.push(parseRow(rawExcelData[i], i));
+      }
+      offset = end;
+
+      if (offset < rawExcelData.length) {
+        setTimeout(processBatch, 0);
+      } else {
+        setParsedStudents(allStudents);
+        setMappingApplied(true);
+        setParsing(false);
+      }
+    };
+
+    processBatch();
   };
 
   // ============ Helpers ============
@@ -660,13 +750,13 @@ const OMRDataUploadPage = () => {
     if (uploadMode === "rollnumber") {
       const noRoll = parsedStudents.filter((s) => !s.rollNumber.trim());
       if (noRoll.length > 0) {
-        alert(`${noRoll.length} row(s) have no roll number.`);
+        showErrorToast(`${noRoll.length} row(s) have no roll number.`);
         return;
       }
     } else {
       const noName = parsedStudents.filter((s) => !s.name.trim());
       if (noName.length > 0) {
-        alert(`${noName.length} row(s) have no name.`);
+        showErrorToast(`${noName.length} row(s) have no name.`);
         return;
       }
     }
@@ -845,7 +935,8 @@ const OMRDataUploadPage = () => {
               </div>
               <div className="col-md-4">
                 {fileName && <small className="text-muted d-block">{fileName}</small>}
-                {excelHeaders.length > 0 && (
+                {parsingFile && <div><Spinner animation="border" size="sm" className="me-1" />Parsing Excel...</div>}
+                {!parsingFile && excelHeaders.length > 0 && (
                   <Badge bg="info">{rawExcelData.length} rows, {excelHeaders.length} columns</Badge>
                 )}
               </div>
@@ -882,8 +973,8 @@ const OMRDataUploadPage = () => {
                 </Button>
                 <Button variant="outline-secondary" size="sm" onClick={expandAllSections}>Expand All</Button>
                 <Button variant="outline-secondary" size="sm" onClick={collapseAllSections}>Collapse All</Button>
-                <Button variant="primary" size="sm" onClick={handleApplyMapping} disabled={!mappingValidation.canApply}>
-                  Apply Mapping & Preview
+                <Button variant="primary" size="sm" onClick={handleApplyMapping} disabled={!mappingValidation.canApply || parsing}>
+                  {parsing ? <><Spinner animation="border" size="sm" className="me-1" />Parsing...</> : "Apply Mapping & Preview"}
                 </Button>
               </div>
             </div>

@@ -1,5 +1,6 @@
 import { FC, useEffect, useState } from "react";
 import axios from "axios";
+import { Dropdown } from "react-bootstrap";
 import UsersRegistrationEditModal from "./UsersRegistrationEditModal";
 import UserCollegeMappingModal from "./UserCollegeMappingModal";
 import { useNavigate } from "react-router-dom";
@@ -125,18 +126,29 @@ const UserRegistration: FC = () => {
               <p className="text-muted">There are no registered users at the moment.</p>
             </div>
           ) : (
-            <div className="table-responsive">
+            <>
+            <style>{`
+              .user-reg-table tbody tr:has(.dropdown-menu.show) {
+                z-index: 10;
+                position: relative;
+              }
+              .user-reg-table .dropdown-menu.show {
+                position: fixed !important;
+                z-index: 1050 !important;
+              }
+            `}</style>
+            <div className="user-reg-table" style={{ overflow: 'visible' }}>
               <table className="table table-hover table-row-bordered table-row-gray-200 align-middle gs-0 gy-3">
                 <thead>
                   <tr className="fw-bold text-muted bg-light">
-                    <th className="ps-4 min-w-50px rounded-start">S.No</th>
-                    <th className="min-w-150px">Name</th>
-                    <th className="min-w-200px">Email</th>
-                    <th className="min-w-120px">Phone</th>
-                    <th className="min-w-150px">Organisation</th>
-                    <th className="min-w-120px">Designation</th>
-                    <th className="min-w-100px">Status</th>
-                    <th className="min-w-150px text-center pe-4 rounded-end">Actions</th>
+                    <th className="ps-4 min-w-40px rounded-start">S.No</th>
+                    <th className="min-w-125px">Name</th>
+                    <th className="min-w-150px">Email</th>
+                    <th className="min-w-100px">Phone</th>
+                    <th className="min-w-120px">Organisation</th>
+                    <th className="min-w-100px">Designation</th>
+                    <th className="min-w-80px">Status</th>
+                    <th className="min-w-80px text-center pe-4 rounded-end">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -186,42 +198,54 @@ const UserRegistration: FC = () => {
                           </span>
                         </td>
                         <td className="text-center pe-4">
-                          <div className="d-flex justify-content-center gap-2">
-                            <button
-                              className={`btn btn-sm ${active ? "btn-danger" : "btn-success"} fw-bold`}
-                              disabled={togglingId === user.id}
-                              onClick={() => toggleActive(user.id)}
-                              title={active ? "Deactivate user" : "Activate user"}
+                          <Dropdown className="d-inline">
+                            <Dropdown.Toggle
+                              variant="light"
+                              size="sm"
+                              id={`dropdown-user-${user.id}`}
+                              className="btn-active-light-primary"
                             >
-                              {togglingId === user.id ? (
-                                <span className="spinner-border spinner-border-sm" role="status" />
-                              ) : (
-                                <>
-                                  <i className={`bi bi-${active ? "x-circle" : "check-circle"} me-1`}></i>
-                                  {active ? "Deactivate" : "Activate"}
-                                </>
-                              )}
-                            </button>
-                            <button
-                              className="btn btn-sm btn-primary fw-bold"
-                              onClick={() => handleEditClick(user)}
-                              title="Edit user details"
+                              <i className="bi bi-three-dots-vertical fs-6"></i>
+                            </Dropdown.Toggle>
+                            <Dropdown.Menu
+                              style={{ minWidth: '160px', zIndex: 1050 }}
+                              popperConfig={{ strategy: 'fixed' }}
+                              renderOnMount
                             >
-                              <i className="bi bi-pencil-square me-1"></i>
-                              Edit
-                            </button>
-                            <button
-                              className="btn btn-sm btn-info fw-bold"
-                              onClick={() => {
-                                setSelectedMappingUser(user);
-                                setShowMappingModal(true);
-                              }}
-                              title="Map to college"
-                            >
-                              <i className="bi bi-building me-1"></i>
-                              Map to College
-                            </button>
-                          </div>
+                              <Dropdown.Item
+                                as="button"
+                                disabled={togglingId === user.id}
+                                onClick={() => toggleActive(user.id)}
+                                className="d-flex align-items-center px-4 py-2"
+                              >
+                                {togglingId === user.id ? (
+                                  <span className="spinner-border spinner-border-sm me-2" role="status" />
+                                ) : (
+                                  <i className={`bi bi-${active ? "x-circle" : "check-circle"} me-2 text-${active ? "danger" : "success"}`}></i>
+                                )}
+                                {active ? "Deactivate" : "Activate"}
+                              </Dropdown.Item>
+                              <Dropdown.Item
+                                as="button"
+                                onClick={() => handleEditClick(user)}
+                                className="d-flex align-items-center px-4 py-2"
+                              >
+                                <i className="bi bi-pencil-square me-2 text-primary"></i>
+                                Edit
+                              </Dropdown.Item>
+                              <Dropdown.Item
+                                as="button"
+                                onClick={() => {
+                                  setSelectedMappingUser(user);
+                                  setShowMappingModal(true);
+                                }}
+                                className="d-flex align-items-center px-4 py-2"
+                              >
+                                <i className="bi bi-building me-2 text-info"></i>
+                                Map to College
+                              </Dropdown.Item>
+                            </Dropdown.Menu>
+                          </Dropdown>
                         </td>
                       </tr>
                     );
@@ -229,6 +253,7 @@ const UserRegistration: FC = () => {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </div>
       </div>

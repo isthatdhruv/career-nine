@@ -1,4 +1,5 @@
 import React from 'react';
+import { showSuccessToast } from '../../../utils/toast';
 
 interface CheckEmailPageProps {
   email?: string;
@@ -13,7 +14,7 @@ const LoginCheckEmail: React.FC<CheckEmailPageProps> = ({ email = 'bob@reui.io' 
   const handleResend = () => {
     console.log('Resending email to:', email);
     // Add your resend logic here
-    alert('Email resent successfully!');
+    showSuccessToast('Email resent successfully!');
   };
 
   return (

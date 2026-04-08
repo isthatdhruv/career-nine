@@ -12,6 +12,7 @@ import {
     ReadMeasuredQualityTypes,
     RemoveMeasuredQualityTypeFromCareer
 } from "../API/Career_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 const CareerTable = (props: { data: any; setLoading: any; setPageLoading: any; }) => {
   const navigate = useNavigate();
@@ -70,7 +71,7 @@ const CareerTable = (props: { data: any; setLoading: any; setPageLoading: any; }
       }
       setSelectedMeasuredQualityTypesByCareer(prev => ({ ...prev, [career_id]: newValue }));
     } catch (error) {
-      alert('Failed to update MeasuredQualityType assignments. Please try again.');
+      showErrorToast('Failed to update MeasuredQualityType assignments. Please try again.');
       setSelectedMeasuredQualityTypesByCareer(prev => ({ ...prev, [career_id]: currentValue }));
     }
   };
@@ -107,7 +108,7 @@ const CareerTable = (props: { data: any; setLoading: any; setPageLoading: any; }
                 await DeleteCareerData(data.career_id);
                 props.setPageLoading(["true"]);
               } catch (error) {
-                alert("Failed to delete career. Please try again.");
+                showErrorToast("Failed to delete career. Please try again.");
               } finally {
                 props.setLoading(false);
               }

@@ -1,0 +1,420 @@
+<h2>Dashboard & UI Design</h2>
+<p class="subtitle">Using Career-Nine project theme: Green (#0C6B5A), Blue (#3B82F6), Light (#F2F7F5)</p>
+
+<style>
+  :root {
+    --c9-primary: #0C6B5A;
+    --c9-primary-dark: #084A3E;
+    --c9-primary-light: #E0F2EE;
+    --c9-blue: #3B82F6;
+    --c9-blue-dark: #2563eb;
+    --c9-blue-light: #dbeafe;
+    --c9-success: #36B37E;
+    --c9-success-light: #dcfce7;
+    --c9-accent: #F59E0B;
+    --c9-accent-light: #fef3c7;
+    --c9-danger: #EF4444;
+    --c9-danger-light: #fee2e2;
+    --c9-bg: #F2F7F5;
+    --c9-card: #ffffff;
+    --c9-text: #1A2B28;
+    --c9-muted: #5C7A72;
+    --c9-border: #D1E5DF;
+    --c9-header: #1e293b;
+    --c9-text-secondary: #64748b;
+  }
+  .c9-mockup {
+    background: var(--c9-bg);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--c9-border);
+    margin-bottom: 24px;
+  }
+  .c9-mockup-header {
+    background: var(--c9-header);
+    color: white;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .c9-card {
+    background: var(--c9-card);
+    border: 1px solid var(--c9-border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .c9-badge {
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    display: inline-block;
+  }
+  .c9-badge-confirmed { background: var(--c9-primary-light); color: var(--c9-primary-dark); }
+  .c9-badge-pending { background: var(--c9-accent-light); color: #92400e; }
+  .c9-badge-assigned { background: var(--c9-blue-light); color: #1d4ed8; }
+  .c9-badge-completed { background: #f0fdf4; color: #15803d; }
+  .c9-badge-danger { background: var(--c9-danger-light); color: #dc2626; }
+  .c9-badge-notes { background: var(--c9-accent-light); color: #b45309; }
+  .c9-btn-primary {
+    background: var(--c9-primary);
+    color: white;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .c9-btn-outline {
+    background: transparent;
+    border: 1px solid var(--c9-border);
+    color: var(--c9-muted);
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .c9-btn-danger-outline {
+    background: transparent;
+    border: 1px solid var(--c9-danger);
+    color: var(--c9-danger);
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .c9-btn-blue {
+    background: var(--c9-blue);
+    color: white;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+</style>
+
+<!-- ==================== STUDENT DASHBOARD ==================== -->
+<div class="section">
+  <h3>1. Student Dashboard — Counselling Tab</h3>
+  <div class="c9-mockup">
+    <div class="c9-mockup-header">Student Portal → Counselling Section</div>
+    <div style="padding: 0;">
+      <!-- Top bar -->
+      <div style="background: white; padding: 16px 24px; border-bottom: 1px solid var(--c9-border); display: flex; justify-content: space-between; align-items: center;">
+        <span style="color: var(--c9-primary); font-weight: 700; font-size: 18px;">My Counselling</span>
+        <div style="display: flex; gap: 14px; align-items: center;">
+          <div style="position: relative; cursor: pointer;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5C7A72" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span style="position: absolute; top: -5px; right: -7px; background: var(--c9-danger); color: white; font-size: 10px; border-radius: 50%; width: 17px; height: 17px; display: flex; align-items: center; justify-content: center; font-weight: 700;">3</span>
+          </div>
+          <button class="c9-btn-primary">Book Session</button>
+        </div>
+      </div>
+
+      <div style="padding: 24px;">
+        <!-- Upcoming Session Card -->
+        <div class="c9-card" style="border-left: 4px solid var(--c9-primary);">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <span class="c9-badge c9-badge-confirmed">CONFIRMED</span>
+              <h4 style="color: var(--c9-text); margin: 10px 0 6px 0; font-size: 16px;">Upcoming Session</h4>
+              <p style="color: var(--c9-text-secondary); margin: 0; font-size: 14px;">April 10, 2026 &nbsp;&bull;&nbsp; 10:00 AM - 10:30 AM</p>
+              <p style="color: var(--c9-text-secondary); margin: 4px 0 0 0; font-size: 14px;">
+                <a href="#" style="color: var(--c9-blue); text-decoration: none; font-weight: 500;">Join Google Meet &rarr;</a>
+              </p>
+            </div>
+            <div style="text-align: right;">
+              <p style="color: var(--c9-muted); font-size: 12px; margin: 0;">Joining in</p>
+              <p style="color: var(--c9-primary); font-size: 26px; font-weight: 700; margin: 4px 0;">2d 14h</p>
+              <button class="c9-btn-danger-outline" style="margin-top: 6px;">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div style="display: flex; gap: 0; margin-bottom: 20px; border-bottom: 2px solid var(--c9-border);">
+          <div style="padding: 10px 20px; color: var(--c9-primary); border-bottom: 2px solid var(--c9-primary); font-weight: 600; font-size: 14px; margin-bottom: -2px;">Upcoming</div>
+          <div style="padding: 10px 20px; color: var(--c9-muted); font-size: 14px;">Past Sessions</div>
+          <div style="padding: 10px 20px; color: var(--c9-muted); font-size: 14px;">Pending Requests</div>
+        </div>
+
+        <!-- Past Session (shown as reference) -->
+        <div class="c9-card" style="border-left: 4px solid var(--c9-blue);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <span class="c9-badge c9-badge-completed">COMPLETED</span>
+              <p style="color: var(--c9-text); margin: 8px 0 2px 0; font-size: 14px; font-weight: 500;">March 28, 2026 &nbsp;&bull;&nbsp; 11:00 AM</p>
+            </div>
+            <button class="c9-btn-outline">View Remarks</button>
+          </div>
+          <div style="margin-top: 14px; padding: 14px; background: var(--c9-bg); border-radius: 8px;">
+            <p style="color: var(--c9-primary-dark); font-size: 12px; margin: 0 0 8px 0; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Counsellor Remarks</p>
+            <p style="color: var(--c9-text); font-size: 13px; margin: 0 0 4px 0;"><strong>Key Points:</strong> Discussed career options in data science. Student shows strong analytical aptitude.</p>
+            <p style="color: var(--c9-text); font-size: 13px; margin: 0 0 4px 0;"><strong>Action Items:</strong> Complete Python certification by April 15. Research 3 companies in target domain.</p>
+            <p style="color: var(--c9-text); font-size: 13px; margin: 0;"><strong>Follow-up:</strong> Recommended in 2 weeks</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SLOT BOOKING MODAL ==================== -->
+<div class="section">
+  <h3>2. Slot Booking Modal (Student View)</h3>
+  <div class="c9-mockup">
+    <div class="c9-mockup-header">Book a Counselling Session — Anonymous Slot Picker</div>
+    <div style="padding: 24px; background: white;">
+      <!-- Week Navigation -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <button class="c9-btn-outline">&larr; Prev Week</button>
+        <span style="color: var(--c9-text); font-weight: 600; font-size: 15px;">April 7 - April 11, 2026</span>
+        <button class="c9-btn-outline">Next Week &rarr;</button>
+      </div>
+
+      <!-- Calendar Grid -->
+      <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px;">
+        <!-- Monday -->
+        <div style="background: var(--c9-bg); border-radius: 10px; padding: 14px; text-align: center;">
+          <p style="color: var(--c9-muted); font-size: 11px; margin: 0; text-transform: uppercase; letter-spacing: 1px;">Mon</p>
+          <p style="color: var(--c9-text); font-weight: 700; margin: 4px 0 14px 0;">Apr 7</p>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <div style="background: var(--c9-primary-light); color: var(--c9-primary); padding: 7px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 500;">10:00 AM</div>
+            <div style="background: var(--c9-primary-light); color: var(--c9-primary); padding: 7px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 500;">10:30 AM</div>
+            <div style="background: var(--c9-primary-light); color: var(--c9-primary); padding: 7px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 500;">11:00 AM</div>
+            <div style="background: var(--c9-primary); color: white; padding: 7px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 600; box-shadow: 0 2px 8px rgba(12,107,90,0.3);">11:30 AM &#10003;</div>
+          </div>
+        </div>
+        <!-- Tuesday -->
+        <div style="background: var(--c9-bg); border-radius: 10px; padding: 14px; text-align: center;">
+          <p style="color: var(--c9-muted); font-size: 11px; margin: 0; text-transform: uppercase; letter-spacing: 1px;">Tue</p>
+          <p style="color: var(--c9-text); font-weight: 700; margin: 4px 0 14px 0;">Apr 8</p>
+          <p style="color: #94a3b8; font-size: 13px; margin-top: 24px;">No slots</p>
+        </div>
+        <!-- Wednesday -->
+        <div style="background: var(--c9-bg); border-radius: 10px; padding: 14px; text-align: center;">
+          <p style="color: var(--c9-muted); font-size: 11px; margin: 0; text-transform: uppercase; letter-spacing: 1px;">Wed</p>
+          <p style="color: var(--c9-text); font-weight: 700; margin: 4px 0 14px 0;">Apr 9</p>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <div style="background: var(--c9-primary-light); color: var(--c9-primary); padding: 7px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 500;">10:00 AM</div>
+            <div style="background: var(--c9-primary-light); color: var(--c9-primary); padding: 7px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 500;">10:30 AM</div>
+          </div>
+        </div>
+        <!-- Thursday -->
+        <div style="background: var(--c9-bg); border-radius: 10px; padding: 14px; text-align: center;">
+          <p style="color: var(--c9-muted); font-size: 11px; margin: 0; text-transform: uppercase; letter-spacing: 1px;">Thu</p>
+          <p style="color: var(--c9-text); font-weight: 700; margin: 4px 0 14px 0;">Apr 10</p>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <div style="background: var(--c9-primary-light); color: var(--c9-primary); padding: 7px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 500;">2:00 PM</div>
+            <div style="background: var(--c9-primary-light); color: var(--c9-primary); padding: 7px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 500;">2:30 PM</div>
+            <div style="background: var(--c9-primary-light); color: var(--c9-primary); padding: 7px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 500;">3:00 PM</div>
+          </div>
+        </div>
+        <!-- Friday -->
+        <div style="background: var(--c9-bg); border-radius: 10px; padding: 14px; text-align: center;">
+          <p style="color: var(--c9-muted); font-size: 11px; margin: 0; text-transform: uppercase; letter-spacing: 1px;">Fri</p>
+          <p style="color: var(--c9-text); font-weight: 700; margin: 4px 0 14px 0;">Apr 11</p>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <div style="background: var(--c9-primary-light); color: var(--c9-primary); padding: 7px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 500;">10:00 AM</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Booking Form -->
+      <div style="background: var(--c9-bg); border: 1px solid var(--c9-border); border-radius: 10px; padding: 18px;">
+        <p style="color: var(--c9-text); margin: 0 0 12px 0; font-weight: 600;">Selected: Monday Apr 7, 11:30 AM (30 min)</p>
+        <label style="color: var(--c9-muted); font-size: 13px; font-weight: 500;">Reason for counselling:</label>
+        <textarea style="width: 100%; background: white; border: 1px solid var(--c9-border); color: var(--c9-text); padding: 10px; border-radius: 8px; margin-top: 6px; min-height: 60px; box-sizing: border-box; resize: vertical; font-family: inherit;" placeholder="Briefly describe what you'd like to discuss..."></textarea>
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px;">
+          <button class="c9-btn-outline">Cancel</button>
+          <button class="c9-btn-primary">Book Slot</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== COUNSELLOR DASHBOARD ==================== -->
+<div class="section">
+  <h3>3. Counsellor Dashboard</h3>
+  <div class="c9-mockup">
+    <div class="c9-mockup-header">Counsellor Portal — Schedule & Sessions</div>
+    <div style="padding: 0;">
+      <!-- Nav tabs -->
+      <div style="background: white; display: flex; border-bottom: 2px solid var(--c9-border);">
+        <div style="padding: 14px 24px; color: var(--c9-primary); border-bottom: 2px solid var(--c9-primary); font-weight: 600; font-size: 14px; margin-bottom: -2px;">My Schedule</div>
+        <div style="padding: 14px 24px; color: var(--c9-muted); font-size: 14px;">Availability</div>
+        <div style="padding: 14px 24px; color: var(--c9-muted); font-size: 14px;">Session History</div>
+        <div style="padding: 14px 24px; color: var(--c9-muted); font-size: 14px; position: relative;">
+          Pending
+          <span style="background: var(--c9-danger); color: white; font-size: 10px; padding: 2px 7px; border-radius: 10px; margin-left: 4px; font-weight: 700;">2</span>
+        </div>
+      </div>
+
+      <div style="padding: 24px;">
+        <h4 style="color: var(--c9-text); margin: 0 0 16px 0;">Today — April 2, 2026</h4>
+
+        <!-- Confirmed Session -->
+        <div class="c9-card" style="border-left: 4px solid var(--c9-primary);">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <span class="c9-badge c9-badge-confirmed">CONFIRMED</span>
+              <p style="color: var(--c9-text); margin: 8px 0 4px 0; font-weight: 600; font-size: 15px;">10:00 AM - 10:30 AM</p>
+              <p style="color: var(--c9-text-secondary); font-size: 13px; margin: 0;">Student: Rahul Sharma (B.Tech CS, 3rd Year)</p>
+              <p style="color: var(--c9-text-secondary); font-size: 13px; margin: 4px 0 0 0;">Reason: Career guidance for data science domain</p>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-end;">
+              <a href="#" style="background: var(--c9-blue-light); color: var(--c9-blue); padding: 6px 14px; border-radius: 6px; font-size: 12px; text-decoration: none; font-weight: 500;">Join Meet &rarr;</a>
+              <button style="background: transparent; border: 1px solid var(--c9-accent); color: #b45309; padding: 5px 12px; border-radius: 6px; font-size: 11px; cursor: pointer;">Reschedule</button>
+              <button class="c9-btn-danger-outline" style="font-size: 11px; padding: 5px 12px;">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Needs Notes Session -->
+        <div class="c9-card" style="border-left: 4px solid var(--c9-accent);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <span class="c9-badge c9-badge-notes">NEEDS NOTES</span>
+              <p style="color: var(--c9-text); margin: 8px 0 4px 0; font-weight: 600;">9:00 AM - 9:30 AM (completed)</p>
+              <p style="color: var(--c9-text-secondary); font-size: 13px; margin: 0;">Student: Priya Patel (B.Com, 2nd Year)</p>
+            </div>
+            <button style="background: var(--c9-accent); color: white; border: none; padding: 8px 18px; border-radius: 8px; font-weight: 600; font-size: 12px; cursor: pointer;">Add Notes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ADMIN QUEUE ==================== -->
+<div class="section">
+  <h3>4. Admin Queue Dashboard</h3>
+  <div class="c9-mockup">
+    <div class="c9-mockup-header">Admin &rarr; Counselling Request Queue</div>
+    <div style="padding: 0;">
+      <!-- Stats bar -->
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; background: white; border-bottom: 1px solid var(--c9-border);">
+        <div style="padding: 18px; text-align: center; border-right: 1px solid var(--c9-border);">
+          <p style="color: var(--c9-muted); font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">Pending</p>
+          <p style="color: var(--c9-danger); font-size: 30px; font-weight: 700; margin: 6px 0 0 0;">5</p>
+        </div>
+        <div style="padding: 18px; text-align: center; border-right: 1px solid var(--c9-border);">
+          <p style="color: var(--c9-muted); font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">Assigned</p>
+          <p style="color: var(--c9-accent); font-size: 30px; font-weight: 700; margin: 6px 0 0 0;">3</p>
+        </div>
+        <div style="padding: 18px; text-align: center; border-right: 1px solid var(--c9-border);">
+          <p style="color: var(--c9-muted); font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">Confirmed</p>
+          <p style="color: var(--c9-primary); font-size: 30px; font-weight: 700; margin: 6px 0 0 0;">12</p>
+        </div>
+        <div style="padding: 18px; text-align: center;">
+          <p style="color: var(--c9-muted); font-size: 12px; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">This Week</p>
+          <p style="color: var(--c9-blue); font-size: 30px; font-weight: 700; margin: 6px 0 0 0;">20</p>
+        </div>
+      </div>
+
+      <!-- Queue Table -->
+      <div style="padding: 24px; background: white;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--c9-border);">
+              <th style="text-align: left; padding: 10px 12px; color: var(--c9-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Student</th>
+              <th style="text-align: left; padding: 10px 12px; color: var(--c9-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Requested Slot</th>
+              <th style="text-align: left; padding: 10px 12px; color: var(--c9-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Reason</th>
+              <th style="text-align: left; padding: 10px 12px; color: var(--c9-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Status</th>
+              <th style="text-align: left; padding: 10px 12px; color: var(--c9-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid #eef3f0;">
+              <td style="padding: 14px 12px; color: var(--c9-text); font-weight: 500;">Rahul Sharma<br><span style="color: var(--c9-muted); font-size: 11px; font-weight: 400;">B.Tech CS, 3rd Year</span></td>
+              <td style="padding: 14px 12px; color: var(--c9-text);">Apr 10, 10:00 AM<br><span style="color: var(--c9-muted); font-size: 11px;">30 min</span></td>
+              <td style="padding: 14px 12px; color: var(--c9-text-secondary); max-width: 180px;">Career guidance for data science</td>
+              <td style="padding: 14px 12px;"><span class="c9-badge c9-badge-pending">PENDING</span></td>
+              <td style="padding: 14px 12px;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <select style="background: var(--c9-bg); border: 1px solid var(--c9-border); color: var(--c9-text); padding: 6px 10px; border-radius: 6px; font-size: 12px;">
+                    <option>Select Counsellor</option>
+                    <option>Dr. Mehra (Career)</option>
+                    <option>Ms. Kapoor (Academic)</option>
+                    <option>Mr. Singh (Psychology)</option>
+                  </select>
+                  <button class="c9-btn-primary" style="padding: 6px 14px; font-size: 12px;">Assign</button>
+                </div>
+              </td>
+            </tr>
+            <tr style="border-bottom: 1px solid #eef3f0;">
+              <td style="padding: 14px 12px; color: var(--c9-text); font-weight: 500;">Ananya Gupta<br><span style="color: var(--c9-muted); font-size: 11px; font-weight: 400;">BBA, 1st Year</span></td>
+              <td style="padding: 14px 12px; color: var(--c9-text);">Apr 11, 2:00 PM<br><span style="color: var(--c9-muted); font-size: 11px;">45 min</span></td>
+              <td style="padding: 14px 12px; color: var(--c9-text-secondary);">Feeling stressed about placements</td>
+              <td style="padding: 14px 12px;"><span class="c9-badge c9-badge-assigned">ASSIGNED</span></td>
+              <td style="padding: 14px 12px; color: var(--c9-text-secondary); font-size: 12px;">&rarr; Ms. Kapoor<br><span style="color: var(--c9-muted); font-size: 11px;">Awaiting confirmation</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== AVAILABILITY MANAGER ==================== -->
+<div class="section">
+  <h3>5. Counsellor Availability Manager</h3>
+  <div class="c9-mockup">
+    <div class="c9-mockup-header">Counsellor &rarr; Manage Availability (Hybrid: Templates + Manual)</div>
+    <div style="padding: 24px; background: white;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+        <!-- Recurring Templates -->
+        <div>
+          <h4 style="color: var(--c9-primary); margin: 0 0 14px 0; font-size: 15px;">Recurring Weekly Schedule</h4>
+          <div style="background: var(--c9-bg); border-radius: 10px; padding: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--c9-border);">
+              <span style="color: var(--c9-text); font-size: 14px; font-weight: 500;">Monday</span>
+              <span style="color: var(--c9-primary); font-size: 13px;">10:00 AM - 1:00 PM (30 min)</span>
+              <span style="color: var(--c9-blue); font-size: 12px; cursor: pointer; font-weight: 500;">Edit</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--c9-border);">
+              <span style="color: var(--c9-text); font-size: 14px; font-weight: 500;">Wednesday</span>
+              <span style="color: var(--c9-primary); font-size: 13px;">10:00 AM - 1:00 PM (30 min)</span>
+              <span style="color: var(--c9-blue); font-size: 12px; cursor: pointer; font-weight: 500;">Edit</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--c9-border);">
+              <span style="color: var(--c9-text); font-size: 14px; font-weight: 500;">Friday</span>
+              <span style="color: var(--c9-primary); font-size: 13px;">2:00 PM - 4:00 PM (45 min)</span>
+              <span style="color: var(--c9-blue); font-size: 12px; cursor: pointer; font-weight: 500;">Edit</span>
+            </div>
+            <button style="background: transparent; border: 1px dashed var(--c9-border); color: var(--c9-muted); padding: 10px; width: 100%; border-radius: 8px; margin-top: 14px; cursor: pointer; font-size: 13px;">+ Add Day</button>
+          </div>
+        </div>
+        <!-- Manual Overrides -->
+        <div>
+          <h4 style="color: var(--c9-accent); margin: 0 0 14px 0; font-size: 15px;">Manual Overrides & Extra Slots</h4>
+          <div style="background: var(--c9-bg); border-radius: 10px; padding: 16px;">
+            <div style="padding: 10px 0; border-bottom: 1px solid var(--c9-border);">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--c9-danger); font-size: 13px; font-weight: 500;">Blocked: Apr 14 (Mon)</span>
+                <span style="color: var(--c9-muted); font-size: 12px; cursor: pointer;">Remove</span>
+              </div>
+              <span style="color: var(--c9-muted); font-size: 11px;">Reason: Public holiday</span>
+            </div>
+            <div style="padding: 10px 0; border-bottom: 1px solid var(--c9-border);">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--c9-success); font-size: 13px; font-weight: 500;">Extra: Apr 12 (Sat) 10:00 - 11:00 AM</span>
+                <span style="color: var(--c9-muted); font-size: 12px; cursor: pointer;">Remove</span>
+              </div>
+              <span style="color: var(--c9-muted); font-size: 11px;">Manually added slot</span>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 14px;">
+              <button style="background: transparent; border: 1px dashed var(--c9-primary); color: var(--c9-primary); padding: 10px; flex: 1; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 500;">+ Add Extra Slot</button>
+              <button style="background: transparent; border: 1px dashed var(--c9-danger); color: var(--c9-danger); padding: 10px; flex: 1; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 500;">+ Block Date</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -2,6 +2,7 @@ import clsx from "clsx";
 import React, { useEffect, useState } from "react";
 import { Dropdown } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
+import { showErrorToast } from '../../../utils/toast';
 import * as Yup from "yup";
 import { ReadQuestionSectionData } from "../../QuestionSections/API/Question_Section_APIs";
 import { CreateQuestionData, ReadMeasuredQualityTypes, UploadQuestionMedia } from "../API/Question_APIs";
@@ -200,7 +201,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
       setQuestionMediaBase64(result.base64);
     } catch (error) {
       console.error("Error converting image to WebP:", error);
-      alert("Failed to process image. Please try a different file.");
+      showErrorToast("Failed to process image. Please try a different file.");
     } finally {
       setQuestionMediaProcessing(false);
     }
@@ -224,7 +225,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
       setQuestionVideoThumbnail(thumbnail);
     } catch (error) {
       console.error("Error compressing video:", error);
-      alert("Failed to compress video. Please try a different file.");
+      showErrorToast("Failed to compress video. Please try a different file.");
     } finally {
       setQuestionMediaProcessing(false);
       setVideoCompressProgress(0);
@@ -368,7 +369,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                   questionImageUrl = uploadResult.url;
                 } catch (uploadErr) {
                   console.error("Media upload failed:", uploadErr);
-                  alert("Image upload failed. Question will be created without the image.");
+                  showErrorToast("Image upload failed. Question will be created without the image.");
                 }
               } else if (questionMediaType === 'video' && questionMediaBase64) {
                 try {
@@ -376,7 +377,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                   questionVideoUrl = uploadResult.url;
                 } catch (uploadErr) {
                   console.error("Media upload failed:", uploadErr);
-                  alert("Video upload failed. Question will be created without the video.");
+                  showErrorToast("Video upload failed. Question will be created without the video.");
                 }
               }
 
@@ -409,7 +410,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
             } catch (error: any) {
               console.error("Error creating question:", error);
               const msg = error?.response?.data?.message || error?.message || "Unknown error";
-              alert("Failed to create question: " + msg);
+              showErrorToast("Failed to create question: " + msg);
             } finally {
               setLoading(false);
             }

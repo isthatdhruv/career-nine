@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.text.SimpleDateFormat;
 
 import com.kccitm.api.exception.ResourceNotFoundException;
+import com.kccitm.api.exception.ServiceException;
 import com.kccitm.api.model.AuthProvider;
 import com.kccitm.api.model.RoleRoleGroupMapping;
 import com.kccitm.api.model.User;
@@ -34,6 +35,9 @@ import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.security.CurrentUser;
 import com.kccitm.api.security.UserPrincipal;
 import com.kccitm.api.service.SmtpEmailService;
+import com.kccitm.api.service.dashboard.StudentDashboardDataService;
+import com.kccitm.api.model.userDefinedModel.StudentDashboardResponse;
+import com.kccitm.api.model.userDefinedModel.StudentPortalComputedData;
 
 @RestController
 public class UserController {
@@ -49,6 +53,9 @@ public class UserController {
 
     @Autowired
     private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
+
+    @Autowired
+    private StudentDashboardDataService studentDashboardDataService;
 
     @GetMapping("/user/me")
     // @PreAuthorize("hasAuthority('USER_ME')")
@@ -136,6 +143,211 @@ public class UserController {
         }
     }
 
+    /**
+     * Student auth for dashboard: authenticates with username + DOB and returns
+     * full dashboard data (profile + assessment scores) in a single response.
+     */
+    @PostMapping(value = "user/student-auth", headers = "Accept=application/json")
+    public ResponseEntity<?> studentDashboardAuth(@RequestBody User currentUser) {
+        Optional<User> userOpt = userRepository.findByUsernameAndDobDate(
+                currentUser.getUsername(), currentUser.getDobDate());
+
+        if (!userOpt.isPresent()) {
+            return ResponseEntity.status(401).body(Map.of(
+                    "error", "Invalid credentials",
+                    "message", "Username or date of birth is incorrect"));
+        }
+
+        User user = userOpt.get();
+        Optional<UserStudent> userStudentOpt = userStudentRepository.getByUserId(user.getId());
+
+        if (!userStudentOpt.isPresent()) {
+            return ResponseEntity.status(404).body(Map.of(
+                    "error", "Student not found",
+                    "message", "No student record found for this user"));
+        }
+
+        UserStudent userStudent = userStudentOpt.get();
+        Long userStudentId = userStudent.getUserStudentId();
+
+        // Build student profile info
+        Map<String, Object> profile = new HashMap<>();
+        profile.put("userStudentId", userStudentId);
+        profile.put("infoCompleted", Boolean.TRUE.equals(userStudent.getInfoCompleted()));
+
+        // Fields from User entity
+        profile.put("username", user.getUsername());
+        profile.put("email", user.getEmail());
+        profile.put("phone", user.getPhone());
+        profile.put("careerNineRollNumber", user.getCareerNineRollNumber());
+
+        if (user.getDobDate() != null) {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd-MM-yyyy");
+            profile.put("dob", sdf.format(user.getDobDate()));
+        }
+
+        if (userStudent.getStudentInfo() != null) {
+            profile.put("name", userStudent.getStudentInfo().getName());
+            profile.put("grade", userStudent.getStudentInfo().getStudentClass());
+            profile.put("section", userStudent.getStudentInfo().getSchoolSectionId());
+            profile.put("schoolBoard", userStudent.getStudentInfo().getSchoolBoard());
+            profile.put("gender", userStudent.getStudentInfo().getGender());
+        }
+
+        if (userStudent.getInstitute() != null) {
+            profile.put("instituteName", userStudent.getInstitute().getInstituteName());
+            profile.put("instituteCode", userStudent.getInstitute().getInstituteCode());
+        }
+
+        // Build full dashboard data (assessment scores, answers, raw scores)
+        StudentDashboardResponse dashboardData = studentDashboardDataService
+                .buildDashboardData(userStudentId);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("profile", profile);
+        response.put("dashboardData", dashboardData);
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Update student profile info (name, email, phone).
+     * Auto-generates careerNineRollNumber if missing.
+     * Sets infoCompleted = true on success.
+     */
+    @PutMapping(value = "student-portal/update-info/{userStudentId}")
+    public ResponseEntity<?> updateStudentInfo(
+            @PathVariable Long userStudentId,
+            @RequestBody Map<String, String> body) {
+        UserStudent userStudent = userStudentRepository.findById(userStudentId)
+                .orElseThrow(() -> new ResourceNotFoundException("UserStudent", "id", userStudentId));
+
+        User user = userRepository.findById(userStudent.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userStudent.getUserId()));
+
+        String name = body.get("name");
+        String email = body.get("email");
+        String phone = body.get("phone");
+
+        // Validate required fields
+        if (name == null || name.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Name is required"));
+        }
+        if (email == null || !email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Valid email is required"));
+        }
+        if (phone == null || !phone.matches("^[6-9]\\d{9}$")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Valid 10-digit Indian phone number is required"));
+        }
+
+        // Update User entity
+        user.setName(name.trim());
+        user.setEmail(email.trim());
+        user.setPhone(phone.trim());
+
+        // Update StudentInfo entity
+        if (userStudent.getStudentInfo() != null) {
+            userStudent.getStudentInfo().setName(name.trim());
+            userStudent.getStudentInfo().setEmail(email.trim());
+            userStudent.getStudentInfo().setPhoneNumber(phone.trim());
+        }
+
+        // Generate careerNineRollNumber if missing
+        if (user.getCareerNineRollNumber() == null || user.getCareerNineRollNumber().trim().isEmpty()) {
+            String rollNumber = generateRollNumber(userStudent);
+            user.setCareerNineRollNumber(rollNumber);
+        }
+
+        // Mark info as completed
+        userStudent.setInfoCompleted(true);
+
+        userRepository.save(user);
+        userStudentRepository.save(userStudent);
+
+        // Return updated profile
+        Map<String, Object> profile = new HashMap<>();
+        profile.put("userStudentId", userStudentId);
+        profile.put("name", user.getName());
+        profile.put("email", user.getEmail());
+        profile.put("phone", user.getPhone());
+        profile.put("careerNineRollNumber", user.getCareerNineRollNumber());
+        profile.put("infoCompleted", true);
+
+        if (userStudent.getStudentInfo() != null) {
+            profile.put("grade", userStudent.getStudentInfo().getStudentClass());
+            profile.put("section", userStudent.getStudentInfo().getSchoolSectionId());
+            profile.put("schoolBoard", userStudent.getStudentInfo().getSchoolBoard());
+            profile.put("gender", userStudent.getStudentInfo().getGender());
+        }
+        if (userStudent.getInstitute() != null) {
+            profile.put("instituteName", userStudent.getInstitute().getInstituteName());
+            profile.put("instituteCode", userStudent.getInstitute().getInstituteCode());
+        }
+        if (user.getDobDate() != null) {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("dd-MM-yyyy");
+            profile.put("dob", sdf.format(user.getDobDate()));
+        }
+        profile.put("username", user.getUsername());
+
+        return ResponseEntity.ok(profile);
+    }
+
+    /**
+     * Generate a unique Career-9 roll number for a student.
+     * Format: C9-{class}-{section}-{seq:04d}
+     * Uniqueness scoped by institute + class + section.
+     */
+    private String generateRollNumber(UserStudent userStudent) {
+        Integer studentClass = null;
+        Integer sectionId = null;
+        Integer instituteId = null;
+
+        if (userStudent.getStudentInfo() != null) {
+            studentClass = userStudent.getStudentInfo().getStudentClass();
+            sectionId = userStudent.getStudentInfo().getSchoolSectionId();
+            instituteId = userStudent.getStudentInfo().getInstituteId();
+        }
+
+        // Fallbacks
+        if (studentClass == null) studentClass = 0;
+        if (sectionId == null) sectionId = 0;
+        if (instituteId == null && userStudent.getInstitute() != null) {
+            instituteId = userStudent.getInstitute().getInstituteCode();
+        }
+        if (instituteId == null) instituteId = 0;
+
+        String prefix = "C9-" + studentClass + "-" + sectionId + "-";
+
+        // Find all existing roll numbers for this class+section+institute
+        List<String> existing = userRepository.findRollNumbersByClassAndSection(
+                instituteId, studentClass, sectionId);
+
+        // Parse the max sequence from existing roll numbers
+        int maxSeq = 0;
+        for (String rn : existing) {
+            if (rn != null && rn.startsWith(prefix)) {
+                try {
+                    int seq = Integer.parseInt(rn.substring(prefix.length()));
+                    maxSeq = Math.max(maxSeq, seq);
+                } catch (NumberFormatException e) {
+                    // skip non-standard roll numbers
+                }
+            }
+        }
+
+        return prefix + String.format("%04d", maxSeq + 1);
+    }
+
+    /**
+     * Returns pre-computed student portal data: pillar scores, career matches,
+     * CCI level, insight text, and trait tags.
+     */
+    @GetMapping(value = "student-portal/computed/{userStudentId}")
+    public ResponseEntity<?> getComputedPortalData(@PathVariable Long userStudentId) {
+        StudentPortalComputedData data = studentDashboardDataService.computePortalData(userStudentId);
+        return ResponseEntity.ok(data);
+    }
+
     @GetMapping(value = "user/delete/{id}", headers = "Accept=application/json")
     public User deleteUser(@PathVariable("id") Long userId) {
         User user = userRepository.getOne(userId);
@@ -189,12 +401,8 @@ public class UserController {
     @PostMapping(value = "user/toggle-active/{id}")
     public ResponseEntity<?> toggleUserActive(@PathVariable("id") Long userId) {
 
-        Optional<User> optionalUser = userRepository.findById(userId);
-        if (!optionalUser.isPresent()) {
-            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
-                    .body(new ApiResponse(false, "User not found"));
-        }
-        User user = optionalUser.get();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
         boolean newStatus = !(user.getIsActive() != null && user.getIsActive());
         user.setIsActive(newStatus);
 
@@ -211,12 +419,8 @@ public class UserController {
 
     @PutMapping(value = "user/update-details/{id}")
     public ResponseEntity<?> updateUserDetails(@PathVariable("id") Long userId, @RequestBody Map<String, Object> body) {
-        Optional<User> optionalUser = userRepository.findById(userId);
-        if (!optionalUser.isPresent()) {
-            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
-                    .body(new ApiResponse(false, "User not found"));
-        }
-        User user = optionalUser.get();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
         if (body.containsKey("name"))
             user.setName((String) body.get("name"));

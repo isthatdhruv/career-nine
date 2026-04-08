@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Modal, Button, Form, Spinner, Badge } from "react-bootstrap";
-import { MdContentCopy, MdDelete } from "react-icons/md";
+import { MdContentCopy, MdDelete, MdQrCode, MdDownload } from "react-icons/md";
+import { QRCodeCanvas } from "qrcode.react";
 import { GetSessionsByInstituteCode } from "../API/College_APIs";
 import {
   createAssessmentMapping,
@@ -9,6 +10,7 @@ import {
   deleteAssessmentMapping,
   updateAssessmentMapping,
 } from "../../AssessmentMapping/API/AssessmentMapping_APIs";
+import { showErrorToast } from '../../../utils/toast';
 
 interface AssessmentMappingModalProps {
   show: boolean;
@@ -31,6 +33,7 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [copySuccess, setCopySuccess] = useState<string>("");
+  const [qrVisibleToken, setQrVisibleToken] = useState<string | null>(null);
 
   // Derived: classes and sections from selected session/class
   const selectedSessionObj = sessions.find(
@@ -72,7 +75,7 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
 
   const handleCreate = async () => {
     if (!selectedAssessment) {
-      alert("Please select an assessment");
+      showErrorToast("Please select an assessment");
       return;
     }
 
@@ -84,20 +87,20 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
 
     if (mappingLevel === "SESSION") {
       if (!selectedSession) {
-        alert("Please select a session");
+        showErrorToast("Please select a session");
         return;
       }
       data.sessionId = Number(selectedSession);
     } else if (mappingLevel === "CLASS") {
       if (!selectedSession || !selectedClass) {
-        alert("Please select a session and class");
+        showErrorToast("Please select a session and class");
         return;
       }
       data.sessionId = Number(selectedSession);
       data.classId = Number(selectedClass);
     } else if (mappingLevel === "SECTION") {
       if (!selectedSession || !selectedClass || !selectedSection) {
-        alert("Please select a session, class, and section");
+        showErrorToast("Please select a session, class, and section");
         return;
       }
       data.sessionId = Number(selectedSession);
@@ -118,7 +121,7 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
       setSelectedSection("");
     } catch (error: any) {
       console.error("Failed to create mapping:", error);
-      alert(
+      showErrorToast(
         "Failed to create mapping: " +
           (error.response?.data || error.message)
       );
@@ -164,6 +167,16 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
     setCopySuccess(token);
     setTimeout(() => setCopySuccess(""), 2000);
   };
+
+  const downloadQrCode = useCallback((token: string, assessmentName: string) => {
+    const canvas = document.getElementById(`qr-canvas-${token}`) as HTMLCanvasElement;
+    if (!canvas) return;
+    const url = canvas.toDataURL("image/png");
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `QR_${assessmentName.replace(/[^a-zA-Z0-9]/g, "_")}_${token.slice(0, 8)}.png`;
+    link.click();
+  }, []);
 
   const getAssessmentName = (assessmentId: number) => {
     const a = assessments.find((a: any) => a.id === assessmentId);
@@ -344,6 +357,7 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
                       <th>Details</th>
                       <th>Status</th>
                       <th>URL</th>
+                      <th>QR Code</th>
                       <th style={{ width: "100px" }}>Actions</th>
                     </tr>
                   </thead>
@@ -387,6 +401,16 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
                         </td>
                         <td>
                           <Button
+                            variant="outline-dark"
+                            size="sm"
+                            onClick={() => setQrVisibleToken(mapping.token)}
+                            title="Show QR Code"
+                          >
+                            <MdQrCode size={14} />
+                          </Button>
+                        </td>
+                        <td>
+                          <Button
                             variant="outline-danger"
                             size="sm"
                             onClick={() => handleDelete(mapping.mappingId)}
@@ -408,6 +432,56 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
           Close
         </Button>
       </Modal.Footer>
+
+      {/* QR Code Modal */}
+      <Modal
+        show={!!qrVisibleToken}
+        onHide={() => setQrVisibleToken(null)}
+        centered
+        size="sm"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title style={{ fontSize: "1rem" }}>
+            QR Code
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="text-center py-4">
+          {qrVisibleToken && (
+            <>
+              <QRCodeCanvas
+                id={`qr-canvas-${qrVisibleToken}`}
+                value={getRegistrationUrl(qrVisibleToken)}
+                size={256}
+                level="H"
+                includeMargin
+              />
+              <div className="mt-2" style={{ fontSize: "0.75em", color: "#6c757d", wordBreak: "break-all" }}>
+                {getRegistrationUrl(qrVisibleToken)}
+              </div>
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer className="justify-content-center">
+          {qrVisibleToken && (
+            <Button
+              variant="success"
+              onClick={() => {
+                const mapping = mappings.find((m) => m.token === qrVisibleToken);
+                downloadQrCode(
+                  qrVisibleToken,
+                  mapping ? getAssessmentName(mapping.assessmentId) : "assessment"
+                );
+              }}
+            >
+              <MdDownload size={16} className="me-1" />
+              Download QR
+            </Button>
+          )}
+          <Button variant="secondary" onClick={() => setQrVisibleToken(null)}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Modal>
   );
 };

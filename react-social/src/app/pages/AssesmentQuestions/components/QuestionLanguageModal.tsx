@@ -2,6 +2,7 @@ import clsx from "clsx";
 import { Field, Form, Formik } from "formik";
 import { useState, useEffect } from "react";
 import { Modal, Button, Dropdown } from "react-bootstrap";
+import { showErrorToast, showSuccessToast } from '../../../utils/toast';
 import * as Yup from "yup";
 import { createLanguageQuestionAndOptionData, readLanguageData } from "../API/Language_APIs";
 import { ReadQuestionByIdData } from "../../AssesmentQuestions/API/Question_APIs";
@@ -131,7 +132,7 @@ const QuestionLanguageModal = ({
         validationSchema={validationSchema}
         onSubmit={async (values, { resetForm }) => {
           if (!selectedLanguage) {
-            alert("Please select a language!");
+            showErrorToast("Please select a language!");
             return;
           }
 
@@ -160,7 +161,7 @@ const QuestionLanguageModal = ({
             onHide();
           } catch (error) {
             console.error(error);
-            alert("Failed to save translations");
+            showErrorToast("Failed to save translations");
           } finally {
             setLoading(false);
             setPageLoading?.(false);
@@ -171,7 +172,7 @@ const QuestionLanguageModal = ({
           // Question translation handler
           const handleQuestionTranslate = async () => {
             if (!questionData.questionText || !selectedLanguage?.languageName) {
-              alert("Question text or target language is missing!");
+              showErrorToast("Question text or target language is missing!");
               return;
             }
             
@@ -183,7 +184,7 @@ const QuestionLanguageModal = ({
               
             } catch (error) {
               console.error("Question translation error:", error);
-              alert("Failed to translate question");
+              showErrorToast("Failed to translate question");
             } finally {
               setTranslatingQuestion(false);
             }
@@ -192,7 +193,7 @@ const QuestionLanguageModal = ({
           // Option translation handler
           const optionTranslate = async (optionText: string, targetLanguage: string, index: number) => {
             if (!optionText || !targetLanguage) {
-              alert("Option text or target language is missing!");
+              showErrorToast("Option text or target language is missing!");
               return;
             }
             
@@ -204,7 +205,7 @@ const QuestionLanguageModal = ({
               
             } catch (error) {
               console.error("Translation error:", error);
-              alert("Failed to translate option");
+              showErrorToast("Failed to translate option");
             } finally {
               setTranslatingOptions(prev => {
                 const newState = { ...prev };
@@ -217,7 +218,7 @@ const QuestionLanguageModal = ({
           // Translate all handler
           const handleTranslateAll = async () => {
             if (!questionData.questionText || !selectedLanguage?.languageName) {
-              alert("Question text or target language is missing!");
+              showErrorToast("Question text or target language is missing!");
               return;
             }
 
@@ -242,7 +243,7 @@ const QuestionLanguageModal = ({
               
             } catch (error) {
               console.error("Translate all error:", error);
-              alert("Failed to translate all content");
+              showErrorToast("Failed to translate all content");
             } finally {
               setTranslatingAll(false);
             }

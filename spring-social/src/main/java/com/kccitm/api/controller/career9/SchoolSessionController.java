@@ -3,7 +3,6 @@ package com.kccitm.api.controller.career9;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.career9.school.SchoolSession;
 import com.kccitm.api.model.career9.school.SchoolClasses;
 import com.kccitm.api.model.career9.school.SchoolSections;
@@ -54,7 +54,7 @@ public class SchoolSessionController {
             // 1. Set institute relationship from instituteCode
             if (session.getInstituteCode() != null) {
                 InstituteDetail institute = instituteDetailRepository.findById(session.getInstituteCode())
-                    .orElseThrow(() -> new RuntimeException("Institute not found with code: " + session.getInstituteCode()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Institute", "code", session.getInstituteCode()));
                 session.setInstitute(institute);
             }
 
@@ -94,7 +94,7 @@ public class SchoolSessionController {
                 SchoolSession newSession = new SchoolSession();
                 newSession.setSessionYear(sessionYear);
                 newSession.setInstitute(instituteDetailRepository.findById(instituteCode)
-                    .orElseThrow(() -> new RuntimeException("Institute not found: " + instituteCode)));
+                    .orElseThrow(() -> new ResourceNotFoundException("Institute", "code", instituteCode)));
                 return schoolSessionRepository.save(newSession);
             });
 
@@ -145,14 +145,9 @@ public class SchoolSessionController {
 
     @PutMapping("/update/{id}")
     public ResponseEntity<SchoolSession> updateSession(@PathVariable Integer id, @RequestBody SchoolSession sessionUpdate) {
-        Optional<SchoolSession> existingOpt = schoolSessionRepository.findById(id);
-        if (!existingOpt.isPresent()) {
-            return ResponseEntity.notFound().build();
-        }
-
-        SchoolSession existing = existingOpt.get();
+        SchoolSession existing = schoolSessionRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("SchoolSession", "id", id));
         existing.setSessionYear(sessionUpdate.getSessionYear());
-
         SchoolSession updated = schoolSessionRepository.save(existing);
         return ResponseEntity.ok(updated);
     }
@@ -160,7 +155,7 @@ public class SchoolSessionController {
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<String> deleteSession(@PathVariable Integer id) {
         if (!schoolSessionRepository.existsById(id)) {
-            return ResponseEntity.notFound().build();
+            throw new ResourceNotFoundException("SchoolSession", "id", id);
         }
         schoolSessionRepository.deleteById(id);
         return ResponseEntity.ok("Session deleted successfully");
@@ -177,12 +172,9 @@ public class SchoolSessionController {
         Map<String, Object> sessionObj = (Map<String, Object>) payload.get("schoolSession");
         if (sessionObj != null && sessionObj.get("id") != null) {
             Integer sessionId = Integer.valueOf(sessionObj.get("id").toString());
-            Optional<SchoolSession> sessionOpt = schoolSessionRepository.findById(sessionId);
-            if (sessionOpt.isPresent()) {
-                schoolClass.setSchoolSession(sessionOpt.get());
-            } else {
-                return ResponseEntity.badRequest().build();
-            }
+            SchoolSession session = schoolSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new ResourceNotFoundException("SchoolSession", "id", sessionId));
+            schoolClass.setSchoolSession(session);
         } else {
             return ResponseEntity.badRequest().build();
         }
@@ -193,14 +185,9 @@ public class SchoolSessionController {
 
     @PutMapping("/class/update/{id}")
     public ResponseEntity<SchoolClasses> updateClass(@PathVariable Integer id, @RequestBody SchoolClasses classUpdate) {
-        Optional<SchoolClasses> existingOpt = schoolClassesRepository.findById(id);
-        if (!existingOpt.isPresent()) {
-            return ResponseEntity.notFound().build();
-        }
-
-        SchoolClasses existing = existingOpt.get();
+        SchoolClasses existing = schoolClassesRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("SchoolClass", "id", id));
         existing.setClassName(classUpdate.getClassName());
-
         SchoolClasses updated = schoolClassesRepository.save(existing);
         return ResponseEntity.ok(updated);
     }
@@ -208,7 +195,7 @@ public class SchoolSessionController {
     @DeleteMapping("/class/delete/{id}")
     public ResponseEntity<String> deleteClass(@PathVariable Integer id) {
         if (!schoolClassesRepository.existsById(id)) {
-            return ResponseEntity.notFound().build();
+            throw new ResourceNotFoundException("SchoolClass", "id", id);
         }
         schoolClassesRepository.deleteById(id);
         return ResponseEntity.ok("Class deleted successfully");
@@ -225,12 +212,9 @@ public class SchoolSessionController {
         Map<String, Object> classObj = (Map<String, Object>) payload.get("schoolClasses");
         if (classObj != null && classObj.get("id") != null) {
             Integer classId = Integer.valueOf(classObj.get("id").toString());
-            Optional<SchoolClasses> classOpt = schoolClassesRepository.findById(classId);
-            if (classOpt.isPresent()) {
-                section.setSchoolClass(classOpt.get());
-            } else {
-                return ResponseEntity.badRequest().build();
-            }
+            SchoolClasses schoolClass = schoolClassesRepository.findById(classId)
+                .orElseThrow(() -> new ResourceNotFoundException("SchoolClass", "id", classId));
+            section.setSchoolClass(schoolClass);
         } else {
             return ResponseEntity.badRequest().build();
         }
@@ -241,14 +225,9 @@ public class SchoolSessionController {
 
     @PutMapping("/section/update/{id}")
     public ResponseEntity<SchoolSections> updateSection(@PathVariable Integer id, @RequestBody SchoolSections sectionUpdate) {
-        Optional<SchoolSections> existingOpt = schoolSectionsRepository.findById(id);
-        if (!existingOpt.isPresent()) {
-            return ResponseEntity.notFound().build();
-        }
-
-        SchoolSections existing = existingOpt.get();
+        SchoolSections existing = schoolSectionsRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("SchoolSection", "id", id));
         existing.setSectionName(sectionUpdate.getSectionName());
-
         SchoolSections updated = schoolSectionsRepository.save(existing);
         return ResponseEntity.ok(updated);
     }
@@ -256,7 +235,7 @@ public class SchoolSessionController {
     @DeleteMapping("/section/delete/{id}")
     public ResponseEntity<String> deleteSection(@PathVariable Integer id) {
         if (!schoolSectionsRepository.existsById(id)) {
-            return ResponseEntity.notFound().build();
+            throw new ResourceNotFoundException("SchoolSection", "id", id);
         }
         schoolSectionsRepository.deleteById(id);
         return ResponseEntity.ok("Section deleted successfully");

@@ -159,6 +159,29 @@ const Login = () => {
         </a> */}
       </div>
       {/* end::Action */}
+
+      {/* begin::Separator */}
+      <div className='text-center text-muted text-uppercase fw-bolder mb-5' style={{fontSize: '12px'}}>Or sign in as</div>
+      {/* end::Separator */}
+
+      {/* begin::Role Buttons */}
+      <div className='d-flex gap-3'>
+        <a
+          href='/student/login'
+          className='btn btn-flex flex-center btn-lg w-100'
+          style={{background: '#E0F2EE', color: '#084A3E', border: '1px solid #D1E5DF', fontWeight: 600}}
+        >
+          Student
+        </a>
+        <a
+          href='/counsellor/login'
+          className='btn btn-flex flex-center btn-lg w-100'
+          style={{background: '#E0F2EE', color: '#084A3E', border: '1px solid #D1E5DF', fontWeight: 600}}
+        >
+          Counsellor
+        </a>
+      </div>
+      {/* end::Role Buttons */}
     </form>
   );
 };

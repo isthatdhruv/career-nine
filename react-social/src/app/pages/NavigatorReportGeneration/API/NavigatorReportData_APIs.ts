@@ -48,6 +48,13 @@ export function generateNavigatorReportData(assessmentId: number, userStudentIds
   });
 }
 
+export function generateAndExportNavigatorExcel(assessmentId: number, userStudentIds: number[]) {
+  return axios.post(`${BASE}/generate-export`, {
+    assessmentId,
+    userStudentIds,
+  }, { responseType: 'blob' });
+}
+
 export function getNavigatorReportDataByAssessment(assessmentId: number) {
   return axios.get<NavigatorReportData[]>(`${BASE}/by-assessment/${assessmentId}`);
 }
@@ -79,6 +86,18 @@ export function resetNavigatorForStudent(userStudentId: number, assessmentId: nu
 
 export function resetNavigatorForAssessment(assessmentId: number) {
   return axios.delete(`${BASE}/reset/assessment/${assessmentId}`);
+}
+
+export function downloadNavigatorReport(userStudentId: number, assessmentId: number) {
+  return axios.get(`${BASE}/download/${userStudentId}/${assessmentId}`, {
+    responseType: 'blob',
+  });
+}
+
+export function getNavigatorReportUrls(assessmentId: number, userStudentIds: number[]) {
+  return axios.post<{ reports: { userStudentId: number; studentName: string; fileName: string; reportUrl: string }[] }>(
+    `${BASE}/download-zip`, { assessmentId, userStudentIds }
+  );
 }
 
 export function exportGeneralAssessmentExcel(assessmentId: number) {

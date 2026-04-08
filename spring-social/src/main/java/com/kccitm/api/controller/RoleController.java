@@ -6,6 +6,8 @@ import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+
+import com.kccitm.api.exception.ResourceNotFoundException;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -54,16 +56,10 @@ public class RoleController {
 
 	@DeleteMapping("/role/delete/{id}")
     public ResponseEntity<String> deleteRole(@PathVariable Integer id) {
-        try {
-            Role role = roleRepository.findById(id).orElse(null);
-            if (role == null) {
-                return ResponseEntity.notFound().build();
-            }
-            roleRepository.deleteById(id);
+        roleRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Role", "id", id));
+        roleRepository.deleteById(id);
 
-            return ResponseEntity.ok("Role deleted successfully");
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Failed to delete role: " + e.getMessage());
-        }
+        return ResponseEntity.ok("Role deleted successfully");
     }
 }

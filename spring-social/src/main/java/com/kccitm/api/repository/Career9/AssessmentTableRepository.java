@@ -32,9 +32,10 @@ public interface AssessmentTableRepository extends JpaRepository<AssessmentTable
         Long getId();
         String getAssessmentName();
         Boolean getIsActive();
+        Boolean getQuestionnaireType();
     }
 
-    @Query("SELECT a.id AS id, a.AssessmentName AS assessmentName, a.isActive AS isActive FROM AssessmentTable a")
+    @Query("SELECT a.id AS id, a.AssessmentName AS assessmentName, a.isActive AS isActive, q.type AS questionnaireType FROM AssessmentTable a LEFT JOIN a.questionnaire q")
     List<AssessmentSummary> findAssessmentSummaryList();
 
     List<AssessmentTable> findByIsLockedTrue();
@@ -43,7 +44,12 @@ public interface AssessmentTableRepository extends JpaRepository<AssessmentTable
 
     List<AssessmentTable> findByIsDeletedTrue();
 
-    @Query("SELECT a.id AS id, a.AssessmentName AS assessmentName, a.isActive AS isActive FROM AssessmentTable a WHERE a.isDeleted = false OR a.isDeleted IS NULL")
+    @Query("SELECT a.id AS id, a.AssessmentName AS assessmentName, a.isActive AS isActive, q.type AS questionnaireType FROM AssessmentTable a LEFT JOIN a.questionnaire q WHERE a.isDeleted = false OR a.isDeleted IS NULL")
     List<AssessmentSummary> findAssessmentSummaryListNotDeleted();
+
+    @Query("SELECT DISTINCT a.id AS id, a.AssessmentName AS assessmentName, a.isActive AS isActive, q.type AS questionnaireType " +
+           "FROM AssessmentTable a LEFT JOIN a.questionnaire q JOIN AssessmentInstituteMapping m ON a.id = m.assessmentId " +
+           "WHERE m.instituteCode = :instituteCode AND m.isActive = true AND (a.isDeleted = false OR a.isDeleted IS NULL)")
+    List<AssessmentSummary> findAssessmentSummariesByInstitute(@Param("instituteCode") Integer instituteCode);
 
 }

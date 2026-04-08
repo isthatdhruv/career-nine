@@ -15,6 +15,7 @@ import {
   UpdateSectionData,
   DeleteSectionData
 } from "../API/College_APIs";
+import { showErrorToast, showSuccessToast } from '../../../utils/toast';
 
 // ============ TYPE DEFINITIONS ============
 
@@ -459,7 +460,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
 
     try {
       await CreateSessionData(formattedOutput);
-      alert('New sessions submitted successfully!');
+      showSuccessToast('New sessions submitted successfully!');
       setNewSessionsData([]);
       setCurrentSessionIndex(null);
       setCurrentGradeIndex(null);
@@ -468,7 +469,7 @@ const CollegeSectionSessionGradeModal = (props: Props) => {
       }
     } catch (error) {
       console.error("Error in CreateSessionData:", error);
-      alert('Error submitting. Please try again.');
+      showErrorToast('Error submitting. Please try again.');
     } finally {
       setLoading(false);
     }

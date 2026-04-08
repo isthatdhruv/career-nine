@@ -38,6 +38,9 @@ public interface AssessmentAnswerRepository extends JpaRepository<AssessmentAnsw
        @Transactional
        void deleteByUserStudent_UserStudentIdAndAssessment_Id(Long userStudentId, Long assessmentId);
 
+       @Transactional
+       void deleteByUserStudent_UserStudentId(Long userStudentId);
+
        List<AssessmentAnswer> findByAssessment_IdAndTextResponseIsNotNull(Long assessmentId);
 
        List<AssessmentAnswer> findByUserStudent_UserStudentIdAndAssessment_Id(Long userStudentId, Long assessmentId);

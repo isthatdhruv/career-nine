@@ -8,6 +8,7 @@ import {
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { MdRestorePage } from "react-icons/md";
+import { showErrorToast } from '../../../../utils/toast';
 
 interface QuestionnaireRecycleBinModalProps {
   show: boolean;
@@ -52,7 +53,7 @@ const QuestionnaireRecycleBinModal = ({
       onRestoreComplete();
     } catch (error) {
       console.error("Error restoring questionnaire:", error);
-      alert("Failed to restore questionnaire. Please try again.");
+      showErrorToast("Failed to restore questionnaire. Please try again.");
     } finally {
       setActionLoading(null);
     }
@@ -74,7 +75,7 @@ const QuestionnaireRecycleBinModal = ({
       );
     } catch (error) {
       console.error("Error permanently deleting questionnaire:", error);
-      alert("Failed to permanently delete questionnaire. Please try again.");
+      showErrorToast("Failed to permanently delete questionnaire. Please try again.");
     } finally {
       setActionLoading(null);
     }

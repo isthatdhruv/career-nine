@@ -17,6 +17,7 @@ export interface StudentInfo {
     assesment_id?: string;
     studentDob?: string;
     schoolSectionId?: number;
+    careerNineRollNumber?: string;
 }
 
 export interface Assessment {
@@ -25,6 +26,7 @@ export interface Assessment {
     isActive?: boolean;
     starDate?: string;
     endDate?: string;
+    questionnaire?: { type?: boolean | null; questionnaireId?: number };
 }
 
 export interface BulkAssessmentAssignment {
@@ -152,6 +154,10 @@ export function getBulkProctoringData(pairs: { userStudentId: number; assessment
 export function exportProctoringExcel(pairs: { userStudentId: number; assessmentId: number }[]) {
     return axios.post(`${API_URL}/assessment-proctoring/export-excel`, pairs, {
         responseType: 'blob',
+        headers: {
+            'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json',
+            'Content-Type': 'application/json',
+        },
     });
 }
 
@@ -235,16 +241,18 @@ export interface OneClickReportResponse {
     status: string;
 }
 
-export function generateBetReportOneClick(assessmentId: number, userStudentId: number) {
+export function generateBetReportOneClick(assessmentId: number, userStudentId: number, force = false) {
     return axios.post<OneClickReportResponse>(`${API_URL}/bet-report-data/one-click-report`, {
         assessmentId,
         userStudentId,
+        force,
     }, { timeout: 120000 }); // 2 min timeout for report generation
 }
 
-export function generateNavigatorReportOneClick(assessmentId: number, userStudentId: number) {
+export function generateNavigatorReportOneClick(assessmentId: number, userStudentId: number, force = false) {
     return axios.post<OneClickReportResponse>(`${API_URL}/navigator-report-data/one-click-report`, {
         assessmentId,
         userStudentId,
+        force,
     }, { timeout: 120000 }); // 2 min timeout for report generation + AI
 }

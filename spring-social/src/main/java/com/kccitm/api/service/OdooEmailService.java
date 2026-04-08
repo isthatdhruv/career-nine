@@ -17,6 +17,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kccitm.api.exception.ServiceException;
 import com.kccitm.api.model.userDefinedModel.SmtpEmailRequest;
 
 /**
@@ -215,6 +216,8 @@ public class OdooEmailService {
 
         if (emailFrom != null) {
             vals.put("email_from", emailFrom);
+        } else {
+            vals.put("email_from", "\"Career-9\" <" + odooUsername + ">");
         }
         if (emailCc != null && !emailCc.isEmpty()) {
             vals.put("email_cc", emailCc);
@@ -236,12 +239,12 @@ public class OdooEmailService {
         JsonNode root = objectMapper.readTree(responseBody);
 
         if (root.has("error")) {
-            throw new RuntimeException("Odoo mail.mail create failed: " + extractError(root));
+            throw new ServiceException("Odoo mail.mail create failed: " + extractError(root));
         }
 
         JsonNode result = root.get("result");
         if (result == null || result.isNull()) {
-            throw new RuntimeException("Odoo mail.mail create: no result in response");
+            throw new ServiceException("Odoo mail.mail create: no result in response");
         }
 
         return result.asLong();
@@ -264,7 +267,7 @@ public class OdooEmailService {
         JsonNode root = objectMapper.readTree(responseBody);
 
         if (root.has("error")) {
-            throw new RuntimeException("Odoo mail.mail send failed: " + extractError(root));
+            throw new ServiceException("Odoo mail.mail send failed: " + extractError(root));
         }
     }
 
@@ -292,7 +295,7 @@ public class OdooEmailService {
         JsonNode root = objectMapper.readTree(responseBody);
 
         if (root.has("error")) {
-            throw new RuntimeException("Odoo ir.attachment create failed: " + extractError(root));
+            throw new ServiceException("Odoo ir.attachment create failed: " + extractError(root));
         }
 
         return root.get("result").asLong();
@@ -340,7 +343,7 @@ public class OdooEmailService {
                     .bodyToMono(String.class)
                     .block();
         } catch (WebClientResponseException e) {
-            throw new RuntimeException("Odoo HTTP error " + e.getStatusCode() + ": " + e.getResponseBodyAsString());
+            throw new ServiceException("Odoo HTTP error " + e.getStatusCode() + ": " + e.getResponseBodyAsString());
         }
     }
 

@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -33,8 +34,10 @@ import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.service.AssessmentSessionService;
 import com.kccitm.api.model.career9.Questionaire.Questionnaire;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
+import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
 import com.kccitm.api.repository.Career9.AssessmentQuestionRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
+import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireRepository;
 
 @RestController
@@ -60,6 +63,12 @@ public class AssessmentTableController {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private AssessmentAnswerRepository assessmentAnswerRepository;
+
+    @Autowired
+    private QuestionnaireQuestionRepository questionnaireQuestionRepository;
 
     @Autowired
     private AssessmentSessionService assessmentSessionService;
@@ -153,6 +162,17 @@ public class AssessmentTableController {
     @GetMapping("/get/list")
     public List<AssessmentTable> getAllAssessment() {
         return assessmentTableRepository.findByIsDeletedFalseOrIsDeletedIsNull();
+    }
+
+    @GetMapping("/get/by-institute/{instituteCode}")
+    public ResponseEntity<List<AssessmentTable>> getAssessmentsByInstitute(@PathVariable Integer instituteCode) {
+        List<Long> assessmentIds = studentAssessmentMappingRepository
+                .findDistinctAssessmentIdsByInstituteCode(instituteCode);
+        if (assessmentIds.isEmpty()) {
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+        List<AssessmentTable> assessments = assessmentTableRepository.findAllById(assessmentIds);
+        return ResponseEntity.ok(assessments);
     }
 
     @GetMapping("/{id}")
@@ -722,6 +742,69 @@ public class AssessmentTableController {
             }
         }
         return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Fixes student assessment mapping statuses by checking if students have
+     * actually answered all questions. Students marked as "completed" who haven't
+     * answered all questions will be set back to "ongoing".
+     */
+    @org.springframework.transaction.annotation.Transactional
+    @PutMapping("/{assessmentId}/fix-completion-status")
+    public ResponseEntity<HashMap<String, Object>> fixCompletionStatus(@PathVariable Long assessmentId) {
+        HashMap<String, Object> response = new HashMap<>();
+
+        Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(assessmentId);
+        if (assessmentOpt.isEmpty()) {
+            response.put("error", "Assessment not found");
+            return ResponseEntity.status(404).body(response);
+        }
+
+        AssessmentTable assessment = assessmentOpt.get();
+        if (assessment.getQuestionnaire() == null) {
+            response.put("error", "Assessment has no questionnaire linked");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        Long questionnaireId = assessment.getQuestionnaire().getQuestionnaireId();
+        Long totalQuestions = questionnaireQuestionRepository.countByQuestionnaireId(questionnaireId);
+
+        List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
+                .findAllByAssessmentId(assessmentId);
+
+        int correctedCount = 0;
+        java.util.ArrayList<HashMap<String, Object>> correctedStudents = new java.util.ArrayList<>();
+
+        for (StudentAssessmentMapping mapping : mappings) {
+            if (!"completed".equals(mapping.getStatus()) && !"submitted".equals(mapping.getStatus())) {
+                continue;
+            }
+
+            Long answeredCount = assessmentAnswerRepository
+                    .countByUserStudent_UserStudentIdAndAssessment_Id(
+                            mapping.getUserStudent().getUserStudentId(), assessmentId);
+
+            if (answeredCount < totalQuestions) {
+                String oldStatus = mapping.getStatus();
+                mapping.setStatus("ongoing");
+                studentAssessmentMappingRepository.save(mapping);
+                correctedCount++;
+
+                HashMap<String, Object> studentInfo = new HashMap<>();
+                studentInfo.put("userStudentId", mapping.getUserStudent().getUserStudentId());
+                studentInfo.put("previousStatus", oldStatus);
+                studentInfo.put("answeredQuestions", answeredCount);
+                studentInfo.put("totalQuestions", totalQuestions);
+                correctedStudents.add(studentInfo);
+            }
+        }
+
+        response.put("assessmentId", assessmentId);
+        response.put("totalQuestions", totalQuestions);
+        response.put("totalMappings", mappings.size());
+        response.put("correctedCount", correctedCount);
+        response.put("correctedStudents", correctedStudents);
+        return ResponseEntity.ok(response);
     }
 
 }

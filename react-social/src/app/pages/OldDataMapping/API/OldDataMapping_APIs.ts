@@ -2,8 +2,10 @@ import axios from "axios";
 const API_URL = process.env.REACT_APP_API_URL;
 
 // Fetch grouped school/session/grade/section data from Firebase (via backend)
-export function fetchFirebaseSchoolData() {
-  return axios.get(`${API_URL}/firebase-mapping/fetch-school-data`);
+export function fetchFirebaseSchoolData(tenant?: string) {
+  return axios.get(`${API_URL}/firebase-mapping/fetch-school-data`, {
+    params: tenant ? { tenant } : undefined,
+  });
 }
 
 // Firebase mapping endpoints
@@ -72,8 +74,10 @@ export function getStudentsByInstitute(instituteCode: number) {
 // ========================== PHASE 2-4: Student Data Import ==========================
 
 // Fetch full user data from Firebase (personal, educational, scores, responses)
-export function fetchFirebaseUserData() {
-  return axios.get(`${API_URL}/firebase-mapping/fetch-user-data`);
+export function fetchFirebaseUserData(tenant?: string) {
+  return axios.get(`${API_URL}/firebase-mapping/fetch-user-data`, {
+    params: tenant ? { tenant } : undefined,
+  });
 }
 
 // Fetch unique questions from Firebase responses
@@ -86,19 +90,15 @@ export function importStudents(payload: any) {
   return axios.post(`${API_URL}/firebase-mapping/import-students`, payload);
 }
 
-// Import assessment raw scores
-export function importScores(payload: any) {
-  return axios.post(`${API_URL}/firebase-mapping/import-scores`, payload);
-}
-
-// Import extra data (career aspirations, subjects, values)
-export function importExtraData(payload: any) {
-  return axios.post(`${API_URL}/firebase-mapping/import-extra-data`, payload);
-}
 
 // Import mapped question-answer pairs as AssessmentAnswer records
-export function importMappedAnswers(payload: { userStudentId: number; assessmentId: number; answers: { questionId: number | null; optionId: number | null; textResponse: string }[] }) {
+export function importMappedAnswers(payload: { userStudentId: number; assessmentId: number; answers: { questionId: number | null; optionId: number | null; textResponse: string }[]; totalMappedQuestions?: number }) {
   return axios.post(`${API_URL}/firebase-mapping/import-mapped-answers`, payload);
+}
+
+// Force-complete status for partial students
+export function forceCompleteStatus(payload: { userStudentId: number; assessmentId: number }[]) {
+  return axios.post(`${API_URL}/firebase-mapping/force-complete-status`, payload);
 }
 
 // Question mapping persistence
@@ -123,8 +123,8 @@ export function getAllAssessments() {
   return axios.get(`${API_URL}/assessments/get/list`);
 }
 
-export function getAllMeasuredQualityTypes() {
-  return axios.get(`${API_URL}/measured-quality-types/getAll`);
+export function getAssessmentsByInstitute(instituteCode: number) {
+  return axios.get(`${API_URL}/assessments/get/by-institute/${instituteCode}`);
 }
 
 export function getAllAssessmentQuestions() {
@@ -137,4 +137,12 @@ export function getAssessmentQuestionnaire(assessmentId: number) {
 
 export function findAssessmentsBySameQuestionnaire(assessmentId: number) {
   return axios.get(`${API_URL}/assessments/find-by-same-questionnaire/${assessmentId}`);
+}
+
+export function detectUnmappedQuestions(assessmentId: number) {
+  return axios.get(`${API_URL}/firebase-mapping/detect-unmapped-questions/${assessmentId}`);
+}
+
+export function deleteFirebaseStudents(instituteCode: number, forceAll: boolean = false) {
+  return axios.delete(`${API_URL}/firebase-mapping/delete-firebase-students/${instituteCode}?forceAll=${forceAll}`);
 }

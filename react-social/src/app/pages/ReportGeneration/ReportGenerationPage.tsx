@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import { ReadCollegeList, GetSessionsByInstituteCode } from "../College/API/College_APIs";
 import {
   getAllAssessments,
@@ -490,9 +491,9 @@ const ReportGenerationPage: React.FC = () => {
                       if (errors.length > 0) {
                         msg += `\n${errors.length} skipped (no completed assessment or error).`;
                       }
-                      alert(msg);
+                      showSuccessToast(msg);
                     } catch (err: any) {
-                      alert("Failed: " + (err?.response?.data?.error || err.message));
+                      showErrorToast("Failed: " + (err?.response?.data?.error || err.message));
                     } finally {
                       setGenerating(false);
                     }
@@ -523,7 +524,7 @@ const ReportGenerationPage: React.FC = () => {
                       a.remove();
                       window.URL.revokeObjectURL(url);
                     } catch (err: any) {
-                      alert("Export failed: " + (err?.response?.data?.error || err.message));
+                      showErrorToast("Export failed: " + (err?.response?.data?.error || err.message));
                     } finally {
                       setExporting(false);
                     }
@@ -563,7 +564,7 @@ const ReportGenerationPage: React.FC = () => {
                         window.URL.revokeObjectURL(url);
                       }
                     } catch (err: any) {
-                      alert("Export failed: " + (err?.response?.data?.error || err.message));
+                      showErrorToast("Export failed: " + (err?.response?.data?.error || err.message));
                     } finally {
                       setExportingOMR(false);
                     }

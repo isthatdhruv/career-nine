@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Modal, Button } from "react-bootstrap";
 import { GetDeletedInstitutes, RestoreInstitute } from "../API/College_APIs";
 import { MdRestorePage } from "react-icons/md";
+import { showErrorToast } from '../../../utils/toast';
 
 interface InstituteRecycleBinModalProps {
   show: boolean;
@@ -46,7 +47,7 @@ const InstituteRecycleBinModal = ({
       onRestoreComplete();
     } catch (error) {
       console.error("Error restoring institute:", error);
-      alert("Failed to restore institute. Please try again.");
+      showErrorToast("Failed to restore institute. Please try again.");
     } finally {
       setActionLoading(null);
     }

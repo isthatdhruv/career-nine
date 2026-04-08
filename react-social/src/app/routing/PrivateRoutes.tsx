@@ -47,12 +47,14 @@ import StudentsList from "../pages/StudentInformation/StudentsList";
 import GroupCreatePage from "../pages/dashboard/widgets/CreateNewGroup";
 import StudentCreatePage from "../pages/dashboard/widgets/CreateNewStudent";
 import GroupStudentPage from "../pages/GroupStudent/GroupStudentPage";
-import GroupStudentAdminPage from "../pages/GroupStudent/GroupStudentAdminPage";
+// GroupStudentAdminPage removed — consolidated into Data Download (/group-student)
 import GroupStudentSchoolPage from "../pages/GroupStudent/GroupStudentSchoolPage";
 import AssignedStudentsPage from "../pages/GroupStudent/AssignedStudentsPage";
 import ReportGenerationPage from "../pages/ReportGeneration/ReportGenerationPage";
 import BetReportGenerationPage from "../pages/ReportGeneration/BetReportGenerationPage";
 import NavigatorReportGenerationPage from "../pages/NavigatorReportGeneration/NavigatorReportGenerationPage";
+import UnifiedReportManagementPage from "../pages/UnifiedReportManagement/UnifiedReportManagementPage";
+import SendReportsPage from "../pages/SendReports/SendReportsPage";
 import GamePage from "../pages/Games/GamePage";
 import DemographicFieldsPage from "../pages/DemographicFields/DemographicFieldsPage";
 import DemographicFieldCreatePage from "../pages/DemographicFields/components/DemographicFieldCreatePage";
@@ -67,6 +69,7 @@ import ReportsPage from "../pages/Reports/ReportsPage";
 import StudentDashboard from "../pages/StudentDashboard/StudentDashboard";
 import ClassTeacherDashboard from "../pages/ClassTeacherDashboard/ClassTeacherDashboard";
 import { Error401 } from "../modules/errors/components/Error401";
+import CareerSuggestionPage from "../pages/CareerSuggestion/CareerSuggestionPage";
 
 // Paths that every logged-in user can access without role check
 const ALWAYS_ALLOWED = [
@@ -215,6 +218,11 @@ const PrivateRoutes = () => {
   const UniversityResultDashboard = lazy(
     () => import("../pages/UniversityResult/UniversityResultDashboard")
   );
+  const CounsellorDashboardPage = lazy(() => import("../pages/Counselling/counsellor/CounsellorDashboardPage"));
+  const AvailabilityManagerPage = lazy(() => import("../pages/Counselling/counsellor/AvailabilityManagerPage"));
+  const SessionNotesPage = lazy(() => import("../pages/Counselling/counsellor/SessionNotesPage"));
+  const AdminCounsellingQueuePage = lazy(() => import("../pages/Counselling/admin/AdminCounsellingQueuePage"));
+  const CounsellorManagementPage = lazy(() => import("../pages/Counselling/admin/CounsellorManagementPage"));
   // const UniversityAllResultDashboard = lazy(
   //   () => import("../pages/UniversityResult/UniversityAllResultDashboard")
   // );
@@ -320,12 +328,6 @@ const PrivateRoutes = () => {
           </SuspensedView>
         } />
 
-        <Route path="/admin/group-student" element={
-          <SuspensedView>
-            <GroupStudentAdminPage />
-          </SuspensedView>
-        } />
-
         <Route path="/school/group-student" element={
           <SuspensedView>
             <GroupStudentSchoolPage />
@@ -341,6 +343,12 @@ const PrivateRoutes = () => {
         <Route path="/report-generation" element={
           <SuspensedView>
             <ReportGenerationPage />
+          </SuspensedView>
+        } />
+
+        <Route path="/career-suggestion" element={
+          <SuspensedView>
+            <CareerSuggestionPage />
           </SuspensedView>
         } />
 
@@ -965,6 +973,22 @@ const PrivateRoutes = () => {
           }
         />
         <Route
+          path="/unified-report-management"
+          element={
+            <SuspensedView>
+              <UnifiedReportManagementPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/send-reports"
+          element={
+            <SuspensedView>
+              <SendReportsPage />
+            </SuspensedView>
+          }
+        />
+        <Route
           path="/activity-log"
           element={
             <SuspensedView>
@@ -1005,6 +1029,47 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <ScoreDebugPage />
+            </SuspensedView>
+          }
+        />
+
+        <Route
+          path="/counsellor/dashboard"
+          element={
+            <SuspensedView>
+              <CounsellorDashboardPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/counsellor/availability"
+          element={
+            <SuspensedView>
+              <AvailabilityManagerPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/counsellor/session-notes/:id"
+          element={
+            <SuspensedView>
+              <SessionNotesPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/admin/counselling-queue"
+          element={
+            <SuspensedView>
+              <AdminCounsellingQueuePage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/admin/counsellors"
+          element={
+            <SuspensedView>
+              <CounsellorManagementPage />
             </SuspensedView>
           }
         />

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { showErrorToast } from '../../utils/toast';
 import {
   getMappingInfoByToken,
   registerStudentByToken,
@@ -59,21 +60,21 @@ const AssessmentRegisterPage = () => {
     e.preventDefault();
 
     if (!name.trim() || !email.trim() || !dob.trim()) {
-      alert("Please fill in all required fields (Name, Email, Date of Birth).");
+      showErrorToast("Please fill in all required fields (Name, Email, Date of Birth).");
       return;
     }
 
     // Validate DOB format
     const dobRegex = /^\d{2}-\d{2}-\d{4}$/;
     if (!dobRegex.test(dob)) {
-      alert("Date of Birth must be in dd-mm-yyyy format.");
+      showErrorToast("Date of Birth must be in dd-mm-yyyy format.");
       return;
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      alert("Please enter a valid email address.");
+      showErrorToast("Please enter a valid email address.");
       return;
     }
 
@@ -101,7 +102,7 @@ const AssessmentRegisterPage = () => {
         err.response?.data?.message ||
         err.response?.data ||
         "Registration failed. Please try again.";
-      alert(typeof msg === "string" ? msg : "Registration failed.");
+      showErrorToast(typeof msg === "string" ? msg : "Registration failed.");
     } finally {
       setSubmitting(false);
     }

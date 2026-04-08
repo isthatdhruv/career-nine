@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { useFormik } from "formik";
 import { useEffect, useRef, useState } from "react";
+import { showErrorToast } from '../../../utils/toast';
 import { Dropdown } from "react-bootstrap";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import UseAnimations from "react-useanimations";
@@ -76,7 +77,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
       setQuestionMediaBase64(result.base64);
     } catch (error) {
       console.error("Error converting image to WebP:", error);
-      alert("Failed to process image. Please try a different file.");
+      showErrorToast("Failed to process image. Please try a different file.");
     } finally {
       setQuestionMediaProcessing(false);
     }
@@ -96,7 +97,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
       setQuestionVideoThumbnail(thumbnail);
     } catch (error) {
       console.error("Error compressing video:", error);
-      alert("Failed to compress video. Please try a different file.");
+      showErrorToast("Failed to compress video. Please try a different file.");
     } finally {
       setQuestionMediaProcessing(false);
       setVideoCompressProgress(0);
@@ -499,7 +500,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
               questionImageUrl = uploadResult.url;
             } catch (uploadErr) {
               console.error("Media upload failed:", uploadErr);
-              alert("Image upload failed. Question will be saved without the image.");
+              showErrorToast("Image upload failed. Question will be saved without the image.");
             }
           } else {
             questionImageUrl = questionMediaBase64;
@@ -511,7 +512,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
               questionVideoUrl = uploadResult.url;
             } catch (uploadErr) {
               console.error("Media upload failed:", uploadErr);
-              alert("Video upload failed. Question will be saved without the video.");
+              showErrorToast("Video upload failed. Question will be saved without the video.");
             }
           } else {
             questionVideoUrl = questionMediaBase64;
@@ -553,9 +554,9 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
           console.error("Error data:", (error as any).response?.data);
 
           const errorMessage = (error as any).response?.data?.message || (error as any).message || "Unknown error occurred";
-          alert(`Failed to update question: ${errorMessage}`);
+          showErrorToast(`Failed to update question: ${errorMessage}`);
         } else {
-          alert("Failed to update question: Unknown error occurred");
+          showErrorToast("Failed to update question: Unknown error occurred");
         }
       } finally {
         setLoading(false);
@@ -594,7 +595,7 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
         [currentOptions.length]: {},
       }));
     } else {
-      alert("Please fill the current option before adding a new one.");
+      showErrorToast("Please fill the current option before adding a new one.");
     }
   };
 

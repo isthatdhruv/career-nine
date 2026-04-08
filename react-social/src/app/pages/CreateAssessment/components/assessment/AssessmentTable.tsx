@@ -1,11 +1,7 @@
 import { useState } from "react";
+import { showErrorToast } from '../../../../utils/toast';
 import { MDBDataTableV5 } from "mdbreact";
-import { AiFillEdit } from "react-icons/ai";
-import { FaLock, FaLockOpen, FaFileDownload, FaRecycle ,FaFilePdf } from "react-icons/fa";
-// import { FaLock, FaLockOpen, FaFileDownload, FaFilePdf } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
-import UseAnimations from "react-useanimations";
-import trash from "react-useanimations/lib/trash";
 import { SoftDeleteAssessment, LockAssessment, UnlockAssessment } from "../../API/Create_Assessment_APIs";
 import { generateOMRSheet } from "../../utils/generateOMRSheet";
 import AssessmentRecycleBinModal from "./AssessmentRecycleBinModal";
@@ -21,6 +17,7 @@ const AssessmentTable = (props: {
   const [showRecycleBin, setShowRecycleBin] = useState(false);
   const [omrLoading, setOmrLoading] = useState<number | null>(null);
   const [pdfLoading, setPdfLoading] = useState<number | null>(null);
+  const [searchText, setSearchText] = useState("");
 
   const handleDownloadQuestionnaire = async (data: any) => {
     const id = data.id || data.assessmentId;
@@ -30,7 +27,7 @@ const AssessmentTable = (props: {
       await generateQuestionnairePDF(id, name);
     } catch (error) {
       console.error("Questionnaire PDF generation failed:", error);
-      alert("Failed to generate questionnaire PDF. Please try again.");
+      showErrorToast("Failed to generate questionnaire PDF. Please try again.");
     } finally {
       setPdfLoading(null);
     }
@@ -44,7 +41,7 @@ const AssessmentTable = (props: {
       await generateOMRSheet(id, name);
     } catch (error) {
       console.error("OMR generation failed:", error);
-      alert("Failed to generate OMR sheet. Please try again.");
+      showErrorToast("Failed to generate OMR sheet. Please try again.");
     } finally {
       setOmrLoading(null);
     }
@@ -69,136 +66,158 @@ const AssessmentTable = (props: {
       props.setPageLoading(["true"]);
     } catch (error) {
       console.error("Lock/unlock failed:", error);
-      alert("Failed to update lock status. Please try again.");
+      showErrorToast("Failed to update lock status. Please try again.");
     } finally {
       props.setLoading(false);
     }
   };
 
+  const filteredData = props.data.filter((item: any) => {
+    if (!searchText.trim()) return true;
+    const q = searchText.trim().toLowerCase();
+    return (item.AssessmentName || item.assessmentName || "").toLowerCase().includes(q);
+  });
+
   const datatable = {
     columns: [
-      {
-        label: "Assessment Name",
-        field: "assessmentName",
-        width: 300,
-        attributes: {
-          "aria-controls": "DataTable",
-          "aria-label": "Assessment Name",
-        },
-      },
-      {
-        label: "Start Date",
-        field: "startDate",
-        sort: "asc",
-        width: 150,
-      },
-      {
-        label: "Actions",
-        field: "actions",
-        sort: "disabled",
-        width: 250,
-      },
+      { label: "#", field: "serialNo", width: 50, sort: "disabled" },
+      { label: "Assessment Name", field: "assessmentName", width: 300, sort: "asc" },
+      { label: "Start Date", field: "startDate", width: 120 },
+      { label: "Status", field: "lockStatus", width: 80, sort: "disabled" },
+      { label: "Actions", field: "actions", sort: "disabled", width: 200 },
     ],
 
-    rows: props.data.map((data: any) => ({
-      assessmentName: data.AssessmentName || data.assessmentName || "N/A",
-      startDate: data.starDate || data.startDate || "N/A",
-      actions: (
-        <>
-          <button
-            onClick={() => {
-              if (data.isLocked) {
-                setShowLockedModal(true);
-                return;
-              }
-              navigate(`/assessments/edit/${data.id || data.assessmentId}`, {
-                state: { data },
-              });
-            }}
-            className="btn btn-icon btn-primary btn-sm me-3"
-          >
-            <AiFillEdit size={16} />
-          </button>
-          <button
-            onClick={() => handleToggleLock(data)}
-            className={`btn btn-icon btn-sm me-3 ${data.isLocked ? "btn-warning" : "btn-secondary"}`}
-            title={data.isLocked ? "Unlock Assessment" : "Lock Assessment"}
-          >
-            {data.isLocked ? <FaLock size={14} /> : <FaLockOpen size={14} />}
-          </button>
-          <button
-            onClick={async () => {
-              if (data.isLocked) {
-                setShowLockedModal(true);
-                return;
-              }
-              if (!window.confirm(`Are you sure you want to delete "${data.AssessmentName || data.assessmentName}"? It will be moved to the recycle bin.`)) return;
-              props.setLoading(true);
-              try {
-                await SoftDeleteAssessment(data.id || data.assessmentId);
-                props.setPageLoading(["true"]);
-              } catch (error) {
-                console.error("Delete failed:", error);
-                alert("Failed to delete assessment. Please try again.");
-              } finally {
-                props.setLoading(false);
-              }
-            }}
-            className="btn btn-icon btn-danger btn-sm me-3"
-          >
-            <UseAnimations
-              animation={trash}
-              size={22}
-              strokeColor={"#EFF8FE"}
-            />
-          </button>
-          <button
-            onClick={() => handleDownloadQuestionnaire(data)}
-            className="btn btn-icon btn-success btn-sm me-3"
-            title="Download Questionnaire PDF"
-            disabled={pdfLoading === (data.id || data.assessmentId)}
-          >
-            {pdfLoading === (data.id || data.assessmentId) ? (
-              <span className="spinner-border spinner-border-sm" />
-            ) : (
-              <FaFilePdf size={14} />
-            )}
-          </button>
-          <button
-            onClick={() => handleDownloadOMR(data)}
-            className="btn btn-icon btn-info btn-sm"
-            title="Download OMR Sheet"
-            disabled={omrLoading === (data.id || data.assessmentId)}
-          >
-            {omrLoading === (data.id || data.assessmentId) ? (
-              <span className="spinner-border spinner-border-sm" />
-            ) : (
-              <FaFileDownload size={14} />
-            )}
-          </button>
-        </>
-      ),
-    })),
+    rows: filteredData.map((data: any, index: number) => {
+      const id = data.id || data.assessmentId;
+      return {
+        serialNo: <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>{index + 1}</span>,
+        assessmentName: (
+          <span style={{ fontSize: "0.88rem", color: "#1f2937", fontWeight: 600 }}>
+            {data.AssessmentName || data.assessmentName || "N/A"}
+          </span>
+        ),
+        startDate: (
+          <span style={{ fontSize: "0.82rem", color: "#6b7280" }}>
+            {data.starDate || data.startDate || "N/A"}
+          </span>
+        ),
+        lockStatus: data.isLocked ? (
+          <span style={{ fontSize: "0.75rem", fontWeight: 600, padding: "3px 8px", borderRadius: "6px", background: "rgba(245, 158, 11, 0.1)", color: "#d97706" }}>
+            <i className="bi bi-lock-fill me-1"></i>Locked
+          </span>
+        ) : (
+          <span style={{ fontSize: "0.75rem", fontWeight: 600, padding: "3px 8px", borderRadius: "6px", background: "rgba(16, 185, 129, 0.1)", color: "#059669" }}>
+            <i className="bi bi-unlock-fill me-1"></i>Open
+          </span>
+        ),
+        actions: (
+          <div className="d-flex gap-1">
+            <button
+              onClick={() => {
+                if (data.isLocked) { setShowLockedModal(true); return; }
+                navigate(`/assessments/edit/${id}`, { state: { data } });
+              }}
+              className="btn btn-sm" title="Edit"
+              style={{ width: "30px", height: "30px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(67, 97, 238, 0.1)", color: "#4361ee", border: "1px solid rgba(67, 97, 238, 0.2)", borderRadius: "6px" }}
+            >
+              <i className="bi bi-pencil-fill" style={{ fontSize: "0.75rem" }}></i>
+            </button>
+            <button
+              onClick={() => handleToggleLock(data)}
+              className="btn btn-sm" title={data.isLocked ? "Unlock" : "Lock"}
+              style={{ width: "30px", height: "30px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: data.isLocked ? "rgba(245, 158, 11, 0.1)" : "rgba(100, 116, 139, 0.1)", color: data.isLocked ? "#d97706" : "#64748b", border: `1px solid ${data.isLocked ? "rgba(245, 158, 11, 0.2)" : "rgba(100, 116, 139, 0.2)"}`, borderRadius: "6px" }}
+            >
+              <i className={`bi ${data.isLocked ? "bi-lock-fill" : "bi-unlock-fill"}`} style={{ fontSize: "0.75rem" }}></i>
+            </button>
+            <button
+              onClick={async () => {
+                if (data.isLocked) { setShowLockedModal(true); return; }
+                if (!window.confirm(`Delete "${data.AssessmentName || data.assessmentName}"? It will be moved to recycle bin.`)) return;
+                props.setLoading(true);
+                try {
+                  await SoftDeleteAssessment(id);
+                  props.setPageLoading(["true"]);
+                } catch (error) {
+                  console.error("Delete failed:", error);
+                  showErrorToast("Failed to delete assessment.");
+                } finally {
+                  props.setLoading(false);
+                }
+              }}
+              className="btn btn-sm" title="Delete"
+              style={{ width: "30px", height: "30px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(220, 38, 38, 0.1)", color: "#dc2626", border: "1px solid rgba(220, 38, 38, 0.2)", borderRadius: "6px" }}
+            >
+              <i className="bi bi-trash-fill" style={{ fontSize: "0.75rem" }}></i>
+            </button>
+            <button
+              onClick={() => handleDownloadQuestionnaire(data)}
+              className="btn btn-sm" title="Download Questionnaire PDF"
+              disabled={pdfLoading === id}
+              style={{ width: "30px", height: "30px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(16, 185, 129, 0.1)", color: "#059669", border: "1px solid rgba(16, 185, 129, 0.2)", borderRadius: "6px" }}
+            >
+              {pdfLoading === id ? <span className="spinner-border spinner-border-sm" style={{ width: "12px", height: "12px" }} /> : <i className="bi bi-file-earmark-pdf-fill" style={{ fontSize: "0.75rem" }}></i>}
+            </button>
+            <button
+              onClick={() => handleDownloadOMR(data)}
+              className="btn btn-sm" title="Download OMR Sheet"
+              disabled={omrLoading === id}
+              style={{ width: "30px", height: "30px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(8, 145, 178, 0.1)", color: "#0891b2", border: "1px solid rgba(8, 145, 178, 0.2)", borderRadius: "6px" }}
+            >
+              {omrLoading === id ? <span className="spinner-border spinner-border-sm" style={{ width: "12px", height: "12px" }} /> : <i className="bi bi-file-earmark-arrow-down-fill" style={{ fontSize: "0.75rem" }}></i>}
+            </button>
+          </div>
+        ),
+      };
+    }),
   };
 
   return (
     <>
-      <div className="d-flex justify-content-end mb-3">
-        <button
-          className="btn btn-danger btn-sm"
-          onClick={() => setShowRecycleBin(true)}
-        >
-          <FaRecycle size={16} className="me-2" /> Recycle Bin
-        </button>
+      {/* Toolbar */}
+      <div className="d-flex align-items-center gap-2 mb-3 flex-wrap">
+        <div className="position-relative" style={{ flex: "1 0 200px", maxWidth: "320px" }}>
+          <i className="bi bi-search position-absolute" style={{ left: 12, top: "50%", transform: "translateY(-50%)", color: "#9ca3af" }}></i>
+          <input
+            type="search"
+            className="form-control form-control-sm"
+            placeholder="Search assessments..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            style={{ paddingLeft: 36, borderRadius: "8px", border: "1.5px solid #e0e0e0", fontSize: "0.85rem" }}
+          />
+        </div>
+        <span style={{ fontSize: "0.78rem", color: "#9ca3af" }}>
+          {filteredData.length} of {props.data.length} assessments
+        </span>
+        <div className="ms-auto">
+          <button
+            className="btn btn-sm d-flex align-items-center gap-1"
+            onClick={() => setShowRecycleBin(true)}
+            style={{
+              background: "rgba(220, 38, 38, 0.1)",
+              color: "#dc2626",
+              border: "1px solid rgba(220, 38, 38, 0.2)",
+              borderRadius: "8px",
+              padding: "5px 10px",
+              fontWeight: 600,
+              fontSize: "0.78rem",
+            }}
+          >
+            <i className="bi bi-recycle"></i>
+            Recycle Bin
+          </button>
+        </div>
       </div>
 
       <MDBDataTableV5
         hover
         scrollY
         maxHeight="160vh"
-        entriesOptions={[5, 20, 25]}
+        entriesOptions={[10, 25, 50]}
         entries={25}
         pagesAmount={4}
+        searchTop={false}
+        searchBottom={false}
         data={datatable}
       />
 
@@ -208,22 +227,21 @@ const AssessmentTable = (props: {
         onRestoreComplete={() => props.setPageLoading(["true"])}
       />
 
-      {/* Locked Assessment Modal */}
       {showLockedModal && (
         <div className="modal fade show d-block" tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
           <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Assessment Locked</h5>
+            <div className="modal-content" style={{ borderRadius: "12px" }}>
+              <div className="modal-header" style={{ borderBottom: "1px solid #f3f4f6" }}>
+                <h6 className="modal-title fw-bold">
+                  <i className="bi bi-lock-fill text-warning me-2"></i>Assessment Locked
+                </h6>
                 <button type="button" className="btn-close" onClick={() => setShowLockedModal(false)}></button>
               </div>
               <div className="modal-body">
-                <p>This assessment is locked and cannot be edited as there is an active assessment going on.</p>
+                <p className="mb-0 text-muted">This assessment is locked and cannot be edited as there is an active assessment going on.</p>
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowLockedModal(false)}>
-                  Close
-                </button>
+              <div className="modal-footer" style={{ borderTop: "1px solid #f3f4f6" }}>
+                <button type="button" className="btn btn-sm btn-secondary" onClick={() => setShowLockedModal(false)} style={{ borderRadius: "6px" }}>Close</button>
               </div>
             </div>
           </div>

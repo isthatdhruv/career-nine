@@ -1,0 +1,403 @@
+/* ── Student Portal Dashboard ── */
+:root {
+  --sp-primary: #263B6A;
+  --sp-primary-dark: #1C2D52;
+  --sp-primary-light: #EEFABD;
+  --sp-secondary: #6984A9;
+  --sp-green: #A0D585;
+  --sp-cream: #EEFABD;
+  --sp-success: #A0D585;
+  --sp-accent: #6984A9;
+  --sp-danger: #EF4444;
+  --sp-info: #6984A9;
+  --sp-bg: #F5F7FA;
+  --sp-card: #fff;
+  --sp-text: #1A1F2E;
+  --sp-muted: #6B7A8D;
+  --sp-border: #DDE3EC;
+  --sp-radius: 12px;
+}
+
+.sp-wrapper {
+  min-height: 100vh;
+  background: var(--sp-bg);
+}
+
+/* ── Loading Screen ── */
+.sp-loading {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--sp-bg);
+  z-index: 1000;
+}
+
+.sp-loading img {
+  height: 40px;
+  margin-bottom: 20px;
+}
+
+.sp-loading-text {
+  color: var(--sp-muted);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+/* ── Profile Header ── */
+.sp-profile-header {
+  background: linear-gradient(135deg, #1C2D52, #263B6A, #354D7A);
+  border-radius: var(--sp-radius);
+  padding: 20px 24px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  position: relative;
+}
+
+.sp-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.sp-profile-info {
+  flex: 1;
+}
+
+.sp-profile-name {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.sp-profile-meta {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.sp-trait-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.sp-trait-tag {
+  background: rgba(255, 255, 255, 0.15);
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.sp-cci-badge {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  text-align: right;
+}
+
+.sp-cci-label {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-bottom: 4px;
+}
+
+.sp-cci-value {
+  font-size: 18px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.sp-cci-high { color: #A0D585; }
+.sp-cci-medium { color: #EEFABD; }
+.sp-cci-low { color: #FCA5A5; }
+
+/* ── Cards ── */
+.sp-card {
+  background: var(--sp-card);
+  border: 1px solid var(--sp-border);
+  border-radius: var(--sp-radius);
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  height: 100%;
+}
+
+.sp-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--sp-muted);
+  margin-bottom: 16px;
+}
+
+/* ── Pillar Bars ── */
+.sp-pillar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.sp-pillar-label {
+  width: 120px;
+  font-size: 12px;
+  color: var(--sp-muted);
+  flex-shrink: 0;
+}
+
+.sp-pillar-bar-wrap {
+  flex: 1;
+  height: 8px;
+  background: var(--sp-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.sp-pillar-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--sp-primary);
+  transition: width 0.6s ease;
+}
+
+.sp-pillar-value {
+  width: 40px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sp-primary);
+}
+
+/* ── Career Match Cards ── */
+.sp-career-card {
+  border: 1px solid var(--sp-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  transition: all 0.15s;
+}
+
+.sp-career-card:hover {
+  border-color: var(--sp-secondary);
+  box-shadow: 0 2px 12px rgba(38, 59, 106, 0.1);
+}
+
+.sp-career-rank {
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.sp-career-rank-best { color: #263B6A; }
+.sp-career-rank-strong { color: #6984A9; }
+.sp-career-rank-good { color: #A0D585; }
+
+.sp-career-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--sp-text);
+  margin-bottom: 4px;
+}
+
+.sp-career-traits {
+  font-size: 11px;
+  color: var(--sp-muted);
+  margin-bottom: 8px;
+}
+
+.sp-career-tags {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.sp-career-tag {
+  background: rgba(105, 132, 169, 0.12);
+  color: var(--sp-primary);
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* ── Library Card ── */
+.sp-library-card {
+  text-align: center;
+}
+
+.sp-qr-placeholder {
+  width: 100px;
+  height: 100px;
+  background: #f0f0f0;
+  border-radius: 8px;
+  margin: 0 auto 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--sp-border);
+}
+
+.sp-library-desc {
+  font-size: 12px;
+  color: var(--sp-muted);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+/* ── Counselling Card ── */
+.sp-counselling-msg {
+  font-size: 12px;
+  color: var(--sp-text);
+  line-height: 1.6;
+  margin-bottom: 14px;
+}
+
+.sp-slot-list {
+  border: 1px solid var(--sp-border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.sp-slot-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--sp-border);
+}
+
+.sp-slot-item:last-child {
+  border-bottom: none;
+}
+
+.sp-slot-time {
+  font-weight: 600;
+  color: var(--sp-text);
+}
+
+/* ── Reports Card ── */
+.sp-report-item {
+  margin-bottom: 14px;
+}
+
+.sp-report-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sp-text);
+  margin-bottom: 2px;
+}
+
+.sp-report-desc {
+  font-size: 11px;
+  color: var(--sp-muted);
+  margin-bottom: 8px;
+}
+
+.sp-report-btn {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.sp-report-btn-primary {
+  background: var(--sp-primary);
+  color: #fff;
+}
+
+.sp-report-btn-primary:hover {
+  background: var(--sp-primary-dark);
+}
+
+.sp-report-btn-outline {
+  background: rgba(105, 132, 169, 0.1);
+  color: var(--sp-primary);
+  border: 1px solid var(--sp-border);
+}
+
+.sp-report-btn-outline:hover {
+  background: rgba(105, 132, 169, 0.2);
+}
+
+.sp-report-btn-share {
+  background: var(--sp-secondary);
+  color: #fff;
+}
+
+.sp-report-btn-share:hover {
+  background: #5A7594;
+}
+
+/* ── Insight Box ── */
+.sp-insight {
+  background: rgba(238, 250, 189, 0.35);
+  border: 1px solid rgba(238, 250, 189, 0.7);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 12px;
+  color: var(--sp-primary);
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  line-height: 1.5;
+}
+
+/* ── Dashboard Grid ── */
+.sp-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.sp-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 768px) {
+  .sp-grid-2, .sp-grid-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .sp-profile-header {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .sp-cci-badge {
+    position: static;
+    text-align: center;
+  }
+
+  .sp-trait-tags {
+    justify-content: center;
+  }
+}

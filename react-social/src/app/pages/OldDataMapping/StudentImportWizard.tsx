@@ -17,20 +17,10 @@ const STEPS = [
 
 // ── Done Screen with clickable detail cards ──────────────────────────────
 const DoneScreen = ({ importResults, studentAssignments, onBack }: { importResults: any; studentAssignments: StudentAssignment[]; onBack: () => void }) => {
-  const [activePanel, setActivePanel] = useState<"students" | "extra" | "skipped" | null>(null);
+  const [activePanel, setActivePanel] = useState<"students" | "skipped" | null>(null);
 
   const studentsCreated = importResults?.studentsCreated || 0;
-  const extraDataImported = importResults?.extraDataImported || 0;
   const studentsSkipped = importResults?.studentsSkipped || 0;
-
-  // Build details from studentAssignments
-  const extraDetails: { name: string; type: string; value: string }[] = [];
-
-  studentAssignments.forEach((sa) => {
-    (sa.careerAspirations || []).forEach((v) => extraDetails.push({ name: sa.name, type: "Career Aspiration", value: v }));
-    (sa.subjectsOfInterest || []).forEach((v) => extraDetails.push({ name: sa.name, type: "Subject of Interest", value: v }));
-    (sa.values || []).forEach((v) => extraDetails.push({ name: sa.name, type: "Value", value: v }));
-  });
 
   return (
     <div className="py-6">
@@ -50,16 +40,6 @@ const DoneScreen = ({ importResults, studentAssignments, onBack }: { importResul
           >
             <div className="fs-2x fw-bold text-success">{studentsCreated}</div>
             <div className="fs-7 text-muted">Students Created</div>
-          </div>
-        </div>
-        <div className="col-auto">
-          <div
-            className={`rounded p-4 text-center border-2 ${activePanel === "extra" ? "border border-info" : ""}`}
-            style={{ minWidth: 140, cursor: "pointer", backgroundColor: activePanel === "extra" ? "#e8f7ff" : "#f1faff" }}
-            onClick={() => setActivePanel(activePanel === "extra" ? null : "extra")}
-          >
-            <div className="fs-2x fw-bold text-info">{extraDataImported}</div>
-            <div className="fs-7 text-muted">Extra Data Items</div>
           </div>
         </div>
         {studentsSkipped > 0 && (
@@ -118,53 +98,6 @@ const DoneScreen = ({ importResults, studentAssignments, onBack }: { importResul
         </div>
       )}
 
-
-      {/* Extra data detail */}
-      {activePanel === "extra" && (
-        <div className="card border border-info mb-4">
-          <div className="card-header bg-light-info py-3">
-            <h6 className="fw-bold mb-0">
-              <i className="bi bi-collection me-2"></i>
-              Extra Data Items ({extraDetails.length})
-            </h6>
-          </div>
-          <div className="card-body p-0">
-            <div style={{ maxHeight: 350, overflowY: "auto" }}>
-              <table className="table table-row-bordered mb-0">
-                <thead className="bg-light">
-                  <tr className="fw-semibold text-muted fs-8">
-                    <th className="ps-4 py-2">#</th>
-                    <th className="py-2">Student</th>
-                    <th className="py-2">Type</th>
-                    <th className="py-2 pe-4">Value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {extraDetails.map((e, i) => (
-                    <tr key={i}>
-                      <td className="ps-4 py-2 fs-8 text-muted">{i + 1}</td>
-                      <td className="py-2 fs-7 fw-semibold">{e.name || "—"}</td>
-                      <td className="py-2">
-                        <span className={`badge fs-9 ${
-                          e.type === "Career Aspiration" ? "badge-light-warning" :
-                          e.type === "Subject of Interest" ? "badge-light-primary" :
-                          "badge-light-info"
-                        }`}>
-                          {e.type}
-                        </span>
-                      </td>
-                      <td className="py-2 pe-4 fs-8">{e.value}</td>
-                    </tr>
-                  ))}
-                  {extraDetails.length === 0 && (
-                    <tr><td colSpan={4} className="text-center text-muted py-4 fs-8">No extra data found in selected students</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Skipped detail */}
       {activePanel === "skipped" && (
@@ -321,7 +254,6 @@ const StudentImportWizard = ({ onBack }: Props) => {
               {currentStep === 1 && (
                 <StudentImportStep
                   studentAssignments={studentAssignments}
-                  scoreTypeMappings={[]}
                   onDone={handleImportDone}
                   onBack={() => setCurrentStep(0)}
                 />

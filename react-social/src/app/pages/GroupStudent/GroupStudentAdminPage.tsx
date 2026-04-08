@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import { ReadCollegeList, GetSessionsByInstituteCode } from "../College/API/College_APIs";
 import {
   getStudentsWithMappingByInstituteId,
@@ -308,14 +309,14 @@ export default function GroupStudentAdminPage() {
       }));
 
     if (assignments.length === 0) {
-      alert("No new assessments to save.");
+      showErrorToast("No new assessments to save.");
       return;
     }
 
     setSaving(true);
     try {
       await bulkAlotAssessment(assignments);
-      alert(`${assignments.length} assessment(s) saved successfully!`);
+      showSuccessToast(`${assignments.length} assessment(s) saved successfully!`);
       setHasChanges(false);
 
       // Refresh data
@@ -354,7 +355,7 @@ export default function GroupStudentAdminPage() {
       }
     } catch (error) {
       console.error("Error saving assessments:", error);
-      alert("Failed to save assessments. Please try again.");
+      showErrorToast("Failed to save assessments. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -420,14 +421,14 @@ export default function GroupStudentAdminPage() {
       // Download file
       XLSX.writeFile(workbook, filename);
 
-      alert(`Download successful for ${downloadStudent.name}!`);
+      showSuccessToast(`Download successful for ${downloadStudent.name}!`);
       setShowDownloadModal(false);
       setDownloadStudent(null);
       setDownloadAssessmentId(null);
       setDownloadAnswers([]);
     } catch (error) {
       console.error("Error downloading:", error);
-      alert("Failed to download. Please try again.");
+      showErrorToast("Failed to download. Please try again.");
     } finally {
       setDownloading(false);
     }
@@ -446,7 +447,7 @@ export default function GroupStudentAdminPage() {
     setResetting(true);
     try {
       await resetAssessment(resetStudent.userStudentId, resetAssessmentId);
-      alert("Assessment reset successfully!");
+      showSuccessToast("Assessment reset successfully!");
       setShowResetConfirm(false);
       setShowResetModal(false);
 
@@ -501,7 +502,7 @@ export default function GroupStudentAdminPage() {
       setResetAssessmentName("");
     } catch (error: any) {
       console.error("Error resetting assessment:", error);
-      alert(error.response?.data?.error || "Failed to reset assessment");
+      showErrorToast(error.response?.data?.error || "Failed to reset assessment");
     } finally {
       setResetting(false);
     }
@@ -677,7 +678,7 @@ export default function GroupStudentAdminPage() {
 
   const handleDownloadStudentList = () => {
     if (filteredStudents.length === 0) {
-      alert("No students to download.");
+      showErrorToast("No students to download.");
       return;
     }
 
@@ -739,10 +740,10 @@ export default function GroupStudentAdminPage() {
       // Download file
       XLSX.writeFile(workbook, filename);
 
-      alert(`Student list downloaded successfully!`);
+      showSuccessToast(`Student list downloaded successfully!`);
     } catch (error) {
       console.error("Error downloading student list:", error);
-      alert("Failed to download student list. Please try again.");
+      showErrorToast("Failed to download student list. Please try again.");
     }
   };
 
@@ -1009,12 +1010,12 @@ export default function GroupStudentAdminPage() {
       const filename = `${instituteName}_All_Answers_${Date.now()}.xlsx`;
       XLSX.writeFile(workbook, filename);
 
-      alert("Download successful!");
+      showSuccessToast("Download successful!");
       setShowBulkDownloadModal(false);
       setBulkDownloadAnswers([]);
     } catch (error) {
       console.error("Error downloading:", error);
-      alert("Failed to download. Please try again.");
+      showErrorToast("Failed to download. Please try again.");
     } finally {
       setBulkDownloading(false);
     }
@@ -1045,7 +1046,7 @@ export default function GroupStudentAdminPage() {
       }
 
       if (pairs.length === 0) {
-        alert("No student-assessment pairs to export.");
+        showErrorToast("No student-assessment pairs to export.");
         return;
       }
 
@@ -1077,7 +1078,7 @@ export default function GroupStudentAdminPage() {
           if (parsed.error) msg = parsed.error;
         } catch (_) {}
       }
-      alert(`Failed to download proctoring data: ${msg}`);
+      showErrorToast(`Failed to download proctoring data: ${msg}`);
     } finally {
       setProctoringDownloading(false);
     }
@@ -1991,106 +1992,116 @@ export default function GroupStudentAdminPage() {
                   </p>
                 </div>
               ) : (
-                <div className="table-responsive" style={{ overflowX: "auto" }}>
-                  <table className="table align-middle mb-0" style={{ minWidth: "1400px" }}>
+                <div className="table-responsive">
+                  <table className="table align-middle mb-0" style={{ width: "100%", tableLayout: "auto", fontSize: "0.85rem" }}>
                     <thead>
                       <tr style={{ background: "#f8f9fa" }}>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           User ID
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Username
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Roll Number
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Control Number
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Student Name
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Allotted Assessment
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Phone Number
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           DOB
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Assessments
                         </th>
                         <th
                           style={{
-                            padding: "16px 24px",
+                            padding: "10px 12px",
                             fontWeight: 600,
                             color: "#1a1a2e",
                             borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
                           }}
                         >
                           Actions
@@ -2108,7 +2119,7 @@ export default function GroupStudentAdminPage() {
                         >
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2117,10 +2128,10 @@ export default function GroupStudentAdminPage() {
                               style={{
                                 background: "rgba(67, 97, 238, 0.1)",
                                 color: "#4361ee",
-                                padding: "6px 12px",
-                                borderRadius: "8px",
+                                padding: "4px 8px",
+                                borderRadius: "6px",
                                 fontWeight: 600,
-                                fontSize: "0.85rem",
+                                fontSize: "0.8rem",
                               }}
                             >
                               #{student.userStudentId}
@@ -2128,7 +2139,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2141,7 +2152,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2151,7 +2162,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2161,7 +2172,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2174,7 +2185,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2185,11 +2196,12 @@ export default function GroupStudentAdminPage() {
                                 background: "rgba(67, 97, 238, 0.1)",
                                 color: "#4361ee",
                                 border: "1px solid rgba(67, 97, 238, 0.3)",
-                                padding: "6px 12px",
-                                borderRadius: "8px",
+                                padding: "4px 8px",
+                                borderRadius: "6px",
                                 fontWeight: 500,
-                                fontSize: "0.85rem",
+                                fontSize: "0.78rem",
                                 transition: "all 0.2s",
+                                whiteSpace: "nowrap",
                               }}
                             >
                               <i className="bi bi-list-ul"></i>
@@ -2198,7 +2210,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2223,7 +2235,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2248,7 +2260,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2262,8 +2274,8 @@ export default function GroupStudentAdminPage() {
                               }
                               style={{
                                 width: "100%",
-                                minWidth: "200px",
-                                padding: "10px 12px",
+                                minWidth: "150px",
+                                padding: "6px 8px",
                                 borderRadius: "8px",
                                 border: "2px solid #e0e0e0",
                                 background: student.selectedAssessment
@@ -2271,7 +2283,7 @@ export default function GroupStudentAdminPage() {
                                   : "#fff",
                                 cursor: "pointer",
                                 fontWeight: 500,
-                                fontSize: "0.9rem",
+                                fontSize: "0.8rem",
                               }}
                             >
                               <option value="">-- Select Assessment --</option>
@@ -2300,7 +2312,7 @@ export default function GroupStudentAdminPage() {
                           </td>
                           <td
                             style={{
-                              padding: "16px 24px",
+                              padding: "10px 12px",
                               borderBottom: "1px solid #f0f0f0",
                             }}
                           >
@@ -2311,12 +2323,13 @@ export default function GroupStudentAdminPage() {
                                 background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
                                 color: "#fff",
                                 border: "none",
-                                padding: "8px 16px",
-                                borderRadius: "8px",
+                                padding: "5px 10px",
+                                borderRadius: "6px",
                                 fontWeight: 600,
-                                fontSize: "0.85rem",
+                                fontSize: "0.78rem",
                                 transition: "all 0.2s",
                                 boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
+                                whiteSpace: "nowrap",
                               }}
                             >
                               <i className="bi bi-speedometer2"></i>
@@ -2652,6 +2665,7 @@ export default function GroupStudentAdminPage() {
                           Reset
                         </button>
                         {assessment.status === "completed" && (
+                          <>
                           <button
                             className="btn btn-outline-success btn-sm d-flex align-items-center gap-1"
                             disabled={reportGeneratingFor === assessment.assessmentId}
@@ -2660,7 +2674,8 @@ export default function GroupStudentAdminPage() {
                               setReportGeneratingFor(assessment.assessmentId);
                               try {
                                 const fullAssessment = assessments.find((a: any) => a.id === assessment.assessmentId) as any;
-                                const isBet = fullAssessment?.questionnaire?.type === true;
+                                const isBet = fullAssessment?.questionnaire?.type === true
+                                  || (fullAssessment?.questionnaire?.type == null && (assessment.assessmentName || '').toUpperCase().includes('BET'));
                                 const res = isBet
                                   ? await generateBetReportOneClick(assessment.assessmentId, modalStudent.userStudentId)
                                   : await generateNavigatorReportOneClick(assessment.assessmentId, modalStudent.userStudentId);
@@ -2669,7 +2684,7 @@ export default function GroupStudentAdminPage() {
                                   window.open(reportUrl, "_blank");
                                 }
                               } catch (err: any) {
-                                alert("Report generation failed: " + (err?.response?.data?.error || err.message));
+                                showErrorToast("Report generation failed: " + (err?.response?.data?.error || err.message));
                               } finally {
                                 setReportGeneratingFor(null);
                               }
@@ -2685,6 +2700,42 @@ export default function GroupStudentAdminPage() {
                             <i className={reportGeneratingFor === assessment.assessmentId ? "bi bi-hourglass-split" : "bi bi-file-earmark-arrow-down"}></i>
                             {reportGeneratingFor === assessment.assessmentId ? "Generating..." : "Report"}
                           </button>
+                          <button
+                            className="btn btn-outline-warning btn-sm d-flex align-items-center gap-1"
+                            disabled={reportGeneratingFor === assessment.assessmentId}
+                            title="Force regenerate report from latest data"
+                            onClick={async () => {
+                              if (!modalStudent) return;
+                              setReportGeneratingFor(assessment.assessmentId);
+                              try {
+                                const fullAssessment = assessments.find((a: any) => a.id === assessment.assessmentId) as any;
+                                const isBet = fullAssessment?.questionnaire?.type === true
+                                  || (fullAssessment?.questionnaire?.type == null && (assessment.assessmentName || '').toUpperCase().includes('BET'));
+                                const res = isBet
+                                  ? await generateBetReportOneClick(assessment.assessmentId, modalStudent.userStudentId, true)
+                                  : await generateNavigatorReportOneClick(assessment.assessmentId, modalStudent.userStudentId, true);
+                                const reportUrl = res.data.reportUrl;
+                                if (reportUrl) {
+                                  window.open(reportUrl, "_blank");
+                                }
+                              } catch (err: any) {
+                                showErrorToast("Report generation failed: " + (err?.response?.data?.error || err.message));
+                              } finally {
+                                setReportGeneratingFor(null);
+                              }
+                            }}
+                            style={{
+                              borderRadius: "8px",
+                              padding: "6px 12px",
+                              fontWeight: 500,
+                              fontSize: "0.8rem",
+                              transition: "all 0.2s",
+                            }}
+                          >
+                            <i className="bi bi-arrow-clockwise"></i>
+                            {reportGeneratingFor === assessment.assessmentId ? "" : "Regenerate"}
+                          </button>
+                          </>
                         )}
                       </div>
                     </div>

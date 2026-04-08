@@ -218,14 +218,14 @@ coverage/
 **/.project
 **/.classpath
 **/.settings/
-
+application.yml
 # Webpack and bundler cache
 **/.cache/
 **/webpack-stats.json
-
+**/**/**/application.yml
 # TypeScript
 **/*.tsbuildinfo
-
+spring-social/src/main/resources/application.yml
 # ESLint cache
 **/.eslintcache
 

@@ -1,6 +1,7 @@
 import { FC, useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { useNavigate, useParams } from "react-router-dom";
+import { showErrorToast } from '../../utils/toast';
 import Chart from "react-apexcharts";
 import { ApexOptions } from "apexcharts";
 import { PageTitle } from "../../../_metronic/layout/core";
@@ -1200,7 +1201,7 @@ const DashboardAdminContent: FC<DashboardAdminContentProps> = ({ students, isLoa
     const instituteId = localStorage.getItem('instituteId');
 
     if (!instituteId) {
-      alert('Institute ID not found. Please reload the page.');
+      showErrorToast('Institute ID not found. Please reload the page.');
       return;
     }
 

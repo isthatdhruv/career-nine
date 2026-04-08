@@ -1,13 +1,18 @@
 package com.kccitm.api.controller.career9;
 
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Font;
@@ -32,6 +37,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.kccitm.api.model.career9.NavigatorReportData;
 import com.kccitm.api.repository.Career9.NavigatorReportDataRepository;
 import com.kccitm.api.service.DigitalOceanSpacesService;
+import com.kccitm.api.service.Navigator.CoreTechnicalNavigatorDataService;
 import com.kccitm.api.service.Navigator.NavigatorReportGenerationService;
 
 @RestController
@@ -40,7 +46,52 @@ public class NavigatorReportDataController {
 
     @Autowired private NavigatorReportDataRepository navigatorReportDataRepository;
     @Autowired private NavigatorReportGenerationService navigatorReportGenerationService;
+    @Autowired private CoreTechnicalNavigatorDataService coreTechnicalNavigatorDataService;
     @Autowired private DigitalOceanSpacesService digitalOceanSpacesService;
+    @Autowired private com.kccitm.api.repository.Career9.GeneratedReportRepository generatedReportRepository;
+    @Autowired private com.kccitm.api.repository.Career9.UserStudentRepository userStudentRepository;
+
+    // ═══════════════════════ GENERATE & EXPORT EXCEL (Phases 0,1,2,3,5) ═══════════════════════
+
+    /**
+     * POST /navigator-report-data/generate-export
+     * Body: { "assessmentId": 18, "userStudentIds": [1, 2, 3] }
+     *
+     * Runs pipeline phases 0,1,2,3,5 (skipping 4: AI, 6: HTML) for each student
+     * and returns an Excel file with the enriched Navigator data.
+     */
+    @PostMapping("/generate-export")
+    @Transactional
+    public ResponseEntity<?> generateAndExportExcel(@RequestBody Map<String, Object> request) {
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+        @SuppressWarnings("unchecked")
+        List<Number> rawIds = (List<Number>) request.get("userStudentIds");
+        if (rawIds == null || rawIds.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "userStudentIds is required"));
+        }
+        List<Long> userStudentIds = new ArrayList<>();
+        for (Number n : rawIds) userStudentIds.add(n.longValue());
+
+        CoreTechnicalNavigatorDataService.PipelineResult result =
+                coreTechnicalNavigatorDataService.generateAndExport(assessmentId, userStudentIds);
+
+        if (result.generated == 0) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "No data generated",
+                            "errors", result.errors.stream()
+                                    .map(e -> Map.of("userStudentId", e.userStudentId, "reason", e.reason))
+                                    .collect(java.util.stream.Collectors.toList())));
+        }
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentDispositionFormData("attachment",
+                "navigator_data_assessment_" + assessmentId + ".xlsx");
+        headers.setContentLength(result.excelBytes.length);
+
+        return new ResponseEntity<>(result.excelBytes, headers, HttpStatus.OK);
+    }
 
     // ═══════════════════════ CRUD ═══════════════════════
 
@@ -55,60 +106,62 @@ public class NavigatorReportDataController {
     @PostMapping("/one-click-report")
     @Transactional
     public ResponseEntity<?> oneClickReport(@RequestBody Map<String, Object> request) {
-        try {
-            Long assessmentId = ((Number) request.get("assessmentId")).longValue();
-            Long userStudentId = ((Number) request.get("userStudentId")).longValue();
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+        Long userStudentId = ((Number) request.get("userStudentId")).longValue();
 
-            // Step 1: Check existing
-            Optional<NavigatorReportData> existing = navigatorReportDataRepository
-                    .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+        // Step 1: Check existing
+        Optional<NavigatorReportData> existing = navigatorReportDataRepository
+                .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
 
-            // Step 2: Generate data if missing OR if AI summary is empty (needs regeneration)
-            boolean needsRegeneration = existing.isEmpty()
-                    || existing.get().getSummary() == null
-                    || existing.get().getSummary().isEmpty()
-                    || existing.get().getSummary().startsWith("Summary generation failed");
+        // Step 2: Generate data if missing, AI summary is empty, or force=true
+        boolean force = Boolean.TRUE.equals(request.get("force"));
+        boolean needsRegeneration = force
+                || existing.isEmpty()
+                || existing.get().getSummary() == null
+                || existing.get().getSummary().isEmpty()
+                || existing.get().getSummary().startsWith("Summary generation failed");
 
-            if (needsRegeneration) {
-                // Delete stale data if exists
-                if (existing.isPresent()) {
-                    navigatorReportDataRepository.deleteByUserStudentUserStudentIdAndAssessmentId(
-                            userStudentId, assessmentId);
-                }
-                NavigatorReportData report = navigatorReportGenerationService
-                        .generateForStudent(userStudentId, assessmentId, false);
-                if (report == null) {
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                            .body(Map.of("error", "No completed assessment found for this student"));
-                }
-                existing = Optional.of(report);
+        if (needsRegeneration) {
+            // Delete stale data if exists
+            if (existing.isPresent()) {
+                navigatorReportDataRepository.deleteByUserStudentUserStudentIdAndAssessmentId(
+                        userStudentId, assessmentId);
             }
-
-            NavigatorReportData report = existing.get();
-
-            // Check eligibility
-            if (!report.isEligible()) {
+            NavigatorReportData report = navigatorReportGenerationService
+                    .generateForStudent(userStudentId, assessmentId, false);
+            if (report == null) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(Map.of("error", "Student is ineligible for report generation",
-                                "issues", safe(report.getEligibilityIssues())));
+                        .body(Map.of("error", "No completed assessment found for this student"));
+            }
+            existing = Optional.of(report);
+        }
+
+        NavigatorReportData report = existing.get();
+
+        // Check eligibility
+        if (!report.isEligible()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "Student is ineligible for report generation",
+                            "issues", safe(report.getEligibilityIssues())));
+        }
+
+        // Step 3: Generate HTML if not already generated
+        if (!"generated".equals(report.getReportStatus()) || report.getReportUrl() == null) {
+            String templateName = resolveTemplateName(report.getStudentClass());
+            String template = loadNavigatorTemplate(templateName);
+            if (template == null) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(Map.of("error", "Could not load Navigator template: " + templateName));
             }
 
-            // Step 3: Generate HTML if not already generated
-            if (!"generated".equals(report.getReportStatus()) || report.getReportUrl() == null) {
-                String templateName = resolveTemplateName(report.getStudentClass());
-                String template = loadNavigatorTemplate(templateName);
-                if (template == null) {
-                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                            .body(Map.of("error", "Could not load Navigator template: " + templateName));
-                }
+            String filledHtml = fillTemplate(template, report);
+            String safeName = (report.getStudentName() != null ? report.getStudentName() : "student")
+                    .replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
+            String reportType = resolveReportType(report.getStudentClass());
+            String fileName = safeName + "_" + userStudentId + "_" + reportType + ".html";
+            String folder = "navigator-reports/assessment-" + assessmentId;
 
-                String filledHtml = fillTemplate(template, report);
-                String safeName = (report.getStudentName() != null ? report.getStudentName() : "student")
-                        .replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
-                String reportType = resolveReportType(report.getStudentClass());
-                String fileName = safeName + "_" + userStudentId + "_" + reportType + ".html";
-                String folder = "navigator-reports/assessment-" + assessmentId;
-
+                try {
                 String reportUrl = digitalOceanSpacesService.uploadBytes(
                         filledHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8),
                         "text/html", folder, fileName);
@@ -116,18 +169,23 @@ public class NavigatorReportDataController {
                 report.setReportStatus("generated");
                 report.setReportUrl(reportUrl);
                 navigatorReportDataRepository.save(report);
-            }
-
-            return ResponseEntity.ok(Map.of(
-                    "reportUrl", report.getReportUrl(),
-                    "studentName", safe(report.getStudentName()),
-                    "status", "generated"
-            ));
-
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Report generation failed: " + e.getMessage()));
+                syncGeneratedReport(userStudentId, assessmentId, "generated", reportUrl);
+                } catch (Exception uploadEx) {
+                    // DO Spaces upload failed — return HTML directly for download
+                    byte[] htmlBytes = filledHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    HttpHeaders headers = new HttpHeaders();
+                    headers.setContentType(MediaType.TEXT_HTML);
+                    headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"");
+                    headers.setContentLength(htmlBytes.length);
+                    return new ResponseEntity<>(htmlBytes, headers, HttpStatus.OK);
+                }
         }
+
+        return ResponseEntity.ok(Map.of(
+                "reportUrl", report.getReportUrl(),
+                "studentName", safe(report.getStudentName()),
+                "status", "generated"
+        ));
     }
 
     // ═══════════════════════ CRUD ═══════════════════════
@@ -218,129 +276,194 @@ public class NavigatorReportDataController {
                 navigatorReportDataRepository.findByAssessmentIdAndEligible(assessmentId, false));
     }
 
+    // ═══════════════════════ DOWNLOAD REPORT (HTML) ═══════════════════════
+
+    @GetMapping("/download/{userStudentId}/{assessmentId}")
+    public ResponseEntity<?> downloadReport(
+            @PathVariable Long userStudentId,
+            @PathVariable Long assessmentId) {
+        Optional<NavigatorReportData> opt = navigatorReportDataRepository
+                .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+        if (opt.isEmpty() || opt.get().getReportUrl() == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "No generated report found for this student"));
+        }
+        NavigatorReportData rd = opt.get();
+        byte[] htmlBytes = digitalOceanSpacesService.downloadFileByUrl(rd.getReportUrl());
+        if (htmlBytes == null) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to download report file"));
+        }
+        String html = inlineImages(new String(htmlBytes, StandardCharsets.UTF_8));
+
+        String safeName = (rd.getStudentName() != null ? rd.getStudentName() : "report")
+                .replaceAll("[^a-zA-Z0-9_\\- ]", "").replaceAll("\\s+", "_");
+        String fileName = safeName + "_navigator_report.html";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.TEXT_HTML);
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"");
+        return new ResponseEntity<>(html.getBytes(StandardCharsets.UTF_8), headers, HttpStatus.OK);
+    }
+
+    // ═══════════════════════ BATCH DOWNLOAD (report URLs) ═══════════════════════
+
+    /**
+     * POST /navigator-report-data/download-zip
+     * Body: { "assessmentId": 18, "userStudentIds": [1, 2, 3] }
+     *
+     * Returns report URLs for the given students (frontend handles PDF conversion + ZIP).
+     */
+    @PostMapping("/download-zip")
+    public ResponseEntity<?> downloadZipInfo(@RequestBody Map<String, Object> request) {
+        if (!request.containsKey("assessmentId") || !request.containsKey("userStudentIds")) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "assessmentId and userStudentIds are required"));
+        }
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+        @SuppressWarnings("unchecked")
+        List<Number> idList = (List<Number>) request.get("userStudentIds");
+
+        List<Map<String, Object>> reports = new ArrayList<>();
+        for (Number idNum : idList) {
+            Long userStudentId = idNum.longValue();
+            Optional<NavigatorReportData> opt = navigatorReportDataRepository
+                    .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+            if (opt.isEmpty() || opt.get().getReportUrl() == null) continue;
+            NavigatorReportData rd = opt.get();
+            String safeName = (rd.getStudentName() != null ? rd.getStudentName() : "student_" + userStudentId)
+                    .replaceAll("[^a-zA-Z0-9_\\- ]", "").replaceAll("\\s+", "_");
+            reports.add(Map.of(
+                    "userStudentId", userStudentId,
+                    "studentName", safe(rd.getStudentName()),
+                    "fileName", safeName + "_" + userStudentId + "_navigator_report",
+                    "reportUrl", rd.getReportUrl()
+            ));
+        }
+        if (reports.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "No generated reports found"));
+        }
+        return ResponseEntity.ok(Map.of("reports", reports));
+    }
+
     // ═══════════════════════ EXCEL EXPORT ═══════════════════════
 
     @GetMapping("/export-excel/{assessmentId}")
-    public ResponseEntity<?> exportExcel(@PathVariable Long assessmentId) {
-        try {
-            List<NavigatorReportData> reports = navigatorReportDataRepository.findByAssessmentId(assessmentId);
-            if (reports.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("error", "No Navigator report data found for this assessment"));
-            }
-
-            Workbook workbook = new XSSFWorkbook();
-            Sheet sheet = workbook.createSheet("Navigator Report Data");
-
-            CellStyle headerStyle = workbook.createCellStyle();
-            Font headerFont = workbook.createFont();
-            headerFont.setBold(true);
-            headerStyle.setFont(headerFont);
-
-            String[] headers = {
-                "student_name", "student_class", "student_school",
-                "personality_1_text", "personality_2_text", "personality_3_text",
-                "intelligence_1_text", "intelligence_2_text", "intelligence_3_text",
-                "learning_style_1", "learning_style_2", "learning_style_3",
-                "enjoys_with_1", "enjoys_with_2", "enjoys_with_3",
-                "struggles_with_1", "struggles_with_2", "struggles_with_3",
-                "soi_1", "soi_2", "soi_3", "soi_4", "soi_5",
-                "values_1", "values_2", "values_3", "values_4",
-                "career_asp_1", "career_asp_2", "career_asp_3", "career_asp_4",
-                "ability_1", "ability_2", "ability_3", "ability_4",
-                "pathway_1", "pathway_2", "pathway_3", "pathway_4", "pathway_5",
-                "pathway_6", "pathway_7", "pathway_8", "pathway_9",
-                "pathway_1_text", "pathway_2_text", "pathway_3_text",
-                "summary", "learning_style_summary", "recommendations",
-                "weak_ability", "career_match_result",
-                "report_status", "report_url"
-            };
-
-            Row headerRow = sheet.createRow(0);
-            for (int i = 0; i < headers.length; i++) {
-                headerRow.createCell(i).setCellValue(headers[i]);
-                headerRow.getCell(i).setCellStyle(headerStyle);
-            }
-
-            int rowIdx = 1;
-            for (NavigatorReportData r : reports) {
-                Row row = sheet.createRow(rowIdx++);
-                int col = 0;
-                row.createCell(col++).setCellValue(safe(r.getStudentName()));
-                row.createCell(col++).setCellValue(safe(r.getStudentClass()));
-                row.createCell(col++).setCellValue(safe(r.getStudentSchool()));
-                row.createCell(col++).setCellValue(safe(r.getPersonality1Text()));
-                row.createCell(col++).setCellValue(safe(r.getPersonality2Text()));
-                row.createCell(col++).setCellValue(safe(r.getPersonality3Text()));
-                row.createCell(col++).setCellValue(safe(r.getIntelligence1Text()));
-                row.createCell(col++).setCellValue(safe(r.getIntelligence2Text()));
-                row.createCell(col++).setCellValue(safe(r.getIntelligence3Text()));
-                row.createCell(col++).setCellValue(safe(r.getLearningStyle1()));
-                row.createCell(col++).setCellValue(safe(r.getLearningStyle2()));
-                row.createCell(col++).setCellValue(safe(r.getLearningStyle3()));
-                row.createCell(col++).setCellValue(safe(r.getEnjoysWith1()));
-                row.createCell(col++).setCellValue(safe(r.getEnjoysWith2()));
-                row.createCell(col++).setCellValue(safe(r.getEnjoysWith3()));
-                row.createCell(col++).setCellValue(safe(r.getStrugglesWith1()));
-                row.createCell(col++).setCellValue(safe(r.getStrugglesWith2()));
-                row.createCell(col++).setCellValue(safe(r.getStrugglesWith3()));
-                row.createCell(col++).setCellValue(safe(r.getSoi1()));
-                row.createCell(col++).setCellValue(safe(r.getSoi2()));
-                row.createCell(col++).setCellValue(safe(r.getSoi3()));
-                row.createCell(col++).setCellValue(safe(r.getSoi4()));
-                row.createCell(col++).setCellValue(safe(r.getSoi5()));
-                row.createCell(col++).setCellValue(safe(r.getValues1()));
-                row.createCell(col++).setCellValue(safe(r.getValues2()));
-                row.createCell(col++).setCellValue(safe(r.getValues3()));
-                row.createCell(col++).setCellValue(safe(r.getValues4()));
-                row.createCell(col++).setCellValue(safe(r.getCareerAsp1()));
-                row.createCell(col++).setCellValue(safe(r.getCareerAsp2()));
-                row.createCell(col++).setCellValue(safe(r.getCareerAsp3()));
-                row.createCell(col++).setCellValue(safe(r.getCareerAsp4()));
-                row.createCell(col++).setCellValue(safe(r.getAbility1()));
-                row.createCell(col++).setCellValue(safe(r.getAbility2()));
-                row.createCell(col++).setCellValue(safe(r.getAbility3()));
-                row.createCell(col++).setCellValue(safe(r.getAbility4()));
-                row.createCell(col++).setCellValue(safe(r.getPathway1()));
-                row.createCell(col++).setCellValue(safe(r.getPathway2()));
-                row.createCell(col++).setCellValue(safe(r.getPathway3()));
-                row.createCell(col++).setCellValue(safe(r.getPathway4()));
-                row.createCell(col++).setCellValue(safe(r.getPathway5()));
-                row.createCell(col++).setCellValue(safe(r.getPathway6()));
-                row.createCell(col++).setCellValue(safe(r.getPathway7()));
-                row.createCell(col++).setCellValue(safe(r.getPathway8()));
-                row.createCell(col++).setCellValue(safe(r.getPathway9()));
-                row.createCell(col++).setCellValue(safe(r.getPathway1Text()));
-                row.createCell(col++).setCellValue(safe(r.getPathway2Text()));
-                row.createCell(col++).setCellValue(safe(r.getPathway3Text()));
-                row.createCell(col++).setCellValue(safe(r.getSummary()));
-                row.createCell(col++).setCellValue(safe(r.getLearningStyleSummary()));
-                row.createCell(col++).setCellValue(safe(r.getRecommendations()));
-                row.createCell(col++).setCellValue(safe(r.getWeakAbility()));
-                row.createCell(col++).setCellValue(safe(r.getCareerMatchResult()));
-                row.createCell(col++).setCellValue(safe(r.getReportStatus()));
-                row.createCell(col++).setCellValue(safe(r.getReportUrl()));
-            }
-
-            for (int i = 0; i < headers.length; i++) {
-                sheet.autoSizeColumn(i);
-            }
-
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            workbook.write(out);
-            workbook.close();
-
-            HttpHeaders responseHeaders = new HttpHeaders();
-            responseHeaders.setContentType(MediaType.parseMediaType(
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
-            responseHeaders.setContentDispositionFormData("attachment", "navigator_report_data.xlsx");
-            responseHeaders.setContentLength(out.size());
-
-            return new ResponseEntity<>(out.toByteArray(), responseHeaders, HttpStatus.OK);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Export failed: " + e.getMessage()));
+    public ResponseEntity<?> exportExcel(@PathVariable Long assessmentId) throws Exception {
+        List<NavigatorReportData> reports = navigatorReportDataRepository.findByAssessmentId(assessmentId);
+        if (reports.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "No Navigator report data found for this assessment"));
         }
+
+        Workbook workbook = new XSSFWorkbook();
+        Sheet sheet = workbook.createSheet("Navigator Report Data");
+
+        CellStyle headerStyle = workbook.createCellStyle();
+        Font headerFont = workbook.createFont();
+        headerFont.setBold(true);
+        headerStyle.setFont(headerFont);
+
+        String[] headers = {
+            "student_name", "student_class", "student_school",
+            "personality_1_text", "personality_2_text", "personality_3_text",
+            "intelligence_1_text", "intelligence_2_text", "intelligence_3_text",
+            "learning_style_1", "learning_style_2", "learning_style_3",
+            "enjoys_with_1", "enjoys_with_2", "enjoys_with_3",
+            "struggles_with_1", "struggles_with_2", "struggles_with_3",
+            "soi_1", "soi_2", "soi_3", "soi_4", "soi_5",
+            "values_1", "values_2", "values_3", "values_4",
+            "career_asp_1", "career_asp_2", "career_asp_3", "career_asp_4",
+            "ability_1", "ability_2", "ability_3", "ability_4",
+            "pathway_1", "pathway_2", "pathway_3", "pathway_4", "pathway_5",
+            "pathway_6", "pathway_7", "pathway_8", "pathway_9",
+            "pathway_1_text", "pathway_2_text", "pathway_3_text",
+            "summary", "learning_style_summary", "recommendations",
+            "weak_ability", "career_match_result",
+            "report_status", "report_url"
+        };
+
+        Row headerRow = sheet.createRow(0);
+        for (int i = 0; i < headers.length; i++) {
+            headerRow.createCell(i).setCellValue(headers[i]);
+            headerRow.getCell(i).setCellStyle(headerStyle);
+        }
+
+        int rowIdx = 1;
+        for (NavigatorReportData r : reports) {
+            Row row = sheet.createRow(rowIdx++);
+            int col = 0;
+            row.createCell(col++).setCellValue(safe(r.getStudentName()));
+            row.createCell(col++).setCellValue(safe(r.getStudentClass()));
+            row.createCell(col++).setCellValue(safe(r.getStudentSchool()));
+            row.createCell(col++).setCellValue(safe(r.getPersonality1Text()));
+            row.createCell(col++).setCellValue(safe(r.getPersonality2Text()));
+            row.createCell(col++).setCellValue(safe(r.getPersonality3Text()));
+            row.createCell(col++).setCellValue(safe(r.getIntelligence1Text()));
+            row.createCell(col++).setCellValue(safe(r.getIntelligence2Text()));
+            row.createCell(col++).setCellValue(safe(r.getIntelligence3Text()));
+            row.createCell(col++).setCellValue(safe(r.getLearningStyle1()));
+            row.createCell(col++).setCellValue(safe(r.getLearningStyle2()));
+            row.createCell(col++).setCellValue(safe(r.getLearningStyle3()));
+            row.createCell(col++).setCellValue(safe(r.getEnjoysWith1()));
+            row.createCell(col++).setCellValue(safe(r.getEnjoysWith2()));
+            row.createCell(col++).setCellValue(safe(r.getEnjoysWith3()));
+            row.createCell(col++).setCellValue(safe(r.getStrugglesWith1()));
+            row.createCell(col++).setCellValue(safe(r.getStrugglesWith2()));
+            row.createCell(col++).setCellValue(safe(r.getStrugglesWith3()));
+            row.createCell(col++).setCellValue(safe(r.getSoi1()));
+            row.createCell(col++).setCellValue(safe(r.getSoi2()));
+            row.createCell(col++).setCellValue(safe(r.getSoi3()));
+            row.createCell(col++).setCellValue(safe(r.getSoi4()));
+            row.createCell(col++).setCellValue(safe(r.getSoi5()));
+            row.createCell(col++).setCellValue(safe(r.getValues1()));
+            row.createCell(col++).setCellValue(safe(r.getValues2()));
+            row.createCell(col++).setCellValue(safe(r.getValues3()));
+            row.createCell(col++).setCellValue(safe(r.getValues4()));
+            row.createCell(col++).setCellValue(safe(r.getCareerAsp1()));
+            row.createCell(col++).setCellValue(safe(r.getCareerAsp2()));
+            row.createCell(col++).setCellValue(safe(r.getCareerAsp3()));
+            row.createCell(col++).setCellValue(safe(r.getCareerAsp4()));
+            row.createCell(col++).setCellValue(safe(r.getAbility1()));
+            row.createCell(col++).setCellValue(safe(r.getAbility2()));
+            row.createCell(col++).setCellValue(safe(r.getAbility3()));
+            row.createCell(col++).setCellValue(safe(r.getAbility4()));
+            row.createCell(col++).setCellValue(safe(r.getPathway1()));
+            row.createCell(col++).setCellValue(safe(r.getPathway2()));
+            row.createCell(col++).setCellValue(safe(r.getPathway3()));
+            row.createCell(col++).setCellValue(safe(r.getPathway4()));
+            row.createCell(col++).setCellValue(safe(r.getPathway5()));
+            row.createCell(col++).setCellValue(safe(r.getPathway6()));
+            row.createCell(col++).setCellValue(safe(r.getPathway7()));
+            row.createCell(col++).setCellValue(safe(r.getPathway8()));
+            row.createCell(col++).setCellValue(safe(r.getPathway9()));
+            row.createCell(col++).setCellValue(safe(r.getPathway1Text()));
+            row.createCell(col++).setCellValue(safe(r.getPathway2Text()));
+            row.createCell(col++).setCellValue(safe(r.getPathway3Text()));
+            row.createCell(col++).setCellValue(safe(r.getSummary()));
+            row.createCell(col++).setCellValue(safe(r.getLearningStyleSummary()));
+            row.createCell(col++).setCellValue(safe(r.getRecommendations()));
+            row.createCell(col++).setCellValue(safe(r.getWeakAbility()));
+            row.createCell(col++).setCellValue(safe(r.getCareerMatchResult()));
+            row.createCell(col++).setCellValue(safe(r.getReportStatus()));
+            row.createCell(col++).setCellValue(safe(r.getReportUrl()));
+        }
+
+        for (int i = 0; i < headers.length; i++) {
+            sheet.autoSizeColumn(i);
+        }
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        workbook.write(out);
+        workbook.close();
+
+        HttpHeaders responseHeaders = new HttpHeaders();
+        responseHeaders.setContentType(MediaType.parseMediaType(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        responseHeaders.setContentDispositionFormData("attachment", "navigator_report_data.xlsx");
+        responseHeaders.setContentLength(out.size());
+
+        return new ResponseEntity<>(out.toByteArray(), responseHeaders, HttpStatus.OK);
     }
 
     // ═══════════════════════ GENERATE & SAVE ═══════════════════════
@@ -356,45 +479,39 @@ public class NavigatorReportDataController {
     @PostMapping("/generate")
     @Transactional
     public ResponseEntity<?> generateAndSave(@RequestBody Map<String, Object> request) {
-        try {
-            if (!request.containsKey("assessmentId") || !request.containsKey("userStudentIds")) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "assessmentId and userStudentIds are required"));
-            }
-            Long assessmentId = ((Number) request.get("assessmentId")).longValue();
-            @SuppressWarnings("unchecked")
-            List<Number> idList = (List<Number>) request.get("userStudentIds");
-
-            List<NavigatorReportData> saved = new ArrayList<>();
-            List<Map<String, Object>> errors = new ArrayList<>();
-
-            for (Number idNum : idList) {
-                Long userStudentId = idNum.longValue();
-                try {
-                    NavigatorReportData report = navigatorReportGenerationService
-                            .generateForStudent(userStudentId, assessmentId);
-                    if (report != null) {
-                        saved.add(report);
-                    } else {
-                        errors.add(Map.of("userStudentId", userStudentId,
-                                "reason", "No completed assessment found"));
-                    }
-                } catch (Exception e) {
-                    errors.add(Map.of("userStudentId", userStudentId,
-                            "reason", e.getMessage()));
-                }
-            }
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("generated", saved.size());
-            response.put("errors", errors);
-            response.put("data", saved);
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to generate Navigator report data: " + e.getMessage()));
+        if (!request.containsKey("assessmentId") || !request.containsKey("userStudentIds")) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "assessmentId and userStudentIds are required"));
         }
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+        @SuppressWarnings("unchecked")
+        List<Number> idList = (List<Number>) request.get("userStudentIds");
+
+        List<NavigatorReportData> saved = new ArrayList<>();
+        List<Map<String, Object>> errors = new ArrayList<>();
+
+        for (Number idNum : idList) {
+            Long userStudentId = idNum.longValue();
+            try {
+                NavigatorReportData report = navigatorReportGenerationService
+                        .generateForStudent(userStudentId, assessmentId);
+                if (report != null) {
+                    saved.add(report);
+                } else {
+                    errors.add(Map.of("userStudentId", userStudentId,
+                            "reason", "No completed assessment found"));
+                }
+            } catch (Exception e) {
+                errors.add(Map.of("userStudentId", userStudentId,
+                        "reason", e.getMessage()));
+            }
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("generated", saved.size());
+        response.put("errors", errors);
+        response.put("data", saved);
+        return ResponseEntity.ok(response);
     }
 
     // ═══════════════════════ GENERATE HTML REPORTS ═══════════════════════
@@ -410,50 +527,50 @@ public class NavigatorReportDataController {
     @PostMapping("/generate-reports")
     @Transactional
     public ResponseEntity<?> generateHtmlReports(@RequestBody Map<String, Object> request) {
-        try {
-            if (!request.containsKey("assessmentId") || !request.containsKey("userStudentIds")) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "assessmentId and userStudentIds are required"));
-            }
-            Long assessmentId = ((Number) request.get("assessmentId")).longValue();
-            @SuppressWarnings("unchecked")
-            List<Number> idList = (List<Number>) request.get("userStudentIds");
+        if (!request.containsKey("assessmentId") || !request.containsKey("userStudentIds")) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "assessmentId and userStudentIds are required"));
+        }
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+        @SuppressWarnings("unchecked")
+        List<Number> idList = (List<Number>) request.get("userStudentIds");
 
-            List<Map<String, Object>> results = new ArrayList<>();
-            List<Map<String, Object>> errors = new ArrayList<>();
+        List<Map<String, Object>> results = new ArrayList<>();
+        List<Map<String, Object>> errors = new ArrayList<>();
 
-            for (Number idNum : idList) {
-                Long userStudentId = idNum.longValue();
-                try {
-                    Optional<NavigatorReportData> reportOpt = navigatorReportDataRepository
-                            .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
-                    if (reportOpt.isEmpty()) {
-                        errors.add(Map.of("userStudentId", userStudentId,
-                                "reason", "No report data found. Generate report data first."));
-                        continue;
-                    }
+        for (Number idNum : idList) {
+            Long userStudentId = idNum.longValue();
+            try {
+                Optional<NavigatorReportData> reportOpt = navigatorReportDataRepository
+                        .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+                if (reportOpt.isEmpty()) {
+                    errors.add(Map.of("userStudentId", userStudentId,
+                            "reason", "No report data found. Generate report data first."));
+                    continue;
+                }
 
-                    NavigatorReportData report = reportOpt.get();
+                NavigatorReportData report = reportOpt.get();
 
-                    // Select template based on student class
-                    String templateName = resolveTemplateName(report.getStudentClass());
-                    String template = loadNavigatorTemplate(templateName);
-                    if (template == null) {
-                        errors.add(Map.of("userStudentId", userStudentId,
-                                "reason", "Could not load template: " + templateName));
-                        continue;
-                    }
+                // Select template based on student class
+                String templateName = resolveTemplateName(report.getStudentClass());
+                String template = loadNavigatorTemplate(templateName);
+                if (template == null) {
+                    errors.add(Map.of("userStudentId", userStudentId,
+                            "reason", "Could not load template: " + templateName));
+                    continue;
+                }
 
-                    // Fill template with report data
-                    String filledHtml = fillTemplate(template, report);
+                // Fill template with report data
+                String filledHtml = fillTemplate(template, report);
 
-                    // Upload to DigitalOcean Spaces
-                    String safeName = (report.getStudentName() != null ? report.getStudentName() : "student")
-                            .replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
-                    String reportType = resolveReportType(report.getStudentClass());
-                    String fileName = safeName + "_" + userStudentId + "_" + reportType + ".html";
-                    String folder = "navigator-reports/assessment-" + assessmentId;
+                // Upload to DigitalOcean Spaces
+                String safeName = (report.getStudentName() != null ? report.getStudentName() : "student")
+                        .replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
+                String reportType = resolveReportType(report.getStudentClass());
+                String fileName = safeName + "_" + userStudentId + "_" + reportType + ".html";
+                String folder = "navigator-reports/assessment-" + assessmentId;
 
+                    try {
                     String reportUrl = digitalOceanSpacesService.uploadBytes(
                             filledHtml.getBytes(StandardCharsets.UTF_8),
                             "text/html",
@@ -464,28 +581,35 @@ public class NavigatorReportDataController {
                     report.setReportStatus("generated");
                     report.setReportUrl(reportUrl);
                     navigatorReportDataRepository.save(report);
+                    syncGeneratedReport(userStudentId, assessmentId, "generated", reportUrl);
 
                     results.add(Map.of(
                             "userStudentId", userStudentId,
                             "studentName", safe(report.getStudentName()),
                             "reportUrl", reportUrl
                     ));
-                } catch (Exception e) {
-                    errors.add(Map.of("userStudentId", userStudentId,
-                            "reason", e.getMessage()));
-                }
+                    } catch (Exception uploadEx) {
+                        // DO Spaces upload failed — encode HTML as data URI for direct download
+                        String dataUri = "data:text/html;base64," + Base64.getEncoder().encodeToString(filledHtml.getBytes(StandardCharsets.UTF_8));
+                        results.add(Map.of(
+                                "userStudentId", userStudentId,
+                                "studentName", safe(report.getStudentName()),
+                                "reportUrl", dataUri,
+                                "fileName", fileName,
+                                "downloadFallback", true
+                        ));
+                    }
+            } catch (Exception e) {
+                errors.add(Map.of("userStudentId", userStudentId,
+                        "reason", e.getMessage()));
             }
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("generated", results.size());
-            response.put("errors", errors);
-            response.put("reports", results);
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to generate reports: " + e.getMessage()));
         }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("generated", results.size());
+        response.put("errors", errors);
+        response.put("reports", results);
+        return ResponseEntity.ok(response);
     }
 
     // ═══════════════════════ UPLOAD NAVIGATOR TEMPLATE ASSETS ═══════════════════════
@@ -499,77 +623,71 @@ public class NavigatorReportDataController {
      */
     @PostMapping("/upload-template-assets")
     public ResponseEntity<?> uploadTemplateAssets() {
-        try {
-            String[] assetPaths = {
-                // Static assets
-                "assets/career-nine-logo.png",
-                "assets/cover.png",
-                "assets/process-steps.png",
-                "assets/hexagon.png",
-                "assets/summary-divider.png",
-                "assets/learning-style-hero.png",
-                "assets/csi-1.png", "assets/csi-2.png", "assets/csi-3.png",
-                "assets/csi-4.png", "assets/csi-5.png", "assets/csi-6.png",
-                "assets/csi-7.png", "assets/csi-8.png", "assets/csi-9.png",
-                "assets/pathway-1.png",
-                "assets/feedback.jpg",
-                "assets/questionmark.jpg",
-                "assets/knowmore.jpg",
-                "assets/qr.png",
-                // Dynamic personality images
-                "images/doer.png",
-                "images/thinker.png",
-                "images/creator.png",
-                "images/helper.png",
-                "images/persuader.png",
-                "images/organizer.png",
-                // Dynamic intelligence images
-                "images/bodily.png",
-                "images/interpersonal.png",
-                "images/intrapersonal.png",
-                "images/linguistic.png",
-                "images/logical.png",
-                "images/musical.png",
-                "images/musical.jpg",
-                "images/spatial.png",
-                "images/naturalistic.png",
-            };
+        String[] assetPaths = {
+            // Static assets
+            "assets/career-nine-logo.png",
+            "assets/cover.png",
+            "assets/process-steps.png",
+            "assets/hexagon.png",
+            "assets/summary-divider.png",
+            "assets/learning-style-hero.png",
+            "assets/csi-1.png", "assets/csi-2.png", "assets/csi-3.png",
+            "assets/csi-4.png", "assets/csi-5.png", "assets/csi-6.png",
+            "assets/csi-7.png", "assets/csi-8.png", "assets/csi-9.png",
+            "assets/pathway-1.png",
+            "assets/feedback.jpg",
+            "assets/questionmark.jpg",
+            "assets/knowmore.jpg",
+            "assets/qr.png",
+            // Dynamic personality images
+            "images/doer.png",
+            "images/thinker.png",
+            "images/creator.png",
+            "images/helper.png",
+            "images/persuader.png",
+            "images/organizer.png",
+            // Dynamic intelligence images
+            "images/bodily.png",
+            "images/interpersonal.png",
+            "images/intrapersonal.png",
+            "images/linguistic.png",
+            "images/logical.png",
+            "images/musical.png",
+            "images/musical.jpg",
+            "images/spatial.png",
+            "images/naturalistic.png",
+        };
 
-            List<String> uploaded = new ArrayList<>();
-            List<String> failed = new ArrayList<>();
+        List<String> uploaded = new ArrayList<>();
+        List<String> failed = new ArrayList<>();
 
-            for (String assetPath : assetPaths) {
-                try {
-                    var is = getClass().getClassLoader()
-                            .getResourceAsStream("navigator-template/" + assetPath);
-                    if (is == null) {
-                        failed.add(assetPath + " (not found in classpath)");
-                        continue;
-                    }
-                    byte[] bytes = is.readAllBytes();
-                    is.close();
-
-                    String contentType = guessContentType(assetPath);
-                    String fileName = assetPath.substring(assetPath.lastIndexOf('/') + 1);
-                    String folder = "navigator-template-assets/" + assetPath.substring(0, assetPath.lastIndexOf('/'));
-
-                    digitalOceanSpacesService.uploadBytes(bytes, contentType, folder, fileName);
-                    uploaded.add(assetPath);
-                } catch (Exception e) {
-                    failed.add(assetPath + " (" + e.getMessage() + ")");
+        for (String assetPath : assetPaths) {
+            try {
+                var is = getClass().getClassLoader()
+                        .getResourceAsStream("navigator-template/" + assetPath);
+                if (is == null) {
+                    failed.add(assetPath + " (not found in classpath)");
+                    continue;
                 }
+                byte[] bytes = is.readAllBytes();
+                is.close();
+
+                String contentType = guessContentType(assetPath);
+                String fileName = assetPath.substring(assetPath.lastIndexOf('/') + 1);
+                String folder = "navigator-template-assets/" + assetPath.substring(0, assetPath.lastIndexOf('/'));
+
+                digitalOceanSpacesService.uploadBytes(bytes, contentType, folder, fileName);
+                uploaded.add(assetPath);
+            } catch (Exception e) {
+                failed.add(assetPath + " (" + e.getMessage() + ")");
             }
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("uploaded", uploaded.size());
-            response.put("failed", failed);
-            response.put("uploadedFiles", uploaded);
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Asset upload failed: " + e.getMessage()));
         }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("uploaded", uploaded.size());
+        response.put("failed", failed);
+        response.put("uploadedFiles", uploaded);
+        return ResponseEntity.ok(response);
     }
 
     private String guessContentType(String path) {
@@ -806,5 +924,74 @@ public class NavigatorReportDataController {
 
     private String safe(String val) {
         return val != null ? val : "";
+    }
+
+    private void syncGeneratedReport(Long userStudentId, Long assessmentId, String status, String reportUrl) {
+        try {
+            com.kccitm.api.model.career9.GeneratedReport gr = generatedReportRepository
+                    .findByUserStudentUserStudentIdAndAssessmentIdAndTypeOfReport(userStudentId, assessmentId, "navigator")
+                    .orElseGet(() -> {
+                        com.kccitm.api.model.career9.GeneratedReport newGr = new com.kccitm.api.model.career9.GeneratedReport();
+                        newGr.setUserStudent(userStudentRepository.findById(userStudentId).orElse(null));
+                        newGr.setAssessmentId(assessmentId);
+                        newGr.setTypeOfReport("navigator");
+                        return newGr;
+                    });
+            gr.setReportStatus(status);
+            gr.setReportUrl(reportUrl);
+            generatedReportRepository.save(gr);
+        } catch (Exception e) {
+            // Non-critical — don't fail the main flow
+        }
+    }
+
+    private String inlineImages(String html) {
+        // Convert <object data="..." type="image/svg+xml"> to <img src="...">
+        html = html.replaceAll(
+                "<object([^>]*?)data=\"([^\"]+)\"([^>]*?)type=\"image/svg\\+xml\"([^>]*?)>\\s*</object>",
+                "<img$1src=\"$2\"$3$4/>");
+        html = html.replaceAll(
+                "<object([^>]*?)type=\"image/svg\\+xml\"([^>]*?)data=\"([^\"]+)\"([^>]*?)>\\s*</object>",
+                "<img$1$2src=\"$3\"$4/>");
+
+        html = inlinePattern(html, Pattern.compile("src=\"(https?://[^\"]+)\""),
+                (url, dataUri) -> "src=\"" + dataUri + "\"");
+        html = inlinePattern(html, Pattern.compile("url\\((\"?)(https?://[^)\"]+)\\1\\)"),
+                (url, dataUri) -> "url(\"" + dataUri + "\")");
+        return html;
+    }
+
+    private String inlinePattern(String html, Pattern pattern,
+            java.util.function.BiFunction<String, String, String> replacer) {
+        Matcher matcher = pattern.matcher(html);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            String imgUrl = matcher.group(matcher.groupCount());
+            try {
+                URL url = new URL(imgUrl);
+                try (InputStream is = url.openStream()) {
+                    byte[] bytes = is.readAllBytes();
+                    String mime = guessMime(imgUrl);
+                    String dataUri = "data:" + mime + ";base64," + Base64.getEncoder().encodeToString(bytes);
+                    matcher.appendReplacement(sb, Matcher.quoteReplacement(replacer.apply(imgUrl, dataUri)));
+                }
+            } catch (Exception e) {
+                matcher.appendReplacement(sb, Matcher.quoteReplacement(matcher.group(0)));
+            }
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
+    private String guessMime(String url) {
+        String lower = url.toLowerCase();
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+        if (lower.endsWith(".webp")) return "image/webp";
+        if (lower.endsWith(".gif")) return "image/gif";
+        if (lower.endsWith(".svg")) return "image/svg+xml";
+        if (lower.endsWith(".ttf")) return "font/ttf";
+        if (lower.endsWith(".woff")) return "font/woff";
+        if (lower.endsWith(".woff2")) return "font/woff2";
+        return "image/png";
     }
 }

@@ -8,6 +8,7 @@ import {
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { MdRestorePage } from "react-icons/md";
+import { showErrorToast } from '../../../utils/toast';
 
 interface MeasuredQualityTypesRecycleBinModalProps {
   show: boolean;
@@ -52,7 +53,7 @@ const MeasuredQualityTypesRecycleBinModal = ({
       onRestoreComplete();
     } catch (error) {
       console.error("Error restoring measured quality type:", error);
-      alert("Failed to restore measured quality type. Please try again.");
+      showErrorToast("Failed to restore measured quality type. Please try again.");
     } finally {
       setActionLoading(null);
     }
@@ -74,7 +75,7 @@ const MeasuredQualityTypesRecycleBinModal = ({
       );
     } catch (error) {
       console.error("Error permanently deleting measured quality type:", error);
-      alert("Failed to permanently delete measured quality type. Please try again.");
+      showErrorToast("Failed to permanently delete measured quality type. Please try again.");
     } finally {
       setActionLoading(null);
     }

@@ -13,6 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.cribbstechnologies.clients.mandrill.exception.RequestFailedException;
 import com.cribbstechnologies.clients.mandrill.model.MandrillRecipient;
 import com.cribbstechnologies.clients.mandrill.model.response.message.SendMessageResponse;
+import com.kccitm.api.exception.ServiceException;
 import com.kccitm.api.service.EmailService;
 import com.kccitm.api.service.SmtpEmailService;
 import com.kccitm.api.model.userDefinedModel.SmtpEmailRequest;
@@ -57,7 +58,7 @@ SmtpEmailService smtpEmailService;
 			smtpEmailService.sendEmail(request);
 			return ResponseEntity.ok("Email sent successfully");
 		} catch (Exception e) {
-			return ResponseEntity.status(500).body("Email failed: " + e.getMessage());
+			throw new ServiceException("Email failed: " + e.getMessage());
 		}
 	}
 }

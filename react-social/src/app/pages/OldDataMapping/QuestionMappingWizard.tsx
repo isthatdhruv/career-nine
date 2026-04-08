@@ -192,8 +192,29 @@ const QuestionMappingWizard = ({ onBack }: Props) => {
       };
 
       addResponses(fbUser.abilityDetailedResponses, "ability");
-      addResponses(fbUser.multipleIntelligenceResponses, "multipleIntelligence");
+      addResponses(fbUser.multipleIntelligenceResponses, "multipleintelligence");
       addResponses(fbUser.personalityDetailedResponses, "personality");
+
+      // Multi-select categories: Firebase stores these as plain string arrays
+      const addStringArray = (arr: string[] | undefined, category: string, questionLabel: string) => {
+        if (!arr || !Array.isArray(arr)) return;
+        arr.forEach((val) => {
+          if (!val) return;
+          newMappings.push({
+            firebaseQuestion: questionLabel,
+            firebaseAnswer: val,
+            systemQuestionId: null,
+            systemQuestionText: "",
+            systemOptionId: null,
+            systemOptionText: "",
+            category,
+          });
+        });
+      };
+
+      addStringArray(fbUser.careerAspirations, "careeraspirations", "Career Aspirations");
+      addStringArray(fbUser.subjectsOfInterest, "subjectofinterest", "Subject of Interest");
+      addStringArray(fbUser.values, "values", "Values");
 
       setMappings(newMappings);
       setActiveCategory(newMappings.length > 0 ? newMappings[0].category : "ability");
@@ -233,8 +254,11 @@ const QuestionMappingWizard = ({ onBack }: Props) => {
 
   const categoryLabels: Record<string, string> = {
     ability: "Ability",
-    multipleIntelligence: "Multiple Intelligence",
+    multipleintelligence: "Multiple Intelligence",
     personality: "Personality",
+    careeraspirations: "Career Aspirations",
+    subjectofinterest: "Subject of Interest",
+    values: "Values",
   };
 
   const categoryCounts = useMemo(() => {

@@ -81,29 +81,24 @@ public class ReportTemplateController {
     public ResponseEntity<?> uploadTemplate(
             @RequestParam("file") MultipartFile file,
             @RequestParam("templateName") String templateName,
-            @RequestParam("assessmentId") Long assessmentId) {
-        try {
-            if (file.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "File is empty"));
-            }
-
-            String fileName = UUID.randomUUID().toString() + ".html";
-            String url = spacesService.uploadBytes(
-                    file.getBytes(), "text/html", "report-templates", fileName);
-
-            ReportTemplate template = new ReportTemplate();
-            template.setTemplateName(templateName);
-            template.setAssessmentId(assessmentId);
-            template.setTemplateUrl(url);
-            template.setCreatedAt(LocalDateTime.now().format(TIMESTAMP_FMT));
-            template.setUpdatedAt(LocalDateTime.now().format(TIMESTAMP_FMT));
-
-            ReportTemplate saved = reportTemplateRepository.save(template);
-            return ResponseEntity.ok(saved);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Upload failed: " + e.getMessage()));
+            @RequestParam("assessmentId") Long assessmentId) throws Exception {
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "File is empty"));
         }
+
+        String fileName = UUID.randomUUID().toString() + ".html";
+        String url = spacesService.uploadBytes(
+                file.getBytes(), "text/html", "report-templates", fileName);
+
+        ReportTemplate template = new ReportTemplate();
+        template.setTemplateName(templateName);
+        template.setAssessmentId(assessmentId);
+        template.setTemplateUrl(url);
+        template.setCreatedAt(LocalDateTime.now().format(TIMESTAMP_FMT));
+        template.setUpdatedAt(LocalDateTime.now().format(TIMESTAMP_FMT));
+
+        ReportTemplate saved = reportTemplateRepository.save(template);
+        return ResponseEntity.ok(saved);
     }
 
     @GetMapping("/getAll")
@@ -158,22 +153,17 @@ public class ReportTemplateController {
     // ==================== PLACEHOLDER DETECTION ====================
 
     @GetMapping("/parse-placeholders/{id}")
-    public ResponseEntity<?> parsePlaceholders(@PathVariable Long id) {
-        try {
-            Optional<ReportTemplate> opt = reportTemplateRepository.findById(id);
-            if (opt.isEmpty()) return ResponseEntity.notFound().build();
+    public ResponseEntity<?> parsePlaceholders(@PathVariable Long id) throws Exception {
+        Optional<ReportTemplate> opt = reportTemplateRepository.findById(id);
+        if (opt.isEmpty()) return ResponseEntity.notFound().build();
 
-            String html = fetchTemplateHtml(opt.get().getTemplateUrl());
-            Set<String> placeholders = extractPlaceholders(html);
+        String html = fetchTemplateHtml(opt.get().getTemplateUrl());
+        Set<String> placeholders = extractPlaceholders(html);
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("placeholders", placeholders);
-            response.put("availableFields", getAvailableDataFields());
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to parse: " + e.getMessage()));
-        }
+        Map<String, Object> response = new HashMap<>();
+        response.put("placeholders", placeholders);
+        response.put("availableFields", getAvailableDataFields());
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/available-fields")
@@ -206,121 +196,106 @@ public class ReportTemplateController {
     // ==================== PREVIEW & GENERATE ====================
 
     @PostMapping("/preview")
-    public ResponseEntity<?> previewReport(@RequestBody Map<String, Object> request) {
-        try {
-            Long templateId = ((Number) request.get("templateId")).longValue();
-            Long userStudentId = ((Number) request.get("userStudentId")).longValue();
-            Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+    public ResponseEntity<?> previewReport(@RequestBody Map<String, Object> request) throws Exception {
+        Long templateId = ((Number) request.get("templateId")).longValue();
+        Long userStudentId = ((Number) request.get("userStudentId")).longValue();
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
 
-            Optional<ReportTemplate> opt = reportTemplateRepository.findById(templateId);
-            if (opt.isEmpty()) return ResponseEntity.notFound().build();
+        Optional<ReportTemplate> opt = reportTemplateRepository.findById(templateId);
+        if (opt.isEmpty()) return ResponseEntity.notFound().build();
 
-            ReportTemplate template = opt.get();
-            String html = fetchTemplateHtml(template.getTemplateUrl());
-            Map<String, String> mappings = parseMappings(template.getFieldMappings());
-            Map<String, String> studentData = buildStudentDataMap(userStudentId, assessmentId);
+        ReportTemplate template = opt.get();
+        String html = fetchTemplateHtml(template.getTemplateUrl());
+        Map<String, String> mappings = parseMappings(template.getFieldMappings());
+        Map<String, String> studentData = buildStudentDataMap(userStudentId, assessmentId);
 
-            String filledHtml = fillTemplate(html, mappings, studentData);
+        String filledHtml = fillTemplate(html, mappings, studentData);
 
-            return ResponseEntity.ok(Map.of("html", filledHtml));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Preview failed: " + e.getMessage()));
-        }
+        return ResponseEntity.ok(Map.of("html", filledHtml));
     }
 
     @PostMapping("/generate-pdf")
-    public ResponseEntity<?> generatePdf(@RequestBody Map<String, Object> request) {
-        try {
-            Long templateId = ((Number) request.get("templateId")).longValue();
-            Long userStudentId = ((Number) request.get("userStudentId")).longValue();
-            Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+    public ResponseEntity<?> generatePdf(@RequestBody Map<String, Object> request) throws Exception {
+        Long templateId = ((Number) request.get("templateId")).longValue();
+        Long userStudentId = ((Number) request.get("userStudentId")).longValue();
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
 
-            Optional<ReportTemplate> opt = reportTemplateRepository.findById(templateId);
-            if (opt.isEmpty()) return ResponseEntity.notFound().build();
+        Optional<ReportTemplate> opt = reportTemplateRepository.findById(templateId);
+        if (opt.isEmpty()) return ResponseEntity.notFound().build();
 
-            ReportTemplate template = opt.get();
-            String html = fetchTemplateHtml(template.getTemplateUrl());
-            Map<String, String> mappings = parseMappings(template.getFieldMappings());
-            Map<String, String> studentData = buildStudentDataMap(userStudentId, assessmentId);
+        ReportTemplate template = opt.get();
+        String html = fetchTemplateHtml(template.getTemplateUrl());
+        Map<String, String> mappings = parseMappings(template.getFieldMappings());
+        Map<String, String> studentData = buildStudentDataMap(userStudentId, assessmentId);
 
-            String filledHtml = fillTemplate(html, mappings, studentData);
-            byte[] pdfBytes = htmlToPdf(filledHtml);
+        String filledHtml = fillTemplate(html, mappings, studentData);
+        byte[] pdfBytes = htmlToPdf(filledHtml);
 
-            String studentName = studentData.getOrDefault("student.name", "report");
-            String fileName = studentName.replaceAll("\\s+", "_") + "_report.pdf";
+        String studentName = studentData.getOrDefault("student.name", "report");
+        String fileName = studentName.replaceAll("\\s+", "_") + "_report.pdf";
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_PDF);
-            headers.setContentDispositionFormData("attachment", fileName);
-            headers.setContentLength(pdfBytes.length);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", fileName);
+        headers.setContentLength(pdfBytes.length);
 
-            return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "PDF generation failed: " + e.getMessage()));
-        }
+        return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
     }
 
     @PostMapping("/generate-pdf-bulk")
-    public ResponseEntity<?> generatePdfBulk(@RequestBody Map<String, Object> request) {
-        try {
-            Long templateId = ((Number) request.get("templateId")).longValue();
-            Long assessmentId = ((Number) request.get("assessmentId")).longValue();
-            @SuppressWarnings("unchecked")
-            List<Number> studentIds = (List<Number>) request.get("userStudentIds");
+    public ResponseEntity<?> generatePdfBulk(@RequestBody Map<String, Object> request) throws Exception {
+        Long templateId = ((Number) request.get("templateId")).longValue();
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+        @SuppressWarnings("unchecked")
+        List<Number> studentIds = (List<Number>) request.get("userStudentIds");
 
-            Optional<ReportTemplate> opt = reportTemplateRepository.findById(templateId);
-            if (opt.isEmpty()) return ResponseEntity.notFound().build();
+        Optional<ReportTemplate> opt = reportTemplateRepository.findById(templateId);
+        if (opt.isEmpty()) return ResponseEntity.notFound().build();
 
-            ReportTemplate template = opt.get();
-            String html = fetchTemplateHtml(template.getTemplateUrl());
-            Map<String, String> mappings = parseMappings(template.getFieldMappings());
+        ReportTemplate template = opt.get();
+        String html = fetchTemplateHtml(template.getTemplateUrl());
+        Map<String, String> mappings = parseMappings(template.getFieldMappings());
 
-            // Build combined HTML with page breaks for merged PDF
-            StringBuilder combinedHtml = new StringBuilder();
-            combinedHtml.append("<html><head><style>")
-                    .append(".page-break { page-break-after: always; }")
-                    .append("</style>");
+        // Build combined HTML with page breaks for merged PDF
+        StringBuilder combinedHtml = new StringBuilder();
+        combinedHtml.append("<html><head><style>")
+                .append(".page-break { page-break-after: always; }")
+                .append("</style>");
 
-            // Extract <head> content from template for styles
-            int headStart = html.indexOf("<head>");
-            int headEnd = html.indexOf("</head>");
-            if (headStart >= 0 && headEnd >= 0) {
-                String headContent = html.substring(headStart + 6, headEnd);
-                // Remove any existing <style> tags and re-add them
-                combinedHtml.append(headContent);
-            }
-            combinedHtml.append("</head><body>");
-
-            for (int i = 0; i < studentIds.size(); i++) {
-                Long studentId = studentIds.get(i).longValue();
-                Map<String, String> studentData = buildStudentDataMap(studentId, assessmentId);
-                String filledHtml = fillTemplate(html, mappings, studentData);
-
-                // Extract just the body content
-                String bodyContent = extractBodyContent(filledHtml);
-                combinedHtml.append("<div");
-                if (i < studentIds.size() - 1) {
-                    combinedHtml.append(" class=\"page-break\"");
-                }
-                combinedHtml.append(">").append(bodyContent).append("</div>");
-            }
-
-            combinedHtml.append("</body></html>");
-
-            byte[] pdfBytes = htmlToPdf(combinedHtml.toString());
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_PDF);
-            headers.setContentDispositionFormData("attachment", "bulk_reports.pdf");
-            headers.setContentLength(pdfBytes.length);
-
-            return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Bulk PDF generation failed: " + e.getMessage()));
+        // Extract <head> content from template for styles
+        int headStart = html.indexOf("<head>");
+        int headEnd = html.indexOf("</head>");
+        if (headStart >= 0 && headEnd >= 0) {
+            String headContent = html.substring(headStart + 6, headEnd);
+            // Remove any existing <style> tags and re-add them
+            combinedHtml.append(headContent);
         }
+        combinedHtml.append("</head><body>");
+
+        for (int i = 0; i < studentIds.size(); i++) {
+            Long studentId = studentIds.get(i).longValue();
+            Map<String, String> studentData = buildStudentDataMap(studentId, assessmentId);
+            String filledHtml = fillTemplate(html, mappings, studentData);
+
+            // Extract just the body content
+            String bodyContent = extractBodyContent(filledHtml);
+            combinedHtml.append("<div");
+            if (i < studentIds.size() - 1) {
+                combinedHtml.append(" class=\"page-break\"");
+            }
+            combinedHtml.append(">").append(bodyContent).append("</div>");
+        }
+
+        combinedHtml.append("</body></html>");
+
+        byte[] pdfBytes = htmlToPdf(combinedHtml.toString());
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "bulk_reports.pdf");
+        headers.setContentLength(pdfBytes.length);
+
+        return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
     }
 
     // ==================== HELPERS ====================

@@ -1,13 +1,18 @@
 package com.kccitm.api.controller.career9;
 
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -53,6 +58,7 @@ import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepos
 import com.kccitm.api.repository.Career9.School.SchoolSectionsRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.service.DigitalOceanSpacesService;
 import com.kccitm.api.service.FirebaseService;
 
@@ -81,6 +87,7 @@ public class BetReportDataController {
     @Autowired private QuestionnaireQuestionRepository questionnaireQuestionRepository;
     @Autowired private FirebaseService firebaseService;
     @Autowired private DigitalOceanSpacesService digitalOceanSpacesService;
+    @Autowired private com.kccitm.api.repository.Career9.GeneratedReportRepository generatedReportRepository;
 
     // ═══════════════════════ ONE-CLICK REPORT ═══════════════════════
 
@@ -94,40 +101,45 @@ public class BetReportDataController {
     @PostMapping("/one-click-report")
     @Transactional
     public ResponseEntity<?> oneClickReport(@RequestBody Map<String, Object> request) {
-        try {
-            Long assessmentId = ((Number) request.get("assessmentId")).longValue();
-            Long userStudentId = ((Number) request.get("userStudentId")).longValue();
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+        Long userStudentId = ((Number) request.get("userStudentId")).longValue();
 
-            // Step 1: Check if report data already exists
-            Optional<BetReportData> existing = betReportDataRepository
-                    .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+        // Step 1: Check if report data already exists
+        Optional<BetReportData> existing = betReportDataRepository
+                .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
 
-            // Step 2: Generate data if missing
-            if (existing.isEmpty()) {
-                BetReportData report = generateForStudentLive(userStudentId, assessmentId);
-                if (report == null) {
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                            .body(Map.of("error", "No completed assessment found for this student"));
-                }
-                existing = Optional.of(report);
+        // Step 2: Generate data if missing or force=true
+        boolean force = Boolean.TRUE.equals(request.get("force"));
+        if (force && existing.isPresent()) {
+            betReportDataRepository.deleteByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+            existing = Optional.empty();
+        }
+        if (existing.isEmpty()) {
+            BetReportData report = generateForStudentLive(userStudentId, assessmentId);
+            if (report == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "No completed assessment found for this student"));
+            }
+            existing = Optional.of(report);
+        }
+
+        BetReportData report = existing.get();
+
+        // Step 3: Generate HTML if not already generated
+        if (!"generated".equals(report.getReportStatus()) || report.getReportUrl() == null) {
+            String template = loadHtmlTemplate();
+            if (template == null) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(Map.of("error", "Could not load BET HTML template"));
             }
 
-            BetReportData report = existing.get();
+            String filledHtml = fillTemplate(template, report);
+            String safeName = (report.getStudentName() != null ? report.getStudentName() : "student")
+                    .replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
+            String fileName = safeName + "_" + userStudentId + "_bet_report.html";
+            String folder = "bet-reports/assessment-" + assessmentId;
 
-            // Step 3: Generate HTML if not already generated
-            if (!"generated".equals(report.getReportStatus()) || report.getReportUrl() == null) {
-                String template = loadHtmlTemplate();
-                if (template == null) {
-                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                            .body(Map.of("error", "Could not load BET HTML template"));
-                }
-
-                String filledHtml = fillTemplate(template, report);
-                String safeName = (report.getStudentName() != null ? report.getStudentName() : "student")
-                        .replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
-                String fileName = safeName + "_" + userStudentId + "_bet_report.html";
-                String folder = "bet-reports/assessment-" + assessmentId;
-
+                try {
                 String reportUrl = digitalOceanSpacesService.uploadBytes(
                         filledHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8),
                         "text/html", folder, fileName);
@@ -135,18 +147,23 @@ public class BetReportDataController {
                 report.setReportStatus("generated");
                 report.setReportUrl(reportUrl);
                 betReportDataRepository.save(report);
-            }
-
-            return ResponseEntity.ok(Map.of(
-                    "reportUrl", report.getReportUrl(),
-                    "studentName", safe(report.getStudentName()),
-                    "status", "generated"
-            ));
-
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Report generation failed: " + e.getMessage()));
+                syncGeneratedReport(userStudentId, assessmentId, "generated", reportUrl);
+                } catch (Exception uploadEx) {
+                    // DO Spaces upload failed — return HTML directly for download
+                    byte[] htmlBytes = filledHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    HttpHeaders headers = new HttpHeaders();
+                    headers.setContentType(MediaType.TEXT_HTML);
+                    headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"");
+                    headers.setContentLength(htmlBytes.length);
+                    return new ResponseEntity<>(htmlBytes, headers, HttpStatus.OK);
+                }
         }
+
+        return ResponseEntity.ok(Map.of(
+                "reportUrl", report.getReportUrl(),
+                "studentName", safe(report.getStudentName()),
+                "status", "generated"
+        ));
     }
 
     // ═══════════════════════ CRUD ═══════════════════════
@@ -182,81 +199,147 @@ public class BetReportDataController {
         return ResponseEntity.ok(Map.of("message", "Deleted"));
     }
 
+    // ═══════════════════════ DOWNLOAD REPORT (HTML) ═══════════════════════
+
+    @GetMapping("/download/{userStudentId}/{assessmentId}")
+    public ResponseEntity<?> downloadReport(
+            @PathVariable Long userStudentId,
+            @PathVariable Long assessmentId) {
+        Optional<BetReportData> opt = betReportDataRepository
+                .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+        if (opt.isEmpty() || opt.get().getReportUrl() == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "No generated report found for this student"));
+        }
+        BetReportData rd = opt.get();
+        byte[] htmlBytes = digitalOceanSpacesService.downloadFileByUrl(rd.getReportUrl());
+        if (htmlBytes == null) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to download report file"));
+        }
+        // Inline all images as base64 data URIs so the HTML is self-contained
+        String html = inlineImages(new String(htmlBytes, StandardCharsets.UTF_8));
+
+        String safeName = (rd.getStudentName() != null ? rd.getStudentName() : "report")
+                .replaceAll("[^a-zA-Z0-9_\\- ]", "").replaceAll("\\s+", "_");
+        String fileName = safeName + "_bet_report.html";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.TEXT_HTML);
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"");
+        return new ResponseEntity<>(html.getBytes(StandardCharsets.UTF_8), headers, HttpStatus.OK);
+    }
+
+    // ═══════════════════════ BATCH DOWNLOAD (HTML files) ═══════════════════════
+
+    /**
+     * POST /bet-report-data/download-zip
+     * Body: { "assessmentId": 5, "userStudentIds": [1, 2, 3] }
+     *
+     * Returns report URLs for the given students (frontend handles PDF conversion + ZIP).
+     */
+    @PostMapping("/download-zip")
+    public ResponseEntity<?> downloadZipInfo(@RequestBody Map<String, Object> request) {
+        if (!request.containsKey("assessmentId") || !request.containsKey("userStudentIds")) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "assessmentId and userStudentIds are required"));
+        }
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+        @SuppressWarnings("unchecked")
+        List<Number> idList = (List<Number>) request.get("userStudentIds");
+
+        List<Map<String, Object>> reports = new ArrayList<>();
+        for (Number idNum : idList) {
+            Long userStudentId = idNum.longValue();
+            Optional<BetReportData> opt = betReportDataRepository
+                    .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+            if (opt.isEmpty() || opt.get().getReportUrl() == null) continue;
+            BetReportData rd = opt.get();
+            String safeName = (rd.getStudentName() != null ? rd.getStudentName() : "student_" + userStudentId)
+                    .replaceAll("[^a-zA-Z0-9_\\- ]", "").replaceAll("\\s+", "_");
+            reports.add(Map.of(
+                    "userStudentId", userStudentId,
+                    "studentName", safe(rd.getStudentName()),
+                    "fileName", safeName + "_" + userStudentId + "_bet_report",
+                    "reportUrl", rd.getReportUrl()
+            ));
+        }
+        if (reports.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "No generated reports found"));
+        }
+        return ResponseEntity.ok(Map.of("reports", reports));
+    }
+
     // ═══════════════════════ EXCEL EXPORT ═══════════════════════
 
     @GetMapping("/export-excel/{assessmentId}")
-    public ResponseEntity<?> exportExcel(@PathVariable Long assessmentId) {
-        try {
-            List<BetReportData> reports = betReportDataRepository.findByAssessmentId(assessmentId);
-            if (reports.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("error", "No BET report data found for this assessment"));
-            }
-
-            Workbook workbook = new XSSFWorkbook();
-            Sheet sheet = workbook.createSheet("BET Report Data");
-
-            // Header style
-            CellStyle headerStyle = workbook.createCellStyle();
-            Font headerFont = workbook.createFont();
-            headerFont.setBold(true);
-            headerStyle.setFont(headerFont);
-
-            // Header row
-            String[] headers = {
-                "student_name", "student_grade", "cog1", "cog2",
-                "cog3", "cog3_description",
-                "self_management_1", "self_management_2", "self_management_3",
-                "social_insight", "environment",
-                "value1", "value2", "value3", "value_overview"
-            };
-
-            Row headerRow = sheet.createRow(0);
-            for (int i = 0; i < headers.length; i++) {
-                headerRow.createCell(i).setCellValue(headers[i]);
-                headerRow.getCell(i).setCellStyle(headerStyle);
-            }
-
-            // Data rows
-            int rowIdx = 1;
-            for (BetReportData r : reports) {
-                Row row = sheet.createRow(rowIdx++);
-                row.createCell(0).setCellValue(safe(r.getStudentName()));
-                row.createCell(1).setCellValue(safe(r.getStudentGrade()));
-                row.createCell(2).setCellValue(safe(r.getCog1()));
-                row.createCell(3).setCellValue(safe(r.getCog2()));
-                row.createCell(4).setCellValue(safe(r.getCog3()));
-                row.createCell(5).setCellValue(safe(r.getCog3Description()));
-                row.createCell(6).setCellValue(safe(r.getSelfManagement1()));
-                row.createCell(7).setCellValue(safe(r.getSelfManagement2()));
-                row.createCell(8).setCellValue(safe(r.getSelfManagement3()));
-                row.createCell(9).setCellValue(safe(r.getSocialInsight()));
-                row.createCell(10).setCellValue(safe(r.getEnvironment()));
-                row.createCell(11).setCellValue(safe(r.getValue1()));
-                row.createCell(12).setCellValue(safe(r.getValue2()));
-                row.createCell(13).setCellValue(safe(r.getValue3()));
-                row.createCell(14).setCellValue(safe(r.getValueOverview()));
-            }
-
-            // Auto-size columns
-            for (int i = 0; i < headers.length; i++) {
-                sheet.autoSizeColumn(i);
-            }
-
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            workbook.write(out);
-            workbook.close();
-
-            HttpHeaders responseHeaders = new HttpHeaders();
-            responseHeaders.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
-            responseHeaders.setContentDispositionFormData("attachment", "bet_report_data.xlsx");
-            responseHeaders.setContentLength(out.size());
-
-            return new ResponseEntity<>(out.toByteArray(), responseHeaders, HttpStatus.OK);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Export failed: " + e.getMessage()));
+    public ResponseEntity<?> exportExcel(@PathVariable Long assessmentId) throws Exception {
+        List<BetReportData> reports = betReportDataRepository.findByAssessmentId(assessmentId);
+        if (reports.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "No BET report data found for this assessment"));
         }
+
+        Workbook workbook = new XSSFWorkbook();
+        Sheet sheet = workbook.createSheet("BET Report Data");
+
+        // Header style
+        CellStyle headerStyle = workbook.createCellStyle();
+        Font headerFont = workbook.createFont();
+        headerFont.setBold(true);
+        headerStyle.setFont(headerFont);
+
+        // Header row
+        String[] headers = {
+            "student_name", "student_grade", "cog1", "cog2",
+            "cog3", "cog3_description",
+            "self_management_1", "self_management_2", "self_management_3",
+            "social_insight", "environment",
+            "value1", "value2", "value3", "value_overview"
+        };
+
+        Row headerRow = sheet.createRow(0);
+        for (int i = 0; i < headers.length; i++) {
+            headerRow.createCell(i).setCellValue(headers[i]);
+            headerRow.getCell(i).setCellStyle(headerStyle);
+        }
+
+        // Data rows
+        int rowIdx = 1;
+        for (BetReportData r : reports) {
+            Row row = sheet.createRow(rowIdx++);
+            row.createCell(0).setCellValue(safe(r.getStudentName()));
+            row.createCell(1).setCellValue(safe(r.getStudentGrade()));
+            row.createCell(2).setCellValue(safe(r.getCog1()));
+            row.createCell(3).setCellValue(safe(r.getCog2()));
+            row.createCell(4).setCellValue(safe(r.getCog3()));
+            row.createCell(5).setCellValue(safe(r.getCog3Description()));
+            row.createCell(6).setCellValue(safe(r.getSelfManagement1()));
+            row.createCell(7).setCellValue(safe(r.getSelfManagement2()));
+            row.createCell(8).setCellValue(safe(r.getSelfManagement3()));
+            row.createCell(9).setCellValue(safe(r.getSocialInsight()));
+            row.createCell(10).setCellValue(safe(r.getEnvironment()));
+            row.createCell(11).setCellValue(safe(r.getValue1()));
+            row.createCell(12).setCellValue(safe(r.getValue2()));
+            row.createCell(13).setCellValue(safe(r.getValue3()));
+            row.createCell(14).setCellValue(safe(r.getValueOverview()));
+        }
+
+        // Auto-size columns
+        for (int i = 0; i < headers.length; i++) {
+            sheet.autoSizeColumn(i);
+        }
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        workbook.write(out);
+        workbook.close();
+
+        HttpHeaders responseHeaders = new HttpHeaders();
+        responseHeaders.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        responseHeaders.setContentDispositionFormData("attachment", "bet_report_data.xlsx");
+        responseHeaders.setContentLength(out.size());
+
+        return new ResponseEntity<>(out.toByteArray(), responseHeaders, HttpStatus.OK);
     }
 
     // ═══════════════════════ MQ/MQT SCORE EXPORT ═══════════════════════
@@ -270,147 +353,148 @@ public class BetReportDataController {
      * Student Name | Roll No | Grade | Section | [MQ1: MQT1] | [MQ1: MQT2] | ... | [MQ2: MQT3] | ...
      */
     @PostMapping("/export-mqt-scores")
-    public ResponseEntity<?> exportMqtScores(@RequestBody Map<String, Object> request) {
-        try {
-            if (!request.containsKey("assessmentId")) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "assessmentId is required"));
-            }
-            Long assessmentId = ((Number) request.get("assessmentId")).longValue();
-
-            // 1. Get student mappings for this assessment
-            List<StudentAssessmentMapping> allMappings = studentAssessmentMappingRepository.findAllByAssessmentId(assessmentId);
-            if (allMappings.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("error", "No student mappings found for this assessment"));
-            }
-
-            // 2. Filter by selected student IDs if provided
-            @SuppressWarnings("unchecked")
-            List<Number> selectedIds = (List<Number>) request.get("userStudentIds");
-            if (selectedIds != null && !selectedIds.isEmpty()) {
-                java.util.Set<Long> selectedSet = selectedIds.stream()
-                        .map(Number::longValue).collect(Collectors.toSet());
-                allMappings = allMappings.stream()
-                        .filter(m -> selectedSet.contains(m.getUserStudent().getUserStudentId()))
-                        .collect(Collectors.toList());
-            }
-
-            if (allMappings.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("error", "No matching students found"));
-            }
-
-            // 3. Get all active MQTs grouped by their parent MQ
-            List<MeasuredQualityTypes> allMqts = measuredQualityTypesRepository.findByIsDeletedFalseOrIsDeletedIsNull();
-
-            // Group MQTs by MQ, maintaining order
-            LinkedHashMap<String, List<MeasuredQualityTypes>> mqToMqts = new LinkedHashMap<>();
-            for (MeasuredQualityTypes mqt : allMqts) {
-                String mqName = mqt.getMeasuredQuality() != null
-                        ? safe(mqt.getMeasuredQuality().getQualityDisplayName() != null
-                            ? mqt.getMeasuredQuality().getQualityDisplayName()
-                            : mqt.getMeasuredQuality().getMeasuredQualityName())
-                        : "Ungrouped";
-                mqToMqts.computeIfAbsent(mqName, k -> new ArrayList<>()).add(mqt);
-            }
-
-            // 4. Build ordered list of MQT columns
-            List<MeasuredQualityTypes> orderedMqts = new ArrayList<>();
-            List<String> mqtColumnHeaders = new ArrayList<>();
-            for (Map.Entry<String, List<MeasuredQualityTypes>> entry : mqToMqts.entrySet()) {
-                String mqName = entry.getKey();
-                for (MeasuredQualityTypes mqt : entry.getValue()) {
-                    orderedMqts.add(mqt);
-                    String mqtName = mqt.getMeasuredQualityTypeDisplayName() != null
-                            ? mqt.getMeasuredQualityTypeDisplayName()
-                            : mqt.getMeasuredQualityTypeName();
-                    mqtColumnHeaders.add(mqName + ": " + safe(mqtName));
-                }
-            }
-
-            // 5. Bulk-fetch all raw scores for these mappings
-            List<Long> mappingIds = allMappings.stream()
-                    .map(StudentAssessmentMapping::getStudentAssessmentId)
-                    .collect(Collectors.toList());
-            List<AssessmentRawScore> allScores = assessmentRawScoreRepository
-                    .findByStudentAssessmentMappingStudentAssessmentIdIn(mappingIds);
-
-            // Index scores by (mappingId -> mqtId -> rawScore)
-            Map<Long, Map<Long, Integer>> scoreIndex = new HashMap<>();
-            for (AssessmentRawScore score : allScores) {
-                Long mapId = score.getStudentAssessmentMapping().getStudentAssessmentId();
-                Long mqtId = score.getMeasuredQualityType() != null
-                        ? score.getMeasuredQualityType().getMeasuredQualityTypeId() : null;
-                if (mqtId != null) {
-                    scoreIndex.computeIfAbsent(mapId, k -> new HashMap<>())
-                            .put(mqtId, score.getRawScore());
-                }
-            }
-
-            // 6. Build Excel
-            Workbook workbook = new XSSFWorkbook();
-            Sheet sheet = workbook.createSheet("MQ-MQT Scores");
-
-            CellStyle headerStyle = workbook.createCellStyle();
-            Font headerFont = workbook.createFont();
-            headerFont.setBold(true);
-            headerStyle.setFont(headerFont);
-
-            // Header row: Student Name | Roll No | Grade | Section | [MQT columns...]
-            List<String> baseHeaders = List.of("Student Name", "Roll No", "Grade", "Section");
-            Row headerRow = sheet.createRow(0);
-            for (int i = 0; i < baseHeaders.size(); i++) {
-                headerRow.createCell(i).setCellValue(baseHeaders.get(i));
-                headerRow.getCell(i).setCellStyle(headerStyle);
-            }
-            for (int i = 0; i < mqtColumnHeaders.size(); i++) {
-                int col = baseHeaders.size() + i;
-                headerRow.createCell(col).setCellValue(mqtColumnHeaders.get(i));
-                headerRow.getCell(col).setCellStyle(headerStyle);
-            }
-
-            // Data rows
-            int rowIdx = 1;
-            for (StudentAssessmentMapping mapping : allMappings) {
-                UserStudent us = mapping.getUserStudent();
-                StudentInfo si = us.getStudentInfo();
-                Row row = sheet.createRow(rowIdx++);
-
-                row.createCell(0).setCellValue(safe(si != null ? si.getName() : ""));
-                row.createCell(1).setCellValue(safe(si != null ? si.getSchoolRollNumber() : ""));
-                row.createCell(2).setCellValue(resolveGrade(si));
-                row.createCell(3).setCellValue(resolveSection(si));
-
-                Map<Long, Integer> studentScores = scoreIndex.getOrDefault(
-                        mapping.getStudentAssessmentId(), Map.of());
-                for (int i = 0; i < orderedMqts.size(); i++) {
-                    Long mqtId = orderedMqts.get(i).getMeasuredQualityTypeId();
-                    Integer score = studentScores.get(mqtId);
-                    row.createCell(baseHeaders.size() + i).setCellValue(score != null ? score : 0);
-                }
-            }
-
-            // Auto-size first 4 columns
-            for (int i = 0; i < baseHeaders.size(); i++) {
-                sheet.autoSizeColumn(i);
-            }
-
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            workbook.write(out);
-            workbook.close();
-
-            HttpHeaders responseHeaders = new HttpHeaders();
-            responseHeaders.setContentType(MediaType.parseMediaType(
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
-            responseHeaders.setContentDispositionFormData("attachment", "mqt_scores_export.xlsx");
-            responseHeaders.setContentLength(out.size());
-
-            return new ResponseEntity<>(out.toByteArray(), responseHeaders, HttpStatus.OK);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Export failed: " + e.getMessage()));
+    public ResponseEntity<?> exportMqtScores(@RequestBody Map<String, Object> request) throws Exception {
+        if (!request.containsKey("assessmentId")) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "assessmentId is required"));
         }
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+
+        // 1. Get student mappings for this assessment
+        List<StudentAssessmentMapping> allMappings = studentAssessmentMappingRepository.findAllByAssessmentId(assessmentId);
+        if (allMappings.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "No student mappings found for this assessment"));
+        }
+
+        // 2. Filter by selected student IDs if provided
+        @SuppressWarnings("unchecked")
+        List<Number> selectedIds = (List<Number>) request.get("userStudentIds");
+        if (selectedIds != null && !selectedIds.isEmpty()) {
+            java.util.Set<Long> selectedSet = selectedIds.stream()
+                    .map(Number::longValue).collect(Collectors.toSet());
+            allMappings = allMappings.stream()
+                    .filter(m -> selectedSet.contains(m.getUserStudent().getUserStudentId()))
+                    .collect(Collectors.toList());
+        }
+
+        if (allMappings.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "No matching students found"));
+        }
+
+        // 3. Bulk-fetch all raw scores for these mappings
+        List<Long> mappingIds = allMappings.stream()
+                .map(StudentAssessmentMapping::getStudentAssessmentId)
+                .collect(Collectors.toList());
+        List<AssessmentRawScore> allScores = assessmentRawScoreRepository
+                .findByStudentAssessmentMappingStudentAssessmentIdIn(mappingIds);
+
+        // Index scores by (mappingId -> mqtId -> rawScore)
+        Map<Long, Map<Long, Integer>> scoreIndex = new HashMap<>();
+        for (AssessmentRawScore score : allScores) {
+            Long mapId = score.getStudentAssessmentMapping().getStudentAssessmentId();
+            Long mqtId = score.getMeasuredQualityType() != null
+                    ? score.getMeasuredQualityType().getMeasuredQualityTypeId() : null;
+            if (mqtId != null) {
+                scoreIndex.computeIfAbsent(mapId, k -> new HashMap<>())
+                        .put(mqtId, score.getRawScore());
+            }
+        }
+
+        // 4. Discover MQTs actually used in this assessment's scores (not all global MQTs)
+        LinkedHashMap<Long, MeasuredQualityTypes> seenMqts = new LinkedHashMap<>();
+        for (AssessmentRawScore score : allScores) {
+            MeasuredQualityTypes mqt = score.getMeasuredQualityType();
+            if (mqt != null && !seenMqts.containsKey(mqt.getMeasuredQualityTypeId())) {
+                seenMqts.put(mqt.getMeasuredQualityTypeId(), mqt);
+            }
+        }
+
+        // Group by parent MQ, maintaining order
+        LinkedHashMap<String, List<MeasuredQualityTypes>> mqToMqts = new LinkedHashMap<>();
+        for (MeasuredQualityTypes mqt : seenMqts.values()) {
+            String mqName = mqt.getMeasuredQuality() != null
+                    ? safe(mqt.getMeasuredQuality().getQualityDisplayName() != null
+                        ? mqt.getMeasuredQuality().getQualityDisplayName()
+                        : mqt.getMeasuredQuality().getMeasuredQualityName())
+                    : "Ungrouped";
+            mqToMqts.computeIfAbsent(mqName, k -> new ArrayList<>()).add(mqt);
+        }
+
+        // 5. Build ordered column list
+        List<MeasuredQualityTypes> orderedMqts = new ArrayList<>();
+        List<String> mqtColumnHeaders = new ArrayList<>();
+        for (Map.Entry<String, List<MeasuredQualityTypes>> entry : mqToMqts.entrySet()) {
+            String mqName = entry.getKey();
+            for (MeasuredQualityTypes mqt : entry.getValue()) {
+                orderedMqts.add(mqt);
+                String mqtName = mqt.getMeasuredQualityTypeDisplayName() != null
+                        ? mqt.getMeasuredQualityTypeDisplayName()
+                        : mqt.getMeasuredQualityTypeName();
+                mqtColumnHeaders.add(mqName + ": " + safe(mqtName));
+            }
+        }
+
+        // 6. Build Excel
+        Workbook workbook = new XSSFWorkbook();
+        Sheet sheet = workbook.createSheet("MQ-MQT Scores");
+
+        CellStyle headerStyle = workbook.createCellStyle();
+        Font headerFont = workbook.createFont();
+        headerFont.setBold(true);
+        headerStyle.setFont(headerFont);
+
+        // Header row: Student Name | Roll No | Grade | Section | [MQT columns...]
+        List<String> baseHeaders = List.of("Student Name", "Roll No", "Grade", "Section");
+        Row headerRow = sheet.createRow(0);
+        for (int i = 0; i < baseHeaders.size(); i++) {
+            headerRow.createCell(i).setCellValue(baseHeaders.get(i));
+            headerRow.getCell(i).setCellStyle(headerStyle);
+        }
+        for (int i = 0; i < mqtColumnHeaders.size(); i++) {
+            int col = baseHeaders.size() + i;
+            headerRow.createCell(col).setCellValue(mqtColumnHeaders.get(i));
+            headerRow.getCell(col).setCellStyle(headerStyle);
+        }
+
+        // Data rows
+        int rowIdx = 1;
+        for (StudentAssessmentMapping mapping : allMappings) {
+            UserStudent us = mapping.getUserStudent();
+            StudentInfo si = us.getStudentInfo();
+            Row row = sheet.createRow(rowIdx++);
+
+            row.createCell(0).setCellValue(safe(si != null ? si.getName() : ""));
+            row.createCell(1).setCellValue(safe(si != null ? si.getSchoolRollNumber() : ""));
+            row.createCell(2).setCellValue(resolveGrade(si));
+            row.createCell(3).setCellValue(resolveSection(si));
+
+            Map<Long, Integer> studentScores = scoreIndex.getOrDefault(
+                    mapping.getStudentAssessmentId(), Map.of());
+            for (int i = 0; i < orderedMqts.size(); i++) {
+                Long mqtId = orderedMqts.get(i).getMeasuredQualityTypeId();
+                Integer score = studentScores.get(mqtId);
+                row.createCell(baseHeaders.size() + i).setCellValue(score != null ? score : 0);
+            }
+        }
+
+        // Auto-size first 4 columns
+        for (int i = 0; i < baseHeaders.size(); i++) {
+            sheet.autoSizeColumn(i);
+        }
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        workbook.write(out);
+        workbook.close();
+
+        HttpHeaders responseHeaders = new HttpHeaders();
+        responseHeaders.setContentType(MediaType.parseMediaType(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        responseHeaders.setContentDispositionFormData("attachment", "mqt_scores_export.xlsx");
+        responseHeaders.setContentLength(out.size());
+
+        return new ResponseEntity<>(out.toByteArray(), responseHeaders, HttpStatus.OK);
     }
 
     // ═══════════════════════ GENERATE & SAVE ═══════════════════════
@@ -425,63 +509,57 @@ public class BetReportDataController {
     @PostMapping("/generate")
     @Transactional
     public ResponseEntity<?> generateAndSave(@RequestBody Map<String, Object> request) {
-        try {
-            // 1. Parse request
-            if (!request.containsKey("assessmentId") || !request.containsKey("userStudentIds")) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "assessmentId and userStudentIds are required"));
-            }
-            Long assessmentId = ((Number) request.get("assessmentId")).longValue();
-            @SuppressWarnings("unchecked")
-            List<Number> idList = (List<Number>) request.get("userStudentIds");
-
-            // 2. Validate assessment is BET type
-            Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(assessmentId);
-            if (assessmentOpt.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("error", "Assessment not found"));
-            }
-            AssessmentTable assessment = assessmentOpt.get();
-            if (assessment.getQuestionnaire() == null) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "Assessment has no linked questionnaire"));
-            }
-            Boolean qType = assessment.getQuestionnaire().getType();
-            if (qType == null || !qType) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "Assessment is not a BET type"));
-            }
-
-            // 3. Process each student
-            List<BetReportData> saved = new ArrayList<>();
-            List<Map<String, Object>> errors = new ArrayList<>();
-
-            for (Number idNum : idList) {
-                Long userStudentId = idNum.longValue();
-                try {
-                    BetReportData report = generateForStudent(userStudentId, assessmentId);
-                    if (report != null) {
-                        saved.add(report);
-                    } else {
-                        errors.add(Map.of("userStudentId", userStudentId,
-                                "reason", "No completed assessment found"));
-                    }
-                } catch (Exception e) {
-                    errors.add(Map.of("userStudentId", userStudentId,
-                            "reason", e.getMessage()));
-                }
-            }
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("generated", saved.size());
-            response.put("errors", errors);
-            response.put("data", saved);
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to generate BET report data: " + e.getMessage()));
+        // 1. Parse request
+        if (!request.containsKey("assessmentId") || !request.containsKey("userStudentIds")) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "assessmentId and userStudentIds are required"));
         }
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+        @SuppressWarnings("unchecked")
+        List<Number> idList = (List<Number>) request.get("userStudentIds");
+
+        // 2. Validate assessment is BET type
+        Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(assessmentId);
+        if (assessmentOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Assessment not found"));
+        }
+        AssessmentTable assessment = assessmentOpt.get();
+        if (assessment.getQuestionnaire() == null) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Assessment has no linked questionnaire"));
+        }
+        Boolean qType = assessment.getQuestionnaire().getType();
+        if (qType == null || !qType) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Assessment is not a BET type"));
+        }
+
+        // 3. Process each student
+        List<BetReportData> saved = new ArrayList<>();
+        List<Map<String, Object>> errors = new ArrayList<>();
+
+        for (Number idNum : idList) {
+            Long userStudentId = idNum.longValue();
+            try {
+                BetReportData report = generateForStudent(userStudentId, assessmentId);
+                if (report != null) {
+                    saved.add(report);
+                } else {
+                    errors.add(Map.of("userStudentId", userStudentId,
+                            "reason", "No completed assessment found"));
+                }
+            } catch (Exception e) {
+                errors.add(Map.of("userStudentId", userStudentId,
+                        "reason", e.getMessage()));
+            }
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("generated", saved.size());
+        response.put("errors", errors);
+        response.put("data", saved);
+        return ResponseEntity.ok(response);
     }
 
     // ═══════════════════════ GENERATE LIVE (calculates raw scores from answers) ═══════════════════════
@@ -496,65 +574,59 @@ public class BetReportDataController {
     @PostMapping("/generate-live")
     @Transactional
     public ResponseEntity<?> generateLiveAndSave(@RequestBody Map<String, Object> request) {
-        try {
-            if (!request.containsKey("assessmentId") || !request.containsKey("userStudentIds")) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "assessmentId and userStudentIds are required"));
-            }
-            Long assessmentId = ((Number) request.get("assessmentId")).longValue();
-            @SuppressWarnings("unchecked")
-            List<Number> idList = (List<Number>) request.get("userStudentIds");
-
-            Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(assessmentId);
-            if (assessmentOpt.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("error", "Assessment not found"));
-            }
-            AssessmentTable assessment = assessmentOpt.get();
-            if (assessment.getQuestionnaire() == null) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "Assessment has no linked questionnaire"));
-            }
-            Boolean qType = assessment.getQuestionnaire().getType();
-            if (qType == null || !qType) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "Assessment is not a BET type"));
-            }
-
-            List<BetReportData> saved = new ArrayList<>();
-            List<Map<String, Object>> errors = new ArrayList<>();
-
-            for (Number idNum : idList) {
-                Long userStudentId = idNum.longValue();
-                try {
-                    BetReportData report = generateForStudentLive(userStudentId, assessmentId);
-                    if (report != null) {
-                        saved.add(report);
-                    } else {
-                        errors.add(Map.of("userStudentId", userStudentId,
-                                "reason", "No completed assessment found"));
-                    }
-                } catch (Exception e) {
-                    errors.add(Map.of("userStudentId", userStudentId,
-                            "reason", e.getMessage()));
-                }
-            }
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("generated", saved.size());
-            response.put("errors", errors);
-            response.put("data", saved);
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to generate BET report data: " + e.getMessage()));
+        if (!request.containsKey("assessmentId") || !request.containsKey("userStudentIds")) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "assessmentId and userStudentIds are required"));
         }
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+        @SuppressWarnings("unchecked")
+        List<Number> idList = (List<Number>) request.get("userStudentIds");
+
+        Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(assessmentId);
+        if (assessmentOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Assessment not found"));
+        }
+        AssessmentTable assessment = assessmentOpt.get();
+        if (assessment.getQuestionnaire() == null) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Assessment has no linked questionnaire"));
+        }
+        Boolean qType = assessment.getQuestionnaire().getType();
+        if (qType == null || !qType) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Assessment is not a BET type"));
+        }
+
+        List<BetReportData> saved = new ArrayList<>();
+        List<Map<String, Object>> errors = new ArrayList<>();
+
+        for (Number idNum : idList) {
+            Long userStudentId = idNum.longValue();
+            try {
+                BetReportData report = generateForStudentLive(userStudentId, assessmentId);
+                if (report != null) {
+                    saved.add(report);
+                } else {
+                    errors.add(Map.of("userStudentId", userStudentId,
+                            "reason", "No completed assessment found"));
+                }
+            } catch (Exception e) {
+                errors.add(Map.of("userStudentId", userStudentId,
+                        "reason", e.getMessage()));
+            }
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("generated", saved.size());
+        response.put("errors", errors);
+        response.put("data", saved);
+        return ResponseEntity.ok(response);
     }
 
     private BetReportData generateForStudentLive(Long userStudentId, Long assessmentId) {
         UserStudent us = userStudentRepository.findById(userStudentId)
-                .orElseThrow(() -> new RuntimeException("Student not found: " + userStudentId));
+                .orElseThrow(() -> new ResourceNotFoundException("UserStudent", "id", userStudentId));
 
         Optional<StudentAssessmentMapping> mappingOpt = studentAssessmentMappingRepository
                 .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
@@ -604,8 +676,17 @@ public class BetReportDataController {
         String[] values = computeTopValues(answers);
         String[] cognitive = computeCognitive(userStudentId);
 
-        // Upsert
-        betReportDataRepository.deleteByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+        // Upsert: preserve reportStatus/reportUrl if re-generating data
+        Optional<BetReportData> existingOpt = betReportDataRepository
+                .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+        String prevReportStatus = null;
+        String prevReportUrl = null;
+        if (existingOpt.isPresent()) {
+            prevReportStatus = existingOpt.get().getReportStatus();
+            prevReportUrl = existingOpt.get().getReportUrl();
+            betReportDataRepository.deleteByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+            betReportDataRepository.flush();
+        }
 
         BetReportData report = new BetReportData();
         report.setUserStudent(us);
@@ -625,6 +706,12 @@ public class BetReportDataController {
         report.setValue3(values[2]);
         report.setValueOverview(buildValueOverview(values));
         report.setSocialInsight(socialInsight);
+
+        // Preserve previous report generation state
+        if (prevReportStatus != null) {
+            report.setReportStatus(prevReportStatus);
+            report.setReportUrl(prevReportUrl);
+        }
 
         return betReportDataRepository.save(report);
     }
@@ -672,47 +759,47 @@ public class BetReportDataController {
     @PostMapping("/generate-reports")
     @Transactional
     public ResponseEntity<?> generateHtmlReports(@RequestBody Map<String, Object> request) {
-        try {
-            if (!request.containsKey("assessmentId") || !request.containsKey("userStudentIds")) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "assessmentId and userStudentIds are required"));
-            }
-            Long assessmentId = ((Number) request.get("assessmentId")).longValue();
-            @SuppressWarnings("unchecked")
-            List<Number> idList = (List<Number>) request.get("userStudentIds");
+        if (!request.containsKey("assessmentId") || !request.containsKey("userStudentIds")) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "assessmentId and userStudentIds are required"));
+        }
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+        @SuppressWarnings("unchecked")
+        List<Number> idList = (List<Number>) request.get("userStudentIds");
 
-            // Read the HTML template
-            String template = loadHtmlTemplate();
-            if (template == null) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(Map.of("error", "Could not load HTML template"));
-            }
+        // Read the HTML template
+        String template = loadHtmlTemplate();
+        if (template == null) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Could not load HTML template"));
+        }
 
-            List<Map<String, Object>> results = new ArrayList<>();
-            List<Map<String, Object>> errors = new ArrayList<>();
+        List<Map<String, Object>> results = new ArrayList<>();
+        List<Map<String, Object>> errors = new ArrayList<>();
 
-            for (Number idNum : idList) {
-                Long userStudentId = idNum.longValue();
-                try {
-                    Optional<BetReportData> reportOpt = betReportDataRepository
-                            .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
-                    if (reportOpt.isEmpty()) {
-                        errors.add(Map.of("userStudentId", userStudentId,
-                                "reason", "No report data found. Generate report data first."));
-                        continue;
-                    }
+        for (Number idNum : idList) {
+            Long userStudentId = idNum.longValue();
+            try {
+                Optional<BetReportData> reportOpt = betReportDataRepository
+                        .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+                if (reportOpt.isEmpty()) {
+                    errors.add(Map.of("userStudentId", userStudentId,
+                            "reason", "No report data found. Generate report data first."));
+                    continue;
+                }
 
-                    BetReportData report = reportOpt.get();
+                BetReportData report = reportOpt.get();
 
-                    // Fill template with report data
-                    String filledHtml = fillTemplate(template, report);
+                // Fill template with report data
+                String filledHtml = fillTemplate(template, report);
 
-                    // Upload to DigitalOcean Spaces
-                    String safeName = (report.getStudentName() != null ? report.getStudentName() : "student")
-                            .replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
-                    String fileName = safeName + "_" + userStudentId + "_bet_report.html";
-                    String folder = "bet-reports/assessment-" + assessmentId;
+                // Upload to DigitalOcean Spaces
+                String safeName = (report.getStudentName() != null ? report.getStudentName() : "student")
+                        .replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
+                String fileName = safeName + "_" + userStudentId + "_bet_report.html";
+                String folder = "bet-reports/assessment-" + assessmentId;
 
+                    try {
                     String reportUrl = digitalOceanSpacesService.uploadBytes(
                             filledHtml.getBytes(StandardCharsets.UTF_8),
                             "text/html",
@@ -720,32 +807,38 @@ public class BetReportDataController {
                             fileName
                     );
 
-                    // Update report status
-                    report.setReportStatus("generated");
-                    report.setReportUrl(reportUrl);
-                    betReportDataRepository.save(report);
+                // Update report status
+                report.setReportStatus("generated");
+                report.setReportUrl(reportUrl);
+                betReportDataRepository.save(report);
+                syncGeneratedReport(userStudentId, assessmentId, "generated", reportUrl);
 
                     results.add(Map.of(
                             "userStudentId", userStudentId,
                             "studentName", safe(report.getStudentName()),
                             "reportUrl", reportUrl
                     ));
-                } catch (Exception e) {
-                    errors.add(Map.of("userStudentId", userStudentId,
-                            "reason", e.getMessage()));
-                }
+                    } catch (Exception uploadEx) {
+                        String dataUri = "data:text/html;base64," + Base64.getEncoder().encodeToString(filledHtml.getBytes(StandardCharsets.UTF_8));
+                        results.add(Map.of(
+                                "userStudentId", userStudentId,
+                                "studentName", safe(report.getStudentName()),
+                                "reportUrl", dataUri,
+                                "fileName", fileName,
+                                "downloadFallback", true
+                        ));
+                    }
+            } catch (Exception e) {
+                errors.add(Map.of("userStudentId", userStudentId,
+                        "reason", e.getMessage()));
             }
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("generated", results.size());
-            response.put("errors", errors);
-            response.put("reports", results);
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to generate reports: " + e.getMessage()));
         }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("generated", results.size());
+        response.put("errors", errors);
+        response.put("reports", results);
+        return ResponseEntity.ok(response);
     }
 
     // ═══════════════════════ UPLOAD TEMPLATE ASSETS TO DO SPACES ═══════════════════════
@@ -758,69 +851,64 @@ public class BetReportDataController {
      */
     @PostMapping("/upload-template-assets")
     public ResponseEntity<?> uploadTemplateAssets() {
-        try {
-            String[] assetPaths = {
-                "assets/cover/img.png",
-                "assets/cover/col.png",
-                "assets/cover/career.png",
-                "assets/report-details/card-img1.png",
-                "assets/report-details/card-img2.png",
-                "assets/report-details/card-img3.png",
-                "assets/report-details/card-img4.png",
-                "assets/report-details/card-left-img.png",
-                "assets/report-details/graphic1.svg",
-                "assets/report-details/graphic2.svg",
-                "assets/closing/card-img1.png",
-                "assets/closing/card-img2.png",
-                "assets/closing/card-img3.png",
-                "assets/closing/card-left-img.png",
-                "assets/closing/card-left-group.png",
-                "assets/closing/graphic.svg",
-                "assets/closing/card-graphic.svg",
-                "assets/graphic.svg",
-                "assets/cog-2-assets/attentive.png",
-                "assets/cog-2-assets/distracted.png",
-                "assets/cog-2-assets/inattentive.png",
-                "assets/cog-2-assets/inconsistent.png",
-                "assets/cog-2-assets/detached.png",
-                "assets/cog-2-assets/vigilant.png",
-            };
+        String[] assetPaths = {
+            "assets/cover/img.png",
+            "assets/cover/col.png",
+            "assets/cover/career.png",
+            "assets/report-details/card-img1.png",
+            "assets/report-details/card-img2.png",
+            "assets/report-details/card-img3.png",
+            "assets/report-details/card-img4.png",
+            "assets/report-details/card-left-img.png",
+            "assets/report-details/graphic1.svg",
+            "assets/report-details/graphic2.svg",
+            "assets/closing/card-img1.png",
+            "assets/closing/card-img2.png",
+            "assets/closing/card-img3.png",
+            "assets/closing/card-left-img.png",
+            "assets/closing/card-left-group.png",
+            "assets/closing/graphic.svg",
+            "assets/closing/card-graphic.svg",
+            "assets/graphic.svg",
+            "assets/cog-2-assets/attentive.png",
+            "assets/cog-2-assets/distracted.png",
+            "assets/cog-2-assets/inattentive.png",
+            "assets/cog-2-assets/inconsistent.png",
+            "assets/cog-2-assets/detached.png",
+            "assets/cog-2-assets/vigilant.png",
+            "assets/closing/qr-code.png",
+        };
 
-            List<String> uploaded = new ArrayList<>();
-            List<String> failed = new ArrayList<>();
+        List<String> uploaded = new ArrayList<>();
+        List<String> failed = new ArrayList<>();
 
-            for (String assetPath : assetPaths) {
-                try {
-                    var is = getClass().getClassLoader()
-                            .getResourceAsStream("bet-template/" + assetPath);
-                    if (is == null) {
-                        failed.add(assetPath + " (not found in classpath)");
-                        continue;
-                    }
-                    byte[] bytes = is.readAllBytes();
-                    is.close();
-
-                    String contentType = guessContentType(assetPath);
-                    String fileName = assetPath.substring(assetPath.lastIndexOf('/') + 1);
-                    String folder = "bet-template-assets/" + assetPath.substring(0, assetPath.lastIndexOf('/'));
-
-                    digitalOceanSpacesService.uploadBytes(bytes, contentType, folder, fileName);
-                    uploaded.add(assetPath);
-                } catch (Exception e) {
-                    failed.add(assetPath + " (" + e.getMessage() + ")");
+        for (String assetPath : assetPaths) {
+            try {
+                var is = getClass().getClassLoader()
+                        .getResourceAsStream("bet-template/" + assetPath);
+                if (is == null) {
+                    failed.add(assetPath + " (not found in classpath)");
+                    continue;
                 }
+                byte[] bytes = is.readAllBytes();
+                is.close();
+
+                String contentType = guessContentType(assetPath);
+                String fileName = assetPath.substring(assetPath.lastIndexOf('/') + 1);
+                String folder = "bet-template-assets/" + assetPath.substring(0, assetPath.lastIndexOf('/'));
+
+                digitalOceanSpacesService.uploadBytes(bytes, contentType, folder, fileName);
+                uploaded.add(assetPath);
+            } catch (Exception e) {
+                failed.add(assetPath + " (" + e.getMessage() + ")");
             }
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("uploaded", uploaded.size());
-            response.put("failed", failed);
-            response.put("uploadedFiles", uploaded);
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Asset upload failed: " + e.getMessage()));
         }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("uploaded", uploaded.size());
+        response.put("failed", failed);
+        response.put("uploadedFiles", uploaded);
+        return ResponseEntity.ok(response);
     }
 
     private String guessContentType(String path) {
@@ -910,108 +998,102 @@ public class BetReportDataController {
     @PostMapping("/fill-missing-ranks")
     @Transactional
     public ResponseEntity<?> fillMissingRanks(@RequestBody Map<String, Object> request) {
-        try {
-            Long assessmentId = ((Number) request.get("assessmentId")).longValue();
-            Long qqId = ((Number) request.get("questionnaireQuestionId")).longValue();
-            @SuppressWarnings("unchecked")
-            List<Number> optIdNums = (List<Number>) request.get("valueOptionIds");
-            int maxRanks = request.containsKey("maxRanks") ? ((Number) request.get("maxRanks")).intValue() : 3;
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+        Long qqId = ((Number) request.get("questionnaireQuestionId")).longValue();
+        @SuppressWarnings("unchecked")
+        List<Number> optIdNums = (List<Number>) request.get("valueOptionIds");
+        int maxRanks = request.containsKey("maxRanks") ? ((Number) request.get("maxRanks")).intValue() : 3;
 
-            List<Long> allValueOptionIds = new ArrayList<>();
-            for (Number n : optIdNums) allValueOptionIds.add(n.longValue());
+        List<Long> allValueOptionIds = new ArrayList<>();
+        for (Number n : optIdNums) allValueOptionIds.add(n.longValue());
 
-            // Load entities once
-            AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
-                    .orElseThrow(() -> new RuntimeException("Assessment not found"));
-            QuestionnaireQuestion qq = questionnaireQuestionRepository.findById(qqId)
-                    .orElseThrow(() -> new RuntimeException("QuestionnaireQuestion not found"));
+        // Load entities once
+        AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Assessment", "id", assessmentId));
+        QuestionnaireQuestion qq = questionnaireQuestionRepository.findById(qqId)
+                .orElseThrow(() -> new ResourceNotFoundException("QuestionnaireQuestion", "id", qqId));
 
-            Map<Long, AssessmentQuestionOptions> optionCache = new HashMap<>();
-            for (Long optId : allValueOptionIds) {
-                assessmentQuestionOptionsRepository.findById(optId)
-                        .ifPresent(opt -> optionCache.put(optId, opt));
-            }
-
-            // Get all completed mappings
-            List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
-                    .findAllByAssessmentId(assessmentId);
-
-            int studentsProcessed = 0;
-            int answersInserted = 0;
-            List<Map<String, Object>> details = new ArrayList<>();
-
-            for (StudentAssessmentMapping mapping : mappings) {
-                if (!"completed".equals(mapping.getStatus())) continue;
-
-                Long userStudentId = mapping.getUserStudent().getUserStudentId();
-                UserStudent us = mapping.getUserStudent();
-
-                // Check this student has ANY answers (only process those with entries)
-                var allAnswers = assessmentAnswerRepository
-                        .findByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
-                if (allAnswers == null || allAnswers.isEmpty()) continue;
-
-                // Find existing ranking answers for this question
-                java.util.Set<Integer> existingRanks = new java.util.HashSet<>();
-                java.util.Set<Long> usedOptionIds = new java.util.HashSet<>();
-                for (var aa : allAnswers) {
-                    if (aa.getRankOrder() != null && aa.getQuestionnaireQuestion() != null
-                            && aa.getQuestionnaireQuestion().getQuestionnaireQuestionId().equals(qqId)) {
-                        existingRanks.add(aa.getRankOrder());
-                        var opt = aa.getOption() != null ? aa.getOption() : aa.getMappedOption();
-                        if (opt != null) usedOptionIds.add(opt.getOptionId());
-                    }
-                }
-
-                // Find missing ranks
-                List<Integer> missingRanks = new ArrayList<>();
-                for (int r = 1; r <= maxRanks; r++) {
-                    if (!existingRanks.contains(r)) missingRanks.add(r);
-                }
-                if (missingRanks.isEmpty()) continue;
-
-                // Available options (not already used by this student)
-                List<Long> available = new ArrayList<>();
-                for (Long optId : allValueOptionIds) {
-                    if (!usedOptionIds.contains(optId)) available.add(optId);
-                }
-                java.util.Collections.shuffle(available);
-
-                int filled = 0;
-                for (int i = 0; i < missingRanks.size() && i < available.size(); i++) {
-                    Long optId = available.get(i);
-                    AssessmentQuestionOptions opt = optionCache.get(optId);
-                    if (opt == null) continue;
-
-                    AssessmentAnswer newAnswer = new AssessmentAnswer();
-                    newAnswer.setUserStudent(us);
-                    newAnswer.setAssessment(assessment);
-                    newAnswer.setQuestionnaireQuestion(qq);
-                    newAnswer.setOption(opt);
-                    newAnswer.setRankOrder(missingRanks.get(i));
-                    assessmentAnswerRepository.save(newAnswer);
-                    filled++;
-                    answersInserted++;
-                }
-
-                studentsProcessed++;
-                details.add(Map.of(
-                        "userStudentId", userStudentId,
-                        "existingRanks", existingRanks.toString(),
-                        "filledRanks", missingRanks.subList(0, Math.min(filled, missingRanks.size())).toString()
-                ));
-            }
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("studentsProcessed", studentsProcessed);
-            response.put("answersInserted", answersInserted);
-            response.put("details", details);
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Fill missing ranks failed: " + e.getMessage()));
+        Map<Long, AssessmentQuestionOptions> optionCache = new HashMap<>();
+        for (Long optId : allValueOptionIds) {
+            assessmentQuestionOptionsRepository.findById(optId)
+                    .ifPresent(opt -> optionCache.put(optId, opt));
         }
+
+        // Get all completed mappings
+        List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
+                .findAllByAssessmentId(assessmentId);
+
+        int studentsProcessed = 0;
+        int answersInserted = 0;
+        List<Map<String, Object>> details = new ArrayList<>();
+
+        for (StudentAssessmentMapping mapping : mappings) {
+            if (!"completed".equals(mapping.getStatus())) continue;
+
+            Long userStudentId = mapping.getUserStudent().getUserStudentId();
+            UserStudent us = mapping.getUserStudent();
+
+            // Check this student has ANY answers (only process those with entries)
+            var allAnswers = assessmentAnswerRepository
+                    .findByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
+            if (allAnswers == null || allAnswers.isEmpty()) continue;
+
+            // Find existing ranking answers for this question
+            java.util.Set<Integer> existingRanks = new java.util.HashSet<>();
+            java.util.Set<Long> usedOptionIds = new java.util.HashSet<>();
+            for (var aa : allAnswers) {
+                if (aa.getRankOrder() != null && aa.getQuestionnaireQuestion() != null
+                        && aa.getQuestionnaireQuestion().getQuestionnaireQuestionId().equals(qqId)) {
+                    existingRanks.add(aa.getRankOrder());
+                    var opt = aa.getOption() != null ? aa.getOption() : aa.getMappedOption();
+                    if (opt != null) usedOptionIds.add(opt.getOptionId());
+                }
+            }
+
+            // Find missing ranks
+            List<Integer> missingRanks = new ArrayList<>();
+            for (int r = 1; r <= maxRanks; r++) {
+                if (!existingRanks.contains(r)) missingRanks.add(r);
+            }
+            if (missingRanks.isEmpty()) continue;
+
+            // Available options (not already used by this student)
+            List<Long> available = new ArrayList<>();
+            for (Long optId : allValueOptionIds) {
+                if (!usedOptionIds.contains(optId)) available.add(optId);
+            }
+            java.util.Collections.shuffle(available);
+
+            int filled = 0;
+            for (int i = 0; i < missingRanks.size() && i < available.size(); i++) {
+                Long optId = available.get(i);
+                AssessmentQuestionOptions opt = optionCache.get(optId);
+                if (opt == null) continue;
+
+                AssessmentAnswer newAnswer = new AssessmentAnswer();
+                newAnswer.setUserStudent(us);
+                newAnswer.setAssessment(assessment);
+                newAnswer.setQuestionnaireQuestion(qq);
+                newAnswer.setOption(opt);
+                newAnswer.setRankOrder(missingRanks.get(i));
+                assessmentAnswerRepository.save(newAnswer);
+                filled++;
+                answersInserted++;
+            }
+
+            studentsProcessed++;
+            details.add(Map.of(
+                    "userStudentId", userStudentId,
+                    "existingRanks", existingRanks.toString(),
+                    "filledRanks", missingRanks.subList(0, Math.min(filled, missingRanks.size())).toString()
+            ));
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("studentsProcessed", studentsProcessed);
+        response.put("answersInserted", answersInserted);
+        response.put("details", details);
+        return ResponseEntity.ok(response);
     }
 
     // ═══════════════════════ RECALCULATE RAW SCORES ═══════════════════════
@@ -1028,81 +1110,75 @@ public class BetReportDataController {
     @PostMapping("/recalculate-raw-scores")
     @Transactional
     public ResponseEntity<?> recalculateRawScores(@RequestBody Map<String, Object> request) {
-        try {
-            if (!request.containsKey("assessmentId")) {
-                return ResponseEntity.badRequest().body(Map.of("error", "assessmentId is required"));
-            }
-            Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+        if (!request.containsKey("assessmentId")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "assessmentId is required"));
+        }
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
 
-            List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
-                    .findAllByAssessmentId(assessmentId);
+        List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
+                .findAllByAssessmentId(assessmentId);
 
-            int updated = 0;
-            List<Map<String, Object>> errors = new ArrayList<>();
+        int updated = 0;
+        List<Map<String, Object>> errors = new ArrayList<>();
 
-            for (StudentAssessmentMapping mapping : mappings) {
-                if (!"completed".equals(mapping.getStatus())) continue;
+        for (StudentAssessmentMapping mapping : mappings) {
+            if (!"completed".equals(mapping.getStatus())) continue;
 
-                Long userStudentId = mapping.getUserStudent().getUserStudentId();
-                Long mappingId = mapping.getStudentAssessmentId();
+            Long userStudentId = mapping.getUserStudent().getUserStudentId();
+            Long mappingId = mapping.getStudentAssessmentId();
 
-                try {
-                    // Fetch answers with full option score details
-                    var answers = assessmentAnswerRepository
-                            .findByUserStudentIdAndAssessmentIdWithDetails(userStudentId, assessmentId);
+            try {
+                // Fetch answers with full option score details
+                var answers = assessmentAnswerRepository
+                        .findByUserStudentIdAndAssessmentIdWithDetails(userStudentId, assessmentId);
 
-                    // Calculate live raw scores: dedup per MQT per answer
-                    Map<Long, Integer> liveScores = new HashMap<>();
-                    for (AssessmentAnswer aa : answers) {
-                        var option = aa.getOption() != null ? aa.getOption() : aa.getMappedOption();
-                        if (option == null || option.getOptionScores() == null) continue;
+                // Calculate live raw scores: dedup per MQT per answer
+                Map<Long, Integer> liveScores = new HashMap<>();
+                for (AssessmentAnswer aa : answers) {
+                    var option = aa.getOption() != null ? aa.getOption() : aa.getMappedOption();
+                    if (option == null || option.getOptionScores() == null) continue;
 
-                        java.util.Set<Long> seenMqts = new java.util.HashSet<>();
-                        for (OptionScoreBasedOnMEasuredQualityTypes os : option.getOptionScores()) {
-                            if (os.getMeasuredQualityType() != null && os.getScore() != null) {
-                                long mqtId = os.getMeasuredQualityType().getMeasuredQualityTypeId();
-                                if (seenMqts.add(mqtId)) {
-                                    liveScores.merge(mqtId, os.getScore(), Integer::sum);
-                                }
+                    java.util.Set<Long> seenMqts = new java.util.HashSet<>();
+                    for (OptionScoreBasedOnMEasuredQualityTypes os : option.getOptionScores()) {
+                        if (os.getMeasuredQualityType() != null && os.getScore() != null) {
+                            long mqtId = os.getMeasuredQualityType().getMeasuredQualityTypeId();
+                            if (seenMqts.add(mqtId)) {
+                                liveScores.merge(mqtId, os.getScore(), Integer::sum);
                             }
                         }
                     }
-
-                    // Delete old raw scores for this mapping
-                    assessmentRawScoreRepository.deleteByStudentAssessmentMappingStudentAssessmentId(mappingId);
-
-                    // Save fresh raw scores
-                    for (Map.Entry<Long, Integer> entry : liveScores.entrySet()) {
-                        Long mqtId = entry.getKey();
-                        Integer score = entry.getValue();
-
-                        MeasuredQualityTypes mqt = measuredQualityTypesRepository.findById(mqtId).orElse(null);
-                        if (mqt == null) continue;
-
-                        AssessmentRawScore rawScore = new AssessmentRawScore();
-                        rawScore.setStudentAssessmentMapping(mapping);
-                        rawScore.setMeasuredQualityType(mqt);
-                        rawScore.setMeasuredQuality(mqt.getMeasuredQuality());
-                        rawScore.setRawScore(score);
-                        assessmentRawScoreRepository.save(rawScore);
-                    }
-
-                    updated++;
-                } catch (Exception e) {
-                    errors.add(Map.of("userStudentId", userStudentId, "reason", e.getMessage()));
                 }
+
+                // Delete old raw scores for this mapping
+                assessmentRawScoreRepository.deleteByStudentAssessmentMappingStudentAssessmentId(mappingId);
+
+                // Save fresh raw scores
+                for (Map.Entry<Long, Integer> entry : liveScores.entrySet()) {
+                    Long mqtId = entry.getKey();
+                    Integer score = entry.getValue();
+
+                    MeasuredQualityTypes mqt = measuredQualityTypesRepository.findById(mqtId).orElse(null);
+                    if (mqt == null) continue;
+
+                    AssessmentRawScore rawScore = new AssessmentRawScore();
+                    rawScore.setStudentAssessmentMapping(mapping);
+                    rawScore.setMeasuredQualityType(mqt);
+                    rawScore.setMeasuredQuality(mqt.getMeasuredQuality());
+                    rawScore.setRawScore(score);
+                    assessmentRawScoreRepository.save(rawScore);
+                }
+
+                updated++;
+            } catch (Exception e) {
+                errors.add(Map.of("userStudentId", userStudentId, "reason", e.getMessage()));
             }
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("updated", updated);
-            response.put("totalMappings", mappings.size());
-            response.put("errors", errors);
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Recalculation failed: " + e.getMessage()));
         }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("updated", updated);
+        response.put("totalMappings", mappings.size());
+        response.put("errors", errors);
+        return ResponseEntity.ok(response);
     }
 
     // ═══════════════════════ CORE LOGIC ═══════════════════════
@@ -1110,7 +1186,7 @@ public class BetReportDataController {
     private BetReportData generateForStudent(Long userStudentId, Long assessmentId) {
         // 1. Fetch student
         UserStudent us = userStudentRepository.findById(userStudentId)
-                .orElseThrow(() -> new RuntimeException("Student not found: " + userStudentId));
+                .orElseThrow(() -> new ResourceNotFoundException("UserStudent", "id", userStudentId));
 
         // 2. Check completed assessment
         Optional<StudentAssessmentMapping> mappingOpt = studentAssessmentMappingRepository
@@ -1462,6 +1538,85 @@ public class BetReportDataController {
 
     private String safe(String value) {
         return value != null ? value : "";
+    }
+
+    private void syncGeneratedReport(Long userStudentId, Long assessmentId, String status, String reportUrl) {
+        try {
+            com.kccitm.api.model.career9.GeneratedReport gr = generatedReportRepository
+                    .findByUserStudentUserStudentIdAndAssessmentIdAndTypeOfReport(userStudentId, assessmentId, "bet")
+                    .orElseGet(() -> {
+                        com.kccitm.api.model.career9.GeneratedReport newGr = new com.kccitm.api.model.career9.GeneratedReport();
+                        newGr.setUserStudent(userStudentRepository.findById(userStudentId).orElse(null));
+                        newGr.setAssessmentId(assessmentId);
+                        newGr.setTypeOfReport("bet");
+                        return newGr;
+                    });
+            gr.setReportStatus(status);
+            gr.setReportUrl(reportUrl);
+            generatedReportRepository.save(gr);
+        } catch (Exception e) {
+            // Non-critical — don't fail the main flow
+        }
+    }
+
+    /**
+     * Replace all external image/font URLs in the HTML with inline base64 data URIs.
+     * Handles both src="..." attributes and CSS url(...) references.
+     */
+    private String inlineImages(String html) {
+        // 0) Convert <object data="..." type="image/svg+xml"></object> to <img src="..." />
+        //    because html2canvas cannot render <object> elements
+        html = html.replaceAll(
+                "<object([^>]*?)data=\"([^\"]+)\"([^>]*?)type=\"image/svg\\+xml\"([^>]*?)>\\s*</object>",
+                "<img$1src=\"$2\"$3$4/>");
+        html = html.replaceAll(
+                "<object([^>]*?)type=\"image/svg\\+xml\"([^>]*?)data=\"([^\"]+)\"([^>]*?)>\\s*</object>",
+                "<img$1$2src=\"$3\"$4/>");
+
+        // 1) Inline src="https://..." attributes
+        html = inlinePattern(html, Pattern.compile("src=\"(https?://[^\"]+)\""),
+                (url, dataUri) -> "src=\"" + dataUri + "\"");
+
+        // 2) Inline CSS url(https://...) — with or without quotes
+        html = inlinePattern(html, Pattern.compile("url\\((\"?)(https?://[^)\"]+)\\1\\)"),
+                (url, dataUri) -> "url(\"" + dataUri + "\")");
+
+        return html;
+    }
+
+    private String inlinePattern(String html, Pattern pattern,
+            java.util.function.BiFunction<String, String, String> replacer) {
+        Matcher matcher = pattern.matcher(html);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            // The actual URL is in the last capturing group
+            String imgUrl = matcher.group(matcher.groupCount());
+            try {
+                URL url = new URL(imgUrl);
+                try (InputStream is = url.openStream()) {
+                    byte[] bytes = is.readAllBytes();
+                    String mime = guessMime(imgUrl);
+                    String dataUri = "data:" + mime + ";base64," + Base64.getEncoder().encodeToString(bytes);
+                    matcher.appendReplacement(sb, Matcher.quoteReplacement(replacer.apply(imgUrl, dataUri)));
+                }
+            } catch (Exception e) {
+                matcher.appendReplacement(sb, Matcher.quoteReplacement(matcher.group(0)));
+            }
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
+    private String guessMime(String url) {
+        String lower = url.toLowerCase();
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+        if (lower.endsWith(".webp")) return "image/webp";
+        if (lower.endsWith(".gif")) return "image/gif";
+        if (lower.endsWith(".svg")) return "image/svg+xml";
+        if (lower.endsWith(".ttf")) return "font/ttf";
+        if (lower.endsWith(".woff")) return "font/woff";
+        if (lower.endsWith(".woff2")) return "font/woff2";
+        return "image/png";
     }
 
     private int toInt(Object obj) {

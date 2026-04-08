@@ -42,6 +42,9 @@ public class UserStudent implements Serializable {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
+    @Column(name = "info_completed", nullable = false, columnDefinition = "boolean default false")
+    private Boolean infoCompleted = false;
+
     public UserStudent(com.kccitm.api.model.User user, StudentInfo studentInfo2, InstituteDetail institue_id) {
         // TODO Auto-generated constructor stub
         this.userId = user.getId();
@@ -88,5 +91,13 @@ public class UserStudent implements Serializable {
 
     public void setUserId(Long userId) {
         this.userId = userId;
+    }
+
+    public Boolean getInfoCompleted() {
+        return infoCompleted;
+    }
+
+    public void setInfoCompleted(Boolean infoCompleted) {
+        this.infoCompleted = infoCompleted;
     }
 }

@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.career9.MeasuredQualities;
 import com.kccitm.api.model.career9.Tool;
 import com.kccitm.api.repository.Career9.MeasuredQualitiesRepository;
@@ -34,7 +35,8 @@ public class ToolController {
     }
     @GetMapping(value = "/get/{id}" , headers = "Accept=application/json")
     public Tool getToolById(@PathVariable Long id) {
-        return toolRepository.findById(id).orElse(null);
+        return toolRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Tool", "id", id));
     }
 
     @PostMapping(value = "/create" , headers = "Accept=application/json")
@@ -58,39 +60,31 @@ public class ToolController {
     }
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<String> deleteTool(@PathVariable Long id) {
-        try {
-            Tool tool = toolRepository.findById(id).orElse(null);
-            if (tool == null) {
-                return ResponseEntity.notFound().build();
-            }
-            
-            for (MeasuredQualities quality : tool.getMeasuredQualities()) {
-                quality.removeTool(tool);
-                continue;
-                // measuredQualitiesRepository.save(quality);
-            }
-            
-            tool.getMeasuredQualities().clear();
-            toolRepository.save(tool);
-            
-            toolRepository.deleteById(id);
-            
-            return ResponseEntity.ok("Tool deleted successfully");
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Failed to delete tool: " + e.getMessage());
+        Tool tool = toolRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Tool", "id", id));
+
+        for (MeasuredQualities quality : tool.getMeasuredQualities()) {
+            quality.removeTool(tool);
+            continue;
+            // measuredQualitiesRepository.save(quality);
         }
+
+        tool.getMeasuredQualities().clear();
+        toolRepository.save(tool);
+
+        toolRepository.deleteById(id);
+
+        return ResponseEntity.ok("Tool deleted successfully");
     }
     
     // Many-to-Many relationship management endpoints
     
     @PostMapping("/{toolId}/measured-qualities/{qualityId}")
     public ResponseEntity<String> addMeasuredQualityToTool(@PathVariable Long toolId, @PathVariable Long qualityId) {
-        Tool tool = toolRepository.findById(toolId).orElse(null);
-        MeasuredQualities measuredQuality = measuredQualitiesRepository.findById(qualityId).orElse(null);
-        
-        if (tool == null || measuredQuality == null) {
-            return ResponseEntity.badRequest().body("Tool or MeasuredQuality not found");
-        }
+        Tool tool = toolRepository.findById(toolId)
+            .orElseThrow(() -> new ResourceNotFoundException("Tool", "id", toolId));
+        MeasuredQualities measuredQuality = measuredQualitiesRepository.findById(qualityId)
+            .orElseThrow(() -> new ResourceNotFoundException("MeasuredQuality", "id", qualityId));
         
         measuredQuality.addTool(tool);
         measuredQualitiesRepository.save(measuredQuality);
@@ -100,12 +94,10 @@ public class ToolController {
     
     @DeleteMapping("/{toolId}/measured-qualities/{qualityId}")
     public ResponseEntity<String> removeMeasuredQualityFromTool(@PathVariable Long toolId, @PathVariable Long qualityId) {
-        Tool tool = toolRepository.findById(toolId).orElse(null);
-        MeasuredQualities measuredQuality = measuredQualitiesRepository.findById(qualityId).orElse(null);
-        
-        if (tool == null || measuredQuality == null) {
-            return ResponseEntity.badRequest().body("Tool or MeasuredQuality not found");
-        }
+        Tool tool = toolRepository.findById(toolId)
+            .orElseThrow(() -> new ResourceNotFoundException("Tool", "id", toolId));
+        MeasuredQualities measuredQuality = measuredQualitiesRepository.findById(qualityId)
+            .orElseThrow(() -> new ResourceNotFoundException("MeasuredQuality", "id", qualityId));
         
         measuredQuality.removeTool(tool);
         measuredQualitiesRepository.save(measuredQuality);
@@ -115,12 +107,8 @@ public class ToolController {
     
     @GetMapping("/{toolId}/measured-qualities")
     public ResponseEntity<Set<MeasuredQualities>> getToolMeasuredQualities(@PathVariable Long toolId) {
-        Tool tool = toolRepository.findById(toolId).orElse(null);
-        
-        if (tool == null) {
-            return ResponseEntity.notFound().build();
-        }
-        
+        Tool tool = toolRepository.findById(toolId)
+            .orElseThrow(() -> new ResourceNotFoundException("Tool", "id", toolId));
         return ResponseEntity.ok(tool.getMeasuredQualities());
     }
 }
