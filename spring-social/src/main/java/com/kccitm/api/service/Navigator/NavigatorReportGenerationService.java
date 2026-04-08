@@ -544,6 +544,194 @@ public class NavigatorReportGenerationService {
         return navigatorReportDataRepository.save(report);
     }
 
+    // ═══════════════════════ INTERMEDIARY SCORES (Phase 0 only) ═══════════════════════
+
+    /**
+     * Raw intermediary scores computed from student answers (Phase 0 output).
+     */
+    public static class IntermediaryScores {
+        public String studentName;
+        public String studentClass;
+        public Map<String, Integer> miScores;        // 8 MI scores
+        public Map<String, Integer> aptitudeScores;  // 10 ability scores
+        public Map<String, Integer> riasecScores;    // R,I,A,S,E,C
+        public List<String> selectedSOIs;            // up to 5
+        public List<String> selectedValues;          // up to 5
+        public List<String> selectedCareerAsps;      // up to 4
+    }
+
+    /**
+     * Compute only Phase 0 intermediary scores for a student without running
+     * the full pipeline (no Phase 1-5, no DB writes).
+     * Returns null if student has no completed assessment.
+     */
+    public IntermediaryScores computeIntermediaryScores(Long userStudentId, Long assessmentId) {
+        UserStudent us = userStudentRepository.findById(userStudentId)
+                .orElseThrow(() -> new RuntimeException("Student not found: " + userStudentId));
+
+        Optional<StudentAssessmentMapping> mappingOpt = studentAssessmentMappingRepository
+                .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+        if (mappingOpt.isEmpty() || !"completed".equals(mappingOpt.get().getStatus())) {
+            return null;
+        }
+
+        StudentInfo si = us.getStudentInfo();
+        String studentName = (si != null && si.getName() != null) ? si.getName() : "";
+        String studentClass = resolveClass(si);
+
+        // Reuse the same scoring logic as generateForStudent
+        List<AssessmentAnswer> allAnswers = assessmentAnswerRepository
+                .findAllByAssessmentIdForExport(assessmentId);
+
+        // Discover section structure
+        Map<Long, QuestionnaireSection> sectionById = new LinkedHashMap<>();
+        Map<Long, Set<Long>> sectionUniqueQQIds = new LinkedHashMap<>();
+        Map<Long, Map<Long, Set<Long>>> sectionQQOptions = new LinkedHashMap<>();
+        Map<Long, QuestionnaireQuestion> qqById = new LinkedHashMap<>();
+
+        AssessmentTable assessmentEntity = assessmentTableRepository.findById(assessmentId).orElse(null);
+        Long questionnaireId = (assessmentEntity != null && assessmentEntity.getQuestionnaire() != null)
+                ? assessmentEntity.getQuestionnaire().getQuestionnaireId() : null;
+
+        if (questionnaireId != null) {
+            List<QuestionnaireQuestion> allQQs = questionnaireQuestionRepository
+                    .findByQuestionnaireIdWithOptions(questionnaireId);
+            for (QuestionnaireQuestion qq : allQQs) {
+                QuestionnaireSection sec = qq.getSection();
+                if (sec == null) continue;
+                Long secId = sec.getQuestionnaireSectionId();
+                sectionById.putIfAbsent(secId, sec);
+                sectionUniqueQQIds.computeIfAbsent(secId, k -> new TreeSet<>())
+                        .add(qq.getQuestionnaireQuestionId());
+                qqById.put(qq.getQuestionnaireQuestionId(), qq);
+                if (qq.getQuestion() != null && qq.getQuestion().getOptions() != null) {
+                    for (AssessmentQuestionOptions opt : qq.getQuestion().getOptions()) {
+                        sectionQQOptions
+                                .computeIfAbsent(secId, k -> new LinkedHashMap<>())
+                                .computeIfAbsent(qq.getQuestionnaireQuestionId(), k -> new TreeSet<>())
+                                .add(opt.getOptionId());
+                    }
+                }
+            }
+        }
+
+        if (sectionById.isEmpty()) {
+            for (AssessmentAnswer a : allAnswers) {
+                if (a.getQuestionnaireQuestion() == null) continue;
+                QuestionnaireQuestion qq = a.getQuestionnaireQuestion();
+                QuestionnaireSection sec = qq.getSection();
+                if (sec == null) continue;
+                Long secId = sec.getQuestionnaireSectionId();
+                sectionById.putIfAbsent(secId, sec);
+                sectionUniqueQQIds.computeIfAbsent(secId, k -> new TreeSet<>())
+                        .add(qq.getQuestionnaireQuestionId());
+                qqById.putIfAbsent(qq.getQuestionnaireQuestionId(), qq);
+                if (a.getOption() != null) {
+                    sectionQQOptions
+                            .computeIfAbsent(secId, k -> new LinkedHashMap<>())
+                            .computeIfAbsent(qq.getQuestionnaireQuestionId(), k -> new TreeSet<>())
+                            .add(a.getOption().getOptionId());
+                }
+            }
+        }
+
+        List<QuestionnaireSection> sortedSections = sectionById.values().stream()
+                .sorted(Comparator.comparingInt(s -> parseInt(s.getOrder())))
+                .collect(Collectors.toList());
+
+        List<SectionMeta> sectionMetas = new ArrayList<>();
+        for (int i = 0; i < sortedSections.size(); i++) {
+            QuestionnaireSection sec = sortedSections.get(i);
+            Long secId = sec.getQuestionnaireSectionId();
+            String letter = String.valueOf((char) ('A' + i));
+            Set<Long> uniqueQQIds = sectionUniqueQQIds.getOrDefault(secId, Collections.emptySet());
+            Map<Long, Set<Long>> qqOptions = sectionQQOptions.getOrDefault(secId, Collections.emptyMap());
+            boolean isMultiSelect = (uniqueQQIds.size() == 1);
+            int maxOptions = qqOptions.values().stream().mapToInt(Set::size).max().orElse(0);
+            boolean isSingleAnswer = !isMultiSelect && maxOptions >= 2;
+            List<Long> sortedQQIds = uniqueQQIds.stream()
+                    .sorted((a2, b) -> {
+                        QuestionnaireQuestion qqA = qqById.get(a2);
+                        QuestionnaireQuestion qqB = qqById.get(b);
+                        return Integer.compare(
+                                parseInt(qqA != null ? qqA.getOrder() : "0"),
+                                parseInt(qqB != null ? qqB.getOrder() : "0"));
+                    })
+                    .collect(Collectors.toList());
+            List<Long> sortedOptionIds = Collections.emptyList();
+            Long singleQQId = null;
+            if (isMultiSelect && !uniqueQQIds.isEmpty()) {
+                singleQQId = uniqueQQIds.iterator().next();
+                sortedOptionIds = new ArrayList<>(
+                        qqOptions.getOrDefault(singleQQId, Collections.emptySet()));
+                Collections.sort(sortedOptionIds);
+            }
+            String sectionName = "";
+            if (sec.getSection() != null && sec.getSection().getSectionName() != null) {
+                sectionName = sec.getSection().getSectionName().toLowerCase();
+            }
+            sectionMetas.add(new SectionMeta(letter, secId, isMultiSelect, isSingleAnswer,
+                    sortedQQIds, sortedOptionIds, singleQQId, qqOptions, sectionName));
+        }
+
+        List<AssessmentAnswer> studentAnswers = allAnswers.stream()
+                .filter(a -> a.getUserStudent() != null
+                        && a.getUserStudent().getUserStudentId().equals(userStudentId))
+                .collect(Collectors.toList());
+
+        // Compute scores
+        Map<String, Integer> riasecScores = new LinkedHashMap<>();
+        Map<String, Integer> aptitudeScores = new LinkedHashMap<>();
+        Map<String, Integer> miScores = new LinkedHashMap<>();
+        List<String> selectedSOIs = new ArrayList<>();
+        List<String> selectedValues = new ArrayList<>();
+        List<String> selectedCareerAsps = new ArrayList<>();
+
+        for (String l : RIASEC_LETTERS) riasecScores.put(l, 0);
+        for (String a : APTITUDE_NAMES) aptitudeScores.put(a, 0);
+        for (String m : MI_NAMES) miScores.put(m, 0);
+
+        for (SectionMeta sm : sectionMetas) {
+            int qCount = sm.sortedQQIds.size();
+            int optCount = sm.sortedOptionIds.size();
+            if (sm.isMultiSelect) {
+                String name = sm.sectionName;
+                boolean isCareerAsp = name.contains("career") || name.contains("aspir");
+                boolean isValues = name.contains("value");
+                boolean isSOI = name.contains("interest") || name.contains("soi") || name.contains("subject");
+                if (isCareerAsp || (!isValues && !isSOI && optCount >= 20)) {
+                    selectedCareerAsps = extractMultiSelectLabels(studentAnswers, sm, CAREER_ASP_LABELS);
+                } else if (isValues || (!isCareerAsp && !isSOI && optCount >= 14 && optCount <= 16)) {
+                    selectedValues = extractMultiSelectLabels(studentAnswers, sm, VALUE_LABELS);
+                } else if (isSOI || (!isCareerAsp && !isValues && optCount > 0)) {
+                    selectedSOIs = extractMultiSelectLabels(studentAnswers, sm, SOI_LABELS);
+                }
+            } else if (sm.isSingleAnswer) {
+                boolean riasecDone = riasecScores.values().stream().mapToInt(Integer::intValue).sum() > 0;
+                boolean aptitudeDone = aptitudeScores.values().stream().mapToInt(Integer::intValue).sum() > 0;
+                boolean miDone = miScores.values().stream().mapToInt(Integer::intValue).sum() > 0;
+                if (qCount >= 48 && qCount <= 60 && !riasecDone) {
+                    riasecScores = computeRiasecScores(studentAnswers, sm, allAnswers);
+                } else if (qCount >= 25 && qCount <= 35 && !aptitudeDone) {
+                    aptitudeScores = computeAptitudeScores(studentAnswers, sm, allAnswers);
+                } else if (qCount >= 20 && qCount <= 26 && !miDone) {
+                    miScores = computeMIScores(studentAnswers, sm, allAnswers);
+                }
+            }
+        }
+
+        IntermediaryScores scores = new IntermediaryScores();
+        scores.studentName = studentName;
+        scores.studentClass = studentClass;
+        scores.miScores = miScores;
+        scores.aptitudeScores = aptitudeScores;
+        scores.riasecScores = riasecScores;
+        scores.selectedSOIs = selectedSOIs;
+        scores.selectedValues = selectedValues;
+        scores.selectedCareerAsps = selectedCareerAsps;
+        return scores;
+    }
+
     // ═══════════════════════ MULTI-SELECT EXTRACTION ═══════════════════════
 
     /**

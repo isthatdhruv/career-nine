@@ -383,35 +383,7 @@ public class BetReportDataController {
                     .body(Map.of("error", "No matching students found"));
         }
 
-        // 3. Get all active MQTs grouped by their parent MQ
-        List<MeasuredQualityTypes> allMqts = measuredQualityTypesRepository.findByIsDeletedFalseOrIsDeletedIsNull();
-
-        // Group MQTs by MQ, maintaining order
-        LinkedHashMap<String, List<MeasuredQualityTypes>> mqToMqts = new LinkedHashMap<>();
-        for (MeasuredQualityTypes mqt : allMqts) {
-            String mqName = mqt.getMeasuredQuality() != null
-                    ? safe(mqt.getMeasuredQuality().getQualityDisplayName() != null
-                        ? mqt.getMeasuredQuality().getQualityDisplayName()
-                        : mqt.getMeasuredQuality().getMeasuredQualityName())
-                    : "Ungrouped";
-            mqToMqts.computeIfAbsent(mqName, k -> new ArrayList<>()).add(mqt);
-        }
-
-        // 4. Build ordered list of MQT columns
-        List<MeasuredQualityTypes> orderedMqts = new ArrayList<>();
-        List<String> mqtColumnHeaders = new ArrayList<>();
-        for (Map.Entry<String, List<MeasuredQualityTypes>> entry : mqToMqts.entrySet()) {
-            String mqName = entry.getKey();
-            for (MeasuredQualityTypes mqt : entry.getValue()) {
-                orderedMqts.add(mqt);
-                String mqtName = mqt.getMeasuredQualityTypeDisplayName() != null
-                        ? mqt.getMeasuredQualityTypeDisplayName()
-                        : mqt.getMeasuredQualityTypeName();
-                mqtColumnHeaders.add(mqName + ": " + safe(mqtName));
-            }
-        }
-
-        // 5. Bulk-fetch all raw scores for these mappings
+        // 3. Bulk-fetch all raw scores for these mappings
         List<Long> mappingIds = allMappings.stream()
                 .map(StudentAssessmentMapping::getStudentAssessmentId)
                 .collect(Collectors.toList());
@@ -427,6 +399,40 @@ public class BetReportDataController {
             if (mqtId != null) {
                 scoreIndex.computeIfAbsent(mapId, k -> new HashMap<>())
                         .put(mqtId, score.getRawScore());
+            }
+        }
+
+        // 4. Discover MQTs actually used in this assessment's scores (not all global MQTs)
+        LinkedHashMap<Long, MeasuredQualityTypes> seenMqts = new LinkedHashMap<>();
+        for (AssessmentRawScore score : allScores) {
+            MeasuredQualityTypes mqt = score.getMeasuredQualityType();
+            if (mqt != null && !seenMqts.containsKey(mqt.getMeasuredQualityTypeId())) {
+                seenMqts.put(mqt.getMeasuredQualityTypeId(), mqt);
+            }
+        }
+
+        // Group by parent MQ, maintaining order
+        LinkedHashMap<String, List<MeasuredQualityTypes>> mqToMqts = new LinkedHashMap<>();
+        for (MeasuredQualityTypes mqt : seenMqts.values()) {
+            String mqName = mqt.getMeasuredQuality() != null
+                    ? safe(mqt.getMeasuredQuality().getQualityDisplayName() != null
+                        ? mqt.getMeasuredQuality().getQualityDisplayName()
+                        : mqt.getMeasuredQuality().getMeasuredQualityName())
+                    : "Ungrouped";
+            mqToMqts.computeIfAbsent(mqName, k -> new ArrayList<>()).add(mqt);
+        }
+
+        // 5. Build ordered column list
+        List<MeasuredQualityTypes> orderedMqts = new ArrayList<>();
+        List<String> mqtColumnHeaders = new ArrayList<>();
+        for (Map.Entry<String, List<MeasuredQualityTypes>> entry : mqToMqts.entrySet()) {
+            String mqName = entry.getKey();
+            for (MeasuredQualityTypes mqt : entry.getValue()) {
+                orderedMqts.add(mqt);
+                String mqtName = mqt.getMeasuredQualityTypeDisplayName() != null
+                        ? mqt.getMeasuredQualityTypeDisplayName()
+                        : mqt.getMeasuredQualityTypeName();
+                mqtColumnHeaders.add(mqName + ": " + safe(mqtName));
             }
         }
 
