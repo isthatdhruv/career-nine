@@ -77,8 +77,9 @@ export function AsideMenuMain() {
   const showTeacher = showTeacherDashboards || showTeacherRegistration;
 
   const showRoles =
-    allowed("/roles/role") || allowed("/roles/users") ||
-    allowed("/roles/role_roleGroup") || allowed("/roles/roleUser");
+    allowed("/roles/role") ||
+    allowed("/roles/role_roleGroup") || allowed("/roles/roleUser") ||
+    allowed("/user-registrations");
 
   const showActivityLog = allowed("/activity-log");
   const showLeads = allowed("/leads");
@@ -182,32 +183,6 @@ export function AsideMenuMain() {
         </>
       )}
 
-      {showRegistration && (
-        <>
-          <div className="menu-item">
-            <div className="menu-content pt-8 pb-2">
-              <span className="menu-section text-muted text-uppercase fs-8 ls-1">
-                Registration
-              </span>
-            </div>
-          </div>
-          <AsideMenuItemWithSub
-            to=""
-            title="User Registration"
-            fontIcon="bi-app-indicator"
-            icon="/media/icons/duotune/communication/com006.svg"
-          >
-            {allowed("/user-registrations") && (
-              <AsideMenuItem
-                to="/user-registrations"
-                icon="/media/icons/duotune/general/gen044.svg"
-                title="User Registration"
-                fontIcon="bi-app-indicator"
-              />
-            )}
-          </AsideMenuItemWithSub>
-        </>
-      )}
 
       {showAssessmentManagement && (
         <>
@@ -551,32 +526,22 @@ export function AsideMenuMain() {
             </div>
           </div>
           <AsideMenuItemWithSub
-            to="/apps/chat"
+            to=""
             title="Roles and Users"
-            fontIcon="bi-chat-left"
+            fontIcon="bi-shield-lock"
             icon="/media/icons/duotune/general/gen019.svg"
           >
-            {allowed("/roles/role") && (
-              <AsideMenuItem to="/roles/role" title="Role" hasBullet={true} />
-            )}
-            {allowed("/roles/users") && (
+            {(allowed("/roles/role") || allowed("/roles/role_roleGroup")) && (
               <AsideMenuItem
-                to="/roles/users"
-                title="Users"
+                to="/user-management/roles/manage"
+                title="Roles & Permissions"
                 hasBullet={true}
               />
             )}
-            {allowed("/roles/role_roleGroup") && (
+            {(allowed("/roles/roleUser") || allowed("/user-registrations")) && (
               <AsideMenuItem
-                to="/roles/role_roleGroup"
-                title="Role - Role Group"
-                hasBullet={true}
-              />
-            )}
-            {allowed("/roles/roleUser") && (
-              <AsideMenuItem
-                to="/roles/roleUser"
-                title="Role - User"
+                to="/user-management/users/manage"
+                title="User Management"
                 hasBullet={true}
               />
             )}
@@ -584,14 +549,6 @@ export function AsideMenuMain() {
         </>
       )}
 
-      {allowed("/career") && (
-        <AsideMenuItem
-          to="/career"
-          icon="/media/icons/duotune/general/gen044.svg"
-          title="Career"
-          fontIcon="bi-app-indicator"
-        />
-      )}
 
       {showActivityLog && (
         <>
