@@ -198,6 +198,7 @@ public class FirebaseDataMappingController {
 
     @Transactional
     @PostMapping("/import-mapped-answers")
+    @Transactional
     public ResponseEntity<?> importMappedAnswers(@RequestBody Map<String, Object> payload) {
         Long userStudentId = getLong(payload, "userStudentId");
             Long assessmentId = getLong(payload, "assessmentId");
@@ -218,7 +219,7 @@ public class FirebaseDataMappingController {
             }
             AssessmentTable assessment = atOpt.get();
 
-            // Find or create StudentAssessmentMapping (Issue 5: use managed entity, not detached ID proxy)
+            // Find or create StudentAssessmentMapping
             Optional<StudentAssessmentMapping> samOpt = studentAssessmentMappingRepository
                     .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
             StudentAssessmentMapping sam;
@@ -244,16 +245,61 @@ public class FirebaseDataMappingController {
                 return ResponseEntity.ok(Map.of("saved", 0, "scoresCalculated", 0, "status", "ongoing", "message", "No answers to save, status set to ongoing"));
             }
 
-            // Get questionnaire ID scoped to this assessment (prevents wrong-questionnaire QQ links)
+            // Get questionnaire ID scoped to this assessment
             final Long questionnaireId = (assessment.getQuestionnaire() != null)
                     ? assessment.getQuestionnaire().getQuestionnaireId() : null;
+
+            // Pre-load all referenced options and QQ mappings in bulk to avoid N+1 queries
+            Set<Long> allOptionIds = new LinkedHashSet<>();
+            Set<Long> allQuestionIds = new LinkedHashSet<>();
+            for (Map<String, Object> ans : answers) {
+                Long optionId = getLong(ans, "optionId");
+                Long questionId = getLong(ans, "questionId");
+                if (optionId != null) allOptionIds.add(optionId);
+                if (questionId != null) allQuestionIds.add(questionId);
+            }
+
+            // Bulk load options
+            Map<Long, AssessmentQuestionOptions> optionCache = new LinkedHashMap<>();
+            if (!allOptionIds.isEmpty()) {
+                assessmentQuestionOptionsRepository.findAllById(allOptionIds)
+                    .forEach(o -> optionCache.put(o.getOptionId(), o));
+            }
+
+            // Bulk load QQ mappings for this questionnaire
+            Map<Long, QuestionnaireQuestion> qqCache = new LinkedHashMap<>();
+            if (questionnaireId != null && !allQuestionIds.isEmpty()) {
+                for (Long qId : allQuestionIds) {
+                    List<QuestionnaireQuestion> qqList = questionnaireQuestionRepository.findByQuestionIdAndQuestionnaireId(qId, questionnaireId);
+                    if (!qqList.isEmpty()) qqCache.put(qId, qqList.get(0));
+                }
+            }
+            // Also cache QQ by parent question ID from options
+            for (AssessmentQuestionOptions opt : optionCache.values()) {
+                if (opt.getQuestion() != null) {
+                    Long parentQId = opt.getQuestion().getQuestionId();
+                    if (!qqCache.containsKey(parentQId) && questionnaireId != null) {
+                        List<QuestionnaireQuestion> qqList = questionnaireQuestionRepository.findByQuestionIdAndQuestionnaireId(parentQId, questionnaireId);
+                        if (!qqList.isEmpty()) qqCache.put(parentQId, qqList.get(0));
+                    }
+                }
+            }
+
+            // Bulk load option scores
+            Map<Long, List<OptionScoreBasedOnMEasuredQualityTypes>> scoreCache = new LinkedHashMap<>();
+            if (!allOptionIds.isEmpty()) {
+                for (Long optId : allOptionIds) {
+                    scoreCache.put(optId, optionScoreRepository.findByOptionId(optId));
+                }
+            }
 
             // Accumulate scores per MeasuredQualityType
             Map<Long, Integer> scoreAccumulator = new LinkedHashMap<>();
             Map<Long, MeasuredQualityTypes> mqtCache = new LinkedHashMap<>();
 
-            int saved = 0;
+            List<AssessmentAnswer> answerBatch = new ArrayList<>(answers.size());
             Set<Long> uniqueQuestionsAnswered = new LinkedHashSet<>();
+
             for (Map<String, Object> ans : answers) {
                 Long optionId = getLong(ans, "optionId");
                 Long questionId = getLong(ans, "questionId");
@@ -264,34 +310,20 @@ public class FirebaseDataMappingController {
                 answer.setAssessment(assessment);
                 answer.setTextResponse(textResponse);
 
-                // Set option and accumulate scores
                 if (optionId != null) {
-                    Optional<AssessmentQuestionOptions> optOpt = assessmentQuestionOptionsRepository.findById(optionId);
-                    if (optOpt.isPresent()) {
-                        answer.setOption(optOpt.get());
+                    AssessmentQuestionOptions opt = optionCache.get(optionId);
+                    if (opt != null) {
+                        answer.setOption(opt);
 
-                        // Set QuestionnaireQuestion scoped to this assessment's questionnaire
-                        if (questionId != null) {
-                            List<QuestionnaireQuestion> qqList = (questionnaireId != null)
-                                    ? questionnaireQuestionRepository.findByQuestionIdAndQuestionnaireId(questionId, questionnaireId)
-                                    : questionnaireQuestionRepository.findByQuestion_QuestionId(questionId);
-                            if (!qqList.isEmpty()) {
-                                answer.setQuestionnaireQuestion(qqList.get(0));
-                            }
+                        // Set QQ from cache
+                        QuestionnaireQuestion qq = (questionId != null) ? qqCache.get(questionId) : null;
+                        if (qq == null && opt.getQuestion() != null) {
+                            qq = qqCache.get(opt.getQuestion().getQuestionId());
                         }
-                        if (answer.getQuestionnaireQuestion() == null && optOpt.get().getQuestion() != null) {
-                            Long parentQId = optOpt.get().getQuestion().getQuestionId();
-                            List<QuestionnaireQuestion> qqList = (questionnaireId != null)
-                                    ? questionnaireQuestionRepository.findByQuestionIdAndQuestionnaireId(parentQId, questionnaireId)
-                                    : questionnaireQuestionRepository.findByQuestion_QuestionId(parentQId);
-                            if (!qqList.isEmpty()) {
-                                answer.setQuestionnaireQuestion(qqList.get(0));
-                            }
-                        }
+                        if (qq != null) answer.setQuestionnaireQuestion(qq);
 
-                        // Fetch scores for this option and accumulate
-                        List<OptionScoreBasedOnMEasuredQualityTypes> optionScores =
-                                optionScoreRepository.findByOptionId(optionId);
+                        // Accumulate scores from cache
+                        List<OptionScoreBasedOnMEasuredQualityTypes> optionScores = scoreCache.getOrDefault(optionId, new ArrayList<>());
                         for (OptionScoreBasedOnMEasuredQualityTypes os : optionScores) {
                             if (os.getMeasuredQualityType() != null && os.getScore() != null) {
                                 Long mqtId = os.getMeasuredQualityType().getMeasuredQualityTypeId();
@@ -301,24 +333,22 @@ public class FirebaseDataMappingController {
                         }
                     }
                 } else if (questionId != null) {
-                    // No optionId (text answer) — still set QuestionnaireQuestion scoped to this assessment
-                    List<QuestionnaireQuestion> qqList = (questionnaireId != null)
-                            ? questionnaireQuestionRepository.findByQuestionIdAndQuestionnaireId(questionId, questionnaireId)
-                            : questionnaireQuestionRepository.findByQuestion_QuestionId(questionId);
-                    if (!qqList.isEmpty()) {
-                        answer.setQuestionnaireQuestion(qqList.get(0));
-                    }
+                    QuestionnaireQuestion qq = qqCache.get(questionId);
+                    if (qq != null) answer.setQuestionnaireQuestion(qq);
                 }
 
-                assessmentAnswerRepository.save(answer);
-                saved++;
+                answerBatch.add(answer);
                 if (questionId != null) {
                     uniqueQuestionsAnswered.add(questionId);
                 }
             }
 
-            // Save accumulated raw scores
-            int scoresCalculated = 0;
+            // Batch save all answers
+            assessmentAnswerRepository.saveAll(answerBatch);
+            int saved = answerBatch.size();
+
+            // Batch save accumulated raw scores
+            List<AssessmentRawScore> scoreBatch = new ArrayList<>();
             for (Map.Entry<Long, Integer> entry : scoreAccumulator.entrySet()) {
                 Long mqtId = entry.getKey();
                 Integer totalScore = entry.getValue();
@@ -330,21 +360,21 @@ public class FirebaseDataMappingController {
                     rawScore.setMeasuredQualityType(mqt);
                     rawScore.setMeasuredQuality(mqt.getMeasuredQuality());
                     rawScore.setRawScore(totalScore);
-                    assessmentRawScoreRepository.save(rawScore);
-                    scoresCalculated++;
+                    scoreBatch.add(rawScore);
                 }
             }
+            if (!scoreBatch.isEmpty()) {
+                assessmentRawScoreRepository.saveAll(scoreBatch);
+            }
+            int scoresCalculated = scoreBatch.size();
 
-            // Determine completeness: compare unique questions this student answered
-            // against the total mapped questions sent from the frontend (allMappedKeys.size).
-            // This is the total number of mapped questions from the Excel, not the full
-            // questionnaire count, so students who answered everything mapped get "completed".
+            // Determine completeness
             String status = "ongoing";
             int questionsAnswered = uniqueQuestionsAnswered.size();
             Long totalMappedFromPayload = getLong(payload, "totalMappedQuestions");
             int totalMappedQuestions = (totalMappedFromPayload != null)
                     ? totalMappedFromPayload.intValue()
-                    : uniqueQuestionsAnswered.size(); // fallback: treat as complete if not provided
+                    : uniqueQuestionsAnswered.size();
 
             if (totalMappedQuestions > 0 && questionsAnswered >= totalMappedQuestions) {
                 status = "completed";
@@ -961,6 +991,12 @@ public class FirebaseDataMappingController {
                 processFirebaseResponses(user, "abilityDetailedResponses", "ability", allFirebaseQuestions, navigator);
                 processFirebaseResponses(user, "multipleIntelligenceResponses", "multipleintelligence", allFirebaseQuestions, navigator);
                 processFirebaseResponses(user, "personalityDetailedResponses", "personality", allFirebaseQuestions, navigator);
+
+                // String array categories: stored as flat arrays of selected values, not question-answer pairs.
+                // Each is treated as a single question with multiple answer options.
+                processFirebaseStringArray(user, "careerAspirations", "careeraspirations", "Career Aspirations", allFirebaseQuestions, navigator);
+                processFirebaseStringArray(user, "subjectsOfInterest", "subjectofinterest", "Subject of Interest", allFirebaseQuestions, navigator);
+                processFirebaseStringArray(user, "values", "values", "Values", allFirebaseQuestions, navigator);
             }
 
             // 4. Filter to unmapped only
@@ -1040,6 +1076,49 @@ public class FirebaseDataMappingController {
             } else if ("career".equals(navigator)) {
                 qInfo.put("careerCount", ((int) qInfo.get("careerCount")) + 1);
             }
+        }
+    }
+
+    /**
+     * Process string array Firebase fields (careerAspirations, subjectsOfInterest, values).
+     * These are stored as flat string arrays — treated as a single question with each value as an answer option.
+     */
+    @SuppressWarnings("unchecked")
+    private void processFirebaseStringArray(Map<String, Object> user, String field, String category,
+            String questionLabel, Map<String, Map<String, Object>> allQuestions, String navigator) {
+        Object obj = user.get(field);
+        if (!(obj instanceof List)) return;
+        List<?> items = (List<?>) obj;
+        if (items.isEmpty()) return;
+
+        String key = category + "::" + questionLabel;
+        Map<String, Object> qInfo = allQuestions.computeIfAbsent(key, k -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("question", questionLabel);
+            m.put("category", category);
+            m.put("answers", new LinkedHashSet<String>());
+            m.put("studentCount", 0);
+            m.put("insightCount", 0);
+            m.put("subjectCount", 0);
+            m.put("careerCount", 0);
+            return m;
+        });
+
+        for (Object item : items) {
+            if (item != null) {
+                String val = item.toString().trim();
+                if (!val.isEmpty()) {
+                    ((Set<String>) qInfo.get("answers")).add(val);
+                }
+            }
+        }
+        qInfo.put("studentCount", ((int) qInfo.get("studentCount")) + 1);
+        if ("insight".equals(navigator)) {
+            qInfo.put("insightCount", ((int) qInfo.get("insightCount")) + 1);
+        } else if ("subject".equals(navigator)) {
+            qInfo.put("subjectCount", ((int) qInfo.get("subjectCount")) + 1);
+        } else if ("career".equals(navigator)) {
+            qInfo.put("careerCount", ((int) qInfo.get("careerCount")) + 1);
         }
     }
 
@@ -1496,8 +1575,10 @@ public class FirebaseDataMappingController {
 
             // Delete existing mappings for this assessment
             firebaseQuestionMappingRepository.deleteByAssessmentId(assessmentId);
+            firebaseQuestionMappingRepository.flush();
 
-            int saved = 0;
+            // Batch insert all mappings at once
+            List<FirebaseQuestionMapping> batch = new ArrayList<>(mappingsList.size());
             for (Map<String, Object> m : mappingsList) {
                 FirebaseQuestionMapping mapping = new FirebaseQuestionMapping();
                 mapping.setAssessmentId(assessmentId);
@@ -1506,9 +1587,10 @@ public class FirebaseDataMappingController {
                 mapping.setSystemQuestionId(getLong(m, "systemQuestionId"));
                 mapping.setFirebaseAnswer(getString(m, "firebaseAnswer"));
                 mapping.setSystemOptionId(getLong(m, "systemOptionId"));
-                firebaseQuestionMappingRepository.save(mapping);
-                saved++;
+                batch.add(mapping);
             }
+            firebaseQuestionMappingRepository.saveAll(batch);
+            int saved = batch.size();
 
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("saved", saved);
@@ -1540,9 +1622,16 @@ public class FirebaseDataMappingController {
                 info.put("assessmentId", aid);
                 info.put("totalMappings", 0);
                 info.put("mappedAt", m.getMappedAt());
-                // Get assessment name
+                // Get assessment name and questionnaire info
                 Optional<AssessmentTable> at = assessmentTableRepository.findById(aid);
                 info.put("assessmentName", at.isPresent() ? at.get().getAssessmentName() : "Unknown");
+                if (at.isPresent() && at.get().getQuestionnaire() != null) {
+                    info.put("questionnaireId", at.get().getQuestionnaire().getQuestionnaireId());
+                    info.put("questionnaireName", at.get().getQuestionnaire().getName());
+                } else {
+                    info.put("questionnaireId", null);
+                    info.put("questionnaireName", "Unknown Questionnaire");
+                }
                 summary.put(aid, info);
             }
             summary.get(aid).put("totalMappings", (int) summary.get(aid).get("totalMappings") + 1);
