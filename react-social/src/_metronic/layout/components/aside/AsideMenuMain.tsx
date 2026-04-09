@@ -64,7 +64,7 @@ export function AsideMenuMain() {
 
   const showDataUpload =
     allowed("/offline-assessment-upload") || allowed("/omr-data-upload") ||
-    allowed("/live-tracking");
+    allowed("/live-tracking") || allowed("/payment-tracking");
 
   const showReports = allowed("/reports") || allowed("/report-generation") || allowed("/send-reports");
 
@@ -377,6 +377,14 @@ export function AsideMenuMain() {
                 fontIcon="bi-broadcast"
               />
             )}
+            {allowed("/payment-tracking") && (
+              <AsideMenuItem
+                to="/payment-tracking"
+                icon="/media/icons/duotune/finance/fin002.svg"
+                title="Payment Tracking"
+                fontIcon="bi-credit-card"
+              />
+            )}
           </AsideMenuItemWithSub>
         </>
       )}
@@ -391,6 +399,14 @@ export function AsideMenuMain() {
             </div>
           </div>
 
+          {allowed("/reports") && (
+            <AsideMenuItem
+              to="/reports-hub"
+              icon="/media/icons/duotune/graphs/gra010.svg"
+              title="Reports Hub"
+              fontIcon="bi-grid-3x3-gap"
+            />
+          )}
           {allowed("/reports") && (
             <AsideMenuItem
               to="/reports"
@@ -427,7 +443,7 @@ export function AsideMenuMain() {
             <AsideMenuItem
               to="/send-reports"
               icon="/media/icons/duotune/general/gen016.svg"
-              title="Send Reports to Contact"
+              title="Send Reports"
               fontIcon="bi-envelope"
             />
           )}

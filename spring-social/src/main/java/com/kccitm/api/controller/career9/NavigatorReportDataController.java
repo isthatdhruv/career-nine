@@ -983,6 +983,43 @@ public class NavigatorReportDataController {
         return sb.toString();
     }
 
+    // ═══════════════════════ NAVIGATOR 360 — RAW INTERMEDIARY SCORES ═══════════════════════
+
+    /**
+     * GET /navigator-report-data/navigator-360/scores/{studentId}/{assessmentId}
+     *
+     * Returns raw intermediary scores for the Navigator 360 report engine.
+     * Computes RIASEC, Aptitude, MI scores and Section A/B/C selections
+     * without running the full report pipeline.
+     */
+    @GetMapping("/navigator-360/scores/{studentId}/{assessmentId}")
+    public ResponseEntity<?> getNavigator360Scores(
+            @PathVariable Long studentId,
+            @PathVariable Long assessmentId) {
+        try {
+            NavigatorReportGenerationService.IntermediaryScores scores =
+                    navigatorReportGenerationService.computeIntermediaryScores(studentId, assessmentId);
+            if (scores == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "No completed assessment found for student"));
+            }
+
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("studentName", scores.studentName);
+            response.put("studentClass", scores.studentClass);
+            response.put("riasecScores", scores.riasecScores);
+            response.put("aptitudeScores", scores.aptitudeScores);
+            response.put("miScores", scores.miScores);
+            response.put("selectedSOIs", scores.selectedSOIs);
+            response.put("selectedValues", scores.selectedValues);
+            response.put("selectedCareerAsps", scores.selectedCareerAsps);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
     private String guessMime(String url) {
         String lower = url.toLowerCase();
         if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
