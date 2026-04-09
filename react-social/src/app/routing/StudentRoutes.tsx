@@ -16,6 +16,9 @@ const StudentInfoForm = lazy(
 const StudentReports = lazy(
   () => import('../pages/StudentDashboard/student-portal/StudentReports')
 )
+const StudentNavigator360Page = lazy(
+  () => import('../pages/StudentDashboard/student-portal/StudentNavigator360Page')
+)
 const StudentCounsellingPage = lazy(() => import('../pages/Counselling/student/StudentCounsellingPage'))
 const SlotBookingPage = lazy(() => import('../pages/Counselling/student/SlotBookingPage'))
 
@@ -113,6 +116,7 @@ const StudentRoutes: FC = () => {
           {/* Pages that require info to be completed */}
           <Route element={<StudentInfoGuard />}>
             <Route path='dashboard' element={<StudentPortalDashboard />} />
+            <Route path='navigator-360' element={<StudentNavigator360Page />} />
             <Route path='assessments' element={<StudentAssessments />} />
             <Route path='reports' element={<StudentReports />} />
             <Route path='counselling' element={<StudentCounsellingPage />} />
