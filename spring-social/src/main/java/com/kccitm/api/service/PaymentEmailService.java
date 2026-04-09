@@ -3,6 +3,7 @@ package com.kccitm.api.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +20,15 @@ public class PaymentEmailService {
 
     @Autowired
     private PaymentTransactionRepository paymentTransactionRepository;
+
+    @Value("${app.razorpay.callback-base-url:}")
+    private String callbackBaseUrl;
+
+    private String getRegistrationUrl(PaymentTransaction txn) {
+        String base = (callbackBaseUrl != null && !callbackBaseUrl.isEmpty())
+                ? callbackBaseUrl : "https://dashboard.career-9.com";
+        return base + "/payment-register/" + txn.getTransactionId();
+    }
 
     @Async
     public void sendWelcomeEmail(String email, String name, String username,
@@ -94,7 +104,7 @@ public class PaymentEmailService {
                     + "<p>" + bodyMessage + "</p>"
                     + "<p>Please try again using the link below:</p>"
                     + "<div style='text-align: center; margin: 24px 0;'>"
-                    + "<a href='" + txn.getShortUrl() + "' style='background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%); color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 1.1em;'>Retry Payment</a>"
+                    + "<a href='" + getRegistrationUrl(txn) + "' style='background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%); color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 1.1em;'>Retry Payment</a>"
                     + "</div>"
                     + "<p style='color: #666; font-size: 0.85em;'>If the amount was deducted, it will be refunded within 5-7 business days.</p>"
                     + "<p style='color: #999; font-size: 0.8em; margin-top: 24px;'>This is an automated email. Please do not reply.</p>"
@@ -126,7 +136,7 @@ public class PaymentEmailService {
                     + "<p>Your payment of <strong>INR " + amountRupees + "</strong> for <strong>" + safeAssessmentName + "</strong> is still pending.</p>"
                     + "<p>Please complete your payment using the link below:</p>"
                     + "<div style='text-align: center; margin: 24px 0;'>"
-                    + "<a href='" + txn.getShortUrl() + "' style='background: #f59e0b; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 1.1em;'>Complete Payment</a>"
+                    + "<a href='" + getRegistrationUrl(txn) + "' style='background: #f59e0b; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 1.1em;'>Complete Payment</a>"
                     + "</div>"
                     + "<p style='color: #999; font-size: 0.8em; margin-top: 24px;'>This is an automated reminder. Please do not reply.</p>"
                     + "</div></div>";
@@ -153,9 +163,9 @@ public class PaymentEmailService {
                 + "<p>Dear <strong>" + safeName + "</strong>,</p>"
                 + "<p>Please complete your payment of <strong>INR " + amountRupees + "</strong> for <strong>" + safeAssessmentName + "</strong>.</p>"
                 + "<div style='text-align: center; margin: 28px 0;'>"
-                + "<a href='" + txn.getShortUrl() + "' style='background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%); color: white; padding: 14px 36px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 1.1em; display: inline-block;'>Pay Now</a>"
+                + "<a href='" + getRegistrationUrl(txn) + "' style='background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%); color: white; padding: 14px 36px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 1.1em; display: inline-block;'>Pay Now</a>"
                 + "</div>"
-                + "<p style='color: #666; font-size: 0.85em;'>Or copy this link: <a href='" + txn.getShortUrl() + "'>" + txn.getShortUrl() + "</a></p>"
+                + "<p style='color: #666; font-size: 0.85em;'>Or copy this link: <a href='" + getRegistrationUrl(txn) + "'>" + getRegistrationUrl(txn) + "</a></p>"
                 + "<p style='color: #999; font-size: 0.8em; margin-top: 24px;'>This is an automated email. Please do not reply.</p>"
                 + "</div></div>";
 
