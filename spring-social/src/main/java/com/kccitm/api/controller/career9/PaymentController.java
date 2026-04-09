@@ -61,6 +61,12 @@ public class PaymentController {
     @Value("${app.razorpay.callback-base-url:}")
     private String callbackBaseUrl;
 
+    private String getRegistrationUrl(PaymentTransaction txn) {
+        String base = (callbackBaseUrl != null && !callbackBaseUrl.isEmpty())
+                ? callbackBaseUrl : "https://dashboard.career-9.com";
+        return base + "/payment-register/" + txn.getTransactionId();
+    }
+
     @PostMapping("/generate-link")
     public ResponseEntity<?> generatePaymentLink(@RequestBody Map<String, Object> request) {
         try {
@@ -229,7 +235,7 @@ public class PaymentController {
         log.setTransactionId(transactionId);
         log.setChannel("email");
         log.setRecipient(email);
-        log.setPaymentLinkUrl(txn.getShortUrl());
+        log.setPaymentLinkUrl(getRegistrationUrl(txn));
         log.setAmount(txn.getAmount());
         log.setSentBy(currentUser != null ? currentUser.getName() : "admin");
 
@@ -283,7 +289,7 @@ public class PaymentController {
         long amountRupees = txn.getAmount() / 100;
         String message = "Hi " + studentName + ",\n\n"
                 + "Please complete your payment of INR " + amountRupees + " for " + assessmentName + ".\n\n"
-                + "Payment Link: " + txn.getShortUrl() + "\n\n"
+                + "Payment Link: " + getRegistrationUrl(txn) + "\n\n"
                 + "Thank you!";
 
         String encodedMessage = URLEncoder.encode(message, StandardCharsets.UTF_8);
@@ -293,7 +299,7 @@ public class PaymentController {
         log.setTransactionId(transactionId);
         log.setChannel("whatsapp");
         log.setRecipient(cleanPhone);
-        log.setPaymentLinkUrl(txn.getShortUrl());
+        log.setPaymentLinkUrl(getRegistrationUrl(txn));
         log.setAmount(txn.getAmount());
         log.setSentBy(currentUser != null ? currentUser.getName() : "admin");
         log.setStatus("sent");
