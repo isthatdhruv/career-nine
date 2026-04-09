@@ -255,16 +255,7 @@ const PrivateRoutes = () => {
       
 
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/payment-status" element={
-        <SuspensedView>
-          <PaymentStatusPage />
-        </SuspensedView>
-      } />
-      <Route path="/payment-register/:transactionId" element={
-        <SuspensedView>
-          <PaymentRegisterPage />
-        </SuspensedView>
-      } />
+      {/* payment-status and payment-register moved to public AppRoutes */}
       <Route element={<AuthorizedLayout />}>
         <Route path="auth/*" element={<Navigate to="/dashboard" />} />
         <Route path="dashboard" element={<DashboardAdminPage />} />

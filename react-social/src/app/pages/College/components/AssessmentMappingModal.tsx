@@ -1,8 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
-import { Modal, Button, Form, Spinner, Badge } from "react-bootstrap";
-import { MdContentCopy, MdDelete, MdQrCode, MdDownload, MdPayment } from "react-icons/md";
+import { Modal, Button, Form, Spinner } from "react-bootstrap";
+import { MdContentCopy, MdDelete, MdQrCode, MdDownload } from "react-icons/md";
 import { QRCodeCanvas } from "qrcode.react";
-import PaymentLinkModal from "./PaymentLinkModal";
 import { GetSessionsByInstituteCode } from "../API/College_APIs";
 import {
   createAssessmentMapping,
@@ -36,7 +35,6 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
   const [submitting, setSubmitting] = useState(false);
   const [copySuccess, setCopySuccess] = useState<string>("");
   const [qrVisibleToken, setQrVisibleToken] = useState<string | null>(null);
-  const [paymentModalMapping, setPaymentModalMapping] = useState<any | null>(null);
 
   // Derived: classes and sections from selected session/class
   const selectedSessionObj = sessions.find(
@@ -199,7 +197,6 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
       if (s) parts.push(s.sessionYear);
     }
     if (mapping.classId) {
-      // Find class in sessions
       for (const session of sessions) {
         const cls = (session.schoolClasses || []).find(
           (c: any) => c.id === mapping.classId
@@ -307,7 +304,7 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
                 </div>
                 <div>
                   <Form.Label style={{ fontWeight: 600, fontSize: "0.8rem", color: "#475569", marginBottom: 8 }}>
-                    Amount (INR) <span style={{ color: "#94a3b8", fontWeight: 400 }}>— optional</span>
+                    Amount (INR) <span style={{ color: "#94a3b8", fontWeight: 400 }}>-- optional</span>
                   </Form.Label>
                   <Form.Control
                     type="number"
@@ -451,7 +448,7 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
                       <tr style={{ background: "#f8fafc" }}>
-                        {["Assessment", "Level", "Details", "Amount", "Status", "Payment", "Actions"].map((h) => (
+                        {["Assessment", "Level", "Details", "Amount", "Status", "Actions"].map((h) => (
                           <th key={h} style={{
                             padding: "14px 18px", fontWeight: 700, fontSize: "0.78rem",
                             color: "#64748b", textTransform: "uppercase" as const, letterSpacing: "0.05em",
@@ -516,22 +513,6 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
                             >
                               {mapping.isActive ? "Active" : "Inactive"}
                             </span>
-                          </td>
-                          <td style={{ padding: "14px 18px", borderBottom: "1px solid #f1f5f9" }}>
-                            <button
-                              onClick={() => setPaymentModalMapping(mapping)}
-                              style={{
-                                display: "inline-flex", alignItems: "center", gap: 6,
-                                padding: "6px 14px", borderRadius: 8,
-                                border: "1.5px solid #e0e7ff",
-                                background: "linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)",
-                                color: "#4338ca", fontWeight: 600, fontSize: "0.78rem",
-                                cursor: "pointer", transition: "all 0.15s",
-                              }}
-                            >
-                              <MdPayment size={14} />
-                              Generate Link
-                            </button>
                           </td>
                           <td style={{ padding: "14px 18px", borderBottom: "1px solid #f1f5f9" }}>
                             <div style={{ display: "flex", gap: 8 }}>
@@ -678,16 +659,6 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
           </Button>
         </Modal.Footer>
       </Modal>
-
-      {/* Payment Link Modal */}
-      {paymentModalMapping && (
-        <PaymentLinkModal
-          show={!!paymentModalMapping}
-          onHide={() => setPaymentModalMapping(null)}
-          mappingId={paymentModalMapping.mappingId}
-          assessmentName={getAssessmentName(paymentModalMapping.assessmentId)}
-        />
-      )}
     </Modal>
   );
 };
