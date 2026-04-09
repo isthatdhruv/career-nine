@@ -139,6 +139,10 @@ export function findAssessmentsBySameQuestionnaire(assessmentId: number) {
   return axios.get(`${API_URL}/assessments/find-by-same-questionnaire/${assessmentId}`);
 }
 
-export function deleteFirebaseStudents(instituteCode: number) {
-  return axios.delete(`${API_URL}/firebase-mapping/delete-firebase-students/${instituteCode}`);
+export function detectUnmappedQuestions(assessmentId: number) {
+  return axios.get(`${API_URL}/firebase-mapping/detect-unmapped-questions/${assessmentId}`);
+}
+
+export function deleteFirebaseStudents(instituteCode: number, forceAll: boolean = false) {
+  return axios.delete(`${API_URL}/firebase-mapping/delete-firebase-students/${instituteCode}?forceAll=${forceAll}`);
 }

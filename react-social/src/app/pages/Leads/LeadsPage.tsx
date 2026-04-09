@@ -259,13 +259,13 @@ export default function LeadsPage() {
 
   const leadTypeBadge = (type: string) => {
     const colors: Record<string, { bg: string; color: string }> = {
-      SCHOOL: { bg: "rgba(67, 97, 238, 0.1)", color: "#4361ee" },
-      PARENT: { bg: "rgba(16, 185, 129, 0.1)", color: "#059669" },
-      STUDENT: { bg: "rgba(245, 158, 11, 0.1)", color: "#d97706" },
+      SCHOOL: { bg: "#2563eb", color: "#fff" },
+      PARENT: { bg: "#059669", color: "#fff" },
+      STUDENT: { bg: "#d97706", color: "#fff" },
     };
-    const c = colors[type] || { bg: "#f0f0f0", color: "#666" };
+    const c = colors[type] || { bg: "#6b7280", color: "#fff" };
     return (
-      <span className="badge" style={{ background: c.bg, color: c.color, padding: "5px 10px", borderRadius: "6px", fontWeight: 600, fontSize: "0.8rem" }}>
+      <span style={{ background: c.bg, color: c.color, padding: "5px 12px", borderRadius: "4px", fontWeight: 700, fontSize: "0.8rem", display: "inline-block" }}>
         {type}
       </span>
     );
@@ -273,97 +273,101 @@ export default function LeadsPage() {
 
   const syncStatusBadge = (status: string) => {
     const colors: Record<string, { bg: string; color: string }> = {
-      SYNCED: { bg: "rgba(16, 185, 129, 0.1)", color: "#059669" },
-      PENDING: { bg: "rgba(245, 158, 11, 0.1)", color: "#d97706" },
-      FAILED: { bg: "rgba(230, 57, 70, 0.1)", color: "#e63946" },
+      SYNCED: { bg: "#059669", color: "#fff" },
+      PENDING: { bg: "#d97706", color: "#fff" },
+      FAILED: { bg: "#dc2626", color: "#fff" },
     };
-    const c = colors[status] || { bg: "#f0f0f0", color: "#666" };
+    const c = colors[status] || { bg: "#6b7280", color: "#fff" };
     return (
-      <span className="badge" style={{ background: c.bg, color: c.color, padding: "5px 10px", borderRadius: "6px", fontWeight: 600, fontSize: "0.8rem" }}>
+      <span style={{ background: c.bg, color: c.color, padding: "5px 12px", borderRadius: "4px", fontWeight: 700, fontSize: "0.8rem", display: "inline-block" }}>
         {status}
       </span>
     );
   };
 
   return (
-    <div className="container-fluid px-4 py-4">
-      {/* Header */}
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: "16px" }}>
-        <div className="card-body p-4">
-          <div className="d-flex justify-content-between align-items-center">
-            <div>
-              <h4 className="mb-1" style={{ color: "#1a1a2e", fontWeight: 700 }}>
-                <i className="bi bi-people-fill me-2" style={{ color: "#4361ee" }}></i>
-                Leads Management
-              </h4>
-              <p className="text-muted mb-0" style={{ fontSize: "0.9rem" }}>
-                View and manage all captured leads
-              </p>
+    <div style={{ background: "#f8fafc", minHeight: "100vh", padding: "24px" }}>
+      {/* Page Header */}
+      <div style={{ marginBottom: "24px" }}>
+        <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
+          <div>
+            <h4 style={{ color: "#111827", fontWeight: 700, marginBottom: "4px", fontSize: "1.4rem" }}>
+              Leads Management
+            </h4>
+            <p style={{ color: "#6b7280", fontSize: "0.9rem", margin: 0 }}>
+              View, filter, and export all captured leads
+            </p>
+          </div>
+          <button
+            className="btn d-flex align-items-center gap-2"
+            onClick={fetchLeads}
+            disabled={loading}
+            style={{ background: "#fff", border: "1px solid #d1d5db", borderRadius: "6px", padding: "8px 16px", fontWeight: 600, fontSize: "0.85rem", color: "#374151" }}
+          >
+            <i className={`bi bi-arrow-clockwise ${loading ? "spin" : ""}`}></i>
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Filters Card */}
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "20px", marginBottom: "20px" }}>
+        <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "12px" }}>
+          Filters
+        </div>
+        <div className="row g-3 align-items-end">
+          <div className="col-md-2">
+            <label className="form-label" style={{ fontSize: "0.82rem", color: "#374151", fontWeight: 600, marginBottom: "4px" }}>Lead Type</label>
+            <select className="form-select" value={filterLeadType} onChange={(e) => setFilterLeadType(e.target.value)} style={{ borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem" }}>
+              <option value="ALL">All Types</option>
+              <option value="SCHOOL">School</option>
+              <option value="PARENT">Parent</option>
+              <option value="STUDENT">Student</option>
+            </select>
+          </div>
+          <div className="col-md-2">
+            <label className="form-label" style={{ fontSize: "0.82rem", color: "#374151", fontWeight: 600, marginBottom: "4px" }}>Odoo Status</label>
+            <select className="form-select" value={filterSyncStatus} onChange={(e) => setFilterSyncStatus(e.target.value)} style={{ borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem" }}>
+              <option value="ALL">All Status</option>
+              <option value="PENDING">Pending</option>
+              <option value="SYNCED">Synced</option>
+              <option value="FAILED">Failed</option>
+            </select>
+          </div>
+          <div className="col-md-2">
+            <label className="form-label" style={{ fontSize: "0.82rem", color: "#374151", fontWeight: 600, marginBottom: "4px" }}>From Date</label>
+            <input type="date" className="form-control" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} style={{ borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem" }} />
+          </div>
+          <div className="col-md-2">
+            <label className="form-label" style={{ fontSize: "0.82rem", color: "#374151", fontWeight: 600, marginBottom: "4px" }}>To Date</label>
+            <input type="date" className="form-control" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} style={{ borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem" }} />
+          </div>
+          <div className="col-md-3">
+            <label className="form-label" style={{ fontSize: "0.82rem", color: "#374151", fontWeight: 600, marginBottom: "4px" }}>Search</label>
+            <div className="position-relative">
+              <i className="bi bi-search position-absolute" style={{ left: 10, top: "50%", transform: "translateY(-50%)", color: "#9ca3af", fontSize: "0.85rem" }}></i>
+              <input type="text" className="form-control" placeholder="Name, email, phone, school..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem", paddingLeft: "32px" }} />
             </div>
-            <div className="d-flex gap-2">
-              <button className="btn d-flex align-items-center gap-2" onClick={fetchLeads} disabled={loading} style={{ background: "#f0f0f0", border: "none", borderRadius: "10px", padding: "0.5rem 1rem", fontWeight: 600 }}>
-                <i className={`bi bi-arrow-clockwise ${loading ? "spin" : ""}`}></i>
-                Refresh
+          </div>
+          <div className="col-md-1 d-flex align-items-end">
+            {hasActiveFilters && (
+              <button className="btn d-flex align-items-center gap-1" onClick={clearFilters} style={{ background: "#fff", color: "#dc2626", border: "2px solid #dc2626", borderRadius: "6px", fontWeight: 600, fontSize: "0.82rem", padding: "8px 12px", whiteSpace: "nowrap" }}>
+                <i className="bi bi-x-lg" style={{ fontSize: "0.7rem" }}></i> Clear
               </button>
-            </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: "16px" }}>
-        <div className="card-body p-4">
-          <div className="row g-3 align-items-end">
-            <div className="col-md-2">
-              <label className="form-label fw-bold" style={{ fontSize: "0.85rem", color: "#555" }}>Lead Type</label>
-              <select className="form-select" value={filterLeadType} onChange={(e) => setFilterLeadType(e.target.value)} style={{ borderRadius: "10px", border: "2px solid #e0e0e0" }}>
-                <option value="ALL">All Types</option>
-                <option value="SCHOOL">School</option>
-                <option value="PARENT">Parent</option>
-                <option value="STUDENT">Student</option>
-              </select>
-            </div>
-            <div className="col-md-2">
-              <label className="form-label fw-bold" style={{ fontSize: "0.85rem", color: "#555" }}>Odoo Status</label>
-              <select className="form-select" value={filterSyncStatus} onChange={(e) => setFilterSyncStatus(e.target.value)} style={{ borderRadius: "10px", border: "2px solid #e0e0e0" }}>
-                <option value="ALL">All Status</option>
-                <option value="PENDING">Pending</option>
-                <option value="SYNCED">Synced</option>
-                <option value="FAILED">Failed</option>
-              </select>
-            </div>
-            <div className="col-md-2">
-              <label className="form-label fw-bold" style={{ fontSize: "0.85rem", color: "#555" }}>Date From</label>
-              <input type="date" className="form-control" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} style={{ borderRadius: "10px", border: "2px solid #e0e0e0" }} />
-            </div>
-            <div className="col-md-2">
-              <label className="form-label fw-bold" style={{ fontSize: "0.85rem", color: "#555" }}>Date To</label>
-              <input type="date" className="form-control" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} style={{ borderRadius: "10px", border: "2px solid #e0e0e0" }} />
-            </div>
-            <div className="col-md-2">
-              <label className="form-label fw-bold" style={{ fontSize: "0.85rem", color: "#555" }}>Search</label>
-              <input type="text" className="form-control" placeholder="Name, email, phone..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ borderRadius: "10px", border: "2px solid #e0e0e0" }} />
-            </div>
-            <div className="col-md-2 d-flex gap-2">
-              {hasActiveFilters && (
-                <button className="btn btn-outline-secondary d-flex align-items-center gap-1" onClick={clearFilters} style={{ borderRadius: "10px", fontWeight: 600, fontSize: "0.85rem" }}>
-                  <i className="bi bi-x-circle"></i> Clear
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Summary + Actions */}
-      <div className="d-flex justify-content-between align-items-center mb-3">
+      {/* Actions Bar */}
+      <div className="d-flex justify-content-between align-items-center" style={{ marginBottom: "16px" }}>
         <div className="d-flex align-items-center gap-3">
-          <span className="badge" style={{ background: "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)", color: "#fff", padding: "8px 16px", borderRadius: "10px", fontSize: "0.85rem", fontWeight: 600 }}>
+          <span style={{ background: "#2563eb", color: "#fff", padding: "6px 14px", borderRadius: "4px", fontSize: "0.82rem", fontWeight: 700 }}>
             {filteredLeads.length} Lead{filteredLeads.length !== 1 ? "s" : ""}
           </span>
           {hasActiveFilters && (
-            <span className="text-muted" style={{ fontSize: "0.85rem" }}>
-              (of {leads.length} total)
+            <span style={{ color: "#6b7280", fontSize: "0.82rem" }}>
+              of {leads.length} total
             </span>
           )}
         </div>
@@ -373,14 +377,13 @@ export default function LeadsPage() {
             onClick={handleDownloadExcel}
             disabled={filteredLeads.length === 0}
             style={{
-              background: filteredLeads.length > 0 ? "linear-gradient(135deg, #10b981 0%, #059669 100%)" : "#e0e0e0",
+              background: filteredLeads.length > 0 ? "#059669" : "#e5e7eb",
               border: "none",
-              borderRadius: "10px",
-              padding: "0.5rem 1.2rem",
+              borderRadius: "6px",
+              padding: "8px 16px",
               fontWeight: 600,
-              color: filteredLeads.length > 0 ? "#fff" : "#9e9e9e",
-              cursor: filteredLeads.length > 0 ? "pointer" : "not-allowed",
-              boxShadow: filteredLeads.length > 0 ? "0 4px 15px rgba(16, 185, 129, 0.3)" : "none",
+              fontSize: "0.85rem",
+              color: filteredLeads.length > 0 ? "#fff" : "#9ca3af",
             }}
           >
             <i className="bi bi-download"></i>
@@ -396,14 +399,13 @@ export default function LeadsPage() {
             }}
             disabled={filteredLeads.length === 0}
             style={{
-              background: filteredLeads.length > 0 ? "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)" : "#e0e0e0",
+              background: filteredLeads.length > 0 ? "#2563eb" : "#e5e7eb",
               border: "none",
-              borderRadius: "10px",
-              padding: "0.5rem 1.2rem",
+              borderRadius: "6px",
+              padding: "8px 16px",
               fontWeight: 600,
-              color: filteredLeads.length > 0 ? "#fff" : "#9e9e9e",
-              cursor: filteredLeads.length > 0 ? "pointer" : "not-allowed",
-              boxShadow: filteredLeads.length > 0 ? "0 4px 15px rgba(67, 97, 238, 0.3)" : "none",
+              fontSize: "0.85rem",
+              color: filteredLeads.length > 0 ? "#fff" : "#9ca3af",
             }}
           >
             <i className="bi bi-envelope"></i>
@@ -413,104 +415,100 @@ export default function LeadsPage() {
       </div>
 
       {/* Table */}
-      <div className="card border-0 shadow-sm" style={{ borderRadius: "16px", overflow: "hidden" }}>
-        <div className="card-body p-0">
-          {loading ? (
-            <div className="text-center py-5">
-              <div className="spinner-border text-primary" role="status">
-                <span className="visually-hidden">Loading...</span>
-              </div>
-              <p className="mt-3 text-muted">Loading leads...</p>
+      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", overflow: "hidden" }}>
+        {loading ? (
+          <div className="text-center py-5">
+            <div className="spinner-border" style={{ color: "#2563eb" }} role="status">
+              <span className="visually-hidden">Loading...</span>
             </div>
-          ) : error ? (
-            <div className="alert alert-danger m-4" style={{ borderRadius: "10px" }}>
-              <i className="bi bi-exclamation-triangle me-2"></i>
-              {error}
-            </div>
-          ) : filteredLeads.length === 0 ? (
-            <div className="text-center py-5">
-              <i className="bi bi-inbox" style={{ fontSize: "3rem", color: "#ccc" }}></i>
-              <p className="mt-3 text-muted">{leads.length === 0 ? "No leads captured yet." : "No leads match the current filters."}</p>
-            </div>
-          ) : (
-            <div className="table-responsive">
-              <table className="table table-hover mb-0">
-                <thead style={{ background: "#f8f9fa" }}>
-                  <tr>
-                    <th style={{ padding: "14px 16px", fontWeight: 600, color: "#1a1a2e", width: "60px" }}>S.No</th>
-                    <th style={{ padding: "14px 16px", fontWeight: 600, color: "#1a1a2e" }}>Full Name</th>
-                    <th style={{ padding: "14px 16px", fontWeight: 600, color: "#1a1a2e" }}>Email</th>
-                    <th style={{ padding: "14px 16px", fontWeight: 600, color: "#1a1a2e" }}>Phone</th>
-                    <th style={{ padding: "14px 16px", fontWeight: 600, color: "#1a1a2e" }}>Designation</th>
-                    <th style={{ padding: "14px 16px", fontWeight: 600, color: "#1a1a2e" }}>School Name</th>
-                    <th style={{ padding: "14px 16px", fontWeight: 600, color: "#1a1a2e" }}>City</th>
-                    <th style={{ padding: "14px 16px", fontWeight: 600, color: "#1a1a2e" }}>CBSE Aff. No</th>
-                    <th style={{ padding: "14px 16px", fontWeight: 600, color: "#1a1a2e" }}>Total Students</th>
-                    <th style={{ padding: "14px 16px", fontWeight: 600, color: "#1a1a2e" }}>Classes Offered</th>
-                    <th style={{ padding: "14px 16px", fontWeight: 600, color: "#1a1a2e" }}>Type</th>
-                    <th style={{ padding: "14px 16px", fontWeight: 600, color: "#1a1a2e" }}>Source</th>
-                    <th style={{ padding: "14px 16px", fontWeight: 600, color: "#1a1a2e" }}>Odoo Status</th>
-                    <th style={{ padding: "14px 16px", fontWeight: 600, color: "#1a1a2e" }}>Extras</th>
-                    <th style={{ padding: "14px 16px", fontWeight: 600, color: "#1a1a2e" }}>Created At</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredLeads.map((lead, index) => {
-                    const extras = parseExtras(lead.extras);
-                    const extrasEntries = Object.entries(extras);
-                    return (
-                      <tr key={lead.id}>
-                        <td style={{ padding: "12px 16px" }}>
-                          <span className="badge bg-light text-dark" style={{ fontSize: "0.85rem" }}>{index + 1}</span>
-                        </td>
-                        <td style={{ padding: "12px 16px", fontWeight: 500, color: "#333" }}>{lead.fullName}</td>
-                        <td style={{ padding: "12px 16px", color: "#555" }}>{lead.email}</td>
-                        <td style={{ padding: "12px 16px", color: "#555" }}>{lead.phone || "—"}</td>
-                        <td style={{ padding: "12px 16px", color: "#555" }}>{lead.designation || "—"}</td>
-                        <td style={{ padding: "12px 16px", color: "#555" }}>{lead.schoolName || "—"}</td>
-                        <td style={{ padding: "12px 16px", color: "#555" }}>{lead.city || "—"}</td>
-                        <td style={{ padding: "12px 16px", color: "#555" }}>{lead.cbseAffiliationNo || "—"}</td>
-                        <td style={{ padding: "12px 16px", color: "#555" }}>{lead.totalStudents || "—"}</td>
-                        <td style={{ padding: "12px 16px", color: "#555" }}>{lead.classesOffered || "—"}</td>
-                        <td style={{ padding: "12px 16px" }}>{leadTypeBadge(lead.leadType)}</td>
-                        <td style={{ padding: "12px 16px", color: "#555", maxWidth: "150px" }} title={lead.source || ""}>
-                          {lead.source ? (lead.source.length > 20 ? lead.source.substring(0, 20) + "..." : lead.source) : "—"}
-                        </td>
-                        <td style={{ padding: "12px 16px" }}>
-                          {syncStatusBadge(lead.odooSyncStatus)}
-                          {lead.odooLeadId && (
-                            <small className="d-block text-muted mt-1" style={{ fontSize: "0.75rem" }}>
-                              ID: {lead.odooLeadId}
-                            </small>
-                          )}
-                        </td>
-                        <td style={{ padding: "12px 16px", maxWidth: "200px" }}>
-                          {extrasEntries.length > 0 ? (
-                            <div style={{ fontSize: "0.8rem", color: "#666" }}>
-                              {extrasEntries.slice(0, 3).map(([key, value]) => (
-                                <div key={key} className="text-truncate" title={`${key}: ${value}`}>
-                                  <strong>{key}:</strong> {String(value)}
-                                </div>
-                              ))}
-                              {extrasEntries.length > 3 && (
-                                <small className="text-muted">+{extrasEntries.length - 3} more</small>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-muted" style={{ fontSize: "0.8rem" }}>—</span>
-                          )}
-                        </td>
-                        <td style={{ padding: "12px 16px", color: "#555", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
-                          {formatDate(lead.createdAt)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+            <p className="mt-3" style={{ color: "#6b7280" }}>Loading leads...</p>
+          </div>
+        ) : error ? (
+          <div style={{ margin: "20px", padding: "12px 16px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "6px", color: "#b91c1c", fontSize: "0.9rem" }}>
+            <i className="bi bi-exclamation-triangle me-2"></i>
+            {error}
+          </div>
+        ) : filteredLeads.length === 0 ? (
+          <div className="text-center py-5">
+            <i className="bi bi-inbox" style={{ fontSize: "2.5rem", color: "#d1d5db" }}></i>
+            <p className="mt-2" style={{ color: "#6b7280" }}>{leads.length === 0 ? "No leads captured yet." : "No leads match the current filters."}</p>
+          </div>
+        ) : (
+          <div className="table-responsive">
+            <table className="table table-hover mb-0" style={{ fontSize: "0.85rem" }}>
+              <thead>
+                <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
+                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>S.No</th>
+                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Full Name</th>
+                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Email</th>
+                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Phone</th>
+                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Designation</th>
+                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>School Name</th>
+                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>City</th>
+                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>CBSE Aff. No</th>
+                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Students</th>
+                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Classes</th>
+                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Type</th>
+                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Source</th>
+                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Odoo Status</th>
+                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Extras</th>
+                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Created At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLeads.map((lead, index) => {
+                  const extras = parseExtras(lead.extras);
+                  const extrasEntries = Object.entries(extras);
+                  return (
+                    <tr key={lead.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                      <td style={{ padding: "10px 14px", color: "#9ca3af", fontWeight: 500 }}>{index + 1}</td>
+                      <td style={{ padding: "10px 14px", fontWeight: 600, color: "#111827" }}>{lead.fullName}</td>
+                      <td style={{ padding: "10px 14px", color: "#4b5563" }}>{lead.email}</td>
+                      <td style={{ padding: "10px 14px", color: "#4b5563" }}>{lead.phone || "—"}</td>
+                      <td style={{ padding: "10px 14px", color: "#4b5563" }}>{lead.designation || "—"}</td>
+                      <td style={{ padding: "10px 14px", color: "#4b5563" }}>{lead.schoolName || "—"}</td>
+                      <td style={{ padding: "10px 14px", color: "#4b5563" }}>{lead.city || "—"}</td>
+                      <td style={{ padding: "10px 14px", color: "#4b5563" }}>{lead.cbseAffiliationNo || "—"}</td>
+                      <td style={{ padding: "10px 14px", color: "#4b5563" }}>{lead.totalStudents || "—"}</td>
+                      <td style={{ padding: "10px 14px", color: "#4b5563" }}>{lead.classesOffered || "—"}</td>
+                      <td style={{ padding: "10px 14px" }}>{leadTypeBadge(lead.leadType)}</td>
+                      <td style={{ padding: "10px 14px", color: "#4b5563", maxWidth: "150px" }} title={lead.source || ""}>
+                        {lead.source ? (lead.source.length > 20 ? lead.source.substring(0, 20) + "..." : lead.source) : "—"}
+                      </td>
+                      <td style={{ padding: "10px 14px" }}>
+                        {syncStatusBadge(lead.odooSyncStatus)}
+                        {lead.odooLeadId && (
+                          <small className="d-block" style={{ fontSize: "0.72rem", color: "#9ca3af", marginTop: "2px" }}>
+                            ID: {lead.odooLeadId}
+                          </small>
+                        )}
+                      </td>
+                      <td style={{ padding: "10px 14px", maxWidth: "200px" }}>
+                        {extrasEntries.length > 0 ? (
+                          <div style={{ fontSize: "0.78rem", color: "#6b7280" }}>
+                            {extrasEntries.slice(0, 3).map(([key, value]) => (
+                              <div key={key} className="text-truncate" title={`${key}: ${value}`}>
+                                <strong>{key}:</strong> {String(value)}
+                              </div>
+                            ))}
+                            {extrasEntries.length > 3 && (
+                              <small style={{ color: "#9ca3af" }}>+{extrasEntries.length - 3} more</small>
+                            )}
+                          </div>
+                        ) : (
+                          <span style={{ color: "#d1d5db" }}>—</span>
+                        )}
+                      </td>
+                      <td style={{ padding: "10px 14px", color: "#4b5563", fontSize: "0.82rem", whiteSpace: "nowrap" }}>
+                        {formatDate(lead.createdAt)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Email Modal */}
@@ -518,29 +516,24 @@ export default function LeadsPage() {
         <>
           <div className="modal-backdrop fade show" onClick={() => !emailSending && setShowEmailModal(false)} style={{ zIndex: 10040 }}></div>
           <div className="modal fade show" style={{ display: "block", zIndex: 10050 }} tabIndex={-1} role="dialog">
-            <div className="modal-dialog modal-dialog-centered" role="document" style={{ maxWidth: "480px" }}>
-              <div className="modal-content" style={{ borderRadius: "16px", border: "none", boxShadow: "0 10px 40px rgba(0,0,0,0.2)" }}>
-                <div className="modal-header" style={{ borderBottom: "2px solid #f0f0f0", padding: "1.5rem" }}>
-                  <h5 className="modal-title" style={{ color: "#1a1a2e", fontWeight: 700 }}>
-                    <i className="bi bi-envelope me-2" style={{ color: "#4361ee" }}></i>
+            <div className="modal-dialog modal-dialog-centered" role="document" style={{ maxWidth: "460px" }}>
+              <div className="modal-content" style={{ borderRadius: "8px", border: "1px solid #e5e7eb", boxShadow: "0 4px 24px rgba(0,0,0,0.12)" }}>
+                <div className="modal-header" style={{ borderBottom: "1px solid #e5e7eb", padding: "16px 20px" }}>
+                  <h6 className="modal-title" style={{ color: "#111827", fontWeight: 700 }}>
+                    <i className="bi bi-envelope me-2" style={{ color: "#2563eb" }}></i>
                     Email Leads Export
-                  </h5>
+                  </h6>
                   <button type="button" className="btn-close" onClick={() => setShowEmailModal(false)} disabled={emailSending} aria-label="Close"></button>
                 </div>
-                <div className="modal-body" style={{ padding: "2rem" }}>
-                  <div className="mb-3">
-                    <div className="card border-0" style={{ background: "#f8f9fa", borderRadius: "10px" }}>
-                      <div className="card-body p-3 d-flex align-items-center gap-2">
-                        <i className="bi bi-file-earmark-excel" style={{ color: "#059669", fontSize: "1.2rem" }}></i>
-                        <div>
-                          <strong style={{ fontSize: "0.9rem" }}>{filteredLeads.length} leads</strong>
-                          <span className="text-muted" style={{ fontSize: "0.85rem" }}> will be included in the Excel attachment</span>
-                        </div>
-                      </div>
-                    </div>
+                <div className="modal-body" style={{ padding: "20px" }}>
+                  <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "6px", padding: "10px 14px", marginBottom: "16px" }} className="d-flex align-items-center gap-2">
+                    <i className="bi bi-file-earmark-excel" style={{ color: "#059669", fontSize: "1.1rem" }}></i>
+                    <span style={{ fontSize: "0.85rem", color: "#374151" }}>
+                      <strong>{filteredLeads.length} leads</strong> will be attached as Excel
+                    </span>
                   </div>
                   <div className="mb-3">
-                    <label className="form-label fw-bold" style={{ fontSize: "0.9rem", color: "#333" }}>Recipient Email *</label>
+                    <label className="form-label" style={{ fontSize: "0.85rem", color: "#374151", fontWeight: 600 }}>Recipient Email *</label>
                     <input
                       type="email"
                       className="form-control"
@@ -548,23 +541,23 @@ export default function LeadsPage() {
                       value={emailTo}
                       onChange={(e) => { setEmailTo(e.target.value); setEmailError(""); }}
                       disabled={emailSending}
-                      style={{ borderRadius: "10px", border: "2px solid #e0e0e0", padding: "0.7rem 1rem" }}
+                      style={{ borderRadius: "6px", border: "1px solid #d1d5db", padding: "8px 12px" }}
                     />
-                    <small className="text-muted">For multiple recipients, separate with commas</small>
+                    <small style={{ color: "#9ca3af", fontSize: "0.78rem" }}>For multiple recipients, separate with commas</small>
                   </div>
                   {emailError && (
-                    <div className="alert alert-danger py-2" style={{ borderRadius: "10px", fontSize: "0.85rem" }}>
+                    <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "6px", padding: "8px 12px", fontSize: "0.85rem", color: "#b91c1c" }}>
                       <i className="bi bi-exclamation-triangle me-2"></i>{emailError}
                     </div>
                   )}
                   {emailSuccess && (
-                    <div className="alert alert-success py-2" style={{ borderRadius: "10px", fontSize: "0.85rem" }}>
+                    <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "6px", padding: "8px 12px", fontSize: "0.85rem", color: "#047857" }}>
                       <i className="bi bi-check-circle me-2"></i>{emailSuccess}
                     </div>
                   )}
                 </div>
-                <div className="modal-footer" style={{ borderTop: "2px solid #f0f0f0", padding: "1.5rem" }}>
-                  <button type="button" className="btn btn-outline-secondary" onClick={() => setShowEmailModal(false)} disabled={emailSending} style={{ borderRadius: "10px", padding: "0.5rem 1.5rem", fontWeight: 600 }}>
+                <div className="modal-footer" style={{ borderTop: "1px solid #e5e7eb", padding: "12px 20px" }}>
+                  <button type="button" className="btn" onClick={() => setShowEmailModal(false)} disabled={emailSending} style={{ background: "#fff", border: "1px solid #d1d5db", borderRadius: "6px", padding: "8px 20px", fontWeight: 600, color: "#374151", fontSize: "0.85rem" }}>
                     Cancel
                   </button>
                   <button
@@ -573,12 +566,13 @@ export default function LeadsPage() {
                     onClick={handleEmailExcel}
                     disabled={emailSending || !emailTo.trim()}
                     style={{
-                      background: "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
+                      background: "#2563eb",
                       border: "none",
-                      borderRadius: "10px",
-                      padding: "0.5rem 1.5rem",
+                      borderRadius: "6px",
+                      padding: "8px 20px",
                       fontWeight: 600,
                       color: "#fff",
+                      fontSize: "0.85rem",
                     }}
                   >
                     {emailSending ? (

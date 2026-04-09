@@ -111,6 +111,11 @@ public class AssessmentInstituteMappingController {
         return mappingRepository.findByInstituteCode(instituteCode);
     }
 
+    @GetMapping("/getByInstitute/{instituteCode}/assessments")
+    public List<AssessmentTableRepository.AssessmentSummary> getAssessmentsByInstitute(@PathVariable Integer instituteCode) {
+        return assessmentTableRepository.findAssessmentSummariesByInstitute(instituteCode);
+    }
+
     @GetMapping("/get/{id}")
     public ResponseEntity<?> getById(@PathVariable Long id) {
         return mappingRepository.findById(id)

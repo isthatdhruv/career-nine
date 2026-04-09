@@ -64,7 +64,7 @@ export function AsideMenuMain() {
 
   const showDataUpload =
     allowed("/offline-assessment-upload") || allowed("/omr-data-upload") ||
-    allowed("/live-tracking");
+    allowed("/live-tracking") || allowed("/payment-tracking");
 
   const showReports = allowed("/reports") || allowed("/report-generation") || allowed("/send-reports");
 
@@ -77,8 +77,9 @@ export function AsideMenuMain() {
   const showTeacher = showTeacherDashboards || showTeacherRegistration;
 
   const showRoles =
-    allowed("/roles/role") || allowed("/roles/users") ||
-    allowed("/roles/role_roleGroup") || allowed("/roles/roleUser");
+    allowed("/roles/role") ||
+    allowed("/roles/role_roleGroup") || allowed("/roles/roleUser") ||
+    allowed("/user-registrations");
 
   const showActivityLog = allowed("/activity-log");
   const showLeads = allowed("/leads");
@@ -138,14 +139,6 @@ export function AsideMenuMain() {
                 fontIcon="bi-app-indicator"
               />
             )}
-            {allowed("/admin/group-student") && (
-              <AsideMenuItem
-                to="/admin/group-student"
-                icon="/media/icons/duotune/general/gen044.svg"
-                title="Group Student Information Admin"
-                fontIcon="bi-app-indicator"
-              />
-            )}
             {showSchoolGroupStudent && allowed("/school/group-student") && (
               <AsideMenuItem
                 to={`/school/group-student?instituteId=${schoolGroupStudentInstituteId}`}
@@ -190,32 +183,6 @@ export function AsideMenuMain() {
         </>
       )}
 
-      {showRegistration && (
-        <>
-          <div className="menu-item">
-            <div className="menu-content pt-8 pb-2">
-              <span className="menu-section text-muted text-uppercase fs-8 ls-1">
-                Registration
-              </span>
-            </div>
-          </div>
-          <AsideMenuItemWithSub
-            to=""
-            title="User Registration"
-            fontIcon="bi-app-indicator"
-            icon="/media/icons/duotune/communication/com006.svg"
-          >
-            {allowed("/user-registrations") && (
-              <AsideMenuItem
-                to="/user-registrations"
-                icon="/media/icons/duotune/general/gen044.svg"
-                title="User Registration"
-                fontIcon="bi-app-indicator"
-              />
-            )}
-          </AsideMenuItemWithSub>
-        </>
-      )}
 
       {showAssessmentManagement && (
         <>
@@ -385,6 +352,14 @@ export function AsideMenuMain() {
                 fontIcon="bi-broadcast"
               />
             )}
+            {allowed("/payment-tracking") && (
+              <AsideMenuItem
+                to="/payment-tracking"
+                icon="/media/icons/duotune/finance/fin002.svg"
+                title="Payment Tracking"
+                fontIcon="bi-credit-card"
+              />
+            )}
           </AsideMenuItemWithSub>
         </>
       )}
@@ -401,13 +376,21 @@ export function AsideMenuMain() {
 
           {allowed("/reports") && (
             <AsideMenuItem
-              to="/reports"
-              icon="/media/icons/duotune/files/fil003.svg"
-              title="Reports"
-              fontIcon="bi-file-earmark-text"
+              to="/reports-hub"
+              icon="/media/icons/duotune/graphs/gra010.svg"
+              title="Reports Hub"
+              fontIcon="bi-grid-3x3-gap"
             />
           )}
           {allowed("/reports") && (
+            <AsideMenuItem
+              to="/reports"
+              icon="/media/icons/duotune/files/fil003.svg"
+              title="Unified Score Export"
+              fontIcon="bi-file-earmark-text"
+            />
+          )}
+          {/* {allowed("/reports") && (
             <AsideMenuItem
               to="/bet-report-generation"
               icon="/media/icons/duotune/general/gen005.svg"
@@ -422,7 +405,7 @@ export function AsideMenuMain() {
               title="Navigator Report Generation"
               fontIcon="bi-compass"
             />
-          )}
+          )} */}
           {allowed("/reports") && (
             <AsideMenuItem
               to="/unified-report-management"
@@ -559,32 +542,22 @@ export function AsideMenuMain() {
             </div>
           </div>
           <AsideMenuItemWithSub
-            to="/apps/chat"
+            to=""
             title="Roles and Users"
-            fontIcon="bi-chat-left"
+            fontIcon="bi-shield-lock"
             icon="/media/icons/duotune/general/gen019.svg"
           >
-            {allowed("/roles/role") && (
-              <AsideMenuItem to="/roles/role" title="Role" hasBullet={true} />
-            )}
-            {allowed("/roles/users") && (
+            {(allowed("/roles/role") || allowed("/roles/role_roleGroup")) && (
               <AsideMenuItem
-                to="/roles/users"
-                title="Users"
+                to="/user-management/roles/manage"
+                title="Roles & Permissions"
                 hasBullet={true}
               />
             )}
-            {allowed("/roles/role_roleGroup") && (
+            {(allowed("/roles/roleUser") || allowed("/user-registrations")) && (
               <AsideMenuItem
-                to="/roles/role_roleGroup"
-                title="Role - Role Group"
-                hasBullet={true}
-              />
-            )}
-            {allowed("/roles/roleUser") && (
-              <AsideMenuItem
-                to="/roles/roleUser"
-                title="Role - User"
+                to="/user-management/users/manage"
+                title="User Management"
                 hasBullet={true}
               />
             )}
@@ -592,14 +565,6 @@ export function AsideMenuMain() {
         </>
       )}
 
-      {allowed("/career") && (
-        <AsideMenuItem
-          to="/career"
-          icon="/media/icons/duotune/general/gen044.svg"
-          title="Career"
-          fontIcon="bi-app-indicator"
-        />
-      )}
 
       {showActivityLog && (
         <>

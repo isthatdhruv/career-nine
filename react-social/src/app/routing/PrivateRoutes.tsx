@@ -47,7 +47,7 @@ import StudentsList from "../pages/StudentInformation/StudentsList";
 import GroupCreatePage from "../pages/dashboard/widgets/CreateNewGroup";
 import StudentCreatePage from "../pages/dashboard/widgets/CreateNewStudent";
 import GroupStudentPage from "../pages/GroupStudent/GroupStudentPage";
-import GroupStudentAdminPage from "../pages/GroupStudent/GroupStudentAdminPage";
+// GroupStudentAdminPage removed — consolidated into Data Download (/group-student)
 import GroupStudentSchoolPage from "../pages/GroupStudent/GroupStudentSchoolPage";
 import AssignedStudentsPage from "../pages/GroupStudent/AssignedStudentsPage";
 import ReportGenerationPage from "../pages/ReportGeneration/ReportGenerationPage";
@@ -60,12 +60,14 @@ import DemographicFieldsPage from "../pages/DemographicFields/DemographicFieldsP
 import DemographicFieldCreatePage from "../pages/DemographicFields/components/DemographicFieldCreatePage";
 import DemographicFieldEditPage from "../pages/DemographicFields/components/DemographicFieldEditPage";
 // import QuestionareEditSinglePage from "../pages/CreateAssessment/components/questionaire/QuestionareEditSinglePage";
+import CareerSuggestionPage from "../pages/CareerSuggestion/CareerSuggestionPage";
 import DashboardAdminPage from "../pages/demo-dashboard-v2/dashboard-admin";
 import InstituteDashboard from "../pages/dashboard/InstituteDashboard";
 import ActivityLogPage from "../pages/ActivityLog/ActivityLogPage";
 import LeadsPage from "../pages/Leads/LeadsPage";
 import LiveTrackingPage from "../pages/LiveTracking/LiveTrackingPage";
 import ReportsPage from "../pages/Reports/ReportsPage";
+import ReportsHubPage from "../pages/ReportsHub/ReportsHubPage";
 import StudentDashboard from "../pages/StudentDashboard/StudentDashboard";
 import ClassTeacherDashboard from "../pages/ClassTeacherDashboard/ClassTeacherDashboard";
 import { Error401 } from "../modules/errors/components/Error401";
@@ -214,6 +216,8 @@ const PrivateRoutes = () => {
     () => import("../modules/role_roleGroup/Role_RoleGroup")
   );
   const RoleUser = lazy(() => import("../modules/roleUser/RoleUser1"));
+  const RolesAndPermissionsPage = lazy(() => import("../pages/RolesAndPermissions/RolesAndPermissionsPage"));
+  const UserManagementPage = lazy(() => import("../pages/UserManagement/UserManagementPage"));
   const UniversityResultDashboard = lazy(
     () => import("../pages/UniversityResult/UniversityResultDashboard")
   );
@@ -222,6 +226,8 @@ const PrivateRoutes = () => {
   const SessionNotesPage = lazy(() => import("../pages/Counselling/counsellor/SessionNotesPage"));
   const AdminCounsellingQueuePage = lazy(() => import("../pages/Counselling/admin/AdminCounsellingQueuePage"));
   const CounsellorManagementPage = lazy(() => import("../pages/Counselling/admin/CounsellorManagementPage"));
+  const PaymentTrackingPage = lazy(() => import("../pages/PaymentTracking/PaymentTrackingPage"));
+  const PaymentStatusPage = lazy(() => import("../pages/PaymentTracking/PaymentStatusPage"));
   // const UniversityAllResultDashboard = lazy(
   //   () => import("../pages/UniversityResult/UniversityAllResultDashboard")
   // );
@@ -247,6 +253,11 @@ const PrivateRoutes = () => {
       
 
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/payment-status" element={
+        <SuspensedView>
+          <PaymentStatusPage />
+        </SuspensedView>
+      } />
       <Route element={<AuthorizedLayout />}>
         <Route path="auth/*" element={<Navigate to="/dashboard" />} />
         <Route path="dashboard" element={<DashboardAdminPage />} />
@@ -324,12 +335,6 @@ const PrivateRoutes = () => {
         <Route path="/group-student" element={
           <SuspensedView>
             <GroupStudentPage />
-          </SuspensedView>
-        } />
-
-        <Route path="/admin/group-student" element={
-          <SuspensedView>
-            <GroupStudentAdminPage />
           </SuspensedView>
         } />
 
@@ -913,46 +918,30 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
+        {/* New consolidated pages */}
         <Route
-          path="/roles/role"
+          path="/user-management/roles/manage"
           element={
             <SuspensedView>
-              <Role />
+              <RolesAndPermissionsPage />
             </SuspensedView>
           }
         />
         <Route
-          path="/roles/users"
+          path="/user-management/users/manage"
           element={
             <SuspensedView>
-              <Users />
+              <UserManagementPage />
             </SuspensedView>
           }
         />
-        <Route
-          path="/user-registrations"
-          element={
-            <SuspensedView>
-              <UserRegistration />
-            </SuspensedView>
-          }
-        />
-        <Route
-          path="/roles/role_roleGroup"
-          element={
-            <SuspensedView>
-              <RoleRoleGroupPage />
-            </SuspensedView>
-          }
-        />
-        <Route
-          path="/roles/roleUser"
-          element={
-            <SuspensedView>
-              <RoleUser />
-            </SuspensedView>
-          }
-        />
+
+        {/* Old routes — redirect to new pages */}
+        <Route path="/roles/role" element={<Navigate to="/user-management/roles/manage" replace />} />
+        <Route path="/roles/role_roleGroup" element={<Navigate to="/user-management/roles/manage" replace />} />
+        <Route path="/roles/roleUser" element={<Navigate to="/user-management/users/manage" replace />} />
+        <Route path="/user-registrations" element={<Navigate to="/user-management/users/manage" replace />} />
+        <Route path="/roles/users" element={<Navigate to="/user-management/users/manage" replace />} />
         <Route
           path="/reports"
           element={
@@ -990,6 +979,14 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <SendReportsPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/reports-hub"
+          element={
+            <SuspensedView>
+              <ReportsHubPage />
             </SuspensedView>
           }
         />
@@ -1079,6 +1076,14 @@ const PrivateRoutes = () => {
           }
         />
 
+        <Route
+          path="/payment-tracking"
+          element={
+            <SuspensedView>
+              <PaymentTrackingPage />
+            </SuspensedView>
+          }
+        />
         {/* Page Not Found */}
         {/* <Route path="*" element={<Navigate to="/error/404" />} /> */}
       </Route>

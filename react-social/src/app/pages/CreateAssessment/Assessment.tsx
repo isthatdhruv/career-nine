@@ -1,7 +1,4 @@
 import { useEffect, useState } from "react";
-import { Button } from "react-bootstrap";
-import { IconContext } from "react-icons";
-import { MdQuestionAnswer } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { ReadAssessmentList } from "./API/Create_Assessment_APIs";
 import { AssessmentTable } from "./components";
@@ -16,7 +13,6 @@ const AssessmentPage = () => {
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Initial load
   useEffect(() => {
     const fetchData = async () => {
       setIsDataLoading(true);
@@ -33,7 +29,6 @@ const AssessmentPage = () => {
     fetchData();
   }, []);
 
-  // Refresh when pageLoading is set to true
   useEffect(() => {
     if (pageLoading[0] === "true") {
       const fetchData = async () => {
@@ -52,52 +47,54 @@ const AssessmentPage = () => {
     }
   }, [pageLoading]);
 
-
   return (
-    <div className="card">
+    <div style={{ background: "#f8fafc", minHeight: "100vh", padding: "24px" }}>
+      {/* Page Header */}
+      <div className="d-flex align-items-center justify-content-between flex-wrap gap-3" style={{ marginBottom: "24px" }}>
+        <div className="d-flex align-items-center gap-3">
+          <div style={{ width: "40px", height: "40px", borderRadius: "8px", background: "#059669", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <i className="bi bi-clipboard-data-fill text-white" style={{ fontSize: "1.1rem" }}></i>
+          </div>
+          <div>
+            <h4 style={{ margin: 0, color: "#111827", fontWeight: 700, fontSize: "1.3rem" }}>Assessments</h4>
+            <p style={{ margin: 0, color: "#6b7280", fontSize: "0.82rem" }}>
+              {(loading || isDataLoading) ? "Loading..." : `${assessmentData.length} assessments configured`}
+            </p>
+          </div>
+        </div>
+        <button
+          className="btn d-flex align-items-center gap-2"
+          onClick={() => navigate("/assessments/create")}
+          style={{ background: "#059669", color: "#fff", border: "none", borderRadius: "6px", padding: "8px 16px", fontWeight: 600, fontSize: "0.85rem" }}
+        >
+          <i className="bi bi-plus-lg"></i>
+          Create Assessment
+        </button>
+      </div>
+
+      {/* Loading */}
       {(loading || isDataLoading) && (
-        <span className="indicator-progress m-5" style={{ display: "block" }}>
-          Please wait...{" "}
-          <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
-        </span>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "48px", textAlign: "center" }}>
+          <div className="spinner-border" style={{ color: "#059669" }} role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+          <p className="mt-3" style={{ color: "#6b7280" }}>Loading assessments...</p>
+        </div>
       )}
 
+      {/* Table */}
       {!loading && !isDataLoading && (
-        <div className="card-header border-0 pt-6">
-          <div className="card-title">
-            <h1>Assessments</h1>
-          </div>
-
-          <div className="card-toolbar">
-            <div className="d-flex justify-content-end">
-              <Button
-                variant="primary"
-                onClick={() => navigate("/assessments/create")}
-              >
-                <IconContext.Provider
-                  value={{ style: { paddingBottom: "4px" } }}
-                >
-                  <div>
-                    Create Assessment <MdQuestionAnswer size={21} />
-                  </div>
-                </IconContext.Provider>
-              </Button>
-            </div>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", overflow: "hidden" }}>
+          <div style={{ padding: "16px" }}>
+            <AssessmentTable
+              data={assessmentData}
+              setLoading={setLoading}
+              setPageLoading={setPageLoading}
+            />
           </div>
         </div>
       )}
 
-      {!loading && !isDataLoading && (
-        <div className="card-body pt-5">
-          <AssessmentTable
-            data={assessmentData}
-            setLoading={setLoading}
-            setPageLoading={setPageLoading}
-          />
-        </div>
-      )}
-
-      {/* Creation Modal */}
       <AssessmentCreateModal
         show={showCreateModal}
         onHide={() => setShowCreateModal(false)}

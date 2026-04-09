@@ -1,24 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { showErrorToast, showSuccessToast } from '../../utils/toast';
-import { downloadReportAsPdf, downloadReportsAsZip, ZipProgress } from "../ReportGeneration/utils/htmlToPdf";
 import { ReadCollegeList, GetSessionsByInstituteCode } from "../College/API/College_APIs";
 import {
-  getAllAssessments,
   getStudentsWithMappingByInstituteId,
-  Assessment,
 } from "../StudentInformation/StudentInfo_APIs";
-import { getAssessmentMappingsByInstitute } from "../AssessmentMapping/API/AssessmentMapping_APIs";
-import {
-  getBetReportDataByAssessment,
-  generateHtmlReports,
-  downloadBetReport,
-  getBetReportUrls,
-  BetReportData,
-  exportGeneralAssessmentExcel,
-  exportGeneralAssessmentExcelForStudent,
-  exportMqtScoresExcel,
-  exportBetReportExcel,
-} from "../ReportGeneration/API/BetReportData_APIs";
+import { getAssessmentSummariesByInstitute } from "../AssessmentMapping/API/AssessmentMapping_APIs";
+import { generateAndExportNavigatorExcel } from "../NavigatorReportGeneration/API/NavigatorReportData_APIs";
+import { exportMqtScoresExcel } from "../ReportGeneration/API/BetReportData_APIs";
 import SchoolReportModal from "./SchoolReportModal";
 
 type StudentRow = {
@@ -35,13 +23,11 @@ type StudentRow = {
 };
 
 type SectionInfo = { className: string; sectionName: string };
-type FilterKey = "name" | "grade" | "section" | "status" | "dataGenerated";
+type FilterKey = "name" | "grade" | "section";
 
 const FILTER_ITEMS: { key: FilterKey; label: string }[] = [
   { key: "grade", label: "Grade / Class" },
   { key: "section", label: "Section" },
-  { key: "status", label: "Report Status" },
-  { key: "dataGenerated", label: "Data Generated" },
   { key: "name", label: "Name" },
 ];
 
@@ -51,8 +37,7 @@ const ReportsPage: React.FC = () => {
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
   const [institutesLoading, setInstitutesLoading] = useState(false);
 
-  const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [assessments, setAssessments] = useState<{ id: number; assessmentName: string; isActive: boolean; questionnaireType: boolean | null }[]>([]);
   const [selectedAssessment, setSelectedAssessment] = useState<number | "">("");
   const [assessmentsLoading, setAssessmentsLoading] = useState(false);
 
@@ -60,12 +45,10 @@ const ReportsPage: React.FC = () => {
   const [sectionLookup, setSectionLookup] = useState<Map<number, SectionInfo>>(new Map());
   const [studentsLoading, setStudentsLoading] = useState(false);
 
-  // ── Report data from bet_report_data table ──
-  const [reportDataMap, setReportDataMap] = useState<Map<number, BetReportData>>(new Map());
-  const [reportDataLoading, setReportDataLoading] = useState(false);
-
   // ── Student selection ──
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<number>>(new Set());
+
+  // ── Pagination ──
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
@@ -74,17 +57,13 @@ const ReportsPage: React.FC = () => {
   const [nameQuery, setNameQuery] = useState("");
   const [selectedGrade, setSelectedGrade] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState<Set<string>>(new Set());
-  const [selectedDataGenerated, setSelectedDataGenerated] = useState<Set<string>>(new Set());
-
-  // ── Generate ──
-  const [generating, setGenerating] = useState(false);
-  const [exportingOMR, setExportingOMR] = useState(false);
-  const [exportingMQT, setExportingMQT] = useState(false);
   const [exportingBET, setExportingBET] = useState(false);
   const [downloadingZip, setDownloadingZip] = useState(false);
-  const [zipProgress, setZipProgress] = useState<ZipProgress | null>(null);
-  const [exportingStudentId, setExportingStudentId] = useState<number | null>(null);
+  const [zipProgress, setZipProgress] = useState<{ completed: number; total: number } | null>(null);
+  const [reportDataMap, setReportDataMap] = useState<Map<number, { reportStatus: string; reportUrl?: string }>>(new Map()); 
+  // ── Generate ──
+  const [generating, setGenerating] = useState(false);
+  const [exportingMQT, setExportingMQT] = useState(false);
   const [schoolReportOpen, setSchoolReportOpen] = useState(false);
 
   // ═══════════════════════ DATA LOADING ═══════════════════════
@@ -98,39 +77,16 @@ const ReportsPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    getAllAssessments()
-      .then((res) => setAllAssessments(res.data || []))
-      .catch(() => setAllAssessments([]));
-  }, []);
-
-  const [mappedAssessmentIds, setMappedAssessmentIds] = useState<Set<number> | null>(null);
-
-  useEffect(() => {
     if (selectedInstitute === "") {
-      setMappedAssessmentIds(null);
+      setAssessments([]);
       return;
     }
     setAssessmentsLoading(true);
-    getAssessmentMappingsByInstitute(Number(selectedInstitute))
-      .then((res) => {
-        const ids = new Set<number>(
-          (res.data || [])
-            .filter((m: any) => m.isActive !== false)
-            .map((m: any) => Number(m.assessmentId))
-        );
-        setMappedAssessmentIds(ids.size > 0 ? ids : null);
-      })
-      .catch(() => setMappedAssessmentIds(null))
+    getAssessmentSummariesByInstitute(Number(selectedInstitute))
+      .then((res) => setAssessments(res.data || []))
+      .catch(() => setAssessments([]))
       .finally(() => setAssessmentsLoading(false));
   }, [selectedInstitute]);
-
-  useEffect(() => {
-    if (mappedAssessmentIds && mappedAssessmentIds.size > 0) {
-      setAssessments(allAssessments.filter((a) => mappedAssessmentIds.has(a.id)));
-    } else {
-      setAssessments(allAssessments);
-    }
-  }, [allAssessments, mappedAssessmentIds]);
 
   useEffect(() => {
     if (selectedInstitute === "") {
@@ -164,35 +120,12 @@ const ReportsPage: React.FC = () => {
       .finally(() => setStudentsLoading(false));
   }, [selectedInstitute]);
 
-  // Fetch report data when assessment is selected
-  useEffect(() => {
-    if (selectedAssessment === "") {
-      setReportDataMap(new Map());
-      return;
-    }
-    setReportDataLoading(true);
-    getBetReportDataByAssessment(Number(selectedAssessment))
-      .then((res) => {
-        const map = new Map<number, BetReportData>();
-        for (const r of res.data || []) {
-          if (r.userStudent?.userStudentId) {
-            map.set(r.userStudent.userStudentId, r);
-          }
-        }
-        setReportDataMap(map);
-      })
-      .catch(() => setReportDataMap(new Map()))
-      .finally(() => setReportDataLoading(false));
-  }, [selectedAssessment]);
-
   // Reset on selection change
   useEffect(() => {
     setFilterEnabled(new Set());
     setNameQuery("");
     setSelectedGrade("");
     setSelectedSection("");
-    setSelectedStatus(new Set<string>());
-    setSelectedDataGenerated(new Set<string>());
     setSelectedStudentIds(new Set());
     setCurrentPage(1);
   }, [selectedInstitute, selectedAssessment]);
@@ -247,27 +180,8 @@ const ReportsPage: React.FC = () => {
         return info?.sectionName === selectedSection;
       });
     }
-    if (filterEnabled.has("status") && selectedStatus.size > 0) {
-      result = result.filter((s) => {
-        const rd = reportDataMap.get(s.userStudentId);
-        const status = rd?.reportStatus || "notGenerated";
-        return selectedStatus.has(status);
-      });
-    }
-    if (filterEnabled.has("dataGenerated") && selectedDataGenerated.size > 0) {
-      result = result.filter((s) => {
-        const hasData = reportDataMap.has(s.userStudentId);
-        if (selectedDataGenerated.has("yes") && hasData) return true;
-        if (selectedDataGenerated.has("no") && !hasData) return true;
-        return false;
-      });
-    }
     return result;
-  }, [
-    assessmentStudents, filterEnabled, nameQuery,
-    selectedGrade, selectedSection, sectionLookup,
-    selectedStatus, selectedDataGenerated, reportDataMap,
-  ]);
+  }, [assessmentStudents, filterEnabled, nameQuery, selectedGrade, selectedSection, sectionLookup]);
 
   const totalPages = Math.max(1, Math.ceil(displayedStudents.length / pageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -278,7 +192,7 @@ const ReportsPage: React.FC = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [nameQuery, selectedGrade, selectedSection, selectedStatus, selectedDataGenerated, filterEnabled]);
+  }, [nameQuery, selectedGrade, selectedSection, filterEnabled]);
 
   // ═══════════════════════ ACTIONS ═══════════════════════
 
@@ -291,8 +205,6 @@ const ReportsPage: React.FC = () => {
         if (key === "name") setNameQuery("");
         if (key === "grade") setSelectedGrade("");
         if (key === "section") setSelectedSection("");
-        if (key === "status") setSelectedStatus(new Set());
-        if (key === "dataGenerated") setSelectedDataGenerated(new Set());
       }
       return next;
     });
@@ -303,47 +215,68 @@ const ReportsPage: React.FC = () => {
     setNameQuery("");
     setSelectedGrade("");
     setSelectedSection("");
-    setSelectedStatus(new Set<string>());
-    setSelectedDataGenerated(new Set<string>());
   };
 
-  const handleGenerateReports = async () => {
+  const visibleSelectedCount = useMemo(() => {
+    const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
+    return Array.from(selectedStudentIds).filter((id) => visibleIds.has(id)).length;
+  }, [selectedStudentIds, displayedStudents]);
+
+  const handleGenerateExcel = async () => {
+    if (!selectedAssessment) return;
+
     const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
     const selectedVisible = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
     const ids = selectedVisible.length > 0
       ? selectedVisible
       : displayedStudents.map((s) => s.userStudentId);
 
-    // Only include students that have report data
-    const idsWithData = ids.filter((id) => reportDataMap.has(id));
-    if (idsWithData.length === 0) {
-      showErrorToast("No students with generated report data found. Generate report data first from the Report Generation page.");
+    if (ids.length === 0) {
+      showErrorToast("No students to generate data for.");
       return;
     }
 
     setGenerating(true);
     try {
-      const res = await generateHtmlReports(Number(selectedAssessment), idsWithData);
-      const { generated, errors } = res.data;
-      let msg = `Generated ${generated} report(s).`;
-      if (errors.length > 0) {
-        msg += `\n${errors.length} failed: ${errors.map((e) => e.reason).join(", ")}`;
-      }
-      showSuccessToast(msg);
-
-      // Refresh report data
-      const refreshRes = await getBetReportDataByAssessment(Number(selectedAssessment));
-      const map = new Map<number, BetReportData>();
-      for (const r of refreshRes.data || []) {
-        if (r.userStudent?.userStudentId) {
-          map.set(r.userStudent.userStudentId, r);
-        }
-      }
-      setReportDataMap(map);
+      const res = await generateAndExportNavigatorExcel(Number(selectedAssessment), ids);
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `navigator_data_${selectedAssessment}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      showSuccessToast(`Generated data for ${ids.length} student(s) — downloading Excel.`);
     } catch (err: any) {
-      showErrorToast("Failed: " + (err?.response?.data?.error || err.message));
+      showErrorToast("Generation failed: " + (err?.response?.data?.error || err.message));
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleExportMQT = async () => {
+    if (!selectedAssessment) return;
+
+    const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
+    const selectedVisible = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
+    const ids = selectedVisible.length > 0 ? selectedVisible : undefined;
+
+    setExportingMQT(true);
+    try {
+      const res = await exportMqtScoresExcel(Number(selectedAssessment), ids);
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mq_mqt_scores_${selectedAssessment}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      showErrorToast("Export failed: " + (err?.response?.data?.error || err.message));
+    } finally {
+      setExportingMQT(false);
     }
   };
 
@@ -351,33 +284,12 @@ const ReportsPage: React.FC = () => {
 
   const selectedInstituteName =
     institutes.find((i) => i.instituteCode === selectedInstitute)?.instituteName || "";
-  const selectedAssessmentName =
-    assessments.find((a) => a.id === selectedAssessment)?.assessmentName || "";
+  const selectedAssessmentObj = assessments.find((a) => a.id === selectedAssessment);
+  const selectedAssessmentName = selectedAssessmentObj?.assessmentName || "";
+  // questionnaireType: true = BET, false/null = Navigator
+  const isNavigator = selectedAssessmentObj ? !selectedAssessmentObj.questionnaireType : false;
 
   const ready = selectedInstitute !== "" && selectedAssessment !== "";
-
-  const visibleSelectedCount = useMemo(() => {
-    const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
-    return Array.from(selectedStudentIds).filter((id) => visibleIds.has(id)).length;
-  }, [selectedStudentIds, displayedStudents]);
-
-  // Stats
-  const reportStats = useMemo(() => {
-    let generated = 0;
-    let notGenerated = 0;
-    let hasData = 0;
-    for (const s of displayedStudents) {
-      const rd = reportDataMap.get(s.userStudentId);
-      if (rd) {
-        hasData++;
-        if (rd.reportStatus === "generated") generated++;
-        else notGenerated++;
-      } else {
-        notGenerated++;
-      }
-    }
-    return { generated, notGenerated, hasData };
-  }, [displayedStudents, reportDataMap]);
 
   // ═══════════════════════ STYLES ═══════════════════════
 
@@ -396,10 +308,10 @@ const ReportsPage: React.FC = () => {
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ fontWeight: 800, fontSize: "1.5rem", color: "#1a1a2e", margin: 0 }}>
-          Report Export & Preview
+          Unified Score Export
         </h2>
         <p style={{ color: "#6b7280", fontSize: "0.9rem", margin: "4px 0 0" }}>
-          Generate HTML reports from BET report data and export to storage
+          Export scores and generate reports across assessments
         </p>
       </div>
 
@@ -437,23 +349,21 @@ const ReportsPage: React.FC = () => {
           <label style={{ fontWeight: 600, fontSize: "0.85rem", color: "#374151", marginBottom: 6, display: "block" }}>
             Assessment
           </label>
-          {assessmentsLoading ? (
-            <div style={{ color: "#9ca3af", padding: "8px 0" }}>Loading...</div>
-          ) : (
-            <select
-              className="form-select form-select-solid"
-              value={selectedAssessment}
-              onChange={(e) =>
-                setSelectedAssessment(e.target.value === "" ? "" : Number(e.target.value))
-              }
-              disabled={selectedInstitute === ""}
-            >
-              <option value="">-- Select an assessment --</option>
-              {assessments.map((a) => (
-                <option key={a.id} value={a.id}>{a.assessmentName}</option>
-              ))}
-            </select>
-          )}
+          <select
+            className="form-select form-select-solid"
+            value={selectedAssessment}
+            onChange={(e) =>
+              setSelectedAssessment(e.target.value === "" ? "" : Number(e.target.value))
+            }
+            disabled={selectedInstitute === "" || assessmentsLoading}
+          >
+            <option value="">
+              {assessmentsLoading ? "Loading assessments..." : "-- Select an assessment --"}
+            </option>
+            {assessments.map((a) => (
+              <option key={a.id} value={a.id}>{a.assessmentName}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -463,7 +373,7 @@ const ReportsPage: React.FC = () => {
           border: "2px dashed #e5e7eb", borderRadius: 12, background: "#fff",
         }}>
           <div style={{ fontSize: "2rem", marginBottom: 8, opacity: 0.4 }}>&#x1F4C4;</div>
-          <div>Select a school and assessment to manage reports</div>
+          <div>Select a school and assessment to view students</div>
         </div>
       )}
 
@@ -480,30 +390,18 @@ const ReportsPage: React.FC = () => {
             <span style={{ fontWeight: 700, color: "#4361ee" }}>{selectedInstituteName}</span>
             <span style={{ color: "#cbd5e1" }}>/</span>
             <span style={{ fontWeight: 600, color: "#1e293b" }}>{selectedAssessmentName}</span>
-            <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+            <div style={{ marginLeft: "auto" }}>
               <span style={{
                 background: "#4361ee", color: "#fff",
                 padding: "4px 12px", borderRadius: 16, fontSize: "0.8rem", fontWeight: 600,
               }}>
                 {assessmentStudents.length} students
               </span>
-              <span style={{
-                background: "#059669", color: "#fff",
-                padding: "4px 12px", borderRadius: 16, fontSize: "0.8rem", fontWeight: 600,
-              }}>
-                {reportStats.generated} reports
-              </span>
-              <span style={{
-                background: reportDataLoading ? "#9ca3af" : "#6b7280", color: "#fff",
-                padding: "4px 12px", borderRadius: 16, fontSize: "0.8rem", fontWeight: 600,
-              }}>
-                {reportStats.hasData} with data
-              </span>
             </div>
           </div>
 
           {/* Students */}
-          {studentsLoading || reportDataLoading ? (
+          {studentsLoading ? (
             <div style={{ color: "#9ca3af", padding: 24 }}>Loading...</div>
           ) : (
             <>
@@ -566,75 +464,6 @@ const ReportsPage: React.FC = () => {
                       </div>
                     );
                   }
-                  if (item.key === "status") {
-                    return (
-                      <div key={item.key} style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
-                        {[
-                          { value: "generated", label: "Generated", color: "#059669" },
-                          { value: "notGenerated", label: "Not Generated", color: "#d97706" },
-                        ].map((opt) => {
-                          const checked = selectedStatus.has(opt.value);
-                          return (
-                            <button
-                              key={opt.value}
-                              onClick={() => {
-                                const next = new Set(selectedStatus);
-                                if (checked) next.delete(opt.value);
-                                else next.add(opt.value);
-                                setSelectedStatus(next);
-                                if (next.size > 0) toggleFilter("status", true);
-                                else toggleFilter("status", false);
-                              }}
-                              style={{
-                                padding: "4px 10px", borderRadius: 6, fontSize: "0.75rem",
-                                fontWeight: 600, cursor: "pointer",
-                                border: `1.5px solid ${checked ? opt.color : "#e5e7eb"}`,
-                                background: checked ? opt.color + "18" : "#fff",
-                                color: checked ? opt.color : "#6b7280",
-                              }}
-                            >
-                              {opt.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    );
-                  }
-                  if (item.key === "dataGenerated") {
-                    return (
-                      <div key={item.key} style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
-                        <span style={{ fontSize: "0.7rem", color: "#9ca3af", alignSelf: "center", marginRight: 2 }}>Data:</span>
-                        {[
-                          { value: "yes", label: "Yes", color: "#059669" },
-                          { value: "no", label: "No", color: "#dc2626" },
-                        ].map((opt) => {
-                          const checked = selectedDataGenerated.has(opt.value);
-                          return (
-                            <button
-                              key={opt.value}
-                              onClick={() => {
-                                const next = new Set(selectedDataGenerated);
-                                if (checked) next.delete(opt.value);
-                                else next.add(opt.value);
-                                setSelectedDataGenerated(next);
-                                if (next.size > 0) toggleFilter("dataGenerated", true);
-                                else toggleFilter("dataGenerated", false);
-                              }}
-                              style={{
-                                padding: "4px 10px", borderRadius: 6, fontSize: "0.75rem",
-                                fontWeight: 600, cursor: "pointer",
-                                border: `1.5px solid ${checked ? opt.color : "#e5e7eb"}`,
-                                background: checked ? opt.color + "18" : "#fff",
-                                color: checked ? opt.color : "#6b7280",
-                              }}
-                            >
-                              {opt.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    );
-                  }
                   return null;
                 })}
                 {filterEnabled.size > 0 && (
@@ -664,115 +493,34 @@ const ReportsPage: React.FC = () => {
                     </span>
                   )}
                 </span>
+                {isNavigator && (
+                  <button
+                    className="btn btn-sm"
+                    onClick={handleGenerateExcel}
+                    disabled={displayedStudents.length === 0 || generating}
+                    style={{
+                      background: generating
+                        ? "#6c757d"
+                        : "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
+                      border: "none", borderRadius: 8, padding: "8px 20px",
+                      fontWeight: 600, color: "white", fontSize: "0.85rem",
+                      boxShadow: generating ? "none" : "0 4px 12px rgba(67, 97, 238, 0.3)",
+                    }}
+                  >
+                    {generating ? "Generating..." : (
+                      <>
+                        Generate Data Excel
+                        {visibleSelectedCount > 0
+                          ? ` (${visibleSelectedCount} selected)`
+                          : ` (All ${displayedStudents.length})`}
+                      </>
+                    )}
+                  </button>
+                )}
                 <button
                   className="btn btn-sm"
-                  onClick={handleGenerateReports}
-                  disabled={displayedStudents.length === 0 || generating}
-                  style={{
-                    background: generating
-                      ? "#6c757d"
-                      : "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
-                    border: "none", borderRadius: 8, padding: "8px 20px",
-                    fontWeight: 600, color: "white", fontSize: "0.85rem",
-                    boxShadow: generating ? "none" : "0 4px 12px rgba(67, 97, 238, 0.3)",
-                  }}
-                >
-                  {generating ? "Generating..." : (
-                    <>
-                      Generate Reports
-                      {visibleSelectedCount > 0
-                        ? ` (${visibleSelectedCount} selected)`
-                        : ` (All ${displayedStudents.length})`}
-                    </>
-                  )}
-                </button>
-                <button
-                  className="btn btn-sm"
-                  onClick={async () => {
-                    if (!selectedAssessment) return;
-                    const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
-                    const selectedVisible = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
-                    setExportingOMR(true);
-                    try {
-                      if (selectedVisible.length === 1) {
-                        // Single student selected → per-student export
-                        const res = await exportGeneralAssessmentExcelForStudent(
-                          Number(selectedAssessment), selectedVisible[0]
-                        );
-                        const url = window.URL.createObjectURL(new Blob([res.data]));
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = `general_assessment_${selectedAssessment}_student_${selectedVisible[0]}.xlsx`;
-                        document.body.appendChild(a);
-                        a.click();
-                        a.remove();
-                        window.URL.revokeObjectURL(url);
-                      } else {
-                        // No selection or multiple → export all
-                        const res = await exportGeneralAssessmentExcel(Number(selectedAssessment));
-                        const url = window.URL.createObjectURL(new Blob([res.data]));
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = `general_assessment_${selectedAssessment}.xlsx`;
-                        document.body.appendChild(a);
-                        a.click();
-                        a.remove();
-                        window.URL.revokeObjectURL(url);
-                      }
-                    } catch (err: any) {
-                      showErrorToast("Export failed: " + (err?.response?.data?.error || err.message));
-                    } finally {
-                      setExportingOMR(false);
-                    }
-                  }}
-                  disabled={exportingOMR}
-                  style={{
-                    background: exportingOMR
-                      ? "#6c757d"
-                      : "linear-gradient(135deg, #0d9488 0%, #065f46 100%)",
-                    border: "none", borderRadius: 8, padding: "8px 20px",
-                    fontWeight: 600, color: "white", fontSize: "0.85rem",
-                    boxShadow: exportingOMR ? "none" : "0 4px 12px rgba(13, 148, 136, 0.3)",
-                  }}
-                >
-                  {exportingOMR ? "Exporting..." : (
-                    <>
-                      Export OMR Data
-                      {visibleSelectedCount === 1
-                        ? ` (1 selected)`
-                        : visibleSelectedCount > 1
-                        ? ` (${visibleSelectedCount} selected)`
-                        : ` (All)`}
-                    </>
-                  )}
-                </button>
-                <button
-                  className="btn btn-sm"
-                  onClick={async () => {
-                    if (!selectedAssessment) return;
-                    const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
-                    const selectedVisible = Array.from(selectedStudentIds).filter((id) => visibleIds.has(id));
-                    setExportingMQT(true);
-                    try {
-                      const res = await exportMqtScoresExcel(
-                        Number(selectedAssessment),
-                        selectedVisible.length > 0 ? selectedVisible : undefined
-                      );
-                      const url = window.URL.createObjectURL(new Blob([res.data]));
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `mqt_scores_${selectedAssessment}.xlsx`;
-                      document.body.appendChild(a);
-                      a.click();
-                      a.remove();
-                      window.URL.revokeObjectURL(url);
-                    } catch (err: any) {
-                      showErrorToast("Export failed: " + (err?.response?.data?.error || err.message));
-                    } finally {
-                      setExportingMQT(false);
-                    }
-                  }}
-                  disabled={exportingMQT}
+                  onClick={handleExportMQT}
+                  disabled={displayedStudents.length === 0 || exportingMQT}
                   style={{
                     background: exportingMQT
                       ? "#6c757d"
@@ -912,29 +660,25 @@ const ReportsPage: React.FC = () => {
                       </th>
                       <th style={{ ...thStyle, width: 44 }}>#</th>
                       <th style={thStyle}>Name</th>
-                      <th style={thStyle}>Roll No.</th>
+                      <th style={thStyle}>Status</th>
                       <th style={thStyle}>Grade</th>
                       <th style={thStyle}>Section</th>
-                      <th style={thStyle}>Data</th>
-                      <th style={thStyle}>Report Status</th>
-                      <th style={thStyle}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {paginatedStudents.map((s, idx) => {
                       const globalIdx = (safeCurrentPage - 1) * pageSize + idx;
                       const secInfo = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
-                      const rd = reportDataMap.get(s.userStudentId);
-                      const hasData = !!rd;
-                      const reportStatus = rd?.reportStatus || "notGenerated";
-                      const reportUrl = rd?.reportUrl || null;
-
-                      const statusColors: Record<string, { bg: string; color: string }> = {
-                        generated: { bg: "#dcfce7", color: "#059669" },
-                        notGenerated: { bg: "#fef3c7", color: "#d97706" },
-                      };
-                      const colors = statusColors[reportStatus] || statusColors.notGenerated;
                       const isChecked = selectedStudentIds.has(s.userStudentId);
+                      const assessmentStatus = (s.assessments || []).find(
+                        (a) => a.assessmentId === Number(selectedAssessment)
+                      )?.status || "-";
+                      const statusColors: Record<string, { bg: string; color: string }> = {
+                        completed: { bg: "#dcfce7", color: "#059669" },
+                        ongoing: { bg: "#fef3c7", color: "#d97706" },
+                        assigned: { bg: "#dbeafe", color: "#2563eb" },
+                      };
+                      const sc = statusColors[assessmentStatus.toLowerCase()] || { bg: "#f3f4f6", color: "#6b7280" };
 
                       return (
                         <tr key={s.userStudentId} style={{ background: globalIdx % 2 === 0 ? "#fff" : "#f9fafb" }}>
@@ -954,99 +698,17 @@ const ReportsPage: React.FC = () => {
                           </td>
                           <td style={tdStyle}>{globalIdx + 1}</td>
                           <td style={tdStyle}><span style={{ fontWeight: 600 }}>{s.name || "-"}</span></td>
-                          <td style={tdStyle}>{s.schoolRollNumber || "-"}</td>
+                          <td style={tdStyle}>
+                            <span style={{
+                              background: sc.bg, color: sc.color,
+                              padding: "3px 10px", borderRadius: 6,
+                              fontWeight: 600, fontSize: "0.75rem",
+                            }}>
+                              {assessmentStatus}
+                            </span>
+                          </td>
                           <td style={tdStyle}>{secInfo?.className || "-"}</td>
                           <td style={tdStyle}>{secInfo?.sectionName || "-"}</td>
-                          <td style={tdStyle}>
-                            <span style={{
-                              background: hasData ? "#dcfce7" : "#fee2e2",
-                              color: hasData ? "#059669" : "#dc2626",
-                              padding: "3px 10px", borderRadius: 6,
-                              fontWeight: 600, fontSize: "0.75rem",
-                            }}>
-                              {hasData ? "Yes" : "No"}
-                            </span>
-                          </td>
-                          <td style={tdStyle}>
-                            <span style={{
-                              background: colors.bg, color: colors.color,
-                              padding: "3px 10px", borderRadius: 6,
-                              fontWeight: 600, fontSize: "0.75rem",
-                            }}>
-                              {reportStatus === "generated" ? "Generated" : "Not Generated"}
-                            </span>
-                          </td>
-                          <td style={tdStyle}>
-                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                              {reportUrl && (
-                                <>
-                                  <a
-                                    href={reportUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    style={{
-                                      padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem",
-                                      fontWeight: 600, background: "#dbeafe", color: "#2563eb",
-                                      textDecoration: "none",
-                                    }}
-                                  >
-                                    Preview
-                                  </a>
-                                  <button
-                                    onClick={async () => {
-                                      try {
-                                        await downloadReportAsPdf(
-                                          () => downloadBetReport(s.userStudentId, Number(selectedAssessment)),
-                                          `${s.name || "report"}_bet_report.pdf`
-                                        );
-                                      } catch (e: any) {
-                                        console.error("Download failed", e);
-                                        showErrorToast("Download failed: " + (e?.response?.data?.error || e.message));
-                                      }
-                                    }}
-                                    style={{
-                                      padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem",
-                                      fontWeight: 600, background: "#f0fdf4", color: "#059669",
-                                      border: "none", cursor: "pointer",
-                                    }}
-                                  >
-                                    Download PDF
-                                  </button>
-                                </>
-                              )}
-                              <button
-                                onClick={async () => {
-                                  if (!selectedAssessment) return;
-                                  setExportingStudentId(s.userStudentId);
-                                  try {
-                                    const res = await exportGeneralAssessmentExcelForStudent(
-                                      Number(selectedAssessment), s.userStudentId
-                                    );
-                                    const url = window.URL.createObjectURL(new Blob([res.data]));
-                                    const a = document.createElement("a");
-                                    a.href = url;
-                                    a.download = `${(s.name || "student").replace(/\s+/g, "_")}_OMR_${s.userStudentId}.xlsx`;
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    a.remove();
-                                    window.URL.revokeObjectURL(url);
-                                  } catch (err: any) {
-                                    showErrorToast("Export failed: " + (err?.response?.data?.error || err.message));
-                                  } finally {
-                                    setExportingStudentId(null);
-                                  }
-                                }}
-                                disabled={exportingStudentId === s.userStudentId}
-                                style={{
-                                  padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem",
-                                  fontWeight: 600, background: "#f0fdfa", color: "#0d9488",
-                                  border: "none", cursor: "pointer",
-                                }}
-                              >
-                                {exportingStudentId === s.userStudentId ? "..." : "OMR"}
-                              </button>
-                            </div>
-                          </td>
                         </tr>
                       );
                     })}
@@ -1115,6 +777,7 @@ const ReportsPage: React.FC = () => {
         assessmentId={Number(selectedAssessment) || 0}
         assessmentName={selectedAssessmentName}
         instituteName={selectedInstituteName}
+        instituteCode={Number(selectedInstitute) || 0}
         userStudentIds={
           (() => {
             const visibleIds = new Set(displayedStudents.map((s) => s.userStudentId));
@@ -1123,37 +786,6 @@ const ReportsPage: React.FC = () => {
           })()
         }
       />
-
-      {/* ZIP Progress Modal */}
-      {downloadingZip && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "#fff", borderRadius: 16, padding: "32px 40px", minWidth: 380, maxWidth: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
-            <h3 style={{ margin: "0 0 16px", fontSize: "1.1rem", fontWeight: 700, color: "#1a1a2e" }}>
-              {zipProgress?.phase === "fetching" ? "Fetching Reports..." : zipProgress?.phase === "converting" ? "Converting to PDF..." : zipProgress?.phase === "zipping" ? "Creating ZIP..." : "Preparing..."}
-            </h3>
-            {zipProgress && (
-              <>
-                <div style={{ background: "#e5e7eb", borderRadius: 8, height: 10, overflow: "hidden", marginBottom: 12 }}>
-                  <div style={{
-                    height: "100%", borderRadius: 8, transition: "width 0.3s ease",
-                    background: zipProgress.phase === "fetching" ? "#3b82f6" : zipProgress.phase === "converting" ? "#8b5cf6" : "#059669",
-                    width: `${Math.round((zipProgress.done / zipProgress.total) * 100)}%`,
-                  }} />
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "#6b7280" }}>
-                  <span>{zipProgress.done} / {zipProgress.total}</span>
-                  <span>{Math.round((zipProgress.done / zipProgress.total) * 100)}%</span>
-                </div>
-                {zipProgress.currentName && (
-                  <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {zipProgress.currentName}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };
