@@ -191,6 +191,9 @@ const LiveTrackingPage = () => {
     show: boolean; studentName: string; data: any;
   }>({ show: false, studentName: "", data: null });
   const [submittingIds, setSubmittingIds] = useState<Set<number>>(new Set());
+  const [selectedStudents, setSelectedStudents] = useState<Set<number>>(new Set());
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number; failed: number } | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevDataRef = useRef<string>("");
@@ -372,6 +375,7 @@ const LiveTrackingPage = () => {
     try {
       const res = await getRedisPartials(selectedId ?? undefined);
       setRedisPartials(res.data || []);
+      setSelectedStudents(new Set());
     } catch {
       setRedisPartials([]);
     } finally {
@@ -444,6 +448,58 @@ const LiveTrackingPage = () => {
         return next;
       });
     }
+  };
+
+  // Toggle single student selection
+  const toggleStudentSelection = (studentId: number) => {
+    setSelectedStudents((prev) => {
+      const next = new Set(prev);
+      if (next.has(studentId)) next.delete(studentId);
+      else next.add(studentId);
+      return next;
+    });
+  };
+
+  // Toggle all students selection
+  const toggleSelectAll = () => {
+    if (selectedStudents.size === redisPartials.length) {
+      setSelectedStudents(new Set());
+    } else {
+      setSelectedStudents(new Set(redisPartials.map((e) => e.userStudentId)));
+    }
+  };
+
+  // Bulk submit: selected students or all, one by one sequentially
+  const handleBulkSubmit = async () => {
+    const targets = selectedStudents.size > 0
+      ? redisPartials.filter((e) => selectedStudents.has(e.userStudentId))
+      : redisPartials;
+
+    if (targets.length === 0) return;
+
+    setBulkSubmitting(true);
+    setBulkProgress({ done: 0, total: targets.length, failed: 0 });
+
+    let done = 0;
+    let failed = 0;
+
+    for (const entry of targets) {
+      try {
+        await submitFromRedis(entry.userStudentId, entry.assessmentId);
+      } catch (err: any) {
+        failed++;
+        const msg = err?.response?.data?.error || err?.response?.data || "Submit failed";
+        console.error(`Bulk submit failed for student ${entry.userStudentId}:`, msg);
+      }
+      done++;
+      setBulkProgress({ done, total: targets.length, failed });
+    }
+
+    await fetchRedisPartials();
+    setSelectedStudents(new Set());
+    setBulkSubmitting(false);
+    // Keep progress visible briefly so user can see final count
+    setTimeout(() => setBulkProgress(null), 4000);
   };
 
   // Format TTL for display
@@ -758,16 +814,59 @@ const LiveTrackingPage = () => {
                   Save All to DB ({redisPartials.length})
                 </button>
               )}
+              {redisPartials.length > 0 && (
+                <button
+                  className="btn btn-sm btn-warning"
+                  onClick={handleBulkSubmit}
+                  disabled={bulkSubmitting}
+                >
+                  {bulkSubmitting ? (
+                    <span className="spinner-border spinner-border-sm me-1" role="status" />
+                  ) : null}
+                  {selectedStudents.size > 0
+                    ? `Bulk Submit Selected (${selectedStudents.size})`
+                    : `Bulk Submit All (${redisPartials.length})`}
+                </button>
+              )}
               <small className="text-muted">
                 {redisPartials.length} student{redisPartials.length !== 1 ? "s" : ""} with buffered answers
               </small>
             </div>
+            {bulkProgress && (
+              <div className="alert alert-info py-2 d-flex align-items-center gap-3 mb-3">
+                <div className="progress flex-grow-1" style={{ height: 8 }}>
+                  <div
+                    className="progress-bar"
+                    style={{
+                      width: `${bulkProgress.total > 0 ? (bulkProgress.done / bulkProgress.total) * 100 : 0}%`,
+                      backgroundColor: bulkProgress.failed > 0 ? "#ffc107" : "#0d6efd",
+                      transition: "width 0.3s ease",
+                    }}
+                  />
+                </div>
+                <small className="text-nowrap">
+                  {bulkProgress.done}/{bulkProgress.total} submitted
+                  {bulkProgress.failed > 0 && (
+                    <span className="text-danger ms-1">({bulkProgress.failed} failed)</span>
+                  )}
+                </small>
+              </div>
+            )}
 
             <div className="table-responsive">
               <table className="table table-hover align-middle">
                 <thead className="table-light">
                   <tr>
-                    <th style={{ width: 60 }}>#</th>
+                    <th style={{ width: 40 }}>
+                      <input
+                        type="checkbox"
+                        className="form-check-input"
+                        checked={redisPartials.length > 0 && selectedStudents.size === redisPartials.length}
+                        onChange={toggleSelectAll}
+                        disabled={bulkSubmitting}
+                      />
+                    </th>
+                    <th style={{ width: 50 }}>#</th>
                     <th>Student</th>
                     <th style={{ width: 100 }}>Answers</th>
                     <th style={{ width: 120 }}>TTL</th>
@@ -778,13 +877,22 @@ const LiveTrackingPage = () => {
                 <tbody>
                   {redisPartials.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center text-muted py-4">
+                      <td colSpan={7} className="text-center text-muted py-4">
                         {redisLoading ? "Loading..." : "No buffered answers in Redis"}
                       </td>
                     </tr>
                   ) : (
                     redisPartials.map((entry, idx) => (
                       <tr key={`${entry.userStudentId}-${entry.assessmentId}`}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            className="form-check-input"
+                            checked={selectedStudents.has(entry.userStudentId)}
+                            onChange={() => toggleStudentSelection(entry.userStudentId)}
+                            disabled={bulkSubmitting}
+                          />
+                        </td>
                         <td className="text-muted">{idx + 1}</td>
                         <td>
                           <div className="fw-semibold">{entry.studentName}</div>

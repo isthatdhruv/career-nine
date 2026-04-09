@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,8 +26,8 @@ import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.PaymentNotificationLogRepository;
 import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
 import com.kccitm.api.security.UserPrincipal;
+import com.kccitm.api.service.PaymentEmailService;
 import com.kccitm.api.service.RazorpayService;
-import com.kccitm.api.service.SmtpEmailService;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
@@ -54,7 +53,7 @@ public class PaymentController {
     private RazorpayService razorpayService;
 
     @Autowired
-    private SmtpEmailService emailService;
+    private PaymentEmailService paymentEmailService;
 
     @Autowired
     private PaymentNotificationLogRepository notificationLogRepository;
@@ -67,6 +66,9 @@ public class PaymentController {
         try {
             Long mappingId = Long.valueOf(request.get("mappingId").toString());
             Long amountRupees = Long.valueOf(request.get("amount").toString());
+            if (amountRupees <= 0) {
+                return ResponseEntity.badRequest().body("Amount must be positive");
+            }
             long amountPaise = amountRupees * 100;
 
             Optional<AssessmentInstituteMapping> mappingOpt = mappingRepository.findById(mappingId);
@@ -167,7 +169,7 @@ public class PaymentController {
         String assessmentName = assessmentTableRepository.findById(txn.getAssessmentId())
                 .map(a -> a.getAssessmentName()).orElse("Assessment");
 
-        sendNudgeEmailAsync(txn, assessmentName);
+        paymentEmailService.sendNudgeEmail(txn, assessmentName);
 
         txn.setNudgeEmailSent(true);
         paymentTransactionRepository.save(txn);
@@ -193,60 +195,12 @@ public class PaymentController {
         String assessmentName = assessmentTableRepository.findById(txn.getAssessmentId())
                 .map(a -> a.getAssessmentName()).orElse("Assessment");
 
-        sendWelcomeEmailAsync(txn, assessmentName);
+        paymentEmailService.sendWelcomeEmailResend(txn, assessmentName);
 
         txn.setWelcomeEmailSent(true);
         paymentTransactionRepository.save(txn);
 
         return ResponseEntity.ok(Map.of("message", "Welcome email resent successfully"));
-    }
-
-    @Async
-    void sendNudgeEmailAsync(PaymentTransaction txn, String assessmentName) {
-        try {
-            long amountRupees = txn.getAmount() / 100;
-            String subject = "Complete Your Payment - " + assessmentName;
-            String htmlContent = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>"
-                    + "<div style='background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 24px; border-radius: 12px 12px 0 0; color: white;'>"
-                    + "<h2 style='margin: 0;'>Payment Pending</h2>"
-                    + "</div>"
-                    + "<div style='padding: 24px; background: #ffffff; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 12px 12px;'>"
-                    + "<p>Dear <strong>" + (txn.getStudentName() != null ? txn.getStudentName() : "Student") + "</strong>,</p>"
-                    + "<p>Your payment of <strong>INR " + amountRupees + "</strong> for <strong>" + assessmentName + "</strong> is still pending.</p>"
-                    + "<p>Please complete your payment using the link below:</p>"
-                    + "<div style='text-align: center; margin: 24px 0;'>"
-                    + "<a href='" + txn.getShortUrl() + "' style='background: #f59e0b; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 1.1em;'>Complete Payment</a>"
-                    + "</div>"
-                    + "<p style='color: #999; font-size: 0.8em; margin-top: 24px;'>This is an automated reminder. Please do not reply.</p>"
-                    + "</div></div>";
-
-            emailService.sendHtmlEmail(txn.getStudentEmail(), subject, htmlContent);
-            logger.info("Nudge email sent to: {}", txn.getStudentEmail());
-        } catch (Exception e) {
-            logger.error("Failed to send nudge email to: {}", txn.getStudentEmail(), e);
-        }
-    }
-
-    @Async
-    void sendWelcomeEmailAsync(PaymentTransaction txn, String assessmentName) {
-        try {
-            String subject = "Welcome! Complete Your Assessment - " + assessmentName;
-            String htmlContent = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>"
-                    + "<div style='background: linear-gradient(135deg, #059669 0%, #047857 100%); padding: 24px; border-radius: 12px 12px 0 0; color: white;'>"
-                    + "<h2 style='margin: 0;'>Payment Successful!</h2>"
-                    + "</div>"
-                    + "<div style='padding: 24px; background: #ffffff; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 12px 12px;'>"
-                    + "<p>Dear <strong>" + (txn.getStudentName() != null ? txn.getStudentName() : "Student") + "</strong>,</p>"
-                    + "<p>Your payment for <strong>" + assessmentName + "</strong> has been received successfully.</p>"
-                    + "<p>Your assessment has been allotted. Please log in to complete it at your earliest convenience.</p>"
-                    + "<p style='color: #999; font-size: 0.8em; margin-top: 24px;'>This is an automated email. Please do not reply.</p>"
-                    + "</div></div>";
-
-            emailService.sendHtmlEmail(txn.getStudentEmail(), subject, htmlContent);
-            logger.info("Welcome email sent to: {}", txn.getStudentEmail());
-        } catch (Exception e) {
-            logger.error("Failed to send welcome email to: {}", txn.getStudentEmail(), e);
-        }
     }
 
     @PostMapping("/{transactionId}/send-email")
@@ -280,7 +234,7 @@ public class PaymentController {
         log.setSentBy(currentUser != null ? currentUser.getName() : "admin");
 
         try {
-            sendPaymentLinkEmailAsync(email, studentName, txn, assessmentName);
+            paymentEmailService.sendPaymentLinkEmail(email, studentName, txn, assessmentName);
             log.setStatus("sent");
             notificationLogRepository.save(log);
 
@@ -364,25 +318,4 @@ public class PaymentController {
                 notificationLogRepository.findByTransactionIdOrderByCreatedAtDesc(transactionId));
     }
 
-    @Async
-    void sendPaymentLinkEmailAsync(String email, String studentName, PaymentTransaction txn, String assessmentName) {
-        long amountRupees = txn.getAmount() / 100;
-        String subject = "Payment Link - " + assessmentName + " (INR " + amountRupees + ")";
-        String htmlContent = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>"
-                + "<div style='background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%); padding: 24px; border-radius: 12px 12px 0 0; color: white;'>"
-                + "<h2 style='margin: 0;'>Assessment Payment</h2>"
-                + "</div>"
-                + "<div style='padding: 24px; background: #ffffff; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 12px 12px;'>"
-                + "<p>Dear <strong>" + studentName + "</strong>,</p>"
-                + "<p>Please complete your payment of <strong>INR " + amountRupees + "</strong> for <strong>" + assessmentName + "</strong>.</p>"
-                + "<div style='text-align: center; margin: 28px 0;'>"
-                + "<a href='" + txn.getShortUrl() + "' style='background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%); color: white; padding: 14px 36px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 1.1em; display: inline-block;'>Pay Now</a>"
-                + "</div>"
-                + "<p style='color: #666; font-size: 0.85em;'>Or copy this link: <a href='" + txn.getShortUrl() + "'>" + txn.getShortUrl() + "</a></p>"
-                + "<p style='color: #999; font-size: 0.8em; margin-top: 24px;'>This is an automated email. Please do not reply.</p>"
-                + "</div></div>";
-
-        emailService.sendHtmlEmail(email, subject, htmlContent);
-        logger.info("Payment link email sent to: {} for transaction: {}", email, txn.getTransactionId());
-    }
 }

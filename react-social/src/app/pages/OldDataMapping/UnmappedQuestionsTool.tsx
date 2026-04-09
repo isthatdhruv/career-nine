@@ -16,6 +16,7 @@ interface SystemQuestion {
   questionId: number;
   questionText: string;
   options: SystemOption[];
+  sectionName: string;
 }
 
 interface UnmappedQuestion {
@@ -161,6 +162,7 @@ export default function UnmappedQuestionsTool({ onBack }: { onBack: () => void }
         const qData = Array.isArray(questionnaireRes.data) ? questionnaireRes.data[0] : questionnaireRes.data;
         const sysQs: SystemQuestion[] = [];
         for (const sec of qData?.sections || qData?.questionnaireSections || []) {
+          const secName = sec.section?.sectionName || sec.sectionName || "";
           for (const qq of sec.questions || sec.questionnaireQuestions || []) {
             const question = qq.question;
             if (!question) continue;
@@ -170,7 +172,7 @@ export default function UnmappedQuestionsTool({ onBack }: { onBack: () => void }
               optionId: o.optionId ?? o.id,
               optionText: o.optionText || "",
             }));
-            sysQs.push({ questionId: qId, questionText: qText, options });
+            sysQs.push({ questionId: qId, questionText: qText, options, sectionName: secName });
           }
         }
         setSystemQuestions(sysQs);
@@ -228,10 +230,51 @@ export default function UnmappedQuestionsTool({ onBack }: { onBack: () => void }
   // System question search per unmapped question
   const [questionSearches, setQuestionSearches] = useState<Map<string, string>>(new Map());
 
+  // Group system questions by section, then map category to the best matching section
+  // based on question count (ability=30, MI=24, personality=54, etc.)
+  const categorySectionMap = useMemo(() => {
+    const sectionCounts = new Map<string, number>();
+    for (const q of systemQuestions) {
+      sectionCounts.set(q.sectionName, (sectionCounts.get(q.sectionName) || 0) + 1);
+    }
+
+    // Heuristic: match category to section by expected question count
+    const catExpected: Record<string, number> = {
+      ability: 30,
+      multipleintelligence: 24,
+      personality: 54,
+    };
+
+    const result = new Map<string, string>(); // category -> sectionName
+    for (const [cat, expected] of Object.entries(catExpected)) {
+      let bestSection = "";
+      let bestDiff = Infinity;
+      for (const [secName, count] of sectionCounts) {
+        // Skip sections already assigned
+        if (Array.from(result.values()).includes(secName)) continue;
+        const diff = Math.abs(count - expected);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          bestSection = secName;
+        }
+      }
+      if (bestSection) result.set(cat, bestSection);
+    }
+    return result;
+  }, [systemQuestions]);
+
   const getFilteredSystemQuestions = (key: string) => {
+    const category = key.split("::")[0];
     const search = (questionSearches.get(key) || "").toLowerCase();
-    if (!search) return systemQuestions.slice(0, 20);
-    return systemQuestions.filter((q) => q.questionText.toLowerCase().includes(search));
+    const matchingSection = categorySectionMap.get(category);
+
+    // Filter to same-section questions first, fall back to all if no section match
+    let pool = matchingSection
+      ? systemQuestions.filter((q) => q.sectionName === matchingSection)
+      : systemQuestions;
+
+    if (!search) return pool.slice(0, 30);
+    return pool.filter((q) => q.questionText.toLowerCase().includes(search));
   };
 
   const selectSystemQuestion = (key: string, sysQ: SystemQuestion) => {

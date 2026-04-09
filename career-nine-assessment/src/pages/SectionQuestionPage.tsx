@@ -609,6 +609,12 @@ const SectionQuestionPage: React.FC = () => {
           ...prev,
           [sectionId!]: { ...sec, [qId]: updated },
         };
+      } else if (question.question.maxOptionsAllowed === 1) {
+        // Single-choice: replace the previous selection with the new one
+        return {
+          ...prev,
+          [sectionId!]: { ...sec, [qId]: [optionId] },
+        };
       }
 
       // If the maximum number of options is reached, return the current state

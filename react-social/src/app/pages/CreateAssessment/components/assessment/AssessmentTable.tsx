@@ -78,6 +78,13 @@ const AssessmentTable = (props: {
     return (item.AssessmentName || item.assessmentName || "").toLowerCase().includes(q);
   });
 
+  const actionBtnStyle = (color: string) => ({
+    width: "36px", height: "36px", padding: 0,
+    display: "flex" as const, alignItems: "center" as const, justifyContent: "center" as const,
+    background: "#fff", color: color, border: `2px solid ${color}`, borderRadius: "6px",
+    cursor: "pointer" as const,
+  });
+
   const datatable = {
     columns: [
       { label: "#", field: "serialNo", width: 50, sort: "disabled" },
@@ -92,21 +99,21 @@ const AssessmentTable = (props: {
       return {
         serialNo: <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>{index + 1}</span>,
         assessmentName: (
-          <span style={{ fontSize: "0.88rem", color: "#1f2937", fontWeight: 600 }}>
+          <span style={{ fontSize: "0.88rem", color: "#111827", fontWeight: 600 }}>
             {data.AssessmentName || data.assessmentName || "N/A"}
           </span>
         ),
         startDate: (
-          <span style={{ fontSize: "0.82rem", color: "#6b7280" }}>
+          <span style={{ fontSize: "0.82rem", color: "#4b5563" }}>
             {data.starDate || data.startDate || "N/A"}
           </span>
         ),
         lockStatus: data.isLocked ? (
-          <span style={{ fontSize: "0.75rem", fontWeight: 600, padding: "3px 8px", borderRadius: "6px", background: "rgba(245, 158, 11, 0.1)", color: "#d97706" }}>
+          <span style={{ fontSize: "0.8rem", fontWeight: 700, padding: "5px 12px", borderRadius: "4px", background: "#d97706", color: "#fff", display: "inline-block" }}>
             <i className="bi bi-lock-fill me-1"></i>Locked
           </span>
         ) : (
-          <span style={{ fontSize: "0.75rem", fontWeight: 600, padding: "3px 8px", borderRadius: "6px", background: "rgba(16, 185, 129, 0.1)", color: "#059669" }}>
+          <span style={{ fontSize: "0.8rem", fontWeight: 700, padding: "5px 12px", borderRadius: "4px", background: "#059669", color: "#fff", display: "inline-block" }}>
             <i className="bi bi-unlock-fill me-1"></i>Open
           </span>
         ),
@@ -118,16 +125,16 @@ const AssessmentTable = (props: {
                 navigate(`/assessments/edit/${id}`, { state: { data } });
               }}
               className="btn btn-sm" title="Edit"
-              style={{ width: "30px", height: "30px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(67, 97, 238, 0.1)", color: "#4361ee", border: "1px solid rgba(67, 97, 238, 0.2)", borderRadius: "6px" }}
+              style={actionBtnStyle("#2563eb")}
             >
-              <i className="bi bi-pencil-fill" style={{ fontSize: "0.75rem" }}></i>
+              <i className="bi bi-pencil-fill" style={{ fontSize: "0.85rem" }}></i>
             </button>
             <button
               onClick={() => handleToggleLock(data)}
               className="btn btn-sm" title={data.isLocked ? "Unlock" : "Lock"}
-              style={{ width: "30px", height: "30px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: data.isLocked ? "rgba(245, 158, 11, 0.1)" : "rgba(100, 116, 139, 0.1)", color: data.isLocked ? "#d97706" : "#64748b", border: `1px solid ${data.isLocked ? "rgba(245, 158, 11, 0.2)" : "rgba(100, 116, 139, 0.2)"}`, borderRadius: "6px" }}
+              style={actionBtnStyle(data.isLocked ? "#d97706" : "#6b7280")}
             >
-              <i className={`bi ${data.isLocked ? "bi-lock-fill" : "bi-unlock-fill"}`} style={{ fontSize: "0.75rem" }}></i>
+              <i className={`bi ${data.isLocked ? "bi-lock-fill" : "bi-unlock-fill"}`} style={{ fontSize: "0.85rem" }}></i>
             </button>
             <button
               onClick={async () => {
@@ -145,25 +152,25 @@ const AssessmentTable = (props: {
                 }
               }}
               className="btn btn-sm" title="Delete"
-              style={{ width: "30px", height: "30px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(220, 38, 38, 0.1)", color: "#dc2626", border: "1px solid rgba(220, 38, 38, 0.2)", borderRadius: "6px" }}
+              style={actionBtnStyle("#dc2626")}
             >
-              <i className="bi bi-trash-fill" style={{ fontSize: "0.75rem" }}></i>
+              <i className="bi bi-trash-fill" style={{ fontSize: "0.85rem" }}></i>
             </button>
             <button
               onClick={() => handleDownloadQuestionnaire(data)}
               className="btn btn-sm" title="Download Questionnaire PDF"
               disabled={pdfLoading === id}
-              style={{ width: "30px", height: "30px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(16, 185, 129, 0.1)", color: "#059669", border: "1px solid rgba(16, 185, 129, 0.2)", borderRadius: "6px" }}
+              style={actionBtnStyle("#059669")}
             >
-              {pdfLoading === id ? <span className="spinner-border spinner-border-sm" style={{ width: "12px", height: "12px" }} /> : <i className="bi bi-file-earmark-pdf-fill" style={{ fontSize: "0.75rem" }}></i>}
+              {pdfLoading === id ? <span className="spinner-border spinner-border-sm" style={{ width: "14px", height: "14px" }} /> : <i className="bi bi-file-earmark-pdf-fill" style={{ fontSize: "0.85rem" }}></i>}
             </button>
             <button
               onClick={() => handleDownloadOMR(data)}
               className="btn btn-sm" title="Download OMR Sheet"
               disabled={omrLoading === id}
-              style={{ width: "30px", height: "30px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(8, 145, 178, 0.1)", color: "#0891b2", border: "1px solid rgba(8, 145, 178, 0.2)", borderRadius: "6px" }}
+              style={actionBtnStyle("#0369a1")}
             >
-              {omrLoading === id ? <span className="spinner-border spinner-border-sm" style={{ width: "12px", height: "12px" }} /> : <i className="bi bi-file-earmark-arrow-down-fill" style={{ fontSize: "0.75rem" }}></i>}
+              {omrLoading === id ? <span className="spinner-border spinner-border-sm" style={{ width: "14px", height: "14px" }} /> : <i className="bi bi-file-earmark-arrow-down-fill" style={{ fontSize: "0.85rem" }}></i>}
             </button>
           </div>
         ),
@@ -176,32 +183,24 @@ const AssessmentTable = (props: {
       {/* Toolbar */}
       <div className="d-flex align-items-center gap-2 mb-3 flex-wrap">
         <div className="position-relative" style={{ flex: "1 0 200px", maxWidth: "320px" }}>
-          <i className="bi bi-search position-absolute" style={{ left: 12, top: "50%", transform: "translateY(-50%)", color: "#9ca3af" }}></i>
+          <i className="bi bi-search position-absolute" style={{ left: 10, top: "50%", transform: "translateY(-50%)", color: "#9ca3af", fontSize: "0.85rem" }}></i>
           <input
             type="search"
             className="form-control form-control-sm"
             placeholder="Search assessments..."
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            style={{ paddingLeft: 36, borderRadius: "8px", border: "1.5px solid #e0e0e0", fontSize: "0.85rem" }}
+            style={{ paddingLeft: 32, borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem" }}
           />
         </div>
-        <span style={{ fontSize: "0.78rem", color: "#9ca3af" }}>
+        <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
           {filteredData.length} of {props.data.length} assessments
         </span>
         <div className="ms-auto">
           <button
             className="btn btn-sm d-flex align-items-center gap-1"
             onClick={() => setShowRecycleBin(true)}
-            style={{
-              background: "rgba(220, 38, 38, 0.1)",
-              color: "#dc2626",
-              border: "1px solid rgba(220, 38, 38, 0.2)",
-              borderRadius: "8px",
-              padding: "5px 10px",
-              fontWeight: 600,
-              fontSize: "0.78rem",
-            }}
+            style={{ background: "#fff", color: "#dc2626", border: "2px solid #dc2626", borderRadius: "6px", padding: "6px 12px", fontWeight: 600, fontSize: "0.82rem" }}
           >
             <i className="bi bi-recycle"></i>
             Recycle Bin
@@ -230,18 +229,18 @@ const AssessmentTable = (props: {
       {showLockedModal && (
         <div className="modal fade show d-block" tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
           <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content" style={{ borderRadius: "12px" }}>
-              <div className="modal-header" style={{ borderBottom: "1px solid #f3f4f6" }}>
-                <h6 className="modal-title fw-bold">
-                  <i className="bi bi-lock-fill text-warning me-2"></i>Assessment Locked
+            <div className="modal-content" style={{ borderRadius: "8px", border: "1px solid #e5e7eb" }}>
+              <div className="modal-header" style={{ borderBottom: "1px solid #e5e7eb" }}>
+                <h6 className="modal-title fw-bold" style={{ color: "#111827" }}>
+                  <i className="bi bi-lock-fill me-2" style={{ color: "#d97706" }}></i>Assessment Locked
                 </h6>
                 <button type="button" className="btn-close" onClick={() => setShowLockedModal(false)}></button>
               </div>
               <div className="modal-body">
-                <p className="mb-0 text-muted">This assessment is locked and cannot be edited as there is an active assessment going on.</p>
+                <p className="mb-0" style={{ color: "#4b5563" }}>This assessment is locked and cannot be edited as there is an active assessment going on.</p>
               </div>
-              <div className="modal-footer" style={{ borderTop: "1px solid #f3f4f6" }}>
-                <button type="button" className="btn btn-sm btn-secondary" onClick={() => setShowLockedModal(false)} style={{ borderRadius: "6px" }}>Close</button>
+              <div className="modal-footer" style={{ borderTop: "1px solid #e5e7eb" }}>
+                <button type="button" className="btn btn-sm" onClick={() => setShowLockedModal(false)} style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: "6px", fontWeight: 600 }}>Close</button>
               </div>
             </div>
           </div>
