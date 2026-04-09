@@ -16,7 +16,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2g
+          memory: 2.5g
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pCareer-qCsfeuECc3MW"]
       interval: 10s
@@ -31,7 +31,7 @@ services:
     restart: always
     command: >
       redis-server
-      --maxmemory 1536mb
+      --maxmemory 1024mb
       --maxmemory-policy allkeys-lru
       --appendonly yes
       --appendfsync everysec
@@ -40,7 +40,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2g
+          memory: 1.5g
     networks:
       - career_shared_net
     volumes:
@@ -80,11 +80,65 @@ services:
     networks:
       - career_shared_net
       
+  redis_staging:
+    image: redis:7.2-alpine
+    restart: always
+    command: >
+      redis-server
+      --maxmemory 384mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+    ports:
+      - '6380:6379'
+    deploy:
+      resources:
+        limits:
+          memory: 768m
+    networks:
+      - career_shared_net
+    volumes:
+      - redis_staging_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  api-staging:
+    container_name: api-staging
+    build:
+      context: ./spring-social
+      dockerfile: dockerfile
+    ports:
+      - 8081:8080
+    command: ["java", "-Xms512m", "-Xmx1g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=sandbox"]
+    restart: always
+    volumes:
+      - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
+    env_file:
+      - .env
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
+    deploy:
+      resources:
+        limits:
+          memory: 1.5g
+    depends_on:
+      mysql_db_staging:
+        condition: service_healthy
+      redis_staging:
+        condition: service_healthy
+    networks:
+      - career_shared_net
+
   mysql_db_staging:
     image: mysql:latest
     restart: always
     environment:
-      MYSQL_DATABASE: 'career-9'
+      MYSQL_DATABASE: 'career-9-staging'
       MYSQL_USER: 'user'
       MYSQL_PASSWORD: 'Career-qCsfeuECc3MW'
       MYSQL_ROOT_PASSWORD: 'Career-qCsfeuECc3MW'
@@ -96,7 +150,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2g
+          memory: 1.5g
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pCareer-qCsfeuECc3MW"]
       interval: 10s
@@ -106,28 +160,29 @@ services:
     networks:
       - career_shared_net
 
-  sync_cron:
-    build:
-      context: .
-      dockerfile: Dockerfile.cron
-    restart: always
-    environment:
-      MASTER_HOST: 'mysql_db_api'
-      STAGING_HOST: 'mysql_db_staging'
-      DB_NAME: 'career-9'
-      DB_USER: 'root'
-      DB_PASSWORD: 'Career-qCsfeuECc3MW'
-    deploy:
-      resources:
-        limits:
-          memory: 512m
-    depends_on:
-      mysql_db_api:
-        condition: service_healthy
-      mysql_db_staging:
-        condition: service_healthy
-    networks:
-      - career_shared_net
+  # sync_cron:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.cron
+  #   restart: always
+  #   environment:
+  #     MASTER_HOST: 'mysql_db_api'
+  #     STAGING_HOST: 'mysql_db_staging'
+  #     DB_NAME: 'career-9'
+  #     STAGING_DB_NAME: 'career-9-staging'
+  #     DB_USER: 'root'
+  #     DB_PASSWORD: 'Career-qCsfeuECc3MW'
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 256m
+  #   depends_on:
+  #     mysql_db_api:
+  #       condition: service_healthy
+  #     mysql_db_staging:
+  #       condition: service_healthy
+  #   networks:
+  #     - career_shared_net
   # redisinsight:
   #   image: redis/redisinsight:latest
   #   restart: always
@@ -171,7 +226,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512m
+          memory: 256m
     depends_on:
       mysql_db_api:
         condition: service_healthy
@@ -182,6 +237,7 @@ volumes:
   mysql_data:
   mysql_staging_data:
   redis_data:
+  redis_staging_data:
   redisinsight_data:
   backup_data:
 

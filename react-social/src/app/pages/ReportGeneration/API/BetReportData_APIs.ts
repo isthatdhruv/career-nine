@@ -99,6 +99,74 @@ export function exportGeneralAssessmentExcelForStudent(assessmentId: number, use
   });
 }
 
+// ── School Report ──
+
+export interface SchoolReportMqtStat {
+  mqtId: number;
+  mqtName: string;
+  average: number;
+  min: number;
+  max: number;
+  sum: number;
+  count: number;
+  gradeWise: Record<string, { average: number; count: number }>;
+}
+
+export interface SchoolReportMqGroup {
+  mqName: string;
+  mqts: SchoolReportMqtStat[];
+}
+
+export interface SchoolReportData {
+  assessmentId: number;
+  totalStudents: number;
+  studentsWithScores: number;
+  grades: string[];
+  gradeStudentCounts: Record<string, number>;
+  mqGroups: SchoolReportMqGroup[];
+}
+
+export function getSchoolReport(assessmentId: number, userStudentIds?: number[]) {
+  return axios.post<SchoolReportData>(`${BASE}/school-report`, {
+    assessmentId,
+    userStudentIds: userStudentIds || [],
+  });
+}
+
+// ── School Report DB Persistence ──
+
+export interface SavedSchoolReport {
+  schoolReportId: number;
+  instituteCode: number;
+  assessmentId: number;
+  instituteName: string;
+  assessmentName: string;
+  totalStudents: number;
+  studentsWithScores: number;
+  status: string;
+  reportData: SchoolReportData | null;
+  aiInsights: Record<string, any> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function saveSchoolReport(payload: {
+  instituteCode: number;
+  assessmentId: number;
+  instituteName: string;
+  assessmentName: string;
+  reportData: SchoolReportData;
+  aiInsights?: Record<string, any>;
+  totalStudents: number;
+  studentsWithScores: number;
+}) {
+  return axios.post(`${BASE}/school-report/save`, payload);
+}
+
+export function getSavedSchoolReport(instituteCode: number, assessmentId: number) {
+  return axios.get<SavedSchoolReport>(`${BASE}/school-report/get/${instituteCode}/${assessmentId}`);
+}
+
 // ── Email Recipients & Send Report Email ──
 
 export interface EmailRecipient {

@@ -755,6 +755,7 @@ public class ContactPersonController {
      * Get report status for all students in an institute for a given assessment.
      */
     @GetMapping("/report-status-by-institute/{instituteCode}/{assessmentId}")
+    @Transactional(readOnly = true)
     public ResponseEntity<?> getReportStatusByInstitute(
             @PathVariable int instituteCode,
             @PathVariable Long assessmentId,
@@ -771,6 +772,22 @@ public class ContactPersonController {
 
             String studentName = userStudentRepository.getNameByUserID(studentId);
             entry.put("studentName", studentName != null ? studentName : "Student #" + studentId);
+
+            // Include email, phone, username from StudentInfo and User
+            com.kccitm.api.model.career9.StudentInfo si = us.getStudentInfo();
+            if (si != null) {
+                entry.put("email", si.getEmail());
+                entry.put("phoneNumber", si.getPhoneNumber());
+                if (si.getUser() != null) {
+                    entry.put("username", si.getUser().getUsername());
+                } else {
+                    entry.put("username", null);
+                }
+            } else {
+                entry.put("email", null);
+                entry.put("phoneNumber", null);
+                entry.put("username", null);
+            }
 
             String reportUrl = null;
             String reportStatus = "notGenerated";
@@ -1111,5 +1128,146 @@ public class ContactPersonController {
         }
 
         return entry;
+    }
+
+    // ============ WHATSAPP VIA AISENSY ============
+
+    /**
+     * Send a WhatsApp message via AiSensy API.
+     * Body: { phoneNumber: String, templateName: String, templateParams: [String...] }
+     */
+    @PostMapping("/send-whatsapp")
+    public ResponseEntity<?> sendWhatsApp(@RequestBody Map<String, Object> payload) {
+        String phoneNumber = (String) payload.get("phoneNumber");
+        String templateName = (String) payload.get("templateName");
+        @SuppressWarnings("unchecked")
+        List<String> templateParams = (List<String>) payload.get("templateParams");
+
+        if (phoneNumber == null || phoneNumber.isEmpty()) {
+            return ResponseEntity.badRequest().body("Phone number is required");
+        }
+        if (templateName == null || templateName.isEmpty()) {
+            return ResponseEntity.badRequest().body("Template name is required");
+        }
+
+        try {
+            // Build AiSensy API request
+            String aiSensyApiKey = System.getenv("AISENSY_API_KEY");
+            if (aiSensyApiKey == null || aiSensyApiKey.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("AiSensy API key not configured");
+            }
+
+            // Normalize phone number - ensure it has country code
+            String normalizedPhone = phoneNumber.replaceAll("[^0-9+]", "");
+            if (!normalizedPhone.startsWith("+") && !normalizedPhone.startsWith("91")) {
+                normalizedPhone = "91" + normalizedPhone;
+            }
+
+            Map<String, Object> aiSensyPayload = new HashMap<>();
+            aiSensyPayload.put("apiKey", aiSensyApiKey);
+            aiSensyPayload.put("campaignName", templateName);
+            aiSensyPayload.put("destination", normalizedPhone);
+            aiSensyPayload.put("userName", "Career-9");
+            if (templateParams != null && !templateParams.isEmpty()) {
+                aiSensyPayload.put("templateParams", templateParams);
+            }
+
+            // Send to AiSensy API
+            org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+            org.springframework.http.HttpEntity<Map<String, Object>> request =
+                    new org.springframework.http.HttpEntity<>(aiSensyPayload, headers);
+
+            ResponseEntity<String> aiSensyResponse = restTemplate.postForEntity(
+                    "https://backend.aisensy.com/campaign/t1/api/v2",
+                    request, String.class);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "WhatsApp message sent successfully");
+            response.put("phoneNumber", normalizedPhone);
+            response.put("aiSensyStatus", aiSensyResponse.getStatusCode().value());
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to send WhatsApp message: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    /**
+     * Send bulk WhatsApp messages via AiSensy API.
+     * Body: { recipients: [{ phoneNumber, templateParams }], templateName: String }
+     */
+    @PostMapping("/send-whatsapp-bulk")
+    public ResponseEntity<?> sendWhatsAppBulk(@RequestBody Map<String, Object> payload) {
+        String templateName = (String) payload.get("templateName");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> recipients = (List<Map<String, Object>>) payload.get("recipients");
+
+        if (templateName == null || templateName.isEmpty()) {
+            return ResponseEntity.badRequest().body("Template name is required");
+        }
+        if (recipients == null || recipients.isEmpty()) {
+            return ResponseEntity.badRequest().body("At least one recipient is required");
+        }
+
+        String aiSensyApiKey = System.getenv("AISENSY_API_KEY");
+        if (aiSensyApiKey == null || aiSensyApiKey.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("AiSensy API key not configured");
+        }
+
+        int successCount = 0;
+        int failCount = 0;
+        org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
+
+        for (Map<String, Object> recipient : recipients) {
+            try {
+                String phoneNumber = (String) recipient.get("phoneNumber");
+                @SuppressWarnings("unchecked")
+                List<String> templateParams = (List<String>) recipient.get("templateParams");
+
+                if (phoneNumber == null || phoneNumber.isEmpty()) {
+                    failCount++;
+                    continue;
+                }
+
+                String normalizedPhone = phoneNumber.replaceAll("[^0-9+]", "");
+                if (!normalizedPhone.startsWith("+") && !normalizedPhone.startsWith("91")) {
+                    normalizedPhone = "91" + normalizedPhone;
+                }
+
+                Map<String, Object> aiSensyPayload = new HashMap<>();
+                aiSensyPayload.put("apiKey", aiSensyApiKey);
+                aiSensyPayload.put("campaignName", templateName);
+                aiSensyPayload.put("destination", normalizedPhone);
+                aiSensyPayload.put("userName", "Career-9");
+                if (templateParams != null && !templateParams.isEmpty()) {
+                    aiSensyPayload.put("templateParams", templateParams);
+                }
+
+                org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+                headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+                org.springframework.http.HttpEntity<Map<String, Object>> request =
+                        new org.springframework.http.HttpEntity<>(aiSensyPayload, headers);
+
+                restTemplate.postForEntity(
+                        "https://backend.aisensy.com/campaign/t1/api/v2",
+                        request, String.class);
+                successCount++;
+            } catch (Exception e) {
+                failCount++;
+            }
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Bulk WhatsApp send completed");
+        response.put("successCount", successCount);
+        response.put("failCount", failCount);
+        response.put("totalRecipients", recipients.size());
+        return ResponseEntity.ok(response);
     }
 }

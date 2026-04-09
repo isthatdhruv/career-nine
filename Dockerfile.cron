@@ -1,10 +1,13 @@
-FROM alpine:3.19
+FROM ubuntu:22.04
 
-RUN apk add --no-cache mysql-client bash
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends mysql-client cron bash && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY sync-master-to-staging.sh /usr/local/bin/sync-master-to-staging.sh
 RUN chmod +x /usr/local/bin/sync-master-to-staging.sh
 
 COPY crontab /etc/crontabs/root
+RUN crontab /etc/crontabs/root
 
-CMD ["crond", "-f", "-l", "2"]
+CMD ["cron", "-f"]

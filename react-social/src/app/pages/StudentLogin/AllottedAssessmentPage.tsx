@@ -121,8 +121,9 @@ export default function AllottedAssessmentPage() {
       navigate('/general-instructions');
     } catch (error: any) {
       console.error('Error starting assessment:', error);
-      // Handle 409 as success (already started/submitted)
+      // Handle 409 as success (already started/submitted) — still fetch the new assessment data
       if (error?.response?.status === 409) {
+        await fetchAssessmentData(String(assessment.assessmentId));
         setSubmissionState('success');
         navigate('/general-instructions');
         return;
