@@ -36,6 +36,7 @@ import BulkSendModal from "./components/BulkSendModal";
 import EmailComposeModal from "./components/EmailComposeModal";
 import DownloadsModal, { ZipJob } from "./components/DownloadsModal";
 import { uploadReportZip, deleteReportZip } from "./API/ReportZip_APIs";
+import { Navigator360Preview } from "./navigator360/Navigator360Report";
 
 // ═══════════════════════ TYPES ═══════════════════════
 
@@ -132,6 +133,9 @@ const ReportsHubPage: React.FC = () => {
   // ── Per-row states ──
   const [sendingWhatsApp, setSendingWhatsApp] = useState<Set<number>>(new Set());
   const [downloadingStudentId, setDownloadingStudentId] = useState<number | null>(null);
+
+  // ── Navigator 360 preview ──
+  const [nav360Preview, setNav360Preview] = useState<{ studentId: number; studentName: string } | null>(null);
 
   // ═══════════════════════ DATA LOADING ═══════════════════════
 
@@ -972,6 +976,7 @@ const ReportsHubPage: React.FC = () => {
                       <th style={thStyle}>Report</th>
                       <th style={thStyle}>Visible</th>
                       <th style={thStyle}>Preview / Download</th>
+                      <th style={thStyle}>Nav 360</th>
                       <th style={{ ...thStyle, textAlign: "center" }}>Send</th>
                     </tr>
                   </thead>
@@ -1069,6 +1074,25 @@ const ReportsHubPage: React.FC = () => {
                                 </button>
                               </div>
                             ) : (
+                              <span style={{ color: "#d1d5db", fontSize: "0.75rem" }}>-</span>
+                            )}
+                          </td>
+                          <td style={tdStyle}>
+                            {asmtStatus === "completed" && (
+                              <div style={{ display: "flex", gap: 4 }}>
+                                <button
+                                  onClick={() => setNav360Preview({ studentId: s.userStudentId, studentName: s.name || "Student" })}
+                                  style={{
+                                    padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 600,
+                                    background: "linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)",
+                                    color: "#fff", border: "none", cursor: "pointer",
+                                    boxShadow: "0 2px 6px rgba(124,58,237,0.3)",
+                                  }}>
+                                  Preview
+                                </button>
+                              </div>
+                            )}
+                            {asmtStatus !== "completed" && (
                               <span style={{ color: "#d1d5db", fontSize: "0.75rem" }}>-</span>
                             )}
                           </td>
@@ -1324,6 +1348,16 @@ const ReportsHubPage: React.FC = () => {
           </div>
           <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
         </div>
+      )}
+
+      {/* Navigator 360 Preview Modal */}
+      {nav360Preview && selectedAssessment && (
+        <Navigator360Preview
+          studentId={nav360Preview.studentId}
+          assessmentId={Number(selectedAssessment)}
+          studentName={nav360Preview.studentName}
+          onClose={() => setNav360Preview(null)}
+        />
       )}
     </div>
   );
