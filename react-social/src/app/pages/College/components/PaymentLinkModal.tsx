@@ -15,6 +15,7 @@ interface GeneratedLink {
   transactionId: number;
   paymentLinkUrl: string;
   shortUrl: string;
+  registrationUrl: string;
   amount: number;
 }
 
@@ -48,10 +49,12 @@ const PaymentLinkModal = ({
 
     try {
       const res = await generatePaymentLink(mappingId, amountNum);
+      const regUrl = `${window.location.origin}/payment-register/${res.data.transactionId}`;
       const link: GeneratedLink = {
         transactionId: res.data.transactionId,
         paymentLinkUrl: res.data.paymentLinkUrl,
         shortUrl: res.data.shortUrl,
+        registrationUrl: regUrl,
         amount: amountNum,
       };
       setGeneratedLinks((prev) => [link, ...prev]);
@@ -273,7 +276,7 @@ const PaymentLinkModal = ({
                     </span>
                     <div style={{ display: "flex", gap: 8 }}>
                       <button
-                        onClick={() => copyLink(link.shortUrl)}
+                        onClick={() => copyLink(link.registrationUrl)}
                         style={{
                           display: "inline-flex",
                           alignItems: "center",
@@ -281,13 +284,13 @@ const PaymentLinkModal = ({
                           padding: "6px 14px",
                           borderRadius: 8,
                           border:
-                            copySuccess === link.shortUrl
+                            copySuccess === link.registrationUrl
                               ? "1.5px solid #059669"
                               : "1.5px solid #e2e8f0",
                           background:
-                            copySuccess === link.shortUrl ? "#dcfce7" : "#fff",
+                            copySuccess === link.registrationUrl ? "#dcfce7" : "#fff",
                           color:
-                            copySuccess === link.shortUrl
+                            copySuccess === link.registrationUrl
                               ? "#059669"
                               : "#475569",
                           fontWeight: 600,
@@ -296,12 +299,12 @@ const PaymentLinkModal = ({
                         }}
                       >
                         <MdContentCopy size={14} />
-                        {copySuccess === link.shortUrl ? "Copied!" : "Copy Link"}
+                        {copySuccess === link.registrationUrl ? "Copied!" : "Copy Link"}
                       </button>
                       <button
                         onClick={() =>
                           setShowQrFor(
-                            showQrFor === link.shortUrl ? null : link.shortUrl
+                            showQrFor === link.registrationUrl ? null : link.registrationUrl
                           )
                         }
                         style={{
@@ -312,7 +315,7 @@ const PaymentLinkModal = ({
                           borderRadius: 8,
                           border: "1.5px solid #e2e8f0",
                           background:
-                            showQrFor === link.shortUrl ? "#eef2ff" : "#fff",
+                            showQrFor === link.registrationUrl ? "#eef2ff" : "#fff",
                           color: "#475569",
                           cursor: "pointer",
                         }}
@@ -330,10 +333,10 @@ const PaymentLinkModal = ({
                       wordBreak: "break-all",
                     }}
                   >
-                    {link.shortUrl}
+                    {link.registrationUrl}
                   </div>
 
-                  {showQrFor === link.shortUrl && (
+                  {showQrFor === link.registrationUrl && (
                     <div
                       style={{
                         textAlign: "center",
@@ -345,7 +348,7 @@ const PaymentLinkModal = ({
                       }}
                     >
                       <QRCodeCanvas
-                        value={link.shortUrl}
+                        value={link.registrationUrl}
                         size={200}
                         level="H"
                         includeMargin

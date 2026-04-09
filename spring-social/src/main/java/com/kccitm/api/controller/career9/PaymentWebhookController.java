@@ -138,6 +138,86 @@ public class PaymentWebhookController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Public endpoint: get transaction info for registration form.
+     * GET /payment/webhook/info/{transactionId}
+     */
+    @GetMapping("/info/{transactionId}")
+    public ResponseEntity<?> getTransactionInfo(@PathVariable Long transactionId) {
+        Optional<PaymentTransaction> txnOpt = paymentTransactionRepository.findById(transactionId);
+        if (!txnOpt.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        PaymentTransaction txn = txnOpt.get();
+        Map<String, Object> response = new HashMap<>();
+        response.put("transactionId", txn.getTransactionId());
+        response.put("amount", txn.getAmount() / 100);
+        response.put("status", txn.getStatus());
+        response.put("shortUrl", txn.getShortUrl());
+
+        String assessmentName = assessmentTableRepository.findById(txn.getAssessmentId())
+                .map(a -> a.getAssessmentName()).orElse("Assessment");
+        response.put("assessmentName", assessmentName);
+
+        // Get institute name
+        if (txn.getInstituteCode() != null) {
+            InstituteDetail institute = instituteDetailRepository.findById(txn.getInstituteCode().intValue());
+            if (institute != null) {
+                response.put("instituteName", institute.getInstituteName());
+            }
+        }
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Public endpoint: student submits registration details before payment.
+     * POST /payment/webhook/register/{transactionId}
+     * Body: { name, email, dob (dd-MM-yyyy), phone, gender, studentClass }
+     */
+    @PostMapping("/register/{transactionId}")
+    public ResponseEntity<?> registerStudentDetails(
+            @PathVariable Long transactionId,
+            @RequestBody Map<String, String> studentData) {
+
+        Optional<PaymentTransaction> txnOpt = paymentTransactionRepository.findById(transactionId);
+        if (!txnOpt.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        PaymentTransaction txn = txnOpt.get();
+
+        // Validate required fields
+        String name = studentData.get("name");
+        String email = studentData.get("email");
+        String dobStr = studentData.get("dob");
+
+        if (name == null || name.isEmpty() || email == null || email.isEmpty() || dobStr == null || dobStr.isEmpty()) {
+            return ResponseEntity.badRequest().body("Name, email, and date of birth are required");
+        }
+
+        // Parse DOB
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
+            txn.setStudentDob(sdf.parse(dobStr));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Invalid date format. Use dd-MM-yyyy");
+        }
+
+        txn.setStudentName(name);
+        txn.setStudentEmail(email);
+        txn.setStudentPhone(studentData.getOrDefault("phone", null));
+        paymentTransactionRepository.save(txn);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "registered");
+        response.put("paymentUrl", txn.getShortUrl());
+        response.put("transactionId", txn.getTransactionId());
+
+        return ResponseEntity.ok(response);
+    }
+
     private void handlePaymentLinkPaid(JSONObject payloadObj) {
         JSONObject paymentLink = payloadObj.getJSONObject("payment_link").getJSONObject("entity");
         String linkId = paymentLink.getString("id");
