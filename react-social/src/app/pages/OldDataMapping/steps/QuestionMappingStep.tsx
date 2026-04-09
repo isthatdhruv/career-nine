@@ -154,6 +154,80 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
       .finally(() => setLoadingExisting(false));
   }, []);
 
+  // Auto-load saved mappings for the current assessment on mount.
+  // If mappings exist in DB, skip the upload phase and go straight to mapping.
+  useEffect(() => {
+    if (systemQuestions.length === 0 || phase !== "upload") return;
+    const assessmentId = studentAssignments[0]?.assessmentId;
+    if (!assessmentId) return;
+
+    getQuestionMappings(assessmentId)
+      .then((res) => {
+        const saved: any[] = res.data || [];
+        if (saved.length === 0) return; // No saved mappings — stay on upload phase
+
+        const normalizeCat = (key: string): string => {
+          const map: Record<string, string> = {
+            multipleIntelligence: "multipleintelligence",
+            careerAspiration: "careeraspirations",
+            subjectOfInterest: "subjectofinterest",
+            value: "values",
+          };
+          return map[key] || key;
+        };
+
+        // Group by firebaseQuestion + category
+        const groupMap = new Map<string, {
+          firebaseQuestion: string;
+          category: string;
+          systemQuestionId: number | null;
+          answers: Map<string, number | null>;
+        }>();
+
+        saved.forEach((s: any) => {
+          const cat = normalizeCat(s.category);
+          const fbQ = s.firebaseQuestion || "";
+          const key = `${cat}::${fbQ}`;
+          if (!groupMap.has(key)) {
+            groupMap.set(key, {
+              firebaseQuestion: fbQ,
+              category: cat,
+              systemQuestionId: s.systemQuestionId || null,
+              answers: new Map(),
+            });
+          }
+          if (s.firebaseAnswer) {
+            groupMap.get(key)!.answers.set(s.firebaseAnswer, s.systemOptionId || null);
+          }
+        });
+
+        const autoMappings: AssessmentQuestionMapping[] = [];
+        groupMap.forEach((group) => {
+          const uniqueAnswers = Array.from(group.answers.keys());
+          autoMappings.push({
+            firebaseQuestion: group.firebaseQuestion,
+            category: group.category,
+            uniqueAnswers,
+            systemQuestionId: group.systemQuestionId,
+            systemQuestionText: "",
+            answerMappings: uniqueAnswers.map((ans) => ({
+              firebaseAnswer: ans,
+              systemOptionId: group.answers.get(ans) || null,
+              systemOptionText: "",
+            })),
+          });
+        });
+
+        if (autoMappings.length > 0) {
+          setMappings(autoMappings);
+          const categories = Array.from(new Set(autoMappings.map((m) => m.category)));
+          setActiveCategory(categories[0] || "");
+          setPhase("mapping"); // Skip upload, go straight to mapping
+        }
+      })
+      .catch(() => {}); // Silently fail — user can still upload manually
+  }, [systemQuestions]);
+
   // Load mappings from an existing assessment
   const handleLoadFromExisting = () => {
     if (!selectedExistingId) return;
