@@ -48,6 +48,9 @@ const FacultyReFillFormPage = lazy(
 const ClassRoomPage = lazy(
   () => import("../pages/ClassRoom/ClassRoom")
 );
+const PaymentStatusPage = lazy(
+  () => import("../pages/PaymentTracking/PaymentStatusPage")
+);
 
 /**
  * Base URL of the website.
@@ -136,6 +139,14 @@ const AppRoutes: FC = () => {
               element={
                 <SuspensedView>
                   <AssessmentRegisterPage />
+                </SuspensedView>
+              }
+            />
+      <Route
+              path="/payment-status"
+              element={
+                <SuspensedView>
+                  <PaymentStatusPage />
                 </SuspensedView>
               }
             />

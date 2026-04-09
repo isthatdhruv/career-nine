@@ -1,5 +1,8 @@
 package com.kccitm.api.service;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.HashMap;
 import java.util.Map;
 
 import javax.crypto.Mac;
@@ -9,16 +12,18 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-
-import com.razorpay.PaymentLink;
-import com.razorpay.RazorpayClient;
-import com.razorpay.RazorpayException;
+import org.springframework.web.client.RestTemplate;
 
 @Service
 public class RazorpayService {
 
     private static final Logger logger = LoggerFactory.getLogger(RazorpayService.class);
+    private static final String RAZORPAY_API_URL = "https://api.razorpay.com/v1/payment_links";
 
     @Value("${app.razorpay.key-id}")
     private String keyId;
@@ -29,8 +34,15 @@ public class RazorpayService {
     @Value("${app.razorpay.webhook-secret}")
     private String webhookSecret;
 
-    private RazorpayClient getClient() throws RazorpayException {
-        return new RazorpayClient(keyId, keySecret);
+    private final RestTemplate restTemplate = new RestTemplate();
+
+    private HttpHeaders getAuthHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        String auth = keyId + ":" + keySecret;
+        String encoded = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
+        headers.set("Authorization", "Basic " + encoded);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return headers;
     }
 
     public Map<String, String> createPaymentLink(
@@ -39,9 +51,7 @@ public class RazorpayService {
             String description,
             String callbackUrl,
             String referenceId,
-            Map<String, String> notes) throws RazorpayException {
-
-        RazorpayClient client = getClient();
+            Map<String, String> notes) throws Exception {
 
         JSONObject request = new JSONObject();
         request.put("amount", amountInPaise);
@@ -67,16 +77,23 @@ public class RazorpayService {
 
         request.put("reminder_enable", true);
 
-        PaymentLink paymentLink = client.paymentLink.create(request);
+        HttpEntity<String> entity = new HttpEntity<>(request.toString(), getAuthHeaders());
+        ResponseEntity<String> response = restTemplate.postForEntity(RAZORPAY_API_URL, entity, String.class);
 
-        logger.info("Razorpay payment link created: {}", String.valueOf(paymentLink.get("id")));
+        JSONObject responseBody = new JSONObject(response.getBody());
 
-        return Map.of(
-            "linkId", paymentLink.get("id").toString(),
-            "shortUrl", paymentLink.get("short_url").toString(),
-            "paymentLinkUrl", paymentLink.get("short_url").toString(),
-            "status", paymentLink.get("status").toString()
-        );
+        String linkId = responseBody.getString("id");
+        String shortUrl = responseBody.getString("short_url");
+        String status = responseBody.getString("status");
+
+        logger.info("Razorpay payment link created: {}", linkId);
+
+        Map<String, String> result = new HashMap<>();
+        result.put("linkId", linkId);
+        result.put("shortUrl", shortUrl);
+        result.put("paymentLinkUrl", shortUrl);
+        result.put("status", status);
+        return result;
     }
 
     public boolean verifyWebhookSignature(String payload, String signature) {
