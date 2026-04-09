@@ -60,6 +60,7 @@ import DemographicFieldsPage from "../pages/DemographicFields/DemographicFieldsP
 import DemographicFieldCreatePage from "../pages/DemographicFields/components/DemographicFieldCreatePage";
 import DemographicFieldEditPage from "../pages/DemographicFields/components/DemographicFieldEditPage";
 // import QuestionareEditSinglePage from "../pages/CreateAssessment/components/questionaire/QuestionareEditSinglePage";
+import CareerSuggestionPage from "../pages/CareerSuggestion/CareerSuggestionPage";
 import DashboardAdminPage from "../pages/demo-dashboard-v2/dashboard-admin";
 import InstituteDashboard from "../pages/dashboard/InstituteDashboard";
 import ActivityLogPage from "../pages/ActivityLog/ActivityLogPage";
@@ -70,7 +71,6 @@ import ReportsHubPage from "../pages/ReportsHub/ReportsHubPage";
 import StudentDashboard from "../pages/StudentDashboard/StudentDashboard";
 import ClassTeacherDashboard from "../pages/ClassTeacherDashboard/ClassTeacherDashboard";
 import { Error401 } from "../modules/errors/components/Error401";
-import CareerSuggestionPage from "../pages/CareerSuggestion/CareerSuggestionPage";
 
 // Paths that every logged-in user can access without role check
 const ALWAYS_ALLOWED = [
@@ -216,6 +216,8 @@ const PrivateRoutes = () => {
     () => import("../modules/role_roleGroup/Role_RoleGroup")
   );
   const RoleUser = lazy(() => import("../modules/roleUser/RoleUser1"));
+  const RolesAndPermissionsPage = lazy(() => import("../pages/RolesAndPermissions/RolesAndPermissionsPage"));
+  const UserManagementPage = lazy(() => import("../pages/UserManagement/UserManagementPage"));
   const UniversityResultDashboard = lazy(
     () => import("../pages/UniversityResult/UniversityResultDashboard")
   );
@@ -911,46 +913,30 @@ const PrivateRoutes = () => {
             </SuspensedView>
           }
         />
+        {/* New consolidated pages */}
         <Route
-          path="/roles/role"
+          path="/user-management/roles/manage"
           element={
             <SuspensedView>
-              <Role />
+              <RolesAndPermissionsPage />
             </SuspensedView>
           }
         />
         <Route
-          path="/roles/users"
+          path="/user-management/users/manage"
           element={
             <SuspensedView>
-              <Users />
+              <UserManagementPage />
             </SuspensedView>
           }
         />
-        <Route
-          path="/user-registrations"
-          element={
-            <SuspensedView>
-              <UserRegistration />
-            </SuspensedView>
-          }
-        />
-        <Route
-          path="/roles/role_roleGroup"
-          element={
-            <SuspensedView>
-              <RoleRoleGroupPage />
-            </SuspensedView>
-          }
-        />
-        <Route
-          path="/roles/roleUser"
-          element={
-            <SuspensedView>
-              <RoleUser />
-            </SuspensedView>
-          }
-        />
+
+        {/* Old routes — redirect to new pages */}
+        <Route path="/roles/role" element={<Navigate to="/user-management/roles/manage" replace />} />
+        <Route path="/roles/role_roleGroup" element={<Navigate to="/user-management/roles/manage" replace />} />
+        <Route path="/roles/roleUser" element={<Navigate to="/user-management/users/manage" replace />} />
+        <Route path="/user-registrations" element={<Navigate to="/user-management/users/manage" replace />} />
+        <Route path="/roles/users" element={<Navigate to="/user-management/users/manage" replace />} />
         <Route
           path="/reports"
           element={

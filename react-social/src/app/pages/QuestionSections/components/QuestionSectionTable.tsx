@@ -34,12 +34,12 @@ const QuestionSectionTable = (props: {
         <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>{index + 1}</span>
       ),
       sectionName: (
-        <span style={{ fontSize: "0.88rem", color: "#1f2937", fontWeight: 600 }}>
+        <span style={{ fontSize: "0.88rem", color: "#111827", fontWeight: 600 }}>
           {data.sectionName}
         </span>
       ),
       sectionDescription: (
-        <span style={{ fontSize: "0.84rem", color: "#6b7280" }}>
+        <span style={{ fontSize: "0.84rem", color: "#4b5563" }}>
           {data.sectionDescription || "—"}
         </span>
       ),
@@ -53,20 +53,9 @@ const QuestionSectionTable = (props: {
             }}
             className="btn btn-sm"
             title="Edit"
-            style={{
-              width: "30px",
-              height: "30px",
-              padding: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "rgba(67, 97, 238, 0.1)",
-              color: "#4361ee",
-              border: "1px solid rgba(67, 97, 238, 0.2)",
-              borderRadius: "6px",
-            }}
+            style={{ width: "36px", height: "36px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", color: "#2563eb", border: "2px solid #2563eb", borderRadius: "6px" }}
           >
-            <i className="bi bi-pencil-fill" style={{ fontSize: "0.75rem" }}></i>
+            <i className="bi bi-pencil-fill" style={{ fontSize: "0.85rem" }}></i>
           </button>
           <button
             onClick={async () => {
@@ -82,20 +71,9 @@ const QuestionSectionTable = (props: {
             }}
             className="btn btn-sm"
             title="Delete"
-            style={{
-              width: "30px",
-              height: "30px",
-              padding: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "rgba(220, 38, 38, 0.1)",
-              color: "#dc2626",
-              border: "1px solid rgba(220, 38, 38, 0.2)",
-              borderRadius: "6px",
-            }}
+            style={{ width: "36px", height: "36px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", color: "#dc2626", border: "2px solid #dc2626", borderRadius: "6px" }}
           >
-            <i className="bi bi-trash-fill" style={{ fontSize: "0.75rem" }}></i>
+            <i className="bi bi-trash-fill" style={{ fontSize: "0.85rem" }}></i>
           </button>
         </div>
       ),
@@ -107,25 +85,17 @@ const QuestionSectionTable = (props: {
       {/* Toolbar */}
       <div className="d-flex align-items-center gap-2 mb-3">
         <div className="position-relative" style={{ flex: "1 0 200px", maxWidth: "320px" }}>
-          <i
-            className="bi bi-search position-absolute"
-            style={{ left: 12, top: "50%", transform: "translateY(-50%)", color: "#9ca3af" }}
-          ></i>
+          <i className="bi bi-search position-absolute" style={{ left: 10, top: "50%", transform: "translateY(-50%)", color: "#9ca3af", fontSize: "0.85rem" }}></i>
           <input
             type="search"
             className="form-control form-control-sm"
             placeholder="Search sections..."
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            style={{
-              paddingLeft: 36,
-              borderRadius: "8px",
-              border: "1.5px solid #e0e0e0",
-              fontSize: "0.85rem",
-            }}
+            style={{ paddingLeft: 32, borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem" }}
           />
         </div>
-        <span style={{ fontSize: "0.78rem", color: "#9ca3af" }}>
+        <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
           {filteredData.length} of {props.data.length} sections
         </span>
       </div>
