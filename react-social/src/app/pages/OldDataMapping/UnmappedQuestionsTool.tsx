@@ -360,23 +360,32 @@ export default function UnmappedQuestionsTool({ onBack }: { onBack: () => void }
         return;
       }
 
-      // Save to ALL assessments using this questionnaire
+      // Save to ALL assessments using this questionnaire.
+      // Load existing from the first assessment (all share the same questionnaire mappings),
+      // then save the combined set to each assessment.
       let savedCount = 0;
-      for (const assessment of selectedQuestionnaire.assessments) {
-        const existingRes = await getQuestionMappings(assessment.assessmentId);
-        const existingRaw: any[] = existingRes.data || [];
+      const firstAssessment = selectedQuestionnaire.assessments[0];
+      const existingRes = await getQuestionMappings(firstAssessment.assessmentId);
+      const existingRaw: any[] = (existingRes.data || []).map((m: any) => ({
+        firebaseQuestion: m.firebaseQuestion,
+        category: m.category,
+        systemQuestionId: m.systemQuestionId,
+        firebaseAnswer: m.firebaseAnswer,
+        systemOptionId: m.systemOptionId,
+      }));
 
-        const combined = [...existingRaw.map((m: any) => ({
-          firebaseQuestion: m.firebaseQuestion,
-          category: m.category,
-          systemQuestionId: m.systemQuestionId,
-          firebaseAnswer: m.firebaseAnswer,
-          systemOptionId: m.systemOptionId,
-        })), ...newMappings];
+      // Deduplicate: remove existing entries that overlap with new mappings
+      const newKeys = new Set(newMappings.map((m) => `${m.category}::${m.firebaseQuestion}::${m.firebaseAnswer}`));
+      const kept = existingRaw.filter((m) => !newKeys.has(`${m.category}::${m.firebaseQuestion}::${m.firebaseAnswer}`));
+      const combined = [...kept, ...newMappings];
 
-        await saveQuestionMappings(assessment.assessmentId, combined);
-        savedCount++;
-      }
+      // Save to all assessments using the same combined payload
+      const savePromises = selectedQuestionnaire.assessments.map((assessment: any) =>
+        saveQuestionMappings(assessment.assessmentId, combined)
+          .then(() => { savedCount++; })
+          .catch((err: any) => console.warn(`Failed to save to assessment ${assessment.assessmentId}:`, err))
+      );
+      await Promise.all(savePromises);
 
       const uniqueQuestions = new Set(newMappings.map((m) => `${m.category}::${m.firebaseQuestion}`));
       setSaveResult(`Saved ${uniqueQuestions.size} new question mappings across ${savedCount} assessments.`);
