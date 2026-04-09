@@ -132,6 +132,13 @@ const QuestionTable = (props: {
     return matchesText && matchesSection;
   });
 
+  const actionBtnStyle = (color: string) => ({
+    width: "36px", height: "36px", padding: 0,
+    display: "flex" as const, alignItems: "center" as const, justifyContent: "center" as const,
+    background: "#fff", color: color, border: `2px solid ${color}`, borderRadius: "6px",
+    cursor: "pointer" as const,
+  });
+
   const datatable = {
     columns: [
       { label: "#", field: "serialNo", width: 50, sort: "disabled" },
@@ -148,45 +155,38 @@ const QuestionTable = (props: {
       return mqtSortDir === "asc" ? ca - cb : cb - ca;
     })).map((data: any, index: number) => {
       const mqtCount = mqtCounts[data.id] ?? 0;
+      const typeColors: Record<string, { bg: string; color: string }> = {
+        "single-choice": { bg: "#2563eb", color: "#fff" },
+        "multiple-choice": { bg: "#7c3aed", color: "#fff" },
+        "ranking": { bg: "#d97706", color: "#fff" },
+      };
+      const tc = typeColors[data.questionType] || { bg: "#f3f4f6", color: "#6b7280" };
+
       return {
         serialNo: (
           <span style={{ color: "#9ca3af", fontSize: "0.82rem" }}>{index + 1}</span>
         ),
         questionText: (
-          <span style={{ fontSize: "0.85rem", color: "#1f2937", fontWeight: 500 }}>
+          <span style={{ fontSize: "0.85rem", color: "#111827", fontWeight: 500 }}>
             {data.questionText}
           </span>
         ),
         questionType: (
-          <span
-            style={{
-              fontSize: "0.75rem",
-              fontWeight: 600,
-              padding: "3px 8px",
-              borderRadius: "6px",
-              background: data.questionType === "single-choice" ? "rgba(67, 97, 238, 0.1)" : data.questionType === "multiple-choice" ? "rgba(124, 58, 237, 0.1)" : "rgba(245, 158, 11, 0.1)",
-              color: data.questionType === "single-choice" ? "#4361ee" : data.questionType === "multiple-choice" ? "#7c3aed" : "#d97706",
-            }}
-          >
+          <span style={{ fontSize: "0.8rem", fontWeight: 700, padding: "5px 12px", borderRadius: "4px", background: tc.bg, color: tc.color, display: "inline-block" }}>
             {data.questionType}
           </span>
         ),
         sectionType: (
-          <span style={{ fontSize: "0.82rem", color: "#6b7280" }}>
+          <span style={{ fontSize: "0.82rem", color: "#4b5563" }}>
             {props.sections.find((section: any) => section.sectionId === (data.section?.sectionId ?? data.sectionId))?.sectionName ?? "Unknown"}
           </span>
         ),
         mqtCount: (
-          <span
-            style={{
-              fontSize: "0.75rem",
-              fontWeight: 600,
-              padding: "3px 8px",
-              borderRadius: "6px",
-              background: mqtCount > 0 ? "rgba(16, 185, 129, 0.1)" : "rgba(220, 38, 38, 0.08)",
-              color: mqtCount > 0 ? "#059669" : "#dc2626",
-            }}
-          >
+          <span style={{
+            fontSize: "0.8rem", fontWeight: 700, padding: "5px 12px", borderRadius: "4px", display: "inline-block",
+            background: mqtCount > 0 ? "#059669" : "#dc2626",
+            color: "#fff",
+          }}>
             {mqtCount > 0 ? `${mqtCount} MQT${mqtCount !== 1 ? "s" : ""}` : "None"}
           </span>
         ),
@@ -194,32 +194,20 @@ const QuestionTable = (props: {
           <div className="d-flex gap-1">
             <button
               onClick={() => navigate(`/assessment-questions/edit/${data.id}`, { state: { data } })}
-              className="btn btn-sm"
-              title="Edit"
-              style={{
-                width: "30px", height: "30px", padding: 0,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                background: "rgba(67, 97, 238, 0.1)", color: "#4361ee",
-                border: "1px solid rgba(67, 97, 238, 0.2)", borderRadius: "6px",
-              }}
+              className="btn btn-sm" title="Edit"
+              style={actionBtnStyle("#2563eb")}
             >
-              <i className="bi bi-pencil-fill" style={{ fontSize: "0.75rem" }}></i>
+              <i className="bi bi-pencil-fill" style={{ fontSize: "0.85rem" }}></i>
             </button>
             <button
               onClick={() => {
                 setActiveQuestionId(data.id);
                 setShowLanguageModal(true);
               }}
-              className="btn btn-sm"
-              title="Language"
-              style={{
-                width: "30px", height: "30px", padding: 0,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                background: "rgba(16, 185, 129, 0.1)", color: "#059669",
-                border: "1px solid rgba(16, 185, 129, 0.2)", borderRadius: "6px",
-              }}
+              className="btn btn-sm" title="Translate"
+              style={actionBtnStyle("#059669")}
             >
-              <i className="bi bi-translate" style={{ fontSize: "0.75rem" }}></i>
+              <i className="bi bi-translate" style={{ fontSize: "0.85rem" }}></i>
             </button>
             <button
               onClick={async () => {
@@ -236,16 +224,10 @@ const QuestionTable = (props: {
                   showErrorToast("Failed to delete question. Please try again.");
                 }
               }}
-              className="btn btn-sm"
-              title="Delete"
-              style={{
-                width: "30px", height: "30px", padding: 0,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                background: "rgba(220, 38, 38, 0.1)", color: "#dc2626",
-                border: "1px solid rgba(220, 38, 38, 0.2)", borderRadius: "6px",
-              }}
+              className="btn btn-sm" title="Delete"
+              style={actionBtnStyle("#dc2626")}
             >
-              <i className="bi bi-trash-fill" style={{ fontSize: "0.75rem" }}></i>
+              <i className="bi bi-trash-fill" style={{ fontSize: "0.85rem" }}></i>
             </button>
           </div>
         ),
@@ -253,20 +235,24 @@ const QuestionTable = (props: {
     }),
   };
 
+  const toolbarBtnStyle = (color: string) => ({
+    background: "#fff", color: color, border: `2px solid ${color}`, borderRadius: "6px", padding: "6px 12px", fontWeight: 600 as const, fontSize: "0.82rem",
+  });
+
   return (
     <>
       {/* Toolbar */}
       <div className="d-flex align-items-center gap-2 mb-3 flex-wrap">
         {/* Search */}
         <div className="position-relative" style={{ flex: "1 0 200px", maxWidth: "320px" }}>
-          <i className="bi bi-search position-absolute" style={{ left: 12, top: "50%", transform: "translateY(-50%)", color: "#9ca3af" }}></i>
+          <i className="bi bi-search position-absolute" style={{ left: 10, top: "50%", transform: "translateY(-50%)", color: "#9ca3af", fontSize: "0.85rem" }}></i>
           <input
             type="search"
             className="form-control form-control-sm"
             placeholder="Search questions..."
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
-            style={{ paddingLeft: 36, borderRadius: "8px", border: "1.5px solid #e0e0e0", fontSize: "0.85rem" }}
+            style={{ paddingLeft: 32, borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.85rem" }}
           />
         </div>
 
@@ -278,7 +264,7 @@ const QuestionTable = (props: {
             setSelectedSection(e.target.value);
             sessionStorage.setItem("questionTableSectionFilter", e.target.value);
           }}
-          style={{ maxWidth: "180px", borderRadius: "8px", border: "1.5px solid #e0e0e0", fontSize: "0.82rem" }}
+          style={{ maxWidth: "180px", borderRadius: "6px", border: "1px solid #d1d5db", fontSize: "0.82rem" }}
         >
           <option value="">All Sections</option>
           {props.sections.map((section: any) => (
@@ -293,13 +279,7 @@ const QuestionTable = (props: {
           className="btn btn-sm d-flex align-items-center gap-1"
           onClick={() => setMqtSortDir(d => d === "none" ? "desc" : d === "desc" ? "asc" : "none")}
           style={{
-            borderRadius: "8px",
-            padding: "5px 10px",
-            fontWeight: 600,
-            fontSize: "0.78rem",
-            background: mqtSortDir !== "none" ? "rgba(67, 97, 238, 0.1)" : "#f1f5f9",
-            color: mqtSortDir !== "none" ? "#4361ee" : "#6b7280",
-            border: `1px solid ${mqtSortDir !== "none" ? "rgba(67, 97, 238, 0.2)" : "#e2e8f0"}`,
+            ...toolbarBtnStyle(mqtSortDir !== "none" ? "#2563eb" : "#6b7280"),
           }}
         >
           MQTs
@@ -316,15 +296,7 @@ const QuestionTable = (props: {
           onClick={handleExportToExcel}
           className="btn btn-sm d-flex align-items-center gap-1"
           disabled={exporting}
-          style={{
-            background: "rgba(16, 185, 129, 0.1)",
-            color: "#059669",
-            border: "1px solid rgba(16, 185, 129, 0.2)",
-            borderRadius: "8px",
-            padding: "5px 10px",
-            fontWeight: 600,
-            fontSize: "0.78rem",
-          }}
+          style={toolbarBtnStyle("#059669")}
         >
           <i className="bi bi-download"></i>
           {exporting ? "Exporting..." : "Export Excel"}
@@ -334,15 +306,7 @@ const QuestionTable = (props: {
           onClick={handleDownloadTemplate}
           className="btn btn-sm d-flex align-items-center gap-1"
           disabled={downloadingTemplate}
-          style={{
-            background: "rgba(8, 145, 178, 0.1)",
-            color: "#0891b2",
-            border: "1px solid rgba(8, 145, 178, 0.2)",
-            borderRadius: "8px",
-            padding: "5px 10px",
-            fontWeight: 600,
-            fontSize: "0.78rem",
-          }}
+          style={toolbarBtnStyle("#0369a1")}
         >
           <i className="bi bi-file-earmark-arrow-down"></i>
           {downloadingTemplate ? "Downloading..." : "Template"}
@@ -351,15 +315,7 @@ const QuestionTable = (props: {
         <button
           onClick={() => setShowBulkUploadModal(true)}
           className="btn btn-sm d-flex align-items-center gap-1"
-          style={{
-            background: "rgba(124, 58, 237, 0.1)",
-            color: "#7c3aed",
-            border: "1px solid rgba(124, 58, 237, 0.2)",
-            borderRadius: "8px",
-            padding: "5px 10px",
-            fontWeight: 600,
-            fontSize: "0.78rem",
-          }}
+          style={toolbarBtnStyle("#7c3aed")}
         >
           <i className="bi bi-upload"></i>
           Upload Excel
@@ -368,7 +324,7 @@ const QuestionTable = (props: {
 
       {/* Results count */}
       <div className="d-flex align-items-center gap-2 mb-2">
-        <span style={{ fontSize: "0.78rem", color: "#9ca3af" }}>
+        <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
           Showing {filteredData.length} of {props.data.length} questions
           {selectedSection && " (filtered)"}
         </span>

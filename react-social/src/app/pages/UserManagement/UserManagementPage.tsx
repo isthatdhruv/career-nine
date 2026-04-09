@@ -2,38 +2,17 @@ import RegisteredUsersTab from "./components/RegisteredUsersTab";
 
 const UserManagementPage = () => {
   return (
-    <div
-      className="min-vh-100"
-      style={{
-        background: "linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%)",
-        padding: "1rem 1.25rem",
-      }}
-    >
-      {/* Header */}
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: "12px" }}>
-        <div className="card-body p-3">
-          <div className="d-flex align-items-center gap-3">
-            <div
-              style={{
-                width: "42px",
-                height: "42px",
-                borderRadius: "10px",
-                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              <i className="bi bi-people-fill text-white" style={{ fontSize: "1.2rem" }}></i>
-            </div>
-            <div>
-              <h5 className="mb-0 fw-bold" style={{ color: "#1a1a2e" }}>User Management</h5>
-              <p className="text-muted mb-0" style={{ fontSize: "0.82rem" }}>
-                Manage users, role group assignments, and institute access
-              </p>
-            </div>
-          </div>
+    <div style={{ background: "#f8fafc", minHeight: "100vh", padding: "24px" }}>
+      {/* Page Header */}
+      <div className="d-flex align-items-center gap-3" style={{ marginBottom: "24px" }}>
+        <div style={{ width: "40px", height: "40px", borderRadius: "8px", background: "#059669", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <i className="bi bi-people-fill text-white" style={{ fontSize: "1.1rem" }}></i>
+        </div>
+        <div>
+          <h4 style={{ margin: 0, color: "#111827", fontWeight: 700, fontSize: "1.3rem" }}>User Management</h4>
+          <p style={{ margin: 0, color: "#6b7280", fontSize: "0.82rem" }}>
+            Manage users, role group assignments, and institute access
+          </p>
         </div>
       </div>
 

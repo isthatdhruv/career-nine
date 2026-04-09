@@ -71,7 +71,6 @@ import ReportsHubPage from "../pages/ReportsHub/ReportsHubPage";
 import StudentDashboard from "../pages/StudentDashboard/StudentDashboard";
 import ClassTeacherDashboard from "../pages/ClassTeacherDashboard/ClassTeacherDashboard";
 import { Error401 } from "../modules/errors/components/Error401";
-import CareerSuggestionPage from "../pages/CareerSuggestion/CareerSuggestionPage";
 
 // Paths that every logged-in user can access without role check
 const ALWAYS_ALLOWED = [

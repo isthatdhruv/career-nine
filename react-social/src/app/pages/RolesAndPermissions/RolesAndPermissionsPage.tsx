@@ -55,38 +55,17 @@ const RolesAndPermissionsPage = () => {
   }, [fetchRoles, fetchRoleGroups]);
 
   return (
-    <div
-      className="min-vh-100"
-      style={{
-        background: "linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%)",
-        padding: "1rem 1.25rem",
-      }}
-    >
-      {/* Header */}
-      <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: "12px" }}>
-        <div className="card-body p-3">
-          <div className="d-flex align-items-center gap-3">
-            <div
-              style={{
-                width: "42px",
-                height: "42px",
-                borderRadius: "10px",
-                background: "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              <i className="bi bi-shield-lock-fill text-white" style={{ fontSize: "1.2rem" }}></i>
-            </div>
-            <div>
-              <h5 className="mb-0 fw-bold" style={{ color: "#1a1a2e" }}>Roles & Permissions</h5>
-              <p className="text-muted mb-0" style={{ fontSize: "0.82rem" }}>
-                Define roles and bundle them into groups for easy assignment
-              </p>
-            </div>
-          </div>
+    <div style={{ background: "#f8fafc", minHeight: "100vh", padding: "24px" }}>
+      {/* Page Header */}
+      <div className="d-flex align-items-center gap-3" style={{ marginBottom: "24px" }}>
+        <div style={{ width: "40px", height: "40px", borderRadius: "8px", background: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <i className="bi bi-shield-lock-fill text-white" style={{ fontSize: "1.1rem" }}></i>
+        </div>
+        <div>
+          <h4 style={{ margin: 0, color: "#111827", fontWeight: 700, fontSize: "1.3rem" }}>Roles & Permissions</h4>
+          <p style={{ margin: 0, color: "#6b7280", fontSize: "0.82rem" }}>
+            Define roles (page access) and bundle them into groups for easy user assignment
+          </p>
         </div>
       </div>
 

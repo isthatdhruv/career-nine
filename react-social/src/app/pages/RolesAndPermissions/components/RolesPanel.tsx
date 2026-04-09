@@ -63,27 +63,32 @@ const RolesPanel = ({ roles, loading, onRefresh }: Props) => {
     }
   };
 
+  const actionBtn = (color: string) => ({
+    width: "34px", height: "34px", padding: 0,
+    display: "flex" as const, alignItems: "center" as const, justifyContent: "center" as const,
+    background: "#fff", color: color, border: `2px solid ${color}`, borderRadius: "6px",
+    cursor: "pointer" as const,
+  });
+
   return (
-    <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: "12px" }}>
-      <div className="card-body p-3">
+    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", marginBottom: "16px" }}>
+      <div style={{ padding: "16px" }}>
         {/* Header */}
-        <div className="d-flex align-items-center justify-content-between mb-3">
-          <div className="d-flex align-items-center gap-2">
-            <i className="bi bi-key-fill" style={{ color: "#4361ee", fontSize: "1rem" }}></i>
-            <h6 className="mb-0 fw-bold" style={{ color: "#1a1a2e" }}>Roles</h6>
-            <span style={{ fontSize: "0.75rem", color: "#9ca3af" }}>({roles.length})</span>
-          </div>
+        <div className="d-flex align-items-center gap-2 mb-3">
+          <i className="bi bi-key-fill" style={{ color: "#2563eb", fontSize: "1rem" }}></i>
+          <h6 style={{ margin: 0, fontWeight: 700, color: "#111827" }}>Roles</h6>
+          <span style={{ fontSize: "0.78rem", color: "#6b7280", background: "#f3f4f6", padding: "2px 8px", borderRadius: "4px" }}>{roles.length}</span>
         </div>
 
         {loading ? (
           <div className="text-center py-4">
-            <div className="spinner-border spinner-border-sm text-primary"></div>
-            <span className="ms-2 text-muted" style={{ fontSize: "0.85rem" }}>Loading roles...</span>
+            <div className="spinner-border spinner-border-sm" style={{ color: "#2563eb" }}></div>
+            <span className="ms-2" style={{ color: "#6b7280", fontSize: "0.85rem" }}>Loading roles...</span>
           </div>
         ) : (
           <>
             {/* Column headers */}
-            <div className="d-flex gap-2 mb-2 px-1" style={{ fontSize: "0.72rem", fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            <div className="d-flex gap-2 mb-2 px-2" style={{ fontSize: "0.72rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px" }}>
               <div style={{ flex: 1 }}>Role Name</div>
               <div style={{ flex: 1 }}>URL Path</div>
               <div style={{ width: "80px", textAlign: "center" }}>Actions</div>
@@ -95,7 +100,7 @@ const RolesPanel = ({ roles, loading, onRefresh }: Props) => {
                 <div
                   key={role.id}
                   className="d-flex align-items-center gap-2"
-                  style={{ padding: "6px 8px", borderRadius: "8px", background: "#fafbfc", border: "1px solid #f0f0f0" }}
+                  style={{ padding: "8px", borderRadius: "6px", background: "#f9fafb", border: "1px solid #f3f4f6" }}
                 >
                   {editingId === role.id ? (
                     <>
@@ -103,49 +108,37 @@ const RolesPanel = ({ roles, loading, onRefresh }: Props) => {
                         className="form-control form-control-sm"
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
-                        style={{ flex: 1, borderRadius: "6px", fontSize: "0.85rem" }}
+                        style={{ flex: 1, borderRadius: "6px", fontSize: "0.85rem", border: "1px solid #d1d5db" }}
                       />
                       <input
                         className="form-control form-control-sm"
                         value={editUrl}
                         onChange={(e) => setEditUrl(e.target.value)}
-                        style={{ flex: 1, borderRadius: "6px", fontSize: "0.85rem" }}
+                        style={{ flex: 1, borderRadius: "6px", fontSize: "0.85rem", border: "1px solid #d1d5db" }}
                       />
                       <div className="d-flex gap-1" style={{ width: "80px", justifyContent: "center" }}>
-                        <button
-                          className="btn btn-sm"
-                          onClick={() => handleUpdate(role)}
-                          style={{ width: "28px", height: "28px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(16, 185, 129, 0.1)", color: "#059669", border: "1px solid rgba(16, 185, 129, 0.2)", borderRadius: "6px" }}
-                        >
-                          <i className="bi bi-check-lg" style={{ fontSize: "0.8rem" }}></i>
+                        <button className="btn btn-sm" onClick={() => handleUpdate(role)} style={actionBtn("#059669")}>
+                          <i className="bi bi-check-lg" style={{ fontSize: "0.9rem" }}></i>
                         </button>
-                        <button
-                          className="btn btn-sm"
-                          onClick={() => setEditingId(null)}
-                          style={{ width: "28px", height: "28px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#f1f5f9", color: "#64748b", border: "1px solid #e2e8f0", borderRadius: "6px" }}
-                        >
-                          <i className="bi bi-x-lg" style={{ fontSize: "0.7rem" }}></i>
+                        <button className="btn btn-sm" onClick={() => setEditingId(null)} style={actionBtn("#6b7280")}>
+                          <i className="bi bi-x-lg" style={{ fontSize: "0.8rem" }}></i>
                         </button>
                       </div>
                     </>
                   ) : (
                     <>
-                      <span style={{ flex: 1, fontSize: "0.85rem", fontWeight: 500, color: "#1f2937" }}>{role.name}</span>
-                      <span style={{ flex: 1, fontSize: "0.82rem", color: "#6b7280", fontFamily: "monospace" }}>{role.url}</span>
+                      <span style={{ flex: 1, fontSize: "0.85rem", fontWeight: 600, color: "#111827" }}>{role.name}</span>
+                      <span style={{ flex: 1, fontSize: "0.82rem", color: "#4b5563", fontFamily: "monospace", background: "#f3f4f6", padding: "2px 8px", borderRadius: "4px", display: "inline-block" }}>{role.url}</span>
                       <div className="d-flex gap-1" style={{ width: "80px", justifyContent: "center" }}>
                         <button
                           className="btn btn-sm"
                           onClick={() => { setEditingId(role.id!); setEditName(role.name); setEditUrl(role.url); }}
-                          style={{ width: "28px", height: "28px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(67, 97, 238, 0.1)", color: "#4361ee", border: "1px solid rgba(67, 97, 238, 0.2)", borderRadius: "6px" }}
+                          style={actionBtn("#2563eb")}
                         >
-                          <i className="bi bi-pencil-fill" style={{ fontSize: "0.65rem" }}></i>
+                          <i className="bi bi-pencil-fill" style={{ fontSize: "0.8rem" }}></i>
                         </button>
-                        <button
-                          className="btn btn-sm"
-                          onClick={() => handleDelete(role.id!)}
-                          style={{ width: "28px", height: "28px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(220, 38, 38, 0.1)", color: "#dc2626", border: "1px solid rgba(220, 38, 38, 0.2)", borderRadius: "6px" }}
-                        >
-                          <i className="bi bi-trash-fill" style={{ fontSize: "0.65rem" }}></i>
+                        <button className="btn btn-sm" onClick={() => handleDelete(role.id!)} style={actionBtn("#dc2626")}>
+                          <i className="bi bi-trash-fill" style={{ fontSize: "0.8rem" }}></i>
                         </button>
                       </div>
                     </>
@@ -156,40 +149,31 @@ const RolesPanel = ({ roles, loading, onRefresh }: Props) => {
 
             {/* Add new role */}
             <div
-              className="d-flex align-items-center gap-2 mt-2"
-              style={{ padding: "8px", borderRadius: "8px", background: "rgba(67, 97, 238, 0.03)", border: "1px dashed rgba(67, 97, 238, 0.2)" }}
+              className="d-flex align-items-center gap-2 mt-3"
+              style={{ padding: "10px", borderRadius: "6px", background: "#f0f9ff", border: "1px dashed #93c5fd" }}
             >
               <input
                 className="form-control form-control-sm"
                 placeholder="Role name"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                style={{ flex: 1, borderRadius: "6px", fontSize: "0.85rem" }}
+                style={{ flex: 1, borderRadius: "6px", fontSize: "0.85rem", border: "1px solid #d1d5db" }}
               />
               <input
                 className="form-control form-control-sm"
                 placeholder="/url-path"
                 value={newUrl}
                 onChange={(e) => setNewUrl(e.target.value)}
-                style={{ flex: 1, borderRadius: "6px", fontSize: "0.85rem" }}
+                style={{ flex: 1, borderRadius: "6px", fontSize: "0.85rem", border: "1px solid #d1d5db" }}
               />
               <button
                 className="btn btn-sm d-flex align-items-center gap-1"
                 onClick={handleCreate}
                 disabled={saving || !newName.trim() || !newUrl.trim()}
-                style={{
-                  background: "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "6px",
-                  padding: "5px 12px",
-                  fontWeight: 600,
-                  fontSize: "0.78rem",
-                  whiteSpace: "nowrap",
-                }}
+                style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: "6px", padding: "6px 14px", fontWeight: 600, fontSize: "0.82rem", whiteSpace: "nowrap" }}
               >
                 <i className="bi bi-plus-lg"></i>
-                {saving ? "Adding..." : "Add"}
+                {saving ? "Adding..." : "Add Role"}
               </button>
             </div>
           </>
