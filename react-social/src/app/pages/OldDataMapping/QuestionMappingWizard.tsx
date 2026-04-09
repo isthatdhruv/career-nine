@@ -6,6 +6,8 @@ import {
   getAllAssessmentQuestions,
   getAllAssessments,
   importMappedAnswers,
+  saveQuestionMappings,
+  getQuestionMappings,
 } from "./API/OldDataMapping_APIs";
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -392,6 +394,49 @@ const QuestionMappingWizard = ({ onBack }: Props) => {
         answers: mappedAnswers,
       });
       setSaveResult({ saved: res.data?.saved || 0 });
+
+      // Also persist the mapping definitions so they appear in Existing Mappings
+      // and are reloaded when importing more students for the same assessment.
+      // Merge with existing mappings so we don't overwrite ones saved earlier
+      // (e.g. from Detect Unmapped tool).
+      const newMappings: any[] = [];
+      mappings.forEach((m) => {
+        if (!m.systemQuestionId) return;
+        newMappings.push({
+          firebaseQuestion: m.firebaseQuestion,
+          category: m.category,
+          systemQuestionId: m.systemQuestionId,
+          firebaseAnswer: m.firebaseAnswer,
+          systemOptionId: m.systemOptionId,
+        });
+      });
+      if (newMappings.length > 0) {
+        try {
+          // Load existing mappings first
+          const existingRes = await getQuestionMappings(assessmentId);
+          const existingRaw: any[] = (existingRes.data || []).map((m: any) => ({
+            firebaseQuestion: m.firebaseQuestion,
+            category: m.category,
+            systemQuestionId: m.systemQuestionId,
+            firebaseAnswer: m.firebaseAnswer,
+            systemOptionId: m.systemOptionId,
+          }));
+
+          // Build a set of keys from new mappings to replace matches
+          const newKeys = new Set(
+            newMappings.map((m) => `${m.category}::${m.firebaseQuestion}::${m.firebaseAnswer}`)
+          );
+
+          // Keep existing mappings that aren't being replaced
+          const kept = existingRaw.filter(
+            (m) => !newKeys.has(`${m.category}::${m.firebaseQuestion}::${m.firebaseAnswer}`)
+          );
+
+          await saveQuestionMappings(assessmentId, [...kept, ...newMappings]);
+        } catch (err) {
+          console.warn("Answers saved but failed to persist mapping definitions:", err);
+        }
+      }
     } catch (err: any) {
       const msg = err?.response?.data?.error || err?.message || "Unknown error";
       setSaveResult({ saved: 0, error: msg });

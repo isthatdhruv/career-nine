@@ -931,14 +931,15 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
       setShowPartialModal(true);
     }
 
-    // Save mappings to DB for reuse
+    // Save mappings to DB for reuse — merge with existing so we don't
+    // overwrite mappings saved earlier (e.g. from Detect Unmapped tool)
     const assessmentId = studentAssignments[0]?.assessmentId;
     if (assessmentId && totalMapped > 0) {
-      const dbMappings: any[] = [];
+      const newMappings: any[] = [];
       mappings.forEach((m) => {
         if (!m.systemQuestionId) return;
         m.answerMappings.forEach((am) => {
-          dbMappings.push({
+          newMappings.push({
             firebaseQuestion: m.firebaseQuestion,
             category: m.category,
             systemQuestionId: m.systemQuestionId,
@@ -948,7 +949,27 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
         });
       });
       try {
-        await saveQuestionMappings(assessmentId, dbMappings);
+        // Load existing mappings first
+        const existingRes = await getQuestionMappings(assessmentId);
+        const existingRaw: any[] = (existingRes.data || []).map((m: any) => ({
+          firebaseQuestion: m.firebaseQuestion,
+          category: m.category,
+          systemQuestionId: m.systemQuestionId,
+          firebaseAnswer: m.firebaseAnswer,
+          systemOptionId: m.systemOptionId,
+        }));
+
+        // Build a set of keys from the new mappings to replace matches
+        const newKeys = new Set(
+          newMappings.map((m) => `${m.category}::${m.firebaseQuestion}::${m.firebaseAnswer}`)
+        );
+
+        // Keep existing mappings that aren't being replaced by new ones
+        const kept = existingRaw.filter(
+          (m) => !newKeys.has(`${m.category}::${m.firebaseQuestion}::${m.firebaseAnswer}`)
+        );
+
+        await saveQuestionMappings(assessmentId, [...kept, ...newMappings]);
       } catch (err) {
         console.warn("Failed to save mappings for reuse:", err);
       }
