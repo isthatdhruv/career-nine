@@ -198,7 +198,6 @@ public class FirebaseDataMappingController {
 
     @Transactional
     @PostMapping("/import-mapped-answers")
-    @Transactional
     public ResponseEntity<?> importMappedAnswers(@RequestBody Map<String, Object> payload) {
         Long userStudentId = getLong(payload, "userStudentId");
             Long assessmentId = getLong(payload, "assessmentId");
