@@ -225,6 +225,7 @@ const PrivateRoutes = () => {
   const AdminCounsellingQueuePage = lazy(() => import("../pages/Counselling/admin/AdminCounsellingQueuePage"));
   const CounsellorManagementPage = lazy(() => import("../pages/Counselling/admin/CounsellorManagementPage"));
   const PaymentTrackingPage = lazy(() => import("../pages/PaymentTracking/PaymentTrackingPage"));
+  const PaymentStatusPage = lazy(() => import("../pages/PaymentTracking/PaymentStatusPage"));
   // const UniversityAllResultDashboard = lazy(
   //   () => import("../pages/UniversityResult/UniversityAllResultDashboard")
   // );
@@ -250,6 +251,11 @@ const PrivateRoutes = () => {
       
 
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/payment-status" element={
+        <SuspensedView>
+          <PaymentStatusPage />
+        </SuspensedView>
+      } />
       <Route element={<AuthorizedLayout />}>
         <Route path="auth/*" element={<Navigate to="/dashboard" />} />
         <Route path="dashboard" element={<DashboardAdminPage />} />

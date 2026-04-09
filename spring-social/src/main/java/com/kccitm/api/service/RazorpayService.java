@@ -16,6 +16,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -34,7 +35,14 @@ public class RazorpayService {
     @Value("${app.razorpay.webhook-secret}")
     private String webhookSecret;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+
+    public RazorpayService() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(10000); // 10 seconds
+        factory.setReadTimeout(30000);    // 30 seconds
+        this.restTemplate = new RestTemplate(factory);
+    }
 
     private HttpHeaders getAuthHeaders() {
         HttpHeaders headers = new HttpHeaders();

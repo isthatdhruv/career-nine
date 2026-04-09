@@ -28,7 +28,7 @@ public class PaymentTransaction implements Serializable {
     @Column(name = "transaction_id")
     private Long transactionId;
 
-    @Column(name = "razorpay_link_id", length = 50)
+    @Column(name = "razorpay_link_id", length = 50, unique = true)
     private String razorpayLinkId;
 
     @Column(name = "razorpay_payment_id", length = 50)

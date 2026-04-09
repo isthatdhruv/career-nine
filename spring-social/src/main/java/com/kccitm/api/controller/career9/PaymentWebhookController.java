@@ -12,14 +12,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.User;
@@ -38,8 +37,8 @@ import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.service.CareerNineRollNumberService;
+import com.kccitm.api.service.PaymentEmailService;
 import com.kccitm.api.service.RazorpayService;
-import com.kccitm.api.service.SmtpEmailService;
 
 @RestController
 @RequestMapping("/payment/webhook")
@@ -57,7 +56,7 @@ public class PaymentWebhookController {
     @Autowired private InstituteDetailRepository instituteDetailRepository;
     @Autowired private CareerNineRollNumberService rollNumberService;
     @Autowired private RazorpayService razorpayService;
-    @Autowired private SmtpEmailService emailService;
+    @Autowired private PaymentEmailService paymentEmailService;
 
     @PostMapping("/razorpay")
     @Transactional
@@ -67,9 +66,10 @@ public class PaymentWebhookController {
 
         logger.info("Razorpay webhook received");
 
-        if (signature != null && !razorpayService.verifyWebhookSignature(payload, signature)) {
-            logger.warn("Invalid Razorpay webhook signature");
-            return ResponseEntity.badRequest().body("Invalid signature");
+        // Reject if signature is missing or invalid
+        if (signature == null || !razorpayService.verifyWebhookSignature(payload, signature)) {
+            logger.warn("Invalid or missing Razorpay webhook signature");
+            return ResponseEntity.status(401).body("Invalid or missing signature");
         }
 
         try {
@@ -104,26 +104,35 @@ public class PaymentWebhookController {
         }
     }
 
-    @GetMapping("/callback")
-    public ResponseEntity<?> handleCallback(
-            @RequestParam(required = false) String razorpay_payment_id,
-            @RequestParam(required = false) String razorpay_payment_link_id,
-            @RequestParam(required = false) String razorpay_payment_link_status,
-            @RequestParam(required = false) String razorpay_signature) {
+    /**
+     * Public endpoint: frontend polls this to get real payment status from DB.
+     * GET /payment/webhook/status/{razorpayLinkId}
+     *
+     * Returns the actual DB status (set by webhook), not the query param from Razorpay redirect.
+     * Frontend polls until status != "created" (i.e., webhook has arrived and updated it).
+     */
+    @GetMapping("/status/{razorpayLinkId}")
+    public ResponseEntity<?> getPaymentStatus(@PathVariable String razorpayLinkId) {
+        Optional<PaymentTransaction> txnOpt = paymentTransactionRepository
+                .findByRazorpayLinkId(razorpayLinkId);
 
+        if (!txnOpt.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        PaymentTransaction txn = txnOpt.get();
         Map<String, Object> response = new HashMap<>();
-        response.put("paymentId", razorpay_payment_id);
-        response.put("linkId", razorpay_payment_link_id);
-        response.put("status", razorpay_payment_link_status);
+        response.put("status", txn.getStatus());
+        response.put("amount", txn.getAmount() / 100);
+        response.put("transactionId", txn.getTransactionId());
+        response.put("assessmentId", txn.getAssessmentId());
 
-        if (razorpay_payment_link_id != null) {
-            Optional<PaymentTransaction> txnOpt = paymentTransactionRepository
-                    .findByRazorpayLinkId(razorpay_payment_link_id);
-            txnOpt.ifPresent(txn -> {
-                response.put("transactionId", txn.getTransactionId());
-                response.put("assessmentId", txn.getAssessmentId());
-                response.put("amount", txn.getAmount() / 100);
-            });
+        String assessmentName = assessmentTableRepository.findById(txn.getAssessmentId())
+                .map(a -> a.getAssessmentName()).orElse("Assessment");
+        response.put("assessmentName", assessmentName);
+
+        if ("failed".equals(txn.getStatus()) && txn.getFailureReason() != null) {
+            response.put("failureReason", txn.getFailureReason());
         }
 
         return ResponseEntity.ok(response);
@@ -140,6 +149,12 @@ public class PaymentWebhookController {
         }
 
         PaymentTransaction txn = txnOpt.get();
+
+        // Idempotency: skip if already processed
+        if ("paid".equals(txn.getStatus())) {
+            logger.info("Duplicate payment_link.paid webhook for linkId: {}, skipping", linkId);
+            return;
+        }
 
         JSONObject payment = payloadObj.getJSONObject("payment").getJSONObject("entity");
         txn.setRazorpayPaymentId(payment.getString("id"));
@@ -188,6 +203,13 @@ public class PaymentWebhookController {
         txn.setStatus(status);
         paymentTransactionRepository.save(txn);
         logger.info("Payment link {} status changed to: {}", linkId, status);
+
+        // Send automated notification for expired/cancelled
+        if (txn.getStudentEmail() != null && !txn.getStudentEmail().isEmpty()) {
+            String assessmentName = assessmentTableRepository.findById(txn.getAssessmentId())
+                    .map(a -> a.getAssessmentName()).orElse("Assessment");
+            paymentEmailService.sendFailedOrPendingEmail(txn, assessmentName, status);
+        }
     }
 
     private void handlePaymentFailed(JSONObject payloadObj) {
@@ -209,6 +231,13 @@ public class PaymentWebhookController {
         }
 
         PaymentTransaction txn = txnOpt.get();
+
+        // Don't overwrite a successful payment with a failed retry
+        if ("paid".equals(txn.getStatus())) {
+            logger.info("Ignoring failed payment event for already-paid transaction: {}", txn.getTransactionId());
+            return;
+        }
+
         txn.setStatus("failed");
         txn.setRazorpayPaymentId(paymentId);
 
@@ -227,6 +256,13 @@ public class PaymentWebhookController {
 
         paymentTransactionRepository.save(txn);
         logger.info("Payment {} marked as failed. Reason: {}", paymentId, txn.getFailureReason());
+
+        // Send automated notification for failed payment
+        if (txn.getStudentEmail() != null && !txn.getStudentEmail().isEmpty()) {
+            String assessmentName = assessmentTableRepository.findById(txn.getAssessmentId())
+                    .map(a -> a.getAssessmentName()).orElse("Assessment");
+            paymentEmailService.sendFailedOrPendingEmail(txn, assessmentName, "failed");
+        }
     }
 
     private void createStudentAndAllotAssessment(PaymentTransaction txn) {
@@ -293,13 +329,16 @@ public class PaymentWebhookController {
             SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
             String dobStr = sdf.format(dob);
 
-            sendWelcomeAndAssessmentEmailAsync(email, name, user.getUsername(), dobStr, assessmentName, txn);
+            paymentEmailService.sendWelcomeEmail(email, name, user.getUsername(), dobStr, assessmentName, txn);
 
             logger.info("Student created and assessment allotted via payment. UserStudentId: {}, TransactionId: {}",
                     userStudent.getUserStudentId(), txn.getTransactionId());
 
         } catch (Exception e) {
             logger.error("Failed to create student after payment. TransactionId: {}", txn.getTransactionId(), e);
+            txn.setStatus("paid_provisioning_failed");
+            txn.setFailureReason("Student creation failed: " + e.getMessage());
+            paymentTransactionRepository.save(txn);
         }
     }
 
@@ -343,41 +382,11 @@ public class PaymentWebhookController {
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
             SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
             String dobStr = user.getDobDate() != null ? sdf.format(user.getDobDate()) : "";
-            sendWelcomeAndAssessmentEmailAsync(existingStudent.getEmail(), existingStudent.getName(),
+            paymentEmailService.sendWelcomeEmail(existingStudent.getEmail(), existingStudent.getName(),
                     user.getUsername(), dobStr, assessmentName, txn);
         }
 
         logger.info("Existing student assigned assessment via payment. UserStudentId: {}", userStudent.getUserStudentId());
     }
 
-    @Async
-    void sendWelcomeAndAssessmentEmailAsync(String email, String name, String username,
-            String dob, String assessmentName, PaymentTransaction txn) {
-        try {
-            String subject = "Payment Successful - " + assessmentName;
-            String htmlContent = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>"
-                    + "<div style='background: linear-gradient(135deg, #059669 0%, #047857 100%); padding: 24px; border-radius: 12px 12px 0 0; color: white;'>"
-                    + "<h2 style='margin: 0;'>Payment Successful!</h2>"
-                    + "</div>"
-                    + "<div style='padding: 24px; background: #ffffff; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 12px 12px;'>"
-                    + "<p>Dear <strong>" + name + "</strong>,</p>"
-                    + "<p>Your payment for <strong>" + assessmentName + "</strong> has been received. Your assessment has been allotted.</p>"
-                    + "<div style='background: #f8f9fa; padding: 16px; border-radius: 8px; margin: 16px 0;'>"
-                    + "<p style='margin: 4px 0;'><strong>Username:</strong> <span style='color: #059669; font-size: 1.1em;'>" + username + "</span></p>"
-                    + "<p style='margin: 4px 0;'><strong>Password:</strong> <span style='color: #059669; font-size: 1.1em;'>" + dob + "</span> (Your Date of Birth)</p>"
-                    + "</div>"
-                    + "<p>Please log in and complete your assessment at your earliest convenience.</p>"
-                    + "<p style='color: #999; font-size: 0.8em; margin-top: 24px;'>This is an automated email. Please do not reply.</p>"
-                    + "</div></div>";
-
-            emailService.sendHtmlEmail(email, subject, htmlContent);
-
-            txn.setWelcomeEmailSent(true);
-            paymentTransactionRepository.save(txn);
-
-            logger.info("Welcome + assessment email sent to: {}", email);
-        } catch (Exception e) {
-            logger.error("Failed to send welcome email to: {}", email, e);
-        }
-    }
 }
