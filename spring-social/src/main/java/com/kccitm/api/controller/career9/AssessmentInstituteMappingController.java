@@ -25,6 +25,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.AssessmentInstituteMapping;
+import com.kccitm.api.model.career9.PaymentTransaction;
+import com.kccitm.api.model.career9.PromoCode;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
@@ -33,6 +35,8 @@ import com.kccitm.api.model.career9.school.SchoolClasses;
 import com.kccitm.api.model.career9.school.SchoolSections;
 import com.kccitm.api.repository.Career9.AssessmentInstituteMappingRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
+import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
+import com.kccitm.api.repository.Career9.PromoCodeRepository;
 import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.School.SchoolClassesRepository;
@@ -41,6 +45,7 @@ import com.kccitm.api.repository.Career9.School.SchoolSessionRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
+import com.kccitm.api.service.RazorpayService;
 import com.kccitm.api.service.SmtpEmailService;
 
 @RestController
@@ -84,6 +89,18 @@ public class AssessmentInstituteMappingController {
 
     @Autowired
     private com.kccitm.api.service.CareerNineRollNumberService rollNumberService;
+
+    @Autowired
+    private RazorpayService razorpayService;
+
+    @Autowired
+    private PaymentTransactionRepository paymentTransactionRepository;
+
+    @Autowired
+    private PromoCodeRepository promoCodeRepository;
+
+    @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:https://dashboard.career-9.com}")
+    private String callbackBaseUrl;
 
     // ============ ADMIN ENDPOINTS ============
 
@@ -135,6 +152,9 @@ public class AssessmentInstituteMappingController {
         if (updated.getIsActive() != null) {
             existing.setIsActive(updated.getIsActive());
         }
+        if (updated.getAmount() != null) {
+            existing.setAmount(updated.getAmount());
+        }
 
         return ResponseEntity.ok(mappingRepository.save(existing));
     }
@@ -162,6 +182,7 @@ public class AssessmentInstituteMappingController {
         Map<String, Object> info = new HashMap<>();
         info.put("mappingLevel", mapping.getMappingLevel());
         info.put("assessmentId", mapping.getAssessmentId());
+        info.put("amount", mapping.getAmount() != null ? mapping.getAmount() : 0);
 
         // Get assessment name
         assessmentTableRepository.findById(mapping.getAssessmentId()).ifPresent(assessment -> {
@@ -273,23 +294,90 @@ public class AssessmentInstituteMappingController {
             }
         }
 
-        // 4. Duplicate check by EMAIL
+        // 4. Check if payment is required
+        Long mappingAmount = mapping.getAmount(); // amount in paise
+        boolean paymentRequired = mappingAmount != null && mappingAmount > 0;
+
+        // 5. Handle promo code if provided
+        String promoCodeStr = (String) studentData.get("promoCode");
+        Integer promoDiscountPercent = null;
+        Long originalAmount = mappingAmount;
+        Long finalAmount = mappingAmount;
+
+        if (paymentRequired && promoCodeStr != null && !promoCodeStr.trim().isEmpty()) {
+            Optional<PromoCode> promoOpt = promoCodeRepository.findByCodeIgnoreCaseAndIsActive(
+                    promoCodeStr.trim().toUpperCase(), true);
+            if (!promoOpt.isPresent()) {
+                return ResponseEntity.badRequest().body("Invalid promo code");
+            }
+            PromoCode promo = promoOpt.get();
+            if (promo.getExpiresAt() != null && promo.getExpiresAt().before(new Date())) {
+                return ResponseEntity.badRequest().body("Promo code has expired");
+            }
+            if (promo.getMaxUses() != null && promo.getCurrentUses() >= promo.getMaxUses()) {
+                return ResponseEntity.badRequest().body("Promo code usage limit reached");
+            }
+            promoDiscountPercent = promo.getDiscountPercent();
+            finalAmount = mappingAmount * (100 - promoDiscountPercent) / 100;
+
+            // Increment usage
+            promo.setCurrentUses(promo.getCurrentUses() + 1);
+            promoCodeRepository.save(promo);
+        }
+
+        // 6. Duplicate check by EMAIL
         List<StudentInfo> byEmail = studentInfoRepository.findByEmailAndInstituteId(email, instituteCode);
         if (!byEmail.isEmpty()) {
+            // If payment required, still need to handle payment for existing student
+            if (paymentRequired && finalAmount > 0) {
+                return handleExistingStudentWithPayment(byEmail.get(0), assessmentId, instituteCode,
+                        mapping.getMappingId(), finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
+                        name, email, dob, phone);
+            }
             return handleExistingStudent(byEmail.get(0), assessmentId, instituteCode);
         }
 
-        // 5. Duplicate check by DOB + institute + class + name
+        // 7. Duplicate check by DOB + institute + class + name
         if (studentClass != null) {
             List<StudentInfo> byDob = studentInfoRepository
                     .findByStudentDobAndInstituteIdAndStudentClassAndNameIgnoreCase(dob, instituteCode, studentClass, name);
             if (!byDob.isEmpty()) {
+                if (paymentRequired && finalAmount > 0) {
+                    return handleExistingStudentWithPayment(byDob.get(0), assessmentId, instituteCode,
+                            mapping.getMappingId(), finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
+                            name, email, dob, phone);
+                }
                 return handleExistingStudent(byDob.get(0), assessmentId, instituteCode);
             }
         }
 
-        // 6. No existing student found — create new one
-        // Create User (same pattern as StudentInfoController.addStudentInfo)
+        // 8. If payment required and finalAmount > 0, create payment transaction and redirect
+        if (paymentRequired && finalAmount > 0) {
+            return createPaymentAndRedirect(mapping.getMappingId(), assessmentId, instituteCode,
+                    finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
+                    name, email, dob, dobStr, phone, gender);
+        }
+
+        // 9. Free registration (no amount, or 100% promo discount) — create student directly
+        // If 100% promo was used, record a zero-amount transaction
+        if (paymentRequired && finalAmount != null && finalAmount == 0 && promoCodeStr != null) {
+            PaymentTransaction txn = new PaymentTransaction();
+            txn.setMappingId(mapping.getMappingId());
+            txn.setAmount(0L);
+            txn.setOriginalAmount(originalAmount);
+            txn.setPromoCode(promoCodeStr.trim().toUpperCase());
+            txn.setPromoDiscountPercent(promoDiscountPercent);
+            txn.setStatus("paid");
+            txn.setAssessmentId(assessmentId);
+            txn.setInstituteCode(instituteCode);
+            txn.setStudentName(name);
+            txn.setStudentEmail(email);
+            txn.setStudentDob(dob);
+            txn.setStudentPhone(phone);
+            paymentTransactionRepository.save(txn);
+        }
+
+        // Create User
         User user = new User((int) (Math.random() * 100000), dob);
         user.setName(name);
         user.setEmail(email);
@@ -339,6 +427,97 @@ public class AssessmentInstituteMappingController {
         sendRegistrationEmail(email, name, user.getUsername(), dobStr, assessmentName);
 
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Create a PaymentTransaction and Razorpay payment link, return payment URL.
+     */
+    private ResponseEntity<?> createPaymentAndRedirect(Long mappingId, Long assessmentId, Integer instituteCode,
+            Long finalAmountPaise, Long originalAmountPaise, String promoCodeStr, Integer promoDiscountPercent,
+            String name, String email, Date dob, String dobStr, String phone, String gender) {
+        try {
+            String assessmentName = assessmentTableRepository.findById(assessmentId)
+                    .map(a -> a.getAssessmentName()).orElse("Assessment");
+
+            String callbackUrl = callbackBaseUrl + "/payment-status";
+            String referenceId = "MAP-" + mappingId + "-" + System.currentTimeMillis();
+
+            Map<String, String> notes = new HashMap<>();
+            notes.put("mappingId", String.valueOf(mappingId));
+            notes.put("assessmentId", String.valueOf(assessmentId));
+            notes.put("instituteCode", String.valueOf(instituteCode));
+            notes.put("studentEmail", email);
+            notes.put("studentName", name);
+
+            Map<String, String> rzpResponse = razorpayService.createPaymentLink(
+                    finalAmountPaise, "INR", assessmentName + " - Payment",
+                    callbackUrl, referenceId, notes);
+
+            // Create PaymentTransaction
+            PaymentTransaction txn = new PaymentTransaction();
+            txn.setMappingId(mappingId);
+            txn.setAmount(finalAmountPaise);
+            txn.setOriginalAmount(originalAmountPaise);
+            txn.setAssessmentId(assessmentId);
+            txn.setInstituteCode(instituteCode);
+            txn.setStudentName(name);
+            txn.setStudentEmail(email);
+            txn.setStudentDob(dob);
+            txn.setStudentPhone(phone);
+            txn.setRazorpayLinkId((String) rzpResponse.get("id"));
+            txn.setPaymentLinkUrl((String) rzpResponse.get("short_url"));
+            txn.setShortUrl((String) rzpResponse.get("short_url"));
+            txn.setStatus("created");
+
+            if (promoCodeStr != null && !promoCodeStr.trim().isEmpty()) {
+                txn.setPromoCode(promoCodeStr.trim().toUpperCase());
+                txn.setPromoDiscountPercent(promoDiscountPercent);
+            }
+
+            paymentTransactionRepository.save(txn);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "payment_required");
+            response.put("paymentUrl", rzpResponse.get("short_url"));
+            response.put("transactionId", txn.getTransactionId());
+            response.put("amount", finalAmountPaise);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Failed to create payment link: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to create payment link. Please try again.");
+        }
+    }
+
+    /**
+     * Handle existing student who needs to pay.
+     */
+    private ResponseEntity<?> handleExistingStudentWithPayment(StudentInfo existingStudentInfo, Long assessmentId,
+            Integer instituteCode, Long mappingId, Long finalAmountPaise, Long originalAmountPaise,
+            String promoCodeStr, Integer promoDiscountPercent,
+            String name, String email, Date dob, String phone) {
+        // Check if already assigned
+        List<UserStudent> userStudents = userStudentRepository.findByStudentInfoId(existingStudentInfo.getId());
+        if (!userStudents.isEmpty()) {
+            UserStudent userStudent = userStudents.get(0);
+            Optional<StudentAssessmentMapping> existingMapping = studentAssessmentMappingRepository
+                    .findFirstByUserStudentUserStudentIdAndAssessmentId(
+                            userStudent.getUserStudentId(), assessmentId);
+            if (existingMapping.isPresent()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("status", "already_registered");
+                response.put("message", "You are already registered for this assessment.");
+                return ResponseEntity.ok(response);
+            }
+        }
+
+        // Not yet assigned — proceed with payment
+        SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
+        String dobStr = sdf.format(dob);
+        return createPaymentAndRedirect(mappingId, assessmentId, instituteCode,
+                finalAmountPaise, originalAmountPaise, promoCodeStr, promoDiscountPercent,
+                name, email, dob, dobStr, phone, null);
     }
 
     /**

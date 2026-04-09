@@ -5,6 +5,7 @@ import {
   getMappingInfoByToken,
   registerStudentByToken,
 } from "../AssessmentMapping/API/AssessmentMapping_APIs";
+import { validatePromoCode } from "../PromoCode/API/PromoCode_APIs";
 
 const AssessmentRegisterPage = () => {
   const { token } = useParams<{ token: string }>();
@@ -25,6 +26,12 @@ const AssessmentRegisterPage = () => {
   const [selectedClassId, setSelectedClassId] = useState("");
   const [selectedSectionId, setSelectedSectionId] = useState("");
 
+  // Promo code
+  const [promoCode, setPromoCode] = useState("");
+  const [promoApplied, setPromoApplied] = useState<{ code: string; discountPercent: number } | null>(null);
+  const [promoError, setPromoError] = useState("");
+  const [promoValidating, setPromoValidating] = useState(false);
+
   useEffect(() => {
     if (token) {
       getMappingInfoByToken(token)
@@ -39,11 +46,17 @@ const AssessmentRegisterPage = () => {
     }
   }, [token]);
 
+  const amountPaise: number = mappingInfo?.amount || 0;
+  const amountRupees = amountPaise / 100;
+  const isPaid = amountPaise > 0;
+
+  const discountedAmountRupees = promoApplied
+    ? amountRupees * (100 - promoApplied.discountPercent) / 100
+    : amountRupees;
+
   // Auto-format DOB as dd-mm-yyyy
   const handleDobChange = (value: string) => {
-    // Remove non-numeric and non-dash characters
     let cleaned = value.replace(/[^0-9-]/g, "");
-    // Auto-insert dashes
     const digits = cleaned.replace(/-/g, "");
     if (digits.length <= 2) {
       cleaned = digits;
@@ -56,6 +69,32 @@ const AssessmentRegisterPage = () => {
     setDob(cleaned);
   };
 
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim()) return;
+    setPromoValidating(true);
+    setPromoError("");
+    setPromoApplied(null);
+
+    try {
+      const res = await validatePromoCode(promoCode.trim());
+      setPromoApplied({
+        code: res.data.code,
+        discountPercent: res.data.discountPercent,
+      });
+    } catch (err: any) {
+      const msg = err.response?.data || "Invalid promo code";
+      setPromoError(typeof msg === "string" ? msg : "Invalid promo code");
+    } finally {
+      setPromoValidating(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setPromoApplied(null);
+    setPromoCode("");
+    setPromoError("");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -64,14 +103,12 @@ const AssessmentRegisterPage = () => {
       return;
     }
 
-    // Validate DOB format
     const dobRegex = /^\d{2}-\d{2}-\d{4}$/;
     if (!dobRegex.test(dob)) {
       showErrorToast("Date of Birth must be in dd-mm-yyyy format.");
       return;
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       showErrorToast("Please enter a valid email address.");
@@ -95,7 +132,19 @@ const AssessmentRegisterPage = () => {
         data.schoolSectionId = Number(selectedSectionId);
       }
 
+      // Include promo code if applied
+      if (promoApplied) {
+        data.promoCode = promoApplied.code;
+      }
+
       const res = await registerStudentByToken(token!, data);
+
+      // Check if payment is required
+      if (res.data.status === "payment_required" && res.data.paymentUrl) {
+        window.location.href = res.data.paymentUrl;
+        return;
+      }
+
       setResult(res.data);
     } catch (err: any) {
       const msg =
@@ -225,6 +274,25 @@ const AssessmentRegisterPage = () => {
             {mappingInfo?.sectionName && ` (${mappingInfo.sectionName})`}
             {mappingInfo?.sessionYear && ` | ${mappingInfo.sessionYear}`}
           </p>
+          {isPaid && (
+            <div style={{
+              marginTop: 12, background: "rgba(255,255,255,0.15)",
+              borderRadius: 8, padding: "8px 16px", display: "inline-block",
+            }}>
+              <span style={{ fontSize: "1.1em", fontWeight: 700 }}>
+                {promoApplied && discountedAmountRupees !== amountRupees ? (
+                  <>
+                    <span style={{ textDecoration: "line-through", opacity: 0.7, marginRight: 8 }}>
+                      INR {amountRupees}
+                    </span>
+                    INR {discountedAmountRupees}
+                  </>
+                ) : (
+                  <>INR {amountRupees}</>
+                )}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Form */}
@@ -378,6 +446,64 @@ const AssessmentRegisterPage = () => {
                 </div>
               </div>
             )}
+
+            {/* Promo Code Section - only shown for paid assessments */}
+            {isPaid && (
+              <div className="col-12">
+                <label className="form-label fw-bold">Promo Code</label>
+                {promoApplied ? (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 12,
+                    background: "#f0fdf4", border: "1.5px solid #86efac",
+                    borderRadius: 8, padding: "10px 16px",
+                  }}>
+                    <span style={{ color: "#166534", fontWeight: 600, flex: 1 }}>
+                      {promoApplied.code} — {promoApplied.discountPercent}% off
+                      {promoApplied.discountPercent === 100 && " (Free!)"}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-outline-danger"
+                      onClick={handleRemovePromo}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Enter promo code"
+                      value={promoCode}
+                      onChange={(e) => {
+                        setPromoCode(e.target.value.toUpperCase());
+                        setPromoError("");
+                      }}
+                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleApplyPromo())}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary"
+                      onClick={handleApplyPromo}
+                      disabled={promoValidating || !promoCode.trim()}
+                      style={{ whiteSpace: "nowrap" }}
+                    >
+                      {promoValidating ? (
+                        <span className="spinner-border spinner-border-sm" />
+                      ) : (
+                        "Apply"
+                      )}
+                    </button>
+                  </div>
+                )}
+                {promoError && (
+                  <div style={{ color: "#dc3545", fontSize: "0.85em", marginTop: 4 }}>
+                    {promoError}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Submit */}
@@ -391,8 +517,10 @@ const AssessmentRegisterPage = () => {
               {submitting ? (
                 <>
                   <span className="spinner-border spinner-border-sm me-2" />
-                  Registering...
+                  {isPaid && discountedAmountRupees > 0 ? "Processing..." : "Registering..."}
                 </>
+              ) : isPaid && discountedAmountRupees > 0 ? (
+                `Register & Pay INR ${discountedAmountRupees}`
               ) : (
                 "Register"
               )}

@@ -227,6 +227,7 @@ const PrivateRoutes = () => {
   const AdminCounsellingQueuePage = lazy(() => import("../pages/Counselling/admin/AdminCounsellingQueuePage"));
   const CounsellorManagementPage = lazy(() => import("../pages/Counselling/admin/CounsellorManagementPage"));
   const PaymentTrackingPage = lazy(() => import("../pages/PaymentTracking/PaymentTrackingPage"));
+  const PromoCodePage = lazy(() => import("../pages/PromoCode/PromoCodePage"));
   const PaymentStatusPage = lazy(() => import("../pages/PaymentTracking/PaymentStatusPage"));
   const PaymentRegisterPage = lazy(() => import("../pages/PaymentTracking/PaymentRegisterPage"));
   // const UniversityAllResultDashboard = lazy(
@@ -1087,6 +1088,14 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <PaymentTrackingPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/promo-codes"
+          element={
+            <SuspensedView>
+              <PromoCodePage />
             </SuspensedView>
           }
         />
