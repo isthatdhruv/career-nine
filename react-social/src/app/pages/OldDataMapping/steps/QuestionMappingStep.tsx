@@ -878,6 +878,7 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
         if (!responses || !Array.isArray(responses)) return;
         responses.forEach((r) => {
           const q = normQ(r.question || "");
+          if (!q) return; // Skip blank/empty questions (Firebase data quality issue)
           const answer = r.selectedOption || r.selectedAnswer || r.answer || r.selected || "";
           const key = `${category}::${q}`;
           studentFirebaseKeys.add(key);
