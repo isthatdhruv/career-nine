@@ -66,9 +66,11 @@ import ActivityLogPage from "../pages/ActivityLog/ActivityLogPage";
 import LeadsPage from "../pages/Leads/LeadsPage";
 import LiveTrackingPage from "../pages/LiveTracking/LiveTrackingPage";
 import ReportsPage from "../pages/Reports/ReportsPage";
+import ReportsHubPage from "../pages/ReportsHub/ReportsHubPage";
 import StudentDashboard from "../pages/StudentDashboard/StudentDashboard";
 import ClassTeacherDashboard from "../pages/ClassTeacherDashboard/ClassTeacherDashboard";
 import { Error401 } from "../modules/errors/components/Error401";
+import CareerSuggestionPage from "../pages/CareerSuggestion/CareerSuggestionPage";
 
 // Paths that every logged-in user can access without role check
 const ALWAYS_ALLOWED = [
@@ -222,6 +224,8 @@ const PrivateRoutes = () => {
   const SessionNotesPage = lazy(() => import("../pages/Counselling/counsellor/SessionNotesPage"));
   const AdminCounsellingQueuePage = lazy(() => import("../pages/Counselling/admin/AdminCounsellingQueuePage"));
   const CounsellorManagementPage = lazy(() => import("../pages/Counselling/admin/CounsellorManagementPage"));
+  const PaymentTrackingPage = lazy(() => import("../pages/PaymentTracking/PaymentTrackingPage"));
+  const PaymentStatusPage = lazy(() => import("../pages/PaymentTracking/PaymentStatusPage"));
   // const UniversityAllResultDashboard = lazy(
   //   () => import("../pages/UniversityResult/UniversityAllResultDashboard")
   // );
@@ -347,7 +351,7 @@ const PrivateRoutes = () => {
 
         <Route path="/career-suggestion" element={
           <SuspensedView>
-            <CareerSuggestionPage />
+            {/* <CareerSuggestionPage /> */}
           </SuspensedView>
         } />
 
@@ -988,6 +992,14 @@ const PrivateRoutes = () => {
           }
         />
         <Route
+          path="/reports-hub"
+          element={
+            <SuspensedView>
+              <ReportsHubPage />
+            </SuspensedView>
+          }
+        />
+        <Route
           path="/activity-log"
           element={
             <SuspensedView>
@@ -1069,6 +1081,23 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <CounsellorManagementPage />
+            </SuspensedView>
+          }
+        />
+
+        <Route
+          path="/payment-tracking"
+          element={
+            <SuspensedView>
+              <PaymentTrackingPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/payment-status"
+          element={
+            <SuspensedView>
+              <PaymentStatusPage />
             </SuspensedView>
           }
         />
