@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { MDBDataTableV5 } from "mdbreact";
 import { Link } from "react-router-dom";
-import { ReadQuestionaireDataList, DeleteQuestionaire } from "../../API/Create_Questionaire_APIs";
+import { ReadQuestionaireData, DeleteQuestionaire } from "../../API/Create_Questionaire_APIs";
 import { MdDeleteSweep, MdDelete } from "react-icons/md";
 import QuestionnaireRecycleBinModal from "./QuestionnaireRecycleBinModal";
 
@@ -67,7 +67,7 @@ const QuestionaireListPage: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await ReadQuestionaireDataList();
+      const response = await ReadQuestionaireData();
       const data = response.data || [];
 
       const formattedRows = data.map((item: any) => ({
