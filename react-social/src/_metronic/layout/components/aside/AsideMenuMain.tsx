@@ -64,7 +64,7 @@ export function AsideMenuMain() {
 
   const showDataUpload =
     allowed("/offline-assessment-upload") || allowed("/omr-data-upload") ||
-    allowed("/live-tracking") || allowed("/payment-tracking");
+    allowed("/live-tracking") || allowed("/payment-tracking") || allowed("/promo-codes");
 
   const showReports = allowed("/reports") || allowed("/report-generation") || allowed("/send-reports");
 
@@ -358,6 +358,14 @@ export function AsideMenuMain() {
                 icon="/media/icons/duotune/finance/fin002.svg"
                 title="Payment Tracking"
                 fontIcon="bi-credit-card"
+              />
+            )}
+            {allowed("/promo-codes") && (
+              <AsideMenuItem
+                to="/promo-codes"
+                icon="/media/icons/duotune/ecommerce/ecm001.svg"
+                title="Promo Codes"
+                fontIcon="bi-tag"
               />
             )}
           </AsideMenuItemWithSub>
