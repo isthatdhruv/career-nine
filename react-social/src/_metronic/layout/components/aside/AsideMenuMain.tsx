@@ -390,7 +390,7 @@ export function AsideMenuMain() {
               fontIcon="bi-grid-3x3-gap"
             />
           )}
-          {allowed("/reports") && (
+          {/* {allowed("/reports") && (
             <AsideMenuItem
               to="/reports"
               icon="/media/icons/duotune/files/fil003.svg"
@@ -398,7 +398,7 @@ export function AsideMenuMain() {
               fontIcon="bi-file-earmark-text"
             />
           )}
-          {/* {allowed("/reports") && (
+          {allowed("/reports") && (
             <AsideMenuItem
               to="/bet-report-generation"
               icon="/media/icons/duotune/general/gen005.svg"
@@ -413,7 +413,7 @@ export function AsideMenuMain() {
               title="Navigator Report Generation"
               fontIcon="bi-compass"
             />
-          )} */}
+          )}
           {allowed("/reports") && (
             <AsideMenuItem
               to="/unified-report-management"
@@ -429,7 +429,7 @@ export function AsideMenuMain() {
               title="Send Reports"
               fontIcon="bi-envelope"
             />
-          )}
+          )} */}
         </>
       )}
 

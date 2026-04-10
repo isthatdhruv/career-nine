@@ -1,17 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { MDBDataTableV5 } from "mdbreact";
 import { Link } from "react-router-dom";
-import { ReadQuestionaireDataList } from "../../API/Create_Questionaire_APIs";
-import { MdDeleteSweep } from "react-icons/md";
+import { ReadQuestionaireDataList, DeleteQuestionaire } from "../../API/Create_Questionaire_APIs";
+import { MdDeleteSweep, MdDelete } from "react-icons/md";
 import QuestionnaireRecycleBinModal from "./QuestionnaireRecycleBinModal";
 
 const QuestionaireListPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showRecycleBin, setShowRecycleBin] = useState(false);
   
-  // This state variable 'questionaireList' holds the raw data
-  const [questionaireList, setQuestionaireList] = useState<any[]>([]);
-
   const [datatable, setDatatable] = useState({
     columns: [
       {
@@ -57,13 +54,21 @@ const QuestionaireListPage: React.FC = () => {
     fetchData();
   }, []);
 
+  const handleSoftDelete = async (id: number, name: string) => {
+    if (!window.confirm(`Move "${name}" to Recycle Bin?`)) return;
+    try {
+      await DeleteQuestionaire(String(id));
+      fetchData();
+    } catch (error) {
+      console.error("Error deleting questionnaire:", error);
+    }
+  };
+
   const fetchData = async () => {
     try {
       setLoading(true);
       const response = await ReadQuestionaireDataList();
       const data = response.data || [];
-
-      setQuestionaireList(data);
 
       const formattedRows = data.map((item: any) => ({
         id: item.questionnaireId,
@@ -74,12 +79,20 @@ const QuestionaireListPage: React.FC = () => {
         isFree: item.isFree === true ? "Free" : "Paid",
         price: item.price || 0,
         actions: (
-          <Link
-            to={`/questionare/edit/${item.questionnaireId}`}
-            className="btn btn-sm btn-light-primary"
-          >
-            Edit
-          </Link>
+          <div className="d-flex gap-2">
+            <Link
+              to={`/questionare/edit/${item.questionnaireId}`}
+              className="btn btn-sm btn-light-primary"
+            >
+              Edit
+            </Link>
+            <button
+              className="btn btn-sm btn-light-danger"
+              onClick={() => handleSoftDelete(item.questionnaireId, item.name || `ID: ${item.questionnaireId}`)}
+            >
+              <MdDelete size={14} />
+            </button>
+          </div>
         ),
       }));
 
