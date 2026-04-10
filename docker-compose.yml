@@ -31,7 +31,7 @@ services:
     restart: always
     command: >
       redis-server
-      --maxmemory 1024mb
+      --maxmemory 2048mb
       --maxmemory-policy allkeys-lru
       --appendonly yes
       --appendfsync everysec
@@ -40,7 +40,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1.5g
+          memory: 2.5g
     networks:
       - career_shared_net
     volumes:
@@ -96,7 +96,7 @@ services:
         limits:
           memory: 768m
     networks:
-      - career_shared_net
+      - career_staging_net
     volumes:
       - redis_staging_data:/data
     healthcheck:
@@ -132,7 +132,7 @@ services:
       redis_staging:
         condition: service_healthy
     networks:
-      - career_shared_net
+      - career_staging_net
 
   mysql_db_staging:
     image: mysql:latest
@@ -158,7 +158,7 @@ services:
       retries: 5
       start_period: 30s
     networks:
-      - career_shared_net
+      - career_staging_net
 
   # sync_cron:
   #   build:
@@ -243,4 +243,6 @@ volumes:
 
 networks:
   career_shared_net:
+    external: true
+  career_staging_net:
     external: true

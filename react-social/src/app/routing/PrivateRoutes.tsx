@@ -227,6 +227,7 @@ const PrivateRoutes = () => {
   const AdminCounsellingQueuePage = lazy(() => import("../pages/Counselling/admin/AdminCounsellingQueuePage"));
   const CounsellorManagementPage = lazy(() => import("../pages/Counselling/admin/CounsellorManagementPage"));
   const PaymentTrackingPage = lazy(() => import("../pages/PaymentTracking/PaymentTrackingPage"));
+  const PromoCodePage = lazy(() => import("../pages/PromoCode/PromoCodePage"));
   const PaymentStatusPage = lazy(() => import("../pages/PaymentTracking/PaymentStatusPage"));
   const PaymentRegisterPage = lazy(() => import("../pages/PaymentTracking/PaymentRegisterPage"));
   // const UniversityAllResultDashboard = lazy(
@@ -254,16 +255,7 @@ const PrivateRoutes = () => {
       
 
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/payment-status" element={
-        <SuspensedView>
-          <PaymentStatusPage />
-        </SuspensedView>
-      } />
-      <Route path="/payment-register/:transactionId" element={
-        <SuspensedView>
-          <PaymentRegisterPage />
-        </SuspensedView>
-      } />
+      {/* payment-status and payment-register moved to public AppRoutes */}
       <Route element={<AuthorizedLayout />}>
         <Route path="auth/*" element={<Navigate to="/dashboard" />} />
         <Route path="dashboard" element={<DashboardAdminPage />} />
@@ -1087,6 +1079,14 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <PaymentTrackingPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/promo-codes"
+          element={
+            <SuspensedView>
+              <PromoCodePage />
             </SuspensedView>
           }
         />

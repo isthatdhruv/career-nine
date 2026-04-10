@@ -64,7 +64,7 @@ export function AsideMenuMain() {
 
   const showDataUpload =
     allowed("/offline-assessment-upload") || allowed("/omr-data-upload") ||
-    allowed("/live-tracking") || allowed("/payment-tracking");
+    allowed("/live-tracking") || allowed("/payment-tracking") || allowed("/promo-codes");
 
   const showReports = allowed("/reports") || allowed("/report-generation") || allowed("/send-reports");
 
@@ -360,6 +360,14 @@ export function AsideMenuMain() {
                 fontIcon="bi-credit-card"
               />
             )}
+            {allowed("/promo-codes") && (
+              <AsideMenuItem
+                to="/promo-codes"
+                icon="/media/icons/duotune/ecommerce/ecm001.svg"
+                title="Promo Codes"
+                fontIcon="bi-tag"
+              />
+            )}
           </AsideMenuItemWithSub>
         </>
       )}
@@ -382,7 +390,7 @@ export function AsideMenuMain() {
               fontIcon="bi-grid-3x3-gap"
             />
           )}
-          {allowed("/reports") && (
+          {/* {allowed("/reports") && (
             <AsideMenuItem
               to="/reports"
               icon="/media/icons/duotune/files/fil003.svg"
@@ -390,7 +398,7 @@ export function AsideMenuMain() {
               fontIcon="bi-file-earmark-text"
             />
           )}
-          {/* {allowed("/reports") && (
+          {allowed("/reports") && (
             <AsideMenuItem
               to="/bet-report-generation"
               icon="/media/icons/duotune/general/gen005.svg"
@@ -405,7 +413,7 @@ export function AsideMenuMain() {
               title="Navigator Report Generation"
               fontIcon="bi-compass"
             />
-          )} */}
+          )}
           {allowed("/reports") && (
             <AsideMenuItem
               to="/unified-report-management"
@@ -421,7 +429,7 @@ export function AsideMenuMain() {
               title="Send Reports"
               fontIcon="bi-envelope"
             />
-          )}
+          )} */}
         </>
       )}
 

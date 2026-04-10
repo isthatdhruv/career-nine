@@ -243,19 +243,23 @@ public class PaymentWebhookController {
         }
         txn.setStatus("paid");
 
-        if (payment.has("email") && !payment.isNull("email")) {
+        // Only fill from Razorpay payload if registration didn't already capture these
+        if ((txn.getStudentEmail() == null || txn.getStudentEmail().isEmpty())
+                && payment.has("email") && !payment.isNull("email")) {
             txn.setStudentEmail(payment.getString("email"));
         }
-        if (payment.has("contact") && !payment.isNull("contact")) {
+        if ((txn.getStudentPhone() == null || txn.getStudentPhone().isEmpty())
+                && payment.has("contact") && !payment.isNull("contact")) {
             txn.setStudentPhone(payment.getString("contact"));
         }
 
         JSONObject notes = paymentLink.optJSONObject("notes");
         if (notes != null) {
-            if (notes.has("customerName")) {
+            if ((txn.getStudentName() == null || txn.getStudentName().isEmpty())
+                    && notes.has("customerName")) {
                 txn.setStudentName(notes.getString("customerName"));
             }
-            if (notes.has("customerDob")) {
+            if (txn.getStudentDob() == null && notes.has("customerDob")) {
                 try {
                     SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
                     txn.setStudentDob(sdf.parse(notes.getString("customerDob")));

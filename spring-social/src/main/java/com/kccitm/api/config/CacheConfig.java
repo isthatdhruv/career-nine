@@ -43,10 +43,20 @@ public class CacheConfig {
                 .prefixCacheNameWith("career9:")
                 .disableCachingNullValues();
 
+        RedisCacheConfiguration firebaseConfig = RedisCacheConfiguration.defaultCacheConfig()
+                .entryTtl(Duration.ofDays(1))
+                .serializeKeysWith(
+                        RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
+                .serializeValuesWith(
+                        RedisSerializationContext.SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer()))
+                .prefixCacheNameWith("career9:")
+                .disableCachingNullValues();
+
         Map<String, RedisCacheConfiguration> cacheConfigurations = new HashMap<>();
         cacheConfigurations.put("assessmentDetails", defaultConfig);
         cacheConfigurations.put("assessmentQuestions", defaultConfig);
         cacheConfigurations.put("measuredQualityTypes", defaultConfig);
+        cacheConfigurations.put("firebaseDocuments", firebaseConfig);
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)

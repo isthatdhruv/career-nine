@@ -60,6 +60,15 @@ const statusConfig: Record<string, {
     gradientOrb1: "radial-gradient(circle at 20% 50%, rgba(168, 85, 247, 0.12) 0%, transparent 50%)",
     gradientOrb2: "radial-gradient(circle at 80% 20%, rgba(192, 132, 252, 0.08) 0%, transparent 50%)",
   },
+  error: {
+    title: "Verification Error",
+    subtitle: "We couldn't verify your payment status right now. If you completed the payment, don't worry — your account will be set up shortly. Check your email for confirmation.",
+    icon: "\u26A0\uFE0F",
+    accentColor: "#f59e0b",
+    accentLight: "rgba(245, 158, 11, 0.12)",
+    gradientOrb1: "radial-gradient(circle at 20% 50%, rgba(245, 158, 11, 0.12) 0%, transparent 50%)",
+    gradientOrb2: "radial-gradient(circle at 80% 20%, rgba(251, 191, 36, 0.08) 0%, transparent 50%)",
+  },
 };
 
 const PaymentStatusPage = () => {
@@ -87,18 +96,33 @@ const PaymentStatusPage = () => {
           if (data.status !== "created") {
             setStatus(data.status as PaymentStatus);
           } else {
+            // Still processing — keep polling
             pollCount.current += 1;
             if (pollCount.current < 15) {
               pollTimer.current = setTimeout(pollStatus, 2000);
               setStatus("created");
             } else {
+              // Max polls reached — trust Razorpay's query param if available
               const linkStatus = searchParams.get("razorpay_payment_link_status");
               setStatus((linkStatus as PaymentStatus) || "created");
             }
           }
         })
         .catch(() => {
-          setStatus("error");
+          // API error (404, network) — keep retrying instead of showing error immediately
+          pollCount.current += 1;
+          if (pollCount.current < 15) {
+            setStatus("created");
+            pollTimer.current = setTimeout(pollStatus, 2000);
+          } else {
+            // All retries exhausted — check Razorpay query param as fallback
+            const linkStatus = searchParams.get("razorpay_payment_link_status");
+            if (linkStatus === "paid") {
+              setStatus("paid");
+            } else {
+              setStatus("error");
+            }
+          }
         });
     };
 

@@ -78,6 +78,15 @@ public class PaymentTransaction implements Serializable {
     @Column(name = "institute_code")
     private Integer instituteCode;
 
+    @Column(name = "promo_code", length = 50)
+    private String promoCode;
+
+    @Column(name = "promo_discount_percent")
+    private Integer promoDiscountPercent;
+
+    @Column(name = "original_amount")
+    private Long originalAmount;
+
     @Column(name = "failure_reason", length = 500)
     private String failureReason;
 
@@ -160,6 +169,15 @@ public class PaymentTransaction implements Serializable {
 
     public Integer getInstituteCode() { return instituteCode; }
     public void setInstituteCode(Integer instituteCode) { this.instituteCode = instituteCode; }
+
+    public String getPromoCode() { return promoCode; }
+    public void setPromoCode(String promoCode) { this.promoCode = promoCode; }
+
+    public Integer getPromoDiscountPercent() { return promoDiscountPercent; }
+    public void setPromoDiscountPercent(Integer promoDiscountPercent) { this.promoDiscountPercent = promoDiscountPercent; }
+
+    public Long getOriginalAmount() { return originalAmount; }
+    public void setOriginalAmount(Long originalAmount) { this.originalAmount = originalAmount; }
 
     public String getFailureReason() { return failureReason; }
     public void setFailureReason(String failureReason) { this.failureReason = failureReason; }

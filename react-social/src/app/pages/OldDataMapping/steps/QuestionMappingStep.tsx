@@ -154,13 +154,55 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
       .finally(() => setLoadingExisting(false));
   }, []);
 
-  // Load mappings from an existing assessment
+  // Group existing mapped assessments by questionnaire for the dropdown
+  const questionnaireOptions = useMemo(() => {
+    const qMap = new Map<number, { questionnaireId: number; questionnaireName: string; assessments: any[]; totalMappings: number }>();
+    existingMappedAssessments.forEach((a: any) => {
+      const qId = a.questionnaireId;
+      if (!qId) return;
+      if (!qMap.has(qId)) {
+        qMap.set(qId, {
+          questionnaireId: qId,
+          questionnaireName: a.questionnaireName || "Unknown Questionnaire",
+          assessments: [],
+          totalMappings: 0,
+        });
+      }
+      const entry = qMap.get(qId)!;
+      entry.assessments.push(a);
+      entry.totalMappings = Math.max(entry.totalMappings, a.totalMappings || 0);
+    });
+    return Array.from(qMap.values());
+  }, [existingMappedAssessments]);
+
+  const [selectedQuestionnaireId, setSelectedQuestionnaireId] = useState<number | null>(null);
+
+  // Auto-select the questionnaire that matches the current assessment
+  useEffect(() => {
+    if (selectedQuestionnaireId || questionnaireOptions.length === 0) return;
+    const assessmentId = studentAssignments[0]?.assessmentId;
+    if (!assessmentId) return;
+    const match = existingMappedAssessments.find((a: any) => a.assessmentId === assessmentId);
+    if (match?.questionnaireId) {
+      setSelectedQuestionnaireId(match.questionnaireId);
+    }
+  }, [studentAssignments, existingMappedAssessments, questionnaireOptions]);
+
+  // Load mappings from an existing questionnaire (picks the assessment with most mappings)
   const handleLoadFromExisting = () => {
-    if (!selectedExistingId) return;
+    if (!selectedQuestionnaireId) return;
+    const qOption = questionnaireOptions.find((q) => q.questionnaireId === selectedQuestionnaireId);
+    if (!qOption || qOption.assessments.length === 0) return;
+    // Pick the assessment with the most mappings for this questionnaire
+    const bestAssessment = qOption.assessments.reduce((best: any, a: any) =>
+      (a.totalMappings || 0) > (best.totalMappings || 0) ? a : best
+    , qOption.assessments[0]);
+    const loadId = bestAssessment.assessmentId;
+    setSelectedExistingId(loadId);
     setLoadingFromExisting(true);
     setError("");
 
-    getQuestionMappings(selectedExistingId)
+    getQuestionMappings(loadId)
       .then((res) => {
         const saved: any[] = res.data || [];
         if (saved.length === 0) {
@@ -169,15 +211,23 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
           return;
         }
 
-        // Normalize old DB category keys
+        // Normalize old DB category keys — always lowercase + map known variants
         const normalizeCat = (key: string): string => {
+          const lower = (key || "").toLowerCase().replace(/\s+/g, "");
           const mapping: Record<string, string> = {
-            multipleIntelligence: "multipleintelligence",
-            careerAspiration: "careeraspirations",
-            subjectOfInterest: "subjectofinterest",
+            multipleintelligence: "multipleintelligence",
+            multipleintelligences: "multipleintelligence",
+            careeraspirations: "careeraspirations",
+            careeraspirationss: "careeraspirations",
+            careeraspiration: "careeraspirations",
+            subjectofinterest: "subjectofinterest",
+            subjectsofinterest: "subjectofinterest",
+            values: "values",
             value: "values",
+            ability: "ability",
+            personality: "personality",
           };
-          return mapping[key] || key;
+          return mapping[lower] || lower;
         };
 
         // Normalize old question labels for string array categories
@@ -782,7 +832,8 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
 
     mappings.forEach((m) => {
       if (!m.systemQuestionId) return;
-      const key = `${m.category}::${normQ(m.firebaseQuestion)}`;
+      const cat = (m.category || "").toLowerCase().replace(/\s+/g, "");
+      const key = `${cat}::${normQ(m.firebaseQuestion)}`;
       allMappedKeys.add(key);
       allMappedQuestionIds.add(m.systemQuestionId);
       const answerMap = new Map<string, number | null>();
@@ -819,14 +870,29 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
       // Build answers for this student
       const answers: { questionId: number; optionId: number | null; textResponse: string }[] = [];
 
+      // Track all Firebase questions this student actually has (regardless of mapping)
+      const studentFirebaseKeys = new Set<string>();
+
+      let debugLoggedOnce = false;
       const processResponses = (responses: DetailedResponse[] | undefined, category: string) => {
         if (!responses || !Array.isArray(responses)) return;
         responses.forEach((r) => {
           const q = normQ(r.question || "");
+          if (!q) return; // Skip blank/empty questions (Firebase data quality issue)
           const answer = r.selectedOption || r.selectedAnswer || r.answer || r.selected || "";
           const key = `${category}::${q}`;
+          studentFirebaseKeys.add(key);
           const mapping = questionLookup.get(key);
-          if (!mapping) return;
+          if (!mapping) {
+            // Log first few mismatches to help debug
+            if (!debugLoggedOnce) {
+              debugLoggedOnce = true;
+              console.warn("[QuestionMapping] No match for student question. Key:", key);
+              console.warn("[QuestionMapping] Raw question:", r.question);
+              console.warn("[QuestionMapping] Available keys (first 5):", Array.from(questionLookup.keys()).slice(0, 5));
+            }
+            return;
+          }
           answeredKeys.add(key);
           const optionId = mapping.answerMap.get(normQ(answer)) ?? null;
           answers.push({
@@ -849,6 +915,7 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
         const matchingKey = Array.from(questionLookup.keys()).find((k) => k.startsWith(category + "::"));
         if (!matchingKey) return;
         const mapping = questionLookup.get(matchingKey)!;
+        studentFirebaseKeys.add(matchingKey);
         answeredKeys.add(matchingKey);
         arr.forEach((val) => {
           if (!val) return;
@@ -865,12 +932,22 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
       processStringArray(sa.subjectsOfInterest, "subjectofinterest");
       processStringArray(sa.values, "values");
 
-      if (answers.length === 0) {
-        // Student has no matching answers at all — treat as partial with all questions missing
+      // Only count questions as "missing" if the student actually has them in Firebase
+      // but they couldn't be matched to a mapping. Questions from other navigators
+      // that this student never took should NOT be counted as missing.
+      const studentMappedKeys = new Set(
+        Array.from(allMappedKeys).filter((k) => studentFirebaseKeys.has(k))
+      );
+      // Questions the student has in Firebase but no mapping exists for
+      const unmappedStudentKeys = Array.from(studentFirebaseKeys).filter(
+        (k) => !answeredKeys.has(k) && !questionLookup.has(k)
+      );
+
+      if (answers.length === 0 && studentFirebaseKeys.size > 0) {
+        // Student has Firebase data but none matched any mapping
         partialStudents++;
-        const allMissingLabels = Array.from(allMappedKeys).map((key) => {
-          const lookup = questionLookup.get(key);
-          return lookup ? lookup.firebaseQuestion : key.split("::")[1] || key;
+        const missingLabels = Array.from(studentFirebaseKeys).map((key) => {
+          return key.split("::")[1] || key;
         });
         partialDetails.push({
           name: sa.name || "Unknown",
@@ -878,9 +955,14 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
           userStudentId,
           assessmentId: sa.assessmentId,
           answeredCount: 0,
-          totalMapped: allMappedKeys.size,
-          missingQuestions: allMissingLabels,
+          totalMapped: studentMappedKeys.size,
+          missingQuestions: missingLabels,
         });
+        setApplyProgress(Math.round(((i + 1) / studentAssignments.length) * 100));
+        continue;
+      }
+
+      if (answers.length === 0) {
         setApplyProgress(Math.round(((i + 1) / studentAssignments.length) * 100));
         continue;
       }
@@ -895,14 +977,13 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
         totalStudents++;
         totalAnswers += answers.length;
 
-        // Check if this student has missing questions (partial answers)
-        const resData = res?.data || {};
-        const missingKeys = Array.from(allMappedKeys).filter((k) => !answeredKeys.has(k));
-        if (resData.status === "ongoing" || missingKeys.length > 0) {
+        // Check if this student has unmapped Firebase questions
+        // Only flag as partial if there are actually unmapped questions
+        // (ignore backend "ongoing" status since it counts across all navigators)
+        if (unmappedStudentKeys.length > 0) {
           partialStudents++;
-          const missingQuestionLabels = missingKeys.map((key) => {
-            const lookup = questionLookup.get(key);
-            return lookup ? lookup.firebaseQuestion : key.split("::")[1] || key;
+          const missingQuestionLabels = unmappedStudentKeys.map((key) => {
+            return key.split("::")[1] || key;
           });
           partialDetails.push({
             name: sa.name || "Unknown",
@@ -910,7 +991,7 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
             userStudentId,
             assessmentId: sa.assessmentId,
             answeredCount: answers.length,
-            totalMapped: allMappedKeys.size,
+            totalMapped: studentMappedKeys.size,
             missingQuestions: missingQuestionLabels,
           });
         }
@@ -925,9 +1006,10 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
     setApplyResult({ totalStudents, totalAnswers, partialStudents, errors });
     setApplying(false);
 
-    // Show partial modal if there are partial students
-    if (partialDetails.length > 0) {
-      setPartialStudentDetails(partialDetails);
+    // Show partial modal only if there are students with actual missing questions
+    const studentsWithMissing = partialDetails.filter((p) => p.missingQuestions.length > 0);
+    if (studentsWithMissing.length > 0) {
+      setPartialStudentDetails(studentsWithMissing);
       setShowPartialModal(true);
     }
 
@@ -1039,32 +1121,32 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
               </p>
             </div>
 
-            {/* Load from existing mapping */}
-            {existingMappedAssessments.length > 0 && (
+            {/* Load from existing questionnaire mapping */}
+            {questionnaireOptions.length > 0 && (
               <div className="mb-4">
                 <div className="fw-semibold fs-7 mb-2">
                   <i className="bi bi-diagram-3 me-1 text-primary"></i>
-                  Load from Existing Mapping
+                  Load from Existing Questionnaire Mapping
                 </div>
                 <div className="d-flex gap-2 align-items-center">
                   <select
                     className="form-select form-select-sm"
                     style={{ maxWidth: 400 }}
-                    value={selectedExistingId ?? ""}
-                    onChange={(e) => setSelectedExistingId(e.target.value ? Number(e.target.value) : null)}
+                    value={selectedQuestionnaireId ?? ""}
+                    onChange={(e) => setSelectedQuestionnaireId(e.target.value ? Number(e.target.value) : null)}
                     disabled={loadingFromExisting}
                   >
-                    <option value="">-- Select an existing mapping --</option>
-                    {existingMappedAssessments.map((a: any) => (
-                      <option key={a.assessmentId} value={a.assessmentId}>
-                        {a.assessmentName} ({a.totalMappings} mappings)
+                    <option value="">-- Select a questionnaire --</option>
+                    {questionnaireOptions.map((q) => (
+                      <option key={q.questionnaireId} value={q.questionnaireId}>
+                        {q.questionnaireName} ({q.totalMappings} mappings, {q.assessments.length} assessment{q.assessments.length !== 1 ? "s" : ""})
                       </option>
                     ))}
                   </select>
                   <button
                     className="btn btn-sm btn-primary text-nowrap"
                     onClick={handleLoadFromExisting}
-                    disabled={!selectedExistingId || loadingFromExisting}
+                    disabled={!selectedQuestionnaireId || loadingFromExisting}
                   >
                     {loadingFromExisting ? (
                       <><span className="spinner-border spinner-border-sm me-1"></span>Loading...</>
