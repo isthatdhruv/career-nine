@@ -60,7 +60,9 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
   const [optionImageProcessing, setOptionImageProcessing] = useState<{ [key: number]: boolean }>({});
   // State for pending image confirmation popup (custom overlay portal)
   const [pendingImage, setPendingImage] = useState<
-    { source: 'question'; base64: string } | { source: 'option'; index: number; base64: string } | null
+    { source: 'question'; base64: string; originalWidth: number; originalHeight: number; originalSize: number; finalWidth: number; finalHeight: number; finalSize: number }
+    | { source: 'option'; index: number; base64: string; originalWidth: number; originalHeight: number; originalSize: number; finalWidth: number; finalHeight: number; finalSize: number }
+    | null
   >(null);
 
   // Game as option states
@@ -75,13 +77,17 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
   const [questionVideoThumbnail, setQuestionVideoThumbnail] = useState<string>("");
   const [videoCompressProgress, setVideoCompressProgress] = useState<number>(0);
 
-  // Handle question image upload — convert to webp and compress, then show confirmation popup
+  // Handle question image upload — shrink to 1280x720, convert to webp, then show confirmation popup
   const handleQuestionImageSelect = async (file: File | null) => {
     if (!file) { setQuestionMediaBase64(""); return; }
     setQuestionMediaProcessing(true);
     try {
-      const result = await convertImageToWebP(file, 0.8, 1920, 1080);
-      setPendingImage({ source: 'question', base64: result.base64 });
+      const result = await convertImageToWebP(file, 0.8, 1280, 720);
+      setPendingImage({
+        source: 'question', base64: result.base64,
+        originalWidth: result.originalWidth, originalHeight: result.originalHeight, originalSize: result.originalSize,
+        finalWidth: result.finalWidth, finalHeight: result.finalHeight, finalSize: result.finalSize,
+      });
     } catch (error) {
       console.error("Error converting image to WebP:", error);
       showErrorToast("Failed to process image. Please try a different file.");
@@ -278,8 +284,12 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
     if (file) {
       setOptionImageProcessing(prev => ({ ...prev, [index]: true }));
       try {
-        const result = await convertImageToWebP(file, 0.8, 1920, 1080);
-        setPendingImage({ source: 'option', index, base64: result.base64 });
+        const result = await convertImageToWebP(file, 0.8, 512, 512);
+        setPendingImage({
+          source: 'option', index, base64: result.base64,
+          originalWidth: result.originalWidth, originalHeight: result.originalHeight, originalSize: result.originalSize,
+          finalWidth: result.finalWidth, finalHeight: result.finalHeight, finalSize: result.finalSize,
+        });
       } catch (error) {
         console.error("Error converting option image to WebP:", error);
         showErrorToast("Failed to process option image. Please try a different file.");
@@ -1362,9 +1372,26 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
           onClick={(e) => e.stopPropagation()}
         >
           <h5 className="mb-3 text-center">Confirm Image</h5>
-          <p className="text-muted text-center mb-3">
-            Image has been compressed and converted to WebP. Do you want to use this image?
+          <p className="text-muted text-center mb-2">
+            Image has been compressed, resized and converted to WebP.
           </p>
+          <div className="mb-3 p-2 rounded" style={{ background: '#f8f9fa', fontSize: 13 }}>
+            <div className="d-flex justify-content-between mb-1">
+              <span className="text-muted">Original:</span>
+              <span>{pendingImage.originalWidth} x {pendingImage.originalHeight} &middot; {(pendingImage.originalSize / 1024).toFixed(1)} KB</span>
+            </div>
+            <div className="d-flex justify-content-between">
+              <span className="text-muted">After processing:</span>
+              <span className="text-success fw-bold">{pendingImage.finalWidth} x {pendingImage.finalHeight} &middot; {(pendingImage.finalSize / 1024).toFixed(1)} KB</span>
+            </div>
+            {pendingImage.originalSize > pendingImage.finalSize && (
+              <div className="text-center mt-1">
+                <span className="badge bg-success">
+                  {Math.round((1 - pendingImage.finalSize / pendingImage.originalSize) * 100)}% smaller
+                </span>
+              </div>
+            )}
+          </div>
           <div className="text-center mb-3">
             <img
               src={pendingImage.base64}

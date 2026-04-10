@@ -11,12 +11,24 @@
  * @param maxHeight - Maximum height in pixels. Image will be scaled down if larger. Default 1080
  * @returns A promise that resolves to { base64: string, blob: Blob, file: File }
  */
+export interface ImageConvertResult {
+  base64: string;
+  blob: Blob;
+  file: File;
+  originalWidth: number;
+  originalHeight: number;
+  originalSize: number;
+  finalWidth: number;
+  finalHeight: number;
+  finalSize: number;
+}
+
 export async function convertImageToWebP(
   file: File,
   quality: number = 0.8,
   maxWidth: number = 1920,
   maxHeight: number = 1080
-): Promise<{ base64: string; blob: Blob; file: File }> {
+): Promise<ImageConvertResult> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -24,8 +36,13 @@ export async function convertImageToWebP(
     img.onload = () => {
       URL.revokeObjectURL(url);
 
+      const originalWidth = img.width;
+      const originalHeight = img.height;
+      const originalSize = file.size;
+
       // Calculate scaled dimensions while maintaining aspect ratio
-      let { width, height } = img;
+      let width = originalWidth;
+      let height = originalHeight;
       if (width > maxWidth || height > maxHeight) {
         const ratio = Math.min(maxWidth / width, maxHeight / height);
         width = Math.round(width * ratio);
@@ -59,7 +76,11 @@ export async function convertImageToWebP(
               file.name.replace(/\.[^.]+$/, ".webp"),
               { type: "image/webp" }
             );
-            resolve({ base64, blob, file: webpFile });
+            resolve({
+              base64, blob, file: webpFile,
+              originalWidth, originalHeight, originalSize,
+              finalWidth: width, finalHeight: height, finalSize: blob.size,
+            });
           };
           reader.onerror = () => reject(new Error("Failed to read WebP blob"));
           reader.readAsDataURL(blob);
