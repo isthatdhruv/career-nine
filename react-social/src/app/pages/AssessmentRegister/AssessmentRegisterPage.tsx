@@ -137,8 +137,12 @@ const AssessmentRegisterPage = () => {
 
       const res = await registerStudentByToken(token!, data);
 
-      if (res.data.status === "payment_required" && res.data.paymentUrl) {
-        window.location.href = res.data.paymentUrl;
+      if (res.data.status === "payment_required") {
+        if (res.data.paymentUrl) {
+          window.location.href = res.data.paymentUrl;
+        } else {
+          showErrorToast("Payment link could not be generated. Please try again.");
+        }
         return;
       }
 

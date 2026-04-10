@@ -464,9 +464,9 @@ public class AssessmentInstituteMappingController {
             txn.setStudentEmail(email);
             txn.setStudentDob(dob);
             txn.setStudentPhone(phone);
-            txn.setRazorpayLinkId((String) rzpResponse.get("id"));
-            txn.setPaymentLinkUrl((String) rzpResponse.get("short_url"));
-            txn.setShortUrl((String) rzpResponse.get("short_url"));
+            txn.setRazorpayLinkId((String) rzpResponse.get("linkId"));
+            txn.setPaymentLinkUrl((String) rzpResponse.get("shortUrl"));
+            txn.setShortUrl((String) rzpResponse.get("shortUrl"));
             txn.setStatus("created");
 
             if (promoCodeStr != null && !promoCodeStr.trim().isEmpty()) {
@@ -478,7 +478,7 @@ public class AssessmentInstituteMappingController {
 
             Map<String, Object> response = new HashMap<>();
             response.put("status", "payment_required");
-            response.put("paymentUrl", rzpResponse.get("short_url"));
+            response.put("paymentUrl", rzpResponse.get("shortUrl"));
             response.put("transactionId", txn.getTransactionId());
             response.put("amount", finalAmountPaise);
 
