@@ -8,6 +8,7 @@ export interface AssessmentQuestionOption {
   description: string;
   assessmentQuestion: AssessmentQuestion;
   optionScores: OptionScore[];
+  optionImageUrl?: string;
   isGame?: boolean;
   game?: GameTable;
 }
