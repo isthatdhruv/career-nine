@@ -26,13 +26,13 @@ public class RazorpayService {
     private static final Logger logger = LoggerFactory.getLogger(RazorpayService.class);
     private static final String RAZORPAY_API_URL = "https://api.razorpay.com/v1/payment_links";
 
-    @Value("${app.razorpay.key-id}")
+    @Value("${app.razorpay.key-id:}")
     private String keyId;
 
-    @Value("${app.razorpay.key-secret}")
+    @Value("${app.razorpay.key-secret:}")
     private String keySecret;
 
-    @Value("${app.razorpay.webhook-secret}")
+    @Value("${app.razorpay.webhook-secret:}")
     private String webhookSecret;
 
     private final RestTemplate restTemplate;
@@ -44,7 +44,14 @@ public class RazorpayService {
         this.restTemplate = new RestTemplate(factory);
     }
 
+    private void validateConfig() {
+        if (keyId == null || keyId.isEmpty() || keySecret == null || keySecret.isEmpty()) {
+            throw new IllegalStateException("Razorpay is not configured. Set app.razorpay.key-id and app.razorpay.key-secret.");
+        }
+    }
+
     private HttpHeaders getAuthHeaders() {
+        validateConfig();
         HttpHeaders headers = new HttpHeaders();
         String auth = keyId + ":" + keySecret;
         String encoded = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
@@ -106,6 +113,10 @@ public class RazorpayService {
 
     public boolean verifyWebhookSignature(String payload, String signature) {
         try {
+            if (webhookSecret == null || webhookSecret.isEmpty()) {
+                logger.error("Razorpay webhook secret is not configured");
+                return false;
+            }
             Mac sha256_HMAC = Mac.getInstance("HmacSHA256");
             SecretKeySpec secretKey = new SecretKeySpec(webhookSecret.getBytes(), "HmacSHA256");
             sha256_HMAC.init(secretKey);
