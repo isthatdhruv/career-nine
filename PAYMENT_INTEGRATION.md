@@ -279,3 +279,4 @@ CREATED -> CANCELLED -> (cancellation email sent)
 - **Amount unit:** All amounts are stored in paise (1 INR = 100 paise). Frontend converts INR input to paise before sending to backend.
 - **Student credentials:** On successful payment, student gets username (auto-generated) and password (DOB in dd-MM-yyyy format). Sent via welcome email.
 - **Polling vs webhooks on frontend:** The frontend uses client-side polling (2s interval, 15 max attempts) rather than WebSockets or SSE to check payment status.
+- **RazorpayService key mapping:** The service returns keys `linkId`, `shortUrl`, `paymentLinkUrl`, `status`. Controllers must use these exact keys (not Razorpay's raw API field names like `id` or `short_url`). A prior bug where the controller used raw field names caused payment URLs to be null.
