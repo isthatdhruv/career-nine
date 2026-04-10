@@ -32,6 +32,9 @@ import { MasterLayout } from "../../_metronic/layout/MasterLayout";
 const AssessmentRegisterPage = lazy(
   () => import("../pages/AssessmentRegister/AssessmentRegisterPage")
 );
+const SchoolAssessmentRegisterPage = lazy(
+  () => import("../pages/SchoolRegistration/SchoolAssessmentRegisterPage")
+);
 const PaymentStatusPage = lazy(
   () => import("../pages/PaymentTracking/PaymentStatusPage")
 );
@@ -142,6 +145,14 @@ const AppRoutes: FC = () => {
               element={
                 <SuspensedView>
                   <AssessmentRegisterPage />
+                </SuspensedView>
+              }
+            />
+      <Route
+              path="/school-register/:token"
+              element={
+                <SuspensedView>
+                  <SchoolAssessmentRegisterPage />
                 </SuspensedView>
               }
             />

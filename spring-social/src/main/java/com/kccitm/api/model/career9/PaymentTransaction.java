@@ -37,8 +37,11 @@ public class PaymentTransaction implements Serializable {
     @Column(name = "razorpay_order_id", length = 50)
     private String razorpayOrderId;
 
-    @Column(name = "mapping_id", nullable = false)
+    @Column(name = "mapping_id")
     private Long mappingId;
+
+    @Column(name = "school_config_id")
+    private Long schoolConfigId;
 
     @Column(name = "amount", nullable = false)
     private Long amount;
@@ -133,6 +136,9 @@ public class PaymentTransaction implements Serializable {
 
     public Long getMappingId() { return mappingId; }
     public void setMappingId(Long mappingId) { this.mappingId = mappingId; }
+
+    public Long getSchoolConfigId() { return schoolConfigId; }
+    public void setSchoolConfigId(Long schoolConfigId) { this.schoolConfigId = schoolConfigId; }
 
     public Long getAmount() { return amount; }
     public void setAmount(Long amount) { this.amount = amount; }
