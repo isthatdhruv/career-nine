@@ -613,6 +613,9 @@ public class AssessmentInstituteMappingController {
                     + "<p style='margin: 4px 0;'><strong>Password:</strong> <span style='color: #667eea; font-size: 1.1em;'>" + dob + "</span> (Your Date of Birth)</p>"
                     + "</div>"
                     + "<p style='color: #666; font-size: 0.9em;'>Please save these credentials. You will need them to log in and take the assessment.</p>"
+                    + "<div style='text-align: center; margin: 24px 0;'>"
+                    + "<a href='https://assessment.career-9.com/' style='display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 1em;'>Go To Assessment</a>"
+                    + "</div>"
                     + "<p style='color: #999; font-size: 0.8em; margin-top: 24px;'>This is an automated email. Please do not reply.</p>"
                     + "</div>"
                     + "</div>";

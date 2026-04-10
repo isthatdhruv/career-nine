@@ -36,6 +36,8 @@ import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
+import com.kccitm.api.model.career9.school.SchoolClasses;
+import com.kccitm.api.repository.Career9.School.SchoolClassesRepository;
 import com.kccitm.api.service.CareerNineRollNumberService;
 import com.kccitm.api.service.PaymentEmailService;
 import com.kccitm.api.service.RazorpayService;
@@ -57,6 +59,7 @@ public class PaymentWebhookController {
     @Autowired private CareerNineRollNumberService rollNumberService;
     @Autowired private RazorpayService razorpayService;
     @Autowired private PaymentEmailService paymentEmailService;
+    @Autowired private SchoolClassesRepository schoolClassesRepository;
 
     @PostMapping("/razorpay")
     @Transactional
@@ -394,6 +397,9 @@ public class PaymentWebhookController {
             studentInfo.setPhoneNumber(phone);
             studentInfo.setInstituteId(instituteCode);
             studentInfo.setSchoolSectionId(sectionId);
+            if (mapping.getClassId() != null) {
+                studentInfo.setStudentClass(parseClassNumber(mapping.getClassId()));
+            }
             studentInfo.setUser(user);
             studentInfo = studentInfoRepository.save(studentInfo);
 
@@ -471,6 +477,20 @@ public class PaymentWebhookController {
         }
 
         logger.info("Existing student assigned assessment via payment. UserStudentId: {}", userStudent.getUserStudentId());
+    }
+
+    private Integer parseClassNumber(Integer classId) {
+        if (classId == null) return null;
+        try {
+            Optional<SchoolClasses> classOpt = schoolClassesRepository.findById(classId);
+            if (classOpt.isPresent()) {
+                String className = classOpt.get().getClassName();
+                return Integer.parseInt(className.replaceAll("[^0-9]", ""));
+            }
+        } catch (NumberFormatException e) {
+            logger.warn("Could not parse class number from className for classId: {}", classId);
+        }
+        return classId;
     }
 
 }

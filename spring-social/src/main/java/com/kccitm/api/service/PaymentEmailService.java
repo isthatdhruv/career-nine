@@ -52,6 +52,9 @@ public class PaymentEmailService {
                     + "<p style='margin: 4px 0;'><strong>Password:</strong> <span style='color: #059669; font-size: 1.1em;'>" + safeDob + "</span> (Your Date of Birth)</p>"
                     + "</div>"
                     + "<p>Please log in and complete your assessment at your earliest convenience.</p>"
+                    + "<div style='text-align: center; margin: 24px 0;'>"
+                    + "<a href='https://assessment.career-9.com/' style='display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 1em;'>Go To Assessment</a>"
+                    + "</div>"
                     + "<p style='color: #999; font-size: 0.8em; margin-top: 24px;'>This is an automated email. Please do not reply.</p>"
                     + "</div></div>";
 
@@ -188,6 +191,9 @@ public class PaymentEmailService {
                     + "<p>Dear <strong>" + studentName + "</strong>,</p>"
                     + "<p>Your payment for <strong>" + safeAssessmentName + "</strong> has been received successfully.</p>"
                     + "<p>Your assessment has been allotted. Please log in to complete it at your earliest convenience.</p>"
+                    + "<div style='text-align: center; margin: 24px 0;'>"
+                    + "<a href='https://assessment.career-9.com/' style='display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 1em;'>Go To Assessment</a>"
+                    + "</div>"
                     + "<p style='color: #999; font-size: 0.8em; margin-top: 24px;'>This is an automated email. Please do not reply.</p>"
                     + "</div></div>";
 
