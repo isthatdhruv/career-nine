@@ -410,13 +410,8 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                   showErrorToast("Image upload failed. Question will be created without the image.");
                 }
               } else if (questionMediaType === 'video' && questionMediaBase64) {
-                try {
-                  const uploadResult = await UploadQuestionMedia(questionMediaBase64, 'video');
-                  questionVideoUrl = uploadResult.url;
-                } catch (uploadErr) {
-                  console.error("Media upload failed:", uploadErr);
-                  showErrorToast("Video upload failed. Question will be created without the video.");
-                }
+                // YouTube link — store directly
+                questionVideoUrl = questionMediaBase64;
               }
 
               // Compose payload
@@ -545,49 +540,48 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
               </div>
             )}
 
-            {/* Question Video Upload */}
+            {/* Question Video — YouTube Link */}
             {questionMediaType === 'video' && (
               <div className="fv-row mb-7">
-                <label className="required fs-6 fw-bold mb-2">Question Video:</label>
+                <label className="required fs-6 fw-bold mb-2">YouTube Video Link:</label>
                 <input
-                  type="file"
-                  accept="video/*"
-                  onChange={(e) => handleQuestionVideoSelect(e.target.files?.[0] || null)}
+                  type="text"
+                  placeholder="Paste YouTube link (e.g. https://www.youtube.com/watch?v=abc123)"
+                  value={questionMediaBase64}
+                  onChange={(e) => setQuestionMediaBase64(e.target.value.trim())}
                   className="form-control form-control-lg form-control-solid mb-2"
                 />
                 <small className="text-muted d-block mb-2">
-                  Supported formats: MP4, WebM, OGG. Video will be compressed automatically.
+                  Supports: youtube.com/watch?v=..., youtu.be/..., youtube.com/embed/...
                 </small>
-                {questionMediaProcessing && (
-                  <div className="mb-2">
-                    <div className="d-flex align-items-center gap-2 text-primary mb-1">
-                      <span className="spinner-border spinner-border-sm"></span>
-                      <span>Compressing video... {videoCompressProgress > 0 ? `${videoCompressProgress}%` : ''}</span>
+                {questionMediaBase64 && (() => {
+                  const match = questionMediaBase64.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+                  const videoId = match ? match[1] : null;
+                  return videoId ? (
+                    <div className="position-relative">
+                      <iframe
+                        width="400"
+                        height="225"
+                        src={`https://www.youtube.com/embed/${videoId}`}
+                        title="Video preview"
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        style={{ borderRadius: 8, border: '1px solid #ddd', maxWidth: '100%' }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-danger position-absolute"
+                        style={{ top: -8, right: -8, padding: '4px 10px', fontSize: 12 }}
+                        onClick={() => setQuestionMediaBase64("")}
+                      >
+                        Remove
+                      </button>
                     </div>
-                    {videoCompressProgress > 0 && (
-                      <div className="progress" style={{ height: 6 }}>
-                        <div className="progress-bar" role="progressbar" style={{ width: `${videoCompressProgress}%` }} />
-                      </div>
-                    )}
-                  </div>
-                )}
-                {questionMediaBase64 && !questionMediaProcessing && (
-                  <div className="position-relative d-inline-block">
-                    <video
-                      src={questionMediaBase64}
-                      controls
-                      style={{ maxWidth: 400, maxHeight: 300, borderRadius: 8, border: '1px solid #ddd' }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-danger position-absolute"
-                      style={{ top: -8, right: -8, padding: '4px 10px', fontSize: 12 }}
-                      onClick={() => { setQuestionMediaBase64(""); setQuestionVideoThumbnail(""); }}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-danger small">Invalid YouTube link. Please check the URL.</div>
+                  );
+                })()}
               </div>
             )}
             <div className="fv-row mb-7">
