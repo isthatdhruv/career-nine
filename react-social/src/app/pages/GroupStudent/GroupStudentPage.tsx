@@ -17,6 +17,7 @@ import {
   exportProctoringExcel,
   generateBetReportOneClick,
   generateNavigatorReportOneClick,
+  updateStudentBasicInfo,
 } from "../StudentInformation/StudentInfo_APIs";
 import { getEmailRecipientsForStudent, sendReportEmail, EmailRecipient } from "../ReportGeneration/API/BetReportData_APIs";
 import * as XLSX from "xlsx";
@@ -59,7 +60,7 @@ export default function GroupStudentPage() {
 
   // ── Modal manager (consolidates 5 modals into one state object) ──
   type ModalState = {
-    type: "none" | "assessment" | "download" | "bulkDownload" | "reset" | "demographics";
+    type: "none" | "assessment" | "download" | "bulkDownload" | "reset" | "demographics" | "edit";
     student: Student | null;
     assessmentId: number | null;
     assessmentName: string;
@@ -67,6 +68,10 @@ export default function GroupStudentPage() {
   };
   const [modal, setModal] = useState<ModalState>({ type: "none", student: null, assessmentId: null, assessmentName: "", showConfirm: false });
   const closeModal = useCallback(() => setModal({ type: "none", student: null, assessmentId: null, assessmentName: "", showConfirm: false }), []);
+
+  // Edit student modal data
+  const [editForm, setEditForm] = useState({ name: "", email: "", phoneNumber: "", studentDob: "" });
+  const [editSaving, setEditSaving] = useState(false);
 
   // Assessment modal data
   const [studentAssessments, setStudentAssessments] = useState<StudentAssessmentInfo[]>([]);
@@ -1170,6 +1175,57 @@ export default function GroupStudentPage() {
     }
   };
 
+  const handleEditStudent = (student: Student) => {
+    setEditForm({
+      name: student.name || "",
+      email: student.username || "",
+      phoneNumber: student.phoneNumber || "",
+      studentDob: student.studentDob || "",
+    });
+    setModal({ type: "edit", student, assessmentId: null, assessmentName: "", showConfirm: false });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!modal.student) return;
+    setEditSaving(true);
+    try {
+      const payload: any = { userStudentId: modal.student.userStudentId };
+      if (editForm.name.trim()) payload.name = editForm.name.trim();
+      if (editForm.email.trim()) payload.email = editForm.email.trim();
+      if (editForm.phoneNumber.trim()) payload.phoneNumber = editForm.phoneNumber.trim();
+      if (editForm.studentDob.trim()) {
+        // Convert from yyyy-MM-dd (input type=date) to dd-MM-yyyy for backend
+        const parts = editForm.studentDob.split("-");
+        if (parts.length === 3 && parts[0].length === 4) {
+          payload.studentDob = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        } else {
+          payload.studentDob = editForm.studentDob;
+        }
+      }
+      await updateStudentBasicInfo(payload);
+      // Update local state so table reflects changes without refetch
+      setStudents((prev) =>
+        prev.map((s) =>
+          s.userStudentId === modal.student!.userStudentId
+            ? {
+                ...s,
+                name: editForm.name.trim() || s.name,
+                username: editForm.email.trim() || s.username,
+                phoneNumber: editForm.phoneNumber.trim() || s.phoneNumber,
+                studentDob: editForm.studentDob.trim() || s.studentDob,
+              }
+            : s
+        )
+      );
+      showSuccessToast("Student info updated successfully");
+      closeModal();
+    } catch (err: any) {
+      showErrorToast(err?.response?.data?.message || "Failed to update student info");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   const handleViewAssessments = (student: Student) => {
     setModal({ type: "assessment", student, assessmentId: null, assessmentName: "", showConfirm: false });
     // Filter out deactivated assessments and deduplicate by assessmentId
@@ -2066,28 +2122,6 @@ export default function GroupStudentPage() {
                             whiteSpace: "nowrap",
                           }}
                         >
-                          Roll Number
-                        </th>
-                        <th
-                          style={{
-                            padding: "10px 12px",
-                            fontWeight: 600,
-                            color: "#1a1a2e",
-                            borderBottom: "2px solid #e0e0e0",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          Control Number
-                        </th>
-                        <th
-                          style={{
-                            padding: "10px 12px",
-                            fontWeight: 600,
-                            color: "#1a1a2e",
-                            borderBottom: "2px solid #e0e0e0",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
                           Student Name
                         </th>
                         <th
@@ -2189,28 +2223,6 @@ export default function GroupStudentPage() {
                               style={{ color: "#1a1a2e" }}
                             >
                               {student.username}
-                            </span>
-                          </td>
-                          <td
-                            style={{
-                              padding: "10px 12px",
-                              borderBottom: "1px solid #f0f0f0",
-                              fontSize: "0.85rem",
-                            }}
-                          >
-                            <span style={{ fontWeight: 500, color: "#555" }}>
-                              {student.schoolRollNumber || "-"}
-                            </span>
-                          </td>
-                          <td
-                            style={{
-                              padding: "10px 12px",
-                              borderBottom: "1px solid #f0f0f0",
-                              fontSize: "0.85rem",
-                            }}
-                          >
-                            <span style={{ fontWeight: 500, color: "#555" }}>
-                              {student.controlNumber ?? "-"}
                             </span>
                           </td>
                           <td
@@ -2365,25 +2377,45 @@ export default function GroupStudentPage() {
                               fontSize: "0.85rem",
                             }}
                           >
-                            <button
-                              className="btn btn-sm d-flex align-items-center gap-1"
-                              onClick={() => navigate(`/student-dashboard/${student.userStudentId}`)}
-                              style={{
-                                background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                                color: "#fff",
-                                border: "none",
-                                padding: "5px 10px",
-                                borderRadius: "6px",
-                                fontWeight: 600,
-                                fontSize: "0.78rem",
-                                transition: "all 0.2s",
-                                boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              <i className="bi bi-speedometer2"></i>
-                              Dashboard
-                            </button>
+                            <div className="d-flex align-items-center gap-1">
+                              <button
+                                className="btn btn-sm d-flex align-items-center gap-1"
+                                onClick={() => handleEditStudent(student)}
+                                style={{
+                                  background: "rgba(67, 97, 238, 0.1)",
+                                  color: "#4361ee",
+                                  border: "1px solid rgba(67, 97, 238, 0.3)",
+                                  padding: "5px 10px",
+                                  borderRadius: "6px",
+                                  fontWeight: 600,
+                                  fontSize: "0.78rem",
+                                  transition: "all 0.2s",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <i className="bi bi-pencil-square"></i>
+                                Edit
+                              </button>
+                              <button
+                                className="btn btn-sm d-flex align-items-center gap-1"
+                                onClick={() => navigate(`/student-dashboard/${student.userStudentId}`)}
+                                style={{
+                                  background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                                  color: "#fff",
+                                  border: "none",
+                                  padding: "5px 10px",
+                                  borderRadius: "6px",
+                                  fontWeight: 600,
+                                  fontSize: "0.78rem",
+                                  transition: "all 0.2s",
+                                  boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                <i className="bi bi-speedometer2"></i>
+                                Dashboard
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -4318,6 +4350,159 @@ export default function GroupStudentPage() {
                   {sendingEmail ? <><span className="spinner-border spinner-border-sm me-2" />Sending...</> : <><i className="bi bi-send me-1"></i>Send</>}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Student Modal */}
+      {modal.type === "edit" && modal.student && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10060,
+          }}
+          onClick={closeModal}
+        >
+          <div
+            style={{
+              backgroundColor: "white",
+              borderRadius: "20px",
+              maxWidth: "500px",
+              width: "90%",
+              boxShadow: "0 25px 50px rgba(0, 0, 0, 0.15)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                background: "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
+                padding: "1rem 1.25rem",
+                borderRadius: "20px 20px 0 0",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <h5 className="mb-0 text-white fw-bold" style={{ fontSize: "1.1rem" }}>
+                <i className="bi bi-pencil-square me-2"></i>
+                Edit Student Info
+              </h5>
+              <button
+                type="button"
+                className="btn-close btn-close-white"
+                onClick={closeModal}
+              ></button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: "1.25rem" }}>
+              <p className="text-muted mb-3" style={{ fontSize: "0.85rem" }}>
+                Editing: <strong>#{modal.student.userStudentId}</strong> &mdash; {modal.student.name || "Unnamed"}
+              </p>
+
+              <div className="mb-3">
+                <label className="form-label fw-semibold" style={{ fontSize: "0.85rem" }}>Name</label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Student name"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                  style={{ borderRadius: "10px" }}
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label fw-semibold" style={{ fontSize: "0.85rem" }}>Email</label>
+                <input
+                  type="email"
+                  className="form-control"
+                  placeholder="Email address"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+                  style={{ borderRadius: "10px" }}
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label fw-semibold" style={{ fontSize: "0.85rem" }}>Phone Number</label>
+                <input
+                  type="tel"
+                  className="form-control"
+                  placeholder="Phone number"
+                  value={editForm.phoneNumber}
+                  onChange={(e) => setEditForm((f) => ({ ...f, phoneNumber: e.target.value }))}
+                  style={{ borderRadius: "10px" }}
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="form-label fw-semibold" style={{ fontSize: "0.85rem" }}>Date of Birth</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={
+                    editForm.studentDob && editForm.studentDob.includes("-") && editForm.studentDob.split("-")[0].length === 2
+                      ? `${editForm.studentDob.split("-")[2]}-${editForm.studentDob.split("-")[1]}-${editForm.studentDob.split("-")[0]}`
+                      : editForm.studentDob
+                  }
+                  onChange={(e) => setEditForm((f) => ({ ...f, studentDob: e.target.value }))}
+                  style={{ borderRadius: "10px" }}
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div
+              style={{
+                padding: "0.75rem 1.25rem",
+                borderTop: "1px solid #e2e8f0",
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "8px",
+              }}
+            >
+              <button
+                className="btn btn-secondary"
+                onClick={closeModal}
+                style={{ borderRadius: "10px" }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn"
+                onClick={handleSaveEdit}
+                disabled={editSaving}
+                style={{
+                  background: "#4361ee",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "10px",
+                  fontWeight: 600,
+                }}
+              >
+                {editSaving ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <i className="bi bi-check-lg me-1"></i>
+                    Save Changes
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

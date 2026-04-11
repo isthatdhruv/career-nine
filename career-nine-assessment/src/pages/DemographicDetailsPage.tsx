@@ -38,6 +38,11 @@ const DemographicDetailsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactErrors, setContactErrors] = useState<{ email?: string; phone?: string }>({});
+  const [contactTouched, setContactTouched] = useState<{ email?: boolean; phone?: boolean }>({});
+
   const userStudentId = localStorage.getItem('userStudentId');
 
   useEffect(() => {
@@ -45,9 +50,32 @@ const DemographicDetailsPage: React.FC = () => {
       navigate('/student-login');
       return;
     }
+    fetchContactInfo();
     fetchFields();
     preloadAssessmentData(assessmentId);
   }, [assessmentId, userStudentId]);
+
+  const fetchContactInfo = async () => {
+    try {
+      const res = await http.get(`/student-demographics/contact-info/${userStudentId}`);
+      setContactEmail(res.data.email || '');
+      setContactPhone(res.data.phoneNumber || '');
+    } catch (error) {
+      console.error('Error fetching contact info:', error);
+    }
+  };
+
+  const validateContactEmail = (value: string): string => {
+    if (!value.trim()) return 'Email is required';
+    if (!/^[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}$/.test(value)) return 'Invalid email format';
+    return '';
+  };
+
+  const validateContactPhone = (value: string): string => {
+    if (!value.trim()) return 'Phone number is required';
+    if (!/^[0-9]{10}$/.test(value)) return 'Phone number must be 10 digits';
+    return '';
+  };
 
   const fetchFields = async () => {
     try {
@@ -162,12 +190,18 @@ const DemographicDetailsPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate contact fields
+    const emailErr = validateContactEmail(contactEmail);
+    const phoneErr = validateContactPhone(contactPhone);
+    setContactTouched({ email: true, phone: true });
+    setContactErrors({ email: emailErr || undefined, phone: phoneErr || undefined });
+
     const allTouched: Record<number, boolean> = {};
     fields.forEach((f) => (allTouched[f.fieldId] = true));
     setTouched(allTouched);
 
     const newErrors: Record<number, string> = {};
-    let hasError = false;
+    let hasError = !!emailErr || !!phoneErr;
     for (const field of fields) {
       const value =
         field.dataType === 'SELECT_MULTI'
@@ -191,21 +225,28 @@ const DemographicDetailsPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const responses = fields.map((field) => ({
-        fieldId: field.fieldId,
-        value:
-          field.dataType === 'SELECT_MULTI'
-            ? (multiValues[field.fieldId] || []).join(',')
-            : values[field.fieldId] || '',
-      }));
+      // Save contact info first (lightweight)
+      await http.post(`/student-demographics/contact-info/${userStudentId}`, {
+        email: contactEmail.trim(),
+        phoneNumber: contactPhone.trim(),
+      });
 
-      const demographicPayload = {
-        userStudentId: Number(userStudentId),
-        assessmentId: Number(assessmentId),
-        responses,
-      };
+      // Save dynamic demographics if any
+      if (fields.length > 0) {
+        const responses = fields.map((field) => ({
+          fieldId: field.fieldId,
+          value:
+            field.dataType === 'SELECT_MULTI'
+              ? (multiValues[field.fieldId] || []).join(',')
+              : values[field.fieldId] || '',
+        }));
 
-      await http.post('/student-demographics/submit', demographicPayload);
+        await http.post('/student-demographics/submit', {
+          userStudentId: Number(userStudentId),
+          assessmentId: Number(assessmentId),
+          responses,
+        });
+      }
 
       await Promise.all([
         http.post('/assessments/startAssessment', {
@@ -454,48 +495,87 @@ const DemographicDetailsPage: React.FC = () => {
           </div>
           <p className="mt-3 text-white fw-semibold">Loading your information...</p>
         </div>
-      ) : fields.length === 0 ? (
-        <div className="container">
-          <div className="row justify-content-center">
-            <div className="col-12 col-md-8 col-lg-6">
-              <div className="assessment-card card shadow-lg">
-                <div className="card-body p-3 p-sm-4 p-md-5 text-center">
-                  <p className="text-muted">No demographic fields configured for this assessment.</p>
-                  <button
-                    className="btn btn-assessment-primary"
-                    onClick={async () => {
-                      setIsSubmitting(true);
-                      try {
-                        await startAssessmentAndNavigate();
-                      } catch (error) {
-                        console.error('Error starting assessment:', error);
-                        alert('Failed to start assessment. Please try again.');
-                      } finally {
-                        setIsSubmitting(false);
-                      }
-                    }}
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? 'Loading...' : 'Continue to Assessment'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       ) : (
         <div className="container">
           <div className="row justify-content-center">
             <div className="col-12 col-md-10 col-lg-8 col-xl-7">
               <div className="assessment-card card shadow-lg">
                 <div className="card-body p-3 p-sm-3 p-md-4" style={{ paddingTop: '1.25rem' }}>
-                  {/* Header */}
                   <div className="text-center mb-2">
                     <h2 className="assessment-heading" style={{ fontSize: '1.5rem' }}>Demographic Details</h2>
                     <p className="assessment-subheading" style={{ marginBottom: '0.5rem' }}>Please provide your information to continue</p>
                   </div>
 
                   <form onSubmit={handleSubmit} noValidate>
+                    {/* Permanent contact fields */}
+                    <div className="mb-3">
+                      <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
+                        Email <span style={{ color: '#e53e3e' }}>*</span>
+                      </label>
+                      <input
+                        type="email"
+                        className={`form-control ${contactErrors.email && contactTouched.email ? 'is-invalid' : ''}`}
+                        placeholder="Enter your email"
+                        value={contactEmail}
+                        onChange={(e) => {
+                          setContactEmail(e.target.value);
+                          if (contactTouched.email) {
+                            setContactErrors((prev) => ({ ...prev, email: validateContactEmail(e.target.value) || undefined }));
+                          }
+                        }}
+                        onBlur={() => {
+                          setContactTouched((prev) => ({ ...prev, email: true }));
+                          setContactErrors((prev) => ({ ...prev, email: validateContactEmail(contactEmail) || undefined }));
+                        }}
+                        style={{
+                          borderRadius: '10px',
+                          padding: '0.75rem',
+                          border: `2px solid ${contactErrors.email && contactTouched.email ? '#e53e3e' : '#e2e8f0'}`,
+                          fontSize: '0.95rem',
+                          backgroundColor: '#ffffff',
+                          color: '#2d3748',
+                        }}
+                      />
+                      {contactErrors.email && contactTouched.email && (
+                        <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{contactErrors.email}</div>
+                      )}
+                    </div>
+
+                    <div className="mb-3">
+                      <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
+                        Phone Number <span style={{ color: '#e53e3e' }}>*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        className={`form-control ${contactErrors.phone && contactTouched.phone ? 'is-invalid' : ''}`}
+                        placeholder="Enter your 10-digit phone number"
+                        value={contactPhone}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                          setContactPhone(val);
+                          if (contactTouched.phone) {
+                            setContactErrors((prev) => ({ ...prev, phone: validateContactPhone(val) || undefined }));
+                          }
+                        }}
+                        onBlur={() => {
+                          setContactTouched((prev) => ({ ...prev, phone: true }));
+                          setContactErrors((prev) => ({ ...prev, phone: validateContactPhone(contactPhone) || undefined }));
+                        }}
+                        style={{
+                          borderRadius: '10px',
+                          padding: '0.75rem',
+                          border: `2px solid ${contactErrors.phone && contactTouched.phone ? '#e53e3e' : '#e2e8f0'}`,
+                          fontSize: '0.95rem',
+                          backgroundColor: '#ffffff',
+                          color: '#2d3748',
+                        }}
+                      />
+                      {contactErrors.phone && contactTouched.phone && (
+                        <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{contactErrors.phone}</div>
+                      )}
+                    </div>
+
+                    {/* Dynamic demographic fields */}
                     {fields.map((field) => renderField(field))}
 
                     <button

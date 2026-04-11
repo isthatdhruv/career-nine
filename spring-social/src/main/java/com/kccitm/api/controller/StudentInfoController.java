@@ -576,6 +576,20 @@ public class StudentInfoController {
                 studentInfo.setStudentClass(Integer.valueOf(classVal.toString()));
             }
         }
+        if (request.containsKey("email")) {
+            studentInfo.setEmail(request.get("email").toString());
+        }
+        if (request.containsKey("phoneNumber")) {
+            studentInfo.setPhoneNumber(request.get("phoneNumber").toString());
+        }
+        if (request.containsKey("studentDob")) {
+            try {
+                SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
+                studentInfo.setStudentDob(sdf.parse(request.get("studentDob").toString()));
+            } catch (Exception e) {
+                return ResponseEntity.badRequest().body("Invalid date format. Use dd-MM-yyyy");
+            }
+        }
 
         // Save updated StudentInfo
         StudentInfo saved = studentInfoRepository.save(studentInfo);

@@ -1,90 +1,25 @@
 {
-  "version": "mnocxf4c",
-  "generated": "2026-04-07T08:28:26.700Z",
+  "version": "mnu5l1tq",
+  "generated": "2026-04-11T09:49:29.342Z",
   "resources": [
     {
-      "url": "/assessment-cache/16/config.json",
-      "size": 3301,
+      "url": "/assessment-cache/30/config.json",
+      "size": 266176,
       "priority": "assessment"
     },
     {
-      "url": "/assessment-cache/16/data.json",
-      "size": 3057,
+      "url": "/assessment-cache/30/data.json",
+      "size": 265883,
       "priority": "assessment"
     },
     {
-      "url": "/assessment-cache/16/images/1596.webp",
-      "size": 874,
+      "url": "/assessment-cache/31/config.json",
+      "size": 266801,
       "priority": "assessment"
     },
     {
-      "url": "/assessment-cache/18/config.json",
-      "size": 267109,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/18/data.json",
-      "size": 266831,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/20/config.json",
-      "size": 266409,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/20/data.json",
-      "size": 266129,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/config.json",
-      "size": 102014,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/data.json",
-      "size": 101737,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/370.webp",
-      "size": 89294,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/371.webp",
-      "size": 88754,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/372.webp",
-      "size": 94680,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/373.webp",
-      "size": 72164,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/374.webp",
-      "size": 134934,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/375.webp",
-      "size": 51446,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/376.webp",
-      "size": 86604,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/377.webp",
-      "size": 47344,
+      "url": "/assessment-cache/31/data.json",
+      "size": 266510,
       "priority": "assessment"
     },
     {
@@ -203,32 +138,32 @@
       "priority": "deferred"
     },
     {
-      "url": "/assets/HydroTubeGame-D_7-sg8r.js",
+      "url": "/assets/HydroTubeGame-lDCcQ_co.js",
       "size": 23193,
       "priority": "critical"
     },
     {
-      "url": "/assets/JungleSpotGame-CVLsSfdz.js",
+      "url": "/assets/JungleSpotGame-C0VMe2j4.js",
       "size": 23324,
       "priority": "critical"
     },
     {
-      "url": "/assets/RabbitPathGame-dcriaNCK.js",
+      "url": "/assets/RabbitPathGame-zwB2De-a.js",
       "size": 26797,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionInstructionPage-8BMbjXlX.js",
+      "url": "/assets/SectionInstructionPage-tVPWVXds.js",
       "size": 4188,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionQuestionPage-zX5aNDuY.js",
-      "size": 169355,
+      "url": "/assets/SectionQuestionPage-DlERx-OL.js",
+      "size": 169428,
       "priority": "critical"
     },
     {
-      "url": "/assets/SelectSectionPage-lFR11zLS.js",
+      "url": "/assets/SelectSectionPage-B6ylTe28.js",
       "size": 4581,
       "priority": "critical"
     },
@@ -243,13 +178,13 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/index-DpwdMkRA.css",
-      "size": 244127,
+      "url": "/assets/index-CUGpC-Tn.js",
+      "size": 280461,
       "priority": "critical"
     },
     {
-      "url": "/assets/index-DqDJ7-fU.js",
-      "size": 278864,
+      "url": "/assets/index-DpwdMkRA.css",
+      "size": 244127,
       "priority": "critical"
     },
     {
@@ -299,12 +234,12 @@
     }
   ],
   "summary": {
-    "total": 59,
-    "totalSize": 24719898,
+    "total": 46,
+    "totalSize": 23844257,
     "byPriority": {
       "assessment": {
-        "count": 17,
-        "size": 1942681
+        "count": 4,
+        "size": 1065370
       },
       "game": {
         "count": 11,
@@ -316,7 +251,7 @@
       },
       "critical": {
         "count": 15,
-        "size": 2346593
+        "size": 2348263
       },
       "other": {
         "count": 4,

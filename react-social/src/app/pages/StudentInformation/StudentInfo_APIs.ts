@@ -92,6 +92,16 @@ export function deleteStudentInfo(id: number) {
     return axios.post<void>(`${STUDENT_INFO_BASE}/delete/${id}`);
 }
 
+export function updateStudentBasicInfo(data: {
+    userStudentId: number;
+    name?: string;
+    email?: string;
+    phoneNumber?: string;
+    studentDob?: string;
+}) {
+    return axios.post(`${STUDENT_INFO_BASE}/updateDemographics`, data);
+}
+
 // Assessment APIs
 export function getAllAssessments() {
     return axios.get<Assessment[]>(`${ASSESSMENTS_BASE}/getAll`);
