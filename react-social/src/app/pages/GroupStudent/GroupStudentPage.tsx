@@ -770,7 +770,7 @@ export default function GroupStudentPage() {
           "Section": secInfo?.sectionName || "N/A",
           // "Roll Number": student.schoolRollNumber || "N/A",
           // "Phone Number": student.phoneNumber || "N/A",
-          "Date of Birth": student.studentDob ? formatDate(student.studentDob) : "N/A",
+          "Date of Birth": student.loginDob || "N/A",
           "Institute": getSelectedInstituteName(),
         };
       });
