@@ -53,22 +53,7 @@ export default function AllottedAssessmentPage() {
     try {
       localStorage.setItem('assessmentId', String(assessment.assessmentId));
 
-      console.log('[Demographics] Checking status for assessment:', assessment.assessmentId, 'student:', userStudentId);
-      const statusRes = await http.get(
-        `/student-demographics/status/${assessment.assessmentId}/${userStudentId}`
-      );
-      const demographicStatus = statusRes.data;
-      console.log('[Demographics] Status response:', demographicStatus);
-
-      if (demographicStatus.totalFields > 0) {
-        navigate(`/demographics/${assessment.assessmentId}`);
-        return;
-      }
-
-      await http.post('/assessments/startAssessment', { userStudentId: Number(userStudentId), assessmentId: assessment.assessmentId });
-
-      await fetchAssessmentData(String(assessment.assessmentId));
-      navigate('/general-instructions');
+      navigate(`/demographics/${assessment.assessmentId}`);
     } catch (error) {
       console.error('Error starting assessment:', error);
       alert('Failed to start assessment. Please try again.');

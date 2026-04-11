@@ -176,17 +176,6 @@ const DemographicDetailsPage: React.FC = () => {
     }
   };
 
-  const startAssessmentAndNavigate = async () => {
-    await Promise.all([
-      http.post('/assessments/startAssessment', {
-        userStudentId: Number(userStudentId),
-        assessmentId: Number(assessmentId),
-      }),
-      fetchAssessmentData(String(assessmentId)),
-    ]);
-    navigate('/general-instructions');
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -486,6 +475,16 @@ const DemographicDetailsPage: React.FC = () => {
     }
   };
 
+  const inputStyle = (hasError: boolean) => ({
+    borderRadius: '10px',
+    padding: '0.75rem',
+    border: `2px solid ${hasError ? '#e53e3e' : '#e2e8f0'}`,
+    fontSize: '0.95rem',
+    backgroundColor: '#ffffff',
+    color: '#2d3748',
+    transition: 'border-color 0.2s ease',
+  });
+
   return (
     <div className="assessment-bg">
       {isLoading ? (
@@ -498,24 +497,31 @@ const DemographicDetailsPage: React.FC = () => {
       ) : (
         <div className="container">
           <div className="row justify-content-center">
-            <div className="col-12 col-md-10 col-lg-8 col-xl-7">
+            <div className="col-12 col-md-8 col-lg-6 col-xl-5">
               <div className="assessment-card card shadow-lg">
-                <div className="card-body p-3 p-sm-3 p-md-4" style={{ paddingTop: '1.25rem' }}>
-                  <div className="text-center mb-2">
-                    <h2 className="assessment-heading" style={{ fontSize: '1.5rem' }}>Demographic Details</h2>
-                    <p className="assessment-subheading" style={{ marginBottom: '0.5rem' }}>Please provide your information to continue</p>
+                <div className="card-body p-3 p-sm-4 p-md-5">
+                  {/* Header */}
+                  <div className="text-center mb-4">
+                    <div className="assessment-icon-circle assessment-icon-circle--sm mx-auto mb-3">
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                    </div>
+                    <h2 className="assessment-heading" style={{ fontSize: '1.5rem' }}>Your Details</h2>
+                    <p className="assessment-subheading" style={{ marginBottom: 0 }}>Please verify your contact information to continue</p>
                   </div>
 
                   <form onSubmit={handleSubmit} noValidate>
-                    {/* Permanent contact fields */}
+                    {/* Contact Info Section */}
                     <div className="mb-3">
                       <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
-                        Email <span style={{ color: '#e53e3e' }}>*</span>
+                        Email Address <span style={{ color: '#e53e3e' }}>*</span>
                       </label>
                       <input
                         type="email"
                         className={`form-control ${contactErrors.email && contactTouched.email ? 'is-invalid' : ''}`}
-                        placeholder="Enter your email"
+                        placeholder="you@example.com"
                         value={contactEmail}
                         onChange={(e) => {
                           setContactEmail(e.target.value);
@@ -527,14 +533,7 @@ const DemographicDetailsPage: React.FC = () => {
                           setContactTouched((prev) => ({ ...prev, email: true }));
                           setContactErrors((prev) => ({ ...prev, email: validateContactEmail(contactEmail) || undefined }));
                         }}
-                        style={{
-                          borderRadius: '10px',
-                          padding: '0.75rem',
-                          border: `2px solid ${contactErrors.email && contactTouched.email ? '#e53e3e' : '#e2e8f0'}`,
-                          fontSize: '0.95rem',
-                          backgroundColor: '#ffffff',
-                          color: '#2d3748',
-                        }}
+                        style={inputStyle(!!(contactErrors.email && contactTouched.email))}
                       />
                       {contactErrors.email && contactTouched.email && (
                         <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{contactErrors.email}</div>
@@ -548,7 +547,7 @@ const DemographicDetailsPage: React.FC = () => {
                       <input
                         type="tel"
                         className={`form-control ${contactErrors.phone && contactTouched.phone ? 'is-invalid' : ''}`}
-                        placeholder="Enter your 10-digit phone number"
+                        placeholder="10-digit phone number"
                         value={contactPhone}
                         onChange={(e) => {
                           const val = e.target.value.replace(/\D/g, '').slice(0, 10);
@@ -561,26 +560,28 @@ const DemographicDetailsPage: React.FC = () => {
                           setContactTouched((prev) => ({ ...prev, phone: true }));
                           setContactErrors((prev) => ({ ...prev, phone: validateContactPhone(contactPhone) || undefined }));
                         }}
-                        style={{
-                          borderRadius: '10px',
-                          padding: '0.75rem',
-                          border: `2px solid ${contactErrors.phone && contactTouched.phone ? '#e53e3e' : '#e2e8f0'}`,
-                          fontSize: '0.95rem',
-                          backgroundColor: '#ffffff',
-                          color: '#2d3748',
-                        }}
+                        style={inputStyle(!!(contactErrors.phone && contactTouched.phone))}
                       />
                       {contactErrors.phone && contactTouched.phone && (
                         <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{contactErrors.phone}</div>
                       )}
                     </div>
 
-                    {/* Dynamic demographic fields */}
-                    {fields.map((field) => renderField(field))}
+                    {/* Divider + dynamic fields */}
+                    {fields.length > 0 && (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '1.25rem 0' }}>
+                          <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+                          <span style={{ fontSize: '0.8rem', color: '#a0aec0', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Additional Details</span>
+                          <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+                        </div>
+                        {fields.map((field) => renderField(field))}
+                      </>
+                    )}
 
                     <button
                       type="submit"
-                      className="btn btn-assessment-primary w-100 mt-3 py-2 py-md-3"
+                      className="btn btn-assessment-primary w-100 mt-4 py-2 py-md-3"
                       disabled={isSubmitting}
                       style={{ fontSize: '1rem', cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
                     >

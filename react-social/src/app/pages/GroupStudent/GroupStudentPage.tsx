@@ -33,6 +33,7 @@ type Student = {
   phoneNumber?: string;
   studentDob?: string;
   username?: string;
+  email?: string;
   schoolSectionId?: number;
   assessments?: StudentAssessmentInfo[];
   assignedAssessmentIds: number[];
@@ -406,6 +407,7 @@ export default function GroupStudentPage() {
             userStudentId: student.userStudentId,
             assessmentName: assessment?.assessmentName || "",
             username: student.username || "",
+            email: student.email || "",
             schoolSectionId: student.schoolSectionId ?? undefined,
             assessments: student.assessments || [],
             assignedAssessmentIds: assignedIds,
@@ -530,6 +532,7 @@ export default function GroupStudentPage() {
             userStudentId: student.userStudentId,
             assessmentName: assessment?.assessmentName || "",
             username: student.username || "",
+            email: student.email || "",
             schoolSectionId: student.schoolSectionId ?? undefined,
             assessments: student.assessments || [],
             assignedAssessmentIds: assignedIds,
@@ -1178,7 +1181,7 @@ export default function GroupStudentPage() {
   const handleEditStudent = (student: Student) => {
     setEditForm({
       name: student.name || "",
-      email: student.username || "",
+      email: student.email || "",
       phoneNumber: student.phoneNumber || "",
       studentDob: student.studentDob || "",
     });
@@ -1193,15 +1196,7 @@ export default function GroupStudentPage() {
       if (editForm.name.trim()) payload.name = editForm.name.trim();
       if (editForm.email.trim()) payload.email = editForm.email.trim();
       if (editForm.phoneNumber.trim()) payload.phoneNumber = editForm.phoneNumber.trim();
-      if (editForm.studentDob.trim()) {
-        // Convert from yyyy-MM-dd (input type=date) to dd-MM-yyyy for backend
-        const parts = editForm.studentDob.split("-");
-        if (parts.length === 3 && parts[0].length === 4) {
-          payload.studentDob = `${parts[2]}-${parts[1]}-${parts[0]}`;
-        } else {
-          payload.studentDob = editForm.studentDob;
-        }
-      }
+      if (editForm.studentDob.trim()) payload.studentDob = editForm.studentDob.trim();
       await updateStudentBasicInfo(payload);
       // Update local state so table reflects changes without refetch
       setStudents((prev) =>
@@ -1210,7 +1205,7 @@ export default function GroupStudentPage() {
             ? {
                 ...s,
                 name: editForm.name.trim() || s.name,
-                username: editForm.email.trim() || s.username,
+                email: editForm.email.trim() || s.email,
                 phoneNumber: editForm.phoneNumber.trim() || s.phoneNumber,
                 studentDob: editForm.studentDob.trim() || s.studentDob,
               }
@@ -4449,13 +4444,10 @@ export default function GroupStudentPage() {
               <div className="mb-3">
                 <label className="form-label fw-semibold" style={{ fontSize: "0.85rem" }}>Date of Birth</label>
                 <input
-                  type="date"
+                  type="text"
                   className="form-control"
-                  value={
-                    editForm.studentDob && editForm.studentDob.includes("-") && editForm.studentDob.split("-")[0].length === 2
-                      ? `${editForm.studentDob.split("-")[2]}-${editForm.studentDob.split("-")[1]}-${editForm.studentDob.split("-")[0]}`
-                      : editForm.studentDob
-                  }
+                  placeholder="dd-MM-yyyy"
+                  value={editForm.studentDob}
                   onChange={(e) => setEditForm((f) => ({ ...f, studentDob: e.target.value }))}
                   style={{ borderRadius: "10px" }}
                 />
