@@ -47,6 +47,7 @@ type Student = {
   assessmentName?: string;
   phoneNumber?: string;
   studentDob?: string;
+  loginDob?: string;
   username?: string;
   email?: string;
   schoolSectionId?: number;
@@ -416,6 +417,7 @@ export default function GroupStudentPage() {
             name: student.name || "",
             phoneNumber: student.phoneNumber || "",
             studentDob: formatDobFromApi(student.studentDob),
+            loginDob: formatDobFromApi(student.loginDob),
             schoolRollNumber: student.schoolRollNumber || "",
             controlNumber: student.controlNumber ?? undefined,
             selectedAssessment: "",
@@ -541,6 +543,7 @@ export default function GroupStudentPage() {
             name: student.name || "",
             phoneNumber: student.phoneNumber || "",
             studentDob: formatDobFromApi(student.studentDob),
+            loginDob: formatDobFromApi(student.loginDob),
             schoolRollNumber: student.schoolRollNumber || "",
             controlNumber: student.controlNumber ?? undefined,
             selectedAssessment: "",
@@ -625,6 +628,7 @@ export default function GroupStudentPage() {
               name: student.name || "",
               phoneNumber: student.phoneNumber || "",
               studentDob: formatDobFromApi(student.studentDob),
+            loginDob: formatDobFromApi(student.loginDob),
               schoolRollNumber: student.schoolRollNumber || "",
               controlNumber: student.controlNumber ?? undefined,
               selectedAssessment: "",
@@ -1199,7 +1203,7 @@ export default function GroupStudentPage() {
       name: student.name || "",
       email: student.email || "",
       phoneNumber: student.phoneNumber || "",
-      studentDob: formatDobFromApi(student.studentDob),
+      studentDob: student.loginDob || "",
     });
     setModal({ type: "edit", student, assessmentId: null, assessmentName: "", showConfirm: false });
   };
@@ -1224,6 +1228,7 @@ export default function GroupStudentPage() {
                 email: editForm.email.trim() || s.email,
                 phoneNumber: editForm.phoneNumber.trim() || s.phoneNumber,
                 studentDob: editForm.studentDob.trim() || s.studentDob,
+                loginDob: editForm.studentDob.trim() || s.loginDob,
               }
             : s
         )
@@ -2309,7 +2314,7 @@ export default function GroupStudentPage() {
                               fontSize: "0.85rem",
                             }}
                           >
-                            {student.studentDob ? (
+                            {student.loginDob ? (
                               <div className="d-flex align-items-center gap-2">
                                 <i
                                   className="bi bi-calendar-event-fill"
@@ -2318,7 +2323,7 @@ export default function GroupStudentPage() {
                                 <span
                                   style={{ fontWeight: 500, color: "#555" }}
                                 >
-                                  {formatDate(student.studentDob)}
+                                  {student.loginDob}
                                 </span>
                               </div>
                             ) : (
