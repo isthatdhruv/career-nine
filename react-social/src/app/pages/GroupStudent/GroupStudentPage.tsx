@@ -22,6 +22,21 @@ import {
 import { getEmailRecipientsForStudent, sendReportEmail, EmailRecipient } from "../ReportGeneration/API/BetReportData_APIs";
 import * as XLSX from "xlsx";
 
+// Convert DOB from API (ISO timestamp or dd-MM-yyyy) to dd-MM-yyyy
+function formatDobFromApi(dob: any): string {
+  if (!dob) return "";
+  const s = String(dob);
+  // Already dd-MM-yyyy
+  if (/^\d{2}-\d{2}-\d{4}$/.test(s)) return s;
+  // ISO format like 2004-02-06T00:00:00.000+00:00
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return s;
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
+}
+
 type Student = {
   id: number;
   name: string;
@@ -400,7 +415,7 @@ export default function GroupStudentPage() {
             id: student.id,
             name: student.name || "",
             phoneNumber: student.phoneNumber || "",
-            studentDob: student.studentDob || "",
+            studentDob: formatDobFromApi(student.studentDob),
             schoolRollNumber: student.schoolRollNumber || "",
             controlNumber: student.controlNumber ?? undefined,
             selectedAssessment: "",
@@ -525,7 +540,7 @@ export default function GroupStudentPage() {
             id: student.id,
             name: student.name || "",
             phoneNumber: student.phoneNumber || "",
-            studentDob: student.studentDob || "",
+            studentDob: formatDobFromApi(student.studentDob),
             schoolRollNumber: student.schoolRollNumber || "",
             controlNumber: student.controlNumber ?? undefined,
             selectedAssessment: "",
@@ -609,13 +624,14 @@ export default function GroupStudentPage() {
               id: student.id,
               name: student.name || "",
               phoneNumber: student.phoneNumber || "",
-              studentDob: student.studentDob || "",
+              studentDob: formatDobFromApi(student.studentDob),
               schoolRollNumber: student.schoolRollNumber || "",
               controlNumber: student.controlNumber ?? undefined,
               selectedAssessment: "",
               userStudentId: student.userStudentId,
               assessmentName: "",
               username: student.username || "",
+              email: student.email || "",
               schoolSectionId: student.schoolSectionId ?? undefined,
               assessments: student.assessments || [],
               assignedAssessmentIds: assignedIds,
@@ -1183,7 +1199,7 @@ export default function GroupStudentPage() {
       name: student.name || "",
       email: student.email || "",
       phoneNumber: student.phoneNumber || "",
-      studentDob: student.studentDob || "",
+      studentDob: formatDobFromApi(student.studentDob),
     });
     setModal({ type: "edit", student, assessmentId: null, assessmentName: "", showConfirm: false });
   };
