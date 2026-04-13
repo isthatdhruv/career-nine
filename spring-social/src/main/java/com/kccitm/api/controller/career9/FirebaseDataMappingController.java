@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
@@ -647,8 +648,10 @@ public class FirebaseDataMappingController {
             response.put("schools", result);
             return ResponseEntity.ok(response);
 
-        } catch (ExecutionException | InterruptedException e) {
-            Thread.currentThread().interrupt();
+        } catch (ExecutionException | InterruptedException | TimeoutException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed to fetch data from Firebase: " + e.getMessage());
         } catch (IllegalStateException e) {
@@ -855,8 +858,10 @@ public class FirebaseDataMappingController {
             response.put("users", result);
             return ResponseEntity.ok(response);
 
-        } catch (ExecutionException | InterruptedException e) {
-            Thread.currentThread().interrupt();
+        } catch (ExecutionException | InterruptedException | TimeoutException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed to fetch user data from Firebase: " + e.getMessage());
         }
@@ -931,8 +936,10 @@ public class FirebaseDataMappingController {
             response.put("totalPersonality", personalityQuestions.size());
             return ResponseEntity.ok(response);
 
-        } catch (ExecutionException | InterruptedException e) {
-            Thread.currentThread().interrupt();
+        } catch (ExecutionException | InterruptedException | TimeoutException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed to fetch questions from Firebase: " + e.getMessage());
         }
@@ -1672,8 +1679,10 @@ public class FirebaseDataMappingController {
             result.put("personalityScores", user.get("personalityScores"));
             return ResponseEntity.ok(result);
 
-        } catch (ExecutionException | InterruptedException e) {
-            Thread.currentThread().interrupt();
+        } catch (ExecutionException | InterruptedException | TimeoutException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to fetch Firebase scores: " + e.getMessage()));
         }

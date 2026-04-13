@@ -34,7 +34,7 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
   const [amount, setAmount] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [copySuccess, setCopySuccess] = useState<string>("");
-  const [qrVisibleToken, setQrVisibleToken] = useState<string | null>(null);
+  const [qrVisible, setQrVisible] = useState<{ token: string; type: "free" | "paid" } | null>(null);
 
   // Derived: classes and sections from selected session/class
   const selectedSessionObj = sessions.find(
@@ -165,23 +165,27 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
     }
   };
 
-  const getRegistrationUrl = (token: string) => {
+  const getFreeRegistrationUrl = (token: string) => {
     return `${process.env.REACT_APP_ASSESSMENT_APP_URL}/assessment-register/${token}`;
   };
 
-  const copyToClipboard = (token: string) => {
-    navigator.clipboard.writeText(getRegistrationUrl(token));
-    setCopySuccess(token);
+  const getPaidRegistrationUrl = (token: string) => {
+    return `${process.env.REACT_APP_URL}/assessment-register/${token}`;
+  };
+
+  const copyToClipboard = (url: string, key: string) => {
+    navigator.clipboard.writeText(url);
+    setCopySuccess(key);
     setTimeout(() => setCopySuccess(""), 2000);
   };
 
-  const downloadQrCode = useCallback((token: string, assessmentName: string) => {
-    const canvas = document.getElementById(`qr-canvas-${token}`) as HTMLCanvasElement;
+  const downloadQrCode = useCallback((canvasId: string, label: string) => {
+    const canvas = document.getElementById(canvasId) as HTMLCanvasElement;
     if (!canvas) return;
     const url = canvas.toDataURL("image/png");
     const link = document.createElement("a");
     link.href = url;
-    link.download = `QR_${assessmentName.replace(/[^a-zA-Z0-9]/g, "_")}_${token.slice(0, 8)}.png`;
+    link.download = `QR_${label.replace(/[^a-zA-Z0-9]/g, "_")}.png`;
     link.click();
   }, []);
 
@@ -448,7 +452,7 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
                       <tr style={{ background: "#f8fafc" }}>
-                        {["Assessment", "Level", "Details", "Amount", "Status", "Actions"].map((h) => (
+                        {["Assessment", "Level", "Details", "Amount", "Status", "Free Link (Assessment)", "Paid Link (Dashboard)", "Actions"].map((h) => (
                           <th key={h} style={{
                             padding: "14px 18px", fontWeight: 700, fontSize: "0.78rem",
                             color: "#64748b", textTransform: "uppercase" as const, letterSpacing: "0.05em",
@@ -514,51 +518,114 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
                               {mapping.isActive ? "Active" : "Inactive"}
                             </span>
                           </td>
-                          <td style={{ padding: "14px 18px", borderBottom: "1px solid #f1f5f9" }}>
-                            <div style={{ display: "flex", gap: 8 }}>
-                              <button
-                                onClick={() => copyToClipboard(mapping.token)}
-                                title="Copy registration URL"
+                          {/* Free Link (Assessment domain) */}
+                          <td style={{ padding: "14px 18px", borderBottom: "1px solid #f1f5f9", maxWidth: 260 }}>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                              <a
+                                href={getFreeRegistrationUrl(mapping.token)}
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 style={{
-                                  display: "inline-flex", alignItems: "center", gap: 6,
-                                  padding: "6px 14px", borderRadius: 8,
-                                  border: copySuccess === mapping.token ? "1.5px solid #059669" : "1.5px solid #e2e8f0",
-                                  background: copySuccess === mapping.token ? "#dcfce7" : "#fff",
-                                  color: copySuccess === mapping.token ? "#059669" : "#475569",
-                                  fontWeight: 600, fontSize: "0.78rem", cursor: "pointer",
-                                  transition: "all 0.15s",
+                                  fontSize: "0.75rem", color: "#059669", wordBreak: "break-all",
+                                  lineHeight: 1.4, textDecoration: "none",
                                 }}
+                                onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+                                onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
                               >
-                                <MdContentCopy size={14} />
-                                {copySuccess === mapping.token ? "Copied!" : "Copy URL"}
-                              </button>
-                              <button
-                                onClick={() => setQrVisibleToken(mapping.token)}
-                                title="Show QR Code"
-                                style={{
-                                  display: "inline-flex", alignItems: "center", gap: 6,
-                                  padding: "6px 12px", borderRadius: 8,
-                                  border: "1.5px solid #e2e8f0", background: "#fff",
-                                  color: "#475569", cursor: "pointer",
-                                  transition: "all 0.15s",
-                                }}
-                              >
-                                <MdQrCode size={14} />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(mapping.mappingId)}
-                                title="Delete mapping"
-                                style={{
-                                  display: "inline-flex", alignItems: "center",
-                                  padding: "6px 12px", borderRadius: 8,
-                                  border: "1.5px solid #fee2e2", background: "#fff",
-                                  color: "#ef4444", cursor: "pointer",
-                                  transition: "all 0.15s",
-                                }}
-                              >
-                                <MdDelete size={14} />
-                              </button>
+                                {getFreeRegistrationUrl(mapping.token)}
+                              </a>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <button
+                                  onClick={() => copyToClipboard(getFreeRegistrationUrl(mapping.token), `free-${mapping.token}`)}
+                                  style={{
+                                    display: "inline-flex", alignItems: "center", gap: 4,
+                                    padding: "3px 8px", borderRadius: 6,
+                                    border: copySuccess === `free-${mapping.token}` ? "1px solid #059669" : "1px solid #e2e8f0",
+                                    background: copySuccess === `free-${mapping.token}` ? "#dcfce7" : "#f8fafc",
+                                    color: copySuccess === `free-${mapping.token}` ? "#059669" : "#64748b",
+                                    fontWeight: 600, fontSize: "0.7rem", cursor: "pointer",
+                                  }}
+                                >
+                                  <MdContentCopy size={11} />
+                                  {copySuccess === `free-${mapping.token}` ? "Copied!" : "Copy"}
+                                </button>
+                                <button
+                                  onClick={() => setQrVisible({ token: mapping.token, type: "free" })}
+                                  style={{
+                                    display: "inline-flex", alignItems: "center", gap: 4,
+                                    padding: "3px 8px", borderRadius: 6,
+                                    border: "1px solid #e2e8f0", background: "#f8fafc",
+                                    color: "#64748b", fontWeight: 600, fontSize: "0.7rem",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  <MdQrCode size={11} />
+                                  QR
+                                </button>
+                              </div>
                             </div>
+                          </td>
+                          {/* Paid Link (Dashboard domain) */}
+                          <td style={{ padding: "14px 18px", borderBottom: "1px solid #f1f5f9", maxWidth: 260 }}>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                              <a
+                                href={getPaidRegistrationUrl(mapping.token)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  fontSize: "0.75rem", color: "#2563eb", wordBreak: "break-all",
+                                  lineHeight: 1.4, textDecoration: "none",
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+                                onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+                              >
+                                {getPaidRegistrationUrl(mapping.token)}
+                              </a>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                <button
+                                  onClick={() => copyToClipboard(getPaidRegistrationUrl(mapping.token), `paid-${mapping.token}`)}
+                                  style={{
+                                    display: "inline-flex", alignItems: "center", gap: 4,
+                                    padding: "3px 8px", borderRadius: 6,
+                                    border: copySuccess === `paid-${mapping.token}` ? "1px solid #2563eb" : "1px solid #e2e8f0",
+                                    background: copySuccess === `paid-${mapping.token}` ? "#dbeafe" : "#f8fafc",
+                                    color: copySuccess === `paid-${mapping.token}` ? "#2563eb" : "#64748b",
+                                    fontWeight: 600, fontSize: "0.7rem", cursor: "pointer",
+                                  }}
+                                >
+                                  <MdContentCopy size={11} />
+                                  {copySuccess === `paid-${mapping.token}` ? "Copied!" : "Copy"}
+                                </button>
+                                <button
+                                  onClick={() => setQrVisible({ token: mapping.token, type: "paid" })}
+                                  style={{
+                                    display: "inline-flex", alignItems: "center", gap: 4,
+                                    padding: "3px 8px", borderRadius: 6,
+                                    border: "1px solid #e2e8f0", background: "#f8fafc",
+                                    color: "#64748b", fontWeight: 600, fontSize: "0.7rem",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  <MdQrCode size={11} />
+                                  QR
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ padding: "14px 18px", borderBottom: "1px solid #f1f5f9" }}>
+                            <button
+                              onClick={() => handleDelete(mapping.mappingId)}
+                              title="Delete mapping"
+                              style={{
+                                display: "inline-flex", alignItems: "center",
+                                padding: "6px 12px", borderRadius: 8,
+                                border: "1.5px solid #fee2e2", background: "#fff",
+                                color: "#ef4444", cursor: "pointer",
+                                transition: "all 0.15s",
+                              }}
+                            >
+                              <MdDelete size={14} />
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -586,8 +653,8 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
 
       {/* QR Code Modal */}
       <Modal
-        show={!!qrVisibleToken}
-        onHide={() => setQrVisibleToken(null)}
+        show={!!qrVisible}
+        onHide={() => setQrVisible(null)}
         centered
       >
         <Modal.Header
@@ -595,11 +662,14 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
           style={{ borderBottom: "1px solid #f1f5f9", padding: "20px 28px" }}
         >
           <Modal.Title style={{ fontSize: "1.05rem", fontWeight: 700, color: "#1e293b" }}>
-            QR Code
+            QR Code —{" "}
+            <span style={{ color: qrVisible?.type === "free" ? "#059669" : "#2563eb" }}>
+              {qrVisible?.type === "free" ? "Free (Assessment)" : "Paid (Dashboard)"}
+            </span>
           </Modal.Title>
         </Modal.Header>
         <Modal.Body style={{ padding: "36px 28px", textAlign: "center" }}>
-          {qrVisibleToken && (
+          {qrVisible && (
             <>
               <div style={{
                 display: "inline-block", padding: 16, background: "#fff",
@@ -607,8 +677,10 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
                 boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
               }}>
                 <QRCodeCanvas
-                  id={`qr-canvas-${qrVisibleToken}`}
-                  value={getRegistrationUrl(qrVisibleToken)}
+                  id={`qr-canvas-${qrVisible.type}-${qrVisible.token}`}
+                  value={qrVisible.type === "free"
+                    ? getFreeRegistrationUrl(qrVisible.token)
+                    : getPaidRegistrationUrl(qrVisible.token)}
                   size={240}
                   level="H"
                   includeMargin
@@ -618,7 +690,9 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
                 marginTop: 16, fontSize: "0.78rem", color: "#94a3b8",
                 wordBreak: "break-all", padding: "0 12px", lineHeight: 1.5,
               }}>
-                {getRegistrationUrl(qrVisibleToken)}
+                {qrVisible.type === "free"
+                  ? getFreeRegistrationUrl(qrVisible.token)
+                  : getPaidRegistrationUrl(qrVisible.token)}
               </div>
             </>
           )}
@@ -627,14 +701,13 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
           justifyContent: "center", gap: 12, padding: "20px 28px",
           borderTop: "1px solid #f1f5f9",
         }}>
-          {qrVisibleToken && (
+          {qrVisible && (
             <Button
               onClick={() => {
-                const mapping = mappings.find((m) => m.token === qrVisibleToken);
-                downloadQrCode(
-                  qrVisibleToken,
-                  mapping ? getAssessmentName(mapping.assessmentId) : "assessment"
-                );
+                const mapping = mappings.find((m) => m.token === qrVisible.token);
+                const label = (mapping ? getAssessmentName(mapping.assessmentId) : "assessment")
+                  + `_${qrVisible.type}_${qrVisible.token.slice(0, 8)}`;
+                downloadQrCode(`qr-canvas-${qrVisible.type}-${qrVisible.token}`, label);
               }}
               style={{
                 background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
@@ -648,7 +721,7 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
             </Button>
           )}
           <Button
-            onClick={() => setQrVisibleToken(null)}
+            onClick={() => setQrVisible(null)}
             style={{
               borderRadius: 10, padding: "10px 24px", fontWeight: 600,
               background: "#f1f5f9", border: "1.5px solid #e2e8f0",
