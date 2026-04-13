@@ -31,6 +31,11 @@ const SchoolAssessmentMappingModal = ({ show, onHide, instituteCode, instituteNa
   // Class → assessment + amount configs (keyed by classId)
   const [classConfigs, setClassConfigs] = useState<Record<string, { assessmentId: string; amount: string; configId?: number }>>({});
 
+  // Bulk assign state
+  const [bulkSelectedClasses, setBulkSelectedClasses] = useState<Set<string>>(new Set());
+  const [bulkAssessmentId, setBulkAssessmentId] = useState<string>("");
+  const [bulkAmount, setBulkAmount] = useState<string>("");
+
   // Link state
   const [link, setLink] = useState<any>(null);
   const [copySuccess, setCopySuccess] = useState(false);
@@ -100,18 +105,64 @@ const SchoolAssessmentMappingModal = ({ show, onHide, instituteCode, instituteNa
     }));
   };
 
+  const toggleBulkClass = (classId: string) => {
+    setBulkSelectedClasses((prev) => {
+      const next = new Set(prev);
+      if (next.has(classId)) next.delete(classId);
+      else next.add(classId);
+      return next;
+    });
+  };
+
+  const toggleBulkSelectAll = () => {
+    if (bulkSelectedClasses.size === classes.length) {
+      setBulkSelectedClasses(new Set());
+    } else {
+      setBulkSelectedClasses(new Set(classes.map((c: any) => String(c.id))));
+    }
+  };
+
+  const handleApplyBulk = () => {
+    if (!bulkAssessmentId) {
+      showErrorToast("Please select an assessment to bulk apply");
+      return;
+    }
+    if (bulkSelectedClasses.size === 0) {
+      showErrorToast("Please select at least one class");
+      return;
+    }
+    setClassConfigs((prev) => {
+      const next = { ...prev };
+      bulkSelectedClasses.forEach((classId) => {
+        next[classId] = {
+          ...next[classId],
+          assessmentId: bulkAssessmentId,
+          amount: bulkAmount,
+        };
+      });
+      return next;
+    });
+    // Clear bulk selection after apply
+    setBulkSelectedClasses(new Set());
+    setBulkAssessmentId("");
+    setBulkAmount("");
+  };
+
   const handleSaveAll = async () => {
     if (!selectedSession) return;
 
-    const configs = classes
+    const configs: { classId: number; assessmentId: number; amount?: number }[] = classes
       .filter((c: any) => classConfigs[String(c.id)]?.assessmentId)
       .map((c: any) => {
         const cfg = classConfigs[String(c.id)];
-        return {
+        const cfgEntry: { classId: number; assessmentId: number; amount?: number } = {
           classId: c.id,
           assessmentId: Number(cfg.assessmentId),
-          amount: cfg.amount && Number(cfg.amount) > 0 ? Math.round(Number(cfg.amount) * 100) : null,
         };
+        if (cfg.amount && Number(cfg.amount) > 0) {
+          cfgEntry.amount = Math.round(Number(cfg.amount) * 100);
+        }
+        return cfgEntry;
       });
 
     if (configs.length === 0) {
@@ -227,6 +278,74 @@ const SchoolAssessmentMappingModal = ({ show, onHide, instituteCode, instituteNa
               </Form.Select>
             </div>
 
+            {/* Bulk Assign Section */}
+            {selectedSession && classes.length > 0 && (
+              <div style={{
+                background: "linear-gradient(135deg, #eff6ff, #f0f9ff)",
+                borderRadius: 16, padding: "20px 24px",
+                border: "1.5px dashed #93c5fd", marginBottom: 20,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#3b82f6" }} />
+                  <h6 style={{ margin: 0, fontWeight: 700, fontSize: "0.95rem", color: "#1e3a8a" }}>
+                    Bulk Assign
+                  </h6>
+                  <span style={{ fontSize: "0.78rem", color: "#3b82f6", fontWeight: 500 }}>
+                    Select multiple classes &amp; apply one assessment + amount
+                  </span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr auto", gap: 12, alignItems: "end" }}>
+                  <div>
+                    <Form.Label style={{ fontWeight: 600, fontSize: "0.75rem", color: "#475569", marginBottom: 6 }}>
+                      Assessment
+                    </Form.Label>
+                    <Form.Select
+                      value={bulkAssessmentId}
+                      onChange={(e) => setBulkAssessmentId(e.target.value)}
+                      style={{ padding: "8px 12px", borderRadius: 8, border: "1.5px solid #bfdbfe", fontSize: "0.85rem", background: "#fff" }}
+                    >
+                      <option value="">-- Select assessment --</option>
+                      {assessments.map((a: any) => (
+                        <option key={a.id} value={a.id}>{a.AssessmentName || a.assessmentName}</option>
+                      ))}
+                    </Form.Select>
+                  </div>
+                  <div>
+                    <Form.Label style={{ fontWeight: 600, fontSize: "0.75rem", color: "#475569", marginBottom: 6 }}>
+                      Amount (INR)
+                    </Form.Label>
+                    <Form.Control
+                      type="number"
+                      placeholder="0 = Free"
+                      value={bulkAmount}
+                      onChange={(e) => setBulkAmount(e.target.value)}
+                      min="0"
+                      style={{ padding: "8px 12px", borderRadius: 8, border: "1.5px solid #bfdbfe", fontSize: "0.85rem", background: "#fff" }}
+                    />
+                  </div>
+                  <Button
+                    onClick={handleApplyBulk}
+                    disabled={!bulkAssessmentId || bulkSelectedClasses.size === 0}
+                    style={{
+                      background: !bulkAssessmentId || bulkSelectedClasses.size === 0
+                        ? "#94a3b8"
+                        : "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+                      border: "none", borderRadius: 10, padding: "9px 20px",
+                      fontWeight: 600, fontSize: "0.85rem",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Apply to {bulkSelectedClasses.size || "selected"}
+                  </Button>
+                </div>
+                {bulkSelectedClasses.size > 0 && (
+                  <div style={{ fontSize: "0.78rem", color: "#1e40af", marginTop: 10, fontWeight: 500 }}>
+                    {bulkSelectedClasses.size} class{bulkSelectedClasses.size !== 1 ? "es" : ""} selected
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Class-Assessment Mapping Table */}
             {selectedSession && classes.length > 0 && (
               <div style={{
@@ -241,20 +360,41 @@ const SchoolAssessmentMappingModal = ({ show, onHide, instituteCode, instituteNa
                       Class → Assessment Mapping
                     </h6>
                   </div>
-                  <span style={{
-                    background: "#f1f5f9", color: "#475569",
-                    padding: "4px 14px", borderRadius: 20,
-                    fontSize: "0.8rem", fontWeight: 600,
-                  }}>
-                    {classes.length} classes
-                  </span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <span style={{
+                      background: "#dcfce7", color: "#065f46",
+                      padding: "4px 12px", borderRadius: 20,
+                      fontSize: "0.78rem", fontWeight: 600,
+                    }}>
+                      {Object.values(classConfigs).filter((c) => c.configId).length} saved
+                    </span>
+                    <span style={{
+                      background: "#f1f5f9", color: "#475569",
+                      padding: "4px 12px", borderRadius: 20,
+                      fontSize: "0.78rem", fontWeight: 600,
+                    }}>
+                      {classes.length} total
+                    </span>
+                  </div>
                 </div>
 
                 <div style={{ maxHeight: 400, overflowY: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
                       <tr style={{ background: "#f8fafc" }}>
-                        {["Class", "Assessment", "Amount (INR)"].map((h) => (
+                        <th style={{
+                          padding: "12px 16px", fontWeight: 700, fontSize: "0.78rem",
+                          color: "#64748b", borderBottom: "2px solid #e2e8f0", width: 40,
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={bulkSelectedClasses.size === classes.length && classes.length > 0}
+                            onChange={toggleBulkSelectAll}
+                            style={{ cursor: "pointer", width: 16, height: 16 }}
+                            title="Select all"
+                          />
+                        </th>
+                        {["Class", "Assessment", "Amount (INR)", "Status"].map((h) => (
                           <th key={h} style={{
                             padding: "12px 16px", fontWeight: 700, fontSize: "0.78rem",
                             color: "#64748b", textTransform: "uppercase" as const, letterSpacing: "0.05em",
@@ -266,8 +406,20 @@ const SchoolAssessmentMappingModal = ({ show, onHide, instituteCode, instituteNa
                     <tbody>
                       {classes.map((cls: any) => {
                         const cfg = classConfigs[String(cls.id)] || { assessmentId: "", amount: "" };
+                        const isSelected = bulkSelectedClasses.has(String(cls.id));
                         return (
-                          <tr key={cls.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                          <tr key={cls.id} style={{
+                            borderBottom: "1px solid #f1f5f9",
+                            background: isSelected ? "#eff6ff" : "transparent",
+                          }}>
+                            <td style={{ padding: "12px 16px", textAlign: "center" }}>
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleBulkClass(String(cls.id))}
+                                style={{ cursor: "pointer", width: 16, height: 16 }}
+                              />
+                            </td>
                             <td style={{ padding: "12px 16px", fontWeight: 600, fontSize: "0.9rem", color: "#1e293b" }}>
                               {cls.className}
                             </td>
@@ -294,6 +446,36 @@ const SchoolAssessmentMappingModal = ({ show, onHide, instituteCode, instituteNa
                                 min="0"
                                 style={{ padding: "8px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: "0.85rem", maxWidth: 140 }}
                               />
+                            </td>
+                            <td style={{ padding: "12px 16px" }}>
+                              {cfg.configId ? (
+                                <span style={{
+                                  display: "inline-flex", alignItems: "center", gap: 4,
+                                  background: "#dcfce7", color: "#065f46",
+                                  padding: "4px 10px", borderRadius: 20,
+                                  fontSize: "0.72rem", fontWeight: 700,
+                                }}>
+                                  &#10003; Saved
+                                </span>
+                              ) : cfg.assessmentId ? (
+                                <span style={{
+                                  display: "inline-flex", alignItems: "center", gap: 4,
+                                  background: "#fef3c7", color: "#92400e",
+                                  padding: "4px 10px", borderRadius: 20,
+                                  fontSize: "0.72rem", fontWeight: 700,
+                                }}>
+                                  Unsaved
+                                </span>
+                              ) : (
+                                <span style={{
+                                  display: "inline-flex", alignItems: "center", gap: 4,
+                                  background: "#f1f5f9", color: "#94a3b8",
+                                  padding: "4px 10px", borderRadius: 20,
+                                  fontSize: "0.72rem", fontWeight: 700,
+                                }}>
+                                  Not mapped
+                                </span>
+                              )}
                             </td>
                           </tr>
                         );
