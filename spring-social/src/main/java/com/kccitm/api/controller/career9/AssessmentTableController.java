@@ -314,7 +314,7 @@ public class AssessmentTableController {
         return assessment;
     }
 
-    @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true) })
+    @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true), @CacheEvict(value = "assessmentSummaryList", allEntries = true) })
     @PostMapping("/create")
     public ResponseEntity<AssessmentTable> createAssessment(@RequestBody java.util.Map<String, Object> requestBody) {
         AssessmentTable assessment = new AssessmentTable();
@@ -372,7 +372,7 @@ public class AssessmentTableController {
         return ResponseEntity.ok(savedAssessment);
     }
 
-    @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true) })
+    @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true), @CacheEvict(value = "assessmentSummaryList", allEntries = true) })
     @PutMapping("/update/{id}")
     public ResponseEntity<AssessmentTable> updateAssessment(@PathVariable Long id,
             @RequestBody AssessmentTable assessment) {
@@ -403,7 +403,7 @@ public class AssessmentTableController {
     }
 
     // Soft-delete: sets isDeleted to true (moves to recycle bin)
-    @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true) })
+    @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true), @CacheEvict(value = "assessmentSummaryList", allEntries = true) })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteAssessment(@PathVariable Long id) {
         Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
@@ -423,7 +423,7 @@ public class AssessmentTableController {
     }
 
     // Restore a soft-deleted assessment
-    @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true) })
+    @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true), @CacheEvict(value = "assessmentSummaryList", allEntries = true) })
     @PutMapping("/restore/{id}")
     public ResponseEntity<AssessmentTable> restoreAssessment(@PathVariable Long id) {
         Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
@@ -436,7 +436,7 @@ public class AssessmentTableController {
     }
 
     // Permanently delete an assessment (from recycle bin only)
-    @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true) })
+    @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true), @CacheEvict(value = "assessmentSummaryList", allEntries = true) })
     @org.springframework.transaction.annotation.Transactional
     @DeleteMapping("/permanent-delete/{id}")
     public ResponseEntity<Void> permanentDeleteAssessment(@PathVariable Long id) {
@@ -462,6 +462,7 @@ public class AssessmentTableController {
         return ResponseEntity.noContent().build();
     }
 
+    @Cacheable(value = "assessmentSummaryList")
     @GetMapping("/get/list-summary")
     public List<AssessmentTableRepository.AssessmentSummary> getAssessmentSummaryList() {
         return assessmentTableRepository.findAssessmentSummaryListNotDeleted();
@@ -484,7 +485,7 @@ public class AssessmentTableController {
     }
 
     // Lock an assessment — generates a JSON snapshot of the full assessment data
-    @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true) })
+    @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true), @CacheEvict(value = "assessmentSummaryList", allEntries = true) })
     @PutMapping("/{id}/lock")
     public ResponseEntity<AssessmentTable> lockAssessment(@PathVariable Long id) {
         Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
@@ -502,7 +503,7 @@ public class AssessmentTableController {
     }
 
     // Unlock an assessment — deletes the JSON snapshot
-    @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true) })
+    @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true), @CacheEvict(value = "assessmentSummaryList", allEntries = true) })
     @PutMapping("/{id}/unlock")
     public ResponseEntity<AssessmentTable> unlockAssessment(@PathVariable Long id) {
         Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);

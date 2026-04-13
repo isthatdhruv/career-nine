@@ -22,6 +22,17 @@ public interface AssessmentAnswerRepository extends JpaRepository<AssessmentAnsw
 
        Long countByUserStudent_UserStudentIdAndAssessment_Id(Long userStudentId, Long assessmentId);
 
+       // Count DISTINCT questions answered by a student for a given assessment.
+       // Using plain count() counts each answer row, which over-counts when a student
+       // selects multiple options for one question (multi-select / ranking).
+       @Query("SELECT COUNT(DISTINCT aa.questionnaireQuestion.questionnaireQuestionId) " +
+              "FROM AssessmentAnswer aa " +
+              "WHERE aa.userStudent.userStudentId = :userStudentId " +
+              "AND aa.assessment.id = :assessmentId")
+       Long countDistinctQuestionsAnsweredByStudent(
+              @Param("userStudentId") Long userStudentId,
+              @Param("assessmentId") Long assessmentId);
+
        // Main query with JOIN FETCH to load related entities including measured
        // qualities
        @Query("SELECT DISTINCT aa FROM AssessmentAnswer aa " +

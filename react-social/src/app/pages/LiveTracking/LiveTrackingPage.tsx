@@ -119,7 +119,8 @@ const ProgressBar = ({
   answered: number;
   total: number;
 }) => {
-  const pct = total > 0 ? Math.round((answered / total) * 100) : 0;
+  const safeAnswered = total > 0 ? Math.min(answered, total) : answered;
+  const pct = total > 0 ? Math.min(100, Math.round((safeAnswered / total) * 100)) : 0;
   return (
     <div className="d-flex align-items-center gap-2" style={{ minWidth: 160 }}>
       <div
@@ -137,7 +138,7 @@ const ProgressBar = ({
         />
       </div>
       <small className="text-muted" style={{ whiteSpace: "nowrap", fontSize: 12 }}>
-        {answered}/{total} ({pct}%)
+        {safeAnswered}/{total} ({pct}%)
       </small>
     </div>
   );
