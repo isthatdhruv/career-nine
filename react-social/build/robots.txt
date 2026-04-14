@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://career-9.com/sitemap.xml
