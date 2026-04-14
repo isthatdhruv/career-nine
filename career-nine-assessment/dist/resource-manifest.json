@@ -1,90 +1,25 @@
 {
-  "version": "mnsnxpbw",
-  "generated": "2026-04-10T08:47:40.412Z",
+  "version": "mnu6c0r1",
+  "generated": "2026-04-11T10:10:27.661Z",
   "resources": [
     {
-      "url": "/assessment-cache/16/config.json",
-      "size": 3301,
+      "url": "/assessment-cache/30/config.json",
+      "size": 266176,
       "priority": "assessment"
     },
     {
-      "url": "/assessment-cache/16/data.json",
-      "size": 3057,
+      "url": "/assessment-cache/30/data.json",
+      "size": 265883,
       "priority": "assessment"
     },
     {
-      "url": "/assessment-cache/16/images/1596.webp",
-      "size": 874,
+      "url": "/assessment-cache/31/config.json",
+      "size": 266801,
       "priority": "assessment"
     },
     {
-      "url": "/assessment-cache/18/config.json",
-      "size": 267109,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/18/data.json",
-      "size": 266831,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/20/config.json",
-      "size": 266409,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/20/data.json",
-      "size": 266129,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/config.json",
-      "size": 102014,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/data.json",
-      "size": 101737,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/370.webp",
-      "size": 89294,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/371.webp",
-      "size": 88754,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/372.webp",
-      "size": 94680,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/373.webp",
-      "size": 72164,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/374.webp",
-      "size": 134934,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/375.webp",
-      "size": 51446,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/376.webp",
-      "size": 86604,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/5/images/377.webp",
-      "size": 47344,
+      "url": "/assessment-cache/31/data.json",
+      "size": 266510,
       "priority": "assessment"
     },
     {
@@ -203,32 +138,32 @@
       "priority": "deferred"
     },
     {
-      "url": "/assets/HydroTubeGame-CEuVjfG1.js",
+      "url": "/assets/HydroTubeGame-DFXz_x8G.js",
       "size": 23193,
       "priority": "critical"
     },
     {
-      "url": "/assets/JungleSpotGame-A3ObKT7k.js",
+      "url": "/assets/JungleSpotGame-_IYbChJI.js",
       "size": 23324,
       "priority": "critical"
     },
     {
-      "url": "/assets/RabbitPathGame-C9kN84J-.js",
+      "url": "/assets/RabbitPathGame-ALMhmfdC.js",
       "size": 26797,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionInstructionPage-DI1CsI3i.js",
+      "url": "/assets/SectionInstructionPage-DYAFIxtt.js",
       "size": 4188,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionQuestionPage-CIFK5czz.js",
-      "size": 169452,
+      "url": "/assets/SectionQuestionPage-CIrJT5JH.js",
+      "size": 169428,
       "priority": "critical"
     },
     {
-      "url": "/assets/SelectSectionPage-DR62EDaq.js",
+      "url": "/assets/SelectSectionPage-b-u8FSvk.js",
       "size": 4581,
       "priority": "critical"
     },
@@ -243,8 +178,8 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/index-7_h_eiqF.js",
-      "size": 278872,
+      "url": "/assets/index-Bs3JN9qR.js",
+      "size": 280723,
       "priority": "critical"
     },
     {
@@ -299,12 +234,12 @@
     }
   ],
   "summary": {
-    "total": 59,
-    "totalSize": 24720003,
+    "total": 46,
+    "totalSize": 23844519,
     "byPriority": {
       "assessment": {
-        "count": 17,
-        "size": 1942681
+        "count": 4,
+        "size": 1065370
       },
       "game": {
         "count": 11,
@@ -316,7 +251,7 @@
       },
       "critical": {
         "count": 15,
-        "size": 2346698
+        "size": 2348525
       },
       "other": {
         "count": 4,

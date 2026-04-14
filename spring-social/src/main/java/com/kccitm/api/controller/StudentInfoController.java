@@ -438,8 +438,10 @@ public class StudentInfoController {
                 studentData.put("controlNumber", si.getControlNumber());
                 try {
                     studentData.put("username", si.getUser() != null ? si.getUser().getUsername() : null);
+                    studentData.put("loginDob", si.getUser() != null ? si.getUser().getDobDate() : null);
                 } catch (Exception e) {
                     studentData.put("username", null);
+                    studentData.put("loginDob", null);
                 }
 
                 UserStudent us = studentInfoToUserStudent.get(si.getId());
@@ -574,6 +576,27 @@ public class StudentInfoController {
             Object classVal = request.get("studentClass");
             if (classVal != null) {
                 studentInfo.setStudentClass(Integer.valueOf(classVal.toString()));
+            }
+        }
+        if (request.containsKey("email")) {
+            studentInfo.setEmail(request.get("email").toString());
+        }
+        if (request.containsKey("phoneNumber")) {
+            studentInfo.setPhoneNumber(request.get("phoneNumber").toString());
+        }
+        if (request.containsKey("studentDob")) {
+            try {
+                SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
+                Date parsedDob = sdf.parse(request.get("studentDob").toString());
+                studentInfo.setStudentDob(parsedDob);
+                // Also update User.dobDate (used for student login)
+                User user = userRepository.findById(userStudent.getUserId()).orElse(null);
+                if (user != null) {
+                    user.setDobDate(parsedDob);
+                    userRepository.save(user);
+                }
+            } catch (Exception e) {
+                return ResponseEntity.badRequest().body("Invalid date format. Use dd-MM-yyyy");
             }
         }
 
