@@ -1,11 +1,82 @@
 import axios from "axios";
 const API_URL = process.env.REACT_APP_API_URL;
 
+// =========================================================================
+// Firebase fetch cache (sessionStorage)
+// ---------------------------------------------------------------------------
+// The backend already caches the raw firestore dump for 10 minutes, so repeat
+// calls within that window are cheap. This layer sits on top so that within a
+// single browser tab we don't even round-trip to the backend — re-opening the
+// mapping wizard or navigating between steps hits sessionStorage directly.
+//
+// Call clearFirebaseFetchCache() + POST /firebase-mapping/invalidate-cache
+// from the "Refresh" button to force a fresh pull.
+// =========================================================================
+const FB_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const FB_CACHE_KEYS = {
+  schoolData: (tenant?: string) => `fb_cache:schoolData:${tenant || "_"}`,
+  userData: (tenant?: string) => `fb_cache:userData:${tenant || "_"}`,
+  uniqueQuestions: () => `fb_cache:uniqueQuestions:_`,
+};
+
+function readCache<T>(key: string): T | null {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    if (Date.now() - ts > FB_CACHE_TTL_MS) {
+      sessionStorage.removeItem(key);
+      return null;
+    }
+    return data as T;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(key: string, data: unknown): void {
+  try {
+    sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
+  } catch {
+    // sessionStorage full or disabled — fail silently, we just lose the cache
+  }
+}
+
+export function clearFirebaseFetchCache(): void {
+  try {
+    const keys = Object.keys(sessionStorage).filter((k) => k.startsWith("fb_cache:"));
+    keys.forEach((k) => sessionStorage.removeItem(k));
+  } catch {
+    // ignore
+  }
+}
+
+// Tell the backend to drop its Redis-side cache. Called from the Refresh
+// button so a fresh Firestore scan runs on the next fetch.
+export function invalidateFirebaseBackendCache() {
+  return axios.post(`${API_URL}/firebase-mapping/invalidate-cache`);
+}
+
 // Fetch grouped school/session/grade/section data from Firebase (via backend)
-export function fetchFirebaseSchoolData(tenant?: string) {
-  return axios.get(`${API_URL}/firebase-mapping/fetch-school-data`, {
+// — cached in sessionStorage. Passing { force: true } bypasses both the
+// sessionStorage and tells the backend to rebuild.
+export async function fetchFirebaseSchoolData(
+  tenant?: string,
+  opts?: { force?: boolean }
+) {
+  const key = FB_CACHE_KEYS.schoolData(tenant);
+  if (!opts?.force) {
+    const cached = readCache<any>(key);
+    if (cached) return { data: cached, fromCache: true } as any;
+  } else {
+    sessionStorage.removeItem(key);
+  }
+
+  const res = await axios.get(`${API_URL}/firebase-mapping/fetch-school-data`, {
     params: tenant ? { tenant } : undefined,
   });
+  writeCache(key, res.data);
+  return res;
 }
 
 // Firebase mapping endpoints
@@ -74,15 +145,39 @@ export function getStudentsByInstitute(instituteCode: number) {
 // ========================== PHASE 2-4: Student Data Import ==========================
 
 // Fetch full user data from Firebase (personal, educational, scores, responses)
-export function fetchFirebaseUserData(tenant?: string) {
-  return axios.get(`${API_URL}/firebase-mapping/fetch-user-data`, {
+// — cached in sessionStorage; pass { force: true } to bypass.
+export async function fetchFirebaseUserData(
+  tenant?: string,
+  opts?: { force?: boolean }
+) {
+  const key = FB_CACHE_KEYS.userData(tenant);
+  if (!opts?.force) {
+    const cached = readCache<any>(key);
+    if (cached) return { data: cached, fromCache: true } as any;
+  } else {
+    sessionStorage.removeItem(key);
+  }
+
+  const res = await axios.get(`${API_URL}/firebase-mapping/fetch-user-data`, {
     params: tenant ? { tenant } : undefined,
   });
+  writeCache(key, res.data);
+  return res;
 }
 
-// Fetch unique questions from Firebase responses
-export function fetchUniqueQuestions() {
-  return axios.get(`${API_URL}/firebase-mapping/fetch-unique-questions`);
+// Fetch unique questions from Firebase responses — cached in sessionStorage.
+export async function fetchUniqueQuestions(opts?: { force?: boolean }) {
+  const key = FB_CACHE_KEYS.uniqueQuestions();
+  if (!opts?.force) {
+    const cached = readCache<any>(key);
+    if (cached) return { data: cached, fromCache: true } as any;
+  } else {
+    sessionStorage.removeItem(key);
+  }
+
+  const res = await axios.get(`${API_URL}/firebase-mapping/fetch-unique-questions`);
+  writeCache(key, res.data);
+  return res;
 }
 
 // Bulk import students (creates User + StudentInfo + UserStudent)

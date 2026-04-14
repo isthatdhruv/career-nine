@@ -10,6 +10,8 @@ import {
   getMappingsByType,
   createSession,
   deleteMappingByName,
+  clearFirebaseFetchCache,
+  invalidateFirebaseBackendCache,
 } from "../API/OldDataMapping_APIs";
 
 export interface DetailedResponse {
@@ -174,64 +176,78 @@ const AssessmentMappingStep = ({
   const [applying, setApplying] = useState(false);
   const [applyProgress, setApplyProgress] = useState("");
 
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadFirebaseData = async (force: boolean = false) => {
+    if (force) setRefreshing(true); else setLoading(true);
+    try {
+      if (force) {
+        clearFirebaseFetchCache();
+        try { await invalidateFirebaseBackendCache(); } catch { /* non-fatal */ }
+      }
+
+      const [assessRes, usersRes, schoolDataRes, instRes, mappedRes] = await Promise.all([
+        getAllAssessments(),
+        fetchFirebaseUserData(undefined, { force }),
+        fetchFirebaseSchoolData(undefined, { force }),
+        getAllInstitutes(),
+        getMappingsByType("SCHOOL"),
+      ]);
+
+      setAssessments(assessRes.data || []);
+
+      const users: FirebaseUser[] =
+        usersRes.data?.users || usersRes.data || [];
+      setFirebaseUsers(users);
+
+      const schoolData = schoolDataRes.data?.schools || [];
+      setFirebaseSchools(schoolData);
+
+      const instList = instRes.data || [];
+      setInstitutes(
+        instList
+          .map((i: any) => ({
+            instituteCode: Number(i.instituteCode ?? i.id),
+            instituteName: i.instituteName ?? i.name ?? "",
+          }))
+          .sort((a: Institute, b: Institute) => a.instituteName.localeCompare(b.instituteName))
+      );
+
+      const mapped = new Set<string>();
+      const s2i = new Map<string, number>();
+      const rawMappings: { firebaseName: string; newEntityId: number; newEntityName: string }[] = [];
+      (mappedRes.data || []).forEach((m: any) => {
+        const entityId = Number(m.newEntityId);
+        if (m.firebaseName) {
+          const key = m.firebaseName.toLowerCase().trim();
+          mapped.add(key);
+          if (entityId) s2i.set(key, entityId);
+          rawMappings.push({
+            firebaseName: m.firebaseName,
+            newEntityId: entityId,
+            newEntityName: m.newEntityName || "",
+          });
+        }
+        if (m.firebaseId && m.firebaseId !== m.firebaseName) {
+          const key = m.firebaseId.toLowerCase().trim();
+          mapped.add(key);
+          if (entityId) s2i.set(key, entityId);
+        }
+      });
+      setAlreadyMappedSchools(mapped);
+      setSchoolToInstituteMap(s2i);
+      setRawSchoolMappings(rawMappings);
+    } catch {
+      setError("Failed to load data");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
   useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      getAllAssessments(),
-      fetchFirebaseUserData(),
-      fetchFirebaseSchoolData(),
-      getAllInstitutes(),
-      getMappingsByType("SCHOOL"),
-    ])
-      .then(([assessRes, usersRes, schoolDataRes, instRes, mappedRes]) => {
-        setAssessments(assessRes.data || []);
-
-        const users: FirebaseUser[] =
-          usersRes.data?.users || usersRes.data || [];
-        setFirebaseUsers(users);
-
-        // School hierarchy data
-        const schoolData = schoolDataRes.data?.schools || [];
-        setFirebaseSchools(schoolData);
-
-        const instList = instRes.data || [];
-        setInstitutes(
-          instList
-            .map((i: any) => ({
-              instituteCode: Number(i.instituteCode ?? i.id),
-              instituteName: i.instituteName ?? i.name ?? "",
-            }))
-            .sort((a: Institute, b: Institute) => a.instituteName.localeCompare(b.instituteName))
-        );
-
-        // Track already-mapped firebase school names + which system school they map to
-        const mapped = new Set<string>();
-        const s2i = new Map<string, number>();
-        const rawMappings: { firebaseName: string; newEntityId: number; newEntityName: string }[] = [];
-        (mappedRes.data || []).forEach((m: any) => {
-          const entityId = Number(m.newEntityId);
-          if (m.firebaseName) {
-            const key = m.firebaseName.toLowerCase().trim();
-            mapped.add(key);
-            if (entityId) s2i.set(key, entityId);
-            rawMappings.push({
-              firebaseName: m.firebaseName,
-              newEntityId: entityId,
-              newEntityName: m.newEntityName || "",
-            });
-          }
-          if (m.firebaseId && m.firebaseId !== m.firebaseName) {
-            const key = m.firebaseId.toLowerCase().trim();
-            mapped.add(key);
-            if (entityId) s2i.set(key, entityId);
-          }
-        });
-        setAlreadyMappedSchools(mapped);
-        setSchoolToInstituteMap(s2i);
-        setRawSchoolMappings(rawMappings);
-      })
-      .catch(() => setError("Failed to load data"))
-      .finally(() => setLoading(false));
+    loadFirebaseData(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fetch assessments for the selected system school
@@ -689,13 +705,33 @@ const AssessmentMappingStep = ({
 
   return (
     <div>
-      <div className="mb-4">
-        <span className="badge badge-light-info fs-7 mb-2">Step 1</span>
-        <h4 className="fw-bold text-dark mb-1">Select Students & Map to School + Assessment</h4>
-        <p className="text-muted fs-7">
-          Filter by Firebase schools, select students, then assign them to a system school and assessment.
-          Firebase schools will be automatically mapped with their sessions, grades &amp; sections.
-        </p>
+      <div className="mb-4 d-flex align-items-start justify-content-between flex-wrap gap-3">
+        <div>
+          <span className="badge badge-light-info fs-7 mb-2">Step 1</span>
+          <h4 className="fw-bold text-dark mb-1">Select Students & Map to School + Assessment</h4>
+          <p className="text-muted fs-7 mb-0">
+            Filter by Firebase schools, select students, then assign them to a system school and assessment.
+            Firebase schools will be automatically mapped with their sessions, grades &amp; sections.
+          </p>
+          <p className="text-muted fs-9 mb-0 mt-1">
+            <i className="bi bi-lightning-charge-fill text-warning me-1"></i>
+            Firebase data is cached (10 min) to speed up repeated mapping. Click Refresh if you know Firestore has new data.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-sm btn-light-primary d-flex align-items-center gap-2"
+          onClick={() => loadFirebaseData(true)}
+          disabled={loading || refreshing}
+          title="Re-fetch fresh data from Firebase"
+        >
+          {refreshing ? (
+            <span className="spinner-border spinner-border-sm" />
+          ) : (
+            <i className="bi bi-arrow-clockwise fs-6"></i>
+          )}
+          {refreshing ? "Refreshing..." : "Refresh Firebase Data"}
+        </button>
       </div>
 
       {error && <div className="alert alert-danger py-2 mb-4">{error}</div>}
