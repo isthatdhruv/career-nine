@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import * as XLSX from "xlsx";
 import { getAssessmentList, getLiveTracking, getLiveTrackingLite, getRedisPartials, flushPartialToDb, getRedisPartialDetail, submitFromRedis } from "./API/LiveTracking_APIs";
 import { showErrorToast } from '../../utils/toast';
 
@@ -182,6 +183,7 @@ const LiveTrackingPage = () => {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterInstitute, setFilterInstitute] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [progressSort, setProgressSort] = useState<"none" | "asc" | "desc">("none");
   const [isPolling, setIsPolling] = useState(true);
   const [activeTab, setActiveTab] = useState<"live" | "redis">("live");
   const [redisPartials, setRedisPartials] = useState<RedisPartialEntry[]>([]);
@@ -544,12 +546,54 @@ const LiveTrackingPage = () => {
       );
     }
 
-    // Sort: ongoing first, then notstarted, then completed
+    const total = data.totalQuestions || 0;
+    const pct = (s: StudentEntry) =>
+      total > 0 ? (s.answeredCount / total) * 100 : 0;
+
+    if (progressSort !== "none") {
+      return [...list].sort((a, b) =>
+        progressSort === "asc" ? pct(a) - pct(b) : pct(b) - pct(a)
+      );
+    }
+
+    // Default sort: ongoing first, then notstarted, then completed
     const order: Record<string, number> = { ongoing: 0, notstarted: 1, completed: 2 };
     return [...list].sort(
       (a, b) => (order[a.status] ?? 1) - (order[b.status] ?? 1)
     );
-  }, [data, filterStatus, filterInstitute, searchQuery]);
+  }, [data, filterStatus, filterInstitute, searchQuery, progressSort]);
+
+  const handleDownloadExcel = useCallback(() => {
+    if (!data || filteredStudents.length === 0) return;
+    const total = data.totalQuestions || 0;
+    const statusLabel = (s: string) =>
+      s === "ongoing" ? "In Progress"
+      : s === "completed" ? "Completed"
+      : s === "notstarted" ? "Not Started"
+      : s;
+
+    const rows = filteredStudents.map((s) => ({
+      Student: s.studentName || "",
+      Email: s.email || "",
+      Institute: s.instituteName || "",
+      Status: statusLabel(s.status),
+      Progress: total > 0
+        ? `${((s.answeredCount / total) * 100).toFixed(1)}%`
+        : "0%",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows, {
+      header: ["Student", "Email", "Institute", "Status", "Progress"],
+    });
+    ws["!cols"] = [
+      { wch: 28 }, { wch: 32 }, { wch: 28 }, { wch: 14 }, { wch: 12 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Live Tracking");
+    const safeName = (data.assessmentName || "assessment").replace(/[^a-z0-9]+/gi, "_");
+    const stamp = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `live_tracking_${safeName}_${stamp}.xlsx`);
+  }, [data, filteredStudents]);
 
   return (
     <div className="card">
@@ -728,6 +772,26 @@ const LiveTrackingPage = () => {
                   ))}
                 </select>
               )}
+              <select
+                className="form-select form-select-sm"
+                value={progressSort}
+                onChange={(e) => setProgressSort(e.target.value as "none" | "asc" | "desc")}
+                style={{ maxWidth: 200 }}
+                title="Sort by progress"
+              >
+                <option value="none">Sort: Default</option>
+                <option value="asc">Progress: Low → High</option>
+                <option value="desc">Progress: High → Low</option>
+              </select>
+              <button
+                className="btn btn-sm btn-success"
+                onClick={handleDownloadExcel}
+                disabled={filteredStudents.length === 0}
+                title="Download filtered list as Excel"
+              >
+                <i className="bi bi-download me-1" />
+                Download
+              </button>
               <small className="text-muted align-self-center">
                 Showing {filteredStudents.length} of {data.students.length}
               </small>
