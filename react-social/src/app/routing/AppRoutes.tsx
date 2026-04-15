@@ -5,7 +5,7 @@
  * components (e.g: `src/app/modules/Auth/pages/AuthPage`, `src/app/BasePage`).
  */
 
-import { FC, lazy, Suspense } from "react";
+import { FC, lazy, Suspense, useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import TopBarProgress from "react-topbar-progress-indicator";
 import { getCSSVariableValue } from "../../_metronic/assets/ts/_utils";
@@ -26,8 +26,14 @@ import PrincipalDashboard from "../pages/PrincipalDashboard/PrincipalDashboard";
 import { MasterLayout } from "../../_metronic/layout/MasterLayout";
 
 const ExternalRedirect: FC<{ to: string }> = ({ to }) => {
-  window.location.replace(to);
-  return null;
+  useEffect(() => {
+    window.location.href = to;
+  }, [to]);
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "sans-serif", color: "#555" }}>
+      Redirecting…
+    </div>
+  );
 };
 
 const AssessmentRegisterPage = lazy(
