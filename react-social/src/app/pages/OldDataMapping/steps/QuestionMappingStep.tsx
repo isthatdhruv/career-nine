@@ -968,18 +968,21 @@ const QuestionMappingStep = ({ studentAssignments, importResults, onDone, onBack
       }
 
       try {
+        // Send per-student expected count: the number of mapped questions this
+        // student actually has in their Firebase data. Sending the global total
+        // (allMappedQuestionIds.size) across all navigators caused students who
+        // only took a subset of navigators to be marked "ongoing" forever.
         const res = await importMappedAnswers({
           userStudentId,
           assessmentId: sa.assessmentId,
           answers,
-          totalMappedQuestions: allMappedQuestionIds.size,
+          totalMappedQuestions: studentMappedKeys.size,
         });
         totalStudents++;
         totalAnswers += answers.length;
 
         // Check if this student has unmapped Firebase questions
         // Only flag as partial if there are actually unmapped questions
-        // (ignore backend "ongoing" status since it counts across all navigators)
         if (unmappedStudentKeys.length > 0) {
           partialStudents++;
           const missingQuestionLabels = unmappedStudentKeys.map((key) => {

@@ -7,7 +7,7 @@
     "dev": "vite",
     "sync-cache": "bash scripts/cache-assessment.sh",
     "build": "bash scripts/cache-assessment.sh && tsc -b && vite build && node scripts/generate-manifest.cjs",
-    "build:staging": "bash scripts/cache-assessment.sh https://staging.api.kccitm.in && vite build --mode staging && node scripts/generate-manifest.cjs",
+    "build:staging": "VITE_API_URL=https://api-staging.career-9.com bash scripts/cache-assessment.sh https://api-staging.career-9.com && VITE_API_URL=https://api-staging.career-9.com vite build --mode staging && node scripts/generate-manifest.cjs",
     "build:production": "bash scripts/cache-assessment.sh https://api.career-9.com && vite build --mode production && node scripts/generate-manifest.cjs",
     "lint": "eslint .",
     "preview": "vite preview"

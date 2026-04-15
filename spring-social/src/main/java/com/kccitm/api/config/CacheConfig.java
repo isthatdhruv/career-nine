@@ -52,11 +52,24 @@ public class CacheConfig {
                 .prefixCacheNameWith("career9:")
                 .disableCachingNullValues();
 
+        // Raw firebase "users" collection dump — shorter TTL because the admin
+        // wizard needs data to feel reasonably fresh. Manual invalidate endpoint
+        // exists for the "Refresh" button in the UI.
+        RedisCacheConfiguration firebaseRawDocsConfig = RedisCacheConfiguration.defaultCacheConfig()
+                .entryTtl(Duration.ofMinutes(10))
+                .serializeKeysWith(
+                        RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
+                .serializeValuesWith(
+                        RedisSerializationContext.SerializationPair.fromSerializer(new GenericJackson2JsonRedisSerializer()))
+                .prefixCacheNameWith("career9:")
+                .disableCachingNullValues();
+
         Map<String, RedisCacheConfiguration> cacheConfigurations = new HashMap<>();
         cacheConfigurations.put("assessmentDetails", defaultConfig);
         cacheConfigurations.put("assessmentQuestions", defaultConfig);
         cacheConfigurations.put("measuredQualityTypes", defaultConfig);
         cacheConfigurations.put("firebaseDocuments", firebaseConfig);
+        cacheConfigurations.put("firebaseRawDocs", firebaseRawDocsConfig);
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)

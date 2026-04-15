@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ReadQuestionSectionData } from "./API/Question_Section_APIs";
+import { ReadQuestionSectionDataList } from "./API/Question_Section_APIs";
 import QuestionSectionTable from "./components/QuestionSectionTable";
 import QuestionSectionRecycleBinModal from "./components/QuestionSectionRecycleBinModal";
 
@@ -14,7 +14,7 @@ const QuestionSectionPage = () => {
   useEffect(() => {
     setLoading(true);
     try {
-      ReadQuestionSectionData().then((data) => {
+      ReadQuestionSectionDataList().then((data) => {
         setQuestionSectionData(data.data);
         setLoading(false);
       });

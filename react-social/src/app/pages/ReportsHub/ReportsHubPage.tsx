@@ -101,6 +101,7 @@ const ReportsHubPage: React.FC = () => {
   const [nameQuery, setNameQuery] = useState("");
   const [selectedGrade, setSelectedGrade] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState<"" | "completed" | "ongoing" | "notstarted">("");
 
   // ── Action states ──
   const [generating, setGenerating] = useState(false);
@@ -300,8 +301,14 @@ const ReportsHubPage: React.FC = () => {
     }
     if (selectedGrade) result = result.filter((s) => sectionLookup.get(s.schoolSectionId!)?.className === selectedGrade);
     if (selectedSection) result = result.filter((s) => sectionLookup.get(s.schoolSectionId!)?.sectionName === selectedSection);
+    if (selectedStatus && selectedAssessmentObj) {
+      result = result.filter((s) => {
+        const st = (s.assessments || []).find((a: any) => a.assessmentId === selectedAssessmentObj.id)?.status || "notstarted";
+        return st === selectedStatus;
+      });
+    }
     return result;
-  }, [assessmentStudents, nameQuery, selectedGrade, selectedSection, sectionLookup]);
+  }, [assessmentStudents, nameQuery, selectedGrade, selectedSection, selectedStatus, selectedAssessmentObj, sectionLookup]);
 
   const totalPages = Math.max(1, Math.ceil(displayedStudents.length / pageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -310,7 +317,7 @@ const ReportsHubPage: React.FC = () => {
     [displayedStudents, safeCurrentPage, pageSize]
   );
 
-  useEffect(() => { setCurrentPage(1); }, [nameQuery, selectedGrade, selectedSection]);
+  useEffect(() => { setCurrentPage(1); }, [nameQuery, selectedGrade, selectedSection, selectedStatus]);
 
   // ═══════════════════════ HELPERS ═══════════════════════
 
@@ -823,6 +830,21 @@ const ReportsHubPage: React.FC = () => {
                     onChange={(e) => setSelectedSection(e.target.value)}>
                     <option value="">All</option>
                     {uniqueSections.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div style={{ minWidth: 160 }}>
+                  <label style={{ fontSize: "0.75rem", color: "#6b7280", fontWeight: 500 }}>Status</label>
+                  <select
+                    className="form-select form-select-sm form-select-solid"
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value as "" | "completed" | "ongoing" | "notstarted")}
+                    disabled={!selectedAssessmentObj}
+                    title={!selectedAssessmentObj ? "Select an assessment first" : ""}
+                  >
+                    <option value="">All</option>
+                    <option value="completed">Completed</option>
+                    <option value="ongoing">Ongoing</option>
+                    <option value="notstarted">Not Started</option>
                   </select>
                 </div>
               </div>

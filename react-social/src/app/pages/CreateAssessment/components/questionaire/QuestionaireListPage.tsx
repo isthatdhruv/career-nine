@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { MDBDataTableV5 } from "mdbreact";
 import { Link } from "react-router-dom";
-import { ReadQuestionaireData, DeleteQuestionaire } from "../../API/Create_Questionaire_APIs";
+import { ReadQuestionaireDataList, DeleteQuestionaire } from "../../API/Create_Questionaire_APIs";
 import { MdDeleteSweep, MdDelete } from "react-icons/md";
 import QuestionnaireRecycleBinModal from "./QuestionnaireRecycleBinModal";
 
@@ -67,17 +67,15 @@ const QuestionaireListPage: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await ReadQuestionaireData();
+      const response = await ReadQuestionaireDataList();
       const data = response.data || [];
 
       const formattedRows = data.map((item: any) => ({
         id: item.questionnaireId,
         name: item.name || "-",
-        tool: item.tool?.toolName || "-",
         modeId: item.modeId === 0 ? "Online" : "Offline",
         type: item.type === true ? "Bet Assessment" : "General",
         isFree: item.isFree === true ? "Free" : "Paid",
-        price: item.price || 0,
         actions: (
           <div className="d-flex gap-2">
             <Link

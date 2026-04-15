@@ -313,6 +313,11 @@ public class AssessmentSubmissionProcessorService {
         assessmentAnswerRepository.saveAll(answersToSave);
         assessmentRawScoreRepository.saveAll(rawScoresToSave);
 
+        // Flip mapping to completed — the async path previously only updated Redis,
+        // leaving MySQL stuck on "ongoing" even after answers + scores were persisted.
+        mapping.setStatus("completed");
+        studentAssessmentMappingRepository.save(mapping);
+
         // Delete old records by their specific IDs
         if (!existingAnswerIds.isEmpty()) {
             assessmentAnswerRepository.deleteAllById(existingAnswerIds);

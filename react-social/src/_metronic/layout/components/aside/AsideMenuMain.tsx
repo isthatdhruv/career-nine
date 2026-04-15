@@ -64,7 +64,8 @@ export function AsideMenuMain() {
 
   const showDataUpload =
     allowed("/offline-assessment-upload") || allowed("/omr-data-upload") ||
-    allowed("/live-tracking") || allowed("/payment-tracking") || allowed("/promo-codes");
+    allowed("/live-tracking") || allowed("/payment-tracking") || allowed("/promo-codes") ||
+    allowed("/communication-logs");
 
   const showReports = allowed("/reports") || allowed("/report-generation") || allowed("/send-reports");
 
@@ -350,6 +351,14 @@ export function AsideMenuMain() {
                 icon="/media/icons/duotune/general/gen019.svg"
                 title="Live Tracking"
                 fontIcon="bi-broadcast"
+              />
+            )}
+            {allowed("/communication-logs") && (
+              <AsideMenuItem
+                to="/communication-logs"
+                icon="/media/icons/duotune/communication/com007.svg"
+                title="Logs of Email and WhatsApp"
+                fontIcon="bi-envelope-paper"
               />
             )}
             {allowed("/payment-tracking") && (
