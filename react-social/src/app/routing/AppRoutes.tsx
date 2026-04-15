@@ -22,12 +22,13 @@ import { PrivateRoutes } from "./PrivateRoutes";
 import StudentRoutes from "./StudentRoutes";
 import CounsellorRoutes from "./CounsellorRoutes";
 // import CompilerPageEdit from "../pages/Compiler/compilerEdit";
-import StudentLoginPage from "../pages/StudentLogin/StudentLoginPage";
-import DemographicDetailsPage from "../pages/StudentLogin/DemographicDetailsPage";
-import DynamicDemographicForm from "../pages/StudentLogin/DynamicDemographicForm";
-import AllottedAssessmentPage from "../pages/StudentLogin/AllottedAssessmentPage";
 import PrincipalDashboard from "../pages/PrincipalDashboard/PrincipalDashboard";
 import { MasterLayout } from "../../_metronic/layout/MasterLayout";
+
+const ExternalRedirect: FC<{ to: string }> = ({ to }) => {
+  window.location.replace(to);
+  return null;
+};
 
 const AssessmentRegisterPage = lazy(
   () => import("../pages/AssessmentRegister/AssessmentRegisterPage")
@@ -117,28 +118,23 @@ const AppRoutes: FC = () => {
      
             <Route
               path="/allotted-assessment"
-              element={<AllottedAssessmentPage />}
+              element={<ExternalRedirect to="https://assessment.career-9.com/" />}
             />
-    
             <Route
               path="/demographics/:assessmentId"
-              element={<DynamicDemographicForm />}
+              element={<ExternalRedirect to="https://assessment.career-9.com/" />}
             />
             <Route
               path="/demographics"
-              element={<DemographicDetailsPage />}
+              element={<ExternalRedirect to="https://assessment.career-9.com/" />}
             />
             <Route
               path="/studentAssessment/completed"
-              element={<ThankYouPage />}
+              element={<ExternalRedirect to="https://assessment.career-9.com/" />}
             />
       <Route
               path="/student-login"
-              element={
-                <SuspensedView>
-                  <StudentLoginPage />
-                </SuspensedView>
-              }
+              element={<ExternalRedirect to="https://assessment.career-9.com/" />}
             />
       <Route
               path="/assessment-register/:token"
