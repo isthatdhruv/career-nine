@@ -63,6 +63,7 @@ public class LiveTrackingController {
             String name = (String) row[1];
             String email = (String) row[2];
             String status = row[3] != null ? (String) row[3] : "notstarted";
+            String username = row.length > 4 ? (String) row[4] : null;
 
             switch (status) {
                 case "ongoing": ongoing++; break;
@@ -74,6 +75,7 @@ public class LiveTrackingController {
             entry.put("userStudentId", userStudentId);
             entry.put("studentName", name != null ? name : "Unknown");
             entry.put("email", email != null ? email : "");
+            entry.put("username", username != null ? username : "");
             entry.put("status", status);
             students.add(entry);
         }
@@ -149,6 +151,10 @@ public class LiveTrackingController {
             StudentInfo si = us.getStudentInfo();
             entry.put("studentName", si != null ? si.getName() : "Unknown");
             entry.put("email", si != null && si.getEmail() != null ? si.getEmail() : "");
+            entry.put("username",
+                    si != null && si.getUser() != null && si.getUser().getUsername() != null
+                            ? si.getUser().getUsername()
+                            : "");
             entry.put("instituteName",
                     us.getInstitute() != null ? us.getInstitute().getInstituteName() : "");
 

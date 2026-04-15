@@ -9,6 +9,7 @@ interface StudentEntry {
   userStudentId: number;
   studentName: string;
   email?: string;
+  username?: string;
   instituteName: string;
   status: string;
   answeredCount: number;
@@ -44,6 +45,7 @@ interface RedisPartialEntry {
   userStudentId: number;
   assessmentId: number;
   studentName: string;
+  username?: string;
   answerCount: number;
   ttlSeconds: number;
   savedAt: string | null;
@@ -182,11 +184,13 @@ const LiveTrackingPage = () => {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterInstitute, setFilterInstitute] = useState<string>("all");
+  const [filterUsername, setFilterUsername] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [progressSort, setProgressSort] = useState<"none" | "asc" | "desc">("none");
   const [isPolling, setIsPolling] = useState(true);
   const [activeTab, setActiveTab] = useState<"live" | "redis">("live");
   const [redisPartials, setRedisPartials] = useState<RedisPartialEntry[]>([]);
+  const [redisFilterUsername, setRedisFilterUsername] = useState("");
   const [redisLoading, setRedisLoading] = useState(false);
   const [flushingIds, setFlushingIds] = useState<Set<number>>(new Set());
   const [flushingAll, setFlushingAll] = useState(false);
@@ -243,6 +247,7 @@ const LiveTrackingPage = () => {
             userStudentId: s.userStudentId,
             studentName: s.studentName,
             email: s.email || "",
+            username: s.username || "",
             instituteName: "",
             status: s.status || "notstarted",
             answeredCount: 0,
@@ -262,12 +267,16 @@ const LiveTrackingPage = () => {
       const res = await getLiveTracking(selectedId);
       const newData: TrackingData = res.data;
 
-      // Preserve email from lite data if full response doesn't include it
+      // Preserve email & username from lite data if full response doesn't include them
       if (data) {
         const emailMap = new Map(data.students.map(s => [s.userStudentId, s.email]));
+        const usernameMap = new Map(data.students.map(s => [s.userStudentId, s.username]));
         for (const s of newData.students) {
           if (!s.email && emailMap.has(s.userStudentId)) {
             s.email = emailMap.get(s.userStudentId);
+          }
+          if (!s.username && usernameMap.has(s.userStudentId)) {
+            s.username = usernameMap.get(s.userStudentId);
           }
         }
       }
@@ -463,20 +472,34 @@ const LiveTrackingPage = () => {
     });
   };
 
-  // Toggle all students selection
+  // Filtered redis partials (by username)
+  const filteredRedisPartials = useMemo(() => {
+    const u = redisFilterUsername.trim().toLowerCase();
+    if (!u) return redisPartials;
+    return redisPartials.filter((e) => (e.username || "").toLowerCase().includes(u));
+  }, [redisPartials, redisFilterUsername]);
+
+  // Toggle all students selection (scoped to currently visible/filtered rows)
   const toggleSelectAll = () => {
-    if (selectedStudents.size === redisPartials.length) {
-      setSelectedStudents(new Set());
-    } else {
-      setSelectedStudents(new Set(redisPartials.map((e) => e.userStudentId)));
-    }
+    const visibleIds = filteredRedisPartials.map((e) => e.userStudentId);
+    const allSelected =
+      visibleIds.length > 0 && visibleIds.every((id) => selectedStudents.has(id));
+    setSelectedStudents((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        visibleIds.forEach((id) => next.delete(id));
+      } else {
+        visibleIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
   };
 
-  // Bulk submit: selected students or all, one by one sequentially
+  // Bulk submit: selected students, or all visible (filtered) if none selected
   const handleBulkSubmit = async () => {
     const targets = selectedStudents.size > 0
-      ? redisPartials.filter((e) => selectedStudents.has(e.userStudentId))
-      : redisPartials;
+      ? filteredRedisPartials.filter((e) => selectedStudents.has(e.userStudentId))
+      : filteredRedisPartials;
 
     if (targets.length === 0) return;
 
@@ -535,12 +558,18 @@ const LiveTrackingPage = () => {
       list = list.filter((s) => s.instituteName === filterInstitute);
     }
 
+    if (filterUsername.trim()) {
+      const u = filterUsername.trim().toLowerCase();
+      list = list.filter((s) => s.username?.toLowerCase().includes(u));
+    }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(
         (s) =>
           s.studentName?.toLowerCase().includes(q) ||
           s.email?.toLowerCase().includes(q) ||
+          s.username?.toLowerCase().includes(q) ||
           s.instituteName?.toLowerCase().includes(q) ||
           String(s.userStudentId).includes(q)
       );
@@ -561,7 +590,7 @@ const LiveTrackingPage = () => {
     return [...list].sort(
       (a, b) => (order[a.status] ?? 1) - (order[b.status] ?? 1)
     );
-  }, [data, filterStatus, filterInstitute, searchQuery, progressSort]);
+  }, [data, filterStatus, filterInstitute, filterUsername, searchQuery, progressSort]);
 
   const handleDownloadExcel = useCallback(() => {
     if (!data || filteredStudents.length === 0) return;
@@ -574,6 +603,7 @@ const LiveTrackingPage = () => {
 
     const rows = filteredStudents.map((s) => ({
       Student: s.studentName || "",
+      Username: s.username || "",
       Email: s.email || "",
       Institute: s.instituteName || "",
       Status: statusLabel(s.status),
@@ -583,10 +613,10 @@ const LiveTrackingPage = () => {
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows, {
-      header: ["Student", "Email", "Institute", "Status", "Progress"],
+      header: ["Student", "Username", "Email", "Institute", "Status", "Progress"],
     });
     ws["!cols"] = [
-      { wch: 28 }, { wch: 32 }, { wch: 28 }, { wch: 14 }, { wch: 12 },
+      { wch: 28 }, { wch: 22 }, { wch: 32 }, { wch: 28 }, { wch: 14 }, { wch: 12 },
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Live Tracking");
@@ -746,6 +776,14 @@ const LiveTrackingPage = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ maxWidth: 260 }}
               />
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                placeholder="Filter by username..."
+                value={filterUsername}
+                onChange={(e) => setFilterUsername(e.target.value)}
+                style={{ maxWidth: 220 }}
+              />
               <select
                 className="form-select form-select-sm"
                 value={filterStatus}
@@ -804,6 +842,7 @@ const LiveTrackingPage = () => {
                   <tr>
                     <th style={{ width: 60 }}>#</th>
                     <th>Student</th>
+                    <th>Username</th>
                     <th>Email</th>
                     <th>Institute</th>
                     <th style={{ width: 130 }}>Status</th>
@@ -814,7 +853,7 @@ const LiveTrackingPage = () => {
                 <tbody>
                   {filteredStudents.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center text-muted py-4">
+                      <td colSpan={8} className="text-center text-muted py-4">
                         No students match the current filter
                       </td>
                     </tr>
@@ -827,6 +866,9 @@ const LiveTrackingPage = () => {
                           <small className="text-muted">
                             ID: {s.userStudentId}
                           </small>
+                        </td>
+                        <td>
+                          <small>{s.username || ""}</small>
                         </td>
                         <td>
                           <small>{s.email || ""}</small>
@@ -890,11 +932,20 @@ const LiveTrackingPage = () => {
                   ) : null}
                   {selectedStudents.size > 0
                     ? `Bulk Submit Selected (${selectedStudents.size})`
-                    : `Bulk Submit All (${redisPartials.length})`}
+                    : `Bulk Submit All (${filteredRedisPartials.length})`}
                 </button>
               )}
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                placeholder="Filter by username..."
+                value={redisFilterUsername}
+                onChange={(e) => setRedisFilterUsername(e.target.value)}
+                style={{ maxWidth: 220 }}
+              />
               <small className="text-muted">
-                {redisPartials.length} student{redisPartials.length !== 1 ? "s" : ""} with buffered answers
+                Showing {filteredRedisPartials.length} of {redisPartials.length} student
+                {redisPartials.length !== 1 ? "s" : ""} with buffered answers
               </small>
             </div>
             {bulkProgress && (
@@ -926,13 +977,17 @@ const LiveTrackingPage = () => {
                       <input
                         type="checkbox"
                         className="form-check-input"
-                        checked={redisPartials.length > 0 && selectedStudents.size === redisPartials.length}
+                        checked={
+                          filteredRedisPartials.length > 0 &&
+                          filteredRedisPartials.every((e) => selectedStudents.has(e.userStudentId))
+                        }
                         onChange={toggleSelectAll}
                         disabled={bulkSubmitting}
                       />
                     </th>
                     <th style={{ width: 50 }}>#</th>
                     <th>Student</th>
+                    <th>Username</th>
                     <th style={{ width: 100 }}>Answers</th>
                     <th style={{ width: 120 }}>TTL</th>
                     <th style={{ width: 180 }}>Last Saved</th>
@@ -940,14 +995,18 @@ const LiveTrackingPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {redisPartials.length === 0 ? (
+                  {filteredRedisPartials.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center text-muted py-4">
-                        {redisLoading ? "Loading..." : "No buffered answers in Redis"}
+                      <td colSpan={8} className="text-center text-muted py-4">
+                        {redisLoading
+                          ? "Loading..."
+                          : redisPartials.length === 0
+                          ? "No buffered answers in Redis"
+                          : "No students match the current filter"}
                       </td>
                     </tr>
                   ) : (
-                    redisPartials.map((entry, idx) => (
+                    filteredRedisPartials.map((entry, idx) => (
                       <tr key={`${entry.userStudentId}-${entry.assessmentId}`}>
                         <td>
                           <input
@@ -962,6 +1021,9 @@ const LiveTrackingPage = () => {
                         <td>
                           <div className="fw-semibold">{entry.studentName}</div>
                           <small className="text-muted">ID: {entry.userStudentId}</small>
+                        </td>
+                        <td>
+                          <small>{entry.username || ""}</small>
                         </td>
                         <td>
                           <span

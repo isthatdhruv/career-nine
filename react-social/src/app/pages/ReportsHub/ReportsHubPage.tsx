@@ -99,6 +99,8 @@ const ReportsHubPage: React.FC = () => {
 
   // ── Search + Filters ──
   const [nameQuery, setNameQuery] = useState("");
+  const [usernameQuery, setUsernameQuery] = useState("");
+  const [usernamePresence, setUsernamePresence] = useState<"all" | "with" | "without">("all");
   const [selectedGrade, setSelectedGrade] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<"" | "completed" | "ongoing" | "notstarted">("");
@@ -299,6 +301,15 @@ const ReportsHubPage: React.FC = () => {
         (s.studentDob || "").includes(q)
       );
     }
+    if (usernameQuery.trim()) {
+      const u = usernameQuery.trim().toLowerCase();
+      result = result.filter((s) => (s.username || "").toLowerCase().includes(u));
+    }
+    if (usernamePresence === "with") {
+      result = result.filter((s) => !!(s.username && s.username.trim()));
+    } else if (usernamePresence === "without") {
+      result = result.filter((s) => !(s.username && s.username.trim()));
+    }
     if (selectedGrade) result = result.filter((s) => sectionLookup.get(s.schoolSectionId!)?.className === selectedGrade);
     if (selectedSection) result = result.filter((s) => sectionLookup.get(s.schoolSectionId!)?.sectionName === selectedSection);
     if (selectedStatus && selectedAssessmentObj) {
@@ -308,7 +319,7 @@ const ReportsHubPage: React.FC = () => {
       });
     }
     return result;
-  }, [assessmentStudents, nameQuery, selectedGrade, selectedSection, selectedStatus, selectedAssessmentObj, sectionLookup]);
+  }, [assessmentStudents, nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, selectedAssessmentObj, sectionLookup]);
 
   const totalPages = Math.max(1, Math.ceil(displayedStudents.length / pageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -317,7 +328,7 @@ const ReportsHubPage: React.FC = () => {
     [displayedStudents, safeCurrentPage, pageSize]
   );
 
-  useEffect(() => { setCurrentPage(1); }, [nameQuery, selectedGrade, selectedSection, selectedStatus]);
+  useEffect(() => { setCurrentPage(1); }, [nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus]);
 
   // ═══════════════════════ HELPERS ═══════════════════════
 
@@ -847,6 +858,34 @@ const ReportsHubPage: React.FC = () => {
                     <option value="notstarted">Not Started</option>
                   </select>
                 </div>
+                <div style={{ minWidth: 180 }}>
+                  <label style={{ fontSize: "0.75rem", color: "#6b7280", fontWeight: 500 }}>Username</label>
+                  <input className="form-control form-control-sm form-control-solid"
+                    placeholder="Filter by username..."
+                    value={usernameQuery} onChange={(e) => setUsernameQuery(e.target.value)} />
+                </div>
+                <div>
+                  <label style={{ fontSize: "0.75rem", color: "#6b7280", fontWeight: 500, display: "block" }}>
+                    Has Username
+                  </label>
+                  <div className="btn-group btn-group-sm" role="group" aria-label="Username presence filter">
+                    {(["all", "with", "without"] as const).map((key) => {
+                      const label = key === "all" ? "All" : key === "with" ? "With" : "Without";
+                      const active = usernamePresence === key;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          className={`btn btn-sm ${active ? "btn-primary" : "btn-light"}`}
+                          onClick={() => setUsernamePresence(key)}
+                          style={{ fontWeight: active ? 600 : 500 }}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               {/* Action bar */}
@@ -992,6 +1031,7 @@ const ReportsHubPage: React.FC = () => {
                       </th>
                       <th style={{ ...thStyle, width: 44 }}>#</th>
                       <th style={thStyle}>Name</th>
+                      <th style={thStyle}>Username</th>
                       <th style={thStyle}>Status</th>
                       <th style={thStyle}>Grade</th>
                       <th style={thStyle}>Section</th>
@@ -1035,6 +1075,13 @@ const ReportsHubPage: React.FC = () => {
                           </td>
                           <td style={tdStyle}>{globalIdx + 1}</td>
                           <td style={{ ...tdStyle, fontWeight: 600 }}>{s.name || "-"}</td>
+                          <td style={tdStyle}>
+                            {s.username ? (
+                              <span style={{ fontFamily: "monospace", fontSize: "0.85rem" }}>{s.username}</span>
+                            ) : (
+                              <span style={{ color: "#9ca3af", fontStyle: "italic", fontSize: "0.8rem" }}>—</span>
+                            )}
+                          </td>
                           <td style={tdStyle}>{statusBadge(asc.bg, asc.color, asmtStatus)}</td>
                           <td style={tdStyle}>{secInfo?.className || "-"}</td>
                           <td style={tdStyle}>{secInfo?.sectionName || "-"}</td>
