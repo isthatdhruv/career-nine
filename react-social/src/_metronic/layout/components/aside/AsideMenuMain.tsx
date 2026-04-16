@@ -89,6 +89,7 @@ export function AsideMenuMain() {
 
   const showCounselling =
     allowed("/admin/counselling-queue") || allowed("/admin/counsellors") ||
+    allowed("/admin/counselling-slots") || allowed("/admin/counselling-notifications") ||
     allowed("/counsellor/dashboard") || allowed("/counsellor/availability");
 
   return (
@@ -665,6 +666,12 @@ export function AsideMenuMain() {
             )}
             {allowed("/admin/counsellors") && (
               <AsideMenuItem to="/admin/counsellors" title="Manage Counsellors" hasBullet={true} />
+            )}
+            {allowed("/admin/counselling-slots") && (
+              <AsideMenuItem to="/admin/counselling-slots" title="Create Slots" hasBullet={true} />
+            )}
+            {allowed("/admin/counselling-notifications") && (
+              <AsideMenuItem to="/admin/counselling-notifications" title="Notifications" hasBullet={true} />
             )}
             {allowed("/counsellor/dashboard") && (
               <AsideMenuItem to="/counsellor/dashboard" title="My Schedule" hasBullet={true} />

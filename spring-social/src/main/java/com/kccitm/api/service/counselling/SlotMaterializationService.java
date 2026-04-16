@@ -42,21 +42,29 @@ public class SlotMaterializationService {
     }
 
     public int materializeSlotsForCounsellor(Long counsellorId) {
+        return materializeSlotsForCounsellor(counsellorId, WEEKS_AHEAD);
+    }
+
+    public int materializeSlotsForCounsellor(Long counsellorId, int days) {
         List<AvailabilityTemplate> templates = templateRepository.findByCounsellorIdAndIsActiveTrue(counsellorId);
         int totalCreated = 0;
 
         for (AvailabilityTemplate template : templates) {
-            totalCreated += materializeSlotsForTemplate(template);
+            totalCreated += materializeSlotsForTemplate(template, days);
         }
 
-        logger.info("SlotMaterializationService: slots created for counsellor {} = {}", counsellorId, totalCreated);
+        logger.info("SlotMaterializationService: slots created for counsellor {} = {} (days={})", counsellorId, totalCreated, days);
         return totalCreated;
     }
 
     private int materializeSlotsForTemplate(AvailabilityTemplate template) {
+        return materializeSlotsForTemplate(template, WEEKS_AHEAD);
+    }
+
+    private int materializeSlotsForTemplate(AvailabilityTemplate template, int days) {
         DayOfWeek templateDayOfWeek = DayOfWeek.valueOf(template.getDayOfWeek().toUpperCase());
         LocalDate tomorrow = LocalDate.now().plusDays(1);
-        LocalDate endDate = LocalDate.now().plusWeeks(WEEKS_AHEAD);
+        LocalDate endDate = LocalDate.now().plusDays(days);
         int created = 0;
 
         for (LocalDate date = tomorrow; !date.isAfter(endDate); date = date.plusDays(1)) {

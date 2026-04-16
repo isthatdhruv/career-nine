@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -46,11 +47,16 @@ public interface AssessmentAnswerRepository extends JpaRepository<AssessmentAnsw
                      @Param("userStudentId") Long userStudentId,
                      @Param("assessmentId") Long assessmentId);
 
+       /** Bulk delete — single DELETE query, no entity loading */
+       @Modifying
        @Transactional
-       void deleteByUserStudent_UserStudentIdAndAssessment_Id(Long userStudentId, Long assessmentId);
+       @Query("DELETE FROM AssessmentAnswer aa WHERE aa.userStudent.userStudentId = :userStudentId AND aa.assessment.id = :assessmentId")
+       void deleteByUserStudent_UserStudentIdAndAssessment_Id(@Param("userStudentId") Long userStudentId, @Param("assessmentId") Long assessmentId);
 
+       @Modifying
        @Transactional
-       void deleteByUserStudent_UserStudentId(Long userStudentId);
+       @Query("DELETE FROM AssessmentAnswer aa WHERE aa.userStudent.userStudentId = :userStudentId")
+       void deleteByUserStudent_UserStudentId(@Param("userStudentId") Long userStudentId);
 
        List<AssessmentAnswer> findByAssessment_IdAndTextResponseIsNotNull(Long assessmentId);
 

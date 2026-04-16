@@ -19,6 +19,7 @@ import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
 import com.kccitm.api.model.career9.counselling.CounsellingSlot;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository;
+import com.kccitm.api.service.counselling.CounsellorInstituteMappingService;
 
 @Service
 public class BookingService {
@@ -37,6 +38,12 @@ public class BookingService {
     @Autowired
     private AuditLogService auditLogService;
 
+    @Autowired
+    private CounsellorInstituteMappingService counsellorInstituteMappingService;
+
+    @Autowired
+    private CounsellingActivityLogService activityLogService;
+
     /**
      * Returns all available slots for the week starting at weekStart (inclusive)
      * through weekStart + 6 days (inclusive).
@@ -48,9 +55,28 @@ public class BookingService {
     }
 
     /**
+     * Returns available slots filtered to only counsellors allocated to the given institute.
+     * Students see only slots from counsellors assigned to their school.
+     */
+    public List<CounsellingSlot> getAvailableSlotsForInstitute(LocalDate weekStart, Integer instituteCode) {
+        LocalDate weekEnd = weekStart.plusDays(6);
+        List<Long> counsellorIds = counsellorInstituteMappingService.getActiveCounsellorIdsForInstitute(instituteCode);
+
+        if (counsellorIds.isEmpty()) {
+            logger.info("No counsellors allocated to institute {} — returning empty slots", instituteCode);
+            return List.of();
+        }
+
+        logger.info("Fetching available slots from {} to {} for institute {} ({} counsellors)",
+                weekStart, weekEnd, instituteCode, counsellorIds.size());
+        return slotRepository.findAvailableSlotsForCounsellors(counsellorIds, weekStart, weekEnd);
+    }
+
+    /**
      * Books a slot for the given student.
      * Verifies the slot is AVAILABLE, transitions it to REQUESTED,
-     * creates a PENDING appointment, and fires notifications.
+     * creates an appointment with the counsellor auto-assigned from the slot,
+     * and fires notifications.
      */
     @Transactional
     public CounsellingAppointment bookSlot(Long slotId, UserStudent student, String reason) {
@@ -68,12 +94,13 @@ public class BookingService {
         slot.setStatus("REQUESTED");
         slotRepository.save(slot);
 
-        // Create appointment
+        // Create appointment — auto-assign counsellor from the slot
         CounsellingAppointment appointment = new CounsellingAppointment();
         appointment.setSlot(slot);
         appointment.setStudent(student);
+        appointment.setCounsellor(slot.getCounsellor());
         appointment.setStudentReason(reason);
-        appointment.setStatus("PENDING");
+        appointment.setStatus("CONFIRMED");
         appointment = appointmentRepository.save(appointment);
 
         logger.info("Created appointment {} for student {} on slot {}",
@@ -105,6 +132,11 @@ public class BookingService {
         newValues.put("slotId", slotId);
         newValues.put("studentId", student.getUserStudentId());
         auditLogService.log(appointment, "BOOKING_CREATED", null, reason, null, newValues);
+
+        activityLogService.log("SLOT_BOOKED", "Session Booked",
+                "Student " + student.getUserStudentId() + " booked a session with " + slot.getCounsellor().getName()
+                + " on " + slot.getDate() + " at " + slot.getStartTime(),
+                slot.getCounsellor(), "Student");
 
         return appointment;
     }

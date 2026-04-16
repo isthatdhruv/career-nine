@@ -19,6 +19,9 @@ public class CounsellorService {
     @Autowired
     private CounsellorRepository counsellorRepository;
 
+    @Autowired
+    private CounsellingActivityLogService activityLogService;
+
     public Counsellor create(Counsellor counsellor) {
         return counsellorRepository.save(counsellor);
     }
@@ -70,8 +73,18 @@ public class CounsellorService {
         Counsellor counsellor = counsellorRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Counsellor not found with id: " + id));
 
-        counsellor.setIsActive(!counsellor.getIsActive());
-        logger.debug("Toggled active status for counsellor id: {} to {}", id, counsellor.getIsActive());
-        return counsellorRepository.save(counsellor);
+        boolean newActive = !counsellor.getIsActive();
+        counsellor.setIsActive(newActive);
+        counsellor.setOnboardingStatus(newActive ? "ACTIVE" : "SUSPENDED");
+        logger.debug("Toggled counsellor id: {} → isActive={}, onboardingStatus={}", id, newActive, counsellor.getOnboardingStatus());
+        Counsellor saved = counsellorRepository.save(counsellor);
+
+        activityLogService.log(
+                newActive ? "COUNSELLOR_ACTIVATED" : "COUNSELLOR_SUSPENDED",
+                newActive ? "Counsellor Activated" : "Counsellor Suspended",
+                counsellor.getName() + " (" + counsellor.getEmail() + ") has been " + (newActive ? "activated" : "suspended") + ".",
+                counsellor, "Admin");
+
+        return saved;
     }
 }

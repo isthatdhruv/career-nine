@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import PortalLayout, { MenuItem } from '../portal/PortalLayout'
 import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
-import { createManualSlot, blockDate, deleteSlot, getSlotsByCounsellor } from '../Counselling/API/SlotAPI'
+import { getSlotsByCounsellor } from '../Counselling/API/SlotAPI'
+import { submitBlockDateRequest, getBlockRequestsByCounsellor, BlockDateRequest } from '../Counselling/API/BlockDateRequestAPI'
 import './CounsellorPortal.css'
 
 const API_URL = process.env.REACT_APP_API_URL
@@ -124,7 +125,9 @@ function formatTime(timeStr: string): string {
 function formatDateShort(dateStr: string): string {
   if (!dateStr) return '—'
   try {
-    const d = new Date(dateStr)
+    // Handle date-only strings like "2026-04-17"
+    const d = dateStr.includes('T') ? new Date(dateStr) : new Date(dateStr + 'T00:00:00')
+    if (isNaN(d.getTime())) return dateStr
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
   } catch {
     return dateStr
@@ -174,6 +177,7 @@ const CounsellorAvailabilityPage: React.FC = () => {
   // Manual slots & blocks
   const [manualSlots, setManualSlots] = useState<any[]>([])
   const [blockedDates, setBlockedDates] = useState<any[]>([])
+  const [blockRequests, setBlockRequests] = useState<BlockDateRequest[]>([])
   const [manualSlotForm, setManualSlotForm] = useState<ManualSlotForm>({
     date: '',
     startTime: '',
@@ -195,27 +199,43 @@ const CounsellorAvailabilityPage: React.FC = () => {
       const userStr = localStorage.getItem('counsellorPortalUser')
       if (userStr) {
         const user = JSON.parse(userStr)
-        getCounsellorByUserId(user.id)
-          .then((res) => {
-            const cId = res.data?.id
-            if (!cId) {
-              setError('Counsellor profile not linked yet. Please contact admin to set up your profile.')
-              setLoading(false)
-              return
-            }
-            setCounsellorId(cId)
-            return Promise.all([
-              axios.get(`${API_URL}/api/availability-template/get/by-counsellor/${cId}`),
-              getSlotsByCounsellor(cId),
-            ]).then(([tRes, sRes]) => {
-              setTemplates(tRes.data || [])
-              const slots: any[] = sRes.data || []
-              setManualSlots(slots.filter((s: any) => s.isManuallyCreated && !s.isBlocked))
-              setBlockedDates(slots.filter((s: any) => s.isBlocked))
-            })
+        const cId = user.counsellorId || null
+
+        const loadData = (id: number) => {
+          setCounsellorId(id)
+          return Promise.all([
+            axios.get(`${API_URL}/api/availability-template/get/by-counsellor/${id}`),
+            getSlotsByCounsellor(id),
+            getBlockRequestsByCounsellor(id).catch(() => ({ data: [] })),
+          ]).then(([tRes, sRes, brRes]) => {
+            setTemplates(tRes.data || [])
+            const slots: any[] = sRes.data || []
+            setManualSlots(slots.filter((s: any) => !s.isBlocked))
+            setBlockedDates(slots.filter((s: any) => s.isBlocked))
+            setBlockRequests(Array.isArray(brRes.data) ? brRes.data : [])
           })
-          .catch(() => setError('Counsellor profile not found. Please contact admin to set up your profile.'))
-          .finally(() => setLoading(false))
+        }
+
+        if (cId) {
+          loadData(cId)
+            .catch(() => setError('Failed to load availability data.'))
+            .finally(() => setLoading(false))
+        } else if (user.id) {
+          getCounsellorByUserId(user.id)
+            .then((res) => {
+              const resolvedId = res.data?.id
+              if (!resolvedId) {
+                setError('Counsellor profile not found.')
+                setLoading(false)
+                return
+              }
+              return loadData(resolvedId)
+            })
+            .catch(() => setError('Counsellor profile not found.'))
+            .finally(() => setLoading(false))
+        } else {
+          setLoading(false)
+        }
       }
     } catch {
       navigate('/counsellor/login')
@@ -235,7 +255,7 @@ const CounsellorAvailabilityPage: React.FC = () => {
     getSlotsByCounsellor(counsellorId)
       .then((res) => {
         const slots: any[] = res.data || []
-        setManualSlots(slots.filter((s) => s.isManuallyCreated && !s.isBlocked))
+        setManualSlots(slots.filter((s) => !s.isBlocked))
         setBlockedDates(slots.filter((s) => s.isBlocked))
       })
       .catch(() => setError('Failed to reload slots.'))
@@ -316,17 +336,15 @@ const CounsellorAvailabilityPage: React.FC = () => {
     setBlockSaving(true)
     setError('')
     try {
-      await blockDate({
-        counsellorId,
-        date: blockDateForm.date,
-        reason: blockDateForm.reason || 'Blocked by counsellor',
-        isBlocked: true,
-      })
-      setSuccess('Date blocked.')
-      reloadSlots()
+      await submitBlockDateRequest(counsellorId, blockDateForm.date, blockDateForm.reason || undefined)
+      setSuccess('Block date request submitted. Admin will review and approve it.')
       setBlockDateForm({ date: '', reason: '' })
+      // Reload block requests
+      getBlockRequestsByCounsellor(counsellorId)
+        .then((res) => setBlockRequests(Array.isArray(res.data) ? res.data : []))
+        .catch(() => {})
     } catch {
-      setError('Failed to block date.')
+      setError('Failed to submit block date request.')
     } finally {
       setBlockSaving(false)
     }
@@ -350,6 +368,27 @@ const CounsellorAvailabilityPage: React.FC = () => {
     setSuccess('')
   }
 
+  // Group slots by date
+  const slotsByDate = new Map<string, any[]>()
+  for (const s of manualSlots) {
+    const key = s.date || ''
+    const arr = slotsByDate.get(key) || []
+    arr.push(s)
+    slotsByDate.set(key, arr)
+  }
+
+  const statusStyle = (status: string): React.CSSProperties => {
+    switch ((status || '').toUpperCase()) {
+      case 'AVAILABLE': return { background: '#D1FAE5', color: '#065F46' }
+      case 'REQUESTED': return { background: '#FEF3C7', color: '#92400E' }
+      case 'BOOKED': return { background: '#DBEAFE', color: '#1E40AF' }
+      default: return { background: '#F3F4F6', color: '#374151' }
+    }
+  }
+
+  const availableCount = manualSlots.filter((s) => (s.status || '').toUpperCase() === 'AVAILABLE').length
+  const bookedCount = manualSlots.filter((s) => ['REQUESTED', 'BOOKED', 'CONFIRMED'].includes((s.status || '').toUpperCase())).length
+
   return (
     <PortalLayout
       title='Counsellor Dashboard'
@@ -357,335 +396,252 @@ const CounsellorAvailabilityPage: React.FC = () => {
       storageKeys={COUNSELLOR_STORAGE_KEYS}
       loginPath='/counsellor/login'
     >
-      <div className='cp-welcome'>
-        <h2 className='cp-welcome-title'>Availability</h2>
-        <p className='cp-welcome-sub'>Manage your recurring schedule and manual overrides</p>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#1E293B' }}>My Availability</h2>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748B' }}>View your assigned slots and block unavailable dates</p>
+        </div>
       </div>
 
+      {/* Alerts */}
       {error && (
-        <div
-          style={{ background: '#FEE2E2', color: '#991B1B', padding: '10px 16px', borderRadius: 8, fontSize: 13, marginBottom: 14 }}
-        >
-          {error}
-          <button onClick={dismissMessages} style={{ marginLeft: 12, background: 'none', border: 'none', cursor: 'pointer', color: '#991B1B', fontWeight: 700 }}>
-            x
-          </button>
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B', padding: '10px 16px', borderRadius: 10, fontSize: 13, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>{error}</span>
+          <button onClick={dismissMessages} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#991B1B', fontSize: 16 }}>&times;</button>
         </div>
       )}
-
       {success && (
-        <div
-          style={{ background: '#D1FAE5', color: '#065F46', padding: '10px 16px', borderRadius: 8, fontSize: 13, marginBottom: 14 }}
-        >
+        <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#065F46', padding: '10px 16px', borderRadius: 10, fontSize: 13, marginBottom: 16 }}>
           {success}
-          <button onClick={dismissMessages} style={{ marginLeft: 12, background: 'none', border: 'none', cursor: 'pointer', color: '#065F46', fontWeight: 700 }}>
-            x
-          </button>
         </div>
       )}
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 40, color: '#6B7A8D', fontSize: 14 }}>
-          Loading availability...
-        </div>
+        <div style={{ textAlign: 'center', padding: 60, color: '#64748B', fontSize: 14 }}>Loading availability...</div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-          {/* ── LEFT: Recurring Weekly Schedule ── */}
-          <div>
-            <div className='cp-card' style={{ marginBottom: 16 }}>
-              <div className='cp-card-title'>Recurring Weekly Schedule</div>
+        <>
+          {/* Stats Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
+            {[
+              { label: 'Total Slots', value: manualSlots.length, color: '#263B6A', bg: '#EFF6FF' },
+              { label: 'Available', value: availableCount, color: '#065F46', bg: '#F0FDF4' },
+              { label: 'Booked', value: bookedCount, color: '#0369A1', bg: '#F0F9FF' },
+            ].map((stat) => (
+              <div key={stat.label} style={{
+                background: stat.bg, borderRadius: 12, padding: '20px 18px', textAlign: 'center',
+                border: '1px solid rgba(0,0,0,0.05)',
+              }}>
+                <div style={{ fontSize: 28, fontWeight: 700, color: stat.color }}>{stat.value}</div>
+                <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 4 }}>{stat.label}</div>
+              </div>
+            ))}
+          </div>
 
-              {templates.length === 0 ? (
-                <div style={{ fontSize: 13, color: '#6B7A8D', marginBottom: 14, fontStyle: 'italic' }}>
-                  No templates set yet.
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20 }}>
+            {/* Left: Slots by Date */}
+            <div>
+              <div style={{
+                background: '#fff', borderRadius: 12, border: '1px solid #E2E8F0',
+                overflow: 'hidden',
+              }}>
+                <div style={{
+                  padding: '14px 18px', borderBottom: '1px solid #E2E8F0',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: '#1E293B' }}>Upcoming Slots</div>
+                  <span style={{ fontSize: 12, color: '#64748B' }}>{manualSlots.length} slot(s)</span>
                 </div>
-              ) : (
-                <div style={{ marginBottom: 14 }}>
-                  {templates.map((t) => (
-                    <div
-                      key={t.id}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '8px 12px',
-                        background: '#F8F9FC',
-                        border: '1px solid #DDE3EC',
-                        borderLeft: '3px solid #6984A9',
-                        borderRadius: 6,
-                        marginBottom: 8,
-                        fontSize: 12,
-                        gap: 8,
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 700, color: '#263B6A', marginBottom: 2 }}>
-                          {t.dayOfWeek}
+
+                {manualSlots.length === 0 ? (
+                  <div style={{ padding: '40px 20px', textAlign: 'center', color: '#94A3B8', fontSize: 14 }}>
+                    No slots assigned yet. Contact admin to set up your schedule.
+                  </div>
+                ) : (
+                  <div style={{ maxHeight: 480, overflowY: 'auto' }}>
+                    {Array.from(slotsByDate.entries())
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([date, daySlots]) => (
+                      <div key={date} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                        <div style={{
+                          padding: '10px 18px', background: '#F8FAFC',
+                          fontSize: 13, fontWeight: 700, color: '#334155',
+                        }}>
+                          {formatDateShort(date)}
                         </div>
-                        <div style={{ color: '#6B7A8D' }}>
-                          {formatTime(t.startTime)} – {formatTime(t.endTime)}
-                          &nbsp;&middot;&nbsp;
-                          {t.slotDurationMinutes} min slots
+                        <div style={{ padding: '10px 18px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                          {daySlots
+                            .sort((a: any, b: any) => (a.startTime || '').localeCompare(b.startTime || ''))
+                            .map((s: any) => {
+                            const sc = statusStyle(s.status)
+                            return (
+                              <div key={s.id} style={{
+                                display: 'inline-flex', alignItems: 'center', gap: 6,
+                                padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                                ...sc,
+                              }}>
+                                <span>{formatTime(s.startTime)} – {formatTime(s.endTime)}</span>
+                                <span style={{ fontSize: 10, opacity: 0.7 }}>{(s.status || '').toUpperCase()}</span>
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
-                      <button
-                        className='cp-action-btn'
-                        onClick={() => handleDeleteTemplate(t.id)}
-                        disabled={deletingTemplate === t.id}
-                        style={{ fontSize: 11, padding: '4px 10px', color: '#DC2626', borderColor: '#FCA5A5', flexShrink: 0 }}
-                      >
-                        {deletingTemplate === t.id ? '...' : 'Delete'}
-                      </button>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right: Block Date + Blocked List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Block Date Form */}
+              <div style={{
+                background: '#fff', borderRadius: 12, border: '1px solid #E2E8F0', padding: 20,
+              }}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: '#1E293B', marginBottom: 14 }}>
+                  Block a Date
+                </div>
+                <p style={{ fontSize: 12, color: '#64748B', margin: '0 0 14px' }}>
+                  Submit a request to block a date. Admin will review and approve it.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Date</label>
+                    <input
+                      type='date'
+                      value={blockDateForm.date}
+                      onChange={(e) => setBlockDateForm((f) => ({ ...f, date: e.target.value }))}
+                      min={new Date().toISOString().split('T')[0]}
+                      style={{
+                        width: '100%', padding: '9px 12px', border: '1.5px solid #E2E8F0',
+                        borderRadius: 8, fontSize: 13, outline: 'none', boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Reason (optional)</label>
+                    <input
+                      type='text'
+                      value={blockDateForm.reason}
+                      onChange={(e) => setBlockDateForm((f) => ({ ...f, reason: e.target.value }))}
+                      placeholder='e.g. Personal leave, Holiday...'
+                      style={{
+                        width: '100%', padding: '9px 12px', border: '1.5px solid #E2E8F0',
+                        borderRadius: 8, fontSize: 13, outline: 'none', boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                  <button
+                    onClick={handleBlockDate}
+                    disabled={blockSaving}
+                    style={{
+                      width: '100%', padding: '10px 0', fontSize: 13, fontWeight: 600,
+                      border: 'none', borderRadius: 8, cursor: blockSaving ? 'not-allowed' : 'pointer',
+                      background: blockSaving ? '#9CA3AF' : '#DC2626', color: '#fff',
+                    }}
+                  >
+                    {blockSaving ? 'Submitting...' : 'Request Block'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Blocked Dates List */}
+              {blockedDates.length > 0 && (
+                <div style={{
+                  background: '#fff', borderRadius: 12, border: '1px solid #E2E8F0', overflow: 'hidden',
+                }}>
+                  <div style={{
+                    padding: '14px 18px', borderBottom: '1px solid #E2E8F0',
+                    fontWeight: 700, fontSize: 15, color: '#1E293B',
+                  }}>
+                    Blocked Dates ({blockedDates.length})
+                  </div>
+                  <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+                    {blockedDates.map((s: any) => (
+                      <div key={s.id} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '10px 18px', borderBottom: '1px solid #F8FAFC',
+                      }}>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#991B1B' }}>
+                            {formatDateShort(s.date || s.startTime)}
+                          </div>
+                          {s.reason && (
+                            <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>{s.reason}</div>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleDeleteSlot(s.id)}
+                          disabled={deletingSlot === s.id}
+                          style={{
+                            background: 'none', border: '1px solid #FECACA', borderRadius: 6,
+                            padding: '3px 10px', fontSize: 11, fontWeight: 600,
+                            color: '#991B1B', cursor: 'pointer',
+                          }}
+                        >
+                          {deletingSlot === s.id ? '...' : 'Remove'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Block Requests */}
+              {blockRequests.length > 0 && (
+                <div style={{
+                  background: '#fff', borderRadius: 12, border: '1px solid #E2E8F0', overflow: 'hidden',
+                }}>
+                  <div style={{
+                    padding: '14px 18px', borderBottom: '1px solid #E2E8F0',
+                    fontWeight: 700, fontSize: 15, color: '#1E293B',
+                  }}>
+                    My Block Requests
+                  </div>
+                  <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+                    {blockRequests
+                      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+                      .map((r) => {
+                        const statusStyle: Record<string, { bg: string; color: string }> = {
+                          PENDING: { bg: '#FEF3C7', color: '#92400E' },
+                          APPROVED: { bg: '#D1FAE5', color: '#065F46' },
+                          REJECTED: { bg: '#FEE2E2', color: '#991B1B' },
+                        }
+                        const sc = statusStyle[r.status] || { bg: '#F3F4F6', color: '#6B7280' }
+                        return (
+                          <div key={r.id} style={{
+                            padding: '10px 18px', borderBottom: '1px solid #F8FAFC',
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          }}>
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>
+                                {formatDateShort(r.blockDate)}
+                              </div>
+                              {r.reason && (
+                                <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>{r.reason}</div>
+                              )}
+                              {r.adminResponse && (
+                                <div style={{ fontSize: 11, color: '#64748B', marginTop: 2, fontStyle: 'italic' }}>
+                                  Admin: {r.adminResponse}
+                                </div>
+                              )}
+                            </div>
+                            <span style={{
+                              padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 600,
+                              background: sc.bg, color: sc.color,
+                            }}>
+                              {r.status}
+                            </span>
+                          </div>
+                        )
+                      })}
+                  </div>
                 </div>
               )}
             </div>
-
-            {/* Add Template Form */}
-            <div className='cp-card'>
-              <div className='cp-card-title'>Add Recurring Template</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div>
-                  <label style={labelStyle}>Day of Week</label>
-                  <select
-                    value={templateForm.dayOfWeek}
-                    onChange={(e) => setTemplateForm((f) => ({ ...f, dayOfWeek: e.target.value }))}
-                    style={inputStyle}
-                  >
-                    {DAYS.map((d) => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <div>
-                    <label style={labelStyle}>Start Time</label>
-                    <input
-                      type='time'
-                      value={templateForm.startTime}
-                      onChange={(e) => setTemplateForm((f) => ({ ...f, startTime: e.target.value }))}
-                      style={inputStyle}
-                    />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>End Time</label>
-                    <input
-                      type='time'
-                      value={templateForm.endTime}
-                      onChange={(e) => setTemplateForm((f) => ({ ...f, endTime: e.target.value }))}
-                      style={inputStyle}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label style={labelStyle}>Slot Duration (minutes)</label>
-                  <input
-                    type='number'
-                    min={5}
-                    max={120}
-                    value={templateForm.slotDurationMinutes}
-                    onChange={(e) =>
-                      setTemplateForm((f) => ({ ...f, slotDurationMinutes: parseInt(e.target.value, 10) || 30 }))
-                    }
-                    style={inputStyle}
-                  />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-                  <button
-                    className='cp-action-btn cp-action-btn-primary'
-                    onClick={handleSaveTemplate}
-                    disabled={templateSaving}
-                  >
-                    {templateSaving ? 'Saving...' : 'Save Template'}
-                  </button>
-                </div>
-              </div>
-            </div>
           </div>
-
-          {/* ── RIGHT: Manual Overrides ── */}
-          <div>
-            {/* Manual Slots list */}
-            {manualSlots.length > 0 && (
-              <div className='cp-card' style={{ marginBottom: 16 }}>
-                <div className='cp-card-title'>Extra Slots</div>
-                {manualSlots.map((s) => (
-                  <div
-                    key={s.id}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '8px 12px',
-                      background: '#F8F9FC',
-                      border: '1px solid #DDE3EC',
-                      borderLeft: '3px solid #059669',
-                      borderRadius: 6,
-                      marginBottom: 8,
-                      fontSize: 12,
-                      gap: 8,
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 700, color: '#065F46', marginBottom: 2 }}>
-                        {formatDateShort(s.startTime || s.date)}
-                      </div>
-                      <div style={{ color: '#6B7A8D' }}>
-                        {formatTime(s.startTime)} – {formatTime(s.endTime)}
-                        {s.durationMinutes ? ` · ${s.durationMinutes} min` : ''}
-                      </div>
-                    </div>
-                    <button
-                      className='cp-action-btn'
-                      onClick={() => handleDeleteSlot(s.id)}
-                      disabled={deletingSlot === s.id}
-                      style={{ fontSize: 11, padding: '4px 10px', color: '#DC2626', borderColor: '#FCA5A5', flexShrink: 0 }}
-                    >
-                      {deletingSlot === s.id ? '...' : 'Delete'}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Blocked Dates list */}
-            {blockedDates.length > 0 && (
-              <div className='cp-card' style={{ marginBottom: 16 }}>
-                <div className='cp-card-title'>Blocked Dates</div>
-                {blockedDates.map((s) => (
-                  <div
-                    key={s.id}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '8px 12px',
-                      background: '#FEF2F2',
-                      border: '1px solid #FCA5A5',
-                      borderLeft: '3px solid #DC2626',
-                      borderRadius: 6,
-                      marginBottom: 8,
-                      fontSize: 12,
-                      gap: 8,
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 700, color: '#991B1B', marginBottom: 2 }}>
-                        {formatDateShort(s.date || s.startTime)}
-                      </div>
-                      {s.reason && (
-                        <div style={{ color: '#6B7A8D' }}>{s.reason}</div>
-                      )}
-                    </div>
-                    <button
-                      className='cp-action-btn'
-                      onClick={() => handleDeleteSlot(s.id)}
-                      disabled={deletingSlot === s.id}
-                      style={{ fontSize: 11, padding: '4px 10px', color: '#DC2626', borderColor: '#FCA5A5', flexShrink: 0 }}
-                    >
-                      {deletingSlot === s.id ? '...' : 'Delete'}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Add Extra Slot Form */}
-            <div className='cp-card' style={{ marginBottom: 16 }}>
-              <div className='cp-card-title'>Add Extra Slot</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div>
-                  <label style={labelStyle}>Date</label>
-                  <input
-                    type='date'
-                    value={manualSlotForm.date}
-                    onChange={(e) => setManualSlotForm((f) => ({ ...f, date: e.target.value }))}
-                    style={inputStyle}
-                  />
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <div>
-                    <label style={labelStyle}>Start Time</label>
-                    <input
-                      type='time'
-                      value={manualSlotForm.startTime}
-                      onChange={(e) => setManualSlotForm((f) => ({ ...f, startTime: e.target.value }))}
-                      style={inputStyle}
-                    />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>End Time</label>
-                    <input
-                      type='time'
-                      value={manualSlotForm.endTime}
-                      onChange={(e) => setManualSlotForm((f) => ({ ...f, endTime: e.target.value }))}
-                      style={inputStyle}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label style={labelStyle}>Duration (minutes)</label>
-                  <input
-                    type='number'
-                    min={5}
-                    max={120}
-                    value={manualSlotForm.durationMinutes}
-                    onChange={(e) =>
-                      setManualSlotForm((f) => ({ ...f, durationMinutes: parseInt(e.target.value, 10) || 30 }))
-                    }
-                    style={inputStyle}
-                  />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-                  <button
-                    className='cp-action-btn cp-action-btn-primary'
-                    onClick={handleSaveManualSlot}
-                    disabled={slotSaving}
-                  >
-                    {slotSaving ? 'Adding...' : 'Add Slot'}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Block Date Form */}
-            <div className='cp-card'>
-              <div className='cp-card-title'>Block a Date</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div>
-                  <label style={labelStyle}>Date</label>
-                  <input
-                    type='date'
-                    value={blockDateForm.date}
-                    onChange={(e) => setBlockDateForm((f) => ({ ...f, date: e.target.value }))}
-                    style={inputStyle}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>Reason (optional)</label>
-                  <input
-                    type='text'
-                    value={blockDateForm.reason}
-                    onChange={(e) => setBlockDateForm((f) => ({ ...f, reason: e.target.value }))}
-                    placeholder='e.g. Exam day, Holiday...'
-                    style={inputStyle}
-                  />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-                  <button
-                    className='cp-action-btn'
-                    onClick={handleBlockDate}
-                    disabled={blockSaving}
-                    style={{ background: '#DC2626', color: '#fff', borderColor: '#DC2626' }}
-                  >
-                    {blockSaving ? 'Blocking...' : 'Block Date'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        </>
       )}
     </PortalLayout>
   )

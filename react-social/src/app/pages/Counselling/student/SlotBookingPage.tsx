@@ -69,11 +69,16 @@ function formatWeekLabel(weekStart: string): string {
 const SlotBookingPage: React.FC = () => {
   const navigate = useNavigate()
 
-  const studentId: number = (() => {
+  const { studentId, instituteCode } = (() => {
     try {
-      return JSON.parse(localStorage.getItem('studentPortalDashboard') || '{}')?.userStudentId || 0
+      const profile = JSON.parse(localStorage.getItem('studentPortalProfile') || '{}')
+      const dashboard = JSON.parse(localStorage.getItem('studentPortalDashboard') || '{}')
+      return {
+        studentId: dashboard?.userStudentId || 0,
+        instituteCode: profile?.instituteCode || profile?.institute?.instituteCode || 0,
+      }
     } catch {
-      return 0
+      return { studentId: 0, instituteCode: 0 }
     }
   })()
 
@@ -91,7 +96,7 @@ const SlotBookingPage: React.FC = () => {
     setSlotsError(null)
     setSelectedSlot(null)
 
-    getAvailableSlots(weekStart)
+    getAvailableSlots(weekStart, instituteCode || undefined)
       .then((res) => {
         const data: Slot[] = Array.isArray(res.data) ? res.data : []
         setSlots(data)
@@ -101,7 +106,7 @@ const SlotBookingPage: React.FC = () => {
         setSlots([])
       })
       .finally(() => setSlotsLoading(false))
-  }, [weekStart])
+  }, [weekStart, instituteCode])
 
   const handlePrevWeek = () => {
     setWeekStart((prev) => shiftWeek(prev, -1))
@@ -151,10 +156,10 @@ const SlotBookingPage: React.FC = () => {
               </svg>
             </div>
             <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--sp-text)', margin: '0 0 8px' }}>
-              Booking Requested!
+              Session Booked!
             </h2>
             <p style={{ fontSize: 13, color: 'var(--sp-muted)', marginBottom: 28, lineHeight: 1.6 }}>
-              Your counselling session has been requested. You will be notified once a counsellor confirms the session.
+              Your counselling session has been confirmed. A counsellor has been assigned automatically. You will receive a notification with session details.
             </p>
             <button className='cl-btn-primary' onClick={() => navigate('/student/counselling')} style={{ fontSize: 13 }}>
               Back to My Sessions

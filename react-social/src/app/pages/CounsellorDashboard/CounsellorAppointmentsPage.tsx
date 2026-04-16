@@ -186,22 +186,36 @@ const CounsellorAppointmentsPage: React.FC = () => {
       const userStr = localStorage.getItem('counsellorPortalUser')
       if (userStr) {
         const user = JSON.parse(userStr)
-        setUserId(user.id)
-        getCounsellorByUserId(user.id)
-          .then((res) => {
-            const cId = res.data?.id
-            if (!cId) {
-              setError('Counsellor profile not linked yet. Please contact admin to set up your profile.')
-              setLoading(false)
-              return
-            }
-            setCounsellorId(cId)
-            return getCounsellorAppointments(cId).then((apptRes) => {
-              setAppointments(apptRes.data || [])
+        setUserId(user.counsellorId || user.id)
+
+        // New login flow stores counsellorId directly
+        const cId = user.counsellorId || null
+        if (cId) {
+          setCounsellorId(cId)
+          getCounsellorAppointments(cId)
+            .then((apptRes) => setAppointments(apptRes.data || []))
+            .catch(() => setError('Failed to load appointments.'))
+            .finally(() => setLoading(false))
+        } else if (user.id) {
+          // Legacy flow
+          getCounsellorByUserId(user.id)
+            .then((res) => {
+              const resolvedId = res.data?.id
+              if (!resolvedId) {
+                setError('Counsellor profile not found.')
+                setLoading(false)
+                return
+              }
+              setCounsellorId(resolvedId)
+              return getCounsellorAppointments(resolvedId).then((apptRes) => {
+                setAppointments(apptRes.data || [])
+              })
             })
-          })
-          .catch(() => setError('Counsellor profile not found. Please contact admin to set up your profile.'))
-          .finally(() => setLoading(false))
+            .catch(() => setError('Counsellor profile not found.'))
+            .finally(() => setLoading(false))
+        } else {
+          setLoading(false)
+        }
       }
     } catch {
       navigate('/counsellor/login')

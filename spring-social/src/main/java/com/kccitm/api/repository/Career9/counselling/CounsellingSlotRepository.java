@@ -29,4 +29,13 @@ public interface CounsellingSlotRepository extends JpaRepository<CounsellingSlot
             @Param("templateId") Long templateId);
 
     List<CounsellingSlot> findByCounsellorIdAndDateAndIsBlockedTrue(Long counsellorId, LocalDate date);
+
+    /** Find available slots for a specific set of counsellors (institute-filtered) */
+    @Query("SELECT s FROM CounsellingSlot s WHERE s.status = 'AVAILABLE' AND s.isBlocked = false "
+         + "AND s.counsellor.id IN :counsellorIds AND s.date BETWEEN :start AND :end "
+         + "ORDER BY s.date, s.startTime")
+    List<CounsellingSlot> findAvailableSlotsForCounsellors(
+            @Param("counsellorIds") List<Long> counsellorIds,
+            @Param("start") LocalDate start,
+            @Param("end") LocalDate end);
 }

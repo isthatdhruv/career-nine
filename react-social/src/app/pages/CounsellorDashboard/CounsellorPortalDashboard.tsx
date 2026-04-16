@@ -69,8 +69,13 @@ const CounsellorPortalDashboard: React.FC = () => {
       if (userStr) {
         const parsedUser = JSON.parse(userStr)
         setUser(parsedUser)
-        // Resolve counsellorId from user
-        if (parsedUser.id) {
+
+        // New login flow stores counsellorId directly
+        const cId = parsedUser.counsellorId || null
+        if (cId) {
+          setCounsellorId(cId)
+        } else if (parsedUser.id) {
+          // Legacy flow — resolve via API
           getCounsellorByUserId(parsedUser.id)
             .then((res) => setCounsellorId(res.data?.id || null))
             .catch(() => setCounsellorId(null))
@@ -82,6 +87,7 @@ const CounsellorPortalDashboard: React.FC = () => {
       setLoading(false)
     }
   }, [navigate])
+
 
   if (loading) {
     return (

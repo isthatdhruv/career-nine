@@ -76,6 +76,9 @@ public class AssessmentSubmissionProcessorService {
     @Autowired
     private AssessmentCompletionEmailService assessmentCompletionEmailService;
 
+    @Autowired
+    private AssessmentCompletionService completionService;
+
     /**
      * Async entry point — called by /submit controller after saving to Redis.
      * Reads submission from Redis, processes answers + scores, persists to MySQL.
@@ -313,11 +316,6 @@ public class AssessmentSubmissionProcessorService {
         assessmentAnswerRepository.saveAll(answersToSave);
         assessmentRawScoreRepository.saveAll(rawScoresToSave);
 
-        // Flip mapping to completed — the async path previously only updated Redis,
-        // leaving MySQL stuck on "ongoing" even after answers + scores were persisted.
-        mapping.setStatus("completed");
-        studentAssessmentMappingRepository.save(mapping);
-
         // Delete old records by their specific IDs
         if (!existingAnswerIds.isEmpty()) {
             assessmentAnswerRepository.deleteAllById(existingAnswerIds);
@@ -325,6 +323,11 @@ public class AssessmentSubmissionProcessorService {
         if (!existingScoreIds.isEmpty()) {
             assessmentRawScoreRepository.deleteAllById(existingScoreIds);
         }
+
+        // Guarded completion: verify the student actually answered every question
+        // before flipping to "completed". Must run AFTER deletes so the count reflects
+        // only the just-persisted answers, not the old rows being replaced.
+        completionService.markCompletedIfFullyAnswered(mapping);
 
         logger.info("Persisted to MySQL: {} answers, {} scores for student={} assessment={}",
                 answersToSave.size(), rawScoresToSave.size(), studentId, assessmentId);

@@ -111,7 +111,7 @@ const StudentPortalDashboard: React.FC = () => {
 
       <div className='sp-grid-3'>
         <CareerLibrary />
-        <BookCounselling cciLevel={cciLevel} />
+        <BookCounselling cciLevel={cciLevel} userStudentId={profile.userStudentId} />
         <YourReports userStudentId={profile.userStudentId} />
       </div>
 
