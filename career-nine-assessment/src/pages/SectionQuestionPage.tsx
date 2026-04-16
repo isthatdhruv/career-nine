@@ -6,7 +6,7 @@ import React, {
   useRef,
 } from "react";
 import { createPortal } from "react-dom";
-import { useParams, useNavigate, useBlocker } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useAssessment } from "../contexts/AssessmentContext";
 import { usePreventReload } from "../hooks/usePreventReload";
 import { AssessmentGameWrapper } from "../games/AssessmentGameWrapper";
@@ -78,28 +78,6 @@ const SectionQuestionPage: React.FC = () => {
   const showTimer = assessmentConfig?.showTimer !== false;
   const saveLater = assessmentConfig?.saveLater !== false;
   usePreventReload();
-
-  // Block back-button navigation during assessment (allow internal question navigation)
-  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
-    // Allow navigation within the assessment question flow
-    if (nextLocation.pathname.startsWith('/studentAssessment/sections/')) return false;
-    // Allow navigation to completion page
-    if (nextLocation.pathname === '/studentAssessment/completed') return false;
-    // Block everything else (back button, manual URL changes)
-    return currentLocation.pathname !== nextLocation.pathname;
-  });
-
-  useEffect(() => {
-    if (blocker.state === 'blocked') {
-      const leave = window.confirm('Are you sure you want to leave? Your progress is saved, but you will exit the assessment.');
-      if (leave) {
-        blocker.proceed();
-      } else {
-        blocker.reset();
-      }
-    }
-  }, [blocker]);
-
   const { scheduleWrite, flush: flushLocalStorage } =
     useDebouncedLocalStorage(500);
   const [showSidebar, setShowSidebar] = useState(false);
