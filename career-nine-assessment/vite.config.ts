@@ -1,6 +1,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
 import { compression } from 'vite-plugin-compression2'
+import { resolve } from 'path'
+import { globSync } from 'glob'
+import { unlinkSync } from 'fs'
 
 export default defineConfig({
   plugins: [
@@ -30,6 +34,40 @@ export default defineConfig({
       },
     },
     react(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      workbox: {
+        maximumFileSizeToCacheInBytes: 15 * 1024 * 1024,
+        globPatterns: ['**/*.{js,css,html,webp,png}'],
+        globIgnores: ['assessment-cache/**', 'resource-manifest.json'],
+        runtimeCaching: [
+          {
+            urlPattern: /\.mp4$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'game-videos',
+              expiration: { maxEntries: 10, maxAgeSeconds: 7 * 24 * 60 * 60 },
+            },
+          },
+          {
+            urlPattern: /\/assessment-cache\/.+\.(json|webp)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'assessment-data',
+              expiration: { maxEntries: 50, maxAgeSeconds: 30 * 24 * 60 * 60 },
+            },
+          },
+          {
+            urlPattern: /\/mediapipe\/.+\.(wasm|data|binarypb)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'mediapipe-wasm',
+              expiration: { maxEntries: 10, maxAgeSeconds: 30 * 24 * 60 * 60 },
+            },
+          },
+        ],
+      },
+    }),
     // Gzip + Brotli compression for text-based assets (JS, CSS, JSON, HTML)
     compression({ algorithm: 'gzip', exclude: [/\.(wasm|mp4|webp|png|jpg)$/] }),
     compression({ algorithm: 'brotliCompress', exclude: [/\.(wasm|mp4|webp|png|jpg)$/] }),

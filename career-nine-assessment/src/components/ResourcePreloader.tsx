@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const CACHE_PREFIX = 'career9-resources-';
 const MANIFEST_URL = '/resource-manifest.json';
@@ -162,6 +162,7 @@ async function downloadWithProgress(
 // ─── Component ───
 
 export default function ResourcePreloader({ children }: { children: React.ReactNode }) {
+  const [ready, setReady] = useState(false);
   const cancelledRef = useRef(false);
 
   useEffect(() => {
@@ -174,8 +175,8 @@ export default function ResourcePreloader({ children }: { children: React.ReactN
     filesCompleted = 0;
     if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
 
-    // App renders immediately (non-blocking) — hide preloader overlay right away
-    hidePreloader();
+    // Start the pseudo progress bar immediately — gives constant visual motion
+    startPseudoProgress();
 
     async function preload() {
       try {
@@ -238,6 +239,7 @@ export default function ResourcePreloader({ children }: { children: React.ReactN
       } finally {
         if (!cancelledRef.current) {
           hidePreloader();
+          setReady(true);
         }
       }
     }
@@ -249,7 +251,6 @@ export default function ResourcePreloader({ children }: { children: React.ReactN
     };
   }, []);
 
-  // Non-blocking: render app immediately, preloading continues in background.
-  // AssessmentContext falls back to API if cache misses — no functional impact.
+  if (!ready) return null;
   return <>{children}</>;
 }
