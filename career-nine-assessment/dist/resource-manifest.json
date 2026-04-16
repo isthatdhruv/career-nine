@@ -1,6 +1,6 @@
 {
-  "version": "mo1edtjj",
-  "generated": "2026-04-16T11:30:11.791Z",
+  "version": "mo1eqok3",
+  "generated": "2026-04-16T11:40:11.859Z",
   "resources": [
     {
       "url": "/assessment-cache/30/config.json",
@@ -50,56 +50,6 @@
     {
       "url": "/assessment-cache/34/data.json",
       "size": 274820,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/41/config.json",
-      "size": 104735,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/41/data.json",
-      "size": 104423,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/41/images/370.webp",
-      "size": 89294,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/41/images/371.webp",
-      "size": 88754,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/41/images/372.webp",
-      "size": 94680,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/41/images/373.webp",
-      "size": 72164,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/41/images/374.webp",
-      "size": 134934,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/41/images/375.webp",
-      "size": 51446,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/41/images/376.webp",
-      "size": 86604,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/41/images/377.webp",
-      "size": 47344,
       "priority": "assessment"
     },
     {
@@ -314,12 +264,12 @@
     }
   ],
   "summary": {
-    "total": 62,
-    "totalSize": 26388013,
+    "total": 52,
+    "totalSize": 25513635,
     "byPriority": {
       "assessment": {
-        "count": 20,
-        "size": 3608271
+        "count": 10,
+        "size": 2733893
       },
       "game": {
         "count": 11,
