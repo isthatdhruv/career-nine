@@ -1,6 +1,6 @@
 {
-  "version": "mo1f0t3b",
-  "generated": "2026-04-16T11:48:04.295Z",
+  "version": "mo1g1dhm",
+  "generated": "2026-04-16T12:16:30.346Z",
   "resources": [
     {
       "url": "/assessment-cache/30/config.json",
@@ -204,22 +204,12 @@
     },
     {
       "url": "/index.html",
-      "size": 23267,
-      "priority": "critical"
-    },
-    {
-      "url": "/workbox-66610c77.js",
-      "size": 21445,
+      "size": 23384,
       "priority": "critical"
     },
     {
       "url": "/_headers",
       "size": 189,
-      "priority": "other"
-    },
-    {
-      "url": "/manifest.webmanifest",
-      "size": 188,
       "priority": "other"
     },
     {
@@ -234,8 +224,8 @@
     }
   ],
   "summary": {
-    "total": 46,
-    "totalSize": 23878364,
+    "total": 44,
+    "totalSize": 23856848,
     "byPriority": {
       "assessment": {
         "count": 4,
@@ -250,12 +240,12 @@
         "size": 16975479
       },
       "critical": {
-        "count": 15,
-        "size": 2349118
+        "count": 14,
+        "size": 2327790
       },
       "other": {
-        "count": 4,
-        "size": 927428
+        "count": 3,
+        "size": 927240
       }
     }
   }

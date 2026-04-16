@@ -38,6 +38,10 @@
     </div>
     <div id="root"></div>
     <script>
+      // Unregister any stale service worker from previous builds
+      if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(reg){reg.unregister()})})}
+    </script>
+    <script>
       // Start pseudo-progress IMMEDIATELY — before any JS bundle loads.
       // On slow 3G the bundle takes 15+ seconds; this keeps the bar moving.
       // React's ResourcePreloader will take over via window.__plReady().
