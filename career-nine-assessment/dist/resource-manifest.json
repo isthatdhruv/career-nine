@@ -1,6 +1,6 @@
 {
-  "version": "mo1eqok3",
-  "generated": "2026-04-16T11:40:11.859Z",
+  "version": "mo1f0t3b",
+  "generated": "2026-04-16T11:48:04.295Z",
   "resources": [
     {
       "url": "/assessment-cache/30/config.json",
@@ -19,36 +19,6 @@
     },
     {
       "url": "/assessment-cache/31/data.json",
-      "size": 274820,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/32/config.json",
-      "size": 268472,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/32/data.json",
-      "size": 268181,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/33/config.json",
-      "size": 274490,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/33/data.json",
-      "size": 274199,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/34/config.json",
-      "size": 275109,
-      "priority": "assessment"
-    },
-    {
-      "url": "/assessment-cache/34/data.json",
       "size": 274820,
       "priority": "assessment"
     },
@@ -264,12 +234,12 @@
     }
   ],
   "summary": {
-    "total": 52,
-    "totalSize": 25513635,
+    "total": 46,
+    "totalSize": 23878364,
     "byPriority": {
       "assessment": {
-        "count": 10,
-        "size": 2733893
+        "count": 4,
+        "size": 1098622
       },
       "game": {
         "count": 11,
