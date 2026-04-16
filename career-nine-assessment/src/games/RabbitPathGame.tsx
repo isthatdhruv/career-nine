@@ -189,25 +189,33 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
 
   // Preload images
   useEffect(() => {
+    let cancelled = false;
     const imageUrls = [SCENE_SRC, RABBIT_FORWARD_SRC, RABBIT_REVERSE_SRC];
     let loadedCount = 0;
+    const images: HTMLImageElement[] = [];
 
     imageUrls.forEach(src => {
       const img = new Image();
+      images.push(img);
       img.onload = () => {
         loadedCount++;
-        if (loadedCount === imageUrls.length) {
+        if (!cancelled && loadedCount === imageUrls.length) {
           setImagesLoaded(true);
         }
       };
       img.onerror = () => {
         loadedCount++;
-        if (loadedCount === imageUrls.length) {
+        if (!cancelled && loadedCount === imageUrls.length) {
           setImagesLoaded(true);
         }
       };
       img.src = src;
     });
+
+    return () => {
+      cancelled = true;
+      images.forEach(img => { img.src = ''; });
+    };
   }, []);
 
   const clearTimers = useCallback(() => {
@@ -272,7 +280,13 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
     }
   }, [isTrial, trialRound, round]);
 
+  const scoredThisRoundRef = useRef(false);
+
   const evaluateAndAdvance = useCallback((input: number[], seq: number[]) => {
+    // Prevent double-scoring if both finishInputAndScore and finishAfterBuffer fire
+    if (scoredThisRoundRef.current) return;
+    scoredThisRoundRef.current = true;
+
     const reversedSeq = [...seq].reverse();
     const correct = input.length === reversedSeq.length && input.every((v, i) => v === reversedSeq[i]);
     // Don't show feedback overlay anymore
@@ -345,6 +359,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
 
   const retryWithSameSequence = useCallback(() => {
     clearTimers();
+    scoredThisRoundRef.current = false;
     setLastResult(null);
     setPlayerInput([]);
     inputRef.current = [];
@@ -389,6 +404,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
 
   const startRound = useCallback((nextRoundIndex: number) => {
     clearTimers();
+    scoredThisRoundRef.current = false;
     setLastResult(null);
     setPlayerInput([]);
     inputRef.current = [];
@@ -891,6 +907,7 @@ export function RabbitPathGame({ userStudentId, playerName, onComplete, onExit }
             boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
           }}
           title="Exit"
+          aria-label="Exit game"
         >
           ✕
         </button>

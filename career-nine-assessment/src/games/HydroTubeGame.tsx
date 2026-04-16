@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 // How to play video path - place video at: public/assets/game/hydro-tube-tutorial.mp4
 const HOW_TO_PLAY_VIDEO_PATH = "/assets/game/hydro-tube-tutorial.mp4";
@@ -129,6 +129,14 @@ export function HydroTubeGame({
 
   const [tilesCorrect, setTilesCorrect] = useState(0);
   const [totalSolutionTiles, setTotalSolutionTiles] = useState(16);
+  const pendingTimeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  // Cleanup all pending timeouts on unmount
+  useEffect(() => {
+    return () => {
+      pendingTimeouts.current.forEach(clearTimeout);
+    };
+  }, []);
 
   const currentPattern = patterns[patternId];
 
@@ -157,7 +165,7 @@ export function HydroTubeGame({
         if (nextTime === 135 || nextTime === 90 || nextTime === 45) {
           const randomTile = Math.floor(Math.random() * 16) + 1;
           setHighlightedTile(randomTile);
-          setTimeout(() => setHighlightedTile(null), 5000);
+          pendingTimeouts.current.push(setTimeout(() => setHighlightedTile(null), 5000));
         }
 
         if (prev <= 1) {
@@ -348,7 +356,7 @@ export function HydroTubeGame({
       }
 
       if (checkWin(newState)) {
-        setTimeout(() => setIsWon(true), 500);
+        pendingTimeouts.current.push(setTimeout(() => setIsWon(true), 500));
       }
       return newState;
     });
@@ -943,6 +951,7 @@ export function HydroTubeGame({
             boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
           }}
           title="Exit"
+          aria-label="Exit game"
         >
           ✕
         </button>

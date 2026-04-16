@@ -163,11 +163,26 @@ const AssessmentRegisterPage = () => {
                       <p className="mb-0">
                         <strong>Date of Birth:</strong> <span className="badge bg-primary">{result.dob}</span>
                       </p>
+                      <button
+                        className="btn btn-outline-secondary btn-sm mt-2"
+                        onClick={() => {
+                          const text = `Username: ${result.username}\nDate of Birth: ${result.dob}`;
+                          navigator.clipboard.writeText(text).then(
+                            () => alert('Credentials copied to clipboard!'),
+                            () => {
+                              // Fallback for older browsers
+                              window.prompt('Copy your credentials:', text);
+                            }
+                          );
+                        }}
+                      >
+                        Copy Credentials
+                      </button>
                     </div>
                   )}
 
                   <p className="text-muted mt-3" style={{ fontSize: "0.85em" }}>
-                    Please save these credentials. You will need them to log in and take the assessment.
+                    <strong>Important:</strong> Please save these credentials before proceeding. You will need them to log in and take the assessment.
                   </p>
 
                   <button className="btn btn-primary mt-3" onClick={() => navigate("/student-login")}>

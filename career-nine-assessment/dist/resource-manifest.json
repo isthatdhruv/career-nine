@@ -1,6 +1,6 @@
 {
-  "version": "mo1hdgiu",
-  "generated": "2026-04-16T12:53:53.766Z",
+  "version": "mo1j1mck",
+  "generated": "2026-04-16T13:40:40.676Z",
   "resources": [
     {
       "url": "/assessment-cache/30/config.json",
@@ -138,32 +138,32 @@
       "priority": "deferred"
     },
     {
-      "url": "/assets/HydroTubeGame-B3BQBfmw.js",
-      "size": 23193,
+      "url": "/assets/HydroTubeGame-BDeLH_-L.js",
+      "size": 23331,
       "priority": "critical"
     },
     {
-      "url": "/assets/JungleSpotGame-rp8ACSQD.js",
-      "size": 23324,
+      "url": "/assets/JungleSpotGame-BiYmaU65.js",
+      "size": 23397,
       "priority": "critical"
     },
     {
-      "url": "/assets/RabbitPathGame-CVams-rI.js",
-      "size": 26797,
+      "url": "/assets/RabbitPathGame-SbitJAl6.js",
+      "size": 26981,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionInstructionPage-BWBJ7WlG.js",
+      "url": "/assets/SectionInstructionPage-DQdfz26k.js",
       "size": 4188,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionQuestionPage-BiBARugz.js",
-      "size": 169428,
+      "url": "/assets/SectionQuestionPage-DVR0VlZw.js",
+      "size": 170049,
       "priority": "critical"
     },
     {
-      "url": "/assets/SelectSectionPage-BIjsPakk.js",
+      "url": "/assets/SelectSectionPage-ZMd4g1o7.js",
       "size": 4581,
       "priority": "critical"
     },
@@ -178,8 +178,13 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/index-D5wdQlzt.js",
-      "size": 281351,
+      "url": "/assets/index-CK7T2LfN.js",
+      "size": 1274010,
+      "priority": "critical"
+    },
+    {
+      "url": "/assets/index-CP_juFgr.js",
+      "size": 283030,
       "priority": "critical"
     },
     {
@@ -188,18 +193,13 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/index-DtiMWJOW.js",
-      "size": 1274010,
-      "priority": "critical"
-    },
-    {
       "url": "/assets/react-l0sNRNKZ.js",
       "size": 1,
       "priority": "critical"
     },
     {
-      "url": "/assets/router-DaoQt3T_.js",
-      "size": 30509,
+      "url": "/assets/router-CLVKLto5.js",
+      "size": 31130,
       "priority": "critical"
     },
     {
@@ -235,7 +235,7 @@
   ],
   "summary": {
     "total": 46,
-    "totalSize": 23878407,
+    "totalSize": 23881723,
     "byPriority": {
       "assessment": {
         "count": 4,
@@ -251,7 +251,7 @@
       },
       "critical": {
         "count": 15,
-        "size": 2349161
+        "size": 2352477
       },
       "other": {
         "count": 4,

@@ -234,7 +234,10 @@ export function JungleSpotGame({ userStudentId, playerName, onComplete, onExit }
         advanceTrial(now);
       }
 
-      rafRef.current = requestAnimationFrame(loop);
+      // Only schedule next frame if stopLoop() hasn't been called (endGame sets rafRef to null)
+      if (rafRef.current !== null) {
+        rafRef.current = requestAnimationFrame(loop);
+      }
     },
     [advanceTrial, gameOver]
   );
@@ -1019,6 +1022,7 @@ export function JungleSpotGame({ userStudentId, playerName, onComplete, onExit }
             boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
           }}
           title="Restart"
+          aria-label="Restart game"
         >
           🔄
         </button>
@@ -1038,6 +1042,7 @@ export function JungleSpotGame({ userStudentId, playerName, onComplete, onExit }
             boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
           }}
           title="Exit"
+          aria-label="Exit game"
         >
           ✕
         </button>

@@ -2,9 +2,6 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { compression } from 'vite-plugin-compression2'
-import { resolve } from 'path'
-import { globSync } from 'glob'
-import { unlinkSync } from 'fs'
 
 export default defineConfig({
   plugins: [
@@ -69,8 +66,8 @@ export default defineConfig({
       },
     }),
     // Gzip + Brotli compression for text-based assets (JS, CSS, JSON, HTML)
-    compression({ algorithm: 'gzip', exclude: [/\.(wasm|mp4|webp|png|jpg)$/] }),
-    compression({ algorithm: 'brotliCompress', exclude: [/\.(wasm|mp4|webp|png|jpg)$/] }),
+    compression({ algorithms: ['gzip'], exclude: [/\.(wasm|mp4|webp|png|jpg)$/] }),
+    compression({ algorithms: ['brotliCompress'], exclude: [/\.(wasm|mp4|webp|png|jpg)$/] }),
   ],
   build: {
     rollupOptions: {

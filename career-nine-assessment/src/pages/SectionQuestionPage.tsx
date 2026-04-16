@@ -6,7 +6,7 @@ import React, {
   useRef,
 } from "react";
 import { createPortal } from "react-dom";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useBlocker } from "react-router-dom";
 import { useAssessment } from "../contexts/AssessmentContext";
 import { usePreventReload } from "../hooks/usePreventReload";
 import { AssessmentGameWrapper } from "../games/AssessmentGameWrapper";
@@ -78,6 +78,28 @@ const SectionQuestionPage: React.FC = () => {
   const showTimer = assessmentConfig?.showTimer !== false;
   const saveLater = assessmentConfig?.saveLater !== false;
   usePreventReload();
+
+  // Block back-button navigation during assessment (allow internal question navigation)
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    // Allow navigation within the assessment question flow
+    if (nextLocation.pathname.startsWith('/studentAssessment/sections/')) return false;
+    // Allow navigation to completion page
+    if (nextLocation.pathname === '/studentAssessment/completed') return false;
+    // Block everything else (back button, manual URL changes)
+    return currentLocation.pathname !== nextLocation.pathname;
+  });
+
+  useEffect(() => {
+    if (blocker.state === 'blocked') {
+      const leave = window.confirm('Are you sure you want to leave? Your progress is saved, but you will exit the assessment.');
+      if (leave) {
+        blocker.proceed();
+      } else {
+        blocker.reset();
+      }
+    }
+  }, [blocker]);
+
   const { scheduleWrite, flush: flushLocalStorage } =
     useDebouncedLocalStorage(500);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -190,6 +212,16 @@ const SectionQuestionPage: React.FC = () => {
     const stored = localStorage.getItem("assessmentTextAnswers");
     return stored ? JSON.parse(stored) : {};
   });
+  // Refs mirroring state for use in callbacks (avoids stale closures)
+  const sectionIdRef = useRef(sectionId);
+  sectionIdRef.current = sectionId;
+  const answersRef = useRef(answers);
+  answersRef.current = answers;
+  const textAnswersRef = useRef(textAnswers);
+  textAnswersRef.current = textAnswers;
+  const rankingAnswersRef = useRef(rankingAnswers);
+  rankingAnswersRef.current = rankingAnswers;
+
   // Track which autocomplete dropdown is open: "questionId-inputIdx" or null
   const [activeAutocomplete, setActiveAutocomplete] = useState<string | null>(
     null,
@@ -201,6 +233,16 @@ const SectionQuestionPage: React.FC = () => {
   const textDebounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>(
     {},
   );
+
+  // Clear all text debounce timers on unmount to prevent state updates on unmounted component
+  useEffect(() => {
+    return () => {
+      for (const timer of Object.values(textDebounceRef.current)) {
+        clearTimeout(timer);
+      }
+    };
+  }, []);
+
   // Track completed games: gameCode -> boolean
   const [completedGames, setCompletedGames] = useState<Record<number, boolean>>(
     () => {
@@ -288,13 +330,9 @@ const SectionQuestionPage: React.FC = () => {
     scheduleWrite("assessmentSkipped", JSON.stringify(toStore));
   }, [skipped, scheduleWrite]);
 
-  // Persist elapsed time every 5 seconds (timer ticks every 1s but writes are batched)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      localStorage.setItem("assessmentElapsedTime", String(elapsedTime));
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, [elapsedTime]);
+    scheduleWrite("assessmentElapsedTime", String(elapsedTime));
+  }, [elapsedTime, scheduleWrite]);
 
   useEffect(() => {
     scheduleWrite("assessmentCompletedGames", JSON.stringify(completedGames));
@@ -834,7 +872,7 @@ const SectionQuestionPage: React.FC = () => {
       // Guard against missing session data
       if (!submissionJSON.userStudentId || !submissionJSON.assessmentId) {
         alert("Session data missing. Please log in again.");
-        navigate("/studentAssessment/login");
+        navigate("/student-login");
         return;
       }
 
@@ -949,6 +987,28 @@ const SectionQuestionPage: React.FC = () => {
     );
     if (startSectionIdx === -1) return null;
 
+    // Read from refs to get latest state (avoids stale closures in callbacks)
+    const curAnswers = answersRef.current;
+    const curTextAnswers = textAnswersRef.current;
+    const curRankingAnswers = rankingAnswersRef.current;
+
+    const isQuestionAnswered = (secId: string, q: any): boolean => {
+      const questionId = q.questionnaireQuestionId;
+      const isRanking = q.question.questionType === "ranking";
+      const isText =
+        q.question.questionType === "text" || q.question.isMQTtyped === true;
+      if (isText) {
+        return Object.values(
+          curTextAnswers[secId]?.[questionId] || {},
+        ).some((t: string) => t.trim().length > 0);
+      } else if (isRanking) {
+        const rankings = curRankingAnswers[secId]?.[questionId] || {};
+        return Object.keys(rankings).length > 0;
+      } else {
+        return (curAnswers[secId]?.[questionId]?.length || 0) > 0;
+      }
+    };
+
     for (let sIdx = startSectionIdx; sIdx < sections.length; sIdx++) {
       const sec = sections[sIdx];
       const secId = String(sec.section.sectionId);
@@ -956,27 +1016,8 @@ const SectionQuestionPage: React.FC = () => {
 
       for (let qIdx = startQ; qIdx < sec.questions.length; qIdx++) {
         const q = sec.questions[qIdx];
-        const questionId = q.questionnaireQuestionId;
-
-        // Skip the question we just answered (state may be stale in closure)
-        if (excludeQuestionId && questionId === excludeQuestionId) continue;
-
-        const isRanking = q.question.questionType === "ranking";
-        const isText =
-          q.question.questionType === "text" || q.question.isMQTtyped === true;
-        let isAnswered = false;
-        if (isText) {
-          isAnswered = Object.values(
-            textAnswers[secId]?.[questionId] || {},
-          ).some((t: string) => t.trim().length > 0);
-        } else if (isRanking) {
-          const rankings = rankingAnswers[secId]?.[questionId] || {};
-          isAnswered = Object.keys(rankings).length > 0;
-        } else {
-          isAnswered = (answers[secId]?.[questionId]?.length || 0) > 0;
-        }
-
-        if (!isAnswered) {
+        if (excludeQuestionId && q.questionnaireQuestionId === excludeQuestionId) continue;
+        if (!isQuestionAnswered(secId, q)) {
           return { sectionId: secId, questionIndex: qIdx };
         }
       }
@@ -991,26 +1032,8 @@ const SectionQuestionPage: React.FC = () => {
 
       for (let qIdx = 0; qIdx < endQ; qIdx++) {
         const q = sec.questions[qIdx];
-        const questionId = q.questionnaireQuestionId;
-
-        if (excludeQuestionId && questionId === excludeQuestionId) continue;
-
-        const isRanking = q.question.questionType === "ranking";
-        const isText =
-          q.question.questionType === "text" || q.question.isMQTtyped === true;
-        let isAnswered = false;
-        if (isText) {
-          isAnswered = Object.values(
-            textAnswers[secId]?.[questionId] || {},
-          ).some((t: string) => t.trim().length > 0);
-        } else if (isRanking) {
-          const rankings = rankingAnswers[secId]?.[questionId] || {};
-          isAnswered = Object.keys(rankings).length > 0;
-        } else {
-          isAnswered = (answers[secId]?.[questionId]?.length || 0) > 0;
-        }
-
-        if (!isAnswered) {
+        if (excludeQuestionId && q.questionnaireQuestionId === excludeQuestionId) continue;
+        if (!isQuestionAnswered(secId, q)) {
           return { sectionId: secId, questionIndex: qIdx };
         }
       }
@@ -1110,8 +1133,10 @@ const SectionQuestionPage: React.FC = () => {
   };
 
   const handleGameComplete = () => {
+    // Read from ref to get the current sectionId (avoids stale closure)
+    const curSectionId = sectionIdRef.current;
     // Auto-select the game option when game is completed
-    if (activeGameCode && sectionId) {
+    if (activeGameCode && curSectionId) {
       // Mark this game as completed
       setCompletedGames((prev) => ({
         ...prev,
@@ -1124,18 +1149,18 @@ const SectionQuestionPage: React.FC = () => {
       if (gameOption) {
         // Directly update answers to mark this question as answered (blue)
         setAnswers((prev) => {
-          const sec = prev[sectionId] || {};
+          const sec = prev[curSectionId] || {};
           const arr = sec[qId] || [];
 
           // Only add if not already selected
           if (!arr.includes(gameOption.optionId)) {
             const updated = [...arr, gameOption.optionId];
             console.log(
-              `✅ Game completed! Marking question ${qId} as answered with option ${gameOption.optionId}`,
+              `Game completed! Marking question ${qId} as answered with option ${gameOption.optionId}`,
             );
             return {
               ...prev,
-              [sectionId]: { ...sec, [qId]: updated },
+              [curSectionId]: { ...sec, [qId]: updated },
             };
           }
           return prev;
@@ -1143,14 +1168,14 @@ const SectionQuestionPage: React.FC = () => {
 
         // Remove from skipped and savedForLater
         setSkipped((prev) => {
-          const s = new Set(prev[sectionId] || []);
+          const s = new Set(prev[curSectionId] || []);
           s.delete(qId);
-          return { ...prev, [sectionId]: s };
+          return { ...prev, [curSectionId]: s };
         });
         setSavedForLater((prev) => {
-          const s = new Set(prev[sectionId] || []);
+          const s = new Set(prev[curSectionId] || []);
           s.delete(qId);
-          return { ...prev, [sectionId]: s };
+          return { ...prev, [curSectionId]: s };
         });
       }
     }
