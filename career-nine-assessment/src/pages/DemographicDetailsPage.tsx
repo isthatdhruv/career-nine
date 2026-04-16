@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import http from '../api/http';
 import { useAssessment } from '../contexts/AssessmentContext';
 import { usePreventReload } from '../hooks/usePreventReload';
@@ -26,8 +26,9 @@ type DemographicField = {
 
 const DemographicDetailsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { assessmentId } = useParams<{ assessmentId: string }>();
-  const { fetchAssessmentData, preloadAssessmentData } = useAssessment();
+  const { fetchAssessmentData, assessmentConfig } = useAssessment();
   usePreventReload();
 
   const [fields, setFields] = useState<DemographicField[]>([]);
@@ -43,6 +44,7 @@ const DemographicDetailsPage: React.FC = () => {
   const [contactErrors, setContactErrors] = useState<{ email?: string; phone?: string }>({});
   const [contactTouched, setContactTouched] = useState<{ email?: boolean; phone?: boolean }>({});
 
+  const collectEmailAndPhone = assessmentConfig?.collectEmailAndPhone !== false;
   const userStudentId = localStorage.getItem('userStudentId');
 
   useEffect(() => {
@@ -50,9 +52,16 @@ const DemographicDetailsPage: React.FC = () => {
       navigate('/student-login');
       return;
     }
-    fetchContactInfo();
-    fetchFields();
-    preloadAssessmentData(assessmentId);
+    if (collectEmailAndPhone) {
+      fetchContactInfo();
+    }
+    // Use fields passed from AllottedAssessmentPage to avoid duplicate fetch
+    const passedFields = (location.state as any)?.demographicFields;
+    if (passedFields) {
+      initFields(passedFields);
+    } else {
+      fetchFields();
+    }
   }, [assessmentId, userStudentId]);
 
   const fetchContactInfo = async () => {
@@ -77,30 +86,32 @@ const DemographicDetailsPage: React.FC = () => {
     return '';
   };
 
+  const initFields = (fieldData: DemographicField[]) => {
+    setFields(fieldData);
+    const initialValues: Record<number, string> = {};
+    const initialMulti: Record<number, string[]> = {};
+    for (const field of fieldData) {
+      if (field.dataType === 'SELECT_MULTI') {
+        initialMulti[field.fieldId] = field.currentValue
+          ? field.currentValue.split(',')
+          : [];
+      } else {
+        initialValues[field.fieldId] = field.currentValue || field.defaultValue || '';
+      }
+    }
+    setValues(initialValues);
+    setMultiValues(initialMulti);
+    setIsLoading(false);
+  };
+
   const fetchFields = async () => {
     try {
       const response = await http.get(
         `/student-demographics/fields/${assessmentId}/${userStudentId}`
       );
-      const fieldData: DemographicField[] = response.data;
-      setFields(fieldData);
-
-      const initialValues: Record<number, string> = {};
-      const initialMulti: Record<number, string[]> = {};
-      for (const field of fieldData) {
-        if (field.dataType === 'SELECT_MULTI') {
-          initialMulti[field.fieldId] = field.currentValue
-            ? field.currentValue.split(',')
-            : [];
-        } else {
-          initialValues[field.fieldId] = field.currentValue || field.defaultValue || '';
-        }
-      }
-      setValues(initialValues);
-      setMultiValues(initialMulti);
+      initFields(response.data);
     } catch (error) {
       console.error('Error fetching demographic fields:', error);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -179,18 +190,21 @@ const DemographicDetailsPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate contact fields
-    const emailErr = validateContactEmail(contactEmail);
-    const phoneErr = validateContactPhone(contactPhone);
-    setContactTouched({ email: true, phone: true });
-    setContactErrors({ email: emailErr || undefined, phone: phoneErr || undefined });
+    // Validate contact fields only if collecting
+    let hasError = false;
+    if (collectEmailAndPhone) {
+      const emailErr = validateContactEmail(contactEmail);
+      const phoneErr = validateContactPhone(contactPhone);
+      setContactTouched({ email: true, phone: true });
+      setContactErrors({ email: emailErr || undefined, phone: phoneErr || undefined });
+      hasError = !!emailErr || !!phoneErr;
+    }
 
     const allTouched: Record<number, boolean> = {};
     fields.forEach((f) => (allTouched[f.fieldId] = true));
     setTouched(allTouched);
 
     const newErrors: Record<number, string> = {};
-    let hasError = !!emailErr || !!phoneErr;
     for (const field of fields) {
       const value =
         field.dataType === 'SELECT_MULTI'
@@ -214,11 +228,13 @@ const DemographicDetailsPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      // Save contact info first (lightweight)
-      await http.post(`/student-demographics/contact-info/${userStudentId}`, {
-        email: contactEmail.trim(),
-        phoneNumber: contactPhone.trim(),
-      });
+      // Save contact info only if collecting
+      if (collectEmailAndPhone) {
+        await http.post(`/student-demographics/contact-info/${userStudentId}`, {
+          email: contactEmail.trim(),
+          phoneNumber: contactPhone.trim(),
+        });
+      }
 
       // Save dynamic demographics if any
       if (fields.length > 0) {
@@ -513,59 +529,63 @@ const DemographicDetailsPage: React.FC = () => {
                   </div>
 
                   <form onSubmit={handleSubmit} noValidate>
-                    {/* Contact Info Section */}
-                    <div className="mb-3">
-                      <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
-                        Email Address <span style={{ color: '#e53e3e' }}>*</span>
-                      </label>
-                      <input
-                        type="email"
-                        className={`form-control ${contactErrors.email && contactTouched.email ? 'is-invalid' : ''}`}
-                        placeholder="you@example.com"
-                        value={contactEmail}
-                        onChange={(e) => {
-                          setContactEmail(e.target.value);
-                          if (contactTouched.email) {
-                            setContactErrors((prev) => ({ ...prev, email: validateContactEmail(e.target.value) || undefined }));
-                          }
-                        }}
-                        onBlur={() => {
-                          setContactTouched((prev) => ({ ...prev, email: true }));
-                          setContactErrors((prev) => ({ ...prev, email: validateContactEmail(contactEmail) || undefined }));
-                        }}
-                        style={inputStyle(!!(contactErrors.email && contactTouched.email))}
-                      />
-                      {contactErrors.email && contactTouched.email && (
-                        <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{contactErrors.email}</div>
-                      )}
-                    </div>
+                    {/* Contact Info Section — only if collectEmailAndPhone */}
+                    {collectEmailAndPhone && (
+                      <>
+                        <div className="mb-3">
+                          <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
+                            Email Address <span style={{ color: '#e53e3e' }}>*</span>
+                          </label>
+                          <input
+                            type="email"
+                            className={`form-control ${contactErrors.email && contactTouched.email ? 'is-invalid' : ''}`}
+                            placeholder="you@example.com"
+                            value={contactEmail}
+                            onChange={(e) => {
+                              setContactEmail(e.target.value);
+                              if (contactTouched.email) {
+                                setContactErrors((prev) => ({ ...prev, email: validateContactEmail(e.target.value) || undefined }));
+                              }
+                            }}
+                            onBlur={() => {
+                              setContactTouched((prev) => ({ ...prev, email: true }));
+                              setContactErrors((prev) => ({ ...prev, email: validateContactEmail(contactEmail) || undefined }));
+                            }}
+                            style={inputStyle(!!(contactErrors.email && contactTouched.email))}
+                          />
+                          {contactErrors.email && contactTouched.email && (
+                            <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{contactErrors.email}</div>
+                          )}
+                        </div>
 
-                    <div className="mb-3">
-                      <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
-                        Phone Number <span style={{ color: '#e53e3e' }}>*</span>
-                      </label>
-                      <input
-                        type="tel"
-                        className={`form-control ${contactErrors.phone && contactTouched.phone ? 'is-invalid' : ''}`}
-                        placeholder="10-digit phone number"
-                        value={contactPhone}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/\D/g, '').slice(0, 10);
-                          setContactPhone(val);
-                          if (contactTouched.phone) {
-                            setContactErrors((prev) => ({ ...prev, phone: validateContactPhone(val) || undefined }));
-                          }
-                        }}
-                        onBlur={() => {
-                          setContactTouched((prev) => ({ ...prev, phone: true }));
-                          setContactErrors((prev) => ({ ...prev, phone: validateContactPhone(contactPhone) || undefined }));
-                        }}
-                        style={inputStyle(!!(contactErrors.phone && contactTouched.phone))}
-                      />
-                      {contactErrors.phone && contactTouched.phone && (
-                        <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{contactErrors.phone}</div>
-                      )}
-                    </div>
+                        <div className="mb-3">
+                          <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
+                            Phone Number <span style={{ color: '#e53e3e' }}>*</span>
+                          </label>
+                          <input
+                            type="tel"
+                            className={`form-control ${contactErrors.phone && contactTouched.phone ? 'is-invalid' : ''}`}
+                            placeholder="10-digit phone number"
+                            value={contactPhone}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                              setContactPhone(val);
+                              if (contactTouched.phone) {
+                                setContactErrors((prev) => ({ ...prev, phone: validateContactPhone(val) || undefined }));
+                              }
+                            }}
+                            onBlur={() => {
+                              setContactTouched((prev) => ({ ...prev, phone: true }));
+                              setContactErrors((prev) => ({ ...prev, phone: validateContactPhone(contactPhone) || undefined }));
+                            }}
+                            style={inputStyle(!!(contactErrors.phone && contactTouched.phone))}
+                          />
+                          {contactErrors.phone && contactTouched.phone && (
+                            <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{contactErrors.phone}</div>
+                          )}
+                        </div>
+                      </>
+                    )}
 
                     {/* Divider + dynamic fields */}
                     {fields.length > 0 && (

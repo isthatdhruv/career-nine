@@ -343,6 +343,9 @@ public class AssessmentTableController {
         if (requestBody.get("saveLater") != null) {
             assessment.setSaveLater((Boolean) requestBody.get("saveLater"));
         }
+        if (requestBody.get("collectEmailAndPhone") != null) {
+            assessment.setCollectEmailAndPhone((Boolean) requestBody.get("collectEmailAndPhone"));
+        }
 
         // Handle questionnaire - fetch existing entity by ID
         if (requestBody.get("questionnaire") != null) {
@@ -389,6 +392,7 @@ public class AssessmentTableController {
         existing.setShowTimer(assessment.getShowTimer());
         existing.setSaveLater(assessment.getSaveLater());
         existing.setIsLocked(assessment.getIsLocked());
+        existing.setCollectEmailAndPhone(assessment.getCollectEmailAndPhone());
 
         // Only update questionnaire reference by ID, don't replace the deserialized object
         if (assessment.getQuestionnaire() != null && assessment.getQuestionnaire().getQuestionnaireId() != null) {

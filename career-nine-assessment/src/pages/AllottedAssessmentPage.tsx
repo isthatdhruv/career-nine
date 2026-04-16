@@ -53,7 +53,30 @@ export default function AllottedAssessmentPage() {
     try {
       localStorage.setItem('assessmentId', String(assessment.assessmentId));
 
-      navigate(`/demographics/${assessment.assessmentId}`);
+      // Load assessment config (uses static cache → API, same call that would happen anyway)
+      await fetchAssessmentData(String(assessment.assessmentId));
+      const config = JSON.parse(sessionStorage.getItem('assessmentConfig') || '{}');
+      const shouldCollectContact = config?.collectEmailAndPhone !== false;
+
+      // Check for dynamic demographic fields
+      const fieldsRes = await http.get(
+        `/student-demographics/fields/${assessment.assessmentId}/${userStudentId}`
+      );
+      const hasDynamicFields = Array.isArray(fieldsRes.data) && fieldsRes.data.length > 0;
+
+      if (shouldCollectContact || hasDynamicFields) {
+        // Pass fields data so demographics page doesn't re-fetch
+        navigate(`/demographics/${assessment.assessmentId}`, {
+          state: { demographicFields: fieldsRes.data },
+        });
+      } else {
+        // Skip demographics — start assessment directly
+        await http.post('/assessments/startAssessment', {
+          userStudentId: Number(userStudentId),
+          assessmentId: Number(assessment.assessmentId),
+        });
+        navigate('/general-instructions');
+      }
     } catch (error) {
       console.error('Error starting assessment:', error);
       alert('Failed to start assessment. Please try again.');
