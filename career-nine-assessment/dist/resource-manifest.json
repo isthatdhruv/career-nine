@@ -1,6 +1,6 @@
 {
-  "version": "mo1c50r5",
-  "generated": "2026-04-16T10:27:22.001Z",
+  "version": "mo1edtjj",
+  "generated": "2026-04-16T11:30:11.791Z",
   "resources": [
     {
       "url": "/assessment-cache/30/config.json",
@@ -218,32 +218,32 @@
       "priority": "deferred"
     },
     {
-      "url": "/assets/HydroTubeGame-B3BQBfmw.js",
+      "url": "/assets/HydroTubeGame-CUmQNoMA.js",
       "size": 23193,
       "priority": "critical"
     },
     {
-      "url": "/assets/JungleSpotGame-rp8ACSQD.js",
+      "url": "/assets/JungleSpotGame-D7WHNbgP.js",
       "size": 23324,
       "priority": "critical"
     },
     {
-      "url": "/assets/RabbitPathGame-CVams-rI.js",
+      "url": "/assets/RabbitPathGame-BThAOYaR.js",
       "size": 26797,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionInstructionPage-BWBJ7WlG.js",
+      "url": "/assets/SectionInstructionPage-3X3Gc4EK.js",
       "size": 4188,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionQuestionPage-BiBARugz.js",
+      "url": "/assets/SectionQuestionPage-BT37x1yb.js",
       "size": 169428,
       "priority": "critical"
     },
     {
-      "url": "/assets/SelectSectionPage-BIjsPakk.js",
+      "url": "/assets/SelectSectionPage-DcItjuMj.js",
       "size": 4581,
       "priority": "critical"
     },
@@ -258,8 +258,8 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/index-D5wdQlzt.js",
-      "size": 281351,
+      "url": "/assets/index-BMTVZbKz.js",
+      "size": 281308,
       "priority": "critical"
     },
     {
@@ -315,7 +315,7 @@
   ],
   "summary": {
     "total": 62,
-    "totalSize": 26388056,
+    "totalSize": 26388013,
     "byPriority": {
       "assessment": {
         "count": 20,
@@ -331,7 +331,7 @@
       },
       "critical": {
         "count": 15,
-        "size": 2349161
+        "size": 2349118
       },
       "other": {
         "count": 4,
