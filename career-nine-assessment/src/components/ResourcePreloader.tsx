@@ -245,8 +245,20 @@ export default function ResourcePreloader({ children }: { children: React.ReactN
     }
 
     preload();
+
+    // Safety timeout: if preloading takes more than 15s, skip it and show the app.
+    // This prevents permanent "loading" screens from blocking students.
+    const safetyTimer = setTimeout(() => {
+      if (!cancelledRef.current) {
+        console.warn('ResourcePreloader: safety timeout reached, skipping preload');
+        hidePreloader();
+        setReady(true);
+      }
+    }, 15000);
+
     return () => {
       cancelledRef.current = true;
+      clearTimeout(safetyTimer);
       if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
     };
   }, []);

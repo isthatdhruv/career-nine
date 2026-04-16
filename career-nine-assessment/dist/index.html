@@ -25,7 +25,7 @@
       #pl-bar{height:100%;width:0%;background:linear-gradient(90deg,#667eea,#764ba2);border-radius:4px;transition:width .3s}
       #pl-label{margin-top:12px;font-size:14px;color:#666}
     </style>
-    <script type="module" crossorigin src="/assets/index-CP_juFgr.js"></script>
+    <script type="module" crossorigin src="/assets/index-CY1aAaWx.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/router-CLVKLto5.js">
     <link rel="stylesheet" crossorigin href="/assets/index-DpwdMkRA.css">
   <link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
@@ -59,6 +59,14 @@
         // React calls this to stop the boot timer and take full control
         window.__plBootPct=function(){return pct};
         window.__plBootStop=function(){clearInterval(t)};
+        // Safety: if React never loads (broken bundle), hide preloader after 20s
+        setTimeout(function(){
+          var el=document.getElementById('preloader');
+          if(el){
+            if(label)label.textContent='Taking longer than expected — please refresh';
+            if(bar)bar.style.width='100%';
+          }
+        },20000);
       })();
     </script>
   </body>
