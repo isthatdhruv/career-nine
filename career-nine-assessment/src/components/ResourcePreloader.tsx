@@ -174,8 +174,8 @@ export default function ResourcePreloader({ children }: { children: React.ReactN
     filesCompleted = 0;
     if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
 
-    // Start the pseudo progress bar immediately — gives constant visual motion
-    startPseudoProgress();
+    // App renders immediately (non-blocking) — hide preloader overlay right away
+    hidePreloader();
 
     async function preload() {
       try {
