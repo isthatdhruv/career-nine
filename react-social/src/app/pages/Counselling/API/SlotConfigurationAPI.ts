@@ -22,3 +22,7 @@ export function deleteSlotConfig(id: number) { return axios.delete(`${BASE}/dele
 export function applySlotConfig(configId: number, counsellorIds: number[]) {
   return axios.post(`${BASE}/apply`, { configId, counsellorIds })
 }
+
+export function cleanupLegacy() {
+  return axios.post<{ slotsDeleted: number; templatesDeleted: number }>(`${BASE}/cleanup-legacy`)
+}

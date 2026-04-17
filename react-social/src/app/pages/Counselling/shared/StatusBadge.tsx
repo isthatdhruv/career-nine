@@ -6,6 +6,7 @@ const STATUS_CLASS_MAP: Record<string, string> = {
   PENDING: 'cl-badge-pending',
   ASSIGNED: 'cl-badge-assigned',
   COMPLETED: 'cl-badge-completed',
+  ENDED: 'cl-badge-completed',
   CANCELLED: 'cl-badge-cancelled',
   RESCHEDULED: 'cl-badge-rescheduled',
   NEEDS_NOTES: 'cl-badge-needs-notes',

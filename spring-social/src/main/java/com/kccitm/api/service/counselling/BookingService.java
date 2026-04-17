@@ -1,9 +1,11 @@
 package com.kccitm.api.service.counselling;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import javax.transaction.Transactional;
 
@@ -46,20 +48,28 @@ public class BookingService {
 
     /**
      * Returns all available slots for the week starting at weekStart (inclusive)
-     * through weekStart + 6 days (inclusive).
+     * through weekStart + 6 days (inclusive). Past dates are excluded.
      */
     public List<CounsellingSlot> getAvailableSlots(LocalDate weekStart) {
         LocalDate weekEnd = weekStart.plusDays(6);
-        logger.info("Fetching available slots from {} to {}", weekStart, weekEnd);
-        return slotRepository.findAvailableSlots(weekStart, weekEnd);
+        LocalDate today = LocalDate.now();
+        LocalDate effectiveStart = weekStart.isBefore(today) ? today : weekStart;
+        logger.info("Fetching available slots from {} to {}", effectiveStart, weekEnd);
+        if (effectiveStart.isAfter(weekEnd)) return List.of();
+        return filterOutPastSlots(slotRepository.findAvailableSlots(effectiveStart, weekEnd));
     }
 
     /**
      * Returns available slots filtered to only counsellors allocated to the given institute.
-     * Students see only slots from counsellors assigned to their school.
+     * Students see only slots from counsellors assigned to their school. Past dates are excluded.
      */
     public List<CounsellingSlot> getAvailableSlotsForInstitute(LocalDate weekStart, Integer instituteCode) {
         LocalDate weekEnd = weekStart.plusDays(6);
+        LocalDate today = LocalDate.now();
+        LocalDate effectiveStart = weekStart.isBefore(today) ? today : weekStart;
+
+        if (effectiveStart.isAfter(weekEnd)) return List.of();
+
         List<Long> counsellorIds = counsellorInstituteMappingService.getActiveCounsellorIdsForInstitute(instituteCode);
 
         if (counsellorIds.isEmpty()) {
@@ -68,8 +78,17 @@ public class BookingService {
         }
 
         logger.info("Fetching available slots from {} to {} for institute {} ({} counsellors)",
-                weekStart, weekEnd, instituteCode, counsellorIds.size());
-        return slotRepository.findAvailableSlotsForCounsellors(counsellorIds, weekStart, weekEnd);
+                effectiveStart, weekEnd, instituteCode, counsellorIds.size());
+        return filterOutPastSlots(
+                slotRepository.findAvailableSlotsForCounsellors(counsellorIds, effectiveStart, weekEnd));
+    }
+
+    private List<CounsellingSlot> filterOutPastSlots(List<CounsellingSlot> slots) {
+        LocalDate today = LocalDate.now();
+        LocalTime now = LocalTime.now();
+        return slots.stream()
+                .filter(s -> !s.getDate().equals(today) || s.getStartTime().isAfter(now))
+                .collect(Collectors.toList());
     }
 
     /**
@@ -88,6 +107,12 @@ public class BookingService {
         if (!"AVAILABLE".equals(slot.getStatus())) {
             throw new BadRequestException(
                     "Slot " + slotId + " is not available for booking. Current status: " + slot.getStatus());
+        }
+
+        LocalDate today = LocalDate.now();
+        if (slot.getDate().isBefore(today)
+                || (slot.getDate().equals(today) && !slot.getStartTime().isAfter(LocalTime.now()))) {
+            throw new BadRequestException("Slot " + slotId + " is in the past and cannot be booked.");
         }
 
         // Transition slot to REQUESTED

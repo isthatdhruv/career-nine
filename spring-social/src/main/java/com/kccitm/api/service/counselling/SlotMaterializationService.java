@@ -8,7 +8,6 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.kccitm.api.model.career9.counselling.AvailabilityTemplate;
@@ -29,7 +28,11 @@ public class SlotMaterializationService {
     @Autowired
     private CounsellingSlotRepository slotRepository;
 
-    @Scheduled(cron = "0 0 0 * * *")
+    /**
+     * DEPRECATED: Scheduled auto-materialization disabled.
+     * Slots are now created via SlotConfigurationController.applyToCounsellors()
+     * when admin picks a saved configuration from the Manage Counsellors page.
+     */
     public void materializeSlots() {
         List<AvailabilityTemplate> activeTemplates = templateRepository.findByIsActiveTrue();
         int totalCreated = 0;

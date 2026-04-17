@@ -37,6 +37,8 @@ const CounsellorRegistrationPage: React.FC = () => {
   const navigate = useNavigate()
   const [form, setForm] = useState<FormData>(initialForm)
   const [step, setStep] = useState(1)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
@@ -50,6 +52,22 @@ const CounsellorRegistrationPage: React.FC = () => {
   const update = (field: keyof FormData, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }))
     setError('')
+  }
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) { setError('Please select an image file.'); return }
+    if (file.size > 5 * 1024 * 1024) { setError('Image must be less than 5MB.'); return }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result as string
+      setPhotoPreview(result)
+      setPhotoBase64(result)
+      setError('')
+    }
+    reader.readAsDataURL(file)
   }
 
   const validateStep1 = (): string | null => {
@@ -105,11 +123,16 @@ const CounsellorRegistrationPage: React.FC = () => {
       qualifications: form.qualifications.trim() || undefined,
       yearsOfExperience: form.yearsOfExperience ? Number(form.yearsOfExperience) : undefined,
     })
-      .then(() => setSubmitted(true))
-      .catch(() => {
-        // Registration saved on UI side — even if API had a transient error,
-        // the user sees the confirmation. They can retry from login page.
+      .then((res) => {
+        setSubmitted(true)
+        // Upload photo if selected
+        const counsellorId = res.data?.counsellorId
+        if (photoBase64 && counsellorId) {
+          axios.post(`${API_BASE_URL}/api/counsellor/upload-photo/${counsellorId}`, { photo: photoBase64 })
+            .catch(() => {}) // Photo upload failure is non-blocking
+        }
       })
+      .catch(() => {})
   }
 
   // ── Step Indicator ──
@@ -203,6 +226,48 @@ const CounsellorRegistrationPage: React.FC = () => {
           {/* ── Step 1: Account Details ── */}
           {step === 1 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Profile Photo */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div
+                  style={{
+                    width: 72, height: 72, borderRadius: '50%', overflow: 'hidden',
+                    border: '2px dashed #D1E5DF', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', background: '#FAFCFB', flexShrink: 0,
+                    cursor: 'pointer', position: 'relative',
+                  }}
+                  onClick={() => document.getElementById('photo-input')?.click()}
+                >
+                  {photoPreview ? (
+                    <img src={photoPreview} alt='Preview' style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <svg width='28' height='28' viewBox='0 0 24 24' fill='none' stroke='#9CA3AF' strokeWidth='1.5'>
+                      <path d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2' />
+                      <circle cx='12' cy='7' r='4' />
+                    </svg>
+                  )}
+                </div>
+                <div>
+                  <button
+                    type='button'
+                    onClick={() => document.getElementById('photo-input')?.click()}
+                    style={{
+                      padding: '6px 16px', fontSize: 13, fontWeight: 600, border: '1.5px solid #D1E5DF',
+                      borderRadius: 8, background: '#fff', color: '#1A2B28', cursor: 'pointer',
+                    }}
+                  >
+                    {photoPreview ? 'Change Photo' : 'Upload Photo'}
+                  </button>
+                  <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 4 }}>JPG, PNG or WebP. Max 5MB.</div>
+                  <input
+                    id='photo-input'
+                    type='file'
+                    accept='image/*'
+                    onChange={handlePhotoChange}
+                    style={{ display: 'none' }}
+                  />
+                </div>
+              </div>
+
               <div>
                 <label style={labelStyle}>Full Name *</label>
                 <input style={inputStyle} placeholder='Enter your full name' value={form.name}
@@ -287,6 +352,16 @@ const CounsellorRegistrationPage: React.FC = () => {
           {/* ── Step 3: Review ── */}
           {step === 3 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {/* Photo preview in review */}
+              {photoPreview && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 8 }}>
+                  <img src={photoPreview} alt='Profile' style={{
+                    width: 56, height: 56, borderRadius: '50%', objectFit: 'cover',
+                    border: '2px solid #D1E5DF',
+                  }} />
+                  <span style={{ fontSize: 13, color: '#5C7A72' }}>Profile photo selected</span>
+                </div>
+              )}
               {[
                 { label: 'Name', value: form.name },
                 { label: 'Email', value: form.email },

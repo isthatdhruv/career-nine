@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import '../Counselling.css'
-import { createSlotConfig, getAllSlotConfigs, deleteSlotConfig, SlotConfig } from '../API/SlotConfigurationAPI'
+import { createSlotConfig, getAllSlotConfigs, deleteSlotConfig, cleanupLegacy, SlotConfig } from '../API/SlotConfigurationAPI'
 
 const SlotManagementPage: React.FC = () => {
   const [configs, setConfigs] = useState<SlotConfig[]>([])
@@ -20,6 +20,7 @@ const SlotManagementPage: React.FC = () => {
   const [hasBreak, setHasBreak] = useState(true)
   const [duration, setDuration] = useState(30)
   const [saving, setSaving] = useState(false)
+  const [cleaning, setCleaning] = useState(false)
 
   const showSuccess = (msg: string) => {
     setSuccess(msg)
@@ -86,6 +87,20 @@ const SlotManagementPage: React.FC = () => {
     }
   }
 
+  const handleCleanupLegacy = async () => {
+    if (!window.confirm('This will delete all legacy slots and templates created by the old system. Already-booked slots are safe. Continue?')) return
+    setCleaning(true)
+    setError(null)
+    try {
+      const res = await cleanupLegacy()
+      showSuccess(`Cleaned up ${res.data.slotsDeleted} slots and ${res.data.templatesDeleted} templates.`)
+    } catch {
+      setError('Failed to cleanup legacy data.')
+    } finally {
+      setCleaning(false)
+    }
+  }
+
   const handleDelete = async (id: number) => {
     try {
       await deleteSlotConfig(id)
@@ -116,9 +131,23 @@ const SlotManagementPage: React.FC = () => {
             Create slot configurations and assign them to counsellors from Manage Counsellors page
           </p>
         </div>
-        <button className='cl-btn-primary' onClick={() => setShowForm(!showForm)} style={{ fontSize: 13 }}>
-          {showForm ? 'Cancel' : 'New Configuration'}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={handleCleanupLegacy}
+            disabled={cleaning}
+            style={{
+              fontSize: 13, padding: '7px 14px', fontWeight: 600,
+              border: '1.5px solid #FECACA', borderRadius: 6,
+              background: '#fff', color: '#991B1B',
+              cursor: cleaning ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {cleaning ? 'Cleaning...' : 'Cleanup Legacy Slots'}
+          </button>
+          <button className='cl-btn-primary' onClick={() => setShowForm(!showForm)} style={{ fontSize: 13 }}>
+            {showForm ? 'Cancel' : 'New Configuration'}
+          </button>
+        </div>
       </div>
 
       {/* Alerts */}

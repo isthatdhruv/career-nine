@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.career9.counselling.Counsellor;
 import com.kccitm.api.repository.Career9.counselling.CounsellorRepository;
+import com.kccitm.api.service.DigitalOceanSpacesService;
 import com.kccitm.api.service.counselling.CounsellorService;
 
 @RestController
@@ -33,6 +34,9 @@ public class CounsellorController {
 
     @Autowired
     private CounsellorRepository counsellorRepository;
+
+    @Autowired
+    private DigitalOceanSpacesService spacesService;
 
     @Autowired
     private com.kccitm.api.service.counselling.CounsellingActivityLogService activityLogService;
@@ -169,6 +173,36 @@ public class CounsellorController {
                 "specializations", counsellor.getSpecializations() != null ? counsellor.getSpecializations() : "",
                 "isActive", counsellor.getIsActive(),
                 "onboardingStatus", counsellor.getOnboardingStatus() != null ? counsellor.getOnboardingStatus() : ""));
+    }
+
+    /**
+     * POST /api/counsellor/upload-photo/{id}
+     * Upload a profile photo as base64 data URL.
+     * Body: { "photo": "data:image/png;base64,..." }
+     */
+    @PostMapping("/upload-photo/{id}")
+    public ResponseEntity<?> uploadPhoto(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        String photo = (String) body.get("photo");
+        if (photo == null || !photo.startsWith("data:image")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid image data"));
+        }
+
+        Counsellor counsellor = counsellorRepository.findById(id).orElse(null);
+        if (counsellor == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        try {
+            String url = spacesService.uploadBase64File(photo, "counsellor-photos", "counsellor-" + id);
+            counsellor.setProfileImageUrl(url);
+            counsellorRepository.save(counsellor);
+            logger.info("Uploaded profile photo for counsellor {}", id);
+            return ResponseEntity.ok(Map.of("profileImageUrl", url));
+        } catch (Exception e) {
+            logger.error("Failed to upload photo for counsellor {}: {}", id, e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to upload photo. Please try again."));
+        }
     }
 
     @PostMapping("/create")

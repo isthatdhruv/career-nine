@@ -351,6 +351,7 @@ public class AppointmentService {
         newAppointment.setAssignedBy(oldAppointment.getAssignedBy());
         newAppointment.setStudentReason(oldAppointment.getStudentReason());
         newAppointment.setStatus("CONFIRMED");
+        newAppointment.setRescheduledFromAppointmentId(appointmentId);
 
         // Transition new slot to CONFIRMED
         newSlot.setStatus("CONFIRMED");

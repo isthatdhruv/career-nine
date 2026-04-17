@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import PortalLayout, { MenuItem } from '../portal/PortalLayout'
 import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
-import { getSlotsByCounsellor } from '../Counselling/API/SlotAPI'
+import { getSlotsByCounsellor, createManualSlot, deleteSlot } from '../Counselling/API/SlotAPI'
 import { submitBlockDateRequest, getBlockRequestsByCounsellor, BlockDateRequest } from '../Counselling/API/BlockDateRequestAPI'
 import './CounsellorPortal.css'
 

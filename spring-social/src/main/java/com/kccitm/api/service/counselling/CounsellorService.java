@@ -64,6 +64,39 @@ public class CounsellorService {
         if (updated.getProfileImageUrl() != null) {
             existing.setProfileImageUrl(updated.getProfileImageUrl());
         }
+        if (updated.getLanguagesSpoken() != null) {
+            existing.setLanguagesSpoken(updated.getLanguagesSpoken());
+        }
+        if (updated.getModeCapability() != null) {
+            existing.setModeCapability(updated.getModeCapability());
+        }
+        if (updated.getQualifications() != null) {
+            existing.setQualifications(updated.getQualifications());
+        }
+        if (updated.getYearsOfExperience() != null) {
+            existing.setYearsOfExperience(updated.getYearsOfExperience());
+        }
+        if (updated.getLinkedinProfile() != null) {
+            existing.setLinkedinProfile(updated.getLinkedinProfile());
+        }
+        if (updated.getMaxSessionsPerDay() != null) {
+            existing.setMaxSessionsPerDay(updated.getMaxSessionsPerDay());
+        }
+        if (updated.getHourlyRatePreference() != null) {
+            existing.setHourlyRatePreference(updated.getHourlyRatePreference());
+        }
+        if (updated.getGovtIdLast4() != null) {
+            existing.setGovtIdLast4(updated.getGovtIdLast4());
+        }
+        if (updated.getBankName() != null) {
+            existing.setBankName(updated.getBankName());
+        }
+        if (updated.getBankAccount() != null) {
+            existing.setBankAccount(updated.getBankAccount());
+        }
+        if (updated.getBankIfsc() != null) {
+            existing.setBankIfsc(updated.getBankIfsc());
+        }
 
         logger.debug("Updating counsellor with id: {}", id);
         return counsellorRepository.save(existing);

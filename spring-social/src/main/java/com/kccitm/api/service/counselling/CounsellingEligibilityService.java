@@ -104,6 +104,17 @@ public class CounsellingEligibilityService {
             return result;
         }
 
+        // 3.5 Check admin override — counsellingAllowed flag set via Manage Students page
+        if (Boolean.TRUE.equals(student.getCounsellingAllowed())) {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("message", "Counselling access granted by administrator.");
+            result.put("track", "EVENT");
+            result.put("action", "BOOK_COUNSELLING");
+            result.put("payload", payload);
+            logger.info("Student {} eligible via admin-granted counsellingAllowed flag", userStudentId);
+            return result;
+        }
+
         // 4. Check EVENT track — does the student's institute have an active counselling plan?
         if (student.getInstitute() != null) {
             Integer instituteCode = student.getInstitute().getInstituteCode();

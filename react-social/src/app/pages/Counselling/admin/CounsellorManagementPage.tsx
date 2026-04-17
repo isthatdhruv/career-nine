@@ -21,6 +21,7 @@ interface Counsellor {
   isExternal?: boolean
   isActive?: boolean
   onboardingStatus?: string
+  profileImageUrl?: string
 }
 
 /** Safely get the counsellor's ID (backend may return `id` or frontend may map `counsellorId`) */
@@ -509,7 +510,7 @@ const CounsellorManagementPage: React.FC = () => {
               Institute Allocation ({selectedIds.size})
             </button>
             <button className='cl-btn-blue' onClick={openSlotModal} style={{ fontSize: 13 }}>
-              Manage Slots ({selectedIds.size})
+              Create Slots ({selectedIds.size})
             </button>
           </div>
         )}
@@ -830,12 +831,29 @@ const CounsellorManagementPage: React.FC = () => {
 
                   {/* Name */}
                   <td style={{ padding: '12px 14px' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--sp-text, #1A2B28)' }}>{c.name}</div>
-                    {c.isExternal && (
-                      <div style={{ fontSize: 11, color: 'var(--sp-muted, #5C7A72)', marginTop: 2 }}>
-                        External
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{
+                        width: 36, height: 36, borderRadius: '50%', overflow: 'hidden',
+                        background: '#E8F5E9', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', flexShrink: 0, border: '1px solid #D1E5DF',
+                      }}>
+                        {c.profileImageUrl ? (
+                          <img src={c.profileImageUrl} alt='' style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <span style={{ fontSize: 14, fontWeight: 700, color: '#0C6B5A' }}>
+                            {c.name?.charAt(0)?.toUpperCase() || '?'}
+                          </span>
+                        )}
                       </div>
-                    )}
+                      <div>
+                        <div style={{ fontWeight: 600, color: 'var(--sp-text, #1A2B28)' }}>{c.name}</div>
+                        {c.isExternal && (
+                          <div style={{ fontSize: 11, color: 'var(--sp-muted, #5C7A72)', marginTop: 1 }}>
+                            External
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </td>
 
                   {/* Email */}
