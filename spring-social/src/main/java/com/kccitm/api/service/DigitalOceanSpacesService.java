@@ -20,6 +20,8 @@ import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.BucketCrossOriginConfiguration;
+import com.amazonaws.services.s3.model.CORSRule;
 import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
@@ -48,6 +50,9 @@ public class DigitalOceanSpacesService {
     @Value("${app.digitalocean.spaces.endpoint:${DO_SPACES_ENDPOINT:https://sgp1.digitaloceanspaces.com}}")
     private String endpoint;
 
+    @Value("${app.cors.allowedOrigins:}")
+    private String[] allowedOrigins;
+
     private AmazonS3 s3Client;
 
     @PostConstruct
@@ -68,10 +73,76 @@ public class DigitalOceanSpacesService {
                     .withCredentials(new AWSStaticCredentialsProvider(credentials))
                     .build();
             logger.info("  Status:     READY");
+            applyBucketCors();
         } else {
             logger.warn("  Status:     NOT CONFIGURED - Set DO_SPACES_ACCESS_KEY and DO_SPACES_SECRET_KEY");
         }
         logger.info("=======================================================");
+    }
+
+    /**
+     * Push a CORS policy to the Spaces bucket so the browser's pre-signed PUT
+     * (used for bulk report-zip uploads) passes its preflight OPTIONS check.
+     * Mirrors the server-side CORS allow-list from app.cors.allowedOrigins.
+     * Failures are non-fatal — if the access key can't set bucket CORS, the
+     * app still boots and the policy can be applied manually in the DO console.
+     */
+    private void applyBucketCors() {
+        try {
+            applyBucketCorsOrThrow();
+            logger.info("  CORS:       applied to bucket {} ({} origins)", bucket,
+                    allowedOrigins == null ? 0 : allowedOrigins.length);
+        } catch (Exception e) {
+            logger.warn("  CORS:       failed to apply ({}) — set manually in DO console if needed",
+                    e.getMessage());
+        }
+    }
+
+    /**
+     * Same as {@link #applyBucketCors()} but surfaces the exception so the
+     * admin endpoint can report real errors back to the caller instead of
+     * swallowing them.
+     */
+    public java.util.List<String> applyBucketCorsOrThrow() {
+        if (s3Client == null) {
+            throw new IllegalStateException("DigitalOcean Spaces is not configured.");
+        }
+        java.util.List<String> origins = new java.util.ArrayList<>();
+        if (allowedOrigins != null) {
+            for (String o : allowedOrigins) {
+                if (o != null && !o.isBlank()) origins.add(o.trim());
+            }
+        }
+        if (origins.isEmpty()) {
+            throw new IllegalStateException("No allowed origins configured (app.cors.allowedOrigins).");
+        }
+        CORSRule rule = new CORSRule()
+                .withAllowedOrigins(origins)
+                .withAllowedMethods(java.util.Arrays.asList(
+                        CORSRule.AllowedMethods.GET,
+                        CORSRule.AllowedMethods.PUT,
+                        CORSRule.AllowedMethods.POST,
+                        CORSRule.AllowedMethods.HEAD))
+                .withAllowedHeaders(java.util.Collections.singletonList("*"))
+                .withExposedHeaders(java.util.Arrays.asList("ETag"))
+                .withMaxAgeSeconds(3600);
+        BucketCrossOriginConfiguration config = new BucketCrossOriginConfiguration()
+                .withRules(java.util.Collections.singletonList(rule));
+        s3Client.setBucketCrossOriginConfiguration(bucket, config);
+        return origins;
+    }
+
+    /**
+     * Read the current CORS rules from the bucket so the admin endpoint can
+     * confirm what is (or isn't) actually stored server-side.
+     */
+    public java.util.List<CORSRule> getBucketCorsRules() {
+        if (s3Client == null) {
+            throw new IllegalStateException("DigitalOcean Spaces is not configured.");
+        }
+        BucketCrossOriginConfiguration config = s3Client.getBucketCrossOriginConfiguration(bucket);
+        if (config == null || config.getRules() == null) return java.util.Collections.emptyList();
+        return config.getRules();
     }
 
     /**
