@@ -11,6 +11,7 @@ import {
 import { getAssessmentMappingsByInstitute } from "../AssessmentMapping/API/AssessmentMapping_APIs";
 import {
   getReportType,
+  getReportTypes,
   generateDataForAssessment,
   getReportDataByAssessment,
   generateReportsForAssessment,
@@ -37,6 +38,8 @@ import EmailComposeModal from "./components/EmailComposeModal";
 import DownloadsModal, { ZipJob } from "./components/DownloadsModal";
 import { uploadReportZip, deleteReportZip } from "./API/ReportZip_APIs";
 import { Navigator360Preview } from "./navigator360/Navigator360Report";
+import { FourPagerPreview } from "./fourPager/FourPagerReport";
+import { buildFourPagerHtml } from "./fourPager/FourPagerAPI";
 
 // ═══════════════════════ TYPES ═══════════════════════
 
@@ -123,6 +126,7 @@ const ReportsHubPage: React.FC = () => {
   const [zipNamePromptOpen, setZipNamePromptOpen] = useState(false);
   const [zipNameInput, setZipNameInput] = useState("");
   const pendingZipIds = useRef<number[]>([]);
+  const pendingZipKind = useRef<"navigator" | "fourPager">("navigator");
   const [miraDesaiOpen, setMiraDesaiOpen] = useState(false);
   const [schoolReportOpen, setSchoolReportOpen] = useState(false);
   const [bulkSendOpen, setBulkSendOpen] = useState(false);
@@ -139,6 +143,11 @@ const ReportsHubPage: React.FC = () => {
 
   // ── Navigator 360 preview ──
   const [nav360Preview, setNav360Preview] = useState<{ studentId: number; studentName: string } | null>(null);
+
+  // ── 4-Pager preview ──
+  const [fourPagerPreview, setFourPagerPreview] = useState<
+    { studentId: number; studentName: string; studentClass?: string } | null
+  >(null);
 
   // ═══════════════════════ DATA LOADING ═══════════════════════
 
@@ -220,8 +229,10 @@ const ReportsHubPage: React.FC = () => {
   }, [assessments, selectedAssessment]);
 
   const reportType: ReportType = selectedAssessmentObj ? getReportType(selectedAssessmentObj) : "bet";
+  const applicableTypes: ReportType[] = selectedAssessmentObj ? getReportTypes(selectedAssessmentObj) : ["bet"];
   const isBet = reportType === "bet";
   const isNavigator = !isBet;
+  const hasFourPager = applicableTypes.includes("fourPager");
 
   const refreshReportData = useCallback(async (): Promise<Map<number, ReportData>> => {
     if (!selectedAssessmentObj) return new Map();
@@ -344,14 +355,19 @@ const ReportsHubPage: React.FC = () => {
   }, [selectedStudentIds, displayedStudents]);
 
   const reportStats = useMemo(() => {
-    let generated = 0, notGenerated = 0;
+    let generated = 0, notGenerated = 0, completed = 0;
+    const assessmentId = selectedAssessmentObj?.id;
     for (const s of displayedStudents) {
       const rd = reportDataMap.get(s.userStudentId);
       if (rd && rd.reportStatus === "generated") generated++;
       else notGenerated++;
+      if (assessmentId != null) {
+        const status = s.assessments?.find((a) => a.assessmentId === assessmentId)?.status;
+        if (status === "completed") completed++;
+      }
     }
-    return { generated, notGenerated };
-  }, [displayedStudents, reportDataMap]);
+    return { generated, notGenerated, completed };
+  }, [displayedStudents, reportDataMap, selectedAssessmentObj]);
 
   const downloadBlob = (data: any, filename: string) => {
     const url = window.URL.createObjectURL(new Blob([data]));
@@ -468,7 +484,25 @@ const ReportsHubPage: React.FC = () => {
     });
     if (ids.length === 0) { showErrorToast("No generated reports to download."); return; }
     pendingZipIds.current = ids;
+    pendingZipKind.current = "navigator";
     setZipNameInput(`${reportType}_reports_${selectedAssessmentObj.assessmentName.replace(/[^a-zA-Z0-9]/g, "_")}`);
+    setZipNamePromptOpen(true);
+  };
+
+  // 4-Pager bulk ZIP — builds HTML client-side from Navigator 360 scores,
+  // converts each to PDF, packages into ZIP, uploads to DO Spaces.
+  const handleFourPagerZipClick = () => {
+    if (!selectedAssessmentObj) return;
+    const assessmentId = selectedAssessmentObj.id;
+    const ids = getSelectedOrAllIds().filter((id) => {
+      const s = students.find((st) => st.userStudentId === id);
+      const status = s?.assessments?.find((a) => a.assessmentId === assessmentId)?.status;
+      return status === "completed";
+    });
+    if (ids.length === 0) { showErrorToast("No completed assessments to package."); return; }
+    pendingZipIds.current = ids;
+    pendingZipKind.current = "fourPager";
+    setZipNameInput(`fourPager_reports_${selectedAssessmentObj.assessmentName.replace(/[^a-zA-Z0-9]/g, "_")}`);
     setZipNamePromptOpen(true);
   };
 
@@ -494,28 +528,49 @@ const ReportsHubPage: React.FC = () => {
       setZipJobs((prev) => prev.map((j) => j.id === jobId ? { ...j, ...patch } : j));
     };
 
+    const kind = pendingZipKind.current;
+
     // Fire and forget
     (async () => {
       try {
-        // Phase 1: Fetch report URLs
-        const res = await getReportUrls(assessment, ids);
-        const studs: { userStudentId: number; fileName: string }[] =
-          res.data.reports.map((r: any) => ({ userStudentId: r.userStudentId, fileName: r.fileName }));
+        // Phase 1: Build the list of students with a filename for each
+        let studs: { userStudentId: number; fileName: string }[];
+        if (kind === "fourPager") {
+          studs = ids.map((id) => {
+            const s = students.find((st) => st.userStudentId === id);
+            const safe = (s?.name || `student_${id}`).replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_");
+            return { userStudentId: id, fileName: `${safe}_4pager` };
+          });
+        } else {
+          const res = await getReportUrls(assessment, ids);
+          studs = res.data.reports.map((r: any) => ({ userStudentId: r.userStudentId, fileName: r.fileName }));
+        }
         const total = studs.length;
 
-        // Phase 2: Fetch HTML in parallel
+        // Phase 2: Fetch / build HTML in parallel
         const CONCURRENCY = 5;
         const htmlResults: { fileName: string; html: string | null }[] = new Array(total);
         let fetchDone = 0;
-        const fetchQueue = studs.map((s, i) => [i, s] as [number, typeof s]);
+        const fetchQueue = studs.map((s, i) => [i, s] as [number, typeof studs[0]]);
 
         const fetchWorker = async () => {
           while (fetchQueue.length > 0) {
             const [idx, student] = fetchQueue.shift()!;
             try {
-              const r = await downloadReport(assessment, student.userStudentId);
-              const html = typeof r.data === "string" ? r.data : await new Blob([r.data]).text();
-              htmlResults[idx] = { fileName: student.fileName, html };
+              if (kind === "fourPager") {
+                const row = students.find((st) => st.userStudentId === student.userStudentId);
+                const section = row?.schoolSectionId ? sectionLookup.get(row.schoolSectionId) : undefined;
+                const { html } = await buildFourPagerHtml(student.userStudentId, assessment.id, {
+                  studentName: row?.name || `Student ${student.userStudentId}`,
+                  studentClass: section?.className || "",
+                  schoolName: selectedInstituteName,
+                });
+                htmlResults[idx] = { fileName: student.fileName, html };
+              } else {
+                const r = await downloadReport(assessment, student.userStudentId);
+                const html = typeof r.data === "string" ? r.data : await new Blob([r.data]).text();
+                htmlResults[idx] = { fileName: student.fileName, html };
+              }
             } catch {
               htmlResults[idx] = { fileName: student.fileName, html: null };
             }
@@ -935,6 +990,19 @@ const ReportsHubPage: React.FC = () => {
                     Download ZIP
                   </button>
 
+                  {/* 4-Pager ZIP (only when 4-pager applies to this assessment) */}
+                  {hasFourPager && (
+                    <button className="btn btn-sm" disabled={reportStats.completed === 0}
+                      onClick={handleFourPagerZipClick}
+                      style={{
+                        background: reportStats.completed === 0 ? "#6c757d" : "linear-gradient(135deg, #2D4A3E 0%, #1f3229 100%)",
+                        border: "none", borderRadius: 8, padding: "8px 20px",
+                        fontWeight: 600, color: "white", fontSize: "0.85rem",
+                      }}>
+                      4-Pager ZIP
+                    </button>
+                  )}
+
                   {/* Downloads Manager */}
                   <button className="btn btn-sm" onClick={() => setDownloadsOpen(true)}
                     style={{
@@ -1159,6 +1227,25 @@ const ReportsHubPage: React.FC = () => {
                                   }}>
                                   Preview
                                 </button>
+                                {hasFourPager && (
+                                  <button
+                                    onClick={() => {
+                                      const section = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
+                                      setFourPagerPreview({
+                                        studentId: s.userStudentId,
+                                        studentName: s.name || "Student",
+                                        studentClass: section?.className || "",
+                                      });
+                                    }}
+                                    style={{
+                                      padding: "3px 10px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 600,
+                                      background: "linear-gradient(135deg, #2D4A3E 0%, #1f3229 100%)",
+                                      color: "#fff", border: "none", cursor: "pointer",
+                                      boxShadow: "0 2px 6px rgba(45,74,62,0.3)",
+                                    }}>
+                                    4-Pager
+                                  </button>
+                                )}
                               </div>
                             )}
                             {asmtStatus !== "completed" && (
@@ -1426,6 +1513,18 @@ const ReportsHubPage: React.FC = () => {
           assessmentId={Number(selectedAssessment)}
           studentName={nav360Preview.studentName}
           onClose={() => setNav360Preview(null)}
+        />
+      )}
+
+      {/* 4-Pager Preview Modal */}
+      {fourPagerPreview && selectedAssessment && (
+        <FourPagerPreview
+          studentId={fourPagerPreview.studentId}
+          assessmentId={Number(selectedAssessment)}
+          studentName={fourPagerPreview.studentName}
+          studentClass={fourPagerPreview.studentClass}
+          schoolName={selectedInstituteName}
+          onClose={() => setFourPagerPreview(null)}
         />
       )}
     </div>
