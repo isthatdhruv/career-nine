@@ -75,13 +75,13 @@ const DemographicDetailsPage: React.FC = () => {
   };
 
   const validateContactEmail = (value: string): string => {
-    if (!value.trim()) return 'Email is required';
+    if (!value.trim()) return '';
     if (!/^[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}$/.test(value)) return 'Invalid email format';
     return '';
   };
 
   const validateContactPhone = (value: string): string => {
-    if (!value.trim()) return 'Phone number is required';
+    if (!value.trim()) return '';
     if (!/^[0-9]{10}$/.test(value)) return 'Phone number must be 10 digits';
     return '';
   };
@@ -534,7 +534,7 @@ const DemographicDetailsPage: React.FC = () => {
                       <>
                         <div className="mb-3">
                           <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
-                            Email Address <span style={{ color: '#e53e3e' }}>*</span>
+                            Email Address
                           </label>
                           <input
                             type="email"
@@ -560,7 +560,7 @@ const DemographicDetailsPage: React.FC = () => {
 
                         <div className="mb-3">
                           <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
-                            Phone Number <span style={{ color: '#e53e3e' }}>*</span>
+                            Phone Number
                           </label>
                           <input
                             type="tel"

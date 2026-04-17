@@ -92,14 +92,12 @@ public class StudentDemographicResponseController {
         String phoneNumber = request.get("phoneNumber");
 
         List<String> errors = new ArrayList<>();
-        if (email == null || email.trim().isEmpty()) {
-            errors.add("Email is required");
-        } else if (!Pattern.matches("^[\\w.+-]+@[\\w.-]+\\.[a-zA-Z]{2,}$", email.trim())) {
+        if (email != null && !email.trim().isEmpty()
+                && !Pattern.matches("^[\\w.+-]+@[\\w.-]+\\.[a-zA-Z]{2,}$", email.trim())) {
             errors.add("Invalid email format");
         }
-        if (phoneNumber == null || phoneNumber.trim().isEmpty()) {
-            errors.add("Phone number is required");
-        } else if (!Pattern.matches("^[0-9]{10}$", phoneNumber.trim())) {
+        if (phoneNumber != null && !phoneNumber.trim().isEmpty()
+                && !Pattern.matches("^[0-9]{10}$", phoneNumber.trim())) {
             errors.add("Phone number must be 10 digits");
         }
         if (!errors.isEmpty()) {
@@ -116,8 +114,8 @@ public class StudentDemographicResponseController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("error", "Student info not found"));
         }
-        info.setEmail(email.trim());
-        info.setPhoneNumber(phoneNumber.trim());
+        info.setEmail(email != null ? email.trim() : null);
+        info.setPhoneNumber(phoneNumber != null ? phoneNumber.trim() : null);
         studentInfoRepository.save(info);
 
         return ResponseEntity.ok(Map.of("success", true));
