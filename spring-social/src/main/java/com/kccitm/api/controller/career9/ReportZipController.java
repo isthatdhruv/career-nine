@@ -63,6 +63,42 @@ public class ReportZipController {
     }
 
     /**
+     * Hand the browser a pre-signed PUT URL so it can upload the zip straight
+     * to DigitalOcean Spaces, bypassing nginx + Spring multipart limits.
+     * Used for bulk report zips that exceed the proxy body-size cap.
+     */
+    @GetMapping("/presign")
+    public ResponseEntity<Map<String, String>> presignUpload(
+            @RequestParam(value = "fileName", required = false) String fileName) {
+        try {
+            String safe = (fileName != null && !fileName.isBlank())
+                    ? fileName.replaceAll("[^a-zA-Z0-9._\\-]", "_")
+                    : "report_" + System.currentTimeMillis() + ".zip";
+            if (!safe.endsWith(".zip")) {
+                safe += ".zip";
+            }
+            // Prefix with a timestamp to prevent collisions on repeat uploads.
+            String objectName = System.currentTimeMillis() + "_" + safe;
+
+            DigitalOceanSpacesService.PresignedUpload p = spacesService
+                    .generatePresignedUpload(FOLDER, objectName, "application/zip", 15);
+
+            Map<String, String> response = new HashMap<>();
+            response.put("uploadUrl", p.uploadUrl);
+            response.put("publicUrl", p.publicUrl);
+            response.put("key", p.key);
+            response.put("fileName", safe);
+            return ResponseEntity.ok(response);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Presign failed: " + e.getMessage()));
+        }
+    }
+
+    /**
      * Delete a ZIP file from DigitalOcean Spaces by URL.
      */
     @DeleteMapping("/delete")

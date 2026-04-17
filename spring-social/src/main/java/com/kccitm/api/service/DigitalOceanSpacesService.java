@@ -14,12 +14,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.amazonaws.HttpMethod;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.CannedAccessControlList;
+import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 
@@ -172,6 +174,44 @@ public class DigitalOceanSpacesService {
         } catch (Exception e) {
             logger.error("Failed to download file from Spaces: {}", fileUrl, e);
             return null;
+        }
+    }
+
+    /**
+     * Generate a pre-signed PUT URL so the browser can upload directly to Spaces,
+     * bypassing nginx/Spring for large payloads (bulk report zips).
+     *
+     * The client MUST send a matching Content-Type and x-amz-acl: public-read
+     * header when PUTting, or the signature will not validate.
+     */
+    public PresignedUpload generatePresignedUpload(String folder, String fileName, String contentType,
+            int expiryMinutes) {
+        if (s3Client == null) {
+            throw new IllegalStateException("DigitalOcean Spaces is not configured.");
+        }
+        String objectKey = folder + "/" + fileName;
+        java.util.Date expiration = new java.util.Date(System.currentTimeMillis() + expiryMinutes * 60_000L);
+
+        GeneratePresignedUrlRequest req = new GeneratePresignedUrlRequest(bucket, objectKey, HttpMethod.PUT)
+                .withExpiration(expiration);
+        if (contentType != null && !contentType.isEmpty()) {
+            req.setContentType(contentType);
+        }
+        req.putCustomRequestHeader("x-amz-acl", "public-read");
+
+        String uploadUrl = s3Client.generatePresignedUrl(req).toString();
+        return new PresignedUpload(uploadUrl, cdnUrl + "/" + objectKey, objectKey);
+    }
+
+    public static class PresignedUpload {
+        public final String uploadUrl;
+        public final String publicUrl;
+        public final String key;
+
+        public PresignedUpload(String uploadUrl, String publicUrl, String key) {
+            this.uploadUrl = uploadUrl;
+            this.publicUrl = publicUrl;
+            this.key = key;
         }
     }
 
