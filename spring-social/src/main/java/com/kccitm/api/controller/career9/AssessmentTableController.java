@@ -466,7 +466,6 @@ public class AssessmentTableController {
         return ResponseEntity.noContent().build();
     }
 
-    @Cacheable(value = "assessmentSummaryList")
     @GetMapping("/get/list-summary")
     public List<AssessmentTableRepository.AssessmentSummary> getAssessmentSummaryList() {
         return assessmentTableRepository.findAssessmentSummaryListNotDeleted();

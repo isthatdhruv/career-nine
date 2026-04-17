@@ -261,7 +261,7 @@ export function buildFourPagerPlaceholders(
   // Static Career Library QR — green on white, matches brand
   out.qr_image_url =
     'https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=0&data=' +
-    encodeURIComponent('https://www.career-9.com/library') +
+    encodeURIComponent('https://library.career-9.com') +
     '&color=0B3D2E&bgcolor=ffffff';
 
   // Top 9 career matches
