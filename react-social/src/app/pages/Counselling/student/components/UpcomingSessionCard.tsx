@@ -1,7 +1,31 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import StatusBadge from '../../shared/StatusBadge'
 import CountdownTimer from '../../shared/CountdownTimer'
 import '../../Counselling.css'
+
+const JOIN_WINDOW_MS = 5 * 60 * 1000
+const RESCHEDULE_CUTOFF_MS = 4 * 60 * 60 * 1000
+
+function formatTimeRemaining(ms: number): string {
+  if (ms <= 0) return 'less than a minute'
+  const totalMinutes = Math.floor(ms / 60000)
+  if (totalMinutes < 1) return 'less than a minute'
+  if (totalMinutes < 60) return `${totalMinutes} minute${totalMinutes === 1 ? '' : 's'}`
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (minutes === 0) return `${hours} hour${hours === 1 ? '' : 's'}`
+  return `${hours} hour${hours === 1 ? '' : 's'} ${minutes} minute${minutes === 1 ? '' : 's'}`
+}
+
+function buildSlotDateTime(dateStr: string, timeStr: string): number {
+  if (!dateStr || !timeStr) return NaN
+  const parts = timeStr.split(':')
+  const hh = (parts[0] || '00').padStart(2, '0')
+  const mm = (parts[1] || '00').padStart(2, '0')
+  const ss = (parts[2] || '00').padStart(2, '0')
+  const d = new Date(`${dateStr}T${hh}:${mm}:${ss}`)
+  return d.getTime()
+}
 
 interface Slot {
   date: string
@@ -46,6 +70,24 @@ function formatTime(timeStr: string): string {
 
 const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, onReschedule }) => {
   const { appointmentId, status, meetingLink, slot, counsellorName, reason } = appointment
+
+  const [now, setNow] = useState<number>(() => Date.now())
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const startMs = buildSlotDateTime(slot.date, slot.startTime)
+  const endMs = buildSlotDateTime(slot.date, slot.endTime)
+  const canJoin =
+    !!meetingLink &&
+    !isNaN(startMs) &&
+    !isNaN(endMs) &&
+    now >= startMs - JOIN_WINDOW_MS &&
+    now < endMs
+
+  const msUntilStart = isNaN(startMs) ? Infinity : startMs - now
+  const rescheduleBlocked = msUntilStart < RESCHEDULE_CUTOFF_MS
 
   return (
     <div className='cl-card cl-card-accent' style={{ marginBottom: 16 }}>
@@ -103,8 +145,8 @@ const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, 
         </div>
       )}
 
-      {/* Meeting Link */}
-      {meetingLink && (
+      {/* Meeting Link — visible only within 5 minutes of the session start */}
+      {canJoin ? (
         <div style={{ marginBottom: 14 }}>
           <a
             href={meetingLink}
@@ -119,6 +161,33 @@ const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, 
             Join Meeting
           </a>
         </div>
+      ) : meetingLink ? (
+        <div style={{ marginBottom: 14, fontSize: 12, color: 'var(--sp-muted, #5C7A72)' }}>
+          Join Meeting will be available 5 minutes before the session starts.
+        </div>
+      ) : null}
+
+      {/* Reschedule cutoff warning (shown when session is within 4 hours) */}
+      {rescheduleBlocked && (
+        <div
+          role='alert'
+          style={{
+            marginBottom: 12, padding: '10px 12px',
+            background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: 8,
+            display: 'flex', alignItems: 'flex-start', gap: 8,
+            fontSize: 12.5, color: '#78350F', lineHeight: 1.5,
+          }}
+        >
+          <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' style={{ flexShrink: 0, marginTop: 1 }}>
+            <path d='M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z' />
+            <line x1='12' y1='9' x2='12' y2='13' />
+            <line x1='12' y1='17' x2='12.01' y2='17' />
+          </svg>
+          <span>
+            Cannot reschedule — the scheduled session is about to start in{' '}
+            <strong>{formatTimeRemaining(msUntilStart)}</strong>.
+          </span>
+        </div>
       )}
 
       {/* Actions */}
@@ -126,7 +195,13 @@ const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, 
         <button
           className='cl-btn-outline'
           onClick={() => onReschedule(appointmentId)}
-          style={{ fontSize: 13 }}
+          disabled={rescheduleBlocked}
+          title={rescheduleBlocked ? 'Session starts in under 4 hours — rescheduling is disabled.' : undefined}
+          style={{
+            fontSize: 13,
+            opacity: rescheduleBlocked ? 0.5 : 1,
+            cursor: rescheduleBlocked ? 'not-allowed' : 'pointer',
+          }}
         >
           <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
             <polyline points='23 4 23 10 17 10' />

@@ -89,8 +89,7 @@ export function AsideMenuMain() {
 
   const showCounselling =
     allowed("/admin/counsellors") ||
-    allowed("/admin/counselling-slots") || allowed("/admin/counselling-students") || allowed("/admin/counselling-notifications") ||
-    allowed("/counsellor/dashboard") || allowed("/counsellor/availability");
+    allowed("/admin/counselling-slots") || allowed("/admin/counselling-students") || allowed("/admin/counselling-notifications");
 
   return (
     <>

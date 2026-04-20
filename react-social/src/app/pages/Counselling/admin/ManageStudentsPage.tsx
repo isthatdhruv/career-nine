@@ -4,11 +4,25 @@ import '../Counselling.css'
 import {
   getStudentsByInstitute,
   setCounsellingAllowed,
-  setReportsVisible,
   ManagedStudent,
 } from '../API/StudentManagementAPI'
+import {
+  getGeneratedReportsByStudent,
+  toggleReportVisibility,
+  GeneratedReport,
+} from '../../ReportGeneration/API/GeneratedReport_APIs'
 
 const API_URL = process.env.REACT_APP_API_URL
+
+function formatReportType(type: string): string {
+  switch ((type || '').toLowerCase()) {
+    case 'navigator': return 'Navigator 360 Report'
+    case 'bet': return 'BET Report'
+    default:
+      if (!type) return 'Report'
+      return type.charAt(0).toUpperCase() + type.slice(1) + ' Report'
+  }
+}
 
 interface Institute {
   code: number
@@ -50,6 +64,11 @@ const ManageStudentsPage: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [searchName, setSearchName] = useState('')
+  const [reportsModalStudent, setReportsModalStudent] = useState<ManagedStudent | null>(null)
+  const [studentReports, setStudentReports] = useState<GeneratedReport[]>([])
+  const [reportsLoading, setReportsLoading] = useState(false)
+  const [reportsError, setReportsError] = useState<string | null>(null)
+  const [reportTogglingId, setReportTogglingId] = useState<number | null>(null)
 
   const showSuccess = (msg: string) => {
     setSuccess(msg)
@@ -106,19 +125,40 @@ const ManageStudentsPage: React.FC = () => {
     }
   }
 
-  const handleToggleReports = async (s: ManagedStudent) => {
-    const key = `r-${s.userStudentId}`
-    setTogglingId(key)
+  const handleOpenReportsModal = (s: ManagedStudent) => {
+    setReportsModalStudent(s)
+    setReportsError(null)
+    setStudentReports([])
+    setReportsLoading(true)
+    getGeneratedReportsByStudent(s.userStudentId)
+      .then((res) => setStudentReports(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setReportsError('Failed to load reports for this student.'))
+      .finally(() => setReportsLoading(false))
+  }
+
+  const handleCloseReportsModal = () => {
+    setReportsModalStudent(null)
+    setStudentReports([])
+    setReportsError(null)
+    setReportTogglingId(null)
+  }
+
+  const handleToggleReportVisibility = async (report: GeneratedReport) => {
+    const newVisible = !report.visibleToStudent
+    setReportTogglingId(report.generatedReportId)
     try {
-      await setReportsVisible(s.userStudentId, !s.reportsVisible)
-      setStudents((prev) => prev.map((x) =>
-        x.userStudentId === s.userStudentId ? { ...x, reportsVisible: !x.reportsVisible } : x
-      ))
-      showSuccess(`Reports ${!s.reportsVisible ? 'visible' : 'hidden'} for ${s.name}.`)
+      await toggleReportVisibility([report.generatedReportId], newVisible)
+      setStudentReports((prev) =>
+        prev.map((r) =>
+          r.generatedReportId === report.generatedReportId
+            ? { ...r, visibleToStudent: newVisible }
+            : r
+        )
+      )
     } catch {
-      setError('Failed to update reports visibility.')
+      setReportsError('Failed to update report visibility.')
     } finally {
-      setTogglingId(null)
+      setReportTogglingId(null)
     }
   }
 
@@ -245,16 +285,22 @@ const ManageStudentsPage: React.FC = () => {
                     </div>
                   </td>
                   <td style={{ padding: '12px 14px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <Toggle
-                        checked={s.reportsVisible}
-                        onChange={() => handleToggleReports(s)}
-                        disabled={togglingId === `r-${s.userStudentId}`}
-                      />
-                      <span style={{ fontSize: 12, color: s.reportsVisible ? '#065F46' : '#6B7280', fontWeight: 500 }}>
-                        {s.reportsVisible ? 'Visible' : 'Hidden'}
-                      </span>
-                    </div>
+                    <button
+                      onClick={() => handleOpenReportsModal(s)}
+                      style={{
+                        padding: '6px 14px',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        borderRadius: 8,
+                        border: '1px solid #0C6B5A',
+                        background: '#fff',
+                        color: '#0C6B5A',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      Show Reports
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -262,6 +308,132 @@ const ManageStudentsPage: React.FC = () => {
           </table>
           <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--sp-muted, #5C7A72)', borderTop: '1px solid var(--sp-border, #D1E5DF)' }}>
             {filteredStudents.length} student(s)
+          </div>
+        </div>
+      )}
+
+      {/* Reports Visibility Modal */}
+      {reportsModalStudent && (
+        <div
+          onClick={handleCloseReportsModal}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+            zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 20,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 640, maxHeight: '85vh', overflow: 'hidden',
+              background: '#fff', borderRadius: 14, boxShadow: '0 24px 48px rgba(0,0,0,0.2)',
+              display: 'flex', flexDirection: 'column',
+            }}
+          >
+            <div style={{
+              padding: '16px 20px', borderBottom: '1px solid var(--sp-border, #D1E5DF)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--sp-text, #1A2B28)' }}>
+                  Generated Reports
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--sp-muted, #5C7A72)', marginTop: 2 }}>
+                  {reportsModalStudent.name || 'Student'} · ID {reportsModalStudent.userStudentId}
+                </div>
+              </div>
+              <button
+                onClick={handleCloseReportsModal}
+                style={{
+                  border: '1px solid var(--sp-border, #D1E5DF)', background: '#fff',
+                  borderRadius: 8, cursor: 'pointer', padding: '4px 10px',
+                  fontSize: 18, color: '#6B7280', lineHeight: 1,
+                }}
+                aria-label='Close'
+              >
+                &times;
+              </button>
+            </div>
+
+            <div style={{ padding: 20, overflowY: 'auto' }}>
+              {reportsError && (
+                <div style={{
+                  marginBottom: 12, padding: '10px 14px', background: '#FEE2E2',
+                  border: '1px solid #FECACA', borderRadius: 8, color: '#991B1B', fontSize: 13,
+                }}>{reportsError}</div>
+              )}
+
+              {reportsLoading ? (
+                <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--sp-muted, #5C7A72)', fontSize: 13 }}>
+                  Loading reports...
+                </div>
+              ) : studentReports.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--sp-muted, #5C7A72)', fontSize: 13 }}>
+                  No generated reports for this student yet.
+                </div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid var(--sp-border, #D1E5DF)' }}>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--sp-muted, #5C7A72)', textTransform: 'uppercase' }}>
+                        Report
+                      </th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--sp-muted, #5C7A72)', textTransform: 'uppercase' }}>
+                        Assessment
+                      </th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--sp-muted, #5C7A72)', textTransform: 'uppercase' }}>
+                        Status
+                      </th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--sp-muted, #5C7A72)', textTransform: 'uppercase' }}>
+                        Visibility
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {studentReports.map((r) => (
+                      <tr key={r.generatedReportId} style={{ borderBottom: '1px solid var(--sp-border, #D1E5DF)' }}>
+                        <td style={{ padding: '10px', fontWeight: 600, color: 'var(--sp-text, #1A2B28)' }}>
+                          {formatReportType(r.typeOfReport)}
+                        </td>
+                        <td style={{ padding: '10px', color: 'var(--sp-muted, #5C7A72)' }}>
+                          {r.assessmentId ?? '-'}
+                        </td>
+                        <td style={{ padding: '10px', color: 'var(--sp-muted, #5C7A72)' }}>
+                          {r.reportStatus}
+                        </td>
+                        <td style={{ padding: '10px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <Toggle
+                              checked={r.visibleToStudent}
+                              onChange={() => handleToggleReportVisibility(r)}
+                              disabled={reportTogglingId === r.generatedReportId}
+                            />
+                            <span style={{ fontSize: 12, color: r.visibleToStudent ? '#065F46' : '#6B7280', fontWeight: 500 }}>
+                              {r.visibleToStudent ? 'Visible' : 'Hidden'}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div style={{
+              padding: '12px 20px', borderTop: '1px solid var(--sp-border, #D1E5DF)',
+              display: 'flex', justifyContent: 'flex-end',
+            }}>
+              <button
+                onClick={handleCloseReportsModal}
+                style={{
+                  padding: '8px 16px', fontSize: 13, fontWeight: 600, borderRadius: 8,
+                  border: 'none', cursor: 'pointer', background: '#0C6B5A', color: '#fff',
+                }}
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}

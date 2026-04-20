@@ -172,7 +172,10 @@ const SlotBookingPage: React.FC = () => {
       setLoading(true)
       rescheduleAppointment(rescheduleAppointmentId!, selectedSlot.slotId, userId)
         .then(() => setBooked(true))
-        .catch(() => showErrorToast('Could not reschedule the session. Please try again.'))
+        .catch((err) => {
+          const serverMsg = typeof err?.response?.data === 'string' ? err.response.data : err?.response?.data?.message
+          showErrorToast(serverMsg || 'Could not reschedule the session. Please try again.')
+        })
         .finally(() => setLoading(false))
       return
     }
