@@ -93,6 +93,7 @@ public class CounsellorController {
         if (body.get("yearsOfExperience") != null) counsellor.setYearsOfExperience(((Number) body.get("yearsOfExperience")).intValue());
         if (body.get("linkedinProfile") != null) counsellor.setLinkedinProfile((String) body.get("linkedinProfile"));
         if (body.get("maxSessionsPerDay") != null) counsellor.setMaxSessionsPerDay(((Number) body.get("maxSessionsPerDay")).intValue());
+        if (body.get("profileImageUrl") != null) counsellor.setProfileImageUrl((String) body.get("profileImageUrl"));
 
         Counsellor saved = counsellorService.create(counsellor);
         logger.info("Counsellor self-registered: {} ({})", saved.getName(), saved.getEmail());

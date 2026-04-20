@@ -39,10 +39,40 @@ export default function StudentsList() {
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetStudent, setResetStudent] = useState<Student | null>(null);
 
-  useEffect(() => {
+  const refreshStudents = () => {
     const instituteId = localStorage.getItem('instituteId');
+    if (!instituteId) {
+      setStudentsLoading(false);
+      return;
+    }
+    setStudentsLoading(true);
+    getStudentsWithMappingByInstituteId(Number(instituteId))
+      .then(response => {
+        const studentData = response.data.map((student: any) => {
+          const assignedIds = Array.isArray(student.assignedAssessmentIds)
+            ? student.assignedAssessmentIds
+            : [];
+          return {
+            id: student.id,
+            name: student.name || "",
+            schoolRollNumber: student.schoolRollNumber || "",
+            controlNumber: student.controlNumber ?? undefined,
+            selectedAssessment: "",
+            userStudentId: student.userStudentId,
+            assignedAssessmentIds: assignedIds,
+          };
+        });
+        setStudents(studentData);
+      })
+      .catch(error => {
+        console.error("Error fetching student info:", error);
+      })
+      .finally(() => {
+        setStudentsLoading(false);
+      });
+  };
 
-    // Fetch assessments
+  useEffect(() => {
     setAssessmentsLoading(true);
     getAllAssessments()
       .then(response => {
@@ -56,37 +86,7 @@ export default function StudentsList() {
         setAssessmentsLoading(false);
       });
 
-    // Fetch students
-    if (instituteId) {
-      setStudentsLoading(true);
-      getStudentsWithMappingByInstituteId(Number(instituteId))
-        .then(response => {
-          const studentData = response.data.map((student: any) => {
-            // Ensure assignedAssessmentIds is always an array
-            const assignedIds = Array.isArray(student.assignedAssessmentIds)
-              ? student.assignedAssessmentIds
-              : [];
-            return {
-              id: student.id,
-              name: student.name || "",
-              schoolRollNumber: student.schoolRollNumber || "",
-              controlNumber: student.controlNumber ?? undefined,
-              selectedAssessment: "",
-              userStudentId: student.userStudentId,
-              assignedAssessmentIds: assignedIds,
-            };
-          });
-          setStudents(studentData);
-        })
-        .catch(error => {
-          console.error("Error fetching student info:", error);
-        })
-        .finally(() => {
-          setStudentsLoading(false);
-        });
-    } else {
-      setStudentsLoading(false);
-    }
+    refreshStudents();
   }, []);
 
   const handleAssessmentChange = (studentId: number, assessmentId: string) => {
@@ -533,6 +533,7 @@ export default function StudentsList() {
       <CreateStudentModal
         show={showAddModal}
         onHide={() => setShowAddModal(false)}
+        onSave={() => refreshStudents()}
       />
     </div>
   );

@@ -7,6 +7,7 @@ import { getAllMappings, allocateCounsellor, deallocateCounsellor, CounsellorIns
 import { getAllSlotConfigs, applySlotConfig, SlotConfig } from '../API/SlotConfigurationAPI'
 import { getSlotsByCounsellor } from '../API/SlotAPI'
 import CounsellorForm from './components/CounsellorForm'
+import { useRefreshInterval } from '../../../utils/useAutoRefresh'
 
 const API_URL = process.env.REACT_APP_API_URL
 
@@ -53,14 +54,22 @@ const AppointmentsSection: React.FC<{ counsellor: Counsellor; onClose: () => voi
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loadingAppts, setLoadingAppts] = useState(true)
   const [apptError, setApptError] = useState<string | null>(null)
+  const cId = getCounsellorId(counsellor)
 
   useEffect(() => {
     setLoadingAppts(true)
-    getCounsellorAppointments(getCounsellorId(counsellor))
+    getCounsellorAppointments(cId)
       .then((res) => setAppointments(Array.isArray(res.data) ? res.data : []))
       .catch(() => setApptError('Failed to load appointments.'))
       .finally(() => setLoadingAppts(false))
-  }, [getCounsellorId(counsellor)])
+  }, [cId])
+
+  useRefreshInterval(() => {
+    if (!cId) return
+    getCounsellorAppointments(cId)
+      .then((res) => setAppointments(Array.isArray(res.data) ? res.data : []))
+      .catch(() => {})
+  }, { skip: !cId })
 
   const statusColors: Record<string, { bg: string; color: string }> = {
     CONFIRMED: { bg: '#D1FAE5', color: '#065F46' },
@@ -304,9 +313,8 @@ const CounsellorManagementPage: React.FC = () => {
     adminUserId = 0
   }
 
-  const loadCounsellors = async () => {
-    setLoading(true)
-    setError(null)
+  const loadCounsellors = async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) { setLoading(true); setError(null) }
     try {
       const [counsellorRes, mappingRes, instituteRes] = await Promise.all([
         getAllCounsellors(),
@@ -318,7 +326,6 @@ const CounsellorManagementPage: React.FC = () => {
       const mappings: CounsellorInstituteMapping[] = Array.isArray(mappingRes.data) ? mappingRes.data : []
       setInstituteMappings(mappings)
 
-      // Get all institutes from the institute API
       const allInstitutes = Array.isArray(instituteRes.data) ? instituteRes.data : []
       setInstitutes(allInstitutes.map((i: any) => ({
         code: i.instituteCode || i.institute_code,
@@ -326,15 +333,16 @@ const CounsellorManagementPage: React.FC = () => {
       })))
 
     } catch {
-      setError('Failed to load counsellors. Please try again.')
+      if (!opts?.silent) setError('Failed to load counsellors. Please try again.')
     } finally {
-      setLoading(false)
+      if (!opts?.silent) setLoading(false)
     }
   }
 
   useEffect(() => {
     loadCounsellors()
   }, [])
+  useRefreshInterval(() => loadCounsellors({ silent: true }))
 
   const showSuccess = (msg: string) => {
     setSuccessMessage(msg)

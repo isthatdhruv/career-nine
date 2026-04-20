@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getStudentEligibility, EligibilityResponse } from '../../../Counselling/API/EligibilityAPI'
+import { useRefreshInterval } from '../../../../utils/useAutoRefresh'
 
 interface BookCounsellingProps {
   cciLevel: 'HIGH' | 'MEDIUM' | 'LOW'
@@ -28,6 +29,13 @@ const BookCounselling: React.FC<BookCounsellingProps> = ({ cciLevel, userStudent
       .catch(() => setEligibility(null))
       .finally(() => setLoading(false))
   }, [userStudentId])
+
+  useRefreshInterval(() => {
+    if (!userStudentId) return
+    getStudentEligibility(userStudentId)
+      .then((res) => setEligibility(res.data))
+      .catch(() => {})
+  }, { skip: !userStudentId })
 
   if (loading) {
     return (

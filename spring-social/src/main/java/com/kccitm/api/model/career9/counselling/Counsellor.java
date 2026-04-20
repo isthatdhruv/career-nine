@@ -92,6 +92,9 @@ public class Counsellor implements Serializable {
     @Column(name = "bank_ifsc", length = 20)
     private String bankIfsc;
 
+    @Column(name = "bank_branch", length = 200)
+    private String bankBranch;
+
     @Column(name = "signed_agreement_url", length = 500)
     private String signedAgreementUrl;
 
@@ -254,6 +257,9 @@ public class Counsellor implements Serializable {
 
     public String getBankIfsc() { return bankIfsc; }
     public void setBankIfsc(String bankIfsc) { this.bankIfsc = bankIfsc; }
+
+    public String getBankBranch() { return bankBranch; }
+    public void setBankBranch(String bankBranch) { this.bankBranch = bankBranch; }
 
     public String getSignedAgreementUrl() { return signedAgreementUrl; }
     public void setSignedAgreementUrl(String signedAgreementUrl) { this.signedAgreementUrl = signedAgreementUrl; }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PortalLayout, { MenuItem } from '../portal/PortalLayout'
 import {
@@ -8,6 +8,7 @@ import {
   cancelAppointment,
 } from '../Counselling/API/AppointmentAPI'
 import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
+import { useRefreshInterval } from '../../utils/useAutoRefresh'
 import './CounsellorPortal.css'
 
 const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
@@ -20,18 +21,6 @@ const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
         <rect x='14' y='3' width='7' height='7' rx='1' />
         <rect x='3' y='14' width='7' height='7' rx='1' />
         <rect x='14' y='14' width='7' height='7' rx='1' />
-      </svg>
-    ),
-  },
-  {
-    label: 'Students',
-    path: '/counsellor/students',
-    icon: (
-      <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
-        <path d='M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2' />
-        <circle cx='9' cy='7' r='4' />
-        <path d='M23 21v-2a4 4 0 0 0-3-3.87' />
-        <path d='M16 3.13a4 4 0 0 1 0 7.75' />
       </svg>
     ),
   },
@@ -68,15 +57,6 @@ const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
     ),
   },
   {
-    label: 'Messages',
-    path: '/counsellor/messages',
-    icon: (
-      <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
-        <path d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' />
-      </svg>
-    ),
-  },
-  {
     label: 'Reports',
     path: '/counsellor/reports',
     icon: (
@@ -87,11 +67,21 @@ const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
       </svg>
     ),
   },
+  {
+    label: 'My Profile',
+    path: '/counsellor/profile',
+    icon: (
+      <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+        <path d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2' />
+        <circle cx='12' cy='7' r='4' />
+      </svg>
+    ),
+  },
 ]
 
 const COUNSELLOR_STORAGE_KEYS = ['counsellorPortalToken', 'counsellorPortalUser', 'counsellorPortalLoggedIn']
 
-type FilterTab = 'all' | 'today' | 'upcoming' | 'completed' | 'pending'
+type FilterTab = 'all' | 'today' | 'upcoming' | 'completed' | 'pending' | 'cancelled'
 
 function getStatusBadgeStyle(status: string): React.CSSProperties {
   switch ((status || '').toUpperCase()) {
@@ -191,6 +181,15 @@ const CounsellorAppointmentsPage: React.FC = () => {
   const [declineReason, setDeclineReason] = useState('')
   const [cancelModal, setCancelModal] = useState<{ appointmentId: number } | null>(null)
   const [cancelReason, setCancelReason] = useState('')
+
+  const refreshAppointments = useCallback(() => {
+    if (!counsellorId) return
+    getCounsellorAppointments(counsellorId)
+      .then((apptRes) => setAppointments(apptRes.data || []))
+      .catch(() => {})
+  }, [counsellorId])
+
+  useRefreshInterval(refreshAppointments, { skip: !counsellorId })
 
   useEffect(() => {
     const isLoggedIn = localStorage.getItem('counsellorPortalLoggedIn')
@@ -310,6 +309,10 @@ const CounsellorAppointmentsPage: React.FC = () => {
   const completed = activeAppointments.filter(
     (a) => (a.status || '').toUpperCase() === 'COMPLETED' || isEndedConfirmed(a)
   )
+  const cancelled = activeAppointments.filter((a) => {
+    const s = (a.status || '').toUpperCase()
+    return s === 'CANCELLED' || s === 'DECLINED'
+  })
 
   // Lookup: id -> appointment (used to show "Rescheduled from ..." under replacements)
   const appointmentsById = new Map<number, any>()
@@ -333,6 +336,8 @@ const CounsellorAppointmentsPage: React.FC = () => {
           return status === 'COMPLETED' || isEndedConfirmed(a)
         case 'pending':
           return status === 'ASSIGNED' || status === 'PENDING'
+        case 'cancelled':
+          return status === 'CANCELLED' || status === 'DECLINED'
         default:
           return true
       }
@@ -350,6 +355,7 @@ const CounsellorAppointmentsPage: React.FC = () => {
     { key: 'upcoming', label: 'Upcoming' },
     { key: 'completed', label: 'Completed' },
     { key: 'pending', label: 'Pending' },
+    { key: 'cancelled', label: `Cancelled${cancelled.length ? ` (${cancelled.length})` : ''}` },
   ]
 
   return (

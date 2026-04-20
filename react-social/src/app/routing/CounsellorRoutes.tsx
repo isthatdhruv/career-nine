@@ -1,11 +1,8 @@
 import { FC, lazy, Suspense, useEffect } from 'react'
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 
-const CounsellorDashboardLogin = lazy(
-  () => import('../pages/CounsellorDashboard/CounsellorDashboardLogin')
-)
-const CounsellorRegistrationPage = lazy(
-  () => import('../pages/CounsellorDashboard/CounsellorRegistrationPage')
+const CounsellorAuthPage = lazy(
+  () => import('../pages/CounsellorDashboard/CounsellorAuthPage')
 )
 const CounsellorPortalDashboard = lazy(
   () => import('../pages/CounsellorDashboard/CounsellorPortalDashboard')
@@ -112,8 +109,8 @@ const CounsellorRoutes: FC = () => {
     <Suspense fallback={<CounsellorFallback />}>
       <Routes>
         {/* Public */}
-        <Route path='login' element={<CounsellorDashboardLogin />} />
-        <Route path='register' element={<CounsellorRegistrationPage />} />
+        <Route path='login' element={<CounsellorAuthPage />} />
+        <Route path='register' element={<CounsellorAuthPage />} />
 
         {/* Protected */}
         <Route element={<CounsellorAuthGuard />}>

@@ -1,20 +1,22 @@
 import React, { useEffect, useState } from 'react'
 import '../Counselling.css'
+import { KTSVG } from '../../../../_metronic/helpers'
 import { getRecentActivities, markAllAsRead, ActivityLog } from '../API/CounsellingActivityAPI'
 import { getPendingBlockRequests, approveBlockRequest, rejectBlockRequest, BlockDateRequest } from '../API/BlockDateRequestAPI'
 import { getAllCounsellors, toggleCounsellorActive } from '../API/CounsellorAPI'
+import { useRefreshInterval } from '../../../utils/useAutoRefresh'
 
-const TYPE_CONFIG: Record<string, { icon: string; color: string; bg: string }> = {
-  COUNSELLOR_REGISTERED: { icon: '\u{1F464}', color: '#0369A1', bg: '#F0F9FF' },
-  COUNSELLOR_ACTIVATED: { icon: '\u{2705}', color: '#065F46', bg: '#F0FDF4' },
-  COUNSELLOR_SUSPENDED: { icon: '\u{1F6D1}', color: '#991B1B', bg: '#FEF2F2' },
-  BLOCK_DATE_REQUESTED: { icon: '\u{1F4C5}', color: '#92400E', bg: '#FFFBEB' },
-  BLOCK_DATE_APPROVED: { icon: '\u{2705}', color: '#065F46', bg: '#F0FDF4' },
-  BLOCK_DATE_REJECTED: { icon: '\u{274C}', color: '#991B1B', bg: '#FEF2F2' },
-  SLOT_BOOKED: { icon: '\u{1F4CB}', color: '#5B21B6', bg: '#F5F3FF' },
+const TYPE_CONFIG: Record<string, { iconPath: string; color: string; bg: string }> = {
+  COUNSELLOR_REGISTERED: { iconPath: '/media/icons/duotune/communication/com013.svg', color: '#0369A1', bg: '#F0F9FF' },
+  COUNSELLOR_ACTIVATED: { iconPath: '/media/icons/duotune/general/gen037.svg', color: '#065F46', bg: '#F0FDF4' },
+  COUNSELLOR_SUSPENDED: { iconPath: '/media/icons/duotune/general/gen044.svg', color: '#991B1B', bg: '#FEF2F2' },
+  BLOCK_DATE_REQUESTED: { iconPath: '/media/icons/duotune/general/gen014.svg', color: '#92400E', bg: '#FFFBEB' },
+  BLOCK_DATE_APPROVED: { iconPath: '/media/icons/duotune/general/gen037.svg', color: '#065F46', bg: '#F0FDF4' },
+  BLOCK_DATE_REJECTED: { iconPath: '/media/icons/duotune/general/gen040.svg', color: '#991B1B', bg: '#FEF2F2' },
+  SLOT_BOOKED: { iconPath: '/media/icons/duotune/general/gen005.svg', color: '#5B21B6', bg: '#F5F3FF' },
 }
 
-const DEFAULT_CONFIG = { icon: '\u{1F514}', color: '#374151', bg: '#F9FAFB' }
+const DEFAULT_CONFIG = { iconPath: '/media/icons/duotune/general/gen007.svg', color: '#374151', bg: '#F9FAFB' }
 
 function timeAgo(dateStr: string): string {
   try {
@@ -43,8 +45,8 @@ const CounsellingNotificationsPage: React.FC = () => {
   const [actionLoading, setActionLoading] = useState<number | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  const loadData = () => {
-    setLoading(true)
+  const loadData = (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true)
     Promise.all([
       getRecentActivities(100),
       getPendingBlockRequests().catch(() => ({ data: [] })),
@@ -58,11 +60,12 @@ const CounsellingNotificationsPage: React.FC = () => {
           c.onboardingStatus === 'PENDING' && c.isActive === false
         ))
       })
-      .catch(() => setActivities([]))
-      .finally(() => setLoading(false))
+      .catch(() => { if (!opts?.silent) setActivities([]) })
+      .finally(() => { if (!opts?.silent) setLoading(false) })
   }
 
   useEffect(() => { loadData() }, [])
+  useRefreshInterval(() => loadData({ silent: true }))
 
   const handleApproveBlock = async (id: number) => {
     setActionLoading(id)
@@ -219,7 +222,7 @@ const CounsellingNotificationsPage: React.FC = () => {
                 borderRadius: 8, marginBottom: 8, fontSize: 13,
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ fontSize: 20 }}>{'\u{1F4C5}'}</span>
+                  <KTSVG path='/media/icons/duotune/general/gen014.svg' className='svg-icon-2x svg-icon-warning' />
                   <div>
                     <div style={{ fontWeight: 600, color: '#1E293B' }}>{r.counsellor.name}</div>
                     <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
@@ -299,9 +302,9 @@ const CounsellingNotificationsPage: React.FC = () => {
                   width: 38, height: 38, borderRadius: '50%',
                   background: a.isRead ? '#F1F5F9' : cfg.bg,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 18, flexShrink: 0,
+                  flexShrink: 0, color: cfg.color,
                 }}>
-                  {cfg.icon}
+                  <KTSVG path={cfg.iconPath} className='svg-icon-2' />
                 </div>
 
                 {/* Content */}
