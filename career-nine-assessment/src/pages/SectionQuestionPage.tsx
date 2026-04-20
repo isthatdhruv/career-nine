@@ -572,11 +572,48 @@ const SectionQuestionPage: React.FC = () => {
       ? parseInt(localStorage.getItem("assessmentId")!)
       : null;
 
+    // Defensive dedupe on composite key (questionId, optionId) or
+    // (questionId, textResponse). Multi-select / ranking / text questions
+    // legitimately have multiple entries per questionId — we only strip
+    // exact duplicates of the same pair, which shouldn't happen and would
+    // double-count scores server-side.
+    const seen = new Set<string>();
+    const deduped: any[] = [];
+    for (const a of answersList) {
+      const qId = a?.questionnaireQuestionId;
+      if (qId == null) continue;
+      let key: string;
+      if (typeof a.optionId === "number") {
+        key = `q:${qId}|o:${a.optionId}`;
+      } else if (typeof a.textResponse === "string") {
+        key = `q:${qId}|t:${a.textResponse.trim()}`;
+      } else {
+        continue; // malformed entry
+      }
+      if (seen.has(key)) {
+        // Keep the last occurrence (same policy as backend dedupe)
+        for (let i = deduped.length - 1; i >= 0; i--) {
+          const prev = deduped[i];
+          const prevKey =
+            typeof prev.optionId === "number"
+              ? `q:${prev.questionnaireQuestionId}|o:${prev.optionId}`
+              : `q:${prev.questionnaireQuestionId}|t:${(prev.textResponse || "").trim()}`;
+          if (prevKey === key) {
+            deduped[i] = a;
+            break;
+          }
+        }
+        continue;
+      }
+      seen.add(key);
+      deduped.push(a);
+    }
+
+    // status/persistenceState are server-controlled now — not included in payload.
     const submissionData: Record<string, any> = {
       userStudentId: userStudentId,
       assessmentId: assessmentId,
-      status: "completed",
-      answers: answersList,
+      answers: deduped,
     };
 
     return submissionData;

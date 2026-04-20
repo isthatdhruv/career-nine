@@ -49,4 +49,21 @@ public interface StudentAssessmentMappingRepository extends JpaRepository<Studen
     List<Object[]> findLiteByAssessmentId(
         @org.springframework.data.repository.query.Param("assessmentId") Long assessmentId);
 
+    // All mappings needing persistence attention (pending or failed) for an assessment.
+    // Used by admin diagnostics to build the "Pending Persistence" view.
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT m FROM StudentAssessmentMapping m " +
+        "WHERE m.assessmentId = :assessmentId " +
+        "  AND m.status = 'completed' " +
+        "  AND m.persistenceState IN ('pending', 'failed')")
+    List<StudentAssessmentMapping> findCompletedPendingPersistence(
+        @org.springframework.data.repository.query.Param("assessmentId") Long assessmentId);
+
+    // Same as above, but across all assessments. Used by auto-expire sweep.
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT m FROM StudentAssessmentMapping m " +
+        "WHERE m.status = 'completed' " +
+        "  AND m.persistenceState IN ('pending', 'failed')")
+    List<StudentAssessmentMapping> findAllCompletedPendingPersistence();
+
 }

@@ -57,6 +57,9 @@ import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
+import com.kccitm.api.repository.AssessmentSubmissionFailureRepository;
+import com.kccitm.api.repository.AssessmentAdminActionRepository;
+import com.kccitm.api.model.career9.AssessmentAdminAction;
 import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.exception.ServiceException;
 import com.kccitm.api.repository.UserRepository;
@@ -90,6 +93,10 @@ public class StudentInfoController {
     private com.kccitm.api.service.AssessmentSessionService assessmentSessionService;
     @Autowired
     private com.kccitm.api.repository.Career9.School.SchoolSectionsRepository schoolSectionsRepository;
+    @Autowired
+    private AssessmentSubmissionFailureRepository submissionFailureRepository;
+    @Autowired
+    private AssessmentAdminActionRepository adminActionRepository;
 
     @GetMapping("/getAll")
     public List<StudentInfo> getAllStudentInfo() {
@@ -612,9 +619,14 @@ public class StudentInfoController {
 
     @PostMapping("/resetAssessment")
     @javax.transaction.Transactional
-    public ResponseEntity<?> resetAssessment(@RequestBody Map<String, Long> request) {
-        Long userStudentId = request.get("userStudentId");
-        Long assessmentId = request.get("assessmentId");
+    public ResponseEntity<?> resetAssessment(@RequestBody Map<String, Object> request) {
+        Object usIdRaw = request.get("userStudentId");
+        Object asIdRaw = request.get("assessmentId");
+        Long userStudentId = usIdRaw instanceof Number ? ((Number) usIdRaw).longValue() : null;
+        Long assessmentId = asIdRaw instanceof Number ? ((Number) asIdRaw).longValue() : null;
+        String reason = request.get("reason") instanceof String ? (String) request.get("reason") : null;
+        Object adminRaw = request.get("adminUserId");
+        Long adminUserId = adminRaw instanceof Number ? ((Number) adminRaw).longValue() : null;
 
         if (userStudentId == null || assessmentId == null) {
             Map<String, String> error = new HashMap<>();
@@ -626,6 +638,11 @@ public class StudentInfoController {
         StudentAssessmentMapping mapping = studentAssessmentMappingRepository
                 .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("StudentAssessmentMapping", "userStudentId/assessmentId", userStudentId + "/" + assessmentId));
+
+        // Capture before-state for audit
+        String beforeState = String.format(
+                "{\"status\":\"%s\",\"persistenceState\":\"%s\"}",
+                mapping.getStatus(), mapping.getPersistenceState());
 
         // Delete assessment answers for this student + assessment
         assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(
@@ -642,14 +659,34 @@ public class StudentInfoController {
         // Clear all Redis state for this student+assessment to prevent:
         // 1. Auto-flush writing stale partial answers back to MySQL
         // 2. Retry scheduler re-processing old submitted answers
-        assessmentSessionService.deleteSession(userStudentId, assessmentId);
-        assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
-        assessmentSessionService.deletePartialAnswers(userStudentId, assessmentId);
-        assessmentSessionService.deleteSubmittedAnswers(userStudentId, assessmentId);
+        assessmentSessionService.clearAllForMapping(userStudentId, assessmentId);
 
-        // Reset status to 'notstarted'
+        // Resolve any submission failure row so the retry scheduler forgets about it
+        submissionFailureRepository
+                .findByUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                .ifPresent(row -> {
+                    row.setResolved(true);
+                    row.setResolvedAt(java.time.Instant.now());
+                    row.setNextRetryAt(null);
+                    submissionFailureRepository.save(row);
+                });
+
+        // Reset status to 'notstarted' and clear persistenceState
         mapping.setStatus("notstarted");
+        mapping.setPersistenceState(null);
         studentAssessmentMappingRepository.save(mapping);
+
+        // Audit trail
+        AssessmentAdminAction audit = new AssessmentAdminAction();
+        audit.setActionType("reset");
+        audit.setUserStudentId(userStudentId);
+        audit.setAssessmentId(assessmentId);
+        audit.setAdminUserId(adminUserId);
+        audit.setActionAt(java.time.Instant.now());
+        audit.setReason(reason);
+        audit.setBeforeStateJson(beforeState);
+        audit.setAfterStateJson("{\"status\":\"notstarted\",\"persistenceState\":null}");
+        adminActionRepository.save(audit);
 
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);

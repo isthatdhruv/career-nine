@@ -32,6 +32,16 @@ public class StudentAssessmentMapping implements Serializable {
     @Column(name = "status", columnDefinition = "varchar(20) default 'notstarted'")
     private String status;
 
+    // Persistence state for async submission pipeline (Redis → MySQL).
+    // Decoupled from `status`: `status` reflects student intent (completed = they
+    // hit submit), `persistenceState` reflects whether the answers have made it
+    // into the MySQL tables yet.
+    //
+    // Values: null (no submit yet), "pending", "persisted",
+    //         "persisted_with_warnings", "failed"
+    @Column(name = "persistence_state", columnDefinition = "varchar(32)")
+    private String persistenceState;
+
     // Student Id
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_student_id", referencedColumnName = "user_student_id", nullable = false)
@@ -86,6 +96,14 @@ public class StudentAssessmentMapping implements Serializable {
 
     public void setAssessmentId(Long assessmentId) {
         this.assessmentId = assessmentId;
+    }
+
+    public String getPersistenceState() {
+        return persistenceState;
+    }
+
+    public void setPersistenceState(String persistenceState) {
+        this.persistenceState = persistenceState;
     }
 
     // public String getStatus() {

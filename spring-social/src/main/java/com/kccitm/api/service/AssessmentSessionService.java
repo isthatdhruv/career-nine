@@ -31,18 +31,27 @@ public class AssessmentSessionService {
     private static final int SESSION_TTL_HOURS = 24;
     private static final String DRAFT_KEY_PREFIX = "career9:draft:";
     private static final int DRAFT_TTL_HOURS = 24;
+    // Submit lock is now short-lived (90s). A crashed processor auto-releases
+    // instead of blocking the student for 24h. Authoritative "already submitted"
+    // check is mapping.status / persistenceState in MySQL.
     private static final String SUBMIT_KEY_PREFIX = "career9:submit:";
-    private static final int SUBMIT_TTL_HOURS = 24;
+    private static final int SUBMIT_LOCK_TTL_SECONDS = 90;
+    // Cached submit result lingers a bit longer so an accidental double-submit
+    // still gets a meaningful response instead of re-locking.
+    private static final int SUBMIT_RESULT_TTL_SECONDS = 3600;
     private static final String HEARTBEAT_KEY_PREFIX = "career9:heartbeat:";
     private static final int HEARTBEAT_TTL_SECONDS = 60;
     private static final String DEMOGRAPHICS_KEY_PREFIX = "career9:demographics:";
     private static final int DEMOGRAPHICS_TTL_HOURS = 24;
     private static final String PARTIAL_KEY_PREFIX = "career9:partial:";
     private static final int PARTIAL_TTL_HOURS = 24;
+    // Submitted payload stays in Redis until the processor confirms persistence.
+    // 7-day TTL is a safety ceiling; successful processing deletes the key explicitly.
+    // Failed submissions stay recoverable for the full week.
     private static final String SUBMITTED_KEY_PREFIX = "career9:submitted:";
-    private static final int SUBMITTED_TTL_HOURS = 48;
+    private static final int SUBMITTED_TTL_HOURS = 168;
     private static final String PROCTORING_KEY_PREFIX = "career9:proctoring:";
-    private static final int PROCTORING_TTL_HOURS = 48;
+    private static final int PROCTORING_TTL_HOURS = 168;
 
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
@@ -100,23 +109,28 @@ public class AssessmentSessionService {
     }
 
     /**
-     * Acquire a submission lock for a student+assessment pair.
-     * Uses Redis SETNX to ensure only one submission can proceed.
+     * Acquire a submission in-flight lock for a student+assessment pair.
+     * Uses Redis SETNX with a 90-second TTL — if the async processor crashes,
+     * the lock auto-releases so another worker / retry can pick up.
+     * Authoritative "already submitted" check lives in MySQL (mapping.status /
+     * persistenceState); this lock only prevents concurrent processing.
      * Returns true if the lock was acquired, false if already locked.
      */
     public boolean acquireSubmissionLock(Long studentId, Long assessmentId) {
         String key = SUBMIT_KEY_PREFIX + studentId + ":" + assessmentId;
         Boolean result = redisTemplate.opsForValue()
-                .setIfAbsent(key, "processing", SUBMIT_TTL_HOURS, TimeUnit.HOURS);
+                .setIfAbsent(key, "processing", SUBMIT_LOCK_TTL_SECONDS, TimeUnit.SECONDS);
         return Boolean.TRUE.equals(result);
     }
 
     /**
-     * Mark a submission as complete by storing the result.
+     * Mark a submission as complete by caching the result for an hour.
+     * Lets an accidental double-submit return the same response instead of
+     * re-locking or re-processing.
      */
     public void markSubmissionComplete(Long studentId, Long assessmentId, Object result) {
         String key = SUBMIT_KEY_PREFIX + studentId + ":" + assessmentId;
-        redisTemplate.opsForValue().set(key, result, SUBMIT_TTL_HOURS, TimeUnit.HOURS);
+        redisTemplate.opsForValue().set(key, result, SUBMIT_RESULT_TTL_SECONDS, TimeUnit.SECONDS);
     }
 
     /**
@@ -498,6 +512,44 @@ public class AssessmentSessionService {
         String key = SUBMITTED_KEY_PREFIX + studentId + ":" + assessmentId;
         redisTemplate.delete(key);
         logger.info("Deleted submitted answers from Redis for student={} assessment={}", studentId, assessmentId);
+    }
+
+    /**
+     * Check whether a submitted: key exists for a student+assessment pair.
+     * Used by admin diagnostics to classify rows (ghost vs recoverable).
+     */
+    public boolean hasSubmittedAnswers(Long studentId, Long assessmentId) {
+        String key = SUBMITTED_KEY_PREFIX + studentId + ":" + assessmentId;
+        return Boolean.TRUE.equals(redisTemplate.hasKey(key));
+    }
+
+    /**
+     * Delete proctoring payload from Redis. Called on admin reset.
+     */
+    public void deleteProctoringData(Long studentId, Long assessmentId) {
+        String key = PROCTORING_KEY_PREFIX + studentId + ":" + assessmentId;
+        redisTemplate.delete(key);
+    }
+
+    /**
+     * Clear all Redis state for a student+assessment pair.
+     * Called on:
+     *   - admin reset (prior submission being wiped)
+     *   - startAssessment (student starting/resuming; wipe any stale attempt)
+     *   - processor success (explicit cleanup after persistence)
+     *
+     * Does NOT delete the submit result cache — that linger allows an
+     * immediate double-submit to see the cached response.
+     */
+    public void clearAllForMapping(Long studentId, Long assessmentId) {
+        deleteSession(studentId, assessmentId);
+        clearSubmissionLock(studentId, assessmentId);
+        deletePartialAnswers(studentId, assessmentId);
+        deleteSubmittedAnswers(studentId, assessmentId);
+        deleteProctoringData(studentId, assessmentId);
+        deleteDraft(studentId, assessmentId);
+        // heartbeat auto-expires in 60s — skip explicit delete
+        logger.info("Cleared all Redis state for student={} assessment={}", studentId, assessmentId);
     }
 
     /**

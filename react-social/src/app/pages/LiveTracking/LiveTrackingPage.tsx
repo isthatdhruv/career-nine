@@ -1,6 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { getAssessmentList, getLiveTracking, getLiveTrackingLite, getRedisPartials, flushPartialToDb, getRedisPartialDetail, submitFromRedis } from "./API/LiveTracking_APIs";
+import {
+  getAssessmentList,
+  getLiveTracking,
+  getLiveTrackingLite,
+  getRedisPartials,
+  flushPartialToDb,
+  getRedisPartialDetail,
+  submitFromRedis,
+  getPendingPersistence,
+  reconcilePersisted,
+  cleanupRedis,
+  retryNow,
+  resetAssessment,
+  getSubmissionFailureDetail,
+  PendingPersistenceEntry,
+  PendingPersistenceDiagnostic,
+} from "./API/LiveTracking_APIs";
 import { showErrorToast } from '../../utils/toast';
 
 /* ─── Types ─── */
@@ -188,7 +204,7 @@ const LiveTrackingPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [progressSort, setProgressSort] = useState<"none" | "asc" | "desc">("none");
   const [isPolling, setIsPolling] = useState(true);
-  const [activeTab, setActiveTab] = useState<"live" | "redis">("live");
+  const [activeTab, setActiveTab] = useState<"live" | "redis" | "pending">("live");
   const [redisPartials, setRedisPartials] = useState<RedisPartialEntry[]>([]);
   const [redisFilterUsername, setRedisFilterUsername] = useState("");
   const [redisLoading, setRedisLoading] = useState(false);
@@ -201,6 +217,16 @@ const LiveTrackingPage = () => {
   const [selectedStudents, setSelectedStudents] = useState<Set<number>>(new Set());
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number; failed: number } | null>(null);
+
+  // ── Pending Persistence state ──────────────────────────────────────────
+  const [pendingEntries, setPendingEntries] = useState<PendingPersistenceEntry[]>([]);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [pendingActionIds, setPendingActionIds] = useState<Set<number>>(new Set());
+  const [failureDetailModal, setFailureDetailModal] = useState<{
+    show: boolean;
+    studentName: string;
+    detail: any;
+  }>({ show: false, studentName: "", detail: null });
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevDataRef = useRef<string>("");
@@ -400,6 +426,120 @@ const LiveTrackingPage = () => {
       fetchRedisPartials();
     }
   }, [activeTab, selectedId, fetchRedisPartials]);
+
+  // ── Pending Persistence fetch + actions ────────────────────────────────
+  const fetchPendingPersistence = useCallback(async () => {
+    if (!selectedId) {
+      setPendingEntries([]);
+      return;
+    }
+    setPendingLoading(true);
+    try {
+      const res = await getPendingPersistence(selectedId);
+      setPendingEntries(res.data || []);
+    } catch {
+      setPendingEntries([]);
+    } finally {
+      setPendingLoading(false);
+    }
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (activeTab === "pending") {
+      fetchPendingPersistence();
+    }
+  }, [activeTab, selectedId, fetchPendingPersistence]);
+
+  // Auto-refresh Pending tab every 15s while visible (transient recoveries can
+  // self-heal quickly — we want the list to shrink without a manual refresh).
+  useEffect(() => {
+    if (activeTab !== "pending") return;
+    const handle = setInterval(() => { fetchPendingPersistence(); }, 15_000);
+    return () => clearInterval(handle);
+  }, [activeTab, fetchPendingPersistence]);
+
+  const withPendingAction = async (
+    studentId: number,
+    fn: () => Promise<unknown>
+  ) => {
+    setPendingActionIds((prev) => new Set(prev).add(studentId));
+    try {
+      await fn();
+      await fetchPendingPersistence();
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || "Action failed";
+      showErrorToast(msg);
+    } finally {
+      setPendingActionIds((prev) => {
+        const next = new Set(prev);
+        next.delete(studentId);
+        return next;
+      });
+    }
+  };
+
+  const handlePendingRetry = (entry: PendingPersistenceEntry) =>
+    withPendingAction(entry.userStudentId, () =>
+      retryNow({
+        userStudentId: entry.userStudentId,
+        assessmentId: entry.assessmentId,
+        reason: "Admin retry",
+      })
+    );
+
+  const handlePendingReconcile = (entry: PendingPersistenceEntry) =>
+    withPendingAction(entry.userStudentId, () =>
+      reconcilePersisted({
+        userStudentId: entry.userStudentId,
+        assessmentId: entry.assessmentId,
+        reason: "Admin reconcile — DB has full data",
+      })
+    );
+
+  const handlePendingCleanupRedis = (entry: PendingPersistenceEntry) =>
+    withPendingAction(entry.userStudentId, () =>
+      cleanupRedis({
+        userStudentId: entry.userStudentId,
+        assessmentId: entry.assessmentId,
+        reason: "Admin cleanup — DB has full data",
+      })
+    );
+
+  const handlePendingReset = async (entry: PendingPersistenceEntry) => {
+    const confirmText = window.prompt(
+      `Reset ${entry.studentName || "student #" + entry.userStudentId}?\n\n` +
+      `This will DELETE their answers and require them to retake. ` +
+      `Type the username to confirm.`
+    );
+    if (confirmText === null) return;
+    if (confirmText.trim() !== (entry.username || "").trim()) {
+      showErrorToast("Confirmation did not match username");
+      return;
+    }
+    await withPendingAction(entry.userStudentId, () =>
+      resetAssessment({
+        userStudentId: entry.userStudentId,
+        assessmentId: entry.assessmentId,
+        reason: "Admin reset via pending persistence UI",
+      })
+    );
+  };
+
+  const handleViewFailureDetail = async (entry: PendingPersistenceEntry) => {
+    try {
+      const res = await getSubmissionFailureDetail(
+        entry.userStudentId,
+        entry.assessmentId
+      );
+      setFailureDetailModal({
+        show: true,
+        studentName: entry.studentName || `Student #${entry.userStudentId}`,
+        detail: res.data,
+      });
+    } catch {
+      showErrorToast("No failure history found");
+    }
+  };
 
   // Flush a single student's partial answers to DB
   const handleFlushOne = async (studentId: number, assessmentId: number) => {
@@ -715,6 +855,26 @@ const LiveTrackingPage = () => {
               Redis Buffered Answers
               {redisPartials.length > 0 && (
                 <span className="badge bg-info ms-2">{redisPartials.length}</span>
+              )}
+            </button>
+          </li>
+          <li className="nav-item">
+            <button
+              className={`nav-link ${activeTab === "pending" ? "active" : ""}`}
+              onClick={() => setActiveTab("pending")}
+              title="Completed students whose answers haven't been confirmed in MySQL yet"
+            >
+              Pending Persistence
+              {pendingEntries.length > 0 && (
+                <span
+                  className={`badge ms-2 ${
+                    pendingEntries.some((e) => e.diagnostic.startsWith("ghost"))
+                      ? "bg-danger"
+                      : "bg-warning text-dark"
+                  }`}
+                >
+                  {pendingEntries.length}
+                </span>
               )}
             </button>
           </li>
@@ -1084,6 +1244,21 @@ const LiveTrackingPage = () => {
           </>
         )}
 
+        {/* ─── Pending Persistence Tab ─── */}
+        {activeTab === "pending" && (
+          <PendingPersistenceTab
+            entries={pendingEntries}
+            loading={pendingLoading}
+            actionIds={pendingActionIds}
+            onRefresh={fetchPendingPersistence}
+            onRetry={handlePendingRetry}
+            onReconcile={handlePendingReconcile}
+            onCleanupRedis={handlePendingCleanupRedis}
+            onReset={handlePendingReset}
+            onViewFailure={handleViewFailureDetail}
+          />
+        )}
+
         {/* Loading skeleton for initial load */}
         {loading && !data && selectedId && activeTab === "live" && (
           <div className="text-center py-5">
@@ -1124,6 +1299,78 @@ const LiveTrackingPage = () => {
         </div>
       )}
 
+      {/* Failure Detail Modal */}
+      {failureDetailModal.show && (
+        <div className="modal d-block" tabIndex={-1} style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+          <div className="modal-dialog modal-lg modal-dialog-scrollable">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Failure History &mdash; {failureDetailModal.studentName}</h5>
+                <button
+                  type="button"
+                  className="btn-close"
+                  onClick={() => setFailureDetailModal({ show: false, studentName: "", detail: null })}
+                />
+              </div>
+              <div className="modal-body">
+                {failureDetailModal.detail ? (
+                  <>
+                    <dl className="row mb-3">
+                      <dt className="col-sm-4">Attempt Count</dt>
+                      <dd className="col-sm-8">{failureDetailModal.detail.attemptCount}</dd>
+
+                      <dt className="col-sm-4">First Failed</dt>
+                      <dd className="col-sm-8">{failureDetailModal.detail.firstFailedAt}</dd>
+
+                      <dt className="col-sm-4">Last Attempt</dt>
+                      <dd className="col-sm-8">{failureDetailModal.detail.lastAttemptAt}</dd>
+
+                      <dt className="col-sm-4">Next Retry</dt>
+                      <dd className="col-sm-8">
+                        {failureDetailModal.detail.nextRetryAt || (
+                          <span className="text-danger">Retries stopped — admin action required</span>
+                        )}
+                      </dd>
+
+                      <dt className="col-sm-4">Error Kind</dt>
+                      <dd className="col-sm-8">
+                        <span className={
+                          failureDetailModal.detail.lastErrorKind === "non_transient"
+                            ? "badge bg-danger"
+                            : "badge bg-warning text-dark"
+                        }>
+                          {failureDetailModal.detail.lastErrorKind || "unknown"}
+                        </span>
+                      </dd>
+
+                      <dt className="col-sm-4">Consecutive Non-Transient</dt>
+                      <dd className="col-sm-8">{failureDetailModal.detail.consecutiveNonTransientCount}</dd>
+
+                      <dt className="col-sm-4">Error Class</dt>
+                      <dd className="col-sm-8"><code>{failureDetailModal.detail.lastErrorClass}</code></dd>
+                    </dl>
+                    <h6>Last Error Message</h6>
+                    <pre style={{ maxHeight: "30vh", overflow: "auto", fontSize: "0.85rem", backgroundColor: "#f8f9fa", padding: 12 }}>
+                      {failureDetailModal.detail.lastErrorMessage || "(no message)"}
+                    </pre>
+                  </>
+                ) : (
+                  <em className="text-muted">No failure record</em>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setFailureDetailModal({ show: false, studentName: "", detail: null })}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Pulse animation for live indicator */}
       <style>{`
         @keyframes pulse {
@@ -1132,6 +1379,251 @@ const LiveTrackingPage = () => {
         }
       `}</style>
     </div>
+  );
+};
+
+// ═════════════════════════════════════════════════════════════════════════
+//   Pending Persistence tab content
+// ═════════════════════════════════════════════════════════════════════════
+
+const DIAGNOSTIC_META: Record<PendingPersistenceDiagnostic, {
+  label: string;
+  severity: "info" | "warning" | "danger" | "orange";
+  description: string;
+}> = {
+  awaiting_processor: {
+    label: "Awaiting processor",
+    severity: "warning",
+    description: "Redis has the submission; DB is empty. Processor will retry automatically.",
+  },
+  partial_inflight: {
+    label: "Partial (in-flight)",
+    severity: "warning",
+    description: "Redis has the submission; DB has some rows. Processor is mid-write.",
+  },
+  duplicate_cleanup_needed: {
+    label: "Cleanup needed",
+    severity: "warning",
+    description: "Both Redis and DB are in sync (full answer set). Safe to delete Redis.",
+  },
+  excess_pending: {
+    label: "Excess (pending)",
+    severity: "orange",
+    description: "Redis has more questions than expected. Inspect before retrying.",
+  },
+  excess_already_persisted: {
+    label: "Excess (already persisted)",
+    severity: "warning",
+    description: "DB has full data; Redis payload has excess. Safe to delete Redis.",
+  },
+  excess_partial_db: {
+    label: "Excess (partial DB)",
+    severity: "danger",
+    description: "Redis payload is excess; DB only has some rows. Inspect — likely needs reset.",
+  },
+  reconcile_only: {
+    label: "Reconcile only",
+    severity: "info",
+    description: "DB has full answer set; persistenceState flag is stale. Zero-risk to reconcile.",
+  },
+  ghost_partial: {
+    label: "Ghost (partial)",
+    severity: "danger",
+    description: "Redis empty; DB has partial answers. Data is unreliable — reset recommended.",
+  },
+  ghost_empty: {
+    label: "Ghost (empty)",
+    severity: "danger",
+    description: "Redis empty; DB empty. Data is unrecoverable — reset and ask student to retake.",
+  },
+};
+
+const diagnosticBadgeClass = (severity: "info" | "warning" | "danger" | "orange"): string => {
+  switch (severity) {
+    case "info": return "badge bg-info text-white";
+    case "warning": return "badge bg-warning text-dark";
+    case "danger": return "badge bg-danger text-white";
+    case "orange": return "badge text-white";   // orange styled inline
+  }
+};
+
+interface PendingTabProps {
+  entries: PendingPersistenceEntry[];
+  loading: boolean;
+  actionIds: Set<number>;
+  onRefresh: () => void;
+  onRetry: (e: PendingPersistenceEntry) => void;
+  onReconcile: (e: PendingPersistenceEntry) => void;
+  onCleanupRedis: (e: PendingPersistenceEntry) => void;
+  onReset: (e: PendingPersistenceEntry) => void;
+  onViewFailure: (e: PendingPersistenceEntry) => void;
+}
+
+const PendingPersistenceTab = (props: PendingTabProps) => {
+  const { entries, loading, actionIds, onRefresh, onRetry, onReconcile, onCleanupRedis, onReset, onViewFailure } = props;
+
+  const ghostCount = entries.filter((e) => e.diagnostic.startsWith("ghost")).length;
+  const excessCount = entries.filter((e) => e.diagnostic.startsWith("excess")).length;
+  const reconcileCount = entries.filter((e) => e.diagnostic === "reconcile_only").length;
+
+  return (
+    <>
+      <div className="d-flex flex-wrap align-items-center gap-3 mb-3">
+        <button
+          className="btn btn-sm btn-outline-primary"
+          onClick={onRefresh}
+          disabled={loading}
+        >
+          {loading ? <span className="spinner-border spinner-border-sm me-1" role="status" /> : null}
+          Refresh
+        </button>
+        <small className="text-muted">
+          Showing {entries.length} row{entries.length === 1 ? "" : "s"}
+          {ghostCount > 0 && <> · <span className="text-danger">{ghostCount} ghost</span></>}
+          {excessCount > 0 && <> · <span style={{ color: "#fd7e14" }}>{excessCount} excess</span></>}
+          {reconcileCount > 0 && <> · <span className="text-info">{reconcileCount} reconcile</span></>}
+        </small>
+      </div>
+
+      <div className="alert alert-secondary py-2 small mb-3">
+        These are students with <code>status = completed</code> whose answers
+        aren&apos;t confirmed in MySQL yet. Most self-heal via auto-retry; this
+        view lets you diagnose and fix the ones that need attention.
+      </div>
+
+      <div className="table-responsive">
+        <table className="table table-hover align-middle">
+          <thead className="table-light">
+            <tr>
+              <th style={{ width: 40 }}>#</th>
+              <th>Student</th>
+              <th>Username</th>
+              <th style={{ width: 140 }}>Diagnostic</th>
+              <th style={{ width: 100 }}>Redis</th>
+              <th style={{ width: 100 }}>DB / Expected</th>
+              <th style={{ width: 90 }}>State</th>
+              <th style={{ width: 80 }}>Attempts</th>
+              <th style={{ minWidth: 280 }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.length === 0 ? (
+              <tr>
+                <td colSpan={9} className="text-center text-muted py-4">
+                  {loading ? "Loading…" : "No pending persistence issues for this assessment 🎉"}
+                </td>
+              </tr>
+            ) : (
+              entries.map((e, idx) => {
+                const meta = DIAGNOSTIC_META[e.diagnostic] ?? DIAGNOSTIC_META.ghost_empty;
+                const busy = actionIds.has(e.userStudentId);
+                const redisInfo = e.redisPresent
+                  ? (e.redisDistinctQuestionCount != null
+                      ? `${e.redisDistinctQuestionCount}q / ${e.redisAnswerCount ?? 0}e`
+                      : "present")
+                  : "—";
+                return (
+                  <tr key={`${e.userStudentId}:${e.assessmentId}`}>
+                    <td className="text-muted">{idx + 1}</td>
+                    <td>
+                      <div className="fw-semibold">{e.studentName || "(unnamed)"}</div>
+                      <small className="text-muted">ID: {e.userStudentId}</small>
+                    </td>
+                    <td><small>{e.username || ""}</small></td>
+                    <td>
+                      <span
+                        className={diagnosticBadgeClass(meta.severity)}
+                        style={meta.severity === "orange" ? { backgroundColor: "#fd7e14" } : undefined}
+                        title={meta.description}
+                      >
+                        {meta.label}
+                      </span>
+                    </td>
+                    <td>
+                      <small>{redisInfo}</small>
+                    </td>
+                    <td>
+                      <small>
+                        {e.dbAnswerCount} / {e.expectedCount || "?"}
+                      </small>
+                    </td>
+                    <td>
+                      <small>
+                        <code>{e.persistenceState}</code>
+                      </small>
+                    </td>
+                    <td>
+                      {e.failure ? (
+                        <button
+                          className="btn btn-link btn-sm p-0"
+                          onClick={() => onViewFailure(e)}
+                          title={`Last error: ${e.failure.lastErrorClass}`}
+                        >
+                          {e.failure.attemptCount}
+                        </button>
+                      ) : (
+                        <small className="text-muted">—</small>
+                      )}
+                    </td>
+                    <td>
+                      <div className="d-flex gap-1 flex-wrap">
+                        {e.recommendedAction === "retry_now" && (
+                          <button
+                            className="btn btn-sm btn-outline-primary"
+                            onClick={() => onRetry(e)}
+                            disabled={busy}
+                          >
+                            Retry Now
+                          </button>
+                        )}
+                        {e.recommendedAction === "cleanup_redis" && (
+                          <button
+                            className="btn btn-sm btn-outline-warning"
+                            onClick={() => onCleanupRedis(e)}
+                            disabled={busy}
+                          >
+                            Clean Up
+                          </button>
+                        )}
+                        {e.recommendedAction === "reconcile" && (
+                          <button
+                            className="btn btn-sm btn-outline-info"
+                            onClick={() => onReconcile(e)}
+                            disabled={busy}
+                          >
+                            Mark Persisted
+                          </button>
+                        )}
+                        {e.recommendedAction === "reset_assessment" && (
+                          <button
+                            className="btn btn-sm btn-danger"
+                            onClick={() => onReset(e)}
+                            disabled={busy}
+                          >
+                            Reset
+                          </button>
+                        )}
+                        {/* Secondary actions — admin can always retry or inspect */}
+                        {e.recommendedAction !== "retry_now" && e.redisPresent && (
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            onClick={() => onRetry(e)}
+                            disabled={busy}
+                            title="Force retry from Redis"
+                          >
+                            Retry
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 };
 
