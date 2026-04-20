@@ -80,7 +80,8 @@ export interface ValueData {
 export interface EnvironmentalAwarenessData {
   netScore: number;
   category: string;
-  icon: string;
+  iconPath: string;
+  iconTint: string;
   friendlyChoices: number;
   unfriendlyChoices: number;
   interpretation: string;
@@ -435,23 +436,26 @@ function getSocialInsightFullData(score: number): {
 /**
  * Get environmental awareness category
  */
-function getEnvironmentalCategory(netScore: number): { category: string; icon: string; interpretation: string } {
+function getEnvironmentalCategory(netScore: number): { category: string; iconPath: string; iconTint: string; interpretation: string } {
   if (netScore >= 2) {
     return {
       category: "Mighty Tree",
-      icon: "🌳",
+      iconPath: "/media/icons/duotune/art/art007.svg",
+      iconTint: "#0C6B5A",
       interpretation: "Your child consistently looks past the \"shiny\" stuff to choose what is best for the planet."
     };
   } else if (netScore >= 0) {
     return {
       category: "Growing Sapling",
-      icon: "🌿",
+      iconPath: "/media/icons/duotune/general/gen037.svg",
+      iconTint: "#10B981",
       interpretation: "Your child is balancing convenience with caring for the planet in your daily life."
     };
   } else {
     return {
       category: "Seedling Starter",
-      icon: "🌱",
+      iconPath: "/media/icons/duotune/general/gen043.svg",
+      iconTint: "#65A30D",
       interpretation: "Your child currently prefers things that are quick and easy—try swapping one \"convenient\" choice for a \"green\" one this week!"
     };
   }
@@ -768,7 +772,8 @@ export function processBetAssessmentData(
   const environmentalAwareness: EnvironmentalAwarenessData = {
     netScore: envNetScore,
     category: envResult.category,
-    icon: envResult.icon,
+    iconPath: envResult.iconPath,
+    iconTint: envResult.iconTint,
     friendlyChoices,
     unfriendlyChoices,
     interpretation: envResult.interpretation,

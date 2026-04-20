@@ -5,6 +5,17 @@ import {
   ParsedGeneralAssessmentData,
   PersonalityScore,
 } from "../API/Dashboard_APIs";
+import { KTSVG } from "../../../../_metronic/helpers";
+
+const RANK_COLORS = ['#D4AF37', '#A8A8A8', '#B08D57'] as const;
+function RankIcon({ idx }: { idx: number }) {
+  if (idx > 2) return <>{`#${idx + 1}`}</>;
+  return (
+    <span style={{ color: RANK_COLORS[idx], display: 'inline-flex', alignItems: 'center' }}>
+      <KTSVG path='/media/icons/duotune/art/art007.svg' className='svg-icon-2' />
+    </span>
+  );
+}
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -222,7 +233,7 @@ const GeneralDashboard: React.FC<Props> = ({ studentId, assessmentId }) => {
                   {top5AbilityNames.map((name, idx) => (
                     <div key={idx} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.5rem 0" }}>
                       <span style={{ fontWeight: 700, color: ["#f59e0b", "#3b82f6", "#8b5cf6", "#10b981", "#6b7280"][idx], fontSize: "1.1rem" }}>
-                        {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `#${idx + 1}`}
+                        <RankIcon idx={idx} />
                       </span>
                       <span style={{ fontWeight: 500 }}>{name}</span>
                       <span style={{ marginLeft: "auto", color: "#6b7280", fontSize: "0.85rem" }}>
@@ -280,7 +291,7 @@ const GeneralDashboard: React.FC<Props> = ({ studentId, assessmentId }) => {
               <div className="result-header">
                 <h3 className="result-title">
                   <span style={{ fontSize: "1.2rem", marginRight: 8 }}>
-                    {idx === 0 ? "🥇" : idx === 1 ? "🥈" : "🥉"}
+                    <RankIcon idx={idx} />
                   </span>
                   #{idx + 1} {profile.name} — "{profile.title}"
                 </h3>
@@ -516,7 +527,7 @@ const GeneralDashboard: React.FC<Props> = ({ studentId, assessmentId }) => {
                 {top5AbilityNames.map((name, idx) => (
                   <div key={idx} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.6rem 0", borderBottom: idx < top5AbilityNames.length - 1 ? "1px solid #f0f0f0" : "none" }}>
                     <span style={{ fontSize: "1.2rem" }}>
-                      {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `#${idx + 1}`}
+                      <RankIcon idx={idx} />
                     </span>
                     <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>{name}</span>
                     <span style={{ marginLeft: "auto", color: "#6b7280", fontSize: "0.85rem" }}>

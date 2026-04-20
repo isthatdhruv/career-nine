@@ -122,9 +122,6 @@ const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, o
 
         if (onSave) {
             onSave(payload);
-        } else {
-             // force refresh or just close
-             window.location.reload();
         }
         onHide();
     } catch (error) {

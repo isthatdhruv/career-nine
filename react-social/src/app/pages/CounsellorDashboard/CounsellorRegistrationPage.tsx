@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toAbsoluteUrl } from '../../../_metronic/helpers'
+import { convertImageToWebP } from '../../utils/imageUtils'
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8091'
 
@@ -38,7 +39,8 @@ const CounsellorRegistrationPage: React.FC = () => {
   const [form, setForm] = useState<FormData>(initialForm)
   const [step, setStep] = useState(1)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
-  const [photoBase64, setPhotoBase64] = useState<string | null>(null)
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  const [photoUploading, setPhotoUploading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
@@ -54,20 +56,29 @@ const CounsellorRegistrationPage: React.FC = () => {
     setError('')
   }
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     if (!file.type.startsWith('image/')) { setError('Please select an image file.'); return }
     if (file.size > 5 * 1024 * 1024) { setError('Image must be less than 5MB.'); return }
 
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = reader.result as string
-      setPhotoPreview(result)
-      setPhotoBase64(result)
-      setError('')
+    setError('')
+    setPhotoUploading(true)
+    try {
+      const result = await convertImageToWebP(file, 0.8, 512, 512)
+      setPhotoPreview(result.base64)
+      const { data } = await axios.post(`${API_BASE_URL}/counsellor-media/upload`, {
+        base64Data: result.base64,
+        mediaType: 'profile',
+      })
+      setPhotoUrl(data?.url ?? null)
+    } catch (err) {
+      setPhotoPreview(null)
+      setPhotoUrl(null)
+      setError('Failed to upload photo. Please try another image.')
+    } finally {
+      setPhotoUploading(false)
     }
-    reader.readAsDataURL(file)
   }
 
   const validateStep1 = (): string | null => {
@@ -122,15 +133,10 @@ const CounsellorRegistrationPage: React.FC = () => {
       modeCapability: form.modeCapability,
       qualifications: form.qualifications.trim() || undefined,
       yearsOfExperience: form.yearsOfExperience ? Number(form.yearsOfExperience) : undefined,
+      profileImageUrl: photoUrl || undefined,
     })
-      .then((res) => {
+      .then(() => {
         setSubmitted(true)
-        // Upload photo if selected
-        const counsellorId = res.data?.counsellorId
-        if (photoBase64 && counsellorId) {
-          axios.post(`${API_BASE_URL}/api/counsellor/upload-photo/${counsellorId}`, { photo: photoBase64 })
-            .catch(() => {}) // Photo upload failure is non-blocking
-        }
       })
       .catch(() => {})
   }
@@ -257,7 +263,9 @@ const CounsellorRegistrationPage: React.FC = () => {
                   >
                     {photoPreview ? 'Change Photo' : 'Upload Photo'}
                   </button>
-                  <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 4 }}>JPG, PNG or WebP. Max 5MB.</div>
+                  <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 4 }}>
+                    {photoUploading ? 'Uploading…' : 'JPG, PNG or WebP. Max 5MB.'}
+                  </div>
                   <input
                     id='photo-input'
                     type='file'
@@ -271,27 +279,32 @@ const CounsellorRegistrationPage: React.FC = () => {
               <div>
                 <label style={labelStyle}>Full Name *</label>
                 <input style={inputStyle} placeholder='Enter your full name' value={form.name}
+                  autoComplete='off' name='c9-name' data-lpignore='true'
                   onChange={(e) => update('name', e.target.value)} />
               </div>
               <div>
                 <label style={labelStyle}>Email *</label>
                 <input style={inputStyle} type='email' placeholder='name@example.com' value={form.email}
+                  autoComplete='off' name='c9-email' data-lpignore='true'
                   onChange={(e) => update('email', e.target.value)} />
               </div>
               <div>
                 <label style={labelStyle}>Phone *</label>
                 <input style={inputStyle} type='tel' placeholder='+91 XXXXX XXXXX' value={form.phone}
+                  autoComplete='off' name='c9-phone' data-lpignore='true'
                   onChange={(e) => update('phone', e.target.value)} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div>
                   <label style={labelStyle}>Password *</label>
                   <input style={inputStyle} type='password' placeholder='Min 6 characters' value={form.password}
+                    autoComplete='new-password' name='c9-new-password' data-lpignore='true'
                     onChange={(e) => update('password', e.target.value)} />
                 </div>
                 <div>
                   <label style={labelStyle}>Confirm Password *</label>
                   <input style={inputStyle} type='password' placeholder='Re-enter password' value={form.confirmPassword}
+                    autoComplete='new-password' name='c9-confirm-password' data-lpignore='true'
                     onChange={(e) => update('confirmPassword', e.target.value)} />
                 </div>
               </div>
@@ -304,18 +317,21 @@ const CounsellorRegistrationPage: React.FC = () => {
               <div>
                 <label style={labelStyle}>Specializations *</label>
                 <input style={inputStyle} placeholder='e.g. Career Counselling, Academic Guidance, Mental Health'
+                  autoComplete='off' name='c9-specializations' data-lpignore='true'
                   value={form.specializations} onChange={(e) => update('specializations', e.target.value)} />
                 <div style={{ fontSize: 11, color: '#5C7A72', marginTop: 4 }}>Comma-separated</div>
               </div>
               <div>
                 <label style={labelStyle}>Languages Spoken *</label>
                 <input style={inputStyle} placeholder='e.g. English, Hindi, Punjabi'
+                  autoComplete='off' name='c9-languages' data-lpignore='true'
                   value={form.languagesSpoken} onChange={(e) => update('languagesSpoken', e.target.value)} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div>
                   <label style={labelStyle}>Counselling Mode</label>
                   <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.modeCapability}
+                    autoComplete='off' name='c9-mode'
                     onChange={(e) => update('modeCapability', e.target.value)}>
                     <option value='BOTH'>Online & Offline</option>
                     <option value='ONLINE'>Online Only</option>
@@ -325,6 +341,7 @@ const CounsellorRegistrationPage: React.FC = () => {
                 <div>
                   <label style={labelStyle}>Years of Experience</label>
                   <input style={inputStyle} type='number' placeholder='e.g. 5' value={form.yearsOfExperience}
+                    autoComplete='off' name='c9-experience' data-lpignore='true'
                     onChange={(e) => update('yearsOfExperience', e.target.value)} />
                 </div>
               </div>
@@ -333,6 +350,7 @@ const CounsellorRegistrationPage: React.FC = () => {
                 <textarea
                   style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }}
                   placeholder='e.g. M.Ed in Counselling Psychology, Certified Career Coach'
+                  autoComplete='off' name='c9-qualifications' data-lpignore='true'
                   value={form.qualifications}
                   onChange={(e) => update('qualifications', e.target.value)}
                 />
@@ -342,6 +360,7 @@ const CounsellorRegistrationPage: React.FC = () => {
                 <textarea
                   style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }}
                   placeholder='A brief introduction about yourself...'
+                  autoComplete='off' name='c9-bio' data-lpignore='true'
                   value={form.bio}
                   onChange={(e) => update('bio', e.target.value)}
                 />
@@ -434,15 +453,15 @@ const CounsellorRegistrationPage: React.FC = () => {
                 ) : (
                   <button
                     onClick={handleSubmit}
-                    disabled={loading}
+                    disabled={loading || photoUploading}
                     style={{
                       padding: '10px 28px', fontSize: 14, fontWeight: 600,
                       border: 'none', borderRadius: 8,
-                      background: loading ? '#9CA3AF' : '#0C6B5A', color: '#fff',
-                      cursor: loading ? 'not-allowed' : 'pointer',
+                      background: (loading || photoUploading) ? '#9CA3AF' : '#0C6B5A', color: '#fff',
+                      cursor: (loading || photoUploading) ? 'not-allowed' : 'pointer',
                     }}
                   >
-                    {loading ? 'Submitting...' : 'Submit Registration'}
+                    {photoUploading ? 'Uploading photo…' : loading ? 'Submitting...' : 'Submit Registration'}
                   </button>
                 )}
               </div>

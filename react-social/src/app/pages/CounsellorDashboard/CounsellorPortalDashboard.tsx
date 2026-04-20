@@ -29,6 +29,11 @@ const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
     icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><circle cx='12' cy='12' r='10'/><polyline points='12 6 12 12 16 14'/></svg>,
   },
   {
+    label: 'Reports',
+    path: '/counsellor/reports',
+    icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><line x1='18' y1='20' x2='18' y2='10'/><line x1='12' y1='20' x2='12' y2='4'/><line x1='6' y1='20' x2='6' y2='14'/></svg>,
+  },
+  {
     label: 'My Profile',
     path: '/counsellor/profile',
     icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><path d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/><circle cx='12' cy='7' r='4'/></svg>,
@@ -125,15 +130,6 @@ const CounsellorPortalDashboard: React.FC = () => {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => navigate('/counsellor/profile')}
-            style={{
-              padding: '8px 18px', fontSize: 13, fontWeight: 600, borderRadius: 8, cursor: 'pointer',
-              border: '1.5px solid #D1E5DF', background: '#fff', color: '#1A2B28',
-            }}
-          >
-            Edit Profile
-          </button>
         </div>
       </div>
 
