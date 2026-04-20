@@ -337,9 +337,12 @@ public class AppointmentService {
                     "New slot " + newSlotId + " is not available. Current status: " + newSlot.getStatus());
         }
 
-        // Mark old appointment and slot
+        // Mark old appointment as rescheduled and release the old slot so
+        // other students can book it again. Blocked/manual slots stay bookable
+        // exactly as they were; only the status flips back to AVAILABLE.
         oldAppointment.setStatus("RESCHEDULED");
-        oldSlot.setStatus("CANCELLED");
+        oldSlot.setStatus("AVAILABLE");
+        oldSlot.setIsBlocked(false);
         slotRepository.save(oldSlot);
         appointmentRepository.save(oldAppointment);
 
@@ -374,6 +377,22 @@ public class AppointmentService {
 
         // Notify student of reschedule
         notificationService.sendRescheduleEmail(oldAppointment, newAppointment);
+
+        // In-app notification to student — UserStudent stores userId (Long),
+        // not a User entity. Build a lightweight User reference using the stored userId.
+        try {
+            User studentUser = new User();
+            studentUser.setId(newAppointment.getStudent().getUserId());
+            notificationService.createInAppNotification(
+                    studentUser,
+                    "APPOINTMENT_RESCHEDULED",
+                    "Counselling Rescheduled",
+                    "Your counselling session has been rescheduled. Check your email for the updated schedule.",
+                    newAppointment.getId(),
+                    "APPOINTMENT");
+        } catch (Exception e) {
+            logger.warn("Failed to create in-app reschedule notification for student: {}", e.getMessage());
+        }
 
         // Audit log for old appointment
         Map<String, Object> oldAuditValues = new HashMap<>();

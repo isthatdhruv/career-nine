@@ -245,8 +245,8 @@ export default function Users() {
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!data) {
-      // if no data, just reload page as requested earlier
-      window.location.reload();
+      // No data to save — navigate back instead of reloading the whole app.
+      navigate(-1);
       return;
     }
 
@@ -270,8 +270,9 @@ export default function Users() {
       if (selectedBoards.length > 0) payload.boards = selectedBoards;
 
       await UpdateCollegeData(payload);
-      // refresh page after success to reflect updates
-      window.location.reload();
+      // Success — go back to the previous screen (usually college list),
+      // which will re-fetch on mount so the change is visible.
+      navigate(-1);
     } catch (error) {
       console.error("UpdateCollegeData failed", error);
       window.location.replace("/error");
@@ -647,7 +648,7 @@ export default function Users() {
           <button
             type="button"
             className="btn btn-outline-secondary btn-sm"
-            onClick={() => window.location.reload()}
+            onClick={() => navigate(-1)}
             disabled={loading}
           >
             Cancel

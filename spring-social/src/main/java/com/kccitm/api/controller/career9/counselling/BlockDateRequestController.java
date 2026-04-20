@@ -1,6 +1,8 @@
 package com.kccitm.api.controller.career9.counselling;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -18,12 +20,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.exception.ResourceNotFoundException;
+import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.counselling.BlockDateRequest;
 import com.kccitm.api.model.career9.counselling.Counsellor;
+import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
 import com.kccitm.api.model.career9.counselling.CounsellingSlot;
 import com.kccitm.api.repository.Career9.counselling.BlockDateRequestRepository;
+import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellorRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository;
+import com.kccitm.api.service.counselling.CounsellingNotificationService;
+import com.kccitm.api.service.counselling.MeetingLinkService;
 @RestController
 @RequestMapping("/api/block-date-request")
 public class BlockDateRequestController {
@@ -38,6 +45,15 @@ public class BlockDateRequestController {
 
     @Autowired
     private CounsellingSlotRepository slotRepository;
+
+    @Autowired
+    private CounsellingAppointmentRepository appointmentRepository;
+
+    @Autowired
+    private CounsellingNotificationService notificationService;
+
+    @Autowired
+    private MeetingLinkService meetingLinkService;
 
     @Autowired
     private com.kccitm.api.service.counselling.CounsellingActivityLogService activityLogService;
@@ -99,10 +115,153 @@ public class BlockDateRequestController {
         }
         requestRepository.save(request);
 
-        // Cancel all slots on that date for this counsellor
+        Long blockedCounsellorId = request.getCounsellor().getId();
+        LocalDate blockDate = request.getBlockDate();
+
+        // All slots on the blocked date for this counsellor
         List<CounsellingSlot> existingSlots = slotRepository.findByCounsellorIdAndDateBetween(
-                request.getCounsellor().getId(), request.getBlockDate(), request.getBlockDate());
+                blockedCounsellorId, blockDate, blockDate);
+
+        // Pool of AVAILABLE slots on the same date from OTHER active counsellors.
+        // We draw from this pool when reassigning appointments so that each
+        // replacement counsellor is picked at random (shuffled) and we never hand
+        // out the same slot twice within one approval.
+        List<CounsellingSlot> replacementPool = new ArrayList<>();
+        for (CounsellingSlot s : slotRepository.findAvailableSlots(blockDate, blockDate)) {
+            if (s.getCounsellor() != null
+                    && !blockedCounsellorId.equals(s.getCounsellor().getId())
+                    && !Boolean.TRUE.equals(s.getIsBlocked())) {
+                replacementPool.add(s);
+            }
+        }
+        Collections.shuffle(replacementPool);
+
+        // Existing confirmed appointments on the blocked counsellor's day —
+        // these are the students we need to reassign (or cancel as fallback).
+        List<CounsellingAppointment> dayAppointments =
+                appointmentRepository.findByCounsellorIdAndDate(blockedCounsellorId, blockDate);
+
         int cancelledCount = 0;
+        int reassignedCount = 0;
+        int studentsCancelledCount = 0;
+
+        for (CounsellingAppointment appointment : dayAppointments) {
+            String status = appointment.getStatus();
+            if (!"CONFIRMED".equals(status) && !"ASSIGNED".equals(status) && !"PENDING".equals(status)) {
+                continue;
+            }
+
+            // Pick the first remaining replacement slot whose start time is >=
+            // appointment start, preferring the closest match. If none found,
+            // any remaining slot will do (the student gets notified either way).
+            CounsellingSlot replacement = null;
+            int chosenIdx = -1;
+            for (int i = 0; i < replacementPool.size(); i++) {
+                CounsellingSlot candidate = replacementPool.get(i);
+                if (candidate.getStartTime().equals(appointment.getSlot().getStartTime())) {
+                    replacement = candidate;
+                    chosenIdx = i;
+                    break;
+                }
+            }
+            if (replacement == null && !replacementPool.isEmpty()) {
+                replacement = replacementPool.get(0);
+                chosenIdx = 0;
+            }
+
+            CounsellingSlot oldSlot = appointment.getSlot();
+
+            if (replacement != null) {
+                replacementPool.remove(chosenIdx);
+
+                Counsellor oldCounsellor = appointment.getCounsellor();
+                Counsellor newCounsellor = replacement.getCounsellor();
+
+                // Point the appointment at the replacement slot + counsellor
+                appointment.setSlot(replacement);
+                appointment.setCounsellor(newCounsellor);
+                replacement.setStatus("CONFIRMED");
+                slotRepository.save(replacement);
+
+                // Regenerate meet link for the new slot
+                try {
+                    String meetLink = meetingLinkService.generateMeetLink(appointment);
+                    appointment.setMeetingLink(meetLink);
+                } catch (Exception e) {
+                    logger.warn("Failed to regenerate meet link after counsellor change for appointment {}: {}",
+                            appointment.getId(), e.getMessage());
+                }
+                appointmentRepository.save(appointment);
+
+                // Notify the newly-assigned counsellor
+                try {
+                    notificationService.sendAssignedToCounsellorEmail(appointment);
+                    if (newCounsellor != null && newCounsellor.getUser() != null) {
+                        notificationService.createInAppNotification(
+                                newCounsellor.getUser(),
+                                "APPOINTMENT_ASSIGNED",
+                                "New Counselling Session Assigned",
+                                "A session has been reassigned to you because another counsellor blocked the date.",
+                                appointment.getId(),
+                                "APPOINTMENT");
+                    }
+                } catch (Exception e) {
+                    logger.warn("Failed to notify replacement counsellor for appointment {}: {}",
+                            appointment.getId(), e.getMessage());
+                }
+
+                // Notify the student that their counsellor changed
+                try {
+                    User studentUser = new User();
+                    studentUser.setId(appointment.getStudent().getUserId());
+                    String oldName = oldCounsellor != null ? oldCounsellor.getName() : "your previous counsellor";
+                    String newName = newCounsellor != null ? newCounsellor.getName() : "a new counsellor";
+                    notificationService.createInAppNotification(
+                            studentUser,
+                            "COUNSELLOR_CHANGED",
+                            "Counsellor Changed",
+                            "Your counsellor has been changed from " + oldName + " to " + newName
+                                    + ". The session date and time remain the same.",
+                            appointment.getId(),
+                            "APPOINTMENT");
+                } catch (Exception e) {
+                    logger.warn("Failed to notify student of counsellor change for appointment {}: {}",
+                            appointment.getId(), e.getMessage());
+                }
+
+                reassignedCount++;
+            } else {
+                // No replacement counsellor available — cancel the appointment
+                // so the student isn't left with a phantom session.
+                appointment.setStatus("CANCELLED");
+                appointmentRepository.save(appointment);
+
+                try {
+                    User studentUser = new User();
+                    studentUser.setId(appointment.getStudent().getUserId());
+                    notificationService.createInAppNotification(
+                            studentUser,
+                            "APPOINTMENT_CANCELLED",
+                            "Counselling Session Cancelled",
+                            "Your counsellor has blocked the date and no replacement was available. "
+                                    + "Please book a new session at your convenience.",
+                            appointment.getId(),
+                            "APPOINTMENT");
+                } catch (Exception e) {
+                    logger.warn("Failed to notify student of cancellation for appointment {}: {}",
+                            appointment.getId(), e.getMessage());
+                }
+
+                studentsCancelledCount++;
+            }
+
+            // Original slot of the blocked counsellor gets hard-blocked below.
+            oldSlot.setStatus("CANCELLED");
+            oldSlot.setIsBlocked(true);
+            slotRepository.save(oldSlot);
+        }
+
+        // Block every remaining slot on that date (AVAILABLE ones with no appointment)
         for (CounsellingSlot slot : existingSlots) {
             if (!"CANCELLED".equals(slot.getStatus())) {
                 slot.setStatus("CANCELLED");
@@ -113,12 +272,14 @@ public class BlockDateRequestController {
             }
         }
 
-        logger.info("Block date request approved: id={} counsellor={} date={} slotsCancelled={}",
-                id, request.getCounsellor().getName(), request.getBlockDate(), cancelledCount);
+        logger.info("Block date approved: id={} counsellor={} date={} slotsCancelled={} reassigned={} cancelledAppointments={}",
+                id, request.getCounsellor().getName(), blockDate, cancelledCount, reassignedCount, studentsCancelledCount);
 
         activityLogService.log("BLOCK_DATE_APPROVED", "Block Date Approved",
-                request.getCounsellor().getName() + "'s request to block " + request.getBlockDate()
-                + " was approved. " + cancelledCount + " slot(s) cancelled.",
+                request.getCounsellor().getName() + "'s request to block " + blockDate
+                + " was approved. " + cancelledCount + " slot(s) cancelled, "
+                + reassignedCount + " session(s) reassigned, "
+                + studentsCancelledCount + " session(s) cancelled.",
                 request.getCounsellor(), "Admin");
 
         return ResponseEntity.ok(request);

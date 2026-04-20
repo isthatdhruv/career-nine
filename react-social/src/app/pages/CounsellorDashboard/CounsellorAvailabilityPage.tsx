@@ -23,18 +23,6 @@ const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
     ),
   },
   {
-    label: 'Students',
-    path: '/counsellor/students',
-    icon: (
-      <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
-        <path d='M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2' />
-        <circle cx='9' cy='7' r='4' />
-        <path d='M23 21v-2a4 4 0 0 0-3-3.87' />
-        <path d='M16 3.13a4 4 0 0 1 0 7.75' />
-      </svg>
-    ),
-  },
-  {
     label: 'Appointments',
     path: '/counsellor/appointments',
     icon: (
@@ -67,15 +55,6 @@ const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
     ),
   },
   {
-    label: 'Messages',
-    path: '/counsellor/messages',
-    icon: (
-      <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
-        <path d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' />
-      </svg>
-    ),
-  },
-  {
     label: 'Reports',
     path: '/counsellor/reports',
     icon: (
@@ -83,6 +62,16 @@ const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
         <line x1='18' y1='20' x2='18' y2='10' />
         <line x1='12' y1='20' x2='12' y2='4' />
         <line x1='6' y1='20' x2='6' y2='14' />
+      </svg>
+    ),
+  },
+  {
+    label: 'My Profile',
+    path: '/counsellor/profile',
+    icon: (
+      <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+        <path d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2' />
+        <circle cx='12' cy='7' r='4' />
       </svg>
     ),
   },
@@ -555,47 +544,56 @@ const CounsellorAvailabilityPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Blocked Dates List */}
-              {blockedDates.length > 0 && (
-                <div style={{
-                  background: '#fff', borderRadius: 12, border: '1px solid #E2E8F0', overflow: 'hidden',
-                }}>
+              {/* Blocked Dates List — visual-only regroup: date as heading, one row
+                  per cancelled slot underneath (each row keeps its own Remove). */}
+              {blockedDates.length > 0 && (() => {
+                const blockedByDate = new Map<string, any[]>()
+                for (const s of blockedDates) {
+                  const key = s.date || (s.startTime ? String(s.startTime).split('T')[0] : '')
+                  const arr = blockedByDate.get(key) || []
+                  arr.push(s)
+                  blockedByDate.set(key, arr)
+                }
+                const groupedEntries = Array.from(blockedByDate.entries()).sort(([a], [b]) => a.localeCompare(b))
+                return (
                   <div style={{
-                    padding: '14px 18px', borderBottom: '1px solid #E2E8F0',
-                    fontWeight: 700, fontSize: 15, color: '#1E293B',
+                    background: '#fff', borderRadius: 12, border: '1px solid #E2E8F0', overflow: 'hidden',
                   }}>
-                    Blocked Dates ({blockedDates.length})
-                  </div>
-                  <div style={{ maxHeight: 240, overflowY: 'auto' }}>
-                    {blockedDates.map((s: any) => (
-                      <div key={s.id} style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '10px 18px', borderBottom: '1px solid #F8FAFC',
-                      }}>
-                        <div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#991B1B' }}>
-                            {formatDateShort(s.date || s.startTime)}
+                    <div style={{
+                      padding: '14px 18px', borderBottom: '1px solid #E2E8F0',
+                      fontWeight: 700, fontSize: 15, color: '#1E293B',
+                    }}>
+                      Blocked Dates ({groupedEntries.length})
+                    </div>
+                    <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                      {groupedEntries.map(([date, daySlots]) => (
+                        <div key={date} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                          <div style={{
+                            padding: '10px 18px', background: '#FEF2F2',
+                            fontSize: 13, fontWeight: 700, color: '#991B1B',
+                          }}>
+                            {formatDateShort(date)}
                           </div>
-                          {s.reason && (
-                            <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>{s.reason}</div>
-                          )}
+                          {daySlots
+                            .sort((a: any, b: any) => (a.startTime || '').localeCompare(b.startTime || ''))
+                            .map((s: any) => (
+                              <div key={s.id} style={{
+                                padding: '10px 18px', borderTop: '1px solid #F8FAFC',
+                              }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>
+                                  {formatTime(s.startTime)} – {formatTime(s.endTime)}
+                                </div>
+                                {s.reason && (
+                                  <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>{s.reason}</div>
+                                )}
+                              </div>
+                            ))}
                         </div>
-                        <button
-                          onClick={() => handleDeleteSlot(s.id)}
-                          disabled={deletingSlot === s.id}
-                          style={{
-                            background: 'none', border: '1px solid #FECACA', borderRadius: 6,
-                            padding: '3px 10px', fontSize: 11, fontWeight: 600,
-                            color: '#991B1B', cursor: 'pointer',
-                          }}
-                        >
-                          {deletingSlot === s.id ? '...' : 'Remove'}
-                        </button>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )
+              })()}
 
               {/* Block Requests */}
               {blockRequests.length > 0 && (

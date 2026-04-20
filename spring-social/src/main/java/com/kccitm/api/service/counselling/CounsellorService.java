@@ -97,6 +97,9 @@ public class CounsellorService {
         if (updated.getBankIfsc() != null) {
             existing.setBankIfsc(updated.getBankIfsc());
         }
+        if (updated.getBankBranch() != null) {
+            existing.setBankBranch(updated.getBankBranch());
+        }
 
         logger.debug("Updating counsellor with id: {}", id);
         return counsellorRepository.save(existing);
