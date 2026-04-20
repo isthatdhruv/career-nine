@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
-import { toAbsoluteUrl } from '../../../_metronic/helpers'
+import { toAbsoluteUrl, KTSVG } from '../../../_metronic/helpers'
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8091'
 
@@ -79,11 +79,19 @@ const CounsellorDashboardLogin: React.FC = () => {
         }} />
 
         <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', maxWidth: 380 }}>
-          <img
-            src={toAbsoluteUrl('/media/logos/kcc.jpg')}
-            alt='Career-9'
-            style={{ height: 56, borderRadius: 12, marginBottom: 32, boxShadow: '0 4px 24px rgba(0,0,0,0.2)' }}
-          />
+          <div
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              background: '#fff', padding: '12px 20px', borderRadius: 14,
+              marginBottom: 32, boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
+            }}
+          >
+            <img
+              src={toAbsoluteUrl('/media/logos/kcc.jpg')}
+              alt='Career-9'
+              style={{ height: 48, display: 'block' }}
+            />
+          </div>
           <h1 style={{ fontSize: 32, fontWeight: 800, color: '#fff', margin: '0 0 12px', lineHeight: 1.2 }}>
             Counsellor Portal
           </h1>
@@ -94,16 +102,16 @@ const CounsellorDashboardLogin: React.FC = () => {
           {/* Feature highlights */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'left' }}>
             {[
-              { icon: '\u{1F4C5}', text: 'Manage your schedule and availability' },
-              { icon: '\u{1F393}', text: 'Access student assessment reports' },
-              { icon: '\u{1F4AC}', text: 'Track sessions and add notes' },
+              { iconPath: '/media/icons/duotune/general/gen014.svg', text: 'Manage your schedule and availability' },
+              { iconPath: '/media/icons/duotune/communication/com014.svg', text: 'Access student assessment reports' },
+              { iconPath: '/media/icons/duotune/communication/com007.svg', text: 'Track sessions and add notes' },
             ].map((item, i) => (
               <div key={i} style={{
                 display: 'flex', alignItems: 'center', gap: 14,
                 padding: '12px 18px', borderRadius: 10,
                 background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(4px)',
               }}>
-                <span style={{ fontSize: 22 }}>{item.icon}</span>
+                <KTSVG path={item.iconPath} className='svg-icon-2x' svgClassName='text-white' />
                 <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.9)', fontWeight: 500 }}>{item.text}</span>
               </div>
             ))}
