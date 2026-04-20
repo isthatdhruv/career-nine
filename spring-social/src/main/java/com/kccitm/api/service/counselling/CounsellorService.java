@@ -19,6 +19,9 @@ public class CounsellorService {
     @Autowired
     private CounsellorRepository counsellorRepository;
 
+    @Autowired
+    private CounsellingActivityLogService activityLogService;
+
     public Counsellor create(Counsellor counsellor) {
         return counsellorRepository.save(counsellor);
     }
@@ -61,6 +64,39 @@ public class CounsellorService {
         if (updated.getProfileImageUrl() != null) {
             existing.setProfileImageUrl(updated.getProfileImageUrl());
         }
+        if (updated.getLanguagesSpoken() != null) {
+            existing.setLanguagesSpoken(updated.getLanguagesSpoken());
+        }
+        if (updated.getModeCapability() != null) {
+            existing.setModeCapability(updated.getModeCapability());
+        }
+        if (updated.getQualifications() != null) {
+            existing.setQualifications(updated.getQualifications());
+        }
+        if (updated.getYearsOfExperience() != null) {
+            existing.setYearsOfExperience(updated.getYearsOfExperience());
+        }
+        if (updated.getLinkedinProfile() != null) {
+            existing.setLinkedinProfile(updated.getLinkedinProfile());
+        }
+        if (updated.getMaxSessionsPerDay() != null) {
+            existing.setMaxSessionsPerDay(updated.getMaxSessionsPerDay());
+        }
+        if (updated.getHourlyRatePreference() != null) {
+            existing.setHourlyRatePreference(updated.getHourlyRatePreference());
+        }
+        if (updated.getGovtIdLast4() != null) {
+            existing.setGovtIdLast4(updated.getGovtIdLast4());
+        }
+        if (updated.getBankName() != null) {
+            existing.setBankName(updated.getBankName());
+        }
+        if (updated.getBankAccount() != null) {
+            existing.setBankAccount(updated.getBankAccount());
+        }
+        if (updated.getBankIfsc() != null) {
+            existing.setBankIfsc(updated.getBankIfsc());
+        }
 
         logger.debug("Updating counsellor with id: {}", id);
         return counsellorRepository.save(existing);
@@ -70,8 +106,18 @@ public class CounsellorService {
         Counsellor counsellor = counsellorRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Counsellor not found with id: " + id));
 
-        counsellor.setIsActive(!counsellor.getIsActive());
-        logger.debug("Toggled active status for counsellor id: {} to {}", id, counsellor.getIsActive());
-        return counsellorRepository.save(counsellor);
+        boolean newActive = !counsellor.getIsActive();
+        counsellor.setIsActive(newActive);
+        counsellor.setOnboardingStatus(newActive ? "ACTIVE" : "SUSPENDED");
+        logger.debug("Toggled counsellor id: {} → isActive={}, onboardingStatus={}", id, newActive, counsellor.getOnboardingStatus());
+        Counsellor saved = counsellorRepository.save(counsellor);
+
+        activityLogService.log(
+                newActive ? "COUNSELLOR_ACTIVATED" : "COUNSELLOR_SUSPENDED",
+                newActive ? "Counsellor Activated" : "Counsellor Suspended",
+                counsellor.getName() + " (" + counsellor.getEmail() + ") has been " + (newActive ? "activated" : "suspended") + ".",
+                counsellor, "Admin");
+
+        return saved;
     }
 }

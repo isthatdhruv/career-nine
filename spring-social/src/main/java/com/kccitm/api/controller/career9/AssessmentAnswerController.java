@@ -109,6 +109,9 @@ public class AssessmentAnswerController {
     @Autowired
     private com.kccitm.api.service.AssessmentSubmissionProcessorService submissionProcessorService;
 
+    @Autowired
+    private com.kccitm.api.service.AssessmentCompletionService completionService;
+
     @GetMapping(value = "/getByStudent/{studentId}", headers = "Accept=application/json")
     public List<AssessmentAnswer> getAssessmentAnswersByStudent(@PathVariable("studentId") Long studentId) {
         UserStudent userStudent = userStudentRepository.findById(studentId).orElse(null);
@@ -379,8 +382,8 @@ public class AssessmentAnswerController {
                                 return studentAssessmentMappingRepository.save(newMapping);
                             });
 
-                    mapping.setStatus("completed");
-                    studentAssessmentMappingRepository.save(mapping);
+                    // NOTE: status flip deferred until after answers are persisted and
+                    // stale rows deleted, so completionService can check the true answer count.
 
                     // SAFE: Collect existing IDs before any writes
                     List<Long> existingAnswerIds = assessmentAnswerRepository
@@ -459,6 +462,9 @@ public class AssessmentAnswerController {
                     if (!existingScoreIds.isEmpty()) {
                         assessmentRawScoreRepository.deleteAllById(existingScoreIds);
                     }
+
+                    // Guarded completion: only flip to "completed" if every question is answered.
+                    completionService.markCompletedIfFullyAnswered(mapping);
 
                     successCount++;
 
@@ -623,8 +629,8 @@ public class AssessmentAnswerController {
                                 return studentAssessmentMappingRepository.save(newMapping);
                             });
 
-                    mapping.setStatus("completed");
-                    studentAssessmentMappingRepository.save(mapping);
+                    // NOTE: status flip deferred until after answers are persisted and
+                    // stale rows deleted, so completionService can check the true answer count.
 
                     // SAFE: Collect existing IDs before any writes
                     List<Long> existingAnswerIds = assessmentAnswerRepository
@@ -706,6 +712,9 @@ public class AssessmentAnswerController {
                     if (!existingScoreIds.isEmpty()) {
                         assessmentRawScoreRepository.deleteAllById(existingScoreIds);
                     }
+
+                    // Guarded completion: only flip to "completed" if every question is answered.
+                    completionService.markCompletedIfFullyAnswered(mapping);
 
                     successCount++;
 
@@ -801,8 +810,8 @@ public class AssessmentAnswerController {
                                 return studentAssessmentMappingRepository.save(newMapping);
                             });
 
-                    mapping.setStatus("completed");
-                    studentAssessmentMappingRepository.save(mapping);
+                    // NOTE: status flip deferred until after answers are persisted and
+                    // stale rows deleted, so completionService can check the true answer count.
 
                     // SAFE: Collect existing IDs before any writes
                     List<Long> existingAnswerIds = assessmentAnswerRepository
@@ -884,6 +893,9 @@ public class AssessmentAnswerController {
                     if (!existingScoreIds.isEmpty()) {
                         assessmentRawScoreRepository.deleteAllById(existingScoreIds);
                     }
+
+                    // Guarded completion: only flip to "completed" if every question is answered.
+                    completionService.markCompletedIfFullyAnswered(mapping);
 
                     successCount++;
 
@@ -1661,14 +1673,15 @@ public class AssessmentAnswerController {
                         .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
                         .orElseThrow(() -> new ServiceException("Failed to create/find assessment mapping"));
             }
-            mapping.setStatus("completed");
-            studentAssessmentMappingRepository.save(mapping);
+            // NOTE: do NOT set status to "completed" here. The async processor will
+            // run completionService.markCompletedIfFullyAnswered after persisting answers,
+            // which is the only place the answer count can be verified accurately.
 
             // Build submission payload and save to Redis for async processing
             Map<String, Object> submissionData = new HashMap<>();
             submissionData.put("userStudentId", userStudentId);
             submissionData.put("assessmentId", assessmentId);
-            submissionData.put("status", "completed");
+            submissionData.put("status", "ongoing");
             submissionData.put("answers", answers);
 
             assessmentSessionService.saveSubmittedAnswers(userStudentId, assessmentId, submissionData);

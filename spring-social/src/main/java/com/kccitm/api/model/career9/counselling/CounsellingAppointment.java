@@ -65,6 +65,9 @@ public class CounsellingAppointment implements Serializable {
     @Column(name = "reminder_1h_sent")
     private Boolean reminder1hSent = false;
 
+    @Column(name = "rescheduled_from_appointment_id")
+    private Long rescheduledFromAppointmentId;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -178,6 +181,14 @@ public class CounsellingAppointment implements Serializable {
 
     public void setReminder1hSent(Boolean reminder1hSent) {
         this.reminder1hSent = reminder1hSent;
+    }
+
+    public Long getRescheduledFromAppointmentId() {
+        return rescheduledFromAppointmentId;
+    }
+
+    public void setRescheduledFromAppointmentId(Long rescheduledFromAppointmentId) {
+        this.rescheduledFromAppointmentId = rescheduledFromAppointmentId;
     }
 
     public LocalDateTime getCreatedAt() {

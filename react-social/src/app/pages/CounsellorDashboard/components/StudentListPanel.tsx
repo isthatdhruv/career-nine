@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { getStudentsForCounsellor } from '../../Counselling/API/StudentCounsellorMappingAPI'
+import { getCounsellorAppointments } from '../../Counselling/API/AppointmentAPI'
 
 interface StudentListPanelProps {
   counsellorId: number | null
@@ -7,12 +7,11 @@ interface StudentListPanelProps {
   onSelectStudent: (id: number) => void
 }
 
-interface MappingEntry {
+interface AppointmentEntry {
   id: number
-  isActive: boolean
-  notes?: string
+  status: string
   student: any
-  counsellor?: any
+  slot?: any
 }
 
 interface StudentRow {
@@ -67,17 +66,22 @@ const StudentListPanel: React.FC<StudentListPanelProps> = ({ counsellorId, selec
     }
     setLoadingStudents(true)
     setFetchError(null)
-    getStudentsForCounsellor(counsellorId)
+    getCounsellorAppointments(counsellorId)
       .then((res) => {
-        const mappings: MappingEntry[] = Array.isArray(res.data) ? res.data : []
-        const active = mappings.filter((m) => m.isActive !== false)
-        const rows: StudentRow[] = active.map((m) => ({
-          id: m.student?.id || m.student?.userStudentId || m.id,
-          name: resolveStudentName(m.student),
-          classInfo: resolveClassInfo(m.student),
-          cci: resolveCci(m.student),
-        }))
-        setStudents(rows)
+        const appointments: AppointmentEntry[] = Array.isArray(res.data) ? res.data : []
+        // Deduplicate by student ID
+        const studentMap = new Map<number, StudentRow>()
+        for (const appt of appointments) {
+          const sid = appt.student?.userStudentId || appt.student?.id
+          if (!sid || studentMap.has(sid)) continue
+          studentMap.set(sid, {
+            id: sid,
+            name: resolveStudentName(appt.student),
+            classInfo: resolveClassInfo(appt.student),
+            cci: resolveCci(appt.student),
+          })
+        }
+        setStudents(Array.from(studentMap.values()))
       })
       .catch(() => {
         setFetchError('Failed to load students.')

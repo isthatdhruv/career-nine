@@ -2,11 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toAbsoluteUrl } from '../../../_metronic/helpers'
 import PortalLayout, { MenuItem } from '../portal/PortalLayout'
-import StudentListPanel from './components/StudentListPanel'
-import StudentProfileCard from './components/StudentProfileCard'
 import AppointmentCalendar from './components/AppointmentCalendar'
 import SessionNotes from './components/SessionNotes'
-import MessagesPanel from './components/MessagesPanel'
 import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
 import './CounsellorPortal.css'
 
@@ -15,11 +12,6 @@ const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
     label: 'Dashboard',
     path: '/counsellor/dashboard',
     icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><rect x='3' y='3' width='7' height='7' rx='1'/><rect x='14' y='3' width='7' height='7' rx='1'/><rect x='3' y='14' width='7' height='7' rx='1'/><rect x='14' y='14' width='7' height='7' rx='1'/></svg>,
-  },
-  {
-    label: 'Students',
-    path: '/counsellor/students',
-    icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><path d='M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2'/><circle cx='9' cy='7' r='4'/><path d='M23 21v-2a4 4 0 0 0-3-3.87'/><path d='M16 3.13a4 4 0 0 1 0 7.75'/></svg>,
   },
   {
     label: 'Appointments',
@@ -37,14 +29,9 @@ const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
     icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><circle cx='12' cy='12' r='10'/><polyline points='12 6 12 12 16 14'/></svg>,
   },
   {
-    label: 'Messages',
-    path: '/counsellor/messages',
-    icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><path d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/></svg>,
-  },
-  {
-    label: 'Reports',
-    path: '/counsellor/reports',
-    icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><line x1='18' y1='20' x2='18' y2='10'/><line x1='12' y1='20' x2='12' y2='4'/><line x1='6' y1='20' x2='6' y2='14'/></svg>,
+    label: 'My Profile',
+    path: '/counsellor/profile',
+    icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><path d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/><circle cx='12' cy='7' r='4'/></svg>,
   },
 ]
 
@@ -55,7 +42,7 @@ const CounsellorPortalDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
   const [counsellorId, setCounsellorId] = useState<number | null>(null)
-  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null)
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null)
 
   useEffect(() => {
     const isLoggedIn = localStorage.getItem('counsellorPortalLoggedIn')
@@ -69,10 +56,22 @@ const CounsellorPortalDashboard: React.FC = () => {
       if (userStr) {
         const parsedUser = JSON.parse(userStr)
         setUser(parsedUser)
-        // Resolve counsellorId from user
-        if (parsedUser.id) {
+
+        // New login flow stores counsellorId directly
+        const cId = parsedUser.counsellorId || null
+        if (cId) {
+          setCounsellorId(cId)
+          import('../Counselling/API/CounsellorAPI').then(({ getCounsellorById }) => {
+            getCounsellorById(cId)
+              .then((res) => setProfileImageUrl(res.data?.profileImageUrl || null))
+              .catch(() => {})
+          })
+        } else if (parsedUser.id) {
           getCounsellorByUserId(parsedUser.id)
-            .then((res) => setCounsellorId(res.data?.id || null))
+            .then((res) => {
+              setCounsellorId(res.data?.id || null)
+              setProfileImageUrl(res.data?.profileImageUrl || null)
+            })
             .catch(() => setCounsellorId(null))
         }
       }
@@ -82,6 +81,7 @@ const CounsellorPortalDashboard: React.FC = () => {
       setLoading(false)
     }
   }, [navigate])
+
 
   if (loading) {
     return (
@@ -101,44 +101,46 @@ const CounsellorPortalDashboard: React.FC = () => {
     >
       {/* Welcome Header */}
       <div className='cp-welcome'>
-        <div>
-          <h2 className='cp-welcome-title'>
-            Welcome, {user?.name || 'Counsellor'}
-          </h2>
-          <p className='cp-welcome-sub'>
-            {user?.organisation || 'Career-9'} &middot; Counsellor Dashboard
-          </p>
-        </div>
-      </div>
-
-      {/* Main Layout: Student List + Detail */}
-      <div className='cp-layout'>
-        <StudentListPanel
-          counsellorId={counsellorId}
-          selectedStudentId={selectedStudentId}
-          onSelectStudent={setSelectedStudentId}
-        />
-
-        <div className='cp-detail'>
-          {selectedStudentId ? (
-            <StudentProfileCard studentId={selectedStudentId} />
-          ) : (
-            <div className='cp-empty-state'>
-              <svg width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='#6B7A8D' strokeWidth='1.5'>
-                <path d='M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2' />
-                <circle cx='9' cy='7' r='4' />
-              </svg>
-              <p>Select a student from the list to view their profile</p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{
+              width: 52, height: 52, borderRadius: '50%', overflow: 'hidden',
+              background: '#E8F5E9', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', flexShrink: 0, border: '2px solid #D1E5DF',
+            }}>
+              {profileImageUrl ? (
+                <img src={profileImageUrl} alt='' style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <span style={{ fontSize: 20, fontWeight: 700, color: '#0C6B5A' }}>
+                  {user?.name?.charAt(0)?.toUpperCase() || '?'}
+                </span>
+              )}
             </div>
-          )}
+            <div>
+              <h2 className='cp-welcome-title'>
+                Welcome, {user?.name || 'Counsellor'}
+              </h2>
+              <p className='cp-welcome-sub'>
+                {user?.organisation || 'Career-9'} &middot; Counsellor Dashboard
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate('/counsellor/profile')}
+            style={{
+              padding: '8px 18px', fontSize: 13, fontWeight: 600, borderRadius: 8, cursor: 'pointer',
+              border: '1.5px solid #D1E5DF', background: '#fff', color: '#1A2B28',
+            }}
+          >
+            Edit Profile
+          </button>
         </div>
       </div>
 
-      {/* Bottom Row: Calendar + Notes + Messages */}
-      <div className='cp-grid-3'>
+      {/* Appointments + Session Notes */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         <AppointmentCalendar counsellorId={counsellorId} />
         <SessionNotes counsellorId={counsellorId} />
-        <MessagesPanel />
       </div>
     </PortalLayout>
   )

@@ -4,6 +4,9 @@ import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 const CounsellorDashboardLogin = lazy(
   () => import('../pages/CounsellorDashboard/CounsellorDashboardLogin')
 )
+const CounsellorRegistrationPage = lazy(
+  () => import('../pages/CounsellorDashboard/CounsellorRegistrationPage')
+)
 const CounsellorPortalDashboard = lazy(
   () => import('../pages/CounsellorDashboard/CounsellorPortalDashboard')
 )
@@ -15,6 +18,9 @@ const CounsellorNotesPage = lazy(
 )
 const CounsellorAvailabilityPage = lazy(
   () => import('../pages/CounsellorDashboard/CounsellorAvailabilityPage')
+)
+const CounsellorProfilePage = lazy(
+  () => import('../pages/CounsellorDashboard/CounsellorProfilePage')
 )
 
 const CounsellorFallback: FC = () => (
@@ -40,28 +46,35 @@ const CounsellorFallback: FC = () => (
  */
 const CounsellorAuthGuard: FC = () => {
   const isLoggedIn = localStorage.getItem('counsellorPortalLoggedIn')
-  const token = localStorage.getItem('counsellorPortalToken')
 
-  if (!isLoggedIn || !token) {
+  if (!isLoggedIn) {
     return <Navigate to='/counsellor/login' replace />
   }
 
-  // Verify stored user has counsellor authority
   try {
     const userStr = localStorage.getItem('counsellorPortalUser')
-    if (userStr) {
-      const user = JSON.parse(userStr)
-      const urls: string[] = user.authorityUrls || []
-      const hasAccess = urls.some((url: string) => {
-        const lower = url.toLowerCase()
-        return lower.includes('counsellor') || lower.includes('counselor') || lower === '*' || lower === '/*'
-      })
-      if (!hasAccess) {
-        localStorage.removeItem('counsellorPortalLoggedIn')
-        localStorage.removeItem('counsellorPortalToken')
-        localStorage.removeItem('counsellorPortalUser')
-        return <Navigate to='/counsellor/login' replace />
-      }
+    if (!userStr) {
+      return <Navigate to='/counsellor/login' replace />
+    }
+
+    const user = JSON.parse(userStr)
+
+    // New counsellor login flow stores counsellorId directly
+    if (user.counsellorId) {
+      return <Outlet />
+    }
+
+    // Legacy flow: check authorityUrls from JWT-based login
+    const urls: string[] = user.authorityUrls || []
+    const hasAccess = urls.some((url: string) => {
+      const lower = url.toLowerCase()
+      return lower.includes('counsellor') || lower.includes('counselor') || lower === '*' || lower === '/*'
+    })
+    if (!hasAccess) {
+      localStorage.removeItem('counsellorPortalLoggedIn')
+      localStorage.removeItem('counsellorPortalToken')
+      localStorage.removeItem('counsellorPortalUser')
+      return <Navigate to='/counsellor/login' replace />
     }
   } catch {
     return <Navigate to='/counsellor/login' replace />
@@ -100,16 +113,15 @@ const CounsellorRoutes: FC = () => {
       <Routes>
         {/* Public */}
         <Route path='login' element={<CounsellorDashboardLogin />} />
+        <Route path='register' element={<CounsellorRegistrationPage />} />
 
         {/* Protected */}
         <Route element={<CounsellorAuthGuard />}>
           <Route path='dashboard' element={<CounsellorPortalDashboard />} />
-          <Route path='students' element={<CounsellorPortalDashboard />} />
           <Route path='appointments' element={<CounsellorAppointmentsPage />} />
           <Route path='notes' element={<CounsellorNotesPage />} />
           <Route path='availability' element={<CounsellorAvailabilityPage />} />
-          <Route path='messages' element={<CounsellorPortalDashboard />} />
-          <Route path='reports' element={<CounsellorPortalDashboard />} />
+          <Route path='profile' element={<CounsellorProfilePage />} />
         </Route>
 
         <Route path='*' element={<Navigate to='login' replace />} />

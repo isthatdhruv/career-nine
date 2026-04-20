@@ -278,6 +278,30 @@ public class CounsellingNotificationService {
         }
     }
 
+    // ─── Block Date Request Email ────────────────────────────────────────────────
+
+    @Async
+    public void sendBlockDateRequestEmail(com.kccitm.api.model.career9.counselling.Counsellor counsellor, String date, String reason) {
+        String adminEmail = "admin@career-9.net";
+        String subject = "Block Date Request — " + counsellor.getName();
+
+        String body = "Dear Admin,\n\n"
+                + "A counsellor has requested to block a date.\n\n"
+                + "────────────────────────────\n"
+                + "Counsellor: " + counsellor.getName() + "\n"
+                + "Email: " + counsellor.getEmail() + "\n"
+                + "Date to Block: " + date + "\n"
+                + "Reason: " + (reason != null && !reason.isEmpty() ? reason : "Not specified") + "\n"
+                + "────────────────────────────\n\n"
+                + "Please log in to the Career-9 admin panel to approve or reject this request.\n"
+                + "Go to: Manage Counsellors → Block Date Requests\n\n"
+                + "Regards,\n"
+                + "Career-9 System";
+
+        sendEmail(adminEmail, subject, body);
+        logger.info("Block date request email sent to admin for counsellor {} on date {}", counsellor.getName(), date);
+    }
+
     // ─── Private Helper ───────────────────────────────────────────────────────────
 
     private void sendEmail(String toEmail, String subject, String body) {

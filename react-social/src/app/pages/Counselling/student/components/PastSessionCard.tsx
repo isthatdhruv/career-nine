@@ -50,7 +50,7 @@ function formatTime(timeStr: string): string {
 }
 
 const PastSessionCard: React.FC<PastSessionCardProps> = ({ appointment }) => {
-  const { appointmentId, slot, counsellorName, reason } = appointment
+  const { appointmentId, slot, counsellorName, reason, status } = appointment
   const [showRemarks, setShowRemarks] = useState(false)
   const [sessionNotes, setSessionNotes] = useState<SessionNotes | null>(null)
   const [notesLoading, setNotesLoading] = useState(false)
@@ -84,7 +84,7 @@ const PastSessionCard: React.FC<PastSessionCardProps> = ({ appointment }) => {
     <div className='cl-card cl-card-info' style={{ marginBottom: 16 }}>
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <StatusBadge status='COMPLETED' />
+        <StatusBadge status={status || 'COMPLETED'} />
         <span style={{ fontSize: 12, color: 'var(--sp-muted, #5C7A72)' }}>
           {slot.durationMinutes > 0 && `${slot.durationMinutes} min session`}
         </span>

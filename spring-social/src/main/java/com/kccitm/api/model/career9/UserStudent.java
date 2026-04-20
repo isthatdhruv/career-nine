@@ -45,6 +45,12 @@ public class UserStudent implements Serializable {
     @Column(name = "info_completed", nullable = false, columnDefinition = "boolean default false")
     private Boolean infoCompleted = false;
 
+    @Column(name = "counselling_allowed", columnDefinition = "boolean default false")
+    private Boolean counsellingAllowed = false;
+
+    @Column(name = "reports_visible", columnDefinition = "boolean default false")
+    private Boolean reportsVisible = false;
+
     public UserStudent(com.kccitm.api.model.User user, StudentInfo studentInfo2, InstituteDetail institue_id) {
         // TODO Auto-generated constructor stub
         this.userId = user.getId();
@@ -100,4 +106,10 @@ public class UserStudent implements Serializable {
     public void setInfoCompleted(Boolean infoCompleted) {
         this.infoCompleted = infoCompleted;
     }
+
+    public Boolean getCounsellingAllowed() { return counsellingAllowed; }
+    public void setCounsellingAllowed(Boolean counsellingAllowed) { this.counsellingAllowed = counsellingAllowed; }
+
+    public Boolean getReportsVisible() { return reportsVisible; }
+    public void setReportsVisible(Boolean reportsVisible) { this.reportsVisible = reportsVisible; }
 }

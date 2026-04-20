@@ -88,7 +88,8 @@ export function AsideMenuMain() {
   const showScoreDebug = allowed("/score-debug");
 
   const showCounselling =
-    allowed("/admin/counselling-queue") || allowed("/admin/counsellors") ||
+    allowed("/admin/counsellors") ||
+    allowed("/admin/counselling-slots") || allowed("/admin/counselling-students") || allowed("/admin/counselling-notifications") ||
     allowed("/counsellor/dashboard") || allowed("/counsellor/availability");
 
   return (
@@ -660,17 +661,17 @@ export function AsideMenuMain() {
             fontIcon="bi-app-indicator"
             icon="/media/icons/duotune/general/gen049.svg"
           >
-            {allowed("/admin/counselling-queue") && (
-              <AsideMenuItem to="/admin/counselling-queue" title="Request Queue" hasBullet={true} />
-            )}
             {allowed("/admin/counsellors") && (
               <AsideMenuItem to="/admin/counsellors" title="Manage Counsellors" hasBullet={true} />
             )}
-            {allowed("/counsellor/dashboard") && (
-              <AsideMenuItem to="/counsellor/dashboard" title="My Schedule" hasBullet={true} />
+            {allowed("/admin/counselling-students") && (
+              <AsideMenuItem to="/admin/counselling-students" title="Manage Students" hasBullet={true} />
             )}
-            {allowed("/counsellor/availability") && (
-              <AsideMenuItem to="/counsellor/availability" title="My Availability" hasBullet={true} />
+            {allowed("/admin/counselling-slots") && (
+              <AsideMenuItem to="/admin/counselling-slots" title="Create Slots" hasBullet={true} />
+            )}
+            {allowed("/admin/counselling-notifications") && (
+              <AsideMenuItem to="/admin/counselling-notifications" title="Notifications" hasBullet={true} />
             )}
           </AsideMenuItemWithSub>
         </>
