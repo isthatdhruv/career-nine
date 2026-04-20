@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import PortalLayout, { MenuItem } from '../portal/PortalLayout'
 import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
 import { getSlotsByCounsellor, createManualSlot, deleteSlot } from '../Counselling/API/SlotAPI'
 import { submitBlockDateRequest, getBlockRequestsByCounsellor, BlockDateRequest } from '../Counselling/API/BlockDateRequestAPI'
+import { useRefreshInterval } from '../../utils/useAutoRefresh'
 import './CounsellorPortal.css'
 
 const API_URL = process.env.REACT_APP_API_URL
@@ -177,6 +178,23 @@ const CounsellorAvailabilityPage: React.FC = () => {
   const [slotSaving, setSlotSaving] = useState(false)
   const [blockSaving, setBlockSaving] = useState(false)
   const [deletingSlot, setDeletingSlot] = useState<number | null>(null)
+
+  const refreshAvailability = useCallback(() => {
+    if (!counsellorId) return
+    Promise.all([
+      axios.get(`${API_URL}/api/availability-template/get/by-counsellor/${counsellorId}`),
+      getSlotsByCounsellor(counsellorId),
+      getBlockRequestsByCounsellor(counsellorId).catch(() => ({ data: [] })),
+    ]).then(([tRes, sRes, brRes]) => {
+      setTemplates(tRes.data || [])
+      const slots: any[] = sRes.data || []
+      setManualSlots(slots.filter((s: any) => !s.isBlocked))
+      setBlockedDates(slots.filter((s: any) => s.isBlocked))
+      setBlockRequests(Array.isArray(brRes.data) ? brRes.data : [])
+    }).catch(() => {})
+  }, [counsellorId])
+
+  useRefreshInterval(refreshAvailability, { skip: !counsellorId })
 
   useEffect(() => {
     const isLoggedIn = localStorage.getItem('counsellorPortalLoggedIn')

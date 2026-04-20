@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import '../Counselling.css'
 import PortalLayout, { MenuItem } from '../../portal/PortalLayout'
@@ -6,6 +6,7 @@ import NotificationBell from '../shared/NotificationBell'
 import { getStudentAppointments } from '../API/AppointmentAPI'
 import UpcomingSessionCard from './components/UpcomingSessionCard'
 import PastSessionCard from './components/PastSessionCard'
+import { useRefreshInterval } from '../../../utils/useAutoRefresh'
 
 const STUDENT_MENU_ITEMS: MenuItem[] = [
   { label: 'Dashboard', path: '/student/dashboard', icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><rect x='3' y='3' width='7' height='7' rx='1'/><rect x='14' y='3' width='7' height='7' rx='1'/><rect x='3' y='14' width='7' height='7' rx='1'/><rect x='14' y='14' width='7' height='7' rx='1'/></svg> },
@@ -78,16 +79,12 @@ const StudentCounsellingPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!studentId) {
-      setLoading(false)
-      return
-    }
-    setLoading(true)
+  const fetchAppointments = useCallback((opts?: { silent?: boolean }) => {
+    if (!studentId) { setLoading(false); return }
+    if (!opts?.silent) setLoading(true)
     getStudentAppointments(studentId)
       .then((res) => {
         const raw = Array.isArray(res.data) ? res.data : []
-        // Backend uses `id`/`studentReason`/`counsellor.name`. Normalize to frontend shape.
         const data: Appointment[] = raw.map((a: any) => ({
           appointmentId: a.id ?? a.appointmentId,
           status: a.status,
@@ -106,10 +103,13 @@ const StudentCounsellingPage: React.FC = () => {
         setAppointments(data)
       })
       .catch(() => {
-        setError('Failed to load appointments. Please try again.')
+        if (!opts?.silent) setError('Failed to load appointments. Please try again.')
       })
-      .finally(() => setLoading(false))
+      .finally(() => { if (!opts?.silent) setLoading(false) })
   }, [studentId])
+
+  useEffect(() => { fetchAppointments() }, [fetchAppointments])
+  useRefreshInterval(() => fetchAppointments({ silent: true }), { skip: !studentId })
 
   const today = getTodayISODate()
 

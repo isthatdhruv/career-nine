@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PortalLayout, { MenuItem } from '../portal/PortalLayout'
 import {
@@ -8,6 +8,7 @@ import {
   cancelAppointment,
 } from '../Counselling/API/AppointmentAPI'
 import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
+import { useRefreshInterval } from '../../utils/useAutoRefresh'
 import './CounsellorPortal.css'
 
 const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
@@ -180,6 +181,15 @@ const CounsellorAppointmentsPage: React.FC = () => {
   const [declineReason, setDeclineReason] = useState('')
   const [cancelModal, setCancelModal] = useState<{ appointmentId: number } | null>(null)
   const [cancelReason, setCancelReason] = useState('')
+
+  const refreshAppointments = useCallback(() => {
+    if (!counsellorId) return
+    getCounsellorAppointments(counsellorId)
+      .then((apptRes) => setAppointments(apptRes.data || []))
+      .catch(() => {})
+  }, [counsellorId])
+
+  useRefreshInterval(refreshAppointments, { skip: !counsellorId })
 
   useEffect(() => {
     const isLoggedIn = localStorage.getItem('counsellorPortalLoggedIn')

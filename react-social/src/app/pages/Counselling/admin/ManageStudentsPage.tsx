@@ -11,6 +11,7 @@ import {
   toggleReportVisibility,
   GeneratedReport,
 } from '../../ReportGeneration/API/GeneratedReport_APIs'
+import { useRefreshInterval } from '../../../utils/useAutoRefresh'
 
 const API_URL = process.env.REACT_APP_API_URL
 
@@ -87,12 +88,12 @@ const ManageStudentsPage: React.FC = () => {
       .catch(() => setError('Failed to load institutes.'))
   }, [])
 
-  const loadStudents = (code: number) => {
-    setLoading(true)
-    setError(null)
+  const loadStudents = (code: number, opts?: { silent?: boolean }) => {
+    if (!opts?.silent) { setLoading(true); setError(null) }
     getStudentsByInstitute(code)
       .then((res) => setStudents(Array.isArray(res.data) ? res.data : []))
       .catch((err) => {
+        if (opts?.silent) return
         console.error('Failed to load students:', err?.response?.status, err?.response?.data, err)
         const status = err?.response?.status
         if (status === 404) {
@@ -101,13 +102,17 @@ const ManageStudentsPage: React.FC = () => {
           setError(`Failed to load students (${status || 'network error'}). Check browser console.`)
         }
       })
-      .finally(() => setLoading(false))
+      .finally(() => { if (!opts?.silent) setLoading(false) })
   }
 
   useEffect(() => {
     if (selectedInstitute) loadStudents(selectedInstitute as number)
     else setStudents([])
   }, [selectedInstitute])
+
+  useRefreshInterval(() => {
+    if (selectedInstitute) loadStudents(selectedInstitute as number, { silent: true })
+  }, { skip: !selectedInstitute })
 
   const handleToggleCounselling = async (s: ManagedStudent) => {
     const key = `c-${s.userStudentId}`
@@ -142,6 +147,13 @@ const ManageStudentsPage: React.FC = () => {
     setReportsError(null)
     setReportTogglingId(null)
   }
+
+  useRefreshInterval(() => {
+    if (!reportsModalStudent) return
+    getGeneratedReportsByStudent(reportsModalStudent.userStudentId)
+      .then((res) => setStudentReports(Array.isArray(res.data) ? res.data : []))
+      .catch(() => {})
+  }, { skip: !reportsModalStudent })
 
   const handleToggleReportVisibility = async (report: GeneratedReport) => {
     const newVisible = !report.visibleToStudent

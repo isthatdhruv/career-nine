@@ -4,6 +4,7 @@ import { KTSVG } from '../../../../_metronic/helpers'
 import { getRecentActivities, markAllAsRead, ActivityLog } from '../API/CounsellingActivityAPI'
 import { getPendingBlockRequests, approveBlockRequest, rejectBlockRequest, BlockDateRequest } from '../API/BlockDateRequestAPI'
 import { getAllCounsellors, toggleCounsellorActive } from '../API/CounsellorAPI'
+import { useRefreshInterval } from '../../../utils/useAutoRefresh'
 
 const TYPE_CONFIG: Record<string, { iconPath: string; color: string; bg: string }> = {
   COUNSELLOR_REGISTERED: { iconPath: '/media/icons/duotune/communication/com013.svg', color: '#0369A1', bg: '#F0F9FF' },
@@ -44,8 +45,8 @@ const CounsellingNotificationsPage: React.FC = () => {
   const [actionLoading, setActionLoading] = useState<number | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  const loadData = () => {
-    setLoading(true)
+  const loadData = (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true)
     Promise.all([
       getRecentActivities(100),
       getPendingBlockRequests().catch(() => ({ data: [] })),
@@ -59,11 +60,12 @@ const CounsellingNotificationsPage: React.FC = () => {
           c.onboardingStatus === 'PENDING' && c.isActive === false
         ))
       })
-      .catch(() => setActivities([]))
-      .finally(() => setLoading(false))
+      .catch(() => { if (!opts?.silent) setActivities([]) })
+      .finally(() => { if (!opts?.silent) setLoading(false) })
   }
 
   useEffect(() => { loadData() }, [])
+  useRefreshInterval(() => loadData({ silent: true }))
 
   const handleApproveBlock = async (id: number) => {
     setActionLoading(id)

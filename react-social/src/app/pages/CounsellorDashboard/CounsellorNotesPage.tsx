@@ -4,6 +4,7 @@ import PortalLayout, { MenuItem } from '../portal/PortalLayout'
 import { getCounsellorAppointments } from '../Counselling/API/AppointmentAPI'
 import { getSessionNotes, createSessionNotes } from '../Counselling/API/SessionNotesAPI'
 import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
+import { useRefreshInterval } from '../../utils/useAutoRefresh'
 import './CounsellorPortal.css'
 
 const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
@@ -132,6 +133,28 @@ const CounsellorNotesPage: React.FC = () => {
   const [formStates, setFormStates] = useState<Record<number, NotesFormState>>({})
   // Map of appointmentId -> saving status
   const [savingMap, setSavingMap] = useState<Record<number, boolean>>({})
+  const [counsellorId, setCounsellorId] = useState<number | null>(null)
+
+  useRefreshInterval(async () => {
+    if (!counsellorId) return
+    try {
+      const apptRes = await getCounsellorAppointments(counsellorId)
+      const completed = (apptRes.data || []).filter(
+        (a: any) => (a.status || '').toUpperCase() === 'COMPLETED'
+      )
+      setAppointments(completed)
+      const notesResults: Record<number, any> = {}
+      await Promise.all(
+        completed.map(async (appt: any) => {
+          try {
+            const nr = await getSessionNotes(appt.id, false)
+            if (nr.data) notesResults[appt.id] = nr.data
+          } catch {}
+        })
+      )
+      setNotesMap(notesResults)
+    } catch {}
+  }, { skip: !counsellorId })
 
   useEffect(() => {
     const isLoggedIn = localStorage.getItem('counsellorPortalLoggedIn')
@@ -172,6 +195,7 @@ const CounsellorNotesPage: React.FC = () => {
       // New login flow stores counsellorId directly
       const cId = user.counsellorId || null
       if (cId) {
+        setCounsellorId(cId)
         loadForCounsellor(cId)
           .catch(() => setError('Failed to load session notes.'))
           .finally(() => setLoading(false))
@@ -185,6 +209,7 @@ const CounsellorNotesPage: React.FC = () => {
               setLoading(false)
               return
             }
+            setCounsellorId(resolvedId)
             return loadForCounsellor(resolvedId)
           })
           .catch(() => setError('Counsellor profile not found. Please contact admin to set up your profile.'))

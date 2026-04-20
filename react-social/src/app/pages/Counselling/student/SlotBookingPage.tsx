@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import '../Counselling.css'
 import { showErrorToast } from '../../../utils/toast'
@@ -8,6 +8,7 @@ import { bookSlot, rescheduleAppointment } from '../API/AppointmentAPI'
 import { getStudentEligibility, EligibilityResponse } from '../API/EligibilityAPI'
 import SlotGrid from './components/SlotGrid'
 import BookingForm from './components/BookingForm'
+import { useRefreshInterval } from '../../../utils/useAutoRefresh'
 
 const STUDENT_MENU_ITEMS: MenuItem[] = [
   { label: 'Dashboard', path: '/student/dashboard', icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><rect x='3' y='3' width='7' height='7' rx='1'/><rect x='14' y='3' width='7' height='7' rx='1'/><rect x='3' y='14' width='7' height='7' rx='1'/><rect x='14' y='14' width='7' height='7' rx='1'/></svg> },
@@ -117,15 +118,15 @@ const SlotBookingPage: React.FC = () => {
       .finally(() => setEligibilityLoading(false))
   }, [studentId, isReschedule])
 
-  useEffect(() => {
-    setSlotsLoading(true)
-    setSlotsError(null)
-    setSelectedSlot(null)
-
+  const fetchSlots = useCallback((opts?: { silent?: boolean }) => {
+    if (!opts?.silent) {
+      setSlotsLoading(true)
+      setSlotsError(null)
+      setSelectedSlot(null)
+    }
     getAvailableSlots(weekStart, instituteCode || undefined)
       .then((res) => {
         const raw = Array.isArray(res.data) ? res.data : []
-        // Backend returns `id`; the frontend uses `slotId`. Normalize here.
         const data: Slot[] = raw
           .map((s: any) => ({
             slotId: s.id || s.slotId,
@@ -139,11 +140,16 @@ const SlotBookingPage: React.FC = () => {
         setSlots(data)
       })
       .catch(() => {
-        setSlotsError('Could not load available slots. Please try again.')
-        setSlots([])
+        if (!opts?.silent) {
+          setSlotsError('Could not load available slots. Please try again.')
+          setSlots([])
+        }
       })
-      .finally(() => setSlotsLoading(false))
+      .finally(() => { if (!opts?.silent) setSlotsLoading(false) })
   }, [weekStart, instituteCode])
+
+  useEffect(() => { fetchSlots() }, [fetchSlots])
+  useRefreshInterval(() => fetchSlots({ silent: true }))
 
   const handlePrevWeek = () => {
     setWeekStart((prev) => shiftWeek(prev, -1))
