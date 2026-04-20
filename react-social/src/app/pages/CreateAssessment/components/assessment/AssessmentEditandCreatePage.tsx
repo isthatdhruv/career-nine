@@ -120,6 +120,7 @@ const AssessmentEditPage = (props?: {
       modeofAssessment: assessmentData.modeofAssessment || false,
       showTimer: assessmentData.showTimer !== false,
       saveLater: assessmentData.saveLater !== false,
+      collectEmailAndPhone: assessmentData.collectEmailAndPhone !== false,
       questionnaires: assessmentData.questionnaires?.map((q: any) => q.questionnaireId) || [],
     },
     validationSchema: validationSchema,
@@ -134,6 +135,7 @@ const AssessmentEditPage = (props?: {
           modeofAssessment: values.modeofAssessment,
           showTimer: values.showTimer,
           saveLater: values.saveLater,
+          collectEmailAndPhone: values.collectEmailAndPhone,
         };
 
         if (selectedQuestionnaireId) {
@@ -291,6 +293,20 @@ const AssessmentEditPage = (props?: {
                   />
                   <label className="form-check-label" htmlFor="saveLater">
                     Allow Save for Later
+                  </label>
+                </div>
+                <div className="form-check form-switch mt-3">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    id="collectEmailAndPhone"
+                    checked={formik.values.collectEmailAndPhone}
+                    onChange={() =>
+                      formik.setFieldValue("collectEmailAndPhone", !formik.values.collectEmailAndPhone)
+                    }
+                  />
+                  <label className="form-check-label" htmlFor="collectEmailAndPhone">
+                    Collect Email & Phone
                   </label>
                 </div>
               </div>

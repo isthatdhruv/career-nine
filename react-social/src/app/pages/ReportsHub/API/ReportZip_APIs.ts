@@ -9,7 +9,7 @@ export function uploadReportZip(file: Blob, fileName: string) {
   return axios.post<{ url: string; fileName: string }>(
     `${API_URL}/report-zip/upload`,
     formData,
-    { headers: { "Content-Type": "multipart/form-data" }, timeout: 300000 }
+    { headers: { "Content-Type": "multipart/form-data" }, timeout: 600000 }
   );
 }
 

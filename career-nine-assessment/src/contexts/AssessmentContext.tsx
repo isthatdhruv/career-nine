@@ -83,6 +83,10 @@ function preDecodeOptionImages(data: any) {
   // Skip if we already decoded images for the exact same data reference
   if (data === _lastDecodedDataRef) return;
   _lastDecodedDataRef = data;
+  // Release old image references to allow GC
+  for (const img of _preDecodedImages) {
+    img.src = '';
+  }
   _preDecodedImages.length = 0;
   for (const q of data) {
     if (!q?.sections) continue;
@@ -223,7 +227,9 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       try {
         setAssessmentData(JSON.parse(stored));
       } catch (e) {
-        console.error('Failed to parse stored assessment data');
+        console.error('Failed to parse stored assessment data, clearing corrupted entry');
+        sessionStorage.removeItem('assessmentData');
+        sessionStorage.removeItem('cachedAssessmentId');
       }
     }
 
@@ -232,7 +238,9 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       try {
         setAssessmentConfig(JSON.parse(storedConfig));
       } catch (e) {
-        console.error('Failed to parse stored assessment config');
+        console.error('Failed to parse stored assessment config, clearing corrupted entry');
+        sessionStorage.removeItem('assessmentConfig');
+        sessionStorage.removeItem('cachedAssessmentId');
       }
     }
   }, []);

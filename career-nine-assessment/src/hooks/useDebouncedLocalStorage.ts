@@ -17,6 +17,20 @@ export function useDebouncedLocalStorage(delayMs: number = 500) {
         localStorage.setItem(key, value);
       } catch (e) {
         console.error(`Failed to write localStorage key "${key}":`, e);
+        // On quota exceeded, try clearing non-critical keys to make space
+        if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+          try {
+            // Remove the largest non-critical cached items first
+            const expendable = ['assessmentSeenSectionInstructions', 'assessmentCompletedGames', 'assessmentSkipped', 'assessmentSavedForLater'];
+            for (const k of expendable) {
+              if (k !== key) localStorage.removeItem(k);
+            }
+            localStorage.setItem(key, value);
+          } catch {
+            // Last resort: try sessionStorage as fallback
+            try { sessionStorage.setItem(key, value); } catch { /* truly out of space */ }
+          }
+        }
       }
     }
   }, []);

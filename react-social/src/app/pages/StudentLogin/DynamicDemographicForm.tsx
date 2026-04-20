@@ -43,7 +43,7 @@ const DynamicDemographicForm: React.FC = () => {
 
   useEffect(() => {
     if (!userStudentId || !assessmentId) {
-      navigate('/student-login');
+      window.location.replace('https://assessment.career-9.com/');
       return;
     }
     fetchFields();

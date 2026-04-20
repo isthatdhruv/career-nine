@@ -63,6 +63,84 @@ public class ReportZipController {
     }
 
     /**
+     * Hand the browser a pre-signed PUT URL so it can upload the zip straight
+     * to DigitalOcean Spaces, bypassing nginx + Spring multipart limits.
+     * Used for bulk report zips that exceed the proxy body-size cap.
+     */
+    @GetMapping("/presign")
+    public ResponseEntity<Map<String, String>> presignUpload(
+            @RequestParam(value = "fileName", required = false) String fileName) {
+        try {
+            String safe = (fileName != null && !fileName.isBlank())
+                    ? fileName.replaceAll("[^a-zA-Z0-9._\\-]", "_")
+                    : "report_" + System.currentTimeMillis() + ".zip";
+            if (!safe.endsWith(".zip")) {
+                safe += ".zip";
+            }
+            // Prefix with a timestamp to prevent collisions on repeat uploads.
+            String objectName = System.currentTimeMillis() + "_" + safe;
+
+            DigitalOceanSpacesService.PresignedUpload p = spacesService
+                    .generatePresignedUpload(FOLDER, objectName, "application/zip", 15);
+
+            Map<String, String> response = new HashMap<>();
+            response.put("uploadUrl", p.uploadUrl);
+            response.put("publicUrl", p.publicUrl);
+            response.put("key", p.key);
+            response.put("fileName", safe);
+            return ResponseEntity.ok(response);
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Presign failed: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Force-apply the bucket CORS policy now (reads app.cors.allowedOrigins).
+     * Call this once after the backend is deployed so the browser preflight
+     * for the pre-signed PUT can succeed. Returns the origins that were set.
+     */
+    @PostMapping("/apply-cors")
+    public ResponseEntity<Map<String, Object>> applyBucketCors() {
+        try {
+            java.util.List<String> origins = spacesService.applyBucketCorsOrThrow();
+            return ResponseEntity.ok(Map.of("status", "applied", "origins", origins));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Read what CORS rules are actually stored on the bucket. Useful to
+     * confirm the policy took (returns empty list if the bucket has no CORS).
+     */
+    @GetMapping("/debug-cors")
+    public ResponseEntity<?> debugBucketCors() {
+        try {
+            java.util.List<com.amazonaws.services.s3.model.CORSRule> rules =
+                    spacesService.getBucketCorsRules();
+            java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
+            for (com.amazonaws.services.s3.model.CORSRule r : rules) {
+                Map<String, Object> m = new HashMap<>();
+                m.put("allowedOrigins", r.getAllowedOrigins());
+                m.put("allowedMethods", r.getAllowedMethods());
+                m.put("allowedHeaders", r.getAllowedHeaders());
+                m.put("exposedHeaders", r.getExposedHeaders());
+                m.put("maxAgeSeconds", r.getMaxAgeSeconds());
+                out.add(m);
+            }
+            return ResponseEntity.ok(Map.of("rules", out));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
      * Delete a ZIP file from DigitalOcean Spaces by URL.
      */
     @DeleteMapping("/delete")

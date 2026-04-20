@@ -231,7 +231,7 @@ const SchoolAssessmentRegisterPage = () => {
             <p style={{ color: "#94a3b8", fontSize: "0.82rem", marginBottom: 24 }}>
               Please save these credentials. You will need them to log in and take the assessment.
             </p>
-            <button onClick={() => navigate("/student-login")} style={s.btnPrimary}>Go to Student Login</button>
+            <button onClick={() => window.location.replace("https://assessment.career-9.com/")} style={s.btnPrimary}>Go to Student Login</button>
           </div>
         </div>
       </div>

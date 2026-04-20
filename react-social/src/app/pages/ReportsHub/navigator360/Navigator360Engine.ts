@@ -31,6 +31,31 @@ import {
   SUBJECT_RIASEC,
 } from './Navigator360CareerData';
 
+// ── Value → Aspiration conflict detection (spec §12 flag P-08) ──
+
+function detectValuesAspirationConflict(
+  studentValues: string[],
+  aspirations: string[]
+): string[] {
+  const specValues = studentValues.map((v) => VALUE_LABEL_TO_SPEC[v] || v);
+  const aspCareerNames = aspirations
+    .map((a) => ASPIRATION_TO_CAREER[a])
+    .filter(Boolean)
+    .map((id) => CAREER_DEFINITIONS.find((c) => c.id === id)?.name || '')
+    .filter(Boolean);
+  const hits = new Set<string>();
+  for (const v of specValues) {
+    const conflicts = VALUE_CONFLICTS[v];
+    if (!conflicts) continue;
+    for (const conflictName of conflicts) {
+      if (aspCareerNames.some((n) => n.includes(conflictName) || conflictName.includes(n))) {
+        hits.add(v);
+      }
+    }
+  }
+  return Array.from(hits);
+}
+
 // ═══════════════════════ STANINE LOOKUP (Section 4.1) ═══════════════════════
 
 function riasecStanine(raw: number): number {
@@ -168,7 +193,8 @@ function computePotentialScore(
   riasec: ScoredDimension[],
   mi: ScoredDimension[],
   abilities: ScoredDimension[],
-  academicPct: number | null
+  academicPct: number | null,
+  completionPctOverride: number = 1.0
 ): PotentialScoreResult {
   const flags: FlagCode[] = [];
 
@@ -259,7 +285,7 @@ function computePotentialScore(
 
   // ── Final ──
   const potRaw = personality + intelligence + ability + academic;
-  const completionPct = 1.0; // assume full completion for now
+  const completionPct = Math.max(0, Math.min(1, completionPctOverride));
   const total = Math.max(0, Math.min(100, Math.round(potRaw * completionPct * 1.05)));
 
   return { personality, intelligence, ability, academic, total, completionPct, flags };
@@ -468,7 +494,8 @@ function collectFlags(
   values: string[],
   cci: CCILevel,
   potFlags: FlagCode[],
-  gradeGroup: string
+  gradeGroup: string,
+  academicPct: number | null = null
 ): FlagInfo[] {
   const flags: FlagInfo[] = [];
 
@@ -530,6 +557,35 @@ function collectFlags(
     });
   }
 
+  // P-08: Values–aspiration conflict
+  const conflictingValues = detectValuesAspirationConflict(values, aspirations);
+  if (conflictingValues.length > 0) {
+    flags.push({
+      code: 'P-08', name: 'Values–Aspiration Conflict',
+      message: `A value you ranked highly (${conflictingValues.join(', ')}) is in tension with one of your aspirations — worth exploring with your counsellor.`,
+      severity: 'info',
+    });
+  }
+
+  // P-09: Academic–Ability discrepancy
+  if (academicPct !== null) {
+    const hiAbCount = abilities.filter((a) => a.level === 'HIGH').length;
+    const allAbLow = abilities.every((a) => a.level === 'LOW');
+    if (hiAbCount >= 3 && academicPct < 50) {
+      flags.push({
+        code: 'P-09', name: 'Academic–Ability Discrepancy',
+        message: 'High tested abilities but academic results do not yet reflect them — there is more to explore about how you learn best.',
+        severity: gradeGroup === '11-12' ? 'warning' : 'info',
+      });
+    } else if (academicPct > 85 && allAbLow) {
+      flags.push({
+        code: 'P-09', name: 'Academic–Ability Discrepancy',
+        message: 'Strong academic results but ability scores are low — counsellor will help you understand what this means.',
+        severity: 'info',
+      });
+    }
+  }
+
   return flags;
 }
 
@@ -547,7 +603,8 @@ function resolveGradeGroup(studentClass: string): '6-8' | '9-10' | '11-12' {
 export function computeNavigator360(
   data: IntermediaryScores,
   academicPct: number | null = null,
-  ccRaw: number | null = null
+  ccRaw: number | null = null,
+  completionPct: number = 1.0
 ): Navigator360Result {
   const gradeGroup = resolveGradeGroup(data.studentClass);
 
@@ -560,7 +617,7 @@ export function computeNavigator360(
   const studentValues = data.selectedValues;
 
   // 3. Compute Potential Score
-  const potentialScore = computePotentialScore(riasec, mi, abilities, academicPct);
+  const potentialScore = computePotentialScore(riasec, mi, abilities, academicPct, completionPct);
 
   // 4. Compute top RIASEC for preference score
   const topRiasec = [...riasec]
@@ -592,7 +649,7 @@ export function computeNavigator360(
   // 11. Flags
   const flags = collectFlags(
     riasec, mi, abilities, data.selectedCareerAsps, studentValues,
-    cci, potentialScore.flags, gradeGroup
+    cci, potentialScore.flags, gradeGroup, academicPct
   );
 
   return {

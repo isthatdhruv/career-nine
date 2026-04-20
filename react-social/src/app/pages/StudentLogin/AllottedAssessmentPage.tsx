@@ -52,7 +52,7 @@ export default function AllottedAssessmentPage() {
     if (!userStudentId) {
       setSubmissionState('error');
       setSubmissionError('Session expired. Please login again.');
-      navigate('/student-login');
+      window.location.replace('https://assessment.career-9.com/');
       return;
     }
 
