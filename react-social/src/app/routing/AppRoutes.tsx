@@ -5,7 +5,7 @@
  * components (e.g: `src/app/modules/Auth/pages/AuthPage`, `src/app/BasePage`).
  */
 
-import { FC, lazy, Suspense } from "react";
+import { FC, lazy, Suspense, useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import TopBarProgress from "react-topbar-progress-indicator";
 import { getCSSVariableValue } from "../../_metronic/assets/ts/_utils";
@@ -22,15 +22,25 @@ import { PrivateRoutes } from "./PrivateRoutes";
 import StudentRoutes from "./StudentRoutes";
 import CounsellorRoutes from "./CounsellorRoutes";
 // import CompilerPageEdit from "../pages/Compiler/compilerEdit";
-import StudentLoginPage from "../pages/StudentLogin/StudentLoginPage";
-import DemographicDetailsPage from "../pages/StudentLogin/DemographicDetailsPage";
-import DynamicDemographicForm from "../pages/StudentLogin/DynamicDemographicForm";
-import AllottedAssessmentPage from "../pages/StudentLogin/AllottedAssessmentPage";
 import PrincipalDashboard from "../pages/PrincipalDashboard/PrincipalDashboard";
 import { MasterLayout } from "../../_metronic/layout/MasterLayout";
 
+const ExternalRedirect: FC<{ to: string }> = ({ to }) => {
+  useEffect(() => {
+    window.location.href = to;
+  }, [to]);
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "sans-serif", color: "#555" }}>
+      Redirecting…
+    </div>
+  );
+};
+
 const AssessmentRegisterPage = lazy(
   () => import("../pages/AssessmentRegister/AssessmentRegisterPage")
+);
+const SchoolAssessmentRegisterPage = lazy(
+  () => import("../pages/SchoolRegistration/SchoolAssessmentRegisterPage")
 );
 const PaymentStatusPage = lazy(
   () => import("../pages/PaymentTracking/PaymentStatusPage")
@@ -114,34 +124,37 @@ const AppRoutes: FC = () => {
      
             <Route
               path="/allotted-assessment"
-              element={<AllottedAssessmentPage />}
+              element={<ExternalRedirect to="https://assessment.career-9.com/" />}
             />
-    
             <Route
               path="/demographics/:assessmentId"
-              element={<DynamicDemographicForm />}
+              element={<ExternalRedirect to="https://assessment.career-9.com/" />}
             />
             <Route
               path="/demographics"
-              element={<DemographicDetailsPage />}
+              element={<ExternalRedirect to="https://assessment.career-9.com/" />}
             />
             <Route
               path="/studentAssessment/completed"
-              element={<ThankYouPage />}
+              element={<ExternalRedirect to="https://assessment.career-9.com/" />}
             />
       <Route
               path="/student-login"
-              element={
-                <SuspensedView>
-                  <StudentLoginPage />
-                </SuspensedView>
-              }
+              element={<ExternalRedirect to="https://assessment.career-9.com/" />}
             />
       <Route
               path="/assessment-register/:token"
               element={
                 <SuspensedView>
                   <AssessmentRegisterPage />
+                </SuspensedView>
+              }
+            />
+      <Route
+              path="/school-register/:token"
+              element={
+                <SuspensedView>
+                  <SchoolAssessmentRegisterPage />
                 </SuspensedView>
               }
             />

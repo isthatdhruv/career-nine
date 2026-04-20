@@ -66,6 +66,7 @@ import InstituteDashboard from "../pages/dashboard/InstituteDashboard";
 import ActivityLogPage from "../pages/ActivityLog/ActivityLogPage";
 import LeadsPage from "../pages/Leads/LeadsPage";
 import LiveTrackingPage from "../pages/LiveTracking/LiveTrackingPage";
+import CommunicationLogsPage from "../pages/CommunicationLogs/CommunicationLogsPage";
 import ReportsPage from "../pages/Reports/ReportsPage";
 import ReportsHubPage from "../pages/ReportsHub/ReportsHubPage";
 import StudentDashboard from "../pages/StudentDashboard/StudentDashboard";
@@ -1002,6 +1003,15 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <LiveTrackingPage />
+            </SuspensedView>
+          }
+        />
+
+        <Route
+          path="/communication-logs"
+          element={
+            <SuspensedView>
+              <CommunicationLogsPage />
             </SuspensedView>
           }
         />

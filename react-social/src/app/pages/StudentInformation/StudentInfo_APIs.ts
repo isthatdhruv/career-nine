@@ -92,9 +92,35 @@ export function deleteStudentInfo(id: number) {
     return axios.post<void>(`${STUDENT_INFO_BASE}/delete/${id}`);
 }
 
+export function updateStudentBasicInfo(data: {
+    userStudentId: number;
+    name?: string;
+    email?: string;
+    phoneNumber?: string;
+    studentDob?: string;
+}) {
+    return axios.post(`${STUDENT_INFO_BASE}/updateDemographics`, data);
+}
+
 // Assessment APIs
+// Uses the lightweight cached /get/list-summary projection (id, name, isActive,
+// questionnaireType) instead of /getAll, which deep-loaded each AssessmentTable
+// + Questionnaire + Sections + Questions + Options + Languages. The response is
+// reshaped so existing callers can still read `assessment.questionnaire?.type`.
 export function getAllAssessments() {
-    return axios.get<Assessment[]>(`${ASSESSMENTS_BASE}/getAll`);
+    return axios
+        .get<Array<{ id: number; assessmentName: string; isActive?: boolean; questionnaireType?: boolean | null }>>(
+            `${ASSESSMENTS_BASE}/get/list-summary`
+        )
+        .then((res) => ({
+            ...res,
+            data: (res.data || []).map<Assessment>((s) => ({
+                id: s.id,
+                assessmentName: s.assessmentName,
+                isActive: s.isActive,
+                questionnaire: { type: s.questionnaireType ?? null },
+            })),
+        }));
 }
 
 export function getAssessmentIdNameMap() {

@@ -31,6 +31,7 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
         collegeId: '',
         schoolContactIds: [] as string[],
         career9ContactIds: [] as string[],
+        collectEmailAndPhone: true,
     };
 
     const [college, setCollege] = useState<any[]>([]);
@@ -104,6 +105,7 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
                             collegeId: values.collegeId,
                             schoolContactIds: values.schoolContactIds,
                             career9ContactIds: values.career9ContactIds,
+                            collectEmailAndPhone: values.collectEmailAndPhone,
                         };
                         
                         // Store data for next step
@@ -223,6 +225,22 @@ const AssessmentCreateModal = ({ show, onHide, setPageLoading }: AssessmentCreat
                                             Offline
                                         </label>
                                     </div>
+                                </div>
+                            </div>
+
+                            {/* Collect Email & Phone */}
+                            <div className="fv-row mb-7">
+                                <div className="form-check form-switch">
+                                    <input
+                                        className="form-check-input"
+                                        type="checkbox"
+                                        id="collectEmailAndPhone"
+                                        checked={values.collectEmailAndPhone}
+                                        onChange={() => setFieldValue('collectEmailAndPhone', !values.collectEmailAndPhone)}
+                                    />
+                                    <label className="form-check-label fs-6 fw-bold" htmlFor="collectEmailAndPhone">
+                                        Collect Email & Phone
+                                    </label>
                                 </div>
                             </div>
 

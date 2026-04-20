@@ -44,6 +44,7 @@ import com.kccitm.api.repository.Career9.BetReportDataRepository;
 import com.kccitm.api.repository.Career9.NavigatorReportDataRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.School.SchoolSectionsRepository;
+import com.kccitm.api.service.CommunicationLogService;
 import com.kccitm.api.service.OdooEmailService;
 
 @RestController
@@ -73,6 +74,9 @@ public class ContactPersonController {
 
     @Autowired
     private OdooEmailService odooEmailService;
+
+    @Autowired
+    private CommunicationLogService communicationLogService;
 
     @Autowired
     private NavigatorReportDataRepository navigatorReportDataRepository;
@@ -344,7 +348,15 @@ public class ContactPersonController {
                     + studentListHtml
                     + "<p>You can now contact these students and send them emails through the Odoo service.</p>"
                     + "<p>This is an automated notification from Career-9.</p>";
-            odooEmailService.sendHtmlEmail(cp.getEmail(), subject, htmlBody);
+            boolean ok = true;
+            String err = null;
+            try {
+                odooEmailService.sendHtmlEmail(cp.getEmail(), subject, htmlBody);
+            } catch (Exception e) {
+                ok = false;
+                err = e.getMessage();
+            }
+            communicationLogService.logEmail(cp.getName(), cp.getEmail(), "CONTACT_ASSIGNMENT", ok, err);
         }
 
         Map<String, Object> response = new HashMap<>();
@@ -525,7 +537,25 @@ public class ContactPersonController {
         request.setHtmlContent(htmlContent);
         request.setFromName(fromName != null && !fromName.isEmpty() ? fromName : "Career-9");
         request.setFromEmail("notifications@career-9.com");
-        odooEmailService.sendEmail(request);
+
+        boolean sendSuccess = true;
+        String sendError = null;
+        try {
+            odooEmailService.sendEmail(request);
+        } catch (Exception e) {
+            sendSuccess = false;
+            sendError = e.getMessage();
+        }
+
+        // Log one row per recipient
+        for (String email : emails) {
+            communicationLogService.logEmail(null, email, "REPORT", sendSuccess, sendError);
+        }
+
+        if (!sendSuccess) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to send email: " + sendError);
+        }
 
         Map<String, Object> response = new HashMap<>();
         response.put("message", "Email sent successfully");
@@ -682,7 +712,20 @@ public class ContactPersonController {
         emailRequest.setAttachments(Arrays.asList(
                 new SmtpEmailRequest.EmailAttachment(zipFileName, zipBaos.toByteArray(), "application/zip")
         ));
-        odooEmailService.sendEmail(emailRequest);
+
+        boolean sendSuccess = true;
+        String sendError = null;
+        try {
+            odooEmailService.sendEmail(emailRequest);
+        } catch (Exception e) {
+            sendSuccess = false;
+            sendError = e.getMessage();
+        }
+        communicationLogService.logEmail(cp.getName(), cp.getEmail(), "REPORT", sendSuccess, sendError);
+        if (!sendSuccess) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to send email: " + sendError);
+        }
 
         Map<String, Object> response = new HashMap<>();
         response.put("message", "Reports ZIP sent successfully to " + cp.getEmail());
@@ -980,7 +1023,20 @@ public class ContactPersonController {
         emailRequest.setAttachments(Arrays.asList(
                 new SmtpEmailRequest.EmailAttachment(zipFileName, zipBaos.toByteArray(), "application/zip")
         ));
-        odooEmailService.sendEmail(emailRequest);
+
+        boolean sendSuccess = true;
+        String sendError = null;
+        try {
+            odooEmailService.sendEmail(emailRequest);
+        } catch (Exception e) {
+            sendSuccess = false;
+            sendError = e.getMessage();
+        }
+        communicationLogService.logEmail(cp.getName(), cp.getEmail(), "REPORT", sendSuccess, sendError);
+        if (!sendSuccess) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to send email: " + sendError);
+        }
 
         Map<String, Object> response = new HashMap<>();
         response.put("message", "Reports ZIP sent successfully to " + cp.getEmail());
@@ -1184,6 +1240,9 @@ public class ContactPersonController {
                     "https://backend.aisensy.com/campaign/t1/api/v2",
                     request, String.class);
 
+            communicationLogService.logWhatsApp(null, normalizedPhone,
+                    mapTemplateToType(templateName), true, null);
+
             Map<String, Object> response = new HashMap<>();
             response.put("message", "WhatsApp message sent successfully");
             response.put("phoneNumber", normalizedPhone);
@@ -1191,10 +1250,26 @@ public class ContactPersonController {
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
+            communicationLogService.logWhatsApp(null, phoneNumber,
+                    mapTemplateToType(templateName), false, e.getMessage());
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("error", "Failed to send WhatsApp message: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
+    }
+
+    /**
+     * Map an AiSensy template/campaign name to our CommunicationLog message_type bucket.
+     * Anything unknown falls back to OTHER so we still capture the log.
+     */
+    private String mapTemplateToType(String templateName) {
+        if (templateName == null) return "OTHER";
+        String t = templateName.toLowerCase();
+        if (t.contains("report")) return "REPORT";
+        if (t.contains("otp") || t.contains("verif")) return "EMAIL_OTP";
+        if (t.contains("welcome") || t.contains("signup") || t.contains("register")) return "WELCOME";
+        if (t.contains("id_card") || t.contains("idcard")) return "ID_CARD";
+        return "OTHER";
     }
 
     /**
@@ -1224,14 +1299,22 @@ public class ContactPersonController {
         int failCount = 0;
         org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
 
+        String messageType = mapTemplateToType(templateName);
+
         for (Map<String, Object> recipient : recipients) {
+            String phoneNumber = (String) recipient.get("phoneNumber");
+            String recipientName = null;
+            Object nameObj = recipient.get("name");
+            if (nameObj != null) recipientName = nameObj.toString();
+
             try {
-                String phoneNumber = (String) recipient.get("phoneNumber");
                 @SuppressWarnings("unchecked")
                 List<String> templateParams = (List<String>) recipient.get("templateParams");
 
                 if (phoneNumber == null || phoneNumber.isEmpty()) {
                     failCount++;
+                    communicationLogService.logWhatsApp(recipientName, phoneNumber,
+                            messageType, false, "Missing phone number");
                     continue;
                 }
 
@@ -1258,8 +1341,12 @@ public class ContactPersonController {
                         "https://backend.aisensy.com/campaign/t1/api/v2",
                         request, String.class);
                 successCount++;
+                communicationLogService.logWhatsApp(recipientName, normalizedPhone,
+                        messageType, true, null);
             } catch (Exception e) {
                 failCount++;
+                communicationLogService.logWhatsApp(recipientName, phoneNumber,
+                        messageType, false, e.getMessage());
             }
         }
 

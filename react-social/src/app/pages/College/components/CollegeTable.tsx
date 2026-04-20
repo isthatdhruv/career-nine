@@ -16,6 +16,7 @@ import CollegeAssignRoleModal from "../components/CollegeAssignRoleModal";
 import { showErrorToast } from '../../../utils/toast';
 import CollegeDetailModal from "./CollegeSectionSessionGradeModal";
 import AssessmentMappingModal from "./AssessmentMappingModal";
+import SchoolAssessmentMappingModal from "./SchoolAssessmentMappingModal";
 
 // Layout reference image (local path)
 const layoutImagePath = "/mnt/data/556d6c4d-1033-4fd7-8d4f-f02d4f436ce2.png";
@@ -79,6 +80,7 @@ const CollegeTable = (props: {
   );
 
   const [assessmentMappingModalShow, setAssessmentMappingModalShow] = useState(false);
+  const [schoolMappingModalShow, setSchoolMappingModalShow] = useState(false);
   const [assessmentMappingInstitute, setAssessmentMappingInstitute] = useState<{
     code: number;
     name: string;
@@ -264,6 +266,18 @@ const CollegeTable = (props: {
                   <MdSchool size={18} className="me-2" />
                   Assessment Mapping
                 </Dropdown.Item>
+                <Dropdown.Item
+                  onClick={() => {
+                    setAssessmentMappingInstitute({
+                      code: Number(data.instituteCode),
+                      name: data.instituteName || "",
+                    });
+                    setSchoolMappingModalShow(true);
+                  }}
+                >
+                  <MdSchool size={18} className="me-2" />
+                  School Registration Setup
+                </Dropdown.Item>
               </Dropdown.Menu>
             </Dropdown>
 
@@ -389,6 +403,14 @@ const CollegeTable = (props: {
       <AssessmentMappingModal
         show={assessmentMappingModalShow}
         onHide={() => setAssessmentMappingModalShow(false)}
+        instituteCode={assessmentMappingInstitute.code}
+        instituteName={assessmentMappingInstitute.name}
+      />
+
+      {/* School Registration Setup */}
+      <SchoolAssessmentMappingModal
+        show={schoolMappingModalShow}
+        onHide={() => setSchoolMappingModalShow(false)}
         instituteCode={assessmentMappingInstitute.code}
         instituteName={assessmentMappingInstitute.name}
       />

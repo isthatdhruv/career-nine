@@ -39,6 +39,7 @@ export default function App() {
               <Route path="/studentAssessment/sections/:sectionId/questions/:questionIndex" element={<SectionQuestionPage />} />
               <Route path="/studentAssessment/completed" element={<ThankYouPage />} />
               <Route path="/assessment-register/:token" element={<AssessmentRegisterPage />} />
+              <Route path="*" element={<Navigate to="/student-login" replace />} />
             </Routes>
           </Suspense>
         </AssessmentProvider>

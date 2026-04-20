@@ -64,6 +64,7 @@ import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
+import com.kccitm.api.service.FirebaseDataCacheService;
 import com.kccitm.api.service.FirebaseService;
 import com.kccitm.api.service.FirebaseStudentDeletionService;
 
@@ -82,6 +83,9 @@ public class FirebaseDataMappingController {
 
     @Autowired
     private FirebaseService firebaseService;
+
+    @Autowired
+    private FirebaseDataCacheService firebaseDataCacheService;
 
     @Autowired
     private UserRepository userRepository;
@@ -531,15 +535,23 @@ public class FirebaseDataMappingController {
      *   }
      * ]
      */
+    /**
+     * Force-clears the cached "users" dump. Frontend calls this from the
+     * Refresh button in the mapping wizard when the admin knows Firebase has
+     * new data and does not want to wait for the 10-minute TTL.
+     */
+    @PostMapping("/invalidate-cache")
+    public ResponseEntity<?> invalidateFirebaseCache() {
+        firebaseDataCacheService.invalidate();
+        return ResponseEntity.ok(Map.of("status", "ok", "message", "Firebase cache cleared"));
+    }
+
     @GetMapping("/fetch-school-data")
     public ResponseEntity<?> fetchSchoolData(@RequestParam(value = "tenant", required = false) String tenant) {
         try {
-            // Collection is "users" (lowercase) — confirmed from Firebase console
-            List<Map<String, Object>> users = firebaseService.getAllDocuments("users");
-            if (users.isEmpty()) {
-                // Fallback: try capitalized
-                users = firebaseService.getAllDocuments("Users");
-            }
+            // Cached dump of the full "users" collection (10-minute TTL).
+            // Original code hit Firestore on every call; see FirebaseDataCacheService.
+            List<Map<String, Object>> users = new ArrayList<>(firebaseDataCacheService.getRawUserDocs());
 
             // Filter by tenant if provided
             if (tenant != null && !tenant.trim().isEmpty()) {
@@ -798,10 +810,7 @@ public class FirebaseDataMappingController {
     @GetMapping("/fetch-user-data")
     public ResponseEntity<?> fetchUserData(@RequestParam(value = "tenant", required = false) String tenant) {
         try {
-            List<Map<String, Object>> users = firebaseService.getAllDocuments("users");
-            if (users.isEmpty()) {
-                users = firebaseService.getAllDocuments("Users");
-            }
+            List<Map<String, Object>> users = new ArrayList<>(firebaseDataCacheService.getRawUserDocs());
 
             // Filter by tenant if provided
             if (tenant != null && !tenant.trim().isEmpty()) {
@@ -874,10 +883,7 @@ public class FirebaseDataMappingController {
     @GetMapping("/fetch-unique-questions")
     public ResponseEntity<?> fetchUniqueQuestions(@RequestParam(value = "tenant", required = false) String tenant) {
         try {
-            List<Map<String, Object>> users = firebaseService.getAllDocuments("users");
-            if (users.isEmpty()) {
-                users = firebaseService.getAllDocuments("Users");
-            }
+            List<Map<String, Object>> users = new ArrayList<>(firebaseDataCacheService.getRawUserDocs());
 
             // Filter by tenant if provided
             if (tenant != null && !tenant.trim().isEmpty()) {

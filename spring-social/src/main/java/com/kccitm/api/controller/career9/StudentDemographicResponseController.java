@@ -69,6 +69,58 @@ public class StudentDemographicResponseController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/contact-info/{userStudentId}")
+    public ResponseEntity<?> getContactInfo(@PathVariable Long userStudentId) {
+        UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
+        if (userStudent == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Student not found"));
+        }
+        StudentInfo info = userStudent.getStudentInfo();
+        Map<String, String> result = new HashMap<>();
+        result.put("email", info != null ? info.getEmail() : null);
+        result.put("phoneNumber", info != null ? info.getPhoneNumber() : null);
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/contact-info/{userStudentId}")
+    @Transactional
+    public ResponseEntity<?> updateContactInfo(
+            @PathVariable Long userStudentId,
+            @RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        String phoneNumber = request.get("phoneNumber");
+
+        List<String> errors = new ArrayList<>();
+        if (email != null && !email.trim().isEmpty()
+                && !Pattern.matches("^[\\w.+-]+@[\\w.-]+\\.[a-zA-Z]{2,}$", email.trim())) {
+            errors.add("Invalid email format");
+        }
+        if (phoneNumber != null && !phoneNumber.trim().isEmpty()
+                && !Pattern.matches("^[0-9]{10}$", phoneNumber.trim())) {
+            errors.add("Phone number must be 10 digits");
+        }
+        if (!errors.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("validationErrors", errors));
+        }
+
+        UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
+        if (userStudent == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Student not found"));
+        }
+        StudentInfo info = userStudent.getStudentInfo();
+        if (info == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Student info not found"));
+        }
+        info.setEmail(email != null ? email.trim() : null);
+        info.setPhoneNumber(phoneNumber != null ? phoneNumber.trim() : null);
+        studentInfoRepository.save(info);
+
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
     @GetMapping("/fields/{assessmentId}/{userStudentId}")
     public ResponseEntity<?> getFieldsForAssessment(
             @PathVariable Long assessmentId,

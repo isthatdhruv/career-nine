@@ -1577,8 +1577,15 @@ public class AssessmentAnswerController {
             UserStudent student = userStudentRepository.findById(studentId).orElse(null);
             if (student != null) {
                 entry.put("studentName", student.getStudentInfo().getName() + " " + student.getStudentInfo().getFamily());
+                entry.put("username",
+                        student.getStudentInfo() != null
+                                && student.getStudentInfo().getUser() != null
+                                && student.getStudentInfo().getUser().getUsername() != null
+                                ? student.getStudentInfo().getUser().getUsername()
+                                : "");
             } else {
                 entry.put("studentName", "Unknown");
+                entry.put("username", "");
             }
         }
 

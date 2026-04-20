@@ -1,6 +1,7 @@
 import clsx from "clsx";
-import React, { useEffect, useState } from "react";
-import { Dropdown } from "react-bootstrap";
+import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Dropdown, Button } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { showErrorToast } from '../../../utils/toast';
 import * as Yup from "yup";
@@ -30,6 +31,16 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   const [optionTypes, setOptionTypes] = useState<{ [key: number]: 'text' | 'image' }>({});
   // NEW: State for storing Base64 image data per option index
   const [optionImages, setOptionImages] = useState<{ [key: number]: string }>({});
+  // State for tracking which option images are being processed
+  const [optionImageProcessing, setOptionImageProcessing] = useState<{ [key: number]: boolean }>({});
+  // State for pending image confirmation popup (custom overlay portal)
+  const [pendingImage, setPendingImage] = useState<
+    { source: 'question'; base64: string; originalWidth: number; originalHeight: number; originalSize: number; finalWidth: number; finalHeight: number; finalSize: number }
+    | { source: 'option'; index: number; base64: string; originalWidth: number; originalHeight: number; originalSize: number; finalWidth: number; finalHeight: number; finalSize: number }
+    | null
+  >(null);
+  // Ref to reset question image file input
+  const questionImageInputRef = useRef<HTMLInputElement>(null);
 
   // NEW: Game as option states
   const [useGameAsOption, setUseGameAsOption] = useState(false);
@@ -146,14 +157,23 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
     }));
   };
 
-  // NEW: Handle image file selection and convert to Base64
-  const handleImageSelect = (index: number, file: File | null) => {
+  // Handle option image: shrink to 512x512, convert to WebP, then show confirmation popup
+  const handleImageSelect = async (index: number, file: File | null) => {
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setOptionImages(prev => ({ ...prev, [index]: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
+      setOptionImageProcessing(prev => ({ ...prev, [index]: true }));
+      try {
+        const result = await convertImageToWebP(file, 0.8, 512, 512);
+        setPendingImage({
+          source: 'option', index, base64: result.base64,
+          originalWidth: result.originalWidth, originalHeight: result.originalHeight, originalSize: result.originalSize,
+          finalWidth: result.finalWidth, finalHeight: result.finalHeight, finalSize: result.finalSize,
+        });
+      } catch (error) {
+        console.error("Error converting option image to WebP:", error);
+        showErrorToast("Failed to process option image. Please try a different file.");
+      } finally {
+        setOptionImageProcessing(prev => ({ ...prev, [index]: false }));
+      }
     } else {
       setOptionImages(prev => { const n = {...prev}; delete n[index]; return n; });
     }
@@ -189,7 +209,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
     });
   };
 
-  // Handle question image upload — convert to webp and compress
+  // Handle question image upload — shrink to 1280x720, convert to webp, then show confirmation popup
   const handleQuestionImageSelect = async (file: File | null) => {
     if (!file) {
       setQuestionMediaBase64("");
@@ -197,8 +217,12 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
     }
     setQuestionMediaProcessing(true);
     try {
-      const result = await convertImageToWebP(file, 0.8, 1920, 1080);
-      setQuestionMediaBase64(result.base64);
+      const result = await convertImageToWebP(file, 0.8, 1280, 720);
+      setPendingImage({
+        source: 'question', base64: result.base64,
+        originalWidth: result.originalWidth, originalHeight: result.originalHeight, originalSize: result.originalSize,
+        finalWidth: result.finalWidth, finalHeight: result.finalHeight, finalSize: result.finalSize,
+      });
     } catch (error) {
       console.error("Error converting image to WebP:", error);
       showErrorToast("Failed to process image. Please try a different file.");
@@ -298,7 +322,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
   }, [useMQTAsOptions]);
 
   return (
-    <div className="container py-5">
+    <><div className="container py-5">
       <div className="card shadow-sm py-5">
         <div className="card-header">
           <h1 className="mb-0">Add Assessment Question</h1>
@@ -324,17 +348,31 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                   game: { gameId: Number(selectedGameId) }
                 }];
               } else {
-                // Regular options mode
+                // Regular options mode - upload option images to CDN first
+                const optionImageUrls: { [key: number]: string } = {};
+                for (const [indexStr, base64Data] of Object.entries(optionImages)) {
+                  const idx = Number(indexStr);
+                  if (optionTypes[idx] === 'image' && base64Data) {
+                    try {
+                      const uploadResult = await UploadQuestionMedia(base64Data, 'image');
+                      optionImageUrls[idx] = uploadResult.url;
+                    } catch (uploadErr) {
+                      console.error(`Option ${idx + 1} image upload failed:`, uploadErr);
+                      showErrorToast(`Option ${idx + 1} image upload failed. It will be skipped.`);
+                    }
+                  }
+                }
+
                 options = formikValues.questionOptions.map((option: any, index: number) => {
                   // Check if this option is in image mode
                   const isImageMode = optionTypes[index] === 'image';
-                  
+
                   // Handle both string options (manual) and object options (MQT)
                   const optionText = isImageMode ? null : (typeof option === 'string' ? option : option.optionText);
-                  const optionImageBase64 = isImageMode ? (optionImages[index] || null) : null;
+                  const optionImageUrl = isImageMode ? (optionImageUrls[index] || null) : null;
                   const isCorrect = typeof option === 'string' ? false : (option.correct || false);
                   const optionDescription = typeof option === 'string' ? null : (option.optionDescription || null);
-                  
+
                   // Build optionScores for this option
                   const optionScores: any[] = [];
                   if (optionMeasuredQualities[index]) {
@@ -342,7 +380,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                       if (val.checked) {
                         optionScores.push({
                           score: val.score,
-                          question_option: {}, // leave empty as per your payload
+                          question_option: {},
                           measuredQualityType: { measuredQualityTypeId: Number(typeId) }
                         });
                       }
@@ -350,7 +388,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                   }
                   return {
                     optionText,
-                    optionImageBase64,
+                    optionImageUrl,
                     optionScores,
                     correct: isCorrect,
                     isGame: false,
@@ -372,13 +410,8 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                   showErrorToast("Image upload failed. Question will be created without the image.");
                 }
               } else if (questionMediaType === 'video' && questionMediaBase64) {
-                try {
-                  const uploadResult = await UploadQuestionMedia(questionMediaBase64, 'video');
-                  questionVideoUrl = uploadResult.url;
-                } catch (uploadErr) {
-                  console.error("Media upload failed:", uploadErr);
-                  showErrorToast("Video upload failed. Question will be created without the video.");
-                }
+                // YouTube link — store directly
+                questionVideoUrl = questionMediaBase64;
               }
 
               // Compose payload
@@ -472,6 +505,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
               <div className="fv-row mb-7">
                 <label className="required fs-6 fw-bold mb-2">Question Image:</label>
                 <input
+                  ref={questionImageInputRef}
                   type="file"
                   accept="image/*"
                   onChange={(e) => handleQuestionImageSelect(e.target.files?.[0] || null)}
@@ -497,7 +531,7 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                       type="button"
                       className="btn btn-sm btn-danger position-absolute"
                       style={{ top: -8, right: -8, padding: '4px 10px', fontSize: 12 }}
-                      onClick={() => setQuestionMediaBase64("")}
+                      onClick={() => { setQuestionMediaBase64(""); if (questionImageInputRef.current) questionImageInputRef.current.value = ""; }}
                     >
                       Remove
                     </button>
@@ -506,49 +540,48 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
               </div>
             )}
 
-            {/* Question Video Upload */}
+            {/* Question Video — YouTube Link */}
             {questionMediaType === 'video' && (
               <div className="fv-row mb-7">
-                <label className="required fs-6 fw-bold mb-2">Question Video:</label>
+                <label className="required fs-6 fw-bold mb-2">YouTube Video Link:</label>
                 <input
-                  type="file"
-                  accept="video/*"
-                  onChange={(e) => handleQuestionVideoSelect(e.target.files?.[0] || null)}
+                  type="text"
+                  placeholder="Paste YouTube link (e.g. https://www.youtube.com/watch?v=abc123)"
+                  value={questionMediaBase64}
+                  onChange={(e) => setQuestionMediaBase64(e.target.value.trim())}
                   className="form-control form-control-lg form-control-solid mb-2"
                 />
                 <small className="text-muted d-block mb-2">
-                  Supported formats: MP4, WebM, OGG. Video will be compressed automatically.
+                  Supports: youtube.com/watch?v=..., youtu.be/..., youtube.com/embed/...
                 </small>
-                {questionMediaProcessing && (
-                  <div className="mb-2">
-                    <div className="d-flex align-items-center gap-2 text-primary mb-1">
-                      <span className="spinner-border spinner-border-sm"></span>
-                      <span>Compressing video... {videoCompressProgress > 0 ? `${videoCompressProgress}%` : ''}</span>
+                {questionMediaBase64 && (() => {
+                  const match = questionMediaBase64.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+                  const videoId = match ? match[1] : null;
+                  return videoId ? (
+                    <div className="position-relative">
+                      <iframe
+                        width="400"
+                        height="225"
+                        src={`https://www.youtube.com/embed/${videoId}`}
+                        title="Video preview"
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        style={{ borderRadius: 8, border: '1px solid #ddd', maxWidth: '100%' }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-danger position-absolute"
+                        style={{ top: -8, right: -8, padding: '4px 10px', fontSize: 12 }}
+                        onClick={() => setQuestionMediaBase64("")}
+                      >
+                        Remove
+                      </button>
                     </div>
-                    {videoCompressProgress > 0 && (
-                      <div className="progress" style={{ height: 6 }}>
-                        <div className="progress-bar" role="progressbar" style={{ width: `${videoCompressProgress}%` }} />
-                      </div>
-                    )}
-                  </div>
-                )}
-                {questionMediaBase64 && !questionMediaProcessing && (
-                  <div className="position-relative d-inline-block">
-                    <video
-                      src={questionMediaBase64}
-                      controls
-                      style={{ maxWidth: 400, maxHeight: 300, borderRadius: 8, border: '1px solid #ddd' }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-danger position-absolute"
-                      style={{ top: -8, right: -8, padding: '4px 10px', fontSize: 12 }}
-                      onClick={() => { setQuestionMediaBase64(""); setQuestionVideoThumbnail(""); }}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-danger small">Invalid YouTube link. Please check the URL.</div>
+                  );
+                })()}
               </div>
             )}
             <div className="fv-row mb-7">
@@ -667,10 +700,17 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
                             onChange={(e) => handleImageSelect(index, e.target.files?.[0] || null)}
                             className="form-control form-control-sm mb-2"
                           />
-                          {optionImages[index] && (
+                          <small className="text-muted d-block mb-1">Auto-compressed and converted to WebP, stored on CDN.</small>
+                          {optionImageProcessing[index] && (
+                            <div className="d-flex align-items-center gap-2 text-primary mb-2">
+                              <span className="spinner-border spinner-border-sm"></span>
+                              <span>Processing...</span>
+                            </div>
+                          )}
+                          {optionImages[index] && !optionImageProcessing[index] && (
                             <div className="position-relative d-inline-block">
-                              <img 
-                                src={optionImages[index]} 
+                              <img
+                                src={optionImages[index]}
                                 alt={`Option ${index + 1}`}
                                 style={{ maxWidth: 150, maxHeight: 100, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }}
                               />
@@ -925,6 +965,69 @@ const QuestionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
         </form>
       </div>
     </div>
+
+    {/* Confirmation popup — rendered via portal to document.body so it sits on top of everything */}
+    {pendingImage && createPortal(
+      <div
+        style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+        onClick={() => { setPendingImage(null); if (questionImageInputRef.current) questionImageInputRef.current.value = ""; }}
+      >
+        <div
+          style={{
+            background: '#fff', borderRadius: 12, padding: 24,
+            maxWidth: 450, width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h5 className="mb-3 text-center">Confirm Image</h5>
+          <p className="text-muted text-center mb-2">
+            Image has been compressed, resized and converted to WebP.
+          </p>
+          <div className="mb-3 p-2 rounded" style={{ background: '#f8f9fa', fontSize: 13 }}>
+            <div className="d-flex justify-content-between mb-1">
+              <span className="text-muted">Original:</span>
+              <span>{pendingImage.originalWidth} x {pendingImage.originalHeight} &middot; {(pendingImage.originalSize / 1024).toFixed(1)} KB</span>
+            </div>
+            <div className="d-flex justify-content-between">
+              <span className="text-muted">After processing:</span>
+              <span className="text-success fw-bold">{pendingImage.finalWidth} x {pendingImage.finalHeight} &middot; {(pendingImage.finalSize / 1024).toFixed(1)} KB</span>
+            </div>
+            {pendingImage.originalSize > pendingImage.finalSize && (
+              <div className="text-center mt-1">
+                <span className="badge bg-success">
+                  {Math.round((1 - pendingImage.finalSize / pendingImage.originalSize) * 100)}% smaller
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="text-center mb-3">
+            <img
+              src={pendingImage.base64}
+              alt="Processed preview"
+              style={{ maxWidth: '100%', maxHeight: 250, objectFit: 'contain', borderRadius: 8, border: '1px solid #ddd' }}
+            />
+          </div>
+          <div className="d-flex justify-content-center gap-3">
+            <Button variant="outline-secondary" onClick={() => { setPendingImage(null); if (questionImageInputRef.current) questionImageInputRef.current.value = ""; }}>Cancel</Button>
+            <Button variant="primary" onClick={() => {
+              if (pendingImage.source === 'question') {
+                setQuestionMediaBase64(pendingImage.base64);
+              } else {
+                setOptionImages(prev => ({ ...prev, [(pendingImage as any).index]: pendingImage.base64 }));
+              }
+              setPendingImage(null);
+            }}>Confirm</Button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    )}
+    </>
   );
 };
 

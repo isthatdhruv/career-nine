@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import * as XLSX from "xlsx";
 import { getAssessmentList, getLiveTracking, getLiveTrackingLite, getRedisPartials, flushPartialToDb, getRedisPartialDetail, submitFromRedis } from "./API/LiveTracking_APIs";
 import { showErrorToast } from '../../utils/toast';
 
@@ -8,6 +9,7 @@ interface StudentEntry {
   userStudentId: number;
   studentName: string;
   email?: string;
+  username?: string;
   instituteName: string;
   status: string;
   answeredCount: number;
@@ -43,6 +45,7 @@ interface RedisPartialEntry {
   userStudentId: number;
   assessmentId: number;
   studentName: string;
+  username?: string;
   answerCount: number;
   ttlSeconds: number;
   savedAt: string | null;
@@ -119,7 +122,8 @@ const ProgressBar = ({
   answered: number;
   total: number;
 }) => {
-  const pct = total > 0 ? Math.round((answered / total) * 100) : 0;
+  const safeAnswered = total > 0 ? Math.min(answered, total) : answered;
+  const pct = total > 0 ? Math.min(100, Math.round((safeAnswered / total) * 100)) : 0;
   return (
     <div className="d-flex align-items-center gap-2" style={{ minWidth: 160 }}>
       <div
@@ -137,7 +141,7 @@ const ProgressBar = ({
         />
       </div>
       <small className="text-muted" style={{ whiteSpace: "nowrap", fontSize: 12 }}>
-        {answered}/{total} ({pct}%)
+        {safeAnswered}/{total} ({pct}%)
       </small>
     </div>
   );
@@ -180,10 +184,13 @@ const LiveTrackingPage = () => {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterInstitute, setFilterInstitute] = useState<string>("all");
+  const [filterUsername, setFilterUsername] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [progressSort, setProgressSort] = useState<"none" | "asc" | "desc">("none");
   const [isPolling, setIsPolling] = useState(true);
   const [activeTab, setActiveTab] = useState<"live" | "redis">("live");
   const [redisPartials, setRedisPartials] = useState<RedisPartialEntry[]>([]);
+  const [redisFilterUsername, setRedisFilterUsername] = useState("");
   const [redisLoading, setRedisLoading] = useState(false);
   const [flushingIds, setFlushingIds] = useState<Set<number>>(new Set());
   const [flushingAll, setFlushingAll] = useState(false);
@@ -240,6 +247,7 @@ const LiveTrackingPage = () => {
             userStudentId: s.userStudentId,
             studentName: s.studentName,
             email: s.email || "",
+            username: s.username || "",
             instituteName: "",
             status: s.status || "notstarted",
             answeredCount: 0,
@@ -259,12 +267,16 @@ const LiveTrackingPage = () => {
       const res = await getLiveTracking(selectedId);
       const newData: TrackingData = res.data;
 
-      // Preserve email from lite data if full response doesn't include it
+      // Preserve email & username from lite data if full response doesn't include them
       if (data) {
         const emailMap = new Map(data.students.map(s => [s.userStudentId, s.email]));
+        const usernameMap = new Map(data.students.map(s => [s.userStudentId, s.username]));
         for (const s of newData.students) {
           if (!s.email && emailMap.has(s.userStudentId)) {
             s.email = emailMap.get(s.userStudentId);
+          }
+          if (!s.username && usernameMap.has(s.userStudentId)) {
+            s.username = usernameMap.get(s.userStudentId);
           }
         }
       }
@@ -460,20 +472,34 @@ const LiveTrackingPage = () => {
     });
   };
 
-  // Toggle all students selection
+  // Filtered redis partials (by username)
+  const filteredRedisPartials = useMemo(() => {
+    const u = redisFilterUsername.trim().toLowerCase();
+    if (!u) return redisPartials;
+    return redisPartials.filter((e) => (e.username || "").toLowerCase().includes(u));
+  }, [redisPartials, redisFilterUsername]);
+
+  // Toggle all students selection (scoped to currently visible/filtered rows)
   const toggleSelectAll = () => {
-    if (selectedStudents.size === redisPartials.length) {
-      setSelectedStudents(new Set());
-    } else {
-      setSelectedStudents(new Set(redisPartials.map((e) => e.userStudentId)));
-    }
+    const visibleIds = filteredRedisPartials.map((e) => e.userStudentId);
+    const allSelected =
+      visibleIds.length > 0 && visibleIds.every((id) => selectedStudents.has(id));
+    setSelectedStudents((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        visibleIds.forEach((id) => next.delete(id));
+      } else {
+        visibleIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
   };
 
-  // Bulk submit: selected students or all, one by one sequentially
+  // Bulk submit: selected students, or all visible (filtered) if none selected
   const handleBulkSubmit = async () => {
     const targets = selectedStudents.size > 0
-      ? redisPartials.filter((e) => selectedStudents.has(e.userStudentId))
-      : redisPartials;
+      ? filteredRedisPartials.filter((e) => selectedStudents.has(e.userStudentId))
+      : filteredRedisPartials;
 
     if (targets.length === 0) return;
 
@@ -532,23 +558,72 @@ const LiveTrackingPage = () => {
       list = list.filter((s) => s.instituteName === filterInstitute);
     }
 
+    if (filterUsername.trim()) {
+      const u = filterUsername.trim().toLowerCase();
+      list = list.filter((s) => s.username?.toLowerCase().includes(u));
+    }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(
         (s) =>
           s.studentName?.toLowerCase().includes(q) ||
           s.email?.toLowerCase().includes(q) ||
+          s.username?.toLowerCase().includes(q) ||
           s.instituteName?.toLowerCase().includes(q) ||
           String(s.userStudentId).includes(q)
       );
     }
 
-    // Sort: ongoing first, then notstarted, then completed
+    const total = data.totalQuestions || 0;
+    const pct = (s: StudentEntry) =>
+      total > 0 ? (s.answeredCount / total) * 100 : 0;
+
+    if (progressSort !== "none") {
+      return [...list].sort((a, b) =>
+        progressSort === "asc" ? pct(a) - pct(b) : pct(b) - pct(a)
+      );
+    }
+
+    // Default sort: ongoing first, then notstarted, then completed
     const order: Record<string, number> = { ongoing: 0, notstarted: 1, completed: 2 };
     return [...list].sort(
       (a, b) => (order[a.status] ?? 1) - (order[b.status] ?? 1)
     );
-  }, [data, filterStatus, filterInstitute, searchQuery]);
+  }, [data, filterStatus, filterInstitute, filterUsername, searchQuery, progressSort]);
+
+  const handleDownloadExcel = useCallback(() => {
+    if (!data || filteredStudents.length === 0) return;
+    const total = data.totalQuestions || 0;
+    const statusLabel = (s: string) =>
+      s === "ongoing" ? "In Progress"
+      : s === "completed" ? "Completed"
+      : s === "notstarted" ? "Not Started"
+      : s;
+
+    const rows = filteredStudents.map((s) => ({
+      Student: s.studentName || "",
+      Username: s.username || "",
+      Email: s.email || "",
+      Institute: s.instituteName || "",
+      Status: statusLabel(s.status),
+      Progress: total > 0
+        ? `${((s.answeredCount / total) * 100).toFixed(1)}%`
+        : "0%",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows, {
+      header: ["Student", "Username", "Email", "Institute", "Status", "Progress"],
+    });
+    ws["!cols"] = [
+      { wch: 28 }, { wch: 22 }, { wch: 32 }, { wch: 28 }, { wch: 14 }, { wch: 12 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Live Tracking");
+    const safeName = (data.assessmentName || "assessment").replace(/[^a-z0-9]+/gi, "_");
+    const stamp = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `live_tracking_${safeName}_${stamp}.xlsx`);
+  }, [data, filteredStudents]);
 
   return (
     <div className="card">
@@ -701,6 +776,14 @@ const LiveTrackingPage = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ maxWidth: 260 }}
               />
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                placeholder="Filter by username..."
+                value={filterUsername}
+                onChange={(e) => setFilterUsername(e.target.value)}
+                style={{ maxWidth: 220 }}
+              />
               <select
                 className="form-select form-select-sm"
                 value={filterStatus}
@@ -727,6 +810,26 @@ const LiveTrackingPage = () => {
                   ))}
                 </select>
               )}
+              <select
+                className="form-select form-select-sm"
+                value={progressSort}
+                onChange={(e) => setProgressSort(e.target.value as "none" | "asc" | "desc")}
+                style={{ maxWidth: 200 }}
+                title="Sort by progress"
+              >
+                <option value="none">Sort: Default</option>
+                <option value="asc">Progress: Low → High</option>
+                <option value="desc">Progress: High → Low</option>
+              </select>
+              <button
+                className="btn btn-sm btn-success"
+                onClick={handleDownloadExcel}
+                disabled={filteredStudents.length === 0}
+                title="Download filtered list as Excel"
+              >
+                <i className="bi bi-download me-1" />
+                Download
+              </button>
               <small className="text-muted align-self-center">
                 Showing {filteredStudents.length} of {data.students.length}
               </small>
@@ -739,6 +842,7 @@ const LiveTrackingPage = () => {
                   <tr>
                     <th style={{ width: 60 }}>#</th>
                     <th>Student</th>
+                    <th>Username</th>
                     <th>Email</th>
                     <th>Institute</th>
                     <th style={{ width: 130 }}>Status</th>
@@ -749,7 +853,7 @@ const LiveTrackingPage = () => {
                 <tbody>
                   {filteredStudents.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center text-muted py-4">
+                      <td colSpan={8} className="text-center text-muted py-4">
                         No students match the current filter
                       </td>
                     </tr>
@@ -762,6 +866,9 @@ const LiveTrackingPage = () => {
                           <small className="text-muted">
                             ID: {s.userStudentId}
                           </small>
+                        </td>
+                        <td>
+                          <small>{s.username || ""}</small>
                         </td>
                         <td>
                           <small>{s.email || ""}</small>
@@ -825,11 +932,20 @@ const LiveTrackingPage = () => {
                   ) : null}
                   {selectedStudents.size > 0
                     ? `Bulk Submit Selected (${selectedStudents.size})`
-                    : `Bulk Submit All (${redisPartials.length})`}
+                    : `Bulk Submit All (${filteredRedisPartials.length})`}
                 </button>
               )}
+              <input
+                type="text"
+                className="form-control form-control-sm"
+                placeholder="Filter by username..."
+                value={redisFilterUsername}
+                onChange={(e) => setRedisFilterUsername(e.target.value)}
+                style={{ maxWidth: 220 }}
+              />
               <small className="text-muted">
-                {redisPartials.length} student{redisPartials.length !== 1 ? "s" : ""} with buffered answers
+                Showing {filteredRedisPartials.length} of {redisPartials.length} student
+                {redisPartials.length !== 1 ? "s" : ""} with buffered answers
               </small>
             </div>
             {bulkProgress && (
@@ -861,13 +977,17 @@ const LiveTrackingPage = () => {
                       <input
                         type="checkbox"
                         className="form-check-input"
-                        checked={redisPartials.length > 0 && selectedStudents.size === redisPartials.length}
+                        checked={
+                          filteredRedisPartials.length > 0 &&
+                          filteredRedisPartials.every((e) => selectedStudents.has(e.userStudentId))
+                        }
                         onChange={toggleSelectAll}
                         disabled={bulkSubmitting}
                       />
                     </th>
                     <th style={{ width: 50 }}>#</th>
                     <th>Student</th>
+                    <th>Username</th>
                     <th style={{ width: 100 }}>Answers</th>
                     <th style={{ width: 120 }}>TTL</th>
                     <th style={{ width: 180 }}>Last Saved</th>
@@ -875,14 +995,18 @@ const LiveTrackingPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {redisPartials.length === 0 ? (
+                  {filteredRedisPartials.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center text-muted py-4">
-                        {redisLoading ? "Loading..." : "No buffered answers in Redis"}
+                      <td colSpan={8} className="text-center text-muted py-4">
+                        {redisLoading
+                          ? "Loading..."
+                          : redisPartials.length === 0
+                          ? "No buffered answers in Redis"
+                          : "No students match the current filter"}
                       </td>
                     </tr>
                   ) : (
-                    redisPartials.map((entry, idx) => (
+                    filteredRedisPartials.map((entry, idx) => (
                       <tr key={`${entry.userStudentId}-${entry.assessmentId}`}>
                         <td>
                           <input
@@ -897,6 +1021,9 @@ const LiveTrackingPage = () => {
                         <td>
                           <div className="fw-semibold">{entry.studentName}</div>
                           <small className="text-muted">ID: {entry.userStudentId}</small>
+                        </td>
+                        <td>
+                          <small>{entry.username || ""}</small>
                         </td>
                         <td>
                           <span

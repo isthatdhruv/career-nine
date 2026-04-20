@@ -54,6 +54,9 @@ public class AssessmentTable implements java.io.Serializable {
     @Column(name = "is_deleted", columnDefinition = "BOOLEAN DEFAULT FALSE")
     private Boolean isDeleted = false;
 
+    @Column(name = "collect_email_and_phone", columnDefinition = "BOOLEAN DEFAULT TRUE")
+    private Boolean collectEmailAndPhone = true;
+
 
     public Long getId() {
         return id;
@@ -152,6 +155,14 @@ public class AssessmentTable implements java.io.Serializable {
 
     public void setIsDeleted(Boolean isDeleted) {
         this.isDeleted = isDeleted;
+    }
+
+    public Boolean getCollectEmailAndPhone() {
+        return collectEmailAndPhone;
+    }
+
+    public void setCollectEmailAndPhone(Boolean collectEmailAndPhone) {
+        this.collectEmailAndPhone = collectEmailAndPhone;
     }
 
 }

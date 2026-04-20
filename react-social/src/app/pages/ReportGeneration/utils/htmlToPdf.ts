@@ -62,7 +62,7 @@ export async function htmlToPdfBlob(htmlString: string): Promise<Blob> {
         useCORS: true,
         allowTaint: true,
         logging: false,
-        imageTimeout: 0,
+        imageTimeout: 5000,
       });
 
       const TARGET_PX_WIDTH = 2400;

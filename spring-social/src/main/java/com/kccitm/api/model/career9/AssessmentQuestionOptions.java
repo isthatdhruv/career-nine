@@ -50,6 +50,9 @@ public class AssessmentQuestionOptions implements Serializable {
     @JsonIgnore
     private byte[] optionImage;
 
+    @Column(name = "option_image_url", length = 1024)
+    private String optionImageUrl;
+
     @Column(name = "is_game", nullable = false)
     private Boolean isGame;
 
@@ -180,5 +183,12 @@ public class AssessmentQuestionOptions implements Serializable {
         this.optionDescription = optionDescription;
     }
 
+    public String getOptionImageUrl() {
+        return optionImageUrl;
+    }
+
+    public void setOptionImageUrl(String optionImageUrl) {
+        this.optionImageUrl = optionImageUrl;
+    }
 
 }

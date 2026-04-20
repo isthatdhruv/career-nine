@@ -15,10 +15,10 @@ CACHE_DIR="public/assessment-cache"
 # If first arg is a number, it's a specific assessment ID
 if [[ "$1" =~ ^[0-9]+$ ]]; then
   ASSESSMENT_ID=$1
-  BASE_URL=${2:-"https://api.career-9.com:8080"}
+  BASE_URL=${2:-"https://api.career-9.com"}
 else
   ASSESSMENT_ID=""
-  BASE_URL=${1:-"https://api.career-9.com:8080"}
+  BASE_URL=${1:-"https://api.career-9.com"}
 fi
 
 sync_assessment() {

@@ -47,6 +47,12 @@ public QuestionSection() {
         this.sectionName = sectionName;
     }
 
+    public QuestionSection(Long sectionId, String sectionName, String sectionDescription) {
+        this.sectionId = sectionId;
+        this.sectionName = sectionName;
+        this.sectionDescription = sectionDescription;
+    }
+
     // Getters and Setters
     public Long getSectionId() {
         return sectionId;

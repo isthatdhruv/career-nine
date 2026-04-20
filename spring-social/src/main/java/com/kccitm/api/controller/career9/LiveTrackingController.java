@@ -63,6 +63,7 @@ public class LiveTrackingController {
             String name = (String) row[1];
             String email = (String) row[2];
             String status = row[3] != null ? (String) row[3] : "notstarted";
+            String username = row.length > 4 ? (String) row[4] : null;
 
             switch (status) {
                 case "ongoing": ongoing++; break;
@@ -74,6 +75,7 @@ public class LiveTrackingController {
             entry.put("userStudentId", userStudentId);
             entry.put("studentName", name != null ? name : "Unknown");
             entry.put("email", email != null ? email : "");
+            entry.put("username", username != null ? username : "");
             entry.put("status", status);
             students.add(entry);
         }
@@ -104,12 +106,15 @@ public class LiveTrackingController {
         AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
             .orElseThrow(() -> new ResourceNotFoundException("AssessmentTable", "id", assessmentId));
 
-        // 2. Get total question count from the linked questionnaire
+        // 2. Get total question count from the linked questionnaire.
+        // Use a proper COUNT query instead of loading full entities with JOIN FETCHes,
+        // which is faster and avoids DISTINCT/fetch-join edge cases that can under- or
+        // over-count (e.g. questions with no options dropped by a stricter join).
         int totalQuestions = 0;
         if (assessment.getQuestionnaire() != null) {
-            totalQuestions = questionnaireQuestionRepository
-                    .findByQuestionnaireIdWithOptions(assessment.getQuestionnaire().getQuestionnaireId())
-                    .size();
+            Long count = questionnaireQuestionRepository
+                    .countByQuestionnaireId(assessment.getQuestionnaire().getQuestionnaireId());
+            totalQuestions = count != null ? count.intValue() : 0;
         }
 
         // 3. Get all student mappings for this assessment
@@ -146,6 +151,10 @@ public class LiveTrackingController {
             StudentInfo si = us.getStudentInfo();
             entry.put("studentName", si != null ? si.getName() : "Unknown");
             entry.put("email", si != null && si.getEmail() != null ? si.getEmail() : "");
+            entry.put("username",
+                    si != null && si.getUser() != null && si.getUser().getUsername() != null
+                            ? si.getUser().getUsername()
+                            : "");
             entry.put("instituteName",
                     us.getInstitute() != null ? us.getInstitute().getInstituteName() : "");
 
@@ -158,16 +167,33 @@ public class LiveTrackingController {
                 entry.put("currentSection", heartbeat.get("sectionName"));
                 entry.put("currentQuestionIndex", heartbeat.get("questionIndex"));
                 entry.put("lastSeen", heartbeat.get("timestamp"));
-                Object liveCount = heartbeat.get("answeredCount");
-                entry.put("answeredCount", liveCount != null ? liveCount : 0);
+                // Cap live count at totalQuestions. The student client populates this
+                // field in the heartbeat; if it ever counts option-selections (for
+                // multi-select questions) instead of distinct questions, the raw value
+                // can exceed totalQuestions and produce >100% in the UI.
+                Object liveCountObj = heartbeat.get("answeredCount");
+                long liveCount = 0L;
+                if (liveCountObj instanceof Number) {
+                    liveCount = ((Number) liveCountObj).longValue();
+                }
+                if (totalQuestions > 0 && liveCount > totalQuestions) {
+                    liveCount = totalQuestions;
+                }
+                entry.put("answeredCount", liveCount);
                 entry.put("isLive", true);
             } else {
-                // Student is NOT actively giving assessment — use DB count
+                // Student is NOT actively giving assessment — use DB count.
+                // Count DISTINCT questions, not answer rows (multi-select would over-count).
                 entry.put("currentPage", null);
                 Long dbCount = assessmentAnswerRepository
-                        .countByUserStudent_UserStudentIdAndAssessment_Id(
+                        .countDistinctQuestionsAnsweredByStudent(
                                 us.getUserStudentId(), assessmentId);
-                entry.put("answeredCount", dbCount != null ? dbCount : 0);
+                // Cap at totalQuestions as a safety net so the UI never shows >100%.
+                long safeCount = dbCount != null ? dbCount : 0L;
+                if (totalQuestions > 0 && safeCount > totalQuestions) {
+                    safeCount = totalQuestions;
+                }
+                entry.put("answeredCount", safeCount);
                 entry.put("isLive", false);
             }
 

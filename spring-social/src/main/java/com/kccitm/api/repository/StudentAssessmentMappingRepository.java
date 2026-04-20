@@ -38,12 +38,13 @@ public interface StudentAssessmentMappingRepository extends JpaRepository<Studen
     List<StudentAssessmentMapping> findByUserStudentUserStudentIdIn(
         @org.springframework.data.repository.query.Param("ids") List<Long> userStudentIds);
 
-    // Lightweight projection: only student id, name, email, status in a single query
+    // Lightweight projection: only student id, name, email, username, status in a single query
     @org.springframework.data.jpa.repository.Query(
-        "SELECT m.userStudent.userStudentId, si.name, si.email, m.status " +
+        "SELECT m.userStudent.userStudentId, si.name, si.email, m.status, u.username " +
         "FROM StudentAssessmentMapping m " +
         "JOIN m.userStudent us " +
         "JOIN us.studentInfo si " +
+        "LEFT JOIN si.user u " +
         "WHERE m.assessmentId = :assessmentId")
     List<Object[]> findLiteByAssessmentId(
         @org.springframework.data.repository.query.Param("assessmentId") Long assessmentId);

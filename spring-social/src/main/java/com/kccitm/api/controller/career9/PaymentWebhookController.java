@@ -36,6 +36,10 @@ import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
+import com.kccitm.api.model.career9.SchoolAssessmentConfig;
+import com.kccitm.api.model.career9.school.SchoolClasses;
+import com.kccitm.api.repository.Career9.SchoolAssessmentConfigRepository;
+import com.kccitm.api.repository.Career9.School.SchoolClassesRepository;
 import com.kccitm.api.service.CareerNineRollNumberService;
 import com.kccitm.api.service.PaymentEmailService;
 import com.kccitm.api.service.RazorpayService;
@@ -57,6 +61,8 @@ public class PaymentWebhookController {
     @Autowired private CareerNineRollNumberService rollNumberService;
     @Autowired private RazorpayService razorpayService;
     @Autowired private PaymentEmailService paymentEmailService;
+    @Autowired private SchoolClassesRepository schoolClassesRepository;
+    @Autowired private SchoolAssessmentConfigRepository schoolAssessmentConfigRepository;
 
     @PostMapping("/razorpay")
     @Transactional
@@ -351,15 +357,38 @@ public class PaymentWebhookController {
 
     private void createStudentAndAllotAssessment(PaymentTransaction txn) {
         try {
-            Optional<AssessmentInstituteMapping> mappingOpt = mappingRepository.findById(txn.getMappingId());
-            if (!mappingOpt.isPresent()) {
-                logger.error("Mapping not found for transaction: {}", txn.getTransactionId());
+            Long assessmentId;
+            Integer instituteCode;
+            Integer sectionId;
+            Integer classId;
+
+            // Resolve source: school config or assessment-institute mapping
+            if (txn.getSchoolConfigId() != null) {
+                Optional<SchoolAssessmentConfig> configOpt = schoolAssessmentConfigRepository.findById(txn.getSchoolConfigId());
+                if (!configOpt.isPresent()) {
+                    logger.error("SchoolAssessmentConfig not found for transaction: {}", txn.getTransactionId());
+                    return;
+                }
+                SchoolAssessmentConfig config = configOpt.get();
+                assessmentId = config.getAssessmentId();
+                instituteCode = config.getInstituteCode();
+                classId = config.getClassId();
+                sectionId = null;
+            } else if (txn.getMappingId() != null) {
+                Optional<AssessmentInstituteMapping> mappingOpt = mappingRepository.findById(txn.getMappingId());
+                if (!mappingOpt.isPresent()) {
+                    logger.error("Mapping not found for transaction: {}", txn.getTransactionId());
+                    return;
+                }
+                AssessmentInstituteMapping mapping = mappingOpt.get();
+                assessmentId = mapping.getAssessmentId();
+                instituteCode = mapping.getInstituteCode();
+                classId = mapping.getClassId();
+                sectionId = mapping.getSectionId();
+            } else {
+                logger.error("Transaction {} has neither mappingId nor schoolConfigId", txn.getTransactionId());
                 return;
             }
-
-            AssessmentInstituteMapping mapping = mappingOpt.get();
-            Long assessmentId = mapping.getAssessmentId();
-            Integer instituteCode = mapping.getInstituteCode();
 
             String email = txn.getStudentEmail();
             String name = txn.getStudentName() != null ? txn.getStudentName() : "Student";
@@ -380,7 +409,6 @@ public class PaymentWebhookController {
             user.setPhone(phone);
             user = userRepository.save(user);
 
-            Integer sectionId = mapping.getSectionId();
             String rollNumber = rollNumberService.generateNextRollNumber(instituteCode, sectionId);
             if (rollNumber != null) {
                 user.setCareerNineRollNumber(rollNumber);
@@ -394,6 +422,9 @@ public class PaymentWebhookController {
             studentInfo.setPhoneNumber(phone);
             studentInfo.setInstituteId(instituteCode);
             studentInfo.setSchoolSectionId(sectionId);
+            if (classId != null) {
+                studentInfo.setStudentClass(parseClassNumber(classId));
+            }
             studentInfo.setUser(user);
             studentInfo = studentInfoRepository.save(studentInfo);
 
@@ -471,6 +502,20 @@ public class PaymentWebhookController {
         }
 
         logger.info("Existing student assigned assessment via payment. UserStudentId: {}", userStudent.getUserStudentId());
+    }
+
+    private Integer parseClassNumber(Integer classId) {
+        if (classId == null) return null;
+        try {
+            Optional<SchoolClasses> classOpt = schoolClassesRepository.findById(classId);
+            if (classOpt.isPresent()) {
+                String className = classOpt.get().getClassName();
+                return Integer.parseInt(className.replaceAll("[^0-9]", ""));
+            }
+        } catch (NumberFormatException e) {
+            logger.warn("Could not parse class number from className for classId: {}", classId);
+        }
+        return classId;
     }
 
 }

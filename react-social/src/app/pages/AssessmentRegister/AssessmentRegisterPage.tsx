@@ -289,7 +289,7 @@ const AssessmentRegisterPage = () => {
             </p>
 
             <button
-              onClick={() => navigate("/student-login")}
+              onClick={() => window.location.replace("https://assessment.career-9.com/")}
               style={s.btnPrimary}
             >
               Go to Student Login

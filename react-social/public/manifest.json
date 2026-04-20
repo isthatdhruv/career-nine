@@ -1,5 +1,16 @@
 {
-  "short_name": "Metronic React App",
-  "name": "Metronic React App demo1",
-  "start_url": "."
+  "short_name": "Career9",
+  "name": "Career9 - Career Guidance & Student Assessment Platform",
+  "description": "Career9 is an intelligent career guidance and student assessment platform helping students discover the right career path through psychometric assessments, counselling, and personalized learning.",
+  "icons": [
+    {
+      "src": "media/logos/kcc.jpg",
+      "sizes": "192x192 512x512",
+      "type": "image/jpeg"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#263B6A",
+  "background_color": "#ffffff"
 }

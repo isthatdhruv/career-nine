@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import http from '../api/http';
 import { useAssessment } from '../contexts/AssessmentContext';
 import { usePreventReload } from '../hooks/usePreventReload';
@@ -26,8 +26,9 @@ type DemographicField = {
 
 const DemographicDetailsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { assessmentId } = useParams<{ assessmentId: string }>();
-  const { fetchAssessmentData, preloadAssessmentData } = useAssessment();
+  const { fetchAssessmentData, assessmentConfig } = useAssessment();
   usePreventReload();
 
   const [fields, setFields] = useState<DemographicField[]>([]);
@@ -38,6 +39,12 @@ const DemographicDetailsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactErrors, setContactErrors] = useState<{ email?: string; phone?: string }>({});
+  const [contactTouched, setContactTouched] = useState<{ email?: boolean; phone?: boolean }>({});
+
+  const collectEmailAndPhone = assessmentConfig?.collectEmailAndPhone !== false;
   const userStudentId = localStorage.getItem('userStudentId');
 
   useEffect(() => {
@@ -45,34 +52,66 @@ const DemographicDetailsPage: React.FC = () => {
       navigate('/student-login');
       return;
     }
-    fetchFields();
-    preloadAssessmentData(assessmentId);
+    if (collectEmailAndPhone) {
+      fetchContactInfo();
+    }
+    // Use fields passed from AllottedAssessmentPage to avoid duplicate fetch
+    const passedFields = (location.state as any)?.demographicFields;
+    if (passedFields) {
+      initFields(passedFields);
+    } else {
+      fetchFields();
+    }
   }, [assessmentId, userStudentId]);
+
+  const fetchContactInfo = async () => {
+    try {
+      const res = await http.get(`/student-demographics/contact-info/${userStudentId}`);
+      setContactEmail(res.data.email || '');
+      setContactPhone(res.data.phoneNumber || '');
+    } catch (error) {
+      console.error('Error fetching contact info:', error);
+    }
+  };
+
+  const validateContactEmail = (value: string): string => {
+    if (!value.trim()) return '';
+    if (!/^[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}$/.test(value)) return 'Invalid email format';
+    return '';
+  };
+
+  const validateContactPhone = (value: string): string => {
+    if (!value.trim()) return '';
+    if (!/^[0-9]{10}$/.test(value)) return 'Phone number must be 10 digits';
+    return '';
+  };
+
+  const initFields = (fieldData: DemographicField[]) => {
+    setFields(fieldData);
+    const initialValues: Record<number, string> = {};
+    const initialMulti: Record<number, string[]> = {};
+    for (const field of fieldData) {
+      if (field.dataType === 'SELECT_MULTI') {
+        initialMulti[field.fieldId] = field.currentValue
+          ? field.currentValue.split(',')
+          : [];
+      } else {
+        initialValues[field.fieldId] = field.currentValue || field.defaultValue || '';
+      }
+    }
+    setValues(initialValues);
+    setMultiValues(initialMulti);
+    setIsLoading(false);
+  };
 
   const fetchFields = async () => {
     try {
       const response = await http.get(
         `/student-demographics/fields/${assessmentId}/${userStudentId}`
       );
-      const fieldData: DemographicField[] = response.data;
-      setFields(fieldData);
-
-      const initialValues: Record<number, string> = {};
-      const initialMulti: Record<number, string[]> = {};
-      for (const field of fieldData) {
-        if (field.dataType === 'SELECT_MULTI') {
-          initialMulti[field.fieldId] = field.currentValue
-            ? field.currentValue.split(',')
-            : [];
-        } else {
-          initialValues[field.fieldId] = field.currentValue || field.defaultValue || '';
-        }
-      }
-      setValues(initialValues);
-      setMultiValues(initialMulti);
+      initFields(response.data);
     } catch (error) {
       console.error('Error fetching demographic fields:', error);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -148,26 +187,24 @@ const DemographicDetailsPage: React.FC = () => {
     }
   };
 
-  const startAssessmentAndNavigate = async () => {
-    await Promise.all([
-      http.post('/assessments/startAssessment', {
-        userStudentId: Number(userStudentId),
-        assessmentId: Number(assessmentId),
-      }),
-      fetchAssessmentData(String(assessmentId)),
-    ]);
-    navigate('/general-instructions');
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate contact fields only if collecting
+    let hasError = false;
+    if (collectEmailAndPhone) {
+      const emailErr = validateContactEmail(contactEmail);
+      const phoneErr = validateContactPhone(contactPhone);
+      setContactTouched({ email: true, phone: true });
+      setContactErrors({ email: emailErr || undefined, phone: phoneErr || undefined });
+      hasError = !!emailErr || !!phoneErr;
+    }
 
     const allTouched: Record<number, boolean> = {};
     fields.forEach((f) => (allTouched[f.fieldId] = true));
     setTouched(allTouched);
 
     const newErrors: Record<number, string> = {};
-    let hasError = false;
     for (const field of fields) {
       const value =
         field.dataType === 'SELECT_MULTI'
@@ -191,21 +228,30 @@ const DemographicDetailsPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const responses = fields.map((field) => ({
-        fieldId: field.fieldId,
-        value:
-          field.dataType === 'SELECT_MULTI'
-            ? (multiValues[field.fieldId] || []).join(',')
-            : values[field.fieldId] || '',
-      }));
+      // Save contact info only if collecting
+      if (collectEmailAndPhone) {
+        await http.post(`/student-demographics/contact-info/${userStudentId}`, {
+          email: contactEmail.trim(),
+          phoneNumber: contactPhone.trim(),
+        });
+      }
 
-      const demographicPayload = {
-        userStudentId: Number(userStudentId),
-        assessmentId: Number(assessmentId),
-        responses,
-      };
+      // Save dynamic demographics if any
+      if (fields.length > 0) {
+        const responses = fields.map((field) => ({
+          fieldId: field.fieldId,
+          value:
+            field.dataType === 'SELECT_MULTI'
+              ? (multiValues[field.fieldId] || []).join(',')
+              : values[field.fieldId] || '',
+        }));
 
-      await http.post('/student-demographics/submit', demographicPayload);
+        await http.post('/student-demographics/submit', {
+          userStudentId: Number(userStudentId),
+          assessmentId: Number(assessmentId),
+          responses,
+        });
+      }
 
       await Promise.all([
         http.post('/assessments/startAssessment', {
@@ -445,6 +491,16 @@ const DemographicDetailsPage: React.FC = () => {
     }
   };
 
+  const inputStyle = (hasError: boolean) => ({
+    borderRadius: '10px',
+    padding: '0.75rem',
+    border: `2px solid ${hasError ? '#e53e3e' : '#e2e8f0'}`,
+    fontSize: '0.95rem',
+    backgroundColor: '#ffffff',
+    color: '#2d3748',
+    transition: 'border-color 0.2s ease',
+  });
+
   return (
     <div className="assessment-bg">
       {isLoading ? (
@@ -454,53 +510,98 @@ const DemographicDetailsPage: React.FC = () => {
           </div>
           <p className="mt-3 text-white fw-semibold">Loading your information...</p>
         </div>
-      ) : fields.length === 0 ? (
-        <div className="container">
-          <div className="row justify-content-center">
-            <div className="col-12 col-md-8 col-lg-6">
-              <div className="assessment-card card shadow-lg">
-                <div className="card-body p-3 p-sm-4 p-md-5 text-center">
-                  <p className="text-muted">No demographic fields configured for this assessment.</p>
-                  <button
-                    className="btn btn-assessment-primary"
-                    onClick={async () => {
-                      setIsSubmitting(true);
-                      try {
-                        await startAssessmentAndNavigate();
-                      } catch (error) {
-                        console.error('Error starting assessment:', error);
-                        alert('Failed to start assessment. Please try again.');
-                      } finally {
-                        setIsSubmitting(false);
-                      }
-                    }}
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? 'Loading...' : 'Continue to Assessment'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       ) : (
         <div className="container">
           <div className="row justify-content-center">
-            <div className="col-12 col-md-10 col-lg-8 col-xl-7">
+            <div className="col-12 col-md-8 col-lg-6 col-xl-5">
               <div className="assessment-card card shadow-lg">
-                <div className="card-body p-3 p-sm-3 p-md-4" style={{ paddingTop: '1.25rem' }}>
+                <div className="card-body p-3 p-sm-4 p-md-5">
                   {/* Header */}
-                  <div className="text-center mb-2">
-                    <h2 className="assessment-heading" style={{ fontSize: '1.5rem' }}>Demographic Details</h2>
-                    <p className="assessment-subheading" style={{ marginBottom: '0.5rem' }}>Please provide your information to continue</p>
+                  <div className="text-center mb-4">
+                    <div className="assessment-icon-circle assessment-icon-circle--sm mx-auto mb-3">
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                    </div>
+                    <h2 className="assessment-heading" style={{ fontSize: '1.5rem' }}>Your Details</h2>
+                    <p className="assessment-subheading" style={{ marginBottom: 0 }}>Please verify your contact information to continue</p>
                   </div>
 
                   <form onSubmit={handleSubmit} noValidate>
-                    {fields.map((field) => renderField(field))}
+                    {/* Contact Info Section — only if collectEmailAndPhone */}
+                    {collectEmailAndPhone && (
+                      <>
+                        <div className="mb-3">
+                          <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
+                            Email Address
+                          </label>
+                          <input
+                            type="email"
+                            className={`form-control ${contactErrors.email && contactTouched.email ? 'is-invalid' : ''}`}
+                            placeholder="you@example.com"
+                            value={contactEmail}
+                            onChange={(e) => {
+                              setContactEmail(e.target.value);
+                              if (contactTouched.email) {
+                                setContactErrors((prev) => ({ ...prev, email: validateContactEmail(e.target.value) || undefined }));
+                              }
+                            }}
+                            onBlur={() => {
+                              setContactTouched((prev) => ({ ...prev, email: true }));
+                              setContactErrors((prev) => ({ ...prev, email: validateContactEmail(contactEmail) || undefined }));
+                            }}
+                            style={inputStyle(!!(contactErrors.email && contactTouched.email))}
+                          />
+                          {contactErrors.email && contactTouched.email && (
+                            <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{contactErrors.email}</div>
+                          )}
+                        </div>
+
+                        <div className="mb-3">
+                          <label className="form-label" style={{ fontWeight: 500, color: '#4a5568' }}>
+                            Phone Number
+                          </label>
+                          <input
+                            type="tel"
+                            className={`form-control ${contactErrors.phone && contactTouched.phone ? 'is-invalid' : ''}`}
+                            placeholder="10-digit phone number"
+                            value={contactPhone}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                              setContactPhone(val);
+                              if (contactTouched.phone) {
+                                setContactErrors((prev) => ({ ...prev, phone: validateContactPhone(val) || undefined }));
+                              }
+                            }}
+                            onBlur={() => {
+                              setContactTouched((prev) => ({ ...prev, phone: true }));
+                              setContactErrors((prev) => ({ ...prev, phone: validateContactPhone(contactPhone) || undefined }));
+                            }}
+                            style={inputStyle(!!(contactErrors.phone && contactTouched.phone))}
+                          />
+                          {contactErrors.phone && contactTouched.phone && (
+                            <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{contactErrors.phone}</div>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* Divider + dynamic fields */}
+                    {fields.length > 0 && (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '1.25rem 0' }}>
+                          <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+                          <span style={{ fontSize: '0.8rem', color: '#a0aec0', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Additional Details</span>
+                          <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
+                        </div>
+                        {fields.map((field) => renderField(field))}
+                      </>
+                    )}
 
                     <button
                       type="submit"
-                      className="btn btn-assessment-primary w-100 mt-3 py-2 py-md-3"
+                      className="btn btn-assessment-primary w-100 mt-4 py-2 py-md-3"
                       disabled={isSubmitting}
                       style={{ fontSize: '1rem', cursor: isSubmitting ? 'not-allowed' : 'pointer' }}
                     >
