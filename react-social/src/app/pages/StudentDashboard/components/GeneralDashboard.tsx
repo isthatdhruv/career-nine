@@ -6,6 +6,11 @@ import {
   PersonalityScore,
 } from "../API/Dashboard_APIs";
 import { KTSVG } from "../../../../_metronic/helpers";
+import {
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ResponsiveContainer, Cell,
+} from "recharts";
 
 const RANK_COLORS = ['#D4AF37', '#A8A8A8', '#B08D57'] as const;
 function RankIcon({ idx }: { idx: number }) {
@@ -16,11 +21,6 @@ function RankIcon({ idx }: { idx: number }) {
     </span>
   );
 }
-import {
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, Cell,
-} from "recharts";
 
 interface Props {
   studentId: number;

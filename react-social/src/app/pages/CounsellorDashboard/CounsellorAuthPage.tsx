@@ -78,13 +78,13 @@ const CounsellorAuthPage: React.FC = () => {
       {/* Right Panel — Animated Mode Swap */}
       <div style={{
         flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center',
-        alignItems: 'center', padding: '40px 48px', background: '#FAFCFB',
-        position: 'relative', overflow: 'hidden',
+        alignItems: 'center', padding: '24px 48px', background: '#FAFCFB',
+        position: 'relative', overflow: 'hidden', height: '100vh',
       }}>
         <div
           style={{
             position: 'relative', width: '100%', maxWidth: 560,
-            minHeight: 560, display: 'flex', justifyContent: 'center',
+            height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center',
           }}
         >
           {/* Login panel */}
@@ -92,7 +92,7 @@ const CounsellorAuthPage: React.FC = () => {
             aria-hidden={mode !== 'login'}
             style={{
               position: 'absolute', inset: 0,
-              display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
+              display: 'flex', justifyContent: 'center', alignItems: 'center',
               opacity: mode === 'login' ? 1 : 0,
               transform: `translateX(${mode === 'login' ? '0' : '-40px'})`,
               transition: 'opacity 320ms ease, transform 320ms ease',
@@ -107,12 +107,11 @@ const CounsellorAuthPage: React.FC = () => {
             aria-hidden={mode !== 'register'}
             style={{
               position: 'absolute', inset: 0,
-              display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
+              display: 'flex', justifyContent: 'center', alignItems: 'center',
               opacity: mode === 'register' ? 1 : 0,
               transform: `translateX(${mode === 'register' ? '0' : '40px'})`,
               transition: 'opacity 320ms ease, transform 320ms ease',
               pointerEvents: mode === 'register' ? 'auto' : 'none',
-              overflowY: 'auto',
             }}
           >
             <CounsellorRegisterPanel onSwitchToLogin={() => switchTo('login')} />

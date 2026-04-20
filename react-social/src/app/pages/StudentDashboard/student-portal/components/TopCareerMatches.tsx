@@ -1,5 +1,5 @@
 import React from 'react'
-import { KTSVG } from '../../../../_metronic/helpers'
+import { KTSVG } from '../../../../../_metronic/helpers'
 
 export interface CareerMatch {
   rank: 'best' | 'strong' | 'good'

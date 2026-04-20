@@ -129,39 +129,39 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
   ]
 
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '10px 14px',
-    border: '1.5px solid #D1E5DF', borderRadius: 8, fontSize: 14,
+    width: '100%', padding: '8px 12px',
+    border: '1.5px solid #D1E5DF', borderRadius: 8, fontSize: 13,
     outline: 'none', background: '#FAFCFB', boxSizing: 'border-box',
     transition: 'border-color 0.2s',
   }
 
   const labelStyle: React.CSSProperties = {
-    display: 'block', fontSize: 13, fontWeight: 600, color: '#1A2B28', marginBottom: 6,
+    display: 'block', fontSize: 12, fontWeight: 600, color: '#1A2B28', marginBottom: 4,
   }
 
   const StepIndicator = () => (
-    <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 28 }}>
+    <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 14 }}>
       {[1, 2, 3].map((s) => (
-        <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div
             style={{
-              width: 32, height: 32, borderRadius: '50%',
+              width: 26, height: 26, borderRadius: '50%',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 13, fontWeight: 700,
+              fontSize: 12, fontWeight: 700,
               background: s <= step ? '#0C6B5A' : '#E5E7EB',
               color: s <= step ? '#fff' : '#9CA3AF',
               transition: 'all 0.2s',
             }}
           >
             {s < step ? (
-              <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='3'>
+              <svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='3'>
                 <path d='M20 6L9 17l-5-5' />
               </svg>
             ) : s}
           </div>
           {s < 3 && (
             <div style={{
-              width: 40, height: 2,
+              width: 32, height: 2,
               background: s < step ? '#0C6B5A' : '#E5E7EB',
               transition: 'all 0.2s',
             }} />
@@ -173,11 +173,11 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
 
   return (
     <div style={{ width: '100%', maxWidth: 520 }}>
-      <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: 24, fontWeight: 700, color: '#1A2B28', margin: '0 0 4px' }}>
+      <div style={{ marginBottom: 12 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1A2B28', margin: '0 0 2px' }}>
           Counsellor Registration
         </h2>
-        <p style={{ fontSize: 13, color: '#5C7A72', margin: 0 }}>
+        <p style={{ fontSize: 12, color: '#5C7A72', margin: 0 }}>
           {stepTitles[step - 1]} — {stepDescriptions[step - 1]}
         </p>
       </div>
@@ -186,20 +186,20 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
 
       {error && (
         <div style={{
-          marginBottom: 16, padding: '10px 14px',
+          marginBottom: 10, padding: '8px 12px',
           background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: 8,
-          color: '#991B1B', fontSize: 13,
+          color: '#991B1B', fontSize: 12,
         }}>
           {error}
         </div>
       )}
 
       {step === 1 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div
               style={{
-                width: 72, height: 72, borderRadius: '50%', overflow: 'hidden',
+                width: 56, height: 56, borderRadius: '50%', overflow: 'hidden',
                 border: '2px dashed #D1E5DF', display: 'flex', alignItems: 'center',
                 justifyContent: 'center', background: '#FAFCFB', flexShrink: 0,
                 cursor: 'pointer', position: 'relative',
@@ -209,7 +209,7 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
               {photoPreview ? (
                 <img src={photoPreview} alt='Preview' style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
-                <svg width='28' height='28' viewBox='0 0 24 24' fill='none' stroke='#9CA3AF' strokeWidth='1.5'>
+                <svg width='22' height='22' viewBox='0 0 24 24' fill='none' stroke='#9CA3AF' strokeWidth='1.5'>
                   <path d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2' />
                   <circle cx='12' cy='7' r='4' />
                 </svg>
@@ -220,13 +220,13 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
                 type='button'
                 onClick={() => document.getElementById('photo-input')?.click()}
                 style={{
-                  padding: '6px 16px', fontSize: 13, fontWeight: 600, border: '1.5px solid #D1E5DF',
+                  padding: '5px 14px', fontSize: 12, fontWeight: 600, border: '1.5px solid #D1E5DF',
                   borderRadius: 8, background: '#fff', color: '#1A2B28', cursor: 'pointer',
                 }}
               >
                 {photoPreview ? 'Change Photo' : 'Upload Photo'}
               </button>
-              <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 4 }}>
+              <div style={{ fontSize: 10, color: '#9CA3AF', marginTop: 2 }}>
                 {photoUploading ? 'Uploading…' : 'JPG, PNG or WebP. Max 5MB.'}
               </div>
               <input id='photo-input' type='file' accept='image/*' onChange={handlePhotoChange} style={{ display: 'none' }} />
@@ -269,7 +269,7 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
       )}
 
       {step === 2 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div>
             <label style={labelStyle}>Specializations *</label>
             <input style={inputStyle} placeholder='e.g. Career Counselling, Academic Guidance, Mental Health'
@@ -304,7 +304,7 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
           <div>
             <label style={labelStyle}>Qualifications</label>
             <textarea
-              style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }}
+              style={{ ...inputStyle, minHeight: 50, resize: 'vertical' }}
               placeholder='e.g. M.Ed in Counselling Psychology, Certified Career Coach'
               autoComplete='off' name='c9-qualifications' data-lpignore='true'
               value={form.qualifications}
@@ -314,7 +314,7 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
           <div>
             <label style={labelStyle}>Short Bio</label>
             <textarea
-              style={{ ...inputStyle, minHeight: 70, resize: 'vertical' }}
+              style={{ ...inputStyle, minHeight: 50, resize: 'vertical' }}
               placeholder='A brief introduction about yourself...'
               autoComplete='off' name='c9-bio' data-lpignore='true'
               value={form.bio}
@@ -325,14 +325,14 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
       )}
 
       {step === 3 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {photoPreview && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingBottom: 6 }}>
               <img src={photoPreview} alt='Profile' style={{
-                width: 56, height: 56, borderRadius: '50%', objectFit: 'cover',
+                width: 42, height: 42, borderRadius: '50%', objectFit: 'cover',
                 border: '2px solid #D1E5DF',
               }} />
-              <span style={{ fontSize: 13, color: '#5C7A72' }}>Profile photo selected</span>
+              <span style={{ fontSize: 12, color: '#5C7A72' }}>Profile photo selected</span>
             </div>
           )}
           {[
@@ -346,15 +346,15 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
             { label: 'Experience', value: form.yearsOfExperience ? `${form.yearsOfExperience} years` : '-' },
             { label: 'Bio', value: form.bio || '-' },
           ].map(({ label, value }) => (
-            <div key={label} style={{ display: 'flex', borderBottom: '1px solid #E5E7EB', padding: '8px 0' }}>
-              <div style={{ width: 160, fontSize: 13, fontWeight: 600, color: '#5C7A72', flexShrink: 0 }}>{label}</div>
-              <div style={{ fontSize: 13, color: '#1A2B28', wordBreak: 'break-word' }}>{value}</div>
+            <div key={label} style={{ display: 'flex', borderBottom: '1px solid #E5E7EB', padding: '5px 0' }}>
+              <div style={{ width: 150, fontSize: 12, fontWeight: 600, color: '#5C7A72', flexShrink: 0 }}>{label}</div>
+              <div style={{ fontSize: 12, color: '#1A2B28', wordBreak: 'break-word' }}>{value}</div>
             </div>
           ))}
           <div style={{
-            marginTop: 8, padding: '12px 16px',
+            marginTop: 6, padding: '8px 12px',
             background: '#FFF8E1', border: '1px solid #FFE082', borderRadius: 8,
-            fontSize: 13, color: '#795548',
+            fontSize: 12, color: '#795548', lineHeight: 1.4,
           }}>
             By submitting, your registration will be reviewed by an administrator. You will be notified once your account is approved.
           </div>
@@ -362,14 +362,14 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
       )}
 
       {!showConfirmation && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16 }}>
           <div>
             {step > 1 && (
               <button
                 onClick={handleBack}
                 disabled={loading}
                 style={{
-                  padding: '10px 24px', fontSize: 14, fontWeight: 600,
+                  padding: '8px 20px', fontSize: 13, fontWeight: 600,
                   border: '1.5px solid #D1E5DF', borderRadius: 8,
                   background: '#fff', color: '#1A2B28', cursor: loading ? 'not-allowed' : 'pointer',
                   opacity: loading ? 0.5 : 1,
@@ -382,7 +382,7 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
               <button
                 onClick={onSwitchToLogin}
                 style={{
-                  padding: '10px 24px', fontSize: 14, fontWeight: 600,
+                  padding: '8px 20px', fontSize: 13, fontWeight: 600,
                   border: '1.5px solid #D1E5DF', borderRadius: 8,
                   background: '#fff', color: '#5C7A72', cursor: 'pointer',
                 }}
@@ -396,7 +396,7 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
               <button
                 onClick={handleNext}
                 style={{
-                  padding: '10px 28px', fontSize: 14, fontWeight: 600,
+                  padding: '8px 24px', fontSize: 13, fontWeight: 600,
                   border: 'none', borderRadius: 8,
                   background: '#0C6B5A', color: '#fff', cursor: 'pointer',
                 }}
@@ -408,7 +408,7 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
                 onClick={handleSubmit}
                 disabled={loading || photoUploading}
                 style={{
-                  padding: '10px 28px', fontSize: 14, fontWeight: 600,
+                  padding: '8px 24px', fontSize: 13, fontWeight: 600,
                   border: 'none', borderRadius: 8,
                   background: (loading || photoUploading) ? '#9CA3AF' : '#0C6B5A', color: '#fff',
                   cursor: (loading || photoUploading) ? 'not-allowed' : 'pointer',
