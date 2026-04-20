@@ -608,13 +608,15 @@ const CounsellorManagementPage: React.FC = () => {
               <div style={{ textAlign: 'center', padding: '20px 0', color: '#5C7A72', fontSize: 14 }}>
                 Loading configurations...
               </div>
-            ) : slotConfigs.length === 0 ? (
+            ) : slotConfigs.filter((c) => c.endDate >= new Date().toISOString().slice(0, 10)).length === 0 ? (
               <div style={{ textAlign: 'center', padding: '20px 0', color: '#5C7A72', fontSize: 13 }}>
-                No slot configurations found. Create one from the <strong>Create Slots</strong> page first.
+                No active slot configurations. Create one from the <strong>Create Slots</strong> page first.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {slotConfigs.map((cfg) => {
+                {slotConfigs
+                  .filter((c) => c.endDate >= new Date().toISOString().slice(0, 10))
+                  .map((cfg) => {
                   const formatDate = (d: string) => {
                     try { return new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) }
                     catch { return d }

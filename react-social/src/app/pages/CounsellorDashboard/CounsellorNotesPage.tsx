@@ -152,40 +152,57 @@ const CounsellorNotesPage: React.FC = () => {
     }
     try {
       const userStr = localStorage.getItem('counsellorPortalUser')
-      if (userStr) {
-        const user = JSON.parse(userStr)
-        setUserId(user.id)
+      if (!userStr) {
+        setLoading(false)
+        return
+      }
+      const user = JSON.parse(userStr)
+      setUserId(user.counsellorId || user.id)
+
+      const loadForCounsellor = async (cId: number) => {
+        const apptRes = await getCounsellorAppointments(cId)
+        const allAppts: any[] = apptRes.data || []
+        const completed = allAppts.filter(
+          (a) => (a.status || '').toUpperCase() === 'COMPLETED'
+        )
+        setAppointments(completed)
+        const notesResults: Record<number, any> = {}
+        await Promise.all(
+          completed.map(async (appt) => {
+            try {
+              const nr = await getSessionNotes(appt.id, false)
+              if (nr.data) notesResults[appt.id] = nr.data
+            } catch {
+              // No notes yet
+            }
+          })
+        )
+        setNotesMap(notesResults)
+      }
+
+      // New login flow stores counsellorId directly
+      const cId = user.counsellorId || null
+      if (cId) {
+        loadForCounsellor(cId)
+          .catch(() => setError('Failed to load session notes.'))
+          .finally(() => setLoading(false))
+      } else if (user.id) {
+        // Legacy flow — resolve counsellorId from userId
         getCounsellorByUserId(user.id)
           .then((res) => {
-            const cId = res.data?.id
-            if (!cId) {
-              setError('Counsellor profile not linked yet. Please contact admin to set up your profile.')
+            const resolvedId = res.data?.id
+            if (!resolvedId) {
+              setError('Counsellor profile not found. Please contact admin to set up your profile.')
               setLoading(false)
               return
             }
-            return getCounsellorAppointments(cId).then(async (apptRes) => {
-              const allAppts: any[] = apptRes.data || []
-              const completed = allAppts.filter(
-                (a) => (a.status || '').toUpperCase() === 'COMPLETED'
-              )
-              setAppointments(completed)
-
-              const notesResults: Record<number, any> = {}
-              await Promise.all(
-                completed.map(async (appt) => {
-                  try {
-                    const nr = await getSessionNotes(appt.id, false)
-                    if (nr.data) notesResults[appt.id] = nr.data
-                  } catch {
-                    // No notes yet
-                  }
-                })
-              )
-              setNotesMap(notesResults)
-            })
+            return loadForCounsellor(resolvedId)
           })
           .catch(() => setError('Counsellor profile not found. Please contact admin to set up your profile.'))
           .finally(() => setLoading(false))
+      } else {
+        setError('Counsellor profile not found. Please contact admin to set up your profile.')
+        setLoading(false)
       }
     } catch {
       navigate('/counsellor/login')

@@ -78,6 +78,19 @@ public class CounsellingEligibilityService {
             return result;
         }
 
+        // Admin override — counsellingAllowed flag set via Manage Students page.
+        // Must run before the assessment/report gates so admins can unblock
+        // students who haven't completed the assessment flow yet.
+        if (Boolean.TRUE.equals(student.getCounsellingAllowed())) {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("message", "Counselling access granted by administrator.");
+            result.put("track", "EVENT");
+            result.put("action", "BOOK_COUNSELLING");
+            result.put("payload", payload);
+            logger.info("Student {} eligible via admin-granted counsellingAllowed flag", userStudentId);
+            return result;
+        }
+
         // 2. Check if student has completed at least one assessment
         List<StudentAssessmentMapping> mappings =
                 studentAssessmentMappingRepository.findByUserStudentUserStudentId(userStudentId);
@@ -101,17 +114,6 @@ public class CounsellingEligibilityService {
             result.put("action", "WAIT_FOR_REPORT");
             result.put("payload", Map.of(
                     "message", "Your assessment is complete. Report is being generated, please check back shortly."));
-            return result;
-        }
-
-        // 3.5 Check admin override — counsellingAllowed flag set via Manage Students page
-        if (Boolean.TRUE.equals(student.getCounsellingAllowed())) {
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("message", "Counselling access granted by administrator.");
-            result.put("track", "EVENT");
-            result.put("action", "BOOK_COUNSELLING");
-            result.put("payload", payload);
-            logger.info("Student {} eligible via admin-granted counsellingAllowed flag", userStudentId);
             return result;
         }
 

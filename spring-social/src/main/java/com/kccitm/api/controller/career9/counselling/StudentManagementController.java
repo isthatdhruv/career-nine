@@ -16,7 +16,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.exception.ResourceNotFoundException;
+import com.kccitm.api.model.career9.GeneratedReport;
 import com.kccitm.api.model.career9.UserStudent;
+import com.kccitm.api.repository.Career9.GeneratedReportRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 
 /**
@@ -32,6 +34,9 @@ public class StudentManagementController {
     @Autowired
     private UserStudentRepository userStudentRepository;
 
+    @Autowired
+    private GeneratedReportRepository generatedReportRepository;
+
     /** Get all students for an institute with their flags */
     @GetMapping("/by-institute/{instituteCode}")
     public ResponseEntity<List<Map<String, Object>>> getByInstitute(@PathVariable Integer instituteCode) {
@@ -43,7 +48,13 @@ public class StudentManagementController {
             row.put("userStudentId", s.getUserStudentId());
             row.put("userId", s.getUserId());
             row.put("counsellingAllowed", Boolean.TRUE.equals(s.getCounsellingAllowed()));
-            row.put("reportsVisible", Boolean.TRUE.equals(s.getReportsVisible()));
+            // Report visibility mirrors GeneratedReport.visibleToStudent — same as the
+            // /reports-hub toggle. "Visible" means at least one report is visible to the student.
+            List<GeneratedReport> reports = generatedReportRepository
+                    .findByUserStudentUserStudentId(s.getUserStudentId());
+            boolean anyVisible = reports.stream()
+                    .anyMatch(r -> Boolean.TRUE.equals(r.getVisibleToStudent()));
+            row.put("reportsVisible", anyVisible);
             row.put("infoCompleted", Boolean.TRUE.equals(s.getInfoCompleted()));
 
             if (s.getStudentInfo() != null) {
@@ -69,7 +80,10 @@ public class StudentManagementController {
         return ResponseEntity.ok(Map.of("userStudentId", userStudentId, "counsellingAllowed", value));
     }
 
-    /** Toggle the reportsVisible flag for a student */
+    /**
+     * Toggle report visibility for a student by flipping GeneratedReport.visibleToStudent
+     * on every generated report that belongs to them — identical to the /reports-hub toggle.
+     */
     @PutMapping("/reports-visible/{userStudentId}")
     public ResponseEntity<?> setReportsVisible(
             @PathVariable Long userStudentId,
@@ -77,9 +91,19 @@ public class StudentManagementController {
         UserStudent student = userStudentRepository.findById(userStudentId)
                 .orElseThrow(() -> new ResourceNotFoundException("UserStudent", "id", userStudentId));
         boolean value = Boolean.TRUE.equals(body.get("value"));
-        student.setReportsVisible(value);
-        userStudentRepository.save(student);
-        logger.info("Set reportsVisible={} for student {}", value, userStudentId);
-        return ResponseEntity.ok(Map.of("userStudentId", userStudentId, "reportsVisible", value));
+
+        List<GeneratedReport> reports = generatedReportRepository
+                .findByUserStudentUserStudentId(student.getUserStudentId());
+        for (GeneratedReport r : reports) {
+            r.setVisibleToStudent(value);
+        }
+        generatedReportRepository.saveAll(reports);
+
+        logger.info("Set visibleToStudent={} on {} report(s) for student {}",
+                value, reports.size(), userStudentId);
+        return ResponseEntity.ok(Map.of(
+                "userStudentId", userStudentId,
+                "reportsVisible", value,
+                "updated", reports.size()));
     }
 }

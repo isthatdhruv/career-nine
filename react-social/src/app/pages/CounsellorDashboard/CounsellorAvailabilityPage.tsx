@@ -368,9 +368,18 @@ const CounsellorAvailabilityPage: React.FC = () => {
     setSuccess('')
   }
 
-  // Group slots by date
+  // Keep only slots whose end time is still in the future — the list is titled
+  // "Upcoming Slots" and the backend never expires past AVAILABLE slots, so without
+  // this filter old unbooked days would linger and be shown as available.
+  const upcomingSlots = manualSlots.filter((s: any) => {
+    if (!s?.date || !s?.endTime) return true
+    const end = new Date(`${s.date}T${s.endTime}`)
+    return isNaN(end.getTime()) || end.getTime() > Date.now()
+  })
+
+  // Group upcoming slots by date
   const slotsByDate = new Map<string, any[]>()
-  for (const s of manualSlots) {
+  for (const s of upcomingSlots) {
     const key = s.date || ''
     const arr = slotsByDate.get(key) || []
     arr.push(s)
@@ -386,8 +395,8 @@ const CounsellorAvailabilityPage: React.FC = () => {
     }
   }
 
-  const availableCount = manualSlots.filter((s) => (s.status || '').toUpperCase() === 'AVAILABLE').length
-  const bookedCount = manualSlots.filter((s) => ['REQUESTED', 'BOOKED', 'CONFIRMED'].includes((s.status || '').toUpperCase())).length
+  const availableCount = upcomingSlots.filter((s) => (s.status || '').toUpperCase() === 'AVAILABLE').length
+  const bookedCount = upcomingSlots.filter((s) => ['REQUESTED', 'BOOKED', 'CONFIRMED'].includes((s.status || '').toUpperCase())).length
 
   return (
     <PortalLayout
@@ -424,7 +433,7 @@ const CounsellorAvailabilityPage: React.FC = () => {
           {/* Stats Row */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
             {[
-              { label: 'Total Slots', value: manualSlots.length, color: '#263B6A', bg: '#EFF6FF' },
+              { label: 'Total Slots', value: upcomingSlots.length, color: '#263B6A', bg: '#EFF6FF' },
               { label: 'Available', value: availableCount, color: '#065F46', bg: '#F0FDF4' },
               { label: 'Booked', value: bookedCount, color: '#0369A1', bg: '#F0F9FF' },
             ].map((stat) => (
@@ -450,12 +459,12 @@ const CounsellorAvailabilityPage: React.FC = () => {
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 }}>
                   <div style={{ fontWeight: 700, fontSize: 15, color: '#1E293B' }}>Upcoming Slots</div>
-                  <span style={{ fontSize: 12, color: '#64748B' }}>{manualSlots.length} slot(s)</span>
+                  <span style={{ fontSize: 12, color: '#64748B' }}>{upcomingSlots.length} slot(s)</span>
                 </div>
 
-                {manualSlots.length === 0 ? (
+                {upcomingSlots.length === 0 ? (
                   <div style={{ padding: '40px 20px', textAlign: 'center', color: '#94A3B8', fontSize: 14 }}>
-                    No slots assigned yet. Contact admin to set up your schedule.
+                    No upcoming slots. Contact admin to set up your schedule.
                   </div>
                 ) : (
                   <div style={{ maxHeight: 480, overflowY: 'auto' }}>

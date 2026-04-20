@@ -88,7 +88,7 @@ export function AsideMenuMain() {
   const showScoreDebug = allowed("/score-debug");
 
   const showCounselling =
-    allowed("/admin/counselling-queue") || allowed("/admin/counsellors") ||
+    allowed("/admin/counsellors") ||
     allowed("/admin/counselling-slots") || allowed("/admin/counselling-students") || allowed("/admin/counselling-notifications") ||
     allowed("/counsellor/dashboard") || allowed("/counsellor/availability");
 
@@ -661,9 +661,6 @@ export function AsideMenuMain() {
             fontIcon="bi-app-indicator"
             icon="/media/icons/duotune/general/gen049.svg"
           >
-            {allowed("/admin/counselling-queue") && (
-              <AsideMenuItem to="/admin/counselling-queue" title="Request Queue" hasBullet={true} />
-            )}
             {allowed("/admin/counsellors") && (
               <AsideMenuItem to="/admin/counsellors" title="Manage Counsellors" hasBullet={true} />
             )}

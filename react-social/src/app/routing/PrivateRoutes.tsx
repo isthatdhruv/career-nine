@@ -225,7 +225,6 @@ const PrivateRoutes = () => {
   const CounsellorDashboardPage = lazy(() => import("../pages/Counselling/counsellor/CounsellorDashboardPage"));
   const AvailabilityManagerPage = lazy(() => import("../pages/Counselling/counsellor/AvailabilityManagerPage"));
   const SessionNotesPage = lazy(() => import("../pages/Counselling/counsellor/SessionNotesPage"));
-  const AdminCounsellingQueuePage = lazy(() => import("../pages/Counselling/admin/AdminCounsellingQueuePage"));
   const CounsellorManagementPage = lazy(() => import("../pages/Counselling/admin/CounsellorManagementPage"));
   const SlotManagementPage = lazy(() => import("../pages/Counselling/admin/SlotManagementPage"));
   const ManageStudentsPage = lazy(() => import("../pages/Counselling/admin/ManageStudentsPage"));
@@ -1067,14 +1066,6 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <SessionNotesPage />
-            </SuspensedView>
-          }
-        />
-        <Route
-          path="/admin/counselling-queue"
-          element={
-            <SuspensedView>
-              <AdminCounsellingQueuePage />
             </SuspensedView>
           }
         />
