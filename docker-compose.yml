@@ -68,6 +68,8 @@ services:
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
+      - SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE=1GB
+      - SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE=1GB
     deploy:
       resources:
         limits:
@@ -200,46 +202,12 @@ services:
   #   volumes:
   #     - redisinsight_data:/data
 
-  backup_cron:
-    image: mysql:latest
-    restart: always
-    volumes:
-      - ./backup.sh:/backup.sh:ro
-      - backup_data:/backups
-    entrypoint: /bin/bash
-    command: >
-      -c "
-      apt-get update -qq && apt-get install -y -qq cron python3 python3-pip > /dev/null 2>&1;
-      pip3 install requests --break-system-packages -q 2>/dev/null || pip3 install requests -q;
-      echo '0 2 * * * /bin/bash /backup.sh >> /backups/backup.log 2>&1' | crontab -;
-      echo 'Backup cron started — runs daily at 2 AM UTC';
-      cron -f
-      "
-    environment:
-      DB_HOST: mysql_db_api
-      DB_PORT: '3306'
-      DB_NAME: career-9
-      DB_USER: root
-      DB_PASSWORD: Career-qCsfeuECc3MW
-      DO_SPACES_ACCESS_KEY: ${DO_SPACES_ACCESS_KEY:-DO801TH68APHQF8DFA4J}
-      DO_SPACES_SECRET_KEY: ${DO_SPACES_SECRET_KEY:-sr6jJMFt83bI9nyA8jaQDVjhFKt9ltQPJEWejDNLgAA}
-    deploy:
-      resources:
-        limits:
-          memory: 256m
-    depends_on:
-      mysql_db_api:
-        condition: service_healthy
-    networks:
-      - career_shared_net
-
 volumes:
   mysql_data:
   mysql_staging_data:
   redis_data:
   redis_staging_data:
   redisinsight_data:
-  backup_data:
 
 networks:
   career_shared_net:
