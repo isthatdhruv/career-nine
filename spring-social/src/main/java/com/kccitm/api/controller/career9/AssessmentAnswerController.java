@@ -1865,13 +1865,17 @@ public class AssessmentAnswerController {
     // ═══════════════════════════════════════════════════════════════════════
 
     /**
-     * Lists all submissions that are stuck in the async pipeline for an assessment.
-     * Rows have status=completed (student finished) AND persistenceState in (pending, failed)
-     * (answers not confirmed in MySQL).
+     * Lists all submissions that may need admin attention for an assessment.
+     * Covers three buckets:
      *
-     * For each row, computes a diagnostic classifying the state so the admin UI
-     * can render the appropriate action:
+     *   (a) status=completed + persistenceState IN (pending|failed|persisted_with_warnings|null)
+     *   (b) status=completed + persistenceState=persisted BUT dbCount &lt; expected
+     *       (shouldn't happen in new code but catches legacy ghost completions)
+     *   (c) status=ongoing + Redis has submitted: payload
+     *       (student got as far as submit but something blocked it — admin
+     *        can retry from Redis on their behalf)
      *
+     * Diagnostics:
      *   awaiting_processor           Redis ✓, DB 0/N              → Retry Now
      *   partial_inflight             Redis ✓, DB &lt;N               → Retry Now
      *   duplicate_cleanup_needed     Redis ✓, DB =N                → Clean Up Redis
@@ -1881,31 +1885,49 @@ public class AssessmentAnswerController {
      *   reconcile_only               Redis ✗, DB =N                → Mark as Persisted
      *   ghost_partial                Redis ✗, DB &lt;N (and &gt;0)       → Reset
      *   ghost_empty                  Redis ✗, DB 0                 → Reset
+     *   persisted_with_warnings      persistenceState warnings, DB complete → Retry or dismiss
+     *   persisted_incomplete         DB &lt;N but flagged persisted   → Retry (if Redis) or Reset
+     *   stuck_ongoing                status=ongoing + Redis submitted present → Finalize from Redis
      */
     @GetMapping(value = "/pending-persistence")
     public ResponseEntity<?> getPendingPersistence(
             @RequestParam(value = "assessmentId", required = false) Long assessmentId) {
 
-        List<StudentAssessmentMapping> rows = (assessmentId != null)
-                ? studentAssessmentMappingRepository.findCompletedPendingPersistence(assessmentId)
-                : studentAssessmentMappingRepository.findAllCompletedPendingPersistence();
+        if (assessmentId == null) {
+            return ResponseEntity.badRequest().body("assessmentId is required");
+        }
+
+        List<StudentAssessmentMapping> completedRows =
+                studentAssessmentMappingRepository.findCompletedForAssessment(assessmentId);
+        List<StudentAssessmentMapping> ongoingRows =
+                studentAssessmentMappingRepository.findOngoingForAssessment(assessmentId);
 
         List<Map<String, Object>> out = new ArrayList<>();
-        for (StudentAssessmentMapping m : rows) {
+        int expected = completionService.getTotalQuestions(assessmentId);
+
+        // ── (a)/(b) completed rows ────────────────────────────────────────
+        for (StudentAssessmentMapping m : completedRows) {
             Long studentId = m.getUserStudent() != null
                     ? m.getUserStudent().getUserStudentId() : null;
             Long aId = m.getAssessmentId();
             if (studentId == null || aId == null) continue;
 
-            int expected = completionService.getTotalQuestions(aId);
             int dbCount = completionService.getAnsweredCount(studentId, aId);
             boolean redisPresent = assessmentSessionService.hasSubmittedAnswers(studentId, aId);
 
-            // We need both raw entry count (for admin UI context) and DISTINCT
-            // questionId count (for diagnostic classification — multi-select
-            // legitimately has multiple entries per question).
+            // Filter out truly-done rows: persistenceState=persisted AND DB is
+            // complete. Redis may still contain the archived payload — that's
+            // fine, it's just a backup, doesn't need admin attention.
+            boolean isFullyResolved =
+                    "persisted".equals(m.getPersistenceState())
+                            && (expected == 0 || dbCount >= expected);
+            if (isFullyResolved) continue;
+
             Integer redisRawCount = null;
             Integer redisDistinctQuestionCount = null;
+            Integer duplicatesDeduped = null;
+            Integer skippedUnknown = null;
+            String submitArchivedAt = null;
             if (redisPresent) {
                 Map<String, Object> submitted = assessmentSessionService.getSubmittedAnswers(studentId, aId);
                 if (submitted != null) {
@@ -1922,11 +1944,25 @@ public class AssessmentAnswerController {
                         }
                         redisDistinctQuestionCount = distinct.size();
                     }
+                    Object dup = submitted.get("duplicatesDeduped");
+                    if (dup instanceof Number) duplicatesDeduped = ((Number) dup).intValue();
+                    Object skip = submitted.get("skippedUnknown");
+                    if (skip instanceof Number) skippedUnknown = ((Number) skip).intValue();
+                    Object ts = submitted.get("archivedAt");
+                    if (ts instanceof String) submitArchivedAt = (String) ts;
                 }
             }
 
-            String diagnostic = classifyDiagnostic(redisPresent, redisDistinctQuestionCount, dbCount, expected);
+            String diagnostic = classifyDiagnosticForCompleted(
+                    m.getPersistenceState(),
+                    redisPresent, redisDistinctQuestionCount,
+                    dbCount, expected);
             String action = recommendedAction(diagnostic);
+            // Override: persisted_incomplete can't be retried without Redis —
+            // fall back to reset so the student can retake.
+            if ("persisted_incomplete".equals(diagnostic) && !redisPresent) {
+                action = "reset_assessment";
+            }
 
             // Enrich with student info
             UserStudent us = m.getUserStudent();
@@ -1958,6 +1994,9 @@ public class AssessmentAnswerController {
             row.put("redisPresent", redisPresent);
             row.put("redisAnswerCount", redisRawCount);
             row.put("redisDistinctQuestionCount", redisDistinctQuestionCount);
+            row.put("duplicatesDeduped", duplicatesDeduped);
+            row.put("skippedUnknown", skippedUnknown);
+            row.put("submitArchivedAt", submitArchivedAt);
             row.put("diagnostic", diagnostic);
             row.put("recommendedAction", action);
             failureOpt.ifPresent(f -> {
@@ -1974,17 +2013,100 @@ public class AssessmentAnswerController {
 
             out.add(row);
         }
+
+        // ── (c) stuck-ongoing rows ───────────────────────────────────────
+        for (StudentAssessmentMapping m : ongoingRows) {
+            Long studentId = m.getUserStudent() != null
+                    ? m.getUserStudent().getUserStudentId() : null;
+            Long aId = m.getAssessmentId();
+            if (studentId == null || aId == null) continue;
+
+            boolean redisSubmittedPresent = assessmentSessionService.hasSubmittedAnswers(studentId, aId);
+            if (!redisSubmittedPresent) continue;   // no submit attempt — nothing stuck
+
+            int dbCount = completionService.getAnsweredCount(studentId, aId);
+
+            Integer redisRawCount = null;
+            Integer redisDistinctQuestionCount = null;
+            Map<String, Object> submitted = assessmentSessionService.getSubmittedAnswers(studentId, aId);
+            if (submitted != null) {
+                Object ansObj = submitted.get("answers");
+                if (ansObj instanceof List) {
+                    List<?> list = (List<?>) ansObj;
+                    redisRawCount = list.size();
+                    java.util.Set<Long> distinct = new java.util.HashSet<>();
+                    for (Object a : list) {
+                        if (a instanceof Map) {
+                            Object q = ((Map<?, ?>) a).get("questionnaireQuestionId");
+                            if (q instanceof Number) distinct.add(((Number) q).longValue());
+                        }
+                    }
+                    redisDistinctQuestionCount = distinct.size();
+                }
+            }
+
+            UserStudent us = m.getUserStudent();
+            String studentName = null;
+            String username = null;
+            if (us != null && us.getStudentInfo() != null) {
+                studentName = us.getStudentInfo().getName();
+                if (us.getStudentInfo().getFamily() != null) {
+                    studentName += " " + us.getStudentInfo().getFamily();
+                }
+                if (us.getStudentInfo().getUser() != null) {
+                    username = us.getStudentInfo().getUser().getUsername();
+                }
+            }
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("userStudentId", studentId);
+            row.put("assessmentId", aId);
+            row.put("studentName", studentName);
+            row.put("username", username);
+            row.put("status", m.getStatus());
+            row.put("persistenceState", m.getPersistenceState());
+            row.put("expectedCount", expected);
+            row.put("dbAnswerCount", dbCount);
+            row.put("redisPresent", true);
+            row.put("redisAnswerCount", redisRawCount);
+            row.put("redisDistinctQuestionCount", redisDistinctQuestionCount);
+            row.put("diagnostic", "stuck_ongoing");
+            row.put("recommendedAction", "retry_now");
+            out.add(row);
+        }
+
         return ResponseEntity.ok(out);
     }
 
-    private static String classifyDiagnostic(boolean redisPresent, Integer redisCount, int dbCount, int expected) {
+    /**
+     * Classify a completed mapping's state. Considers persistenceState along
+     * with Redis/DB counts so we can catch:
+     *   - persisted_with_warnings: dedupe/unknown happened, mostly fine
+     *   - persisted_incomplete: flagged persisted but DB &lt; expected (bug or legacy)
+     */
+    private static String classifyDiagnosticForCompleted(
+            String persistenceState,
+            boolean redisPresent,
+            Integer redisDistinctQuestionCount,
+            int dbCount,
+            int expected) {
         boolean expectedKnown = expected > 0;
         boolean dbFull = expectedKnown && dbCount >= expected;
         boolean dbPartial = dbCount > 0 && (!expectedKnown || dbCount < expected);
         boolean dbEmpty = dbCount == 0;
 
+        // Explicit handling for already-processed states with DB mismatches.
+        if ("persisted".equals(persistenceState) && !dbFull && expectedKnown) {
+            return "persisted_incomplete";
+        }
+        if ("persisted_with_warnings".equals(persistenceState)) {
+            return dbFull ? "persisted_with_warnings" : "persisted_incomplete";
+        }
+
         if (redisPresent) {
-            boolean excess = redisCount != null && expectedKnown && redisCount > expected;
+            boolean excess = redisDistinctQuestionCount != null
+                    && expectedKnown
+                    && redisDistinctQuestionCount > expected;
             if (excess) {
                 if (dbFull) return "excess_already_persisted";
                 if (dbEmpty) return "excess_pending";
@@ -2005,6 +2127,8 @@ public class AssessmentAnswerController {
             case "awaiting_processor":
             case "partial_inflight":
             case "excess_pending":
+            case "stuck_ongoing":
+            case "persisted_incomplete":
                 return "retry_now";
             case "duplicate_cleanup_needed":
             case "excess_already_persisted":
@@ -2014,6 +2138,7 @@ public class AssessmentAnswerController {
             case "ghost_empty":
                 return "reset_assessment";
             case "reconcile_only":
+            case "persisted_with_warnings":
                 return "reconcile";
             default:
                 return "inspect";
@@ -2042,10 +2167,15 @@ public class AssessmentAnswerController {
                         "StudentAssessmentMapping", "student/assessment",
                         userStudentId + "/" + assessmentId));
 
-        // Safety check: don't mark persisted if DB doesn't actually have the data
+        // Safety check: don't mark persisted if DB doesn't actually have the data.
+        // Exception: if the row is already `persisted_with_warnings`, admin is
+        // explicitly acknowledging that some answers were skipped by the
+        // processor (unknown question/option) — allow the flip.
         int expected = completionService.getTotalQuestions(assessmentId);
         int dbCount = completionService.getAnsweredCount(userStudentId, assessmentId);
-        if (expected > 0 && dbCount < expected) {
+        boolean isAcknowledgingWarnings =
+                "persisted_with_warnings".equals(mapping.getPersistenceState());
+        if (expected > 0 && dbCount < expected && !isAcknowledgingWarnings) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
                     "error", "Cannot reconcile: DB has " + dbCount + " of " + expected + " answers",
                     "dbAnswerCount", dbCount,
@@ -2137,9 +2267,15 @@ public class AssessmentAnswerController {
 
     /**
      * Admin action: force an immediate retry attempt, bypassing backoff.
-     * Same code path as the scheduled retry — just dispatched now.
+     *
+     * Also acts as the "finalize stuck-ongoing" path: if a student is stuck at
+     * status=ongoing with a submitted: payload in Redis (their submit was
+     * blocked for some reason), admin can use this to push them through. We
+     * flip status=completed + persistenceState=pending to match what /submit
+     * would have done, then dispatch the processor.
      */
     @PostMapping(value = "/retry-now")
+    @javax.transaction.Transactional
     public ResponseEntity<?> retryNow(@RequestBody Map<String, Object> request) {
         Long userStudentId = asLong(request.get("userStudentId"));
         Long assessmentId = asLong(request.get("assessmentId"));
@@ -2157,12 +2293,44 @@ public class AssessmentAnswerController {
             ));
         }
 
+        // Ensure mapping is in the right state for the processor. This is
+        // idempotent for already-completed rows and rescues stuck-ongoing ones.
+        StudentAssessmentMapping mapping = studentAssessmentMappingRepository
+                .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                .orElse(null);
+        if (mapping != null) {
+            mapping.setStatus("completed");
+            mapping.setPersistenceState("pending");
+            studentAssessmentMappingRepository.save(mapping);
+        }
+
+        // Clear any stale in-flight lock so dispatch isn't rejected by it
+        assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
+
         writeAudit("retry_now", userStudentId, assessmentId, adminUserId, reason, null, null);
 
         // Fire — processor handles its own lock + failure tracking
         submissionProcessorService.processSubmissionAsync(userStudentId, assessmentId);
 
         return ResponseEntity.accepted().body(Map.of("status", "dispatched"));
+    }
+
+    /**
+     * Admin inspection: return the raw Redis submitted: payload for a
+     * (student, assessment) pair. The payload is preserved for 7 days after
+     * submit so admin can inspect what the student actually sent, including
+     * any answers the processor had to skip (unknown optionId, unknown
+     * questionId). Lets admin reconcile without forcing the student to retake.
+     */
+    @GetMapping(value = "/submitted-detail")
+    public ResponseEntity<?> getSubmittedDetail(
+            @RequestParam("userStudentId") Long userStudentId,
+            @RequestParam("assessmentId") Long assessmentId) {
+        Map<String, Object> data = assessmentSessionService.getSubmittedAnswers(userStudentId, assessmentId);
+        if (data == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(data);
     }
 
     /**

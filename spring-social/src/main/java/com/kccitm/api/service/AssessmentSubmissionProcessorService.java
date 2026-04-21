@@ -143,12 +143,13 @@ public class AssessmentSubmissionProcessorService {
 
         try {
             doProcessSubmission(studentId, assessmentId);
-            resolveFailure(studentId, assessmentId);
+            // Call through self so @Transactional activates.
+            self.resolveFailure(studentId, assessmentId);
         } catch (Throwable t) {
             boolean transientErr = classifyTransient(t);
             logger.error("Processing failed for student={} assessment={} (transient={}): {}",
                     studentId, assessmentId, transientErr, t.toString(), t);
-            recordFailure(studentId, assessmentId, t, transientErr);
+            self.recordFailure(studentId, assessmentId, t, transientErr);
         } finally {
             assessmentSessionService.clearSubmissionLock(studentId, assessmentId);
         }
@@ -378,17 +379,32 @@ public class AssessmentSubmissionProcessorService {
             rawScoresToSave.add(ars);
         }
 
-        // 5. Persist to MySQL (transactional, delete-before-save)
-        persistToMySQL(studentId, assessmentId, mapping, answersToSave, rawScoresToSave);
+        // 5. Persist to MySQL (transactional, delete-before-save).
+        // Call via `self` so Spring's proxy wraps the call with @Transactional —
+        // direct this-invocation would bypass AOP and lose rollback semantics.
+        self.persistToMySQL(studentId, assessmentId, mapping, answersToSave, rawScoresToSave);
 
         // 6. Flip persistenceState based on whether we saw warnings
         boolean hadWarnings = (duplicateCount > 0) || (skippedUnknownCount > 0);
         mapping.setPersistenceState(hadWarnings ? "persisted_with_warnings" : "persisted");
+        // Also make completion status idempotent: if the mapping was still
+        // "ongoing" (e.g. admin dispatched a stuck submission), the presence of
+        // the full answer set in MySQL makes "completed" the correct state.
+        if (!"completed".equals(mapping.getStatus())) {
+            mapping.setStatus("completed");
+        }
         studentAssessmentMappingRepository.save(mapping);
 
-        // 7. Clean up Redis — the submission is safely in MySQL
-        assessmentSessionService.deleteSubmittedAnswers(studentId, assessmentId);
+        // 7. Clean up partial: key (no longer needed — student submitted).
+        // CRITICAL: we do NOT delete the submitted: key on success. It stays as
+        // an archive (7-day TTL from original submit) so that if any answers
+        // were orphaned (unknown optionId / questionId skipped), the admin can
+        // inspect the raw payload, manually map orphans, or acknowledge. The
+        // student is never forced to retake due to data loss.
         assessmentSessionService.deletePartialAnswers(studentId, assessmentId);
+        assessmentSessionService.markSubmittedArchived(studentId, assessmentId,
+                hadWarnings ? "persisted_with_warnings" : "persisted",
+                duplicateCount, skippedUnknownCount);
 
         // 8. Cache a short-lived result for any duplicate-submit that races us
         Map<String, Object> result = new HashMap<>();
@@ -533,7 +549,7 @@ public class AssessmentSubmissionProcessorService {
     }
 
     @Transactional
-    void recordFailure(Long studentId, Long assessmentId, Throwable error, boolean transientErr) {
+    public void recordFailure(Long studentId, Long assessmentId, Throwable error, boolean transientErr) {
         AssessmentSubmissionFailure row = failureRepository
                 .findByUserStudentIdAndAssessmentId(studentId, assessmentId)
                 .orElseGet(() -> {
@@ -583,7 +599,7 @@ public class AssessmentSubmissionProcessorService {
     }
 
     @Transactional
-    void resolveFailure(Long studentId, Long assessmentId) {
+    public void resolveFailure(Long studentId, Long assessmentId) {
         failureRepository.findByUserStudentIdAndAssessmentId(studentId, assessmentId)
                 .ifPresent(row -> {
                     if (!Boolean.TRUE.equals(row.getResolved())) {

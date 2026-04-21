@@ -14,6 +14,7 @@ import {
   retryNow,
   resetAssessment,
   getSubmissionFailureDetail,
+  getSubmittedDetail,
   PendingPersistenceEntry,
   PendingPersistenceDiagnostic,
 } from "./API/LiveTracking_APIs";
@@ -538,6 +539,19 @@ const LiveTrackingPage = () => {
       });
     } catch {
       showErrorToast("No failure history found");
+    }
+  };
+
+  const handleInspectPayload = async (entry: PendingPersistenceEntry) => {
+    try {
+      const res = await getSubmittedDetail(entry.userStudentId, entry.assessmentId);
+      setRedisJsonModal({
+        show: true,
+        studentName: `${entry.studentName || "Student #" + entry.userStudentId} — submitted payload`,
+        data: res.data,
+      });
+    } catch {
+      showErrorToast("No Redis payload found for this student (may have expired)");
     }
   };
 
@@ -1256,6 +1270,7 @@ const LiveTrackingPage = () => {
             onCleanupRedis={handlePendingCleanupRedis}
             onReset={handlePendingReset}
             onViewFailure={handleViewFailureDetail}
+            onInspectPayload={handleInspectPayload}
           />
         )}
 
@@ -1436,6 +1451,21 @@ const DIAGNOSTIC_META: Record<PendingPersistenceDiagnostic, {
     severity: "danger",
     description: "Redis empty; DB empty. Data is unrecoverable — reset and ask student to retake.",
   },
+  persisted_with_warnings: {
+    label: "Persisted (with warnings)",
+    severity: "info",
+    description: "Processing succeeded but the payload had duplicates or unknown questionIds/optionIds. DB count matches expected. Acknowledge with Mark Persisted.",
+  },
+  persisted_incomplete: {
+    label: "Persisted (incomplete)",
+    severity: "danger",
+    description: "Flagged persisted but DB has fewer answers than expected. Investigate — retry from Redis if possible, otherwise reset.",
+  },
+  stuck_ongoing: {
+    label: "Stuck ongoing",
+    severity: "orange",
+    description: "Status is ongoing but a submission payload is sitting in Redis. Student pressed submit but something blocked the flow. Retry to finalize on their behalf.",
+  },
 };
 
 const diagnosticBadgeClass = (severity: "info" | "warning" | "danger" | "orange"): string => {
@@ -1457,10 +1487,11 @@ interface PendingTabProps {
   onCleanupRedis: (e: PendingPersistenceEntry) => void;
   onReset: (e: PendingPersistenceEntry) => void;
   onViewFailure: (e: PendingPersistenceEntry) => void;
+  onInspectPayload: (e: PendingPersistenceEntry) => void;
 }
 
 const PendingPersistenceTab = (props: PendingTabProps) => {
-  const { entries, loading, actionIds, onRefresh, onRetry, onReconcile, onCleanupRedis, onReset, onViewFailure } = props;
+  const { entries, loading, actionIds, onRefresh, onRetry, onReconcile, onCleanupRedis, onReset, onViewFailure, onInspectPayload } = props;
 
   const ghostCount = entries.filter((e) => e.diagnostic.startsWith("ghost")).length;
   const excessCount = entries.filter((e) => e.diagnostic.startsWith("excess")).length;
@@ -1590,6 +1621,7 @@ const PendingPersistenceTab = (props: PendingTabProps) => {
                             className="btn btn-sm btn-outline-info"
                             onClick={() => onReconcile(e)}
                             disabled={busy}
+                            title="Acknowledge warnings and flip to persisted"
                           >
                             Mark Persisted
                           </button>
@@ -1603,18 +1635,44 @@ const PendingPersistenceTab = (props: PendingTabProps) => {
                             Reset
                           </button>
                         )}
-                        {/* Secondary actions — admin can always retry or inspect */}
-                        {e.recommendedAction !== "retry_now" && e.redisPresent && (
+                        {/* Always offer inspect when Redis has the payload */}
+                        {e.redisPresent && (
                           <button
                             className="btn btn-sm btn-outline-secondary"
-                            onClick={() => onRetry(e)}
+                            onClick={() => onInspectPayload(e)}
                             disabled={busy}
-                            title="Force retry from Redis"
+                            title="View the raw submitted payload (incl. orphan answers)"
                           >
-                            Retry
+                            Inspect
                           </button>
                         )}
+                        {/* For incomplete/warning rows with Redis, offer both Acknowledge and Retry */}
+                        {e.redisPresent &&
+                          (e.diagnostic === "persisted_incomplete" ||
+                            e.diagnostic === "persisted_with_warnings") && (
+                            <button
+                              className="btn btn-sm btn-outline-info"
+                              onClick={() => onReconcile(e)}
+                              disabled={busy}
+                              title="Acknowledge warnings — student doesn't retake"
+                            >
+                              Acknowledge
+                            </button>
+                          )}
                       </div>
+                      {(e.duplicatesDeduped != null || e.skippedUnknown != null) &&
+                        ((e.duplicatesDeduped ?? 0) > 0 || (e.skippedUnknown ?? 0) > 0) && (
+                          <small className="text-muted d-block mt-1">
+                            {(e.duplicatesDeduped ?? 0) > 0 && (
+                              <span>dup: {e.duplicatesDeduped}</span>
+                            )}
+                            {(e.duplicatesDeduped ?? 0) > 0 &&
+                              (e.skippedUnknown ?? 0) > 0 && <span> · </span>}
+                            {(e.skippedUnknown ?? 0) > 0 && (
+                              <span>skipped: {e.skippedUnknown}</span>
+                            )}
+                          </small>
+                        )}
                     </td>
                   </tr>
                 );

@@ -371,6 +371,41 @@ public class AssessmentSessionService {
     }
 
     /**
+     * Mark a submitted: key as "archived" after successful processing, storing
+     * warning counts so admin tools can surface them. The TTL continues to
+     * decay naturally (submit set 7d TTL; we preserve it rather than refreshing
+     * indefinitely). After 7 days it expires and is cleaned by Redis.
+     *
+     * This is the key design choice: we do NOT delete the key on success.
+     * Keeping it around gives the admin a recovery window — if processing
+     * skipped/dropped answers (unknown optionId, unknown questionId), admin
+     * can inspect the original payload, manually reconcile, or acknowledge —
+     * without ever forcing the student to retake.
+     */
+    @SuppressWarnings("unchecked")
+    public void markSubmittedArchived(Long studentId, Long assessmentId,
+                                      String persistenceState,
+                                      int duplicatesDeduped,
+                                      int skippedUnknown) {
+        String key = SUBMITTED_KEY_PREFIX + studentId + ":" + assessmentId;
+        Object value = redisTemplate.opsForValue().get(key);
+        if (!(value instanceof Map)) return;
+
+        Map<String, Object> payload = (Map<String, Object>) value;
+        payload.put("processingStatus", persistenceState);
+        payload.put("archivedAt", Instant.now().toString());
+        payload.put("duplicatesDeduped", duplicatesDeduped);
+        payload.put("skippedUnknown", skippedUnknown);
+
+        Long ttl = redisTemplate.getExpire(key, TimeUnit.SECONDS);
+        if (ttl != null && ttl > 0) {
+            redisTemplate.opsForValue().set(key, payload, ttl, TimeUnit.SECONDS);
+        } else {
+            redisTemplate.opsForValue().set(key, payload, SUBMITTED_TTL_HOURS, TimeUnit.HOURS);
+        }
+    }
+
+    /**
      * Check if a submission lock exists for a student+assessment pair.
      */
     public boolean hasSubmissionLock(Long studentId, Long assessmentId) {

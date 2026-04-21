@@ -56,7 +56,10 @@ export type PendingPersistenceDiagnostic =
   | "excess_partial_db"
   | "reconcile_only"
   | "ghost_partial"
-  | "ghost_empty";
+  | "ghost_empty"
+  | "persisted_with_warnings"
+  | "persisted_incomplete"
+  | "stuck_ongoing";
 
 export type PendingPersistenceAction =
   | "retry_now"
@@ -77,6 +80,9 @@ export interface PendingPersistenceEntry {
   redisPresent: boolean;
   redisAnswerCount: number | null;
   redisDistinctQuestionCount: number | null;
+  duplicatesDeduped: number | null;
+  skippedUnknown: number | null;
+  submitArchivedAt: string | null;
   diagnostic: PendingPersistenceDiagnostic;
   recommendedAction: PendingPersistenceAction;
   failure?: PendingPersistenceFailure;
@@ -127,6 +133,13 @@ export function resetAssessment(data: {
 
 export function getSubmissionFailureDetail(userStudentId: number, assessmentId: number) {
   return axios.get(`${API_URL}/assessment-answer/submission-failure-detail`, {
+    params: { userStudentId, assessmentId }
+  });
+}
+
+/** Fetch the raw Redis submitted: payload for a student/assessment. */
+export function getSubmittedDetail(userStudentId: number, assessmentId: number) {
+  return axios.get(`${API_URL}/assessment-answer/submitted-detail`, {
     params: { userStudentId, assessmentId }
   });
 }

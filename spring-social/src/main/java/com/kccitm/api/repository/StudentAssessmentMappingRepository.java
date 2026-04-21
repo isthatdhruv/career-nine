@@ -49,17 +49,28 @@ public interface StudentAssessmentMappingRepository extends JpaRepository<Studen
     List<Object[]> findLiteByAssessmentId(
         @org.springframework.data.repository.query.Param("assessmentId") Long assessmentId);
 
-    // All mappings needing persistence attention (pending or failed) for an assessment.
-    // Used by admin diagnostics to build the "Pending Persistence" view.
+    // All completed mappings for an assessment — used by the admin Pending
+    // Persistence view. We fetch broadly and classify in Java (needs db answer
+    // count per row anyway for the diagnostic); the UI filters out truly-done
+    // rows (persisted + dbCount==expected + no Redis payload).
     @org.springframework.data.jpa.repository.Query(
         "SELECT m FROM StudentAssessmentMapping m " +
         "WHERE m.assessmentId = :assessmentId " +
-        "  AND m.status = 'completed' " +
-        "  AND m.persistenceState IN ('pending', 'failed')")
-    List<StudentAssessmentMapping> findCompletedPendingPersistence(
+        "  AND m.status = 'completed'")
+    List<StudentAssessmentMapping> findCompletedForAssessment(
         @org.springframework.data.repository.query.Param("assessmentId") Long assessmentId);
 
-    // Same as above, but across all assessments. Used by auto-expire sweep.
+    // Stuck-ongoing: student has Redis partial data but hasn't clicked final
+    // submit. Used by admin view to let them force-finalise on behalf of the
+    // student (existing submit-from-redis path).
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT m FROM StudentAssessmentMapping m " +
+        "WHERE m.assessmentId = :assessmentId " +
+        "  AND m.status = 'ongoing'")
+    List<StudentAssessmentMapping> findOngoingForAssessment(
+        @org.springframework.data.repository.query.Param("assessmentId") Long assessmentId);
+
+    // Failures needing auto-expire sweep attention.
     @org.springframework.data.jpa.repository.Query(
         "SELECT m FROM StudentAssessmentMapping m " +
         "WHERE m.status = 'completed' " +
