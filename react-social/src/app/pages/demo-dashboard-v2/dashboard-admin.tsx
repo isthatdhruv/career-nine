@@ -39,8 +39,8 @@ const lightTheme = {
   warningSoft: "#fffbeb",
   danger: "#f43f5e",
   dangerSoft: "#fff1f2",
-  info: "#06b6d4",
-  infoSoft: "#ecfeff",
+  info: "#64748b",
+  infoSoft: "#f1f5f9",
   purple: "#8b5cf6",
   purpleSoft: "#f5f3ff",
   gridLine: "rgba(15, 23, 42, 0.06)",
@@ -70,8 +70,8 @@ const darkTheme: Theme = {
   warningSoft: "rgba(251, 191, 36, 0.12)",
   danger: "#fb7185",
   dangerSoft: "rgba(251, 113, 133, 0.12)",
-  info: "#22d3ee",
-  infoSoft: "rgba(34, 211, 238, 0.12)",
+  info: "#94a3b8",
+  infoSoft: "rgba(148, 163, 184, 0.12)",
   purple: "#a78bfa",
   purpleSoft: "rgba(167, 139, 250, 0.12)",
   gridLine: "rgba(255,255,255,0.05)",
@@ -142,6 +142,24 @@ const DashboardAdminContent: FC = () => {
   const [mappingsLoading, setMappingsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [refreshNonce, setRefreshNonce] = useState(0);
+
+  const refreshing = loading || mappingsLoading || loginsLoading;
+  const [manualRefresh, setManualRefresh] = useState(false);
+
+  const handleRefresh = () => {
+    if (refreshing) return;
+    setManualRefresh(true);
+    setRefreshNonce((n) => n + 1);
+  };
+
+  // Clear the manual-refresh flag once everything settles
+  useEffect(() => {
+    if (manualRefresh && !refreshing) {
+      const t = setTimeout(() => setManualRefresh(false), 250);
+      return () => clearTimeout(t);
+    }
+  }, [manualRefresh, refreshing]);
 
   // ---- Date range filter ----
   type RangeKey = "7d" | "30d" | "90d" | "all" | "custom";
@@ -175,6 +193,8 @@ const DashboardAdminContent: FC = () => {
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setErrors({});
     (async () => {
       const calls: { key: string; fn: () => Promise<any[]>; setter: (v: any[]) => void }[] = [
         { key: "students", fn: fetchStudents, setter: setStudents },
@@ -206,7 +226,7 @@ const DashboardAdminContent: FC = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshNonce]);
 
   // Second pass: once institutes are known, fetch student+mapping data per institute
   // and flatten. This unlocks accurate "attempted vs report generated" numbers in the drill-down.
@@ -277,7 +297,7 @@ const DashboardAdminContent: FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [range]);
+  }, [range, refreshNonce]);
 
   const tone = (k: Tone) => {
     switch (k) {
@@ -733,28 +753,33 @@ const DashboardAdminContent: FC = () => {
         style={{
           background: t.bg,
           color: t.text,
-          padding: "28px 28px 56px",
-          margin: "-30px -30px -60px",
+          padding: "24px 32px 64px",
+          margin: "-30px -40px -60px",
           minHeight: "100vh",
           fontFamily:
             'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
           fontFeatureSettings: '"cv11", "ss01"',
         }}
       >
-        <TopBar
-          t={t}
+        {manualRefresh && refreshing && <div className="ds-refresh-bar" />}
+        <Hero
           greeting={greeting}
           name={adminName}
           date={dateDisplay}
           onLogout={logout}
+          onRefresh={handleRefresh}
+          refreshing={refreshing}
           loading={loading}
           error={
             Object.keys(errors).length > 0
-              ? `${Object.keys(errors).length} source(s) failed (${Object.entries(errors)
-                  .map(([k, v]) => `${k}: ${v}`)
-                  .join(", ")})`
+              ? `${Object.keys(errors).length} source(s) failed`
               : null
           }
+          quickStats={[
+            { label: "Students", value: loading ? "—" : fmtNum(validStudents.length) },
+            { label: "Institutes", value: loading ? "—" : fmtNum(institutes.length) },
+            { label: "Assessments", value: loading ? "—" : fmtNum(assessments.length) },
+          ]}
         />
 
         <DateRangeBar
@@ -769,16 +794,15 @@ const DashboardAdminContent: FC = () => {
         />
 
         {/* KPI GRID */}
-        <div className="ds-grid" style={{ marginTop: 16, gap: 16 }}>
+        <div className="ds-grid" style={{ marginTop: 24 }}>
           <KpiCard
             t={t}
             tone={tone("primary")}
             icon={<IconUsers />}
             title={rangeActive ? "Students with report" : "Total students"}
+            loading={loading}
             value={
-              loading
-                ? "—"
-                : rangeActive
+              rangeActive
                 ? errors.reports
                   ? "—"
                   : fmtNum(generatedStudentIds.size)
@@ -787,7 +811,9 @@ const DashboardAdminContent: FC = () => {
                 : fmtNum(validStudents.length)
             }
             caption={
-              rangeActive
+              loading
+                ? "Loading…"
+                : rangeActive
                 ? errors.reports
                   ? `Failed: ${errors.reports}`
                   : `Distinct students whose report generated in ${rangeLabel(rangeKey, range).toLowerCase()}`
@@ -803,22 +829,21 @@ const DashboardAdminContent: FC = () => {
             tone={tone("success")}
             icon={<IconBuilding />}
             title={rangeActive ? "Institutes active" : "Active institutes"}
+            loading={loading || (rangeActive && mappingsLoading)}
             value={
-              loading
-                ? "—"
-                : rangeActive
-                ? mappingsLoading
-                  ? "—"
-                  : fmtNum(activeInstituteIds.size)
+              rangeActive
+                ? fmtNum(activeInstituteIds.size)
                 : errors.institutes
                 ? "—"
                 : fmtNum(institutes.length)
             }
             caption={
-              rangeActive
-                ? mappingsLoading
-                  ? "Loading mappings…"
-                  : `Institutes with completions or in-range reports`
+              loading
+                ? "Loading…"
+                : rangeActive && mappingsLoading
+                ? "Loading mappings…"
+                : rangeActive
+                ? `Institutes with completions or in-range reports`
                 : errors.institutes
                 ? `Failed: ${errors.institutes}`
                 : "Schools & colleges onboarded"
@@ -832,17 +857,18 @@ const DashboardAdminContent: FC = () => {
             tone={tone("info")}
             icon={<IconClipboard />}
             title={rangeActive ? "Assessments scheduled" : "Assessments"}
+            loading={loading}
             value={
-              loading
-                ? "—"
-                : rangeActive
+              rangeActive
                 ? fmtNum(activeAssessmentIds.size)
                 : errors.assessments
                 ? "—"
                 : fmtNum(assessments.length)
             }
             caption={
-              rangeActive
+              loading
+                ? "Loading…"
+                : rangeActive
                 ? `Scheduled window overlaps ${rangeLabel(rangeKey, range).toLowerCase()}`
                 : errors.assessments
                 ? `Failed: ${errors.assessments}`
@@ -856,9 +882,12 @@ const DashboardAdminContent: FC = () => {
             tone={tone("warning")}
             icon={<IconHeadset />}
             title="Counsellors"
-            value={loading ? "—" : errors.counsellors ? "—" : fmtNum(counsellors.length)}
+            loading={loading}
+            value={errors.counsellors ? "—" : fmtNum(counsellors.length)}
             caption={
-              errors.counsellors
+              loading
+                ? "Loading…"
+                : errors.counsellors
                 ? `Failed: ${errors.counsellors}`
                 : "Available for student guidance · lifetime"
             }
@@ -869,9 +898,12 @@ const DashboardAdminContent: FC = () => {
             tone={tone("purple")}
             icon={<IconActivity />}
             title="Assessments conducted"
-            value={loading ? "—" : errors.reports ? "—" : fmtNum(reportMetrics.totalConducted)}
+            loading={loading}
+            value={errors.reports ? "—" : fmtNum(reportMetrics.totalConducted)}
             caption={
-              errors.reports
+              loading
+                ? "Loading…"
+                : errors.reports
                 ? `Failed: ${errors.reports}`
                 : rangeActive
                 ? `Reports generated in ${rangeLabel(rangeKey, range).toLowerCase()} · ${reportMetrics.rows.length} distinct assessments`
@@ -885,19 +917,18 @@ const DashboardAdminContent: FC = () => {
             tone={tone("success")}
             icon={<IconFileCheck />}
             title="Students completed"
+            loading={loading || mappingsLoading}
             value={
-              loading
-                ? "—"
-                : mappingsLoading
-                ? "—"
-                : rangeActive
+              rangeActive
                 ? fmtNum(completedInRangeStudents.size)
                 : errors.mappings
                 ? "—"
                 : fmtNum(completionMetrics.students)
             }
             caption={
-              mappingsLoading
+              loading
+                ? "Loading…"
+                : mappingsLoading
                 ? "Loading mappings…"
                 : rangeActive
                 ? `Lifetime per active assessment · ${fmtNum(generatedStudentIds.size)} got report in range`
@@ -912,7 +943,7 @@ const DashboardAdminContent: FC = () => {
         </div>
 
         {/* ENGAGEMENT + ASSESSMENTS DONUT */}
-        <div className="ds-two-col" style={{ marginTop: 16 }}>
+        <div className="ds-two-col" style={{ marginTop: 24 }}>
           <EngagementCard
             t={t}
             series={loginsByDay}
@@ -939,7 +970,7 @@ const DashboardAdminContent: FC = () => {
         </div>
 
         {/* ASSESSMENT REPORT DRILL-DOWN */}
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 24 }}>
           <AssessmentReportDrilldown
             t={t}
             assessments={assessments}
@@ -959,13 +990,13 @@ const DashboardAdminContent: FC = () => {
 
         {/* DATA HEALTH */}
         {rangeActive && (dataHealth.orphanedStudents > 0 || dataHealth.reportsWithoutAid > 0) && (
-          <div style={{ marginTop: 16 }}>
+          <div style={{ marginTop: 24 }}>
             <DataHealthRow t={t} health={dataHealth} />
           </div>
         )}
 
         {/* INSTITUTES TABLE */}
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 24 }}>
           <InstitutesTable
             t={t}
             data={topInstitutes}
@@ -977,7 +1008,7 @@ const DashboardAdminContent: FC = () => {
         </div>
 
         {/* RECENT LOGINS */}
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 24 }}>
           <RecentLoginsCard t={t} logins={recentLogins} loading={loading} tone={tone} />
         </div>
       </div>
@@ -988,105 +1019,124 @@ const DashboardAdminContent: FC = () => {
 /* ============================================================
    TOP BAR
    ============================================================ */
-const TopBar: FC<{
-  t: Theme;
+const Hero: FC<{
   greeting: string;
   name: string;
   date: string;
   onLogout: () => void;
+  onRefresh: () => void;
+  refreshing: boolean;
   loading: boolean;
   error: string | null;
-}> = ({ t, greeting, name, date, onLogout, loading, error }) => (
-  <div
-    style={{
-      position: "relative",
-      borderRadius: 16,
-      border: `1px solid ${t.border}`,
-      background: t.card,
-      padding: "24px 28px",
-      overflow: "hidden",
-    }}
-  >
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        background: t.gradientHeader,
-        pointerEvents: "none",
-      }}
-    />
-    <div
-      style={{
-        position: "relative",
-        display: "flex",
-        flexWrap: "wrap",
-        gap: 20,
-        alignItems: "center",
-        justifyContent: "space-between",
-      }}
-    >
-      <div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+  quickStats: { label: string; value: string }[];
+}> = ({ greeting, name, date, onLogout, onRefresh, refreshing, loading, error, quickStats }) => (
+  <div className="ds-hero">
+    <div className="ds-hero-grid" />
+    <div className="ds-hero-glow ds-hero-glow-1" />
+    <div className="ds-hero-glow ds-hero-glow-2" />
+    <div className="ds-hero-glow ds-hero-glow-3" />
+
+    <div className="ds-hero-content">
+      <div style={{ flex: 1, minWidth: 280 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
           {error ? (
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "4px 10px",
-                borderRadius: 100,
-                background: t.warningSoft,
-                color: t.warning,
-                fontSize: 11,
-                fontWeight: 600,
-              }}
-            >
+            <span className="ds-hero-pill" style={{ background: "rgba(251,191,36,0.18)", color: "#fde68a" }}>
               <IconAlert /> {error}
             </span>
           ) : (
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "4px 10px",
-                borderRadius: 100,
-                background: t.successSoft,
-                color: t.success,
-                fontSize: 11,
-                fontWeight: 600,
-              }}
-            >
-              <span className="ds-pulse" style={{ background: t.success }} />
+            <span className="ds-hero-pill" style={{ background: "rgba(52,211,153,0.18)", color: "#a7f3d0" }}>
+              <span className="ds-pulse" style={{ background: "#34d399" }} />
               {loading ? "Loading network data…" : "Live network data"}
             </span>
           )}
-          <span style={{ fontSize: 12, color: t.textMuted, fontWeight: 500 }}>{date}</span>
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", fontWeight: 500 }}>{date}</span>
         </div>
-        <div style={{ fontSize: 13, color: t.textMuted, fontWeight: 500 }}>{greeting},</div>
+
         <div
           style={{
-            fontSize: 26,
+            fontSize: 13,
+            color: "rgba(255,255,255,0.65)",
+            fontWeight: 500,
+            letterSpacing: "0.01em",
+          }}
+        >
+          {greeting},
+        </div>
+        <h1
+          style={{
+            fontSize: 44,
             fontWeight: 700,
-            letterSpacing: "-0.02em",
-            color: t.text,
-            marginTop: 2,
+            letterSpacing: "-0.035em",
+            color: "#ffffff",
+            margin: "4px 0 0",
+            lineHeight: 1.05,
           }}
         >
           {name}
-        </div>
-        <div style={{ fontSize: 13, color: t.textMuted, marginTop: 4 }}>
-          Here’s what’s happening across your network today.
+        </h1>
+        <p
+          style={{
+            fontSize: 15,
+            color: "rgba(255,255,255,0.7)",
+            margin: "10px 0 0",
+            maxWidth: 520,
+          }}
+        >
+          Here's what's happening across your network — institutes, assessments, and students in one place.
+        </p>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 24, flexWrap: "wrap" }}>
+          <button
+            className="ds-btn ds-btn-hero-primary"
+            onClick={onRefresh}
+            disabled={refreshing}
+            style={{
+              opacity: refreshing ? 0.75 : 1,
+              cursor: refreshing ? "wait" : "pointer",
+            }}
+          >
+            <span
+              className={refreshing ? "ds-spin-icon" : ""}
+              style={{ display: "inline-flex" }}
+            >
+              <IconRefresh />
+            </span>
+            {refreshing ? "Refreshing…" : "Refresh data"}
+          </button>
+          <button className="ds-btn ds-btn-hero-ghost" onClick={onLogout}>
+            <IconLogout /> Logout
+          </button>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <button className="ds-btn ds-btn-secondary">
-          <IconRefresh /> Refresh
-        </button>
-        <button className="ds-btn ds-btn-ghost" onClick={onLogout}>
-          <IconLogout /> Logout
-        </button>
+      <div className="ds-hero-stats">
+        {quickStats.map((s, i) => (
+          <div key={s.label} className="ds-hero-stat" style={{ animationDelay: `${i * 80}ms` }}>
+            <div
+              style={{
+                fontSize: 11,
+                color: "rgba(255,255,255,0.55)",
+                fontWeight: 600,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+              }}
+            >
+              {s.label}
+            </div>
+            <div
+              style={{
+                fontSize: 32,
+                fontWeight: 700,
+                color: "#ffffff",
+                fontVariantNumeric: "tabular-nums",
+                marginTop: 6,
+                letterSpacing: "-0.02em",
+              }}
+            >
+              {s.value}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   </div>
@@ -1213,6 +1263,18 @@ const DateRangeBar: FC<{
 /* ============================================================
    KPI CARD
    ============================================================ */
+const Spinner: FC<{ color: string; size?: number }> = ({ color, size = 22 }) => (
+  <span
+    className="ds-spinner"
+    style={{
+      width: size,
+      height: size,
+      borderColor: `${color}26`,
+      borderTopColor: color,
+    }}
+  />
+);
+
 const KpiCard: FC<{
   t: Theme;
   tone: { solid: string; soft: string };
@@ -1220,24 +1282,40 @@ const KpiCard: FC<{
   title: string;
   value: string;
   caption: string;
+  loading?: boolean;
   errored?: boolean;
   dateFiltered?: boolean;
   warn?: string;
-}> = ({ t, tone, icon, title, value, caption, errored, dateFiltered, warn }) => (
+}> = ({ t, tone, icon, title, value, caption, loading, errored, dateFiltered, warn }) => (
   <div
-    className="ds-card"
+    className="ds-card ds-kpi-card"
     style={{
       background: t.card,
       border: `1px solid ${errored ? t.dangerSoft : t.border}`,
-      borderRadius: 14,
-      padding: 20,
+      borderRadius: 16,
+      padding: "22px 22px 20px",
       display: "flex",
       flexDirection: "column",
-      gap: 14,
-      minHeight: 130,
+      gap: 16,
+      minHeight: 148,
       position: "relative",
+      overflow: "hidden",
+      // @ts-ignore — CSS custom prop for hover glow
+      ["--kpi-tone" as any]: tone.solid,
     }}
   >
+    <span
+      aria-hidden
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 2,
+        background: `linear-gradient(90deg, ${tone.solid}, ${tone.solid}00 80%)`,
+        opacity: errored ? 0 : 0.9,
+      }}
+    />
     {(dateFiltered || warn) && (
       <div
         style={{
@@ -1294,40 +1372,55 @@ const KpiCard: FC<{
     )}
     <div
       style={{
-        width: 38,
-        height: 38,
-        borderRadius: 10,
-        background: errored ? t.dangerSoft : tone.soft,
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        background: errored
+          ? t.dangerSoft
+          : `linear-gradient(135deg, ${tone.soft}, ${tone.soft}66)`,
         color: errored ? t.danger : tone.solid,
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
+        boxShadow: errored ? "none" : `inset 0 0 0 1px ${tone.solid}1a`,
       }}
     >
       {errored ? <IconAlert /> : icon}
     </div>
     <div>
-      <div style={{ fontSize: 12, color: t.textMuted, fontWeight: 500, letterSpacing: "0.01em" }}>
+      <div
+        style={{
+          fontSize: 11,
+          color: t.textMuted,
+          fontWeight: 600,
+          letterSpacing: "0.06em",
+          textTransform: "uppercase",
+        }}
+      >
         {title}
       </div>
       <div
         style={{
-          fontSize: 30,
+          fontSize: 36,
           fontWeight: 700,
-          letterSpacing: "-0.025em",
+          letterSpacing: "-0.03em",
           color: t.text,
-          marginTop: 4,
+          marginTop: 6,
           fontVariantNumeric: "tabular-nums",
-          lineHeight: 1.1,
+          lineHeight: 1.05,
+          minHeight: 40,
+          display: "flex",
+          alignItems: "center",
         }}
       >
-        {value}
+        {loading ? <Spinner color={tone.solid} size={24} /> : value}
       </div>
       <div
         style={{
           fontSize: 12,
-          color: errored ? t.danger : t.textSubtle,
-          marginTop: 6,
+          color: errored ? t.danger : t.textMuted,
+          marginTop: 8,
+          lineHeight: 1.4,
         }}
       >
         {caption}
@@ -2760,15 +2853,34 @@ const CardHeader: FC<{ t: Theme; title: string; subtitle?: string; right?: React
       alignItems: "center",
       justifyContent: "space-between",
       gap: 12,
-      padding: "20px 24px 12px",
+      padding: "22px 26px 14px",
       flexWrap: "wrap",
     }}
   >
     <div>
-      <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: t.text }}>
+      <div
+        style={{
+          fontSize: 17,
+          fontWeight: 600,
+          letterSpacing: "-0.015em",
+          color: t.text,
+          lineHeight: 1.3,
+        }}
+      >
         {title}
       </div>
-      {subtitle && <div style={{ fontSize: 12, color: t.textMuted, marginTop: 2 }}>{subtitle}</div>}
+      {subtitle && (
+        <div
+          style={{
+            fontSize: 13,
+            color: t.textMuted,
+            marginTop: 4,
+            lineHeight: 1.5,
+          }}
+        >
+          {subtitle}
+        </div>
+      )}
     </div>
     {right && <div>{right}</div>}
   </div>
@@ -2835,17 +2947,152 @@ const EmptyState: FC<{ t: Theme; label: string }> = ({ t, label }) => (
    ============================================================ */
 const DashboardStyles: FC<{ theme: Theme }> = ({ theme: t }) => (
   <style>{`
-    .ds-root { transition: background 200ms ease, color 200ms ease; }
+    .ds-root {
+      transition: background 200ms ease, color 200ms ease;
+    }
+
+    /* Break out of any restrictive parent container while dashboard is mounted */
+    body #kt_app_content,
+    body #kt_app_content_container,
+    body .app-content,
+    body .app-content-container,
+    body .container,
+    body .container-xxl,
+    body .container-fluid {
+      max-width: none !important;
+    }
+
+    /* --------------------- HERO (slate + muted rose) --------------------- */
+    .ds-hero {
+      position: relative;
+      border-radius: 20px;
+      overflow: hidden;
+      padding: 48px 56px;
+      background:
+        radial-gradient(1200px 500px at 85% -15%, rgba(244,63,94,0.14), transparent 60%),
+        radial-gradient(800px 400px at -5% 115%, rgba(244,63,94,0.08), transparent 55%),
+        linear-gradient(135deg, #0f172a 0%, #1a2238 50%, #1e293b 100%);
+      color: #fff;
+      animation: ds-fade-up 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .ds-hero-glow {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(70px);
+      pointer-events: none;
+    }
+    .ds-hero-glow-1 {
+      top: -140px; right: -80px; width: 380px; height: 380px;
+      background: radial-gradient(closest-side, rgba(244,63,94,0.22), transparent);
+    }
+    .ds-hero-glow-2 {
+      bottom: -160px; left: 15%; width: 440px; height: 440px;
+      background: radial-gradient(closest-side, rgba(100,116,139,0.28), transparent);
+    }
+    .ds-hero-glow-3 {
+      top: 40%; right: 28%; width: 220px; height: 220px;
+      background: radial-gradient(closest-side, rgba(244,63,94,0.1), transparent);
+    }
+    .ds-hero-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+      background-size: 42px 42px;
+      mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+      -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+      pointer-events: none;
+    }
+    .ds-hero-content {
+      position: relative;
+      display: flex;
+      gap: 40px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .ds-hero-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 100px;
+      fontSize: 11px;
+      font-weight: 600;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .ds-hero-stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(110px, 1fr));
+      gap: 12px;
+      min-width: 380px;
+    }
+    @media (max-width: 900px) { .ds-hero-stats { min-width: 0; grid-template-columns: repeat(3, 1fr); width: 100%; } }
+    .ds-hero-stat {
+      padding: 16px 18px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: transform 200ms ease, background 200ms ease, border-color 200ms ease;
+      animation: ds-fade-up 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .ds-hero-stat:hover {
+      transform: translateY(-2px);
+      background: rgba(255,255,255,0.1);
+      border-color: rgba(255,255,255,0.18);
+    }
+
+    .ds-btn-hero-primary {
+      background: #fff;
+      color: #0b1020;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+    .ds-btn-hero-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+      background: #f5f5f7;
+    }
+    .ds-btn-hero-ghost {
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.16);
+      backdrop-filter: blur(10px);
+    }
+    .ds-btn-hero-ghost:hover {
+      background: rgba(255,255,255,0.16);
+      border-color: rgba(255,255,255,0.28);
+    }
+
+    /* --------------------- ENTRANCE ANIMATION --------------------- */
+    @keyframes ds-fade-up {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .ds-grid > * {
+      animation: ds-fade-up 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .ds-grid > *:nth-child(1) { animation-delay: 40ms; }
+    .ds-grid > *:nth-child(2) { animation-delay: 80ms; }
+    .ds-grid > *:nth-child(3) { animation-delay: 120ms; }
+    .ds-grid > *:nth-child(4) { animation-delay: 160ms; }
+    .ds-grid > *:nth-child(5) { animation-delay: 200ms; }
+    .ds-grid > *:nth-child(6) { animation-delay: 240ms; }
+
 
     .ds-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px !important;
     }
 
     .ds-two-col {
       display: grid;
       grid-template-columns: 2fr 1fr;
-      gap: 16px;
+      gap: 20px;
     }
     @media (max-width: 1100px) { .ds-two-col { grid-template-columns: 1fr; } }
 
@@ -2925,12 +3172,49 @@ const DashboardStyles: FC<{ theme: Theme }> = ({ theme: t }) => (
     .ds-date-input:focus { outline: none; border-color: ${t.primary}; box-shadow: 0 0 0 3px ${t.primarySoft}; }
 
     .ds-card {
-      transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+      position: relative;
+      transition:
+        transform 260ms cubic-bezier(0.16, 1, 0.3, 1),
+        box-shadow 260ms ease,
+        border-color 260ms ease;
+    }
+    .ds-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+      opacity: ${t.name === "dark" ? 1 : 0};
     }
     .ds-card:hover {
-      transform: translateY(-2px);
+      transform: translateY(-3px);
       box-shadow: ${t.shadowHover};
       border-color: ${t.borderStrong} !important;
+    }
+
+    /* KPI card hover glow driven by per-card tone custom prop */
+    .ds-kpi-card::after {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: inherit;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 260ms ease;
+      background: radial-gradient(
+        400px circle at 50% -20%,
+        var(--kpi-tone, transparent) 0%,
+        transparent 50%
+      );
+      mix-blend-mode: ${t.name === "dark" ? "screen" : "multiply"};
+    }
+    .ds-kpi-card:hover::after {
+      opacity: ${t.name === "dark" ? 0.12 : 0.08};
     }
 
     .ds-row { transition: background 150ms ease; }
@@ -2988,6 +3272,46 @@ const DashboardStyles: FC<{ theme: Theme }> = ({ theme: t }) => (
     @keyframes ds-pulse {
       0% { transform: scale(1); opacity: 0.6; }
       100% { transform: scale(2.6); opacity: 0; }
+    }
+
+    @keyframes ds-spin {
+      to { transform: rotate(360deg); }
+    }
+    .ds-spinner {
+      display: inline-block;
+      border-radius: 50%;
+      border-style: solid;
+      border-width: 2.5px;
+      animation: ds-spin 0.8s linear infinite;
+      vertical-align: middle;
+    }
+
+    .ds-spin-icon {
+      animation: ds-spin 0.9s linear infinite;
+    }
+
+    /* Top progress bar shown while a manual refresh is in flight */
+    .ds-refresh-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      z-index: 9999;
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        ${t.primary} 50%,
+        transparent 100%
+      );
+      background-size: 50% 100%;
+      background-repeat: no-repeat;
+      animation: ds-refresh-sweep 1.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+      pointer-events: none;
+    }
+    @keyframes ds-refresh-sweep {
+      0% { background-position: -50% 0; }
+      100% { background-position: 150% 0; }
     }
 
     .ds-skeleton {
