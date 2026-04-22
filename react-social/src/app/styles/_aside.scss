@@ -1,0 +1,246 @@
+// Aside menu beautification — app-wide polish matching the admin dashboard palette.
+// Loaded after Metronic styles via app/styles/index.scss.
+
+// ---------- Base aside container ----------
+.aside {
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.04) !important;
+  transition: background 200ms ease, border-color 200ms ease;
+
+  &.aside-light {
+    background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%) !important;
+    border-right: 1px solid rgba(15, 23, 42, 0.06) !important;
+  }
+
+  &.aside-dark {
+    background: linear-gradient(180deg, #0f172a 0%, #131c36 60%, #1a2238 100%) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.04) !important;
+  }
+}
+
+// ---------- Logo block ----------
+.aside-logo {
+  position: relative;
+  transition: background 200ms ease;
+
+  // Subtle divider under logo
+  &::after {
+    content: "";
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    bottom: 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(15, 23, 42, 0.06),
+      transparent
+    );
+  }
+
+  .aside-dark &::after {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.06),
+      transparent
+    );
+  }
+}
+
+// ---------- Section headings ----------
+.aside-menu {
+  .menu-content {
+    padding: 20px 22px 6px !important;
+
+    .menu-heading,
+    .menu-section {
+      font-size: 10px !important;
+      font-weight: 700 !important;
+      letter-spacing: 0.1em !important;
+      text-transform: uppercase !important;
+      color: rgba(15, 23, 42, 0.38) !important;
+    }
+  }
+}
+
+.aside-dark .aside-menu .menu-content .menu-heading,
+.aside-dark .aside-menu .menu-content .menu-section {
+  color: rgba(255, 255, 255, 0.35) !important;
+}
+
+// ---------- Menu items ----------
+.aside-menu .menu-item {
+  padding: 0 14px;
+
+  & > .menu-link {
+    position: relative;
+    border-radius: 10px !important;
+    padding: 10px 12px !important;
+    margin: 2px 0 !important;
+    transition:
+      background 220ms cubic-bezier(0.16, 1, 0.3, 1),
+      color 220ms ease,
+      transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+      padding-left 220ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+
+    .menu-title {
+      font-weight: 500 !important;
+      font-size: 13.5px !important;
+      letter-spacing: -0.005em !important;
+    }
+
+    .menu-icon {
+      transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+
+      .svg-icon,
+      i {
+        transition: color 220ms ease !important;
+      }
+    }
+
+    .menu-arrow {
+      transition: transform 220ms ease !important;
+    }
+  }
+
+  // Hover state
+  & > .menu-link:hover {
+    background: rgba(15, 23, 42, 0.045) !important;
+    padding-left: 14px !important;
+
+    .menu-icon {
+      transform: translateX(1px);
+    }
+  }
+
+  // Active / current route
+  &.here > .menu-link,
+  &.show > .menu-link,
+  & > .menu-link.active {
+    background: linear-gradient(
+      90deg,
+      rgba(244, 63, 94, 0.08),
+      rgba(244, 63, 94, 0.02) 70%,
+      transparent
+    ) !important;
+    color: #0f172a !important;
+
+    &::before {
+      content: "";
+      position: absolute;
+      left: -2px;
+      top: 10px;
+      bottom: 10px;
+      width: 3px;
+      border-radius: 0 3px 3px 0;
+      background: linear-gradient(180deg, #f43f5e, #e11d48);
+      box-shadow: 0 0 12px rgba(244, 63, 94, 0.35);
+    }
+
+    .menu-title {
+      font-weight: 600 !important;
+      color: #0f172a !important;
+    }
+
+    .menu-icon .svg-icon,
+    .menu-icon i {
+      color: #f43f5e !important;
+    }
+  }
+}
+
+// Dark theme hover/active
+.aside-dark .aside-menu .menu-item {
+  & > .menu-link {
+    color: rgba(255, 255, 255, 0.75) !important;
+
+    .menu-title {
+      color: rgba(255, 255, 255, 0.82) !important;
+    }
+  }
+
+  & > .menu-link:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+
+    .menu-title {
+      color: #ffffff !important;
+    }
+  }
+
+  &.here > .menu-link,
+  &.show > .menu-link,
+  & > .menu-link.active {
+    background: linear-gradient(
+      90deg,
+      rgba(244, 63, 94, 0.16),
+      rgba(244, 63, 94, 0.04) 70%,
+      transparent
+    ) !important;
+
+    .menu-title {
+      color: #ffffff !important;
+      font-weight: 600 !important;
+    }
+
+    .menu-icon .svg-icon,
+    .menu-icon i {
+      color: #fda4af !important;
+    }
+  }
+}
+
+// ---------- Submenus ----------
+.aside-menu .menu-sub {
+  padding: 2px 0 6px !important;
+
+  .menu-item > .menu-link {
+    padding: 8px 12px 8px 38px !important;
+
+    .menu-title {
+      font-size: 13px !important;
+      font-weight: 500 !important;
+    }
+  }
+
+  .menu-item > .menu-link:hover {
+    padding-left: 40px !important;
+  }
+}
+
+// ---------- Accordion arrow rotation ----------
+.aside-menu .menu-item.show > .menu-link .menu-arrow {
+  transform: rotate(90deg);
+}
+
+// ---------- Scrollbar polish ----------
+#kt_aside_menu::-webkit-scrollbar,
+.aside-menu::-webkit-scrollbar {
+  width: 6px;
+}
+#kt_aside_menu::-webkit-scrollbar-thumb,
+.aside-menu::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.12);
+  border-radius: 100px;
+}
+#kt_aside_menu::-webkit-scrollbar-thumb:hover,
+.aside-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.25);
+}
+.aside-dark #kt_aside_menu::-webkit-scrollbar-thumb,
+.aside-dark .aside-menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+}
+.aside-dark #kt_aside_menu::-webkit-scrollbar-thumb:hover,
+.aside-dark .aside-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+// ---------- Aside toggle button ----------
+.aside-toggle {
+  transition: transform 200ms ease, background 200ms ease;
+
+  &:hover {
+    transform: scale(1.05);
+  }
+}
