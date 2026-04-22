@@ -7,6 +7,8 @@ import { useThemeMode } from "../../../_metronic/partials/layout/theme-mode/Them
 import { useAuth } from "../../modules/auth/core/Auth";
 import {
   fetchAssessments,
+  fetchCounsellingAppointments,
+  fetchCounsellorRatingSummary,
   fetchCounsellors,
   fetchGeneratedReports,
   fetchInstitutes,
@@ -134,6 +136,8 @@ const DashboardAdminContent: FC = () => {
   const [students, setStudents] = useState<any[]>([]);
   const [institutes, setInstitutes] = useState<any[]>([]);
   const [counsellors, setCounsellors] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [ratingSummary, setRatingSummary] = useState<any[]>([]);
   const [assessments, setAssessments] = useState<any[]>([]);
   const [logins, setLogins] = useState<any[]>([]);
   const [loginsLoading, setLoginsLoading] = useState(false);
@@ -200,6 +204,8 @@ const DashboardAdminContent: FC = () => {
         { key: "students", fn: fetchStudents, setter: setStudents },
         { key: "institutes", fn: fetchInstitutes, setter: setInstitutes },
         { key: "counsellors", fn: fetchCounsellors, setter: setCounsellors },
+        { key: "appointments", fn: fetchCounsellingAppointments, setter: setAppointments },
+        { key: "ratingSummary", fn: fetchCounsellorRatingSummary, setter: setRatingSummary },
         { key: "assessments", fn: fetchAssessments, setter: setAssessments },
         { key: "reports", fn: fetchGeneratedReports, setter: setReports },
       ];
@@ -985,6 +991,31 @@ const DashboardAdminContent: FC = () => {
             rangeEnd={range.end}
             activeAssessmentIds={activeAssessmentIds}
             errored={!!errors.reports || !!errors.assessments}
+          />
+        </div>
+
+        {/* COUNSELLING DRILL-DOWN */}
+        <div style={{ marginTop: 24 }}>
+          <CounsellingDrillDownCard
+            t={t}
+            institutes={institutes}
+            studentMappings={studentMappings}
+            appointments={appointments}
+            mappingsLoading={mappingsLoading}
+            loading={loading}
+            errored={!!errors.appointments}
+          />
+        </div>
+
+        {/* COUNSELLOR LEADERBOARD */}
+        <div style={{ marginTop: 24 }}>
+          <CounsellorLeaderboardCard
+            t={t}
+            counsellors={counsellors}
+            appointments={appointments}
+            ratingSummary={ratingSummary}
+            loading={loading}
+            errored={!!errors.counsellors || !!errors.appointments}
           />
         </div>
 
@@ -1851,14 +1882,13 @@ const InstitutesTable: FC<{
             <thead>
               <tr>
                 {(rangeActive
-                  ? ["#", "Institute", "City", "Active students", "Reports generated", "Status"]
-                  : ["#", "Institute", "City", "Branches", "Status"]
+                  ? ["#", "Institute", "Active students", "Reports generated", "Status"]
+                  : ["#", "Institute", "Status"]
                 ).map((h) => (
                   <th
                     key={h}
                     style={{
                       textAlign:
-                        h === "Branches" ||
                         h === "Status" ||
                         h === "Active students" ||
                         h === "Reports generated"
@@ -1920,16 +1950,7 @@ const InstitutesTable: FC<{
                       </div>
                     </div>
                   </td>
-                  <td
-                    style={{
-                      padding: "14px 16px",
-                      borderBottom: `1px solid ${t.border}`,
-                      color: t.textMuted,
-                    }}
-                  >
-                    {s.city}
-                  </td>
-                  {rangeActive ? (
+                  {rangeActive && (
                     <>
                       <td
                         style={{
@@ -1956,18 +1977,6 @@ const InstitutesTable: FC<{
                         {fmtNum(s.reportsGenerated)}
                       </td>
                     </>
-                  ) : (
-                    <td
-                      style={{
-                        padding: "14px 16px",
-                        borderBottom: `1px solid ${t.border}`,
-                        textAlign: "right",
-                        fontVariantNumeric: "tabular-nums",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {s.branches != null ? s.branches : "—"}
-                    </td>
                   )}
                   <td
                     style={{
@@ -2744,6 +2753,668 @@ const AssessmentReportDrilldown: FC<{
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+};
+
+/* ============================================================
+   COUNSELLOR LEADERBOARD
+   ============================================================ */
+const COUNSELLING_ACTIVE_STATUSES = new Set([
+  "PENDING",
+  "ASSIGNED",
+  "CONFIRMED",
+  "COMPLETED",
+]);
+
+const apptSessionTime = (appt: any): number => {
+  const date = appt?.slot?.date;
+  const time = appt?.slot?.startTime;
+  if (!date) return NaN;
+  const iso = time ? `${date}T${time}` : `${date}T00:00:00`;
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) ? NaN : t;
+};
+
+const RatingCell: FC<{ t: Theme; average: number; count: number }> = ({
+  t,
+  average,
+  count,
+}) => {
+  if (!count || !average) {
+    return (
+      <span style={{ fontSize: 12, color: t.textSubtle }}>No ratings yet</span>
+    );
+  }
+  const fillPct = Math.max(0, Math.min(100, (average / 5) * 100));
+  return (
+    <div
+      style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+      title={`${average.toFixed(2)} from ${count} ${count === 1 ? "review" : "reviews"}`}
+    >
+      <div
+        style={{ position: "relative", lineHeight: 1, fontSize: 13, letterSpacing: 1 }}
+        aria-label={`${average.toFixed(2)} out of 5`}
+      >
+        <span style={{ color: t.textSubtle, opacity: 0.35 }}>★★★★★</span>
+        <span
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: `${fillPct}%`,
+            overflow: "hidden",
+            color: t.warning,
+            whiteSpace: "nowrap",
+          }}
+        >
+          ★★★★★
+        </span>
+      </div>
+      <span
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          color: t.text,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {average.toFixed(2)}
+      </span>
+      <span
+        style={{ fontSize: 11, color: t.textMuted, fontVariantNumeric: "tabular-nums" }}
+      >
+        ({count})
+      </span>
+    </div>
+  );
+};
+
+const CounsellorLeaderboardCard: FC<{
+  t: Theme;
+  counsellors: any[];
+  appointments: any[];
+  ratingSummary: any[];
+  loading: boolean;
+  errored: boolean;
+}> = ({ t, counsellors, appointments, ratingSummary, loading, errored }) => {
+  const rows = useMemo(() => {
+    const byCounsellor = new Map<
+      string,
+      { completed: number; upcoming: number; cancelled: number }
+    >();
+    const ensure = (id: string) => {
+      let e = byCounsellor.get(id);
+      if (!e) {
+        e = { completed: 0, upcoming: 0, cancelled: 0 };
+        byCounsellor.set(id, e);
+      }
+      return e;
+    };
+    const now = Date.now();
+    appointments.forEach((a) => {
+      const cid = String(pick(a?.counsellor || {}, ["id"]) ?? "");
+      if (!cid) return;
+      const status = String(a?.status || "").toUpperCase();
+      const st = apptSessionTime(a);
+      const entry = ensure(cid);
+      if (status === "CANCELLED") {
+        entry.cancelled += 1;
+      } else if (status === "RESCHEDULED") {
+        // rescheduled rows are replaced by a new CONFIRMED row; don't double-count
+      } else if (status === "COMPLETED") {
+        // Set by SessionNotesService when the counsellor files notes — authoritative
+        entry.completed += 1;
+      } else if (status === "CONFIRMED") {
+        // Proxy: confirmed session with a slot in the past ran; notes may not be filed yet
+        if (!Number.isNaN(st) && st < now) entry.completed += 1;
+        else entry.upcoming += 1;
+      } else if (status === "ASSIGNED" || status === "PENDING") {
+        entry.upcoming += 1;
+      }
+    });
+
+    const ratingById = new Map<string, { average: number; count: number }>();
+    ratingSummary.forEach((r) => {
+      const id = String(pick(r, ["counsellorId", "id"]) ?? "");
+      if (!id) return;
+      const average = Number(pick(r, ["average", "avg"]) ?? 0);
+      const count = Number(pick(r, ["count", "total"]) ?? 0);
+      ratingById.set(id, { average, count });
+    });
+
+    return counsellors
+      .map((c) => {
+        const id = String(pick(c, ["id", "counsellorId"]) ?? "");
+        const stats = byCounsellor.get(id) || { completed: 0, upcoming: 0, cancelled: 0 };
+        const rating = ratingById.get(id) || { average: 0, count: 0 };
+        return {
+          id,
+          name: pick(c, ["name", "fullName"]) || "Counsellor",
+          email: pick(c, ["email"]) || "",
+          isActive: c?.isActive !== false,
+          profileImageUrl: pick(c, ["profileImageUrl"]) || "",
+          ...stats,
+          avgRating: rating.average,
+          ratingCount: rating.count,
+        };
+      })
+      .sort(
+        (a, b) =>
+          b.completed - a.completed ||
+          b.avgRating - a.avgRating ||
+          b.upcoming - a.upcoming ||
+          a.name.localeCompare(b.name)
+      );
+  }, [counsellors, appointments, ratingSummary]);
+
+  const totalCompleted = rows.reduce((sum, r) => sum + r.completed, 0);
+  const activeCounsellors = rows.filter((r) => r.isActive).length;
+  const maxCompleted = rows.reduce((m, r) => Math.max(m, r.completed), 0);
+  const networkRating = useMemo(() => {
+    let total = 0;
+    let count = 0;
+    rows.forEach((r) => {
+      if (r.ratingCount > 0) {
+        total += r.avgRating * r.ratingCount;
+        count += r.ratingCount;
+      }
+    });
+    return { average: count > 0 ? total / count : 0, count };
+  }, [rows]);
+
+  return (
+    <Card t={t}>
+      <CardHeader
+        t={t}
+        title="Counsellor sessions & ratings"
+        subtitle={
+          errored
+            ? "Could not load counsellor data"
+            : networkRating.count > 0
+            ? `${fmtNum(totalCompleted)} sessions completed · network rating ${networkRating.average.toFixed(
+                2
+              )} ★ from ${fmtNum(networkRating.count)} ${
+                networkRating.count === 1 ? "review" : "reviews"
+              }`
+            : `${fmtNum(totalCompleted)} sessions completed across ${activeCounsellors} active ${
+                activeCounsellors === 1 ? "counsellor" : "counsellors"
+              }`
+        }
+        right={
+          networkRating.count > 0 ? (
+            <Pill t={t} tone="warning">
+              {networkRating.average.toFixed(2)} ★ · {fmtNum(networkRating.count)}
+            </Pill>
+          ) : totalCompleted > 0 ? (
+            <Pill t={t} tone="success">{fmtNum(totalCompleted)} completed</Pill>
+          ) : undefined
+        }
+      />
+      <div style={{ padding: "0 20px 20px", minHeight: 240 }}>
+        {loading ? (
+          <Skeleton t={t} height={240} />
+        ) : rows.length === 0 ? (
+          <EmptyState t={t} label="No counsellors configured yet" />
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table
+              className="ds-table"
+              style={{
+                width: "100%",
+                borderCollapse: "separate",
+                borderSpacing: 0,
+                fontSize: 13,
+                color: t.text,
+              }}
+            >
+              <thead>
+                <tr>
+                  {[
+                    { label: "#", align: "left" as const },
+                    { label: "Counsellor", align: "left" as const },
+                    { label: "Rating", align: "left" as const },
+                    { label: "Completed", align: "right" as const },
+                    { label: "Upcoming", align: "right" as const },
+                    { label: "Share", align: "right" as const },
+                  ].map((h) => (
+                    <th
+                      key={h.label}
+                      style={{
+                        textAlign: h.align,
+                        padding: "10px 12px",
+                        fontSize: 10,
+                        fontWeight: 600,
+                        color: t.textMuted,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.04em",
+                        borderBottom: `1px solid ${t.border}`,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {h.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={r.id || i} className="ds-row">
+                    <td
+                      style={{
+                        padding: "12px 12px",
+                        borderBottom: `1px solid ${t.border}`,
+                        color: t.textMuted,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {String(i + 1).padStart(2, "0")}
+                    </td>
+                    <td style={{ padding: "12px 12px", borderBottom: `1px solid ${t.border}` }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 10,
+                            background: r.profileImageUrl
+                              ? `center/cover no-repeat url(${r.profileImageUrl})`
+                              : t.primarySoft,
+                            color: t.primary,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontWeight: 700,
+                            fontSize: 11,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {!r.profileImageUrl && initials(r.name)}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontWeight: 600,
+                              color: t.text,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                            }}
+                          >
+                            <span
+                              style={{
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {r.name}
+                            </span>
+                            {!r.isActive && (
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  color: t.textSubtle,
+                                  fontWeight: 500,
+                                }}
+                              >
+                                · inactive
+                              </span>
+                            )}
+                          </div>
+                          {r.email && (
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: t.textMuted,
+                                marginTop: 1,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                maxWidth: 240,
+                              }}
+                            >
+                              {r.email}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td
+                      style={{
+                        padding: "12px 12px",
+                        borderBottom: `1px solid ${t.border}`,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      <RatingCell
+                        t={t}
+                        average={r.avgRating}
+                        count={r.ratingCount}
+                      />
+                    </td>
+                    <td
+                      style={{
+                        padding: "12px 12px",
+                        borderBottom: `1px solid ${t.border}`,
+                        textAlign: "right",
+                        fontVariantNumeric: "tabular-nums",
+                        fontWeight: 700,
+                        color: r.completed > 0 ? t.success : t.textMuted,
+                      }}
+                    >
+                      {fmtNum(r.completed)}
+                    </td>
+                    <td
+                      style={{
+                        padding: "12px 12px",
+                        borderBottom: `1px solid ${t.border}`,
+                        textAlign: "right",
+                        fontVariantNumeric: "tabular-nums",
+                        color: r.upcoming > 0 ? t.text : t.textMuted,
+                      }}
+                    >
+                      {fmtNum(r.upcoming)}
+                    </td>
+                    <td
+                      style={{
+                        padding: "12px 12px",
+                        borderBottom: `1px solid ${t.border}`,
+                        textAlign: "right",
+                      }}
+                    >
+                      <PercentBar
+                        t={t}
+                        value={pct(r.completed, Math.max(maxCompleted, 1))}
+                        color={t.success}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+};
+
+/* ============================================================
+   COUNSELLING DRILL-DOWN (per institute)
+   ============================================================ */
+const CounsellingDrillDownCard: FC<{
+  t: Theme;
+  institutes: any[];
+  studentMappings: any[];
+  appointments: any[];
+  mappingsLoading: boolean;
+  loading: boolean;
+  errored: boolean;
+}> = ({ t, institutes, studentMappings, appointments, mappingsLoading, loading, errored }) => {
+  // Students who have at least one non-cancelled/non-rescheduled counselling appointment
+  const studentsWithCounselling = useMemo(() => {
+    const s = new Set<string>();
+    appointments.forEach((a) => {
+      const status = String(a?.status || "").toUpperCase();
+      if (!COUNSELLING_ACTIVE_STATUSES.has(status)) return;
+      const sid =
+        pick(a?.student || {}, ["userStudentId", "id", "studentId"]) ??
+        pick(a, ["studentId", "userStudentId"]);
+      if (sid != null) s.add(String(sid));
+    });
+    return s;
+  }, [appointments]);
+
+  // Build: instituteId → { students, completedAssessment, counselled }
+  const perInstitute = useMemo(() => {
+    type Agg = {
+      id: string;
+      name: string;
+      totalStudents: number;
+      completedAssessment: Set<string>;
+      counselled: Set<string>;
+    };
+    const byInstitute = new Map<string, Agg>();
+
+    const nameById = new Map<string, string>();
+    institutes.forEach((i: any) => {
+      const primaryId = pick(i, ["id", "instituteId", "instituteCode"]);
+      const altId = pick(i, ["instituteCode", "code"]);
+      const resolvedName = pick(i, [
+        "instituteName",
+        "name",
+        "schoolName",
+        "collegeName",
+      ]);
+      const name =
+        resolvedName || `Institute #${primaryId ?? altId ?? "?"}`;
+      if (primaryId != null) nameById.set(String(primaryId), String(name));
+      if (altId != null) nameById.set(String(altId), String(name));
+    });
+
+    studentMappings.forEach((s: any) => {
+      const sid = String(pick(s, ["userStudentId", "user_student_id", "id"]) ?? "");
+      const iid = String(pick(s, ["instituteId", "institute_id"]) ?? "");
+      if (!sid || !iid) return;
+      let agg = byInstitute.get(iid);
+      if (!agg) {
+        agg = {
+          id: iid,
+          name: nameById.get(iid) || `Institute #${iid}`,
+          totalStudents: 0,
+          completedAssessment: new Set(),
+          counselled: new Set(),
+        };
+        byInstitute.set(iid, agg);
+      }
+      agg.totalStudents += 1;
+
+      const assigned = Array.isArray(s.assessments) ? s.assessments : [];
+      const completedAny = assigned.some((a: any) => {
+        const st = String(pick(a, ["status"]) || "").toLowerCase();
+        return st === "completed" || st === "submitted";
+      });
+      if (completedAny) agg.completedAssessment.add(sid);
+      if (studentsWithCounselling.has(sid)) agg.counselled.add(sid);
+    });
+
+    return Array.from(byInstitute.values())
+      .map((v) => ({
+        id: v.id,
+        name: v.name,
+        totalStudents: v.totalStudents,
+        completedAssessment: v.completedAssessment.size,
+        counselled: Array.from(v.completedAssessment).filter((sid) =>
+          v.counselled.has(sid)
+        ).length,
+      }))
+      .sort(
+        (a, b) => b.completedAssessment - a.completedAssessment || a.name.localeCompare(b.name)
+      );
+  }, [institutes, studentMappings, studentsWithCounselling]);
+
+  const [selectedId, setSelectedId] = useState<string>("");
+  useEffect(() => {
+    if (perInstitute.length === 0) return;
+    const stillVisible = perInstitute.some((i) => i.id === selectedId);
+    if (!selectedId || !stillVisible) {
+      const withAny = perInstitute.find((i) => i.completedAssessment > 0);
+      setSelectedId((withAny || perInstitute[0]).id);
+    }
+  }, [perInstitute, selectedId]);
+
+  const selected = perInstitute.find((i) => i.id === selectedId);
+  const completedAssessment = selected?.completedAssessment ?? 0;
+  const counselled = selected?.counselled ?? 0;
+  const notCounselled = Math.max(completedAssessment - counselled, 0);
+
+  const donutOpts: ApexOptions = useMemo(
+    () => ({
+      chart: { type: "donut", fontFamily: "inherit" },
+      labels: ["Took counselling", "Did not take counselling"],
+      colors: [t.success, t.textSubtle],
+      stroke: { width: 0 },
+      legend: { show: false },
+      dataLabels: { enabled: false },
+      plotOptions: {
+        pie: {
+          donut: {
+            size: "76%",
+            labels: {
+              show: true,
+              name: { show: true, color: t.textMuted, fontSize: "12px", offsetY: 16 },
+              value: {
+                show: true,
+                color: t.text,
+                fontSize: "32px",
+                fontWeight: 700,
+                offsetY: -14,
+                formatter: (val) => `${val}`,
+              },
+              total: {
+                show: true,
+                label: "Assessment completed",
+                color: t.textMuted,
+                formatter: () => `${completedAssessment}`,
+              },
+            },
+          },
+        },
+      },
+      tooltip: {
+        theme: t.name,
+        y: { formatter: (v) => `${v} ${v === 1 ? "student" : "students"}` },
+      },
+    }),
+    [t, completedAssessment]
+  );
+
+  return (
+    <Card t={t}>
+      <CardHeader
+        t={t}
+        title="Counselling drill-down"
+        subtitle={
+          errored
+            ? "Could not load counselling appointments"
+            : `${perInstitute.length} ${
+                perInstitute.length === 1 ? "institute" : "institutes"
+              } · of students who completed assessment, how many took counselling`
+        }
+        right={
+          <select
+            className="ds-select"
+            value={selectedId}
+            onChange={(e) => setSelectedId(e.target.value)}
+            disabled={loading || mappingsLoading || perInstitute.length === 0}
+          >
+            <option value="" disabled>
+              {loading || mappingsLoading ? "Loading…" : "Select institute"}
+            </option>
+            {perInstitute.map((i) => (
+              <option key={i.id} value={i.id}>
+                {i.name}
+                {i.completedAssessment > 0
+                  ? ` · ${i.counselled}/${i.completedAssessment} counselled`
+                  : ""}
+              </option>
+            ))}
+          </select>
+        }
+      />
+      <div style={{ padding: "0 24px 24px" }}>
+        {loading || mappingsLoading ? (
+          <Skeleton t={t} height={280} />
+        ) : !selected ? (
+          <EmptyState
+            t={t}
+            label={
+              perInstitute.length === 0
+                ? "No institutes with students yet"
+                : "No data for this institute yet"
+            }
+          />
+        ) : completedAssessment === 0 ? (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: 240,
+              color: t.textMuted,
+              fontSize: 13,
+              textAlign: "center",
+              padding: 20,
+            }}
+          >
+            No students from {selected.name} have completed an assessment yet.
+          </div>
+        ) : (
+          <div className="ds-drilldown">
+            <div className="ds-drilldown-chart">
+              <Chart
+                key={`counsel-drill-${selectedId}-${t.name}`}
+                options={donutOpts}
+                series={[counselled, notCounselled]}
+                type="donut"
+                height={260}
+              />
+            </div>
+            <div className="ds-drilldown-stats">
+              <div style={{ fontSize: 15, fontWeight: 600, color: t.text, marginBottom: 4 }}>
+                {selected.name}
+              </div>
+              <div style={{ fontSize: 12, color: t.textMuted, marginBottom: 16 }}>
+                {fmtNum(selected.totalStudents)}{" "}
+                {selected.totalStudents === 1 ? "student" : "students"} on roster ·{" "}
+                {fmtNum(completedAssessment)} finished an assessment
+              </div>
+
+              <StatTile
+                t={t}
+                color={t.success}
+                label="Took counselling"
+                value={counselled}
+                helper={
+                  completedAssessment > 0
+                    ? `${pct(counselled, completedAssessment)}% of assessment-completers`
+                    : "—"
+                }
+              />
+              <StatTile
+                t={t}
+                color={t.textSubtle}
+                label="Have not taken counselling"
+                value={notCounselled}
+                helper="completed assessment · no booking yet"
+              />
+              <div
+                style={{
+                  marginTop: 12,
+                  paddingTop: 12,
+                  borderTop: `1px dashed ${t.border}`,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: 12,
+                  color: t.textMuted,
+                }}
+              >
+                <span>Conversion (counselling / assessment)</span>
+                <span
+                  style={{
+                    fontWeight: 700,
+                    color: t.text,
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {pct(counselled, Math.max(completedAssessment, 1))}%
+                </span>
+              </div>
             </div>
           </div>
         )}

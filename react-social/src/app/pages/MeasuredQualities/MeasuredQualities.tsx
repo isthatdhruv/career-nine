@@ -1,16 +1,14 @@
 import { useEffect, useState } from "react";
-import { Button } from "react-bootstrap";
-import { IconContext } from "react-icons";
-import { MdQuestionAnswer, MdDeleteSweep } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { ReadMeasuredQualitiesData } from "./API/Measured_Qualities_APIs";
 import { MeasuredQualitiesTable } from "./components";
 import MeasuredQualitiesRecycleBinModal from "./components/MeasuredQualitiesRecycleBinModal";
+import PageHeader from "../../components/PageHeader";
 
 const MeasuredQualitiesPage = () => {
   const [measuredQualitiesData, setMeasuredQualitiesData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [sections, setSections] = useState<any[]>([]); 
+  const [sections, setSections] = useState<any[]>([]);
   const [pageLoading, setPageLoading] = useState(["false"]);
   const [showRecycleBin, setShowRecycleBin] = useState(false);
   const navigate = useNavigate();
@@ -48,66 +46,49 @@ const MeasuredQualitiesPage = () => {
     if (pageLoading[0] === "true") {
       setPageLoading(["false"]);
     }
-  }, [pageLoading[0]]); 
+  }, [pageLoading[0]]);
 
 
   return (
-    <div className="card">
-      {loading && (
-        <span className="indicator-progress m-5" style={{ display: "block" }}>
-          Please wait...{" "}
-          <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
-        </span>
-      )}
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className='bi bi-shield-check' />}
+        title="Measured Qualities"
+        subtitle={<><strong>{measuredQualitiesData.length}</strong> qualities</>}
+        actions={[
+          {
+            label: "Add Measured Quality",
+            iconClass: "bi-plus-lg",
+            onClick: () => navigate("/measured-qualities/create"),
+            variant: "primary",
+          },
+          {
+            label: "Recycle Bin",
+            iconClass: "bi-trash",
+            onClick: () => setShowRecycleBin(true),
+            variant: "danger",
+          },
+        ]}
+      />
 
-      {!loading && (
-        <div className="card-header border-0 pt-6">
-          <div className="card-title">
-            <h1>Measured Qualities</h1>
+      <div className="card">
+        {loading && (
+          <span className="indicator-progress m-5" style={{ display: "block" }}>
+            Please wait...{" "}
+            <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
+          </span>
+        )}
+
+        {!loading && (
+          <div className="card-body pt-5">
+            <MeasuredQualitiesTable
+              data={measuredQualitiesData}
+              setLoading={setLoading}
+              setPageLoading={setPageLoading}
+            />
           </div>
-
-          <div className="card-toolbar">
-            <div className="d-flex justify-content-end gap-2">
-              <Button
-                variant="outline-danger"
-                onClick={() => setShowRecycleBin(true)}
-              >
-                <IconContext.Provider
-                  value={{ style: { paddingBottom: "4px" } }}
-                >
-                  <div>
-                    Recycle Bin <MdDeleteSweep size={21} />
-                  </div>
-                </IconContext.Provider>
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => {
-                  navigate("/measured-qualities/create");
-                }}
-              >
-                <IconContext.Provider
-                  value={{ style: { paddingBottom: "4px" } }}
-                >
-                  <div>
-                    Add Measured Qualities <MdQuestionAnswer size={21} />
-                  </div>
-                </IconContext.Provider>
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {!loading && (
-        <div className="card-body pt-5">
-          <MeasuredQualitiesTable
-            data={measuredQualitiesData}
-            setLoading={setLoading}
-            setPageLoading={setPageLoading}
-          />
-        </div>
-      )}
+        )}
+      </div>
 
       <MeasuredQualitiesRecycleBinModal
         show={showRecycleBin}

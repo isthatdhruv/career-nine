@@ -3,6 +3,7 @@ import { Tab, Tabs, Badge } from "react-bootstrap";
 import PaymentTable, { PaymentRow } from "./components/PaymentTable";
 import { getPaymentTransactions, sendNudgeEmail, resendWelcomeEmail } from "./API/Payment_APIs";
 import { showErrorToast } from "../../utils/toast";
+import PageHeader from "../../components/PageHeader";
 
 const PaymentTrackingPage = () => {
   const [activeTab, setActiveTab] = useState<string>("paid");
@@ -62,15 +63,21 @@ const PaymentTrackingPage = () => {
   };
 
   return (
-    <div style={{ padding: "0 24px" }}>
-      <div style={{ marginBottom: 28 }}>
-        <h2 style={{ fontWeight: 800, fontSize: "1.5rem", color: "#1e293b", margin: 0 }}>
-          Payment Tracking
-        </h2>
-        <p style={{ color: "#64748b", fontSize: "0.9rem", marginTop: 4 }}>
-          Track all Razorpay payment transactions for assessments
-        </p>
-      </div>
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className="bi bi-credit-card" />}
+        title="Payment Tracking"
+        subtitle={<><strong>{transactions.length}</strong> transactions · Razorpay</>}
+        actions={[
+          {
+            label: "Refresh",
+            iconClass: "bi-arrow-clockwise",
+            onClick: () => (activeTab === "all" ? loadTransactions() : loadTransactions(activeTab)),
+            variant: "primary",
+            disabled: loading,
+          },
+        ]}
+      />
 
       <div style={{ background: "#fff", borderRadius: 16, padding: "24px 28px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
         <Tabs activeKey={activeTab} onSelect={(k) => setActiveTab(k || "paid")} className="mb-4">

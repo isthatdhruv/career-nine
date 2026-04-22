@@ -5,6 +5,7 @@ import { getStudentsWithMappingByInstituteId, getAllAssessments, bulkAlotAssessm
 import StudentAnswerExcelModal from "./StudentAnswerExcelModal";
 import ResetAssessmentModal from "./ResetAssessmentModal";
 import CreateStudentModal from "./CreateStudentModal";
+import { ActionIcon } from "../../components/ActionIcon";
 
 export type Student = {
   id: number;
@@ -240,7 +241,7 @@ export default function StudentsList() {
               }}
               onClick={() => setShowAddModal(true)}
             >
-              <i className="bi bi-plus-lg"></i>
+              <ActionIcon type="add" size="sm" />
               Add Student
             </button>
           </div>
@@ -435,7 +436,7 @@ export default function StudentsList() {
                               transition: 'all 0.2s'
                             }}
                           >
-                            <i className="bi bi-download"></i>
+                            <ActionIcon type="download" size="sm" />
                             Download
                           </button>
                           <button
@@ -450,7 +451,7 @@ export default function StudentsList() {
                               transition: 'all 0.2s'
                             }}
                           >
-                            <i className="bi bi-arrow-counterclockwise"></i>
+                            <ActionIcon type="refresh" size="sm" />
                             Reset
                           </button>
                         </div>
@@ -499,7 +500,7 @@ export default function StudentsList() {
                   </>
                 ) : (
                   <>
-                    <i className="bi bi-check2-circle"></i>
+                    <ActionIcon type="approve" size="sm" />
                     Save Changes
                   </>
                 )}

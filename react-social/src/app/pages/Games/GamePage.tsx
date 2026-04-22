@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
-import { Button } from "react-bootstrap";
-import { IconContext } from "react-icons";
-import { BsCalendarWeek } from "react-icons/bs";
 import { useLocation } from "react-router-dom";
 import { ListGamesData } from "./components/API/GAME_APIs";
 import GameCreateModal from "./components/GameCreateModal";
 import GameTable from "./components/GameTable";
+import PageHeader from "../../components/PageHeader";
 
 
 const GamePage = () => {
@@ -30,50 +28,47 @@ const GamePage = () => {
   }, [pageLoading]);
 
   return (
-    <div className="card">
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className="bi bi-controller" />}
+        title={data ? `${data.gameName}-${data.gameCode} - Sessions` : "Games"}
+        subtitle={
+          loading ? (
+            "Loading..."
+          ) : (
+            <>
+              <strong>{GameData?.length || 0}</strong> games
+            </>
+          )
+        }
+        actions={[
+          {
+            label: "Add Game",
+            iconClass: "bi-plus-lg",
+            onClick: () => setModalShowCreate(true),
+            variant: "primary",
+          },
+        ]}
+      />
+
       {loading && (
-        <span className="indicator-progress m-5" style={{ display: "block" }}>
-          Please wait...{" "}
-          <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
-        </span>
-      )}
-
-      {!loading && (
-        <div className="card-header border-0 pt-6">
-          <div className="card-title">
-            <h1>
-              {data ? `${data.gameName}-${data.gameCode} - Sessions` : "Games"}
-            </h1>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "48px", textAlign: "center" }}>
+          <div className="spinner-border" style={{ color: "#0ea5e9" }} role="status">
+            <span className="visually-hidden">Loading...</span>
           </div>
-
-          <div className="card-toolbar">
-            <div className="d-flex justify-content-end">
-              <Button
-                variant="primary"
-                onClick={() => {
-                  setModalShowCreate(true);
-                }}
-              >
-                <IconContext.Provider
-                  value={{ style: { paddingBottom: "4px" } }}
-                >
-                  <div>
-                    Add Game <BsCalendarWeek size={23} />
-                  </div>
-                </IconContext.Provider>
-              </Button>
-            </div>
-          </div>
+          <p className="mt-3" style={{ color: "#6b7280" }}>Loading games...</p>
         </div>
       )}
 
       {!loading && (
-        <div className="card-body pt-5">
-          <GameTable
-            data={GameData || []}
-            setLoading={setLoading}
-            setPageLoading={setPageLoading}
-          />
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", overflow: "hidden" }}>
+          <div style={{ padding: "16px" }}>
+            <GameTable
+              data={GameData || []}
+              setLoading={setLoading}
+              setPageLoading={setPageLoading}
+            />
+          </div>
         </div>
       )}
 

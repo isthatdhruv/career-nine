@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { deleteDemographicField } from '../API/DemographicField_APIs';
 import { showErrorToast } from '../../../utils/toast';
+import { ActionIcon } from '../../../components/ActionIcon';
 
 type FieldDefinition = {
   fieldId: number;
@@ -155,7 +156,7 @@ const DemographicFieldTable = ({ data, setPageLoading, refreshData }: Props) => 
                         onClick={() => navigate(`/demographic-fields/edit/${field.fieldId}`)}
                         style={{ width: "36px", height: "36px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", color: "#2563eb", border: "2px solid #2563eb", borderRadius: "6px" }}
                       >
-                        <i className="bi bi-pencil-fill" style={{ fontSize: "0.85rem" }}></i>
+                        <ActionIcon type="edit" size="sm" />
                       </button>
                       {deleteConfirm === field.fieldId ? (
                         <>
@@ -181,7 +182,7 @@ const DemographicFieldTable = ({ data, setPageLoading, refreshData }: Props) => 
                           onClick={() => setDeleteConfirm(field.fieldId)}
                           style={{ width: "36px", height: "36px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", color: "#dc2626", border: "2px solid #dc2626", borderRadius: "6px" }}
                         >
-                          <i className="bi bi-trash-fill" style={{ fontSize: "0.85rem" }}></i>
+                          <ActionIcon type="delete" size="sm" />
                         </button>
                       )}
                     </div>

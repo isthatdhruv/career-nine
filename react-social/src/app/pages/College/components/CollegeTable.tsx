@@ -1,13 +1,14 @@
 // CollegeTable.tsx
 import { useState } from "react";
 import { MDBDataTableV5 } from "mdbreact";
-import { AiFillEdit, AiOutlineInfoCircle } from "react-icons/ai";
+import { AiOutlineInfoCircle } from "react-icons/ai";
 import { Link, useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
 import { Button, Dropdown } from "react-bootstrap";
 import { IconContext } from "react-icons";
 import { MdSchool, MdOutlineDashboard } from "react-icons/md";
+import { ActionIcon } from "../../../components/ActionIcon";
 
 import { DeleteCollegeData } from "../API/College_APIs";
 import CollegeEditModal from "./CollegeEditModal";
@@ -145,7 +146,7 @@ const CollegeTable = (props: {
               }}
               className="btn btn-icon btn-primary btn-sm me-3"
             >
-              <AiFillEdit size={16} />
+              <ActionIcon type="edit" size="sm" />
             </button>
 
             {/* Delete Button */}

@@ -2,6 +2,7 @@ import { useState } from "react";
 import axios from "axios";
 import { showErrorToast } from "../../../utils/toast";
 import type { RoleItem } from "../RolesAndPermissionsPage";
+import { ActionIcon } from "../../../components/ActionIcon";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -118,10 +119,10 @@ const RolesPanel = ({ roles, loading, onRefresh }: Props) => {
                       />
                       <div className="d-flex gap-1" style={{ width: "80px", justifyContent: "center" }}>
                         <button className="btn btn-sm" onClick={() => handleUpdate(role)} style={actionBtn("#059669")}>
-                          <i className="bi bi-check-lg" style={{ fontSize: "0.9rem" }}></i>
+                          <ActionIcon type="approve" size="sm" />
                         </button>
                         <button className="btn btn-sm" onClick={() => setEditingId(null)} style={actionBtn("#6b7280")}>
-                          <i className="bi bi-x-lg" style={{ fontSize: "0.8rem" }}></i>
+                          <ActionIcon type="reject" size="sm" />
                         </button>
                       </div>
                     </>
@@ -135,10 +136,10 @@ const RolesPanel = ({ roles, loading, onRefresh }: Props) => {
                           onClick={() => { setEditingId(role.id!); setEditName(role.name); setEditUrl(role.url); }}
                           style={actionBtn("#2563eb")}
                         >
-                          <i className="bi bi-pencil-fill" style={{ fontSize: "0.8rem" }}></i>
+                          <ActionIcon type="edit" size="sm" />
                         </button>
                         <button className="btn btn-sm" onClick={() => handleDelete(role.id!)} style={actionBtn("#dc2626")}>
-                          <i className="bi bi-trash-fill" style={{ fontSize: "0.8rem" }}></i>
+                          <ActionIcon type="delete" size="sm" />
                         </button>
                       </div>
                     </>
@@ -172,7 +173,7 @@ const RolesPanel = ({ roles, loading, onRefresh }: Props) => {
                 disabled={saving || !newName.trim() || !newUrl.trim()}
                 style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: "6px", padding: "6px 14px", fontWeight: 600, fontSize: "0.82rem", whiteSpace: "nowrap" }}
               >
-                <i className="bi bi-plus-lg"></i>
+                <ActionIcon type="add" size="sm" />
                 {saving ? "Adding..." : "Add Role"}
               </button>
             </div>

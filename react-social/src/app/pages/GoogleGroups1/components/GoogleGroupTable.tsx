@@ -1,9 +1,9 @@
 import { MDBDataTableV5 } from "mdbreact";
 import { useState } from "react";
-import { AiFillEdit } from "react-icons/ai";
 import { Link } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
+import { ActionIcon } from "../../../components/ActionIcon";
 import { DeleteCourseData } from "../API/GoogleGroup_APIs";
 import CourseEditModal from "./GoogleGroupEditModal";
 
@@ -59,7 +59,7 @@ const GoogleGroupTable = (props: {
                   }}
                   className="btn btn-icon btn-primary btn-sm me-3"
                 >
-                  <AiFillEdit size={16} />
+                  <ActionIcon type="edit" size="sm" />
                 </button>
 
                 <button

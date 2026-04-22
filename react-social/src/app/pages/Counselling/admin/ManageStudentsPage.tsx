@@ -12,6 +12,7 @@ import {
   GeneratedReport,
 } from '../../ReportGeneration/API/GeneratedReport_APIs'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
+import PageHeader from '../../../components/PageHeader'
 
 const API_URL = process.env.REACT_APP_API_URL
 
@@ -179,16 +180,13 @@ const ManageStudentsPage: React.FC = () => {
     : students
 
   return (
+    <div className="ph-page">
     <div style={{ padding: '24px 28px', background: 'var(--sp-bg, #F2F7F5)', minHeight: '100vh' }}>
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--sp-text, #1A2B28)' }}>
-          Manage Students
-        </h2>
-        <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--sp-muted, #5C7A72)' }}>
-          Control which students can access counselling and view their reports
-        </p>
-      </div>
+      <PageHeader
+        icon={<i className="bi bi-person-lines-fill" />}
+        title="Manage Students"
+        subtitle="Control which students can access counselling and view their reports"
+      />
 
       {/* Alerts */}
       {error && (
@@ -449,6 +447,7 @@ const ManageStudentsPage: React.FC = () => {
           </div>
         </div>
       )}
+    </div>
     </div>
   )
 }

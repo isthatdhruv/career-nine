@@ -8,6 +8,7 @@ import TopCareerMatches, { CareerMatch } from './components/TopCareerMatches'
 import CareerLibrary from './components/CareerLibrary'
 import BookCounselling from './components/BookCounselling'
 import YourReports from './components/YourReports'
+import PendingRatingPrompt from '../../Counselling/student/components/PendingRatingPrompt'
 import {
   DashboardApiResponse,
   getDashboardDataFromCache,
@@ -122,6 +123,8 @@ const StudentPortalDashboard: React.FC = () => {
           Explore the Career Library to learn more about these paths.
         </span>
       </div>
+
+      {profile?.userStudentId > 0 && <PendingRatingPrompt studentId={profile.userStudentId} />}
     </PortalLayout>
   )
 }

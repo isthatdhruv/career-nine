@@ -6,6 +6,7 @@ import { SoftDeleteAssessment, LockAssessment, UnlockAssessment } from "../../AP
 import { generateOMRSheet } from "../../utils/generateOMRSheet";
 import AssessmentRecycleBinModal from "./AssessmentRecycleBinModal";
 import { generateQuestionnairePDF } from "../../utils/generateQuestionnairePDF";
+import { ActionIcon } from "../../../../components/ActionIcon";
 
 const AssessmentTable = (props: {
   data: any;
@@ -79,10 +80,11 @@ const AssessmentTable = (props: {
   });
 
   const actionBtnStyle = (color: string) => ({
-    width: "36px", height: "36px", padding: 0,
+    width: "34px", height: "34px", padding: 0,
     display: "flex" as const, alignItems: "center" as const, justifyContent: "center" as const,
-    background: "#fff", color: color, border: `2px solid ${color}`, borderRadius: "6px",
+    background: "transparent", color: color, border: "none", borderRadius: "8px",
     cursor: "pointer" as const,
+    transition: "background-color 150ms ease",
   });
 
   const datatable = {
@@ -127,14 +129,14 @@ const AssessmentTable = (props: {
               className="btn btn-sm" title="Edit"
               style={actionBtnStyle("#2563eb")}
             >
-              <i className="bi bi-pencil-fill" style={{ fontSize: "0.85rem" }}></i>
+              <ActionIcon type="edit" size="sm" />
             </button>
             <button
               onClick={() => handleToggleLock(data)}
               className="btn btn-sm" title={data.isLocked ? "Unlock" : "Lock"}
               style={actionBtnStyle(data.isLocked ? "#d97706" : "#6b7280")}
             >
-              <i className={`bi ${data.isLocked ? "bi-lock-fill" : "bi-unlock-fill"}`} style={{ fontSize: "0.85rem" }}></i>
+              <ActionIcon type={data.isLocked ? "lock" : "unlock"} size="sm" />
             </button>
             <button
               onClick={async () => {
@@ -154,7 +156,7 @@ const AssessmentTable = (props: {
               className="btn btn-sm" title="Delete"
               style={actionBtnStyle("#dc2626")}
             >
-              <i className="bi bi-trash-fill" style={{ fontSize: "0.85rem" }}></i>
+              <ActionIcon type="delete" size="sm" />
             </button>
             <button
               onClick={() => handleDownloadQuestionnaire(data)}
@@ -162,7 +164,7 @@ const AssessmentTable = (props: {
               disabled={pdfLoading === id}
               style={actionBtnStyle("#059669")}
             >
-              {pdfLoading === id ? <span className="spinner-border spinner-border-sm" style={{ width: "14px", height: "14px" }} /> : <i className="bi bi-file-earmark-pdf-fill" style={{ fontSize: "0.85rem" }}></i>}
+              {pdfLoading === id ? <span className="spinner-border spinner-border-sm" style={{ width: "14px", height: "14px" }} /> : <ActionIcon type="pdf" size="sm" />}
             </button>
             <button
               onClick={() => handleDownloadOMR(data)}
@@ -170,7 +172,7 @@ const AssessmentTable = (props: {
               disabled={omrLoading === id}
               style={actionBtnStyle("#0369a1")}
             >
-              {omrLoading === id ? <span className="spinner-border spinner-border-sm" style={{ width: "14px", height: "14px" }} /> : <i className="bi bi-file-earmark-arrow-down-fill" style={{ fontSize: "0.85rem" }}></i>}
+              {omrLoading === id ? <span className="spinner-border spinner-border-sm" style={{ width: "14px", height: "14px" }} /> : <ActionIcon type="download" size="sm" />}
             </button>
           </div>
         ),
@@ -202,7 +204,7 @@ const AssessmentTable = (props: {
             onClick={() => setShowRecycleBin(true)}
             style={{ background: "#fff", color: "#dc2626", border: "2px solid #dc2626", borderRadius: "6px", padding: "6px 12px", fontWeight: 600, fontSize: "0.82rem" }}
           >
-            <i className="bi bi-recycle"></i>
+            <ActionIcon type="delete" size="sm" />
             Recycle Bin
           </button>
         </div>

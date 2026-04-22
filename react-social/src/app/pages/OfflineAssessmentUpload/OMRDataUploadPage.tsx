@@ -5,6 +5,7 @@ import { ReadCollegeData } from "../College/API/College_APIs";
 import { getAssessmentMappingsByInstitute, getAssessmentSummaryList } from "../AssessmentMapping/API/AssessmentMapping_APIs";
 import { getOfflineMapping, bulkSubmitByRollNumber, bulkSubmitWithStudents, getSavedOmrMapping, saveOmrMapping, getSavedOmrMappingByQuestionnaire, getAllOmrMappings } from "./API/OfflineUpload_APIs";
 import { showErrorToast, showSuccessToast } from '../../utils/toast';
+import PageHeader from "../../components/PageHeader";
 
 // ============ Types ============
 
@@ -864,16 +865,34 @@ const OMRDataUploadPage = () => {
   // ============ Render ============
 
   return (
-    <div className="card">
-      <div className="card-header">
-        <h3 className="card-title">OMR Data Upload</h3>
-        <div className="card-toolbar d-flex align-items-center gap-3">
-          <Button variant="outline-primary" size="sm" onClick={handleShowSavedMappings}>
-            View Saved Mappings
-          </Button>
-          <small className="text-muted">Upload scanned OMR data with manual column mapping</small>
-        </div>
-      </div>
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className="bi bi-upc-scan" />}
+        title="OMR Data Upload"
+        subtitle={
+          parsedStudents.length > 0 ? (
+            <><strong>{parsedStudents.length}</strong> students parsed · Upload scanned OMR data with manual column mapping</>
+          ) : (
+            <>Upload scanned OMR data with manual column mapping</>
+          )
+        }
+        actions={[
+          {
+            label: submitting ? "Submitting..." : `Submit${parsedStudents.length ? ` (${parsedStudents.length})` : ""}`,
+            iconClass: "bi-upload",
+            onClick: handleSubmit,
+            variant: "primary",
+            disabled: submitting || parsedStudents.length === 0,
+          },
+          {
+            label: "View Saved Mappings",
+            iconClass: "bi-clipboard",
+            onClick: handleShowSavedMappings,
+            variant: "ghost",
+          },
+        ]}
+      />
+      <div className="card">
       <div className="card-body">
 
         {/* ── Step 1: School & Assessment ── */}
@@ -1388,6 +1407,7 @@ const OMRDataUploadPage = () => {
         </Modal>
 
       </div>
+    </div>
     </div>
   );
 };

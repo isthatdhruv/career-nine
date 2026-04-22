@@ -6,6 +6,7 @@ import NotificationBell from '../shared/NotificationBell'
 import { getStudentAppointments } from '../API/AppointmentAPI'
 import UpcomingSessionCard from './components/UpcomingSessionCard'
 import PastSessionCard from './components/PastSessionCard'
+import PendingRatingPrompt from './components/PendingRatingPrompt'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
 
 const STUDENT_MENU_ITEMS: MenuItem[] = [
@@ -312,6 +313,7 @@ const StudentCounsellingPage: React.FC = () => {
         {/* Tab content */}
         {renderContent()}
       </div>
+      {studentId > 0 && <PendingRatingPrompt studentId={studentId} />}
     </PortalLayout>
   )
 }

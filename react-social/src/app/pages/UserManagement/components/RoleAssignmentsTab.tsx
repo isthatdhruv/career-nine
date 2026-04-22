@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import Select from "react-select";
 import { showErrorToast, showSuccessToast } from "../../../utils/toast";
+import { ActionIcon } from "../../../components/ActionIcon";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -200,7 +201,7 @@ const RoleAssignmentsTab = () => {
                   background: "rgba(220, 38, 38, 0.1)", color: "#dc2626", border: "1px solid rgba(220, 38, 38, 0.2)", borderRadius: "6px",
                 }}
               >
-                <i className="bi bi-trash-fill" style={{ fontSize: "0.65rem" }}></i>
+                <ActionIcon type="delete" size="sm" />
               </button>
             </div>
             );
@@ -256,7 +257,7 @@ const RoleAssignmentsTab = () => {
                 fontWeight: 600, fontSize: "0.78rem", whiteSpace: "nowrap",
               }}
             >
-              <i className="bi bi-plus-lg"></i>
+              <ActionIcon type="add" size="sm" />
               {saving ? "Saving..." : "Assign"}
             </button>
           </div>

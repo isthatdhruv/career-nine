@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useReducer, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { showErrorToast, showSuccessToast } from '../../utils/toast';
+import PageHeader from "../../components/PageHeader";
+import { ActionIcon } from "../../components/ActionIcon";
 import { ReadCollegeList, GetSessionsByInstituteCode } from "../College/API/College_APIs";
 import {
   getStudentsWithMappingByInstituteId,
@@ -1295,13 +1297,26 @@ export default function GroupStudentPage() {
   };
 
   return (
-    <div
-      className="min-vh-100"
-      style={{
-        background: "linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%)",
-        padding: "1rem 1.25rem",
-      }}
-    >
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className="bi bi-people" />}
+        title="Group Students"
+        subtitle={
+          selectedInstitute ? (
+            <>
+              <strong>{students.length}</strong> student{students.length === 1 ? "" : "s"} ·{" "}
+              {getSelectedInstituteName()}
+            </>
+          ) : (
+            "Select an institute to manage student assessments"
+          )
+        }
+      />
+      <div
+        style={{
+          padding: "0",
+        }}
+      >
       <style>{`
         .form-select-custom {
           width: 100%;
@@ -1361,7 +1376,7 @@ export default function GroupStudentPage() {
             }
           }}
         >
-          <option value="">🏫 Select Institute</option>
+          <option value="">Select Institute</option>
           {institutes.map((inst) => (
             <option key={inst.instituteCode} value={inst.instituteCode}>
               {inst.instituteName}
@@ -1424,7 +1439,7 @@ export default function GroupStudentPage() {
                 fontSize: "0.9rem",
               }}
             >
-              <i className="bi bi-funnel-fill"></i>
+              <ActionIcon type="filter" size="sm" />
               Filters
               {isFiltered && (
                 <span
@@ -1509,7 +1524,7 @@ export default function GroupStudentPage() {
                     fontSize: "0.85rem",
                   }}
                 >
-                  <i className="bi bi-x-circle"></i>
+                  <ActionIcon type="reject" size="sm" />
                   Clear All
                 </button>
               </>
@@ -1540,7 +1555,7 @@ export default function GroupStudentPage() {
                   onClick={() => setShowFilterPanel(false)}
                   style={{ color: "#fff", background: "rgba(255,255,255,0.2)", border: "none", borderRadius: "8px", padding: "4px 10px" }}
                 >
-                  <i className="bi bi-x fs-5"></i>
+                  <ActionIcon type="reject" size="sm" />
                 </button>
               </div>
               <div style={{ display: "flex", minHeight: "300px" }}>
@@ -2002,7 +2017,7 @@ export default function GroupStudentPage() {
                       transition: "all 0.3s ease",
                     }}
                   >
-                    <i className="bi bi-download"></i>
+                    <ActionIcon type="download" size="sm" />
                     Student List
                   </button>
                   <button
@@ -2023,7 +2038,7 @@ export default function GroupStudentPage() {
                       transition: "all 0.3s ease",
                     }}
                   >
-                    <i className="bi bi-file-earmark-spreadsheet"></i>
+                    <ActionIcon type="excel" size="sm" />
                     Download All Answers
                   </button>
                   <button
@@ -2405,7 +2420,7 @@ export default function GroupStudentPage() {
                                   whiteSpace: "nowrap",
                                 }}
                               >
-                                <i className="bi bi-pencil-square"></i>
+                                <ActionIcon type="edit" size="sm" />
                                 Edit
                               </button>
                               <button
@@ -2532,7 +2547,7 @@ export default function GroupStudentPage() {
                       </>
                     ) : (
                       <>
-                        <i className="bi bi-check2-circle"></i>
+                        <ActionIcon type="approve" size="sm" />
                         Save Changes
                       </>
                     )}
@@ -2749,7 +2764,7 @@ export default function GroupStudentPage() {
                             border: "1px solid rgba(67, 97, 238, 0.2)",
                           }}
                         >
-                          <i className="bi bi-download"></i>
+                          <ActionIcon type="download" size="sm" />
                           Answers
                         </button>
                         <button
@@ -2799,7 +2814,7 @@ export default function GroupStudentPage() {
                             border: `1px solid ${assessment.status === "notstarted" ? "#e2e8f0" : "rgba(245, 158, 11, 0.2)"}`,
                           }}
                         >
-                          <i className="bi bi-arrow-counterclockwise"></i>
+                          <ActionIcon type="refresh" size="sm" />
                           Reset
                         </button>
 
@@ -2826,7 +2841,7 @@ export default function GroupStudentPage() {
                                   border: "none",
                                 }}
                               >
-                                <i className="bi bi-eye"></i>
+                                <ActionIcon type="view" size="sm" />
                                 View Report
                               </button>
                             ) : (
@@ -2865,7 +2880,7 @@ export default function GroupStudentPage() {
                                   border: `1px solid ${isGenerating ? "#e2e8f0" : "rgba(16, 185, 129, 0.2)"}`,
                                 }}
                               >
-                                <i className={isGenerating ? "bi bi-hourglass-split" : "bi bi-file-earmark-arrow-down"}></i>
+                                {isGenerating ? <i className="bi bi-hourglass-split"></i> : <ActionIcon type="download" size="sm" />}
                                 {isGenerating ? "Generating..." : "Generate"}
                               </button>
                             )}
@@ -2906,7 +2921,7 @@ export default function GroupStudentPage() {
                                 border: `1px solid ${isGenerating ? "#e2e8f0" : "rgba(245, 158, 11, 0.2)"}`,
                               }}
                             >
-                              <i className="bi bi-arrow-clockwise"></i>
+                              <ActionIcon type="refresh" size="sm" />
                               Regenerate
                             </button>
 
@@ -2947,7 +2962,7 @@ export default function GroupStudentPage() {
                                   border: "1px solid rgba(100, 116, 139, 0.2)",
                                 }}
                               >
-                                <i className="bi bi-envelope"></i>
+                                <ActionIcon type="send" size="sm" />
                                 Email
                               </button>
                               </>
@@ -3485,7 +3500,7 @@ export default function GroupStudentPage() {
                       </>
                     ) : (
                       <>
-                        <i className="bi bi-download me-2"></i>
+                        <ActionIcon type="download" size="sm" className="me-2" />
                         Download Excel
                       </>
                     )}
@@ -3975,7 +3990,7 @@ export default function GroupStudentPage() {
                       </>
                     ) : (
                       <>
-                        <i className="bi bi-download me-2"></i>
+                        <ActionIcon type="download" size="sm" className="me-2" />
                         Download Excel ({pivotedBulkData.rows.length} students)
                       </>
                     )}
@@ -4359,7 +4374,7 @@ export default function GroupStudentPage() {
                     fontWeight: 600,
                   }}
                 >
-                  {sendingEmail ? <><span className="spinner-border spinner-border-sm me-2" />Sending...</> : <><i className="bi bi-send me-1"></i>Send</>}
+                  {sendingEmail ? <><span className="spinner-border spinner-border-sm me-2" />Sending...</> : <><ActionIcon type="send" size="sm" className="me-1" />Send</>}
                 </button>
               </div>
             </div>
@@ -4507,7 +4522,7 @@ export default function GroupStudentPage() {
                   </>
                 ) : (
                   <>
-                    <i className="bi bi-check-lg me-1"></i>
+                    <ActionIcon type="approve" size="sm" className="me-1" />
                     Save Changes
                   </>
                 )}
@@ -4516,6 +4531,7 @@ export default function GroupStudentPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

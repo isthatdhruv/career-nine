@@ -3,10 +3,10 @@ import { DeleteGroupData, GetGroupNameData } from "./API/GoogleGroup_APIs";
 
 import { Button } from "react-bootstrap";
 import { IconContext } from "react-icons";
-import { AiFillEdit } from "react-icons/ai";
 import { BiBookReader } from "react-icons/bi";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
+import { ActionIcon } from "../../components/ActionIcon";
 import GroupCreateModal from "./GroupCreateModal";
 import GroupEditModal from "./GroupEditModal";
 
@@ -90,7 +90,7 @@ const Groups = () => {
                       }}
                       className="btn btn-icon btn-primary me-3"
                     >
-                      <AiFillEdit size={22} />
+                      <ActionIcon type="edit" size="sm" />
                     </button>
                     <button
                       onClick={() => {

@@ -5,6 +5,7 @@ import {
   CommunicationLogFilters,
 } from "./API/CommunicationLogs_APIs";
 import { showErrorToast } from "../../utils/toast";
+import PageHeader from "../../components/PageHeader";
 
 const MESSAGE_TYPES = [
   "REPORT",
@@ -17,10 +18,10 @@ const MESSAGE_TYPES = [
 
 const channelBadge = (channel: string) => {
   if (channel === "EMAIL") {
-    return <span className="badge bg-primary px-3 py-2">📧 Email</span>;
+    return <span className="badge bg-primary px-3 py-2"><i className="bi bi-envelope me-1" /> Email</span>;
   }
   if (channel === "WHATSAPP") {
-    return <span className="badge bg-success px-3 py-2">💬 WhatsApp</span>;
+    return <span className="badge bg-success px-3 py-2"><i className="bi bi-chat-dots me-1" /> WhatsApp</span>;
   }
   return <span className="badge bg-secondary px-3 py-2">{channel}</span>;
 };
@@ -108,15 +109,30 @@ const CommunicationLogsPage = () => {
   };
 
   return (
-    <div className="container-fluid py-4">
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className="bi bi-envelope-paper" />}
+        title="Communication Logs"
+        subtitle={
+          <><strong>{totalElements}</strong> total logs · Every email and WhatsApp message sent from the app is recorded here</>
+        }
+        actions={[
+          {
+            label: loading ? "Refreshing..." : "Apply Filters",
+            iconClass: "bi-funnel",
+            onClick: applyFilters,
+            variant: "primary",
+            disabled: loading,
+          },
+          {
+            label: "Reset",
+            iconClass: "bi-arrow-counterclockwise",
+            onClick: resetFilters,
+            variant: "ghost",
+          },
+        ]}
+      />
       <div className="card shadow-sm">
-        <div className="card-header">
-          <h1 className="mb-0">Logs of Email and WhatsApp</h1>
-          <small className="text-muted">
-            Every email and WhatsApp message sent from the app is recorded here.
-          </small>
-        </div>
-
         <div className="card-body">
           {/* Filter Bar */}
           <div className="row g-2 mb-3">

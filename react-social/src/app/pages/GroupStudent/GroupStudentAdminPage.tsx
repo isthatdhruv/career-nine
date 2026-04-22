@@ -19,6 +19,7 @@ import {
   generateNavigatorReportOneClick,
 } from "../StudentInformation/StudentInfo_APIs";
 import * as XLSX from "xlsx";
+import { ActionIcon } from "../../components/ActionIcon";
 
 type Student = {
   id: number;
@@ -1311,7 +1312,7 @@ export default function GroupStudentAdminPage() {
                 fontSize: "0.9rem",
               }}
             >
-              <i className="bi bi-funnel-fill"></i>
+              <ActionIcon type="filter" size="sm" />
               Filters
               {isFiltered && (
                 <span
@@ -1396,7 +1397,7 @@ export default function GroupStudentAdminPage() {
                     fontSize: "0.85rem",
                   }}
                 >
-                  <i className="bi bi-x-circle"></i>
+                  <ActionIcon type="reject" size="sm" />
                   Clear All
                 </button>
               </>
@@ -1427,7 +1428,7 @@ export default function GroupStudentAdminPage() {
                   onClick={() => setShowFilterPanel(false)}
                   style={{ color: "#fff", background: "rgba(255,255,255,0.2)", border: "none", borderRadius: "8px", padding: "4px 10px" }}
                 >
-                  <i className="bi bi-x fs-5"></i>
+                  <ActionIcon type="reject" size="sm" />
                 </button>
               </div>
               <div style={{ display: "flex", minHeight: "300px" }}>
@@ -1891,7 +1892,7 @@ export default function GroupStudentAdminPage() {
                         : "none",
                     }}
                   >
-                    <i className="bi bi-download"></i>
+                    <ActionIcon type="download" size="sm" />
                     Download List
                   </button>
                   <button
@@ -1914,7 +1915,7 @@ export default function GroupStudentAdminPage() {
                         : "none",
                     }}
                   >
-                    <i className="bi bi-file-earmark-spreadsheet"></i>
+                    <ActionIcon type="excel" size="sm" />
                     Download All Answers
                   </button>
                   <button
@@ -2439,7 +2440,7 @@ export default function GroupStudentAdminPage() {
                       </>
                     ) : (
                       <>
-                        <i className="bi bi-check2-circle"></i>
+                        <ActionIcon type="approve" size="sm" />
                         Save Changes
                       </>
                     )}
@@ -2635,7 +2636,7 @@ export default function GroupStudentAdminPage() {
                             transition: "all 0.2s",
                           }}
                         >
-                          <i className="bi bi-download"></i>
+                          <ActionIcon type="download" size="sm" />
                           Download
                         </button>
                         <button
@@ -2661,7 +2662,7 @@ export default function GroupStudentAdminPage() {
                             transition: "all 0.2s",
                           }}
                         >
-                          <i className="bi bi-arrow-counterclockwise"></i>
+                          <ActionIcon type="refresh" size="sm" />
                           Reset
                         </button>
                         {assessment.status === "completed" && (
@@ -2697,7 +2698,7 @@ export default function GroupStudentAdminPage() {
                               transition: "all 0.2s",
                             }}
                           >
-                            <i className={reportGeneratingFor === assessment.assessmentId ? "bi bi-hourglass-split" : "bi bi-file-earmark-arrow-down"}></i>
+                            {reportGeneratingFor === assessment.assessmentId ? <i className="bi bi-hourglass-split"></i> : <ActionIcon type="download" size="sm" />}
                             {reportGeneratingFor === assessment.assessmentId ? "Generating..." : "Report"}
                           </button>
                           <button
@@ -2732,7 +2733,7 @@ export default function GroupStudentAdminPage() {
                               transition: "all 0.2s",
                             }}
                           >
-                            <i className="bi bi-arrow-clockwise"></i>
+                            <ActionIcon type="refresh" size="sm" />
                             {reportGeneratingFor === assessment.assessmentId ? "" : "Regenerate"}
                           </button>
                           </>
@@ -3269,7 +3270,7 @@ export default function GroupStudentAdminPage() {
                       </>
                     ) : (
                       <>
-                        <i className="bi bi-download me-2"></i>
+                        <ActionIcon type="download" size="sm" className="me-2" />
                         Download Excel
                       </>
                     )}
@@ -3759,7 +3760,7 @@ export default function GroupStudentAdminPage() {
                       </>
                     ) : (
                       <>
-                        <i className="bi bi-download me-2"></i>
+                        <ActionIcon type="download" size="sm" className="me-2" />
                         Download Excel ({pivotedBulkData.rows.length} students)
                       </>
                     )}

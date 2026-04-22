@@ -6,6 +6,7 @@ import {
   GetAssessmentList,
 } from "./API/TextResponseMapping_APIs";
 import { matchTextToOption, matchTextToOptionsBulk } from "../AssesmentQuestions/API/Translate_APIs";
+import PageHeader from "../../components/PageHeader";
 
 interface OptionRef {
   optionId: number;
@@ -201,179 +202,179 @@ const TextResponseMappingPage: React.FC = () => {
   const totalCount = textResponses.length;
 
   return (
-    <div className="card">
-      <div className="card-header border-0 pt-6">
-        <div className="card-title">
-          <h3 className="fw-bolder m-0">Text Response Mapping</h3>
-        </div>
-      </div>
-      <div className="card-body py-4">
-        {message && (
-          <div className={`alert alert-${message.type} alert-dismissible fade show`} role="alert">
-            {message.text}
-            <button type="button" className="btn-close" onClick={() => setMessage(null)}></button>
-          </div>
-        )}
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className='bi bi-file-earmark-text' />}
+        title="Text Response Mapping"
+        subtitle={
+          selectedAssessmentId && totalCount > 0 ? (
+            <><strong>{totalCount}</strong> responses · <strong>{unmappedCount}</strong> unmapped</>
+          ) : (
+            "Map free-text answers to option choices"
+          )
+        }
+        actions={
+          selectedAssessmentId && textResponses.length > 0
+            ? [
+                {
+                  label: bulkAiLoading ? "AI Processing..." : `AI Auto-Map (${unmappedCount})`,
+                  iconClass: "bi-magic",
+                  onClick: handleBulkAiMap,
+                  variant: "primary",
+                  disabled: bulkAiLoading || unmappedCount === 0,
+                },
+                {
+                  label: recalculating ? "Recalculating..." : "Recalculate Scores",
+                  iconClass: "bi-arrow-repeat",
+                  onClick: handleRecalculateScores,
+                  variant: "ghost",
+                  disabled: recalculating,
+                },
+              ]
+            : undefined
+        }
+      />
 
-        {/* Assessment Selector */}
-        <div className="row mb-5">
-          <div className="col-md-4">
-            <label className="fs-6 fw-bold mb-2">Select Assessment</label>
-            <select
-              className="form-select form-select-solid"
-              value={selectedAssessmentId || ""}
-              onChange={(e) => setSelectedAssessmentId(e.target.value ? Number(e.target.value) : null)}
-            >
-              <option value="">-- Select Assessment --</option>
-              {assessments.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.assessmentName}
-                </option>
-              ))}
-            </select>
+      <div className="card">
+        <div className="card-body py-4">
+          {message && (
+            <div className={`alert alert-${message.type} alert-dismissible fade show`} role="alert">
+              {message.text}
+              <button type="button" className="btn-close" onClick={() => setMessage(null)}></button>
+            </div>
+          )}
+
+          {/* Assessment Selector */}
+          <div className="row mb-5">
+            <div className="col-md-4">
+              <label className="fs-6 fw-bold mb-2">Select Assessment</label>
+              <select
+                className="form-select form-select-solid"
+                value={selectedAssessmentId || ""}
+                onChange={(e) => setSelectedAssessmentId(e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">-- Select Assessment --</option>
+                {assessments.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.assessmentName}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-          {selectedAssessmentId && textResponses.length > 0 && (
-            <div className="col-md-8 d-flex align-items-end gap-3">
-              <button
-                className="btn btn-info"
-                onClick={handleBulkAiMap}
-                disabled={bulkAiLoading || unmappedCount === 0}
-              >
-                {bulkAiLoading ? (
-                  <><span className="spinner-border spinner-border-sm me-2"></span>AI Processing...</>
-                ) : (
-                  <>AI Auto-Map Unmapped ({unmappedCount})</>
-                )}
-              </button>
-              <button
-                className="btn btn-success"
-                onClick={handleRecalculateScores}
-                disabled={recalculating}
-              >
-                {recalculating ? (
-                  <><span className="spinner-border spinner-border-sm me-2"></span>Recalculating...</>
-                ) : (
-                  "Recalculate Scores"
-                )}
-              </button>
-              <span className="badge bg-secondary fs-7 p-3">
-                {totalCount} responses, {unmappedCount} unmapped
-              </span>
+
+          {/* Text Responses Table */}
+          {loading ? (
+            <div className="text-center py-10">
+              <span className="spinner-border spinner-border-lg"></span>
+              <p className="mt-3">Loading text responses...</p>
+            </div>
+          ) : !selectedAssessmentId ? (
+            <div className="text-center py-10 text-muted">
+              <p className="fs-5">Select an assessment to view text responses.</p>
+            </div>
+          ) : textResponses.length === 0 ? (
+            <div className="text-center py-10 text-muted">
+              <p className="fs-5">No text responses found for this assessment.</p>
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <table className="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
+                <thead>
+                  <tr className="fw-bolder text-muted">
+                    <th className="min-w-200px">Question</th>
+                    <th className="min-w-150px">Text Response</th>
+                    <th className="min-w-50px">Count</th>
+                    <th className="min-w-200px">Map to Option</th>
+                    <th className="min-w-50px">Status</th>
+                    <th className="min-w-150px text-end">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {textResponses.map((item) => {
+                    const currentMapping = mappingState[item.assessmentAnswerId];
+                    const isSaved = item.mappedOption?.optionId === currentMapping;
+                    const isSaving = savingIds.has(item.assessmentAnswerId);
+                    const isAiLoading = aiLoadingIds.has(item.assessmentAnswerId);
+
+                    return (
+                      <tr key={item.assessmentAnswerId}>
+                        <td>
+                          <span className="text-dark d-block fs-7" style={{ maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {item.question?.questionText || "N/A"}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="badge bg-light-primary text-primary fs-7 p-2">
+                            {item.textResponse}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="badge bg-secondary fs-7">{item.count || 1}</span>
+                        </td>
+                        <td>
+                          <select
+                            className="form-select form-select-sm"
+                            value={currentMapping || ""}
+                            onChange={(e) =>
+                              setMappingState((prev) => ({
+                                ...prev,
+                                [item.assessmentAnswerId]: e.target.value ? Number(e.target.value) : "",
+                              }))
+                            }
+                          >
+                            <option value="">-- Select Option --</option>
+                            {item.question?.options.map((opt) => (
+                              <option key={opt.optionId} value={opt.optionId}>
+                                {opt.optionText}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>
+                          {item.mappedOption ? (
+                            <span className="badge bg-success">Mapped</span>
+                          ) : currentMapping ? (
+                            <span className="badge bg-warning text-dark">Unsaved</span>
+                          ) : (
+                            <span className="badge bg-danger">Unmapped</span>
+                          )}
+                        </td>
+                        <td className="text-end">
+                          <button
+                            className="btn btn-sm btn-light-info me-2"
+                            onClick={() => handleAiSuggest(item)}
+                            disabled={isAiLoading || !item.question?.options?.length}
+                            title="AI Suggest"
+                          >
+                            {isAiLoading ? (
+                              <span className="spinner-border spinner-border-sm"></span>
+                            ) : (
+                              "AI Suggest"
+                            )}
+                          </button>
+                          <button
+                            className="btn btn-sm btn-light-success"
+                            onClick={() => handleMapSingle(item.assessmentAnswerId)}
+                            disabled={!currentMapping || isSaving || isSaved}
+                          >
+                            {isSaving ? (
+                              <span className="spinner-border spinner-border-sm"></span>
+                            ) : isSaved ? (
+                              "Saved"
+                            ) : (
+                              "Save"
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
-
-        {/* Text Responses Table */}
-        {loading ? (
-          <div className="text-center py-10">
-            <span className="spinner-border spinner-border-lg"></span>
-            <p className="mt-3">Loading text responses...</p>
-          </div>
-        ) : !selectedAssessmentId ? (
-          <div className="text-center py-10 text-muted">
-            <p className="fs-5">Select an assessment to view text responses.</p>
-          </div>
-        ) : textResponses.length === 0 ? (
-          <div className="text-center py-10 text-muted">
-            <p className="fs-5">No text responses found for this assessment.</p>
-          </div>
-        ) : (
-          <div className="table-responsive">
-            <table className="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
-              <thead>
-                <tr className="fw-bolder text-muted">
-                  <th className="min-w-200px">Question</th>
-                  <th className="min-w-150px">Text Response</th>
-                  <th className="min-w-50px">Count</th>
-                  <th className="min-w-200px">Map to Option</th>
-                  <th className="min-w-50px">Status</th>
-                  <th className="min-w-150px text-end">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {textResponses.map((item) => {
-                  const currentMapping = mappingState[item.assessmentAnswerId];
-                  const isSaved = item.mappedOption?.optionId === currentMapping;
-                  const isSaving = savingIds.has(item.assessmentAnswerId);
-                  const isAiLoading = aiLoadingIds.has(item.assessmentAnswerId);
-
-                  return (
-                    <tr key={item.assessmentAnswerId}>
-                      <td>
-                        <span className="text-dark d-block fs-7" style={{ maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {item.question?.questionText || "N/A"}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="badge bg-light-primary text-primary fs-7 p-2">
-                          {item.textResponse}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="badge bg-secondary fs-7">{item.count || 1}</span>
-                      </td>
-                      <td>
-                        <select
-                          className="form-select form-select-sm"
-                          value={currentMapping || ""}
-                          onChange={(e) =>
-                            setMappingState((prev) => ({
-                              ...prev,
-                              [item.assessmentAnswerId]: e.target.value ? Number(e.target.value) : "",
-                            }))
-                          }
-                        >
-                          <option value="">-- Select Option --</option>
-                          {item.question?.options.map((opt) => (
-                            <option key={opt.optionId} value={opt.optionId}>
-                              {opt.optionText}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td>
-                        {item.mappedOption ? (
-                          <span className="badge bg-success">Mapped</span>
-                        ) : currentMapping ? (
-                          <span className="badge bg-warning text-dark">Unsaved</span>
-                        ) : (
-                          <span className="badge bg-danger">Unmapped</span>
-                        )}
-                      </td>
-                      <td className="text-end">
-                        <button
-                          className="btn btn-sm btn-light-info me-2"
-                          onClick={() => handleAiSuggest(item)}
-                          disabled={isAiLoading || !item.question?.options?.length}
-                          title="AI Suggest"
-                        >
-                          {isAiLoading ? (
-                            <span className="spinner-border spinner-border-sm"></span>
-                          ) : (
-                            "AI Suggest"
-                          )}
-                        </button>
-                        <button
-                          className="btn btn-sm btn-light-success"
-                          onClick={() => handleMapSingle(item.assessmentAnswerId)}
-                          disabled={!currentMapping || isSaving || isSaved}
-                        >
-                          {isSaving ? (
-                            <span className="spinner-border spinner-border-sm"></span>
-                          ) : isSaved ? (
-                            "Saved"
-                          ) : (
-                            "Save"
-                          )}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
     </div>
   );

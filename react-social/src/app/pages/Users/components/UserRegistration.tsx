@@ -4,6 +4,7 @@ import { Dropdown } from "react-bootstrap";
 import UsersRegistrationEditModal from "./UsersRegistrationEditModal";
 import UserCollegeMappingModal from "./UserCollegeMappingModal";
 import { useNavigate } from "react-router-dom";
+import { ActionIcon } from "../../../components/ActionIcon";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -230,7 +231,7 @@ const UserRegistration: FC = () => {
                                 onClick={() => handleEditClick(user)}
                                 className="d-flex align-items-center px-4 py-2"
                               >
-                                <i className="bi bi-pencil-square me-2 text-primary"></i>
+                                <ActionIcon type="edit" size="sm" className="me-2" />
                                 Edit
                               </Dropdown.Item>
                               <Dropdown.Item

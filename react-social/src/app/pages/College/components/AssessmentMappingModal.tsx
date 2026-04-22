@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Modal, Button, Form, Spinner } from "react-bootstrap";
-import { MdContentCopy, MdDelete, MdQrCode, MdDownload } from "react-icons/md";
+import { MdQrCode } from "react-icons/md";
+import { ActionIcon } from "../../../components/ActionIcon";
 import { QRCodeCanvas } from "qrcode.react";
 import { GetSessionsByInstituteCode } from "../API/College_APIs";
 import {
@@ -546,7 +547,7 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
                                     fontWeight: 600, fontSize: "0.7rem", cursor: "pointer",
                                   }}
                                 >
-                                  <MdContentCopy size={11} />
+                                  <ActionIcon type="copy" size="sm" />
                                   {copySuccess === `free-${mapping.token}` ? "Copied!" : "Copy"}
                                 </button>
                                 <button
@@ -593,7 +594,7 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
                                     fontWeight: 600, fontSize: "0.7rem", cursor: "pointer",
                                   }}
                                 >
-                                  <MdContentCopy size={11} />
+                                  <ActionIcon type="copy" size="sm" />
                                   {copySuccess === `paid-${mapping.token}` ? "Copied!" : "Copy"}
                                 </button>
                                 <button
@@ -624,7 +625,7 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
                                 transition: "all 0.15s",
                               }}
                             >
-                              <MdDelete size={14} />
+                              <ActionIcon type="delete" size="sm" />
                             </button>
                           </td>
                         </tr>
@@ -716,7 +717,7 @@ const AssessmentMappingModal = (props: AssessmentMappingModalProps) => {
                 boxShadow: "0 4px 14px rgba(5, 150, 105, 0.25)",
               }}
             >
-              <MdDownload size={16} style={{ marginRight: 8 }} />
+              <span style={{ marginRight: 8 }}><ActionIcon type="download" size="sm" /></span>
               Download QR
             </Button>
           )}

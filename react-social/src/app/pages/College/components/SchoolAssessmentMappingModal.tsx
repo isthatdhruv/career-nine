@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Modal, Button, Form, Spinner } from "react-bootstrap";
-import { MdContentCopy, MdQrCode, MdDownload, MdSave } from "react-icons/md";
+import { MdQrCode } from "react-icons/md";
+import { ActionIcon } from "../../../components/ActionIcon";
 import { QRCodeCanvas } from "qrcode.react";
 import { GetSessionsByInstituteCode } from "../API/College_APIs";
 import {
@@ -500,7 +501,7 @@ const SchoolAssessmentMappingModal = ({ show, onHide, instituteCode, instituteNa
                     {saving ? (
                       <><Spinner animation="border" size="sm" style={{ marginRight: 8 }} />Saving...</>
                     ) : (
-                      <><MdSave size={16} style={{ marginRight: 8 }} />Save All Mappings</>
+                      <><span style={{ marginRight: 8 }}><ActionIcon type="approve" size="sm" /></span>Save All Mappings</>
                     )}
                   </Button>
                 </div>
@@ -560,7 +561,7 @@ const SchoolAssessmentMappingModal = ({ show, onHide, instituteCode, instituteNa
                           fontWeight: 600, fontSize: "0.78rem", cursor: "pointer",
                         }}
                       >
-                        <MdContentCopy size={14} />
+                        <ActionIcon type="copy" size="sm" />
                         {copySuccess ? "Copied!" : "Copy URL"}
                       </button>
                       <button
@@ -615,7 +616,7 @@ const SchoolAssessmentMappingModal = ({ show, onHide, instituteCode, instituteNa
                               color: "#fff", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer",
                             }}
                           >
-                            <MdDownload size={14} />
+                            <ActionIcon type="download" size="sm" />
                             Download QR
                           </button>
                         </div>

@@ -1,9 +1,9 @@
 // ContactPersonTable.tsx
 import { useState } from "react";
 import { MDBDataTableV5 } from "mdbreact";
-import { AiFillEdit } from "react-icons/ai";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
+import { ActionIcon } from "../../../components/ActionIcon";
 import { DeleteContactInformationData } from "../API/Contact_Person_APIs";
 import ContactPersonEditModal from "./ContactPersonEditModal";
 import { showErrorToast } from '../../../utils/toast';
@@ -87,7 +87,7 @@ const ContactPersonTable = (props: {
               className="btn btn-icon btn-primary btn-sm me-3"
               type="button"
             >
-              <AiFillEdit size={16} />
+              <ActionIcon type="edit" size="sm" />
             </button>
 
             <button

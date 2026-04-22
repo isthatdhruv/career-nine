@@ -186,4 +186,9 @@ public class CounsellingAppointmentController {
     public ResponseEntity<Map<String, Long>> getStats() {
         return ResponseEntity.ok(appointmentService.getStats());
     }
+
+    @GetMapping("/getAll")
+    public ResponseEntity<List<CounsellingAppointment>> getAll() {
+        return ResponseEntity.ok(appointmentRepository.findAll());
+    }
 }

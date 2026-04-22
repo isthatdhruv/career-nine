@@ -1,16 +1,14 @@
 import { useEffect, useState } from "react";
-import { Button } from "react-bootstrap";
-import { IconContext } from "react-icons";
-import { MdQuestionAnswer } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { ReadContactInformationData } from "./API/Contact_Person_APIs";
 import ContactPersonTable from "./components/ContactPersonTable";
+import PageHeader from "../../components/PageHeader";
 
 
 const ContactPersonPage = () => {
   const [contactPersonData, setContactPersonData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [sections, setSections] = useState<any[]>([]); 
+  const [sections, setSections] = useState<any[]>([]);
   const [pageLoading, setPageLoading] = useState(["false"]);
   const navigate = useNavigate();
 
@@ -44,58 +42,47 @@ const ContactPersonPage = () => {
 
   useEffect(() => {
     fetchQuestions();
-    
+
     if (pageLoading[0] === "true") {
       setPageLoading(["false"]);
     }
-  }, [pageLoading[0]]); 
+  }, [pageLoading[0]]);
 
 
   return (
-    <div className="card">
-      {loading && (
-        <span className="indicator-progress m-5" style={{ display: "block" }}>
-          Please wait...{" "}
-          <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
-        </span>
-      )}
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className='bi bi-person-rolodex' />}
+        title="Contact Person Information"
+        subtitle={<><strong>{contactPersonData.length}</strong> contacts</>}
+        actions={[
+          {
+            label: "Add Contact Person",
+            iconClass: "bi-plus-lg",
+            onClick: () => navigate("/contact-person/create"),
+            variant: "primary",
+          },
+        ]}
+      />
 
-      {!loading && (
-        <div className="card-header border-0 pt-6">
-          <div className="card-title">
-            <h1>Contact Person Information</h1>
+      <div className="card">
+        {loading && (
+          <span className="indicator-progress m-5" style={{ display: "block" }}>
+            Please wait...{" "}
+            <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
+          </span>
+        )}
+
+        {!loading && (
+          <div className="card-body pt-5">
+            <ContactPersonTable
+              data={contactPersonData}
+              setLoading={setLoading}
+              setPageLoading={setPageLoading}
+            />
           </div>
-
-          <div className="card-toolbar">
-            <div className="d-flex justify-content-end">
-              <Button
-                variant="primary"
-                onClick={() => {
-                  navigate("/contact-person/create");
-                }}
-              >
-                <IconContext.Provider
-                  value={{ style: { paddingBottom: "4px" } }}
-                >
-                  <div>
-                    Add Contact Person <MdQuestionAnswer size={21} />
-                  </div>
-                </IconContext.Provider>
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {!loading && (
-        <div className="card-body pt-5">
-          <ContactPersonTable
-            data={contactPersonData}
-            setLoading={setLoading}
-            setPageLoading={setPageLoading}
-          />
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

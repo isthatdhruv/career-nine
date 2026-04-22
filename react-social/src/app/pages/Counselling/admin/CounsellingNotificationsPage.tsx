@@ -5,6 +5,7 @@ import { getRecentActivities, markAllAsRead, ActivityLog } from '../API/Counsell
 import { getPendingBlockRequests, approveBlockRequest, rejectBlockRequest, BlockDateRequest } from '../API/BlockDateRequestAPI'
 import { getAllCounsellors, toggleCounsellorActive } from '../API/CounsellorAPI'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
+import PageHeader from '../../../components/PageHeader'
 
 const TYPE_CONFIG: Record<string, { iconPath: string; color: string; bg: string }> = {
   COUNSELLOR_REGISTERED: { iconPath: '/media/icons/duotune/communication/com013.svg', color: '#0369A1', bg: '#F0F9FF' },
@@ -124,23 +125,16 @@ const CounsellingNotificationsPage: React.FC = () => {
   ]
 
   return (
+    <div className="ph-page">
     <div style={{ padding: '24px 28px', background: 'var(--sp-bg, #F2F7F5)', minHeight: '100vh' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--sp-text, #1A2B28)' }}>
-            Counselling Notifications
-          </h2>
-          <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--sp-muted, #5C7A72)' }}>
-            Activity log of all counsellor-related events
-          </p>
-        </div>
-        {unreadCount > 0 && (
-          <button className='cl-btn-outline' onClick={handleMarkAllRead} style={{ fontSize: 13 }}>
-            Mark all as read
-          </button>
-        )}
-      </div>
+      <PageHeader
+        icon={<i className="bi bi-bell" />}
+        title="Counselling Notifications"
+        subtitle={<><strong>{unreadCount}</strong> unread · Activity log of all counsellor-related events</>}
+        actions={unreadCount > 0 ? [
+          { label: 'Mark all as read', iconClass: 'bi-check-all', onClick: handleMarkAllRead, variant: 'primary' },
+        ] : []}
+      />
 
       {/* Success */}
       {success && (
@@ -329,6 +323,7 @@ const CounsellingNotificationsPage: React.FC = () => {
           })}
         </div>
       )}
+    </div>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { getLoginLogs } from "./API/ActivityLog_APIs";
 import UrlAccessModal from "./components/UrlAccessModal";
+import PageHeader from "../../components/PageHeader";
 
 interface LoginLog {
   id: number;
@@ -57,13 +58,28 @@ const ActivityLogPage = () => {
   };
 
   return (
-    <div className="card">
-      <div className="card-header border-0 pt-6">
-        <div className="card-title">
-          <h1>User Activity Log</h1>
-        </div>
-      </div>
-
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className="bi bi-journal-text" />}
+        title="Activity Log"
+        subtitle={
+          fetched ? (
+            <><strong>{loginLogs.length}</strong> entries</>
+          ) : (
+            "Track user login activity and URL access"
+          )
+        }
+        actions={[
+          {
+            label: loading ? "Fetching..." : "Fetch Logs",
+            iconClass: "bi-arrow-clockwise",
+            onClick: handleFetch,
+            variant: "primary",
+            disabled: loading || !startDate || !endDate,
+          },
+        ]}
+      />
+      <div className="card">
       <div className="card-body pt-3">
         {/* Date Filter */}
         <div className="row mb-5 align-items-end">
@@ -188,6 +204,7 @@ const ActivityLogPage = () => {
         startDate={startDate}
         endDate={endDate}
       />
+      </div>
     </div>
   );
 };

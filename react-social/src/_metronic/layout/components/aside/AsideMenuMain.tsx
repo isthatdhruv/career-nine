@@ -44,7 +44,7 @@ export function AsideMenuMain() {
     allowed("/college") || allowed("/contact-person") || allowed("/group-student") ||
     allowed("/admin/group-student") || allowed("/school/group-student") ||
     allowed("/school/assigned-students") ||
-    allowed("/board") || allowed("/upload-excel") || allowed("/studentlist");
+    allowed("/board") || allowed("/upload-excel");
 
   const showQuestionnaire =
     allowed("/questionare/create") || allowed("/questionaire/List") ||
@@ -68,14 +68,6 @@ export function AsideMenuMain() {
     allowed("/communication-logs");
 
   const showReports = allowed("/reports") || allowed("/report-generation") || allowed("/send-reports");
-
-  const showTeacherDashboards =
-    allowed("/teacher/class-dashboard") || allowed("/principal/dashboard");
-
-  const showTeacherRegistration =
-    allowed("/faculty/registration-details") || allowed("/faculty/registration-form");
-
-  const showTeacher = showTeacherDashboards || showTeacherRegistration;
 
   const showRoles =
     allowed("/roles/role") ||
@@ -170,14 +162,6 @@ export function AsideMenuMain() {
                 icon="/media/icons/duotune/general/gen044.svg"
                 title="Add Students in Bulk"
                 fontIcon="bi-app-indicator"
-              />
-            )}
-            {allowed("/studentlist") && (
-              <AsideMenuItem
-                to="/studentlist"
-                title="Student's List & Profile"
-                fontIcon="bi-app-indicator"
-                icon="/media/icons/duotune/communication/com006.svg"
               />
             )}
           </AsideMenuItemWithSub>
@@ -491,63 +475,6 @@ export function AsideMenuMain() {
         fontIcon="bi-app-indicator"
       /> */}
 
-      {showTeacher && (
-        <>
-          <div className="menu-item">
-            <div className="menu-content pt-8 pb-2">
-              <span className="menu-section text-muted text-uppercase fs-8 ls-1">
-                TEACHER
-              </span>
-            </div>
-          </div>
-          {showTeacherDashboards && (
-            <AsideMenuItemWithSub
-              to=""
-              title="Dashboards"
-              fontIcon="bi-speedometer2"
-              icon="/media/icons/duotune/general/gen019.svg"
-            >
-              {allowed("/teacher/class-dashboard") && (
-                <AsideMenuItem
-                  to="/teacher/class-dashboard"
-                  title="Class Teacher Dashboard"
-                  hasBullet={true}
-                />
-              )}
-              {allowed("/principal/dashboard") && (
-                <AsideMenuItem
-                  to="/principal/dashboard"
-                  title="Principal Dashboard"
-                  hasBullet={true}
-                />
-              )}
-            </AsideMenuItemWithSub>
-          )}
-          {showTeacherRegistration && (
-            <AsideMenuItemWithSub
-              to=""
-              title="Teachers Registration"
-              fontIcon="bi-app-indicator"
-              icon="/media/icons/duotune/communication/com006.svg"
-            >
-              {allowed("/faculty/registration-details") && (
-                <AsideMenuItem
-                  to="/faculty/registration-details"
-                  title="Registrations List"
-                  hasBullet={true}
-                />
-              )}
-              {allowed("/faculty/registration-form") && (
-                <AsideMenuItem
-                  to="/faculty/registration-form"
-                  title="Registration Form"
-                  hasBullet={true}
-                />
-              )}
-            </AsideMenuItemWithSub>
-          )}
-        </>
-      )}
 
       {showRoles && (
         <>

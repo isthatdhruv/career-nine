@@ -40,6 +40,7 @@ import { uploadReportZip, deleteReportZip } from "./API/ReportZip_APIs";
 import { Navigator360Preview } from "./navigator360/Navigator360Report";
 import { FourPagerPreview } from "./fourPager/FourPagerReport";
 import { buildFourPagerHtml } from "./fourPager/FourPagerAPI";
+import PageHeader from "../../components/PageHeader";
 
 // ═══════════════════════ TYPES ═══════════════════════
 
@@ -778,16 +779,45 @@ const ReportsHubPage: React.FC = () => {
   // ═══════════════════════ RENDER ═══════════════════════
 
   return (
-    <div style={{ padding: "24px 32px", maxWidth: 1500, margin: "0 auto" }}>
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ fontWeight: 800, fontSize: "1.5rem", color: "#1a1a2e", margin: 0 }}>
-          Reports Hub
-        </h2>
-        <p style={{ color: "#6b7280", fontSize: "0.9rem", margin: "4px 0 0" }}>
-          Generate, manage, export, and send reports from one place
-        </p>
-      </div>
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className="bi bi-grid-3x3-gap" />}
+        title="Reports Hub"
+        subtitle={
+          ready ? (
+            <>
+              <strong>{displayedStudents.length}</strong> students · {selectedAssessmentName}
+              {" · "}
+              <strong>{reportStats.generated}</strong> reports generated
+            </>
+          ) : (
+            <>Generate, manage, export, and send reports from one place</>
+          )
+        }
+        actions={[
+          {
+            label: generating ? "Generating..." : `Generate${countLabel}`,
+            iconClass: "bi-play-circle",
+            onClick: handleGenerate,
+            variant: "primary",
+            disabled: !ready || displayedStudents.length === 0 || generating,
+          },
+          {
+            label: "Download ZIP",
+            iconClass: "bi-file-earmark-zip",
+            onClick: handleDownloadZipClick,
+            variant: "ghost",
+            disabled: !ready || reportStats.generated === 0,
+          },
+          {
+            label: "Bulk Send",
+            iconClass: "bi-send",
+            onClick: () => setBulkSendOpen(true),
+            variant: "ghost",
+            disabled: !ready || reportStats.generated === 0,
+          },
+        ]}
+      />
 
       {/* Selection Row */}
       <div style={{
@@ -837,7 +867,7 @@ const ReportsHubPage: React.FC = () => {
           padding: 48, textAlign: "center", color: "#9ca3af",
           border: "2px dashed #e5e7eb", borderRadius: 12, background: "#fff",
         }}>
-          <div style={{ fontSize: "2rem", marginBottom: 8, opacity: 0.4 }}>&#x1F4CA;</div>
+          <div style={{ fontSize: "2rem", marginBottom: 8, opacity: 0.4 }}><i className="bi bi-bar-chart" /></div>
           <div>Select a school and assessment to get started</div>
         </div>
       )}

@@ -7,7 +7,7 @@ import {
 } from "../API/Measured_Quality_Types_APIs";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
-import { MdRestorePage } from "react-icons/md";
+import { ActionIcon } from "../../../components/ActionIcon";
 import { showErrorToast } from '../../../utils/toast';
 
 interface MeasuredQualityTypesRecycleBinModalProps {
@@ -155,7 +155,7 @@ const MeasuredQualityTypesRecycleBinModal = ({
                           {isActionLoading ? (
                             <span className="spinner-border spinner-border-sm" role="status" />
                           ) : (
-                            <MdRestorePage size={16} />
+                            <ActionIcon type="refresh" size="sm" />
                           )}
                         </button>
                         <button

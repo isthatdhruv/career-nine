@@ -1,8 +1,7 @@
 import React from "react";
 import { MDBDataTableV5 } from "mdbreact";
-import { AiFillEdit } from "react-icons/ai";
-import { FiTrash2 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
+import { ActionIcon } from "../../../components/ActionIcon";
 import { DeleteListData } from "../API/List_APIs";
 import { showErrorToast } from '../../../utils/toast';
 
@@ -39,7 +38,7 @@ const ListTable: React.FC<Props> = ({ data = [], setLoading, setPageLoading }) =
               padding: "6px 8px",
             }}
           >
-            <AiFillEdit size={16} />
+            <ActionIcon type="edit" size="sm" />
           </button>
 
           {/* Delete */}
@@ -67,7 +66,7 @@ const ListTable: React.FC<Props> = ({ data = [], setLoading, setPageLoading }) =
               padding: "6px 8px",
             }}
           >
-            <FiTrash2 size={16} />
+            <ActionIcon type="delete" size="sm" />
           </button>
         </div>
       ),

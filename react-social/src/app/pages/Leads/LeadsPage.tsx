@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from "react";
 import * as XLSX from "xlsx";
 import { getAllLeads, sendLeadsEmail, Lead } from "./API/Leads_APIs";
 import { showErrorToast } from '../../utils/toast';
+import { ActionIcon } from "../../components/ActionIcon";
+import PageHeader from "../../components/PageHeader";
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -286,29 +288,46 @@ export default function LeadsPage() {
   };
 
   return (
-    <div style={{ background: "#f8fafc", minHeight: "100vh", padding: "24px" }}>
-      {/* Page Header */}
-      <div style={{ marginBottom: "24px" }}>
-        <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
-          <div>
-            <h4 style={{ color: "#111827", fontWeight: 700, marginBottom: "4px", fontSize: "1.4rem" }}>
-              Leads Management
-            </h4>
-            <p style={{ color: "#6b7280", fontSize: "0.9rem", margin: 0 }}>
-              View, filter, and export all captured leads
-            </p>
-          </div>
-          <button
-            className="btn d-flex align-items-center gap-2"
-            onClick={fetchLeads}
-            disabled={loading}
-            style={{ background: "#fff", border: "1px solid #d1d5db", borderRadius: "6px", padding: "8px 16px", fontWeight: 600, fontSize: "0.85rem", color: "#374151" }}
-          >
-            <i className={`bi bi-arrow-clockwise ${loading ? "spin" : ""}`}></i>
-            Refresh
-          </button>
-        </div>
-      </div>
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className="bi bi-people" />}
+        title="Leads"
+        subtitle={
+          <>
+            <strong>{filteredLeads.length}</strong> lead{filteredLeads.length !== 1 ? "s" : ""}
+            {hasActiveFilters ? <> of {leads.length} total</> : null}
+            {" · "}View, filter, and export all captured leads
+          </>
+        }
+        actions={[
+          {
+            label: "Download Excel",
+            iconClass: "bi-download",
+            onClick: handleDownloadExcel,
+            variant: "primary",
+            disabled: filteredLeads.length === 0,
+          },
+          {
+            label: "Email Excel",
+            iconClass: "bi-envelope",
+            onClick: () => {
+              setShowEmailModal(true);
+              setEmailError("");
+              setEmailSuccess("");
+              setEmailTo("");
+            },
+            variant: "ghost",
+            disabled: filteredLeads.length === 0,
+          },
+          {
+            label: "Refresh",
+            iconClass: "bi-arrow-clockwise",
+            onClick: fetchLeads,
+            variant: "ghost",
+            disabled: loading,
+          },
+        ]}
+      />
 
       {/* Filters Card */}
       <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "20px", marginBottom: "20px" }}>
@@ -352,7 +371,7 @@ export default function LeadsPage() {
           <div className="col-md-1 d-flex align-items-end">
             {hasActiveFilters && (
               <button className="btn d-flex align-items-center gap-1" onClick={clearFilters} style={{ background: "#fff", color: "#dc2626", border: "2px solid #dc2626", borderRadius: "6px", fontWeight: 600, fontSize: "0.82rem", padding: "8px 12px", whiteSpace: "nowrap" }}>
-                <i className="bi bi-x-lg" style={{ fontSize: "0.7rem" }}></i> Clear
+                <ActionIcon type="reject" size="sm" /> Clear
               </button>
             )}
           </div>
@@ -386,7 +405,7 @@ export default function LeadsPage() {
               color: filteredLeads.length > 0 ? "#fff" : "#9ca3af",
             }}
           >
-            <i className="bi bi-download"></i>
+            <ActionIcon type="download" size="sm" />
             Download Excel
           </button>
           <button
@@ -408,23 +427,31 @@ export default function LeadsPage() {
               color: filteredLeads.length > 0 ? "#fff" : "#9ca3af",
             }}
           >
-            <i className="bi bi-envelope"></i>
+            <ActionIcon type="send" size="sm" />
             Email Excel
           </button>
         </div>
       </div>
 
       {/* Table */}
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", overflow: "hidden" }}>
+      <div
+        style={{
+          background: "#fff",
+          border: "1px solid rgba(15, 23, 42, 0.06)",
+          borderRadius: 14,
+          boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
+          overflow: "hidden",
+        }}
+      >
         {loading ? (
           <div className="text-center py-5">
-            <div className="spinner-border" style={{ color: "#2563eb" }} role="status">
+            <div className="spinner-border" style={{ color: "#0f172a" }} role="status">
               <span className="visually-hidden">Loading...</span>
             </div>
             <p className="mt-3" style={{ color: "#6b7280" }}>Loading leads...</p>
           </div>
         ) : error ? (
-          <div style={{ margin: "20px", padding: "12px 16px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "6px", color: "#b91c1c", fontSize: "0.9rem" }}>
+          <div style={{ margin: "20px", padding: "12px 16px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, color: "#b91c1c", fontSize: "0.9rem" }}>
             <i className="bi bi-exclamation-triangle me-2"></i>
             {error}
           </div>
@@ -434,80 +461,182 @@ export default function LeadsPage() {
             <p className="mt-2" style={{ color: "#6b7280" }}>{leads.length === 0 ? "No leads captured yet." : "No leads match the current filters."}</p>
           </div>
         ) : (
-          <div className="table-responsive">
-            <table className="table table-hover mb-0" style={{ fontSize: "0.85rem" }}>
-              <thead>
-                <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
-                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>S.No</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Full Name</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Email</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Phone</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Designation</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>School Name</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>City</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>CBSE Aff. No</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Students</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Classes</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Type</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Source</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Odoo Status</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Extras</th>
-                  <th style={{ padding: "12px 14px", fontWeight: 700, color: "#374151", fontSize: "0.78rem", textTransform: "uppercase", letterSpacing: "0.3px" }}>Created At</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredLeads.map((lead, index) => {
-                  const extras = parseExtras(lead.extras);
-                  const extrasEntries = Object.entries(extras);
-                  return (
-                    <tr key={lead.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                      <td style={{ padding: "10px 14px", color: "#9ca3af", fontWeight: 500 }}>{index + 1}</td>
-                      <td style={{ padding: "10px 14px", fontWeight: 600, color: "#111827" }}>{lead.fullName}</td>
-                      <td style={{ padding: "10px 14px", color: "#4b5563" }}>{lead.email}</td>
-                      <td style={{ padding: "10px 14px", color: "#4b5563" }}>{lead.phone || "—"}</td>
-                      <td style={{ padding: "10px 14px", color: "#4b5563" }}>{lead.designation || "—"}</td>
-                      <td style={{ padding: "10px 14px", color: "#4b5563" }}>{lead.schoolName || "—"}</td>
-                      <td style={{ padding: "10px 14px", color: "#4b5563" }}>{lead.city || "—"}</td>
-                      <td style={{ padding: "10px 14px", color: "#4b5563" }}>{lead.cbseAffiliationNo || "—"}</td>
-                      <td style={{ padding: "10px 14px", color: "#4b5563" }}>{lead.totalStudents || "—"}</td>
-                      <td style={{ padding: "10px 14px", color: "#4b5563" }}>{lead.classesOffered || "—"}</td>
-                      <td style={{ padding: "10px 14px" }}>{leadTypeBadge(lead.leadType)}</td>
-                      <td style={{ padding: "10px 14px", color: "#4b5563", maxWidth: "150px" }} title={lead.source || ""}>
-                        {lead.source ? (lead.source.length > 20 ? lead.source.substring(0, 20) + "..." : lead.source) : "—"}
-                      </td>
-                      <td style={{ padding: "10px 14px" }}>
-                        {syncStatusBadge(lead.odooSyncStatus)}
-                        {lead.odooLeadId && (
-                          <small className="d-block" style={{ fontSize: "0.72rem", color: "#9ca3af", marginTop: "2px" }}>
-                            ID: {lead.odooLeadId}
-                          </small>
-                        )}
-                      </td>
-                      <td style={{ padding: "10px 14px", maxWidth: "200px" }}>
-                        {extrasEntries.length > 0 ? (
-                          <div style={{ fontSize: "0.78rem", color: "#6b7280" }}>
-                            {extrasEntries.slice(0, 3).map(([key, value]) => (
-                              <div key={key} className="text-truncate" title={`${key}: ${value}`}>
-                                <strong>{key}:</strong> {String(value)}
-                              </div>
-                            ))}
-                            {extrasEntries.length > 3 && (
-                              <small style={{ color: "#9ca3af" }}>+{extrasEntries.length - 3} more</small>
-                            )}
-                          </div>
-                        ) : (
-                          <span style={{ color: "#d1d5db" }}>—</span>
-                        )}
-                      </td>
-                      <td style={{ padding: "10px 14px", color: "#4b5563", fontSize: "0.82rem", whiteSpace: "nowrap" }}>
-                        {formatDate(lead.createdAt)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <style>{`
+              .leads-scroll {
+                overflow-x: auto;
+                overflow-y: hidden;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-gutter: stable;
+              }
+              .leads-scroll::-webkit-scrollbar { height: 10px; }
+              .leads-scroll::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.2); border-radius: 100px; }
+              .leads-scroll::-webkit-scrollbar-thumb:hover { background: rgba(15, 23, 42, 0.32); }
+              .leads-scroll::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.03); }
+
+              .leads-table {
+                width: 100%;
+                min-width: 1600px;
+                border-collapse: separate;
+                border-spacing: 0;
+                font-size: 12.5px;
+                color: #0f172a;
+                table-layout: fixed;
+              }
+              .leads-table thead th {
+                position: sticky;
+                top: 0;
+                z-index: 2;
+                background: #f8fafc !important;
+                color: #64748b !important;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+                font-size: 10.5px !important;
+                font-weight: 700 !important;
+                padding: 11px 10px !important;
+                border-bottom: 1px solid rgba(15, 23, 42, 0.08) !important;
+                white-space: nowrap;
+                text-align: left;
+              }
+              .leads-table tbody td {
+                padding: 10px !important;
+                border-bottom: 1px solid rgba(15, 23, 42, 0.05) !important;
+                vertical-align: top;
+                color: #334155;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+              }
+              .leads-table tbody tr:last-child td { border-bottom: 0 !important; }
+              .leads-table tbody tr:hover td { background: #f8fafc; }
+
+              /* Sticky S.No + Full Name columns so user keeps context while scrolling */
+              .leads-table th.sticky-col,
+              .leads-table td.sticky-col {
+                position: sticky;
+                background: #fff;
+                z-index: 1;
+              }
+              .leads-table thead th.sticky-col { background: #f8fafc !important; z-index: 3; }
+              .leads-table th.sticky-sno,
+              .leads-table td.sticky-sno { left: 0; width: 56px; }
+              .leads-table th.sticky-name,
+              .leads-table td.sticky-name {
+                left: 56px;
+                min-width: 180px;
+                box-shadow: 1px 0 0 rgba(15, 23, 42, 0.06);
+              }
+              .leads-table tbody tr:hover td.sticky-col { background: #f8fafc; }
+
+              .leads-cell-strong { color: #0f172a; font-weight: 600; }
+              .leads-extras {
+                font-size: 11.5px;
+                color: #475569;
+                line-height: 1.35;
+                white-space: normal;
+              }
+              .leads-extras > div {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+              }
+            `}</style>
+            <div className="leads-scroll">
+              <table className="leads-table">
+                <colgroup>
+                  <col style={{ width: 56 }} />
+                  <col style={{ width: 180 }} />
+                  <col style={{ width: 200 }} />
+                  <col style={{ width: 130 }} />
+                  <col style={{ width: 130 }} />
+                  <col style={{ width: 180 }} />
+                  <col style={{ width: 110 }} />
+                  <col style={{ width: 110 }} />
+                  <col style={{ width: 90 }} />
+                  <col style={{ width: 90 }} />
+                  <col style={{ width: 110 }} />
+                  <col style={{ width: 140 }} />
+                  <col style={{ width: 130 }} />
+                  <col style={{ width: 220 }} />
+                  <col style={{ width: 130 }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th className="sticky-col sticky-sno">#</th>
+                    <th className="sticky-col sticky-name">Full Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Designation</th>
+                    <th>School</th>
+                    <th>City</th>
+                    <th>CBSE No</th>
+                    <th>Students</th>
+                    <th>Classes</th>
+                    <th>Type</th>
+                    <th>Source</th>
+                    <th>Odoo</th>
+                    <th>Extras</th>
+                    <th>Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredLeads.map((lead, index) => {
+                    const extras = parseExtras(lead.extras);
+                    const extrasEntries = Object.entries(extras);
+                    return (
+                      <tr key={lead.id}>
+                        <td className="sticky-col sticky-sno" style={{ color: "#94a3b8", fontWeight: 500 }}>
+                          {index + 1}
+                        </td>
+                        <td className="sticky-col sticky-name leads-cell-strong" title={lead.fullName}>
+                          {lead.fullName}
+                        </td>
+                        <td title={lead.email}>{lead.email}</td>
+                        <td>{lead.phone || "—"}</td>
+                        <td title={lead.designation || ""}>{lead.designation || "—"}</td>
+                        <td title={lead.schoolName || ""}>{lead.schoolName || "—"}</td>
+                        <td title={lead.city || ""}>{lead.city || "—"}</td>
+                        <td>{lead.cbseAffiliationNo || "—"}</td>
+                        <td>{lead.totalStudents || "—"}</td>
+                        <td>{lead.classesOffered || "—"}</td>
+                        <td style={{ whiteSpace: "nowrap" }}>{leadTypeBadge(lead.leadType)}</td>
+                        <td title={lead.source || ""}>
+                          {lead.source || "—"}
+                        </td>
+                        <td style={{ whiteSpace: "nowrap" }}>
+                          {syncStatusBadge(lead.odooSyncStatus)}
+                          {lead.odooLeadId && (
+                            <div style={{ fontSize: "0.68rem", color: "#94a3b8", marginTop: 2 }}>
+                              ID: {lead.odooLeadId}
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          {extrasEntries.length > 0 ? (
+                            <div className="leads-extras">
+                              {extrasEntries.slice(0, 3).map(([key, value]) => (
+                                <div key={key} title={`${key}: ${value}`}>
+                                  <strong>{key}:</strong> {String(value)}
+                                </div>
+                              ))}
+                              {extrasEntries.length > 3 && (
+                                <div style={{ color: "#94a3b8" }}>+{extrasEntries.length - 3} more</div>
+                              )}
+                            </div>
+                          ) : (
+                            <span style={{ color: "#cbd5e1" }}>—</span>
+                          )}
+                        </td>
+                        <td style={{ color: "#64748b", fontSize: "0.75rem" }}>
+                          {formatDate(lead.createdAt)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
@@ -582,7 +711,7 @@ export default function LeadsPage() {
                       </>
                     ) : (
                       <>
-                        <i className="bi bi-send me-2"></i>
+                        <ActionIcon type="send" size="sm" className="me-2" />
                         Send Email
                       </>
                     )}

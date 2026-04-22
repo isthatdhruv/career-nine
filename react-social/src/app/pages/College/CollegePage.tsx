@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
-import { Button } from "react-bootstrap";
-import { IconContext } from "react-icons";
-import { MdSchool, MdDeleteSweep } from "react-icons/md";
 import { ReadCollegeData } from "./API/College_APIs";
 import CollegeCreateModal from "./components/CollegeCreateModal";
 import CollegeTable from "./components/CollegeTable";
 import StudentUploadModal from "./components/StudentUploadModal";
 import InstituteRecycleBinModal from "./components/InstituteRecycleBinModal";
+import PageHeader from "../../components/PageHeader";
 
 const CollegePage = () => {
   const [modalShowCreate, setModalShowCreate] = useState(false);
@@ -43,61 +41,46 @@ const CollegePage = () => {
   };
 
   return (
-    <div className="card">
-      {loading && (
-        <span className="indicator-progress m-5" style={{ display: "block" }}>
-          Please wait...{" "}
-          <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
-        </span>
-      )}
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className='bi bi-buildings' />}
+        title="Institutes List"
+        subtitle={<><strong>{collegeData.length}</strong> institutes</>}
+        actions={[
+          {
+            label: "Add Institute",
+            iconClass: "bi-plus-lg",
+            onClick: () => setModalShowCreate(true),
+            variant: "primary",
+          },
+          {
+            label: "Recycle Bin",
+            iconClass: "bi-trash",
+            onClick: () => setShowRecycleBin(true),
+            variant: "danger",
+          },
+        ]}
+      />
 
-      {!loading && (
-        <div className="card-header border-0 pt-6">
-          <div className="card-title">
-            <h1>Institutes List</h1>
+      <div className="card">
+        {loading && (
+          <span className="indicator-progress m-5" style={{ display: "block" }}>
+            Please wait...{" "}
+            <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
+          </span>
+        )}
+
+        {!loading && (
+          <div className="card-body pt-5">
+            <CollegeTable
+              data={collegeData}
+              setLoading={setLoading}
+              setPageLoading={setPageLoading}
+              onUploadClick={openUploadForCollege}
+            />
           </div>
-
-          <div className="card-toolbar">
-            <div className="d-flex justify-content-end">
-              <div style={{ display: "flex", gap: 8 }}>
-                <Button
-                  variant="outline-danger"
-                  onClick={() => setShowRecycleBin(true)}
-                >
-                  <IconContext.Provider value={{ style: { paddingBottom: "4px" } }}>
-                    <div>
-                      Recycle Bin <MdDeleteSweep size={21} />
-                    </div>
-                  </IconContext.Provider>
-                </Button>
-                <Button
-                  variant="primary"
-                  onClick={() => {
-                    setModalShowCreate(true);
-                  }}
-                >
-                  <IconContext.Provider value={{ style: { paddingBottom: "4px" } }}>
-                    <div>
-                      Add Institute <MdSchool size={21} />
-                    </div>
-                  </IconContext.Provider>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {!loading && (
-        <div className="card-body pt-5">
-          <CollegeTable
-            data={collegeData}
-            setLoading={setLoading}
-            setPageLoading={setPageLoading}
-            onUploadClick={openUploadForCollege}
-          />
-        </div>
-      )}
+        )}
+      </div>
 
       <CollegeCreateModal
         setPageLoading={setPageLoading}

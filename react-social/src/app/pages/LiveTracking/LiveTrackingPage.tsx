@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { getAssessmentList, getLiveTracking, getLiveTrackingLite, getRedisPartials, flushPartialToDb, getRedisPartialDetail, submitFromRedis } from "./API/LiveTracking_APIs";
 import { showErrorToast } from '../../utils/toast';
+import PageHeader from "../../components/PageHeader";
+import { ActionIcon } from "../../components/ActionIcon";
 
 /* ─── Types ─── */
 
@@ -626,50 +628,41 @@ const LiveTrackingPage = () => {
   }, [data, filteredStudents]);
 
   return (
-    <div className="card">
-      <div className="card-header border-0 pt-6" style={{ overflow: "visible" }}>
-        <div className="d-flex flex-wrap align-items-center w-100 gap-3">
-          <h1 className="mb-0 fs-3 me-auto">Live Assessment Tracking</h1>
-
-          {/* Polling indicator */}
-          <div className="d-flex align-items-center gap-2">
-            <div
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                backgroundColor: isPolling ? "#198754" : "#dc3545",
-                animation: isPolling ? "pulse 2s infinite" : "none",
-              }}
-            />
-            <small className="text-muted">
-              {isPolling ? "Live" : "Paused"}
-            </small>
-          </div>
-
-          <button
-            className={`btn btn-sm ${isPolling ? "btn-outline-secondary" : "btn-outline-success"}`}
-            onClick={() => setIsPolling(!isPolling)}
-          >
-            {isPolling ? "Pause" : "Resume"}
-          </button>
-
-          <button
-            className="btn btn-sm btn-outline-primary"
-            onClick={handleRefresh}
-            disabled={loading || !selectedId}
-          >
-            {loading ? (
-              <span
-                className="spinner-border spinner-border-sm me-1"
-                role="status"
-              />
-            ) : null}
-            Refresh
-          </button>
-        </div>
-      </div>
-
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className="bi bi-broadcast" />}
+        title="Live Tracking"
+        subtitle={
+          data ? (
+            <><strong>{data.summary.total}</strong> students · <strong>{data.summary.completed}</strong> completed · <strong>{data.summary.ongoing}</strong> in progress · {isPolling ? "Live" : "Paused"}</>
+          ) : (
+            <>Select an assessment to start tracking</>
+          )
+        }
+        actions={[
+          {
+            label: loading ? "Refreshing..." : "Refresh",
+            iconClass: "bi-arrow-clockwise",
+            onClick: handleRefresh,
+            variant: "primary",
+            disabled: loading || !selectedId,
+          },
+          {
+            label: isPolling ? "Pause" : "Resume",
+            iconClass: isPolling ? "bi-pause-fill" : "bi-play-fill",
+            onClick: () => setIsPolling(!isPolling),
+            variant: "ghost",
+          },
+          {
+            label: "Export Excel",
+            iconClass: "bi-download",
+            onClick: handleDownloadExcel,
+            variant: "ghost",
+            disabled: !data || filteredStudents.length === 0,
+          },
+        ]}
+      />
+      <div className="card">
       <div className="card-body pt-4">
         {/* Assessment selector */}
         <div className="row mb-4">
@@ -827,7 +820,7 @@ const LiveTrackingPage = () => {
                 disabled={filteredStudents.length === 0}
                 title="Download filtered list as Excel"
               >
-                <i className="bi bi-download me-1" />
+                <ActionIcon type="download" size="sm" className="me-1" />
                 Download
               </button>
               <small className="text-muted align-self-center">
@@ -1131,6 +1124,7 @@ const LiveTrackingPage = () => {
           50% { opacity: 0.4; }
         }
       `}</style>
+    </div>
     </div>
   );
 };

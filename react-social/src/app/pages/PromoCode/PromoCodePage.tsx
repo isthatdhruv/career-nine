@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Modal, Button, Form, Spinner, Badge } from "react-bootstrap";
-import { MdAdd, MdEdit, MdDelete } from "react-icons/md";
+import { MdEdit, MdDelete } from "react-icons/md";
 import {
   createPromoCode,
   getAllPromoCodes,
@@ -8,6 +8,7 @@ import {
   deletePromoCode,
 } from "./API/PromoCode_APIs";
 import { showErrorToast } from "../../utils/toast";
+import PageHeader from "../../components/PageHeader";
 
 interface PromoCodeItem {
   id: number;
@@ -160,32 +161,20 @@ const PromoCodePage = () => {
   };
 
   return (
-    <div style={{ padding: "32px" }}>
-      {/* Header */}
-      <div style={{
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-        marginBottom: 32,
-      }}>
-        <div>
-          <h4 style={{ margin: 0, fontWeight: 700, color: "#1e293b" }}>Promo Codes</h4>
-          <p style={{ margin: 0, color: "#64748b", fontSize: "0.9rem", marginTop: 4 }}>
-            Manage discount codes for assessment payments
-          </p>
-        </div>
-        <Button
-          onClick={openCreateModal}
-          style={{
-            background: "linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%)",
-            border: "none", borderRadius: 10, padding: "10px 24px",
-            fontWeight: 600, fontSize: "0.9rem",
-            boxShadow: "0 4px 14px rgba(67, 97, 238, 0.3)",
-            display: "flex", alignItems: "center", gap: 8,
-          }}
-        >
-          <MdAdd size={18} />
-          Create Promo Code
-        </Button>
-      </div>
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className="bi bi-tag" />}
+        title="Promo Codes"
+        subtitle={<><strong>{promoCodes.length}</strong> codes · Discounts for assessments</>}
+        actions={[
+          {
+            label: "Create Promo Code",
+            iconClass: "bi-plus-lg",
+            onClick: openCreateModal,
+            variant: "primary",
+          },
+        ]}
+      />
 
       {/* Table */}
       <div style={{
