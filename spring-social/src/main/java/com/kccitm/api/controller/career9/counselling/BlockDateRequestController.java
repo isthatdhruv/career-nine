@@ -210,7 +210,7 @@ public class BlockDateRequestController {
                             appointment.getId(), e.getMessage());
                 }
 
-                // Notify the student that their counsellor changed
+                // Notify the student that their counsellor changed (in-app + email)
                 try {
                     User studentUser = new User();
                     studentUser.setId(appointment.getStudent().getUserId());
@@ -224,6 +224,14 @@ public class BlockDateRequestController {
                                     + ". The session date and time remain the same.",
                             appointment.getId(),
                             "APPOINTMENT");
+
+                    // Also email the student so they don't miss the change
+                    try {
+                        notificationService.sendConfirmedToStudentEmail(appointment);
+                    } catch (Exception emailEx) {
+                        logger.warn("Failed to email student about counsellor change for appointment {}: {}",
+                                appointment.getId(), emailEx.getMessage());
+                    }
                 } catch (Exception e) {
                     logger.warn("Failed to notify student of counsellor change for appointment {}: {}",
                             appointment.getId(), e.getMessage());
@@ -232,7 +240,8 @@ public class BlockDateRequestController {
                 reassignedCount++;
             } else {
                 // No replacement counsellor available — cancel the appointment
-                // so the student isn't left with a phantom session.
+                // so the student isn't left with a phantom session, then nudge
+                // them via in-app notification + email to rebook (item 6.b).
                 appointment.setStatus("CANCELLED");
                 appointmentRepository.save(appointment);
 
@@ -249,6 +258,13 @@ public class BlockDateRequestController {
                             "APPOINTMENT");
                 } catch (Exception e) {
                     logger.warn("Failed to notify student of cancellation for appointment {}: {}",
+                            appointment.getId(), e.getMessage());
+                }
+
+                try {
+                    notificationService.sendCounsellorLeaveCancellationEmail(appointment);
+                } catch (Exception e) {
+                    logger.warn("Failed to email student of cancellation for appointment {}: {}",
                             appointment.getId(), e.getMessage());
                 }
 

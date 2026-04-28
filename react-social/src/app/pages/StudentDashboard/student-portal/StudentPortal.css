@@ -401,3 +401,274 @@
     justify-content: center;
   }
 }
+
+/* ── Scrollable Report Sections ────────────────────────────────────────── */
+
+.sp-report-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+.sp-report-section {
+  background: var(--sp-card);
+  border-radius: var(--sp-radius);
+  border: 1px solid var(--sp-border);
+  box-shadow: 0 8px 28px rgba(28, 45, 82, 0.06);
+  position: relative;
+  overflow: hidden;
+}
+
+.sp-report-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--sp-primary-dark), var(--sp-primary), var(--sp-secondary));
+}
+
+.sp-report-section-header {
+  padding: 22px 32px 16px 32px;
+  border-bottom: 1px dashed var(--sp-border);
+}
+
+.sp-report-section-heading {
+  min-width: 0;
+}
+
+.sp-report-section-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sp-secondary);
+  margin-bottom: 6px;
+}
+
+.sp-report-section-title-lg {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--sp-text);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.sp-report-section-body {
+  padding: 22px 32px 26px 32px;
+}
+
+/* ── Page 1 stat tiles ─────────────────────────────────────────────────── */
+
+.sp-report-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 20px 0 18px 0;
+}
+
+.sp-report-stat {
+  background: var(--sp-bg);
+  border: 1px solid var(--sp-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.sp-report-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sp-muted);
+  margin-bottom: 8px;
+}
+
+.sp-report-stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--sp-primary-dark);
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+
+.sp-report-stat-value small {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sp-muted);
+}
+
+.sp-report-stat-value-sm {
+  font-size: 16px;
+}
+
+.sp-report-stat-foot {
+  font-size: 11px;
+  color: var(--sp-muted);
+}
+
+.sp-report-callout {
+  background: var(--sp-primary-light);
+  border-left: 3px solid var(--sp-primary);
+  color: var(--sp-text);
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.55;
+  margin-top: 8px;
+}
+
+.sp-report-callout strong {
+  color: var(--sp-primary-dark);
+}
+
+/* ── Page 2 strengths layout ───────────────────────────────────────────── */
+
+.sp-report-strengths {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.sp-report-strengths-chart {
+  min-width: 0;
+}
+
+.sp-report-strengths-side {
+  background: var(--sp-bg);
+  border: 1px solid var(--sp-border);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+
+.sp-report-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--sp-primary-dark);
+  margin-bottom: 8px;
+}
+
+.sp-report-pillar-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sp-report-pillar-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--sp-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.sp-report-pillar-item.top {
+  border-color: var(--sp-primary);
+  background: linear-gradient(90deg, var(--sp-primary-light), #fff);
+}
+
+.sp-report-pillar-name {
+  color: var(--sp-text);
+  font-weight: 500;
+}
+
+.sp-report-pillar-score {
+  font-weight: 700;
+  color: var(--sp-primary-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.sp-report-trait-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sp-report-trait-chip {
+  background: #fff;
+  border: 1px solid var(--sp-border);
+  color: var(--sp-text);
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+/* ── Page 3 careers ────────────────────────────────────────────────────── */
+
+.sp-report-careers {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sp-career-card-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.sp-career-card-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(28, 45, 82, 0.12);
+  border-color: var(--sp-primary);
+  text-decoration: none;
+  color: inherit;
+}
+
+.sp-career-card-link:focus-visible {
+  outline: 2px solid var(--sp-primary);
+  outline-offset: 2px;
+}
+
+.sp-career-link-arrow {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 14px;
+  color: var(--sp-secondary);
+  opacity: 0;
+  transform: translate(-4px, 4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.sp-career-card-link:hover .sp-career-link-arrow {
+  opacity: 1;
+  transform: translate(0, 0);
+  color: var(--sp-primary);
+}
+
+/* ── Responsive tweaks ─────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .sp-report-section-header {
+    padding: 18px 20px 14px 20px;
+  }
+
+  .sp-report-section-body {
+    padding: 18px 20px 22px 20px;
+  }
+
+  .sp-report-section-title-lg {
+    font-size: 20px;
+  }
+
+  .sp-report-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .sp-report-strengths {
+    grid-template-columns: 1fr;
+  }
+}

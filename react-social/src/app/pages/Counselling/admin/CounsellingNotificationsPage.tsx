@@ -72,7 +72,7 @@ const CounsellingNotificationsPage: React.FC = () => {
     setActionLoading(id)
     try {
       await approveBlockRequest(id)
-      setSuccess('Block date approved. Slots cancelled for that date.')
+      setSuccess('Leave request approved. Slots cancelled for that date.')
       setTimeout(() => setSuccess(null), 4000)
       loadData()
     } catch { /* ignore */ }
@@ -95,7 +95,7 @@ const CounsellingNotificationsPage: React.FC = () => {
     setActionLoading(id)
     try {
       await rejectBlockRequest(id)
-      setSuccess('Block date request rejected.')
+      setSuccess('Leave request rejected.')
       setTimeout(() => setSuccess(null), 4000)
       loadData()
     } catch { /* ignore */ }
@@ -206,7 +206,7 @@ const CounsellingNotificationsPage: React.FC = () => {
             padding: '14px 20px', background: '#FEF2F2', borderBottom: '1px solid #FECACA',
             fontWeight: 700, fontSize: 15, color: '#991B1B',
           }}>
-            Pending Block Date Requests ({pendingBlocks.length})
+            Pending Leave Requests ({pendingBlocks.length})
           </div>
           <div style={{ padding: 12 }}>
             {pendingBlocks.map((r) => (
@@ -220,7 +220,7 @@ const CounsellingNotificationsPage: React.FC = () => {
                   <div>
                     <div style={{ fontWeight: 600, color: '#1E293B' }}>{r.counsellor.name}</div>
                     <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                      Wants to block <strong>{r.blockDate}</strong>
+                      Wants leave on <strong>{r.blockDate}</strong>
                       {r.reason && <> &middot; {r.reason}</>}
                     </div>
                   </div>

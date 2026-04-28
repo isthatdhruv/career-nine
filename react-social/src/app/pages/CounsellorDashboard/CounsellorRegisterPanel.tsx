@@ -16,12 +16,15 @@ interface FormData {
   modeCapability: string
   qualifications: string
   yearsOfExperience: string
+  workTime: string
+  counsellorType: string
 }
 
 const initialForm: FormData = {
   name: '', email: '', phone: '', password: '', confirmPassword: '',
   specializations: '', bio: '', languagesSpoken: '', modeCapability: 'BOTH',
   qualifications: '', yearsOfExperience: '',
+  workTime: 'FULL_TIME', counsellorType: 'CAREER',
 }
 
 interface CounsellorRegisterPanelProps {
@@ -117,6 +120,8 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
       modeCapability: form.modeCapability,
       qualifications: form.qualifications.trim() || undefined,
       yearsOfExperience: form.yearsOfExperience ? Number(form.yearsOfExperience) : undefined,
+      workTime: form.workTime,
+      counsellorType: form.counsellorType,
       profileImageUrl: photoUrl || undefined,
     }).catch(() => {})
   }
@@ -301,6 +306,26 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
                 onChange={(e) => update('yearsOfExperience', e.target.value)} />
             </div>
           </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div>
+              <label style={labelStyle}>Work-time</label>
+              <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.workTime}
+                autoComplete='off' name='c9-worktime'
+                onChange={(e) => update('workTime', e.target.value)}>
+                <option value='FULL_TIME'>Full-time</option>
+                <option value='PART_TIME'>Part-time</option>
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Counsellor Type</label>
+              <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.counsellorType}
+                autoComplete='off' name='c9-type'
+                onChange={(e) => update('counsellorType', e.target.value)}>
+                <option value='CAREER'>Career</option>
+                <option value='SCHOOL'>School</option>
+              </select>
+            </div>
+          </div>
           <div>
             <label style={labelStyle}>Qualifications</label>
             <textarea
@@ -312,10 +337,10 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
             />
           </div>
           <div>
-            <label style={labelStyle}>Short Bio</label>
+            <label style={labelStyle}>About Me</label>
             <textarea
               style={{ ...inputStyle, minHeight: 50, resize: 'vertical' }}
-              placeholder='A brief introduction about yourself...'
+              placeholder='Tell students a bit about yourself, your background and approach...'
               autoComplete='off' name='c9-bio' data-lpignore='true'
               value={form.bio}
               onChange={(e) => update('bio', e.target.value)}
@@ -342,9 +367,11 @@ const CounsellorRegisterPanel: React.FC<CounsellorRegisterPanelProps> = ({ onSwi
             { label: 'Specializations', value: form.specializations },
             { label: 'Languages', value: form.languagesSpoken },
             { label: 'Mode', value: form.modeCapability === 'BOTH' ? 'Online & Offline' : form.modeCapability === 'ONLINE' ? 'Online Only' : 'Offline Only' },
+            { label: 'Work-time', value: form.workTime === 'FULL_TIME' ? 'Full-time' : 'Part-time' },
+            { label: 'Counsellor Type', value: form.counsellorType === 'SCHOOL' ? 'School' : 'Career' },
             { label: 'Qualifications', value: form.qualifications || '-' },
             { label: 'Experience', value: form.yearsOfExperience ? `${form.yearsOfExperience} years` : '-' },
-            { label: 'Bio', value: form.bio || '-' },
+            { label: 'About Me', value: form.bio || '-' },
           ].map(({ label, value }) => (
             <div key={label} style={{ display: 'flex', borderBottom: '1px solid #E5E7EB', padding: '5px 0' }}>
               <div style={{ width: 150, fontSize: 12, fontWeight: 600, color: '#5C7A72', flexShrink: 0 }}>{label}</div>
