@@ -97,7 +97,7 @@ const SelectSectionPage: React.FC = () => {
                 {/* Loading State */}
                 {(loading || !sectionsReady) && (
                   <div className="text-center py-5">
-                    <div className="spinner-border" role="status" style={{ width: "3rem", height: "3rem", color: "#667eea" }}>
+                    <div className="spinner-border" role="status" style={{ width: "3rem", height: "3rem", color: "#f43f5e" }}>
                       <span className="visually-hidden">Loading...</span>
                     </div>
                     <p className="mt-3" style={{ color: "#718096" }}>Loading sections...</p>
@@ -111,7 +111,7 @@ const SelectSectionPage: React.FC = () => {
                       style={{
                         width: "80px",
                         height: "80px",
-                        background: "linear-gradient(135deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%)",
+                        background: "linear-gradient(135deg, rgba(244,63,94,0.1) 0%, rgba(225,29,72,0.1) 100%)",
                         borderRadius: "50%",
                         display: "flex",
                         alignItems: "center",
@@ -119,7 +119,7 @@ const SelectSectionPage: React.FC = () => {
                         margin: "0 auto 1.25rem",
                       }}
                     >
-                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#667eea" strokeWidth="2">
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" strokeWidth="2">
                         <circle cx="12" cy="12" r="10" />
                         <line x1="12" y1="8" x2="12" y2="12" />
                         <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -150,7 +150,7 @@ const SelectSectionPage: React.FC = () => {
                               width: "42px",
                               height: "42px",
                               minWidth: "42px",
-                              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                              background: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
                               borderRadius: "10px",
                               display: "flex",
                               alignItems: "center",
@@ -158,7 +158,7 @@ const SelectSectionPage: React.FC = () => {
                               color: "white",
                               fontSize: "1.1rem",
                               fontWeight: "700",
-                              boxShadow: "0 4px 12px rgba(102, 126, 234, 0.3)",
+                              boxShadow: "0 4px 12px rgba(244, 63, 94, 0.3)",
                             }}
                           >
                             {index + 1}
@@ -189,7 +189,7 @@ const SelectSectionPage: React.FC = () => {
                               justifyContent: "center",
                             }}
                           >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#667eea" strokeWidth="2.5">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" strokeWidth="2.5">
                               <line x1="5" y1="12" x2="19" y2="12" />
                               <polyline points="12 5 19 12 12 19" />
                             </svg>

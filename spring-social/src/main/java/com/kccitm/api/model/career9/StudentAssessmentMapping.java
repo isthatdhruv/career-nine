@@ -41,10 +41,24 @@ public class StudentAssessmentMapping implements Serializable {
     @Column(name = "assessment_id", nullable = false)
     private Long assessmentId;
 
+    @Column(name = "feedback_rating")
+    private Integer feedbackRating;
+
+    /**
+     * How many times this student-assessment mapping has been reset.
+     * Incremented inside the reset flow; checked against
+     * AssessmentTable.maxResetsPerStudent before allowing a new reset.
+     */
+    @Column(name = "reset_count", columnDefinition = "INT DEFAULT 0")
+    private Integer resetCount = 0;
+
     @PrePersist
     public void prePersist() {
         if (this.status == null) {
             this.status = "notstarted";
+        }
+        if (this.resetCount == null) {
+            this.resetCount = 0;
         }
     }
 
@@ -86,6 +100,22 @@ public class StudentAssessmentMapping implements Serializable {
 
     public void setAssessmentId(Long assessmentId) {
         this.assessmentId = assessmentId;
+    }
+
+    public Integer getFeedbackRating() {
+        return feedbackRating;
+    }
+
+    public void setFeedbackRating(Integer feedbackRating) {
+        this.feedbackRating = feedbackRating;
+    }
+
+    public Integer getResetCount() {
+        return resetCount == null ? 0 : resetCount;
+    }
+
+    public void setResetCount(Integer resetCount) {
+        this.resetCount = resetCount;
     }
 
     // public String getStatus() {

@@ -34,10 +34,23 @@ const DemographicDetailsPage: React.FC = () => {
   const [fields, setFields] = useState<DemographicField[]>([]);
   const [values, setValues] = useState<Record<number, string>>({});
   const [multiValues, setMultiValues] = useState<Record<number, string[]>>({});
+  const [otherValues, setOtherValues] = useState<Record<number, string>>({});
   const [errors, setErrors] = useState<Record<number, string>>({});
   const [touched, setTouched] = useState<Record<number, boolean>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Treat values matching 'other'/'others' as the catch-all custom option
+  const isOtherValue = (v: string | undefined | null): boolean => {
+    if (!v) return false;
+    const t = v.trim().toLowerCase();
+    return t === "other" || t === "others";
+  };
+
+  const fieldHasOtherOption = (field: DemographicField): boolean =>
+    field.options?.some(
+      (o) => isOtherValue(o.optionValue) || isOtherValue(o.optionLabel)
+    ) ?? false;
 
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
@@ -238,13 +251,28 @@ const DemographicDetailsPage: React.FC = () => {
 
       // Save dynamic demographics if any
       if (fields.length > 0) {
-        const responses = fields.map((field) => ({
-          fieldId: field.fieldId,
-          value:
-            field.dataType === 'SELECT_MULTI'
-              ? (multiValues[field.fieldId] || []).join(',')
-              : values[field.fieldId] || '',
-        }));
+        const responses = fields.map((field) => {
+          let value: string;
+          if (field.dataType === 'SELECT_MULTI') {
+            value = (multiValues[field.fieldId] || []).join(',');
+          } else {
+            const raw = values[field.fieldId] || '';
+            // If user selected "Other" and typed a custom value, send the custom value
+            if (
+              fieldHasOtherOption(field) &&
+              isOtherValue(raw) &&
+              (otherValues[field.fieldId] || '').trim()
+            ) {
+              value = otherValues[field.fieldId].trim();
+            } else {
+              value = raw;
+            }
+          }
+          return {
+            fieldId: field.fieldId,
+            value,
+          };
+        });
 
         await http.post('/student-demographics/submit', {
           userStudentId: Number(userStudentId),
@@ -384,14 +412,14 @@ const DemographicDetailsPage: React.FC = () => {
                         error && isTouched
                           ? '#e53e3e'
                           : values[field.fieldId] === option.optionValue
-                          ? '#667eea'
+                          ? '#f43f5e'
                           : '#e2e8f0'
                       }`,
                       borderRadius: '10px',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
                       background:
-                        values[field.fieldId] === option.optionValue ? '#eef2ff' : 'white',
+                        values[field.fieldId] === option.optionValue ? '#fff1f2' : 'white',
                       display: 'flex',
                       alignItems: 'center',
                     }}
@@ -403,12 +431,33 @@ const DemographicDetailsPage: React.FC = () => {
                       checked={values[field.fieldId] === option.optionValue}
                       onChange={(e) => handleChange(field.fieldId, e.target.value)}
                       onBlur={() => handleBlur(field.fieldId)}
-                      style={{ width: '18px', height: '18px', marginRight: '0.5rem', cursor: 'pointer', accentColor: '#667eea' }}
+                      style={{ width: '18px', height: '18px', marginRight: '0.5rem', cursor: 'pointer', accentColor: '#f43f5e' }}
                     />
                     <span style={{ fontSize: '0.9rem', color: '#2d3748' }}>{option.optionLabel}</span>
                   </label>
                 ))}
               </div>
+              {/* "Other" custom textbox for radio-style single-select */}
+              {fieldHasOtherOption(field) && isOtherValue(values[field.fieldId]) && (
+                <input
+                  type="text"
+                  placeholder={`Please specify ${label.toLowerCase()}`}
+                  value={otherValues[field.fieldId] || ''}
+                  onChange={(e) =>
+                    setOtherValues((prev) => ({ ...prev, [field.fieldId]: e.target.value }))
+                  }
+                  style={{
+                    marginTop: '0.6rem',
+                    width: '100%',
+                    borderRadius: '10px',
+                    padding: '0.6rem 0.85rem',
+                    border: '2px solid #e2e8f0',
+                    fontSize: '0.92rem',
+                    backgroundColor: '#ffffff',
+                    color: '#2d3748',
+                  }}
+                />
+              )}
               {error && isTouched && (
                 <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{error}</div>
               )}
@@ -439,6 +488,27 @@ const DemographicDetailsPage: React.FC = () => {
                 <option key={option.optionId} value={option.optionValue}>{option.optionLabel}</option>
               ))}
             </select>
+            {/* "Other" custom textbox for dropdown-style single-select */}
+            {fieldHasOtherOption(field) && isOtherValue(values[field.fieldId]) && (
+              <input
+                type="text"
+                placeholder={`Please specify ${label.toLowerCase()}`}
+                value={otherValues[field.fieldId] || ''}
+                onChange={(e) =>
+                  setOtherValues((prev) => ({ ...prev, [field.fieldId]: e.target.value }))
+                }
+                style={{
+                  marginTop: '0.6rem',
+                  width: '100%',
+                  borderRadius: '10px',
+                  padding: '0.6rem 0.85rem',
+                  border: '2px solid #e2e8f0',
+                  fontSize: '0.92rem',
+                  backgroundColor: '#ffffff',
+                  color: '#2d3748',
+                }}
+              />
+            )}
             {error && isTouched && (
               <div className="field-error" style={{ color: '#e53e3e', fontSize: '0.85rem', marginTop: '0.25rem' }}>{error}</div>
             )}
@@ -459,10 +529,10 @@ const DemographicDetailsPage: React.FC = () => {
                     key={option.optionId}
                     style={{
                       padding: '0.4rem 0.85rem',
-                      border: `2px solid ${isChecked ? '#667eea' : '#e2e8f0'}`,
+                      border: `2px solid ${isChecked ? '#f43f5e' : '#e2e8f0'}`,
                       borderRadius: '10px',
                       cursor: 'pointer',
-                      background: isChecked ? '#eef2ff' : 'white',
+                      background: isChecked ? '#fff1f2' : 'white',
                       display: 'flex',
                       alignItems: 'center',
                       transition: 'all 0.2s ease',
@@ -473,7 +543,7 @@ const DemographicDetailsPage: React.FC = () => {
                       checked={isChecked}
                       onChange={(e) => handleMultiChange(field.fieldId, option.optionValue, e.target.checked)}
                       onBlur={() => handleBlur(field.fieldId)}
-                      style={{ width: '16px', height: '16px', marginRight: '0.5rem', cursor: 'pointer', accentColor: '#667eea' }}
+                      style={{ width: '16px', height: '16px', marginRight: '0.5rem', cursor: 'pointer', accentColor: '#f43f5e' }}
                     />
                     <span style={{ fontSize: '0.9rem', color: '#2d3748' }}>{option.optionLabel}</span>
                   </label>

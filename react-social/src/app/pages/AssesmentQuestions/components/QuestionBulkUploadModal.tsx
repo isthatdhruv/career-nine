@@ -577,6 +577,108 @@ const QuestionBulkUploadModal: React.FC<QuestionBulkUploadModalProps> = ({
         {/* Question Preview/Edit Form */}
         {file && currentQuestion && !uploadResults && (
           <>
+            {/* Missing-fields summary — flags every blank required cell across ALL parsed questions */}
+            {(() => {
+              type Issue = { qIndex: number; field: string };
+              const issues: Issue[] = [];
+              questions.forEach((q, i) => {
+                if (!q.questionText || !q.questionText.trim())
+                  issues.push({ qIndex: i, field: "Question Text" });
+                if (!q.questionType || !q.questionType.trim())
+                  issues.push({ qIndex: i, field: "Question Type" });
+                if (!q.sectionId || !String(q.sectionId).trim())
+                  issues.push({ qIndex: i, field: "Section ID" });
+                if (!q.options || q.options.length === 0) {
+                  issues.push({ qIndex: i, field: "Options (none)" });
+                } else {
+                  q.options.forEach((o, oi) => {
+                    if (!o.optionText || !String(o.optionText).trim())
+                      issues.push({ qIndex: i, field: `Option ${oi + 1} Text` });
+                  });
+                }
+              });
+
+              if (issues.length === 0) return null;
+
+              const affected = Array.from(new Set(issues.map((x) => x.qIndex))).sort((a, b) => a - b);
+              return (
+                <div
+                  style={{
+                    marginBottom: 16,
+                    border: "1px solid rgba(244, 63, 94, 0.3)",
+                    background: "linear-gradient(180deg, #fff1f2 0%, #fff7f8 100%)",
+                    borderRadius: 12,
+                    padding: "14px 16px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <i
+                      className="bi bi-exclamation-triangle-fill"
+                      style={{ color: "#e11d48", fontSize: 18 }}
+                    />
+                    <strong style={{ color: "#9f1239", fontSize: 14 }}>
+                      {issues.length} missing field
+                      {issues.length === 1 ? "" : "s"} found across{" "}
+                      {affected.length} question
+                      {affected.length === 1 ? "" : "s"}
+                    </strong>
+                  </div>
+                  <div style={{ fontSize: 12, color: "#7f1d1d", marginBottom: 10 }}>
+                    Fix the highlighted fields below. Click any chip to jump to that question.
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {affected.map((qi) => {
+                      const fields = issues
+                        .filter((x) => x.qIndex === qi)
+                        .map((x) => x.field);
+                      const isCurrent = qi === currentIndex;
+                      return (
+                        <button
+                          key={qi}
+                          type="button"
+                          onClick={() => {
+                            setCurrentIndex(qi);
+                            loadMQTFromQuestion(qi);
+                          }}
+                          title={`Missing: ${fields.join(", ")}`}
+                          style={{
+                            border: "1px solid",
+                            borderColor: isCurrent ? "#e11d48" : "rgba(244, 63, 94, 0.4)",
+                            background: isCurrent ? "#e11d48" : "#ffffff",
+                            color: isCurrent ? "#ffffff" : "#9f1239",
+                            borderRadius: 100,
+                            padding: "4px 12px",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            transition: "all 150ms ease",
+                          }}
+                        >
+                          Q{qi + 1}
+                          <span
+                            style={{
+                              marginLeft: 6,
+                              opacity: 0.85,
+                              fontWeight: 500,
+                            }}
+                          >
+                            · {fields.length}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Question Counter */}
             <div className="mb-3">
               <h4 className="text-primary">

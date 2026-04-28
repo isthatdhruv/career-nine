@@ -4,6 +4,7 @@ import CollegeCreateModal from "./components/CollegeCreateModal";
 import CollegeTable from "./components/CollegeTable";
 import StudentUploadModal from "./components/StudentUploadModal";
 import InstituteRecycleBinModal from "./components/InstituteRecycleBinModal";
+import InstituteLimitsModal from "./components/InstituteLimitsModal";
 import PageHeader from "../../components/PageHeader";
 
 const CollegePage = () => {
@@ -14,6 +15,7 @@ const CollegePage = () => {
   const [showStudentUpload, setShowStudentUpload] = useState(false);
   const [selectedCollegeForUpload, setSelectedCollegeForUpload] = useState<any>(null);
   const [showRecycleBin, setShowRecycleBin] = useState(false);
+  const [showLimits, setShowLimits] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -52,6 +54,12 @@ const CollegePage = () => {
             iconClass: "bi-plus-lg",
             onClick: () => setModalShowCreate(true),
             variant: "primary",
+          },
+          {
+            label: "Set Limits",
+            iconClass: "bi-sliders",
+            onClick: () => setShowLimits(true),
+            variant: "ghost",
           },
           {
             label: "Recycle Bin",
@@ -99,6 +107,12 @@ const CollegePage = () => {
         show={showRecycleBin}
         onHide={() => setShowRecycleBin(false)}
         onRestoreComplete={() => setPageLoading([String(Date.now())])}
+      />
+
+      <InstituteLimitsModal
+        show={showLimits}
+        onHide={() => setShowLimits(false)}
+        institutes={collegeData}
       />
     </div>
   );

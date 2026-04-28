@@ -201,6 +201,37 @@ public class AssessmentAnswerController {
             }
     }
 
+    @PutMapping(value = "/feedback-rating", headers = "Accept=application/json")
+    public ResponseEntity<?> saveFeedbackRating(@RequestBody Map<String, Object> body) {
+        if (body.get("userStudentId") == null || body.get("assessmentId") == null || body.get("rating") == null) {
+            return ResponseEntity.badRequest().body("userStudentId, assessmentId and rating are required");
+        }
+        Long userStudentId = ((Number) body.get("userStudentId")).longValue();
+        Long assessmentId = ((Number) body.get("assessmentId")).longValue();
+        Integer rating = ((Number) body.get("rating")).intValue();
+
+        if (rating < 1 || rating > 5) {
+            return ResponseEntity.badRequest().body("rating must be between 1 and 5");
+        }
+
+        Optional<StudentAssessmentMapping> mappingOpt = studentAssessmentMappingRepository
+                .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+
+        if (!mappingOpt.isPresent()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("No assessment mapping found for given student and assessment");
+        }
+
+        StudentAssessmentMapping mapping = mappingOpt.get();
+        mapping.setFeedbackRating(rating);
+        studentAssessmentMappingRepository.save(mapping);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "saved");
+        response.put("rating", rating);
+        return ResponseEntity.ok(response);
+    }
+
     /**
      * Save a draft of student's current answer state to Redis.
      * Called periodically (every 30s) by the frontend to back up localStorage.

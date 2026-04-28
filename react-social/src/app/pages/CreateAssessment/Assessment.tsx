@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ReadAssessmentList } from "./API/Create_Assessment_APIs";
 import { AssessmentTable } from "./components";
 import AssessmentCreateModal from "./components/assessment/AssessmentCreateModal";
+import AssessmentResetLimitModal from "./components/assessment/AssessmentResetLimitModal";
 import PageHeader from "../../components/PageHeader";
 
 const AssessmentPage = () => {
@@ -13,6 +14,7 @@ const AssessmentPage = () => {
   const [pageLoading, setPageLoading] = useState(["false"]);
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showResetLimit, setShowResetLimit] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -69,6 +71,12 @@ const AssessmentPage = () => {
             onClick: () => navigate("/assessments/create"),
             variant: "primary",
           },
+          {
+            label: "Reset Limit",
+            iconClass: "bi-arrow-counterclockwise",
+            onClick: () => setShowResetLimit(true),
+            variant: "ghost",
+          },
         ]}
       />
 
@@ -99,6 +107,12 @@ const AssessmentPage = () => {
         show={showCreateModal}
         onHide={() => setShowCreateModal(false)}
         setPageLoading={setPageLoading}
+      />
+
+      <AssessmentResetLimitModal
+        show={showResetLimit}
+        onHide={() => setShowResetLimit(false)}
+        assessments={assessmentData}
       />
     </div>
   );

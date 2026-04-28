@@ -49,4 +49,12 @@ public interface StudentAssessmentMappingRepository extends JpaRepository<Studen
     List<Object[]> findLiteByAssessmentId(
         @org.springframework.data.repository.query.Param("assessmentId") Long assessmentId);
 
+    // Count of all student-assessment mappings for an institute — used by the
+    // "max assessments per institute" limit before allowing new allotments.
+    @org.springframework.data.jpa.repository.Query(
+        "SELECT COUNT(m) FROM StudentAssessmentMapping m " +
+        "WHERE m.userStudent.institute.instituteCode = :instituteCode")
+    long countByInstituteCode(
+        @org.springframework.data.repository.query.Param("instituteCode") Integer instituteCode);
+
 }

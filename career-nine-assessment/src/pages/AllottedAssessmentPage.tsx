@@ -149,7 +149,7 @@ export default function AllottedAssessmentPage() {
                   style={{
                     width: '100px',
                     height: '100px',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    background: 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)',
                     borderRadius: '50%',
                     display: 'flex',
                     alignItems: 'center',
@@ -203,7 +203,7 @@ export default function AllottedAssessmentPage() {
                         ? 'linear-gradient(90deg, #10b981 0%, #059669 100%)'
                         : !assessment.isActive
                         ? 'linear-gradient(90deg, #9ca3af 0%, #6b7280 100%)'
-                        : 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+                        : 'linear-gradient(90deg, #f43f5e 0%, #e11d48 100%)',
                     }}
                   />
 
@@ -248,13 +248,13 @@ export default function AllottedAssessmentPage() {
                       style={{
                         width: '56px',
                         height: '56px',
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        background: 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)',
                         borderRadius: '14px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         marginBottom: '1rem',
-                        boxShadow: '0 4px 15px rgba(102, 126, 234, 0.3)',
+                        boxShadow: '0 4px 15px rgba(244, 63, 94, 0.3)',
                       }}
                     >
                       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
@@ -311,7 +311,7 @@ export default function AllottedAssessmentPage() {
                             ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
                             : !assessment.isActive
                             ? '#e5e7eb'
-                            : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            : 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)',
                         color: !assessment.isActive ? '#9ca3af' : 'white',
                         transition: 'all 0.3s ease',
                         display: 'flex',
@@ -321,7 +321,7 @@ export default function AllottedAssessmentPage() {
                         boxShadow:
                           assessment.studentStatus === 'completed' || !assessment.isActive
                             ? 'none'
-                            : '0 4px 15px rgba(102, 126, 234, 0.4)',
+                            : '0 4px 15px rgba(244, 63, 94, 0.4)',
                         opacity: assessment.studentStatus === 'completed' || !assessment.isActive ? 0.7 : 1,
                       }}
                     >

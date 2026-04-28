@@ -330,12 +330,16 @@ public class StudentInfoController {
 
     @PostMapping("/bulkAlotAssessment")
     @org.springframework.transaction.annotation.Transactional
-    public synchronized List<StudentAssessmentMapping> bulkAlotAssessment(
+    public synchronized ResponseEntity<?> bulkAlotAssessment(
             @RequestBody List<java.util.Map<String, Long>> assignments) {
         List<StudentAssessmentMapping> savedMappings = new java.util.ArrayList<>();
 
         // Deduplicate assignments in the request itself
         java.util.Set<String> processedKeys = new java.util.HashSet<>();
+
+        // Cache per-institute remaining capacity so we don't re-query mid-loop
+        // and so we honor the cumulative limit across the request batch.
+        java.util.Map<Integer, Long> remainingByInstitute = new java.util.HashMap<>();
 
         for (java.util.Map<String, Long> assignment : assignments) {
             Long userStudentId = assignment.get("userStudentId");
@@ -348,6 +352,45 @@ public class StudentInfoController {
                     continue; // Skip duplicate in same request
                 }
                 processedKeys.add(key);
+
+                // Resolve institute for this student so we can enforce the per-institute cap
+                java.util.Optional<UserStudent> userStudentOpt = userStudentRepository.findById(userStudentId);
+                if (!userStudentOpt.isPresent() || userStudentOpt.get().getInstitute() == null) {
+                    // Couldn't resolve institute — skip enforcement, fall through to existing flow
+                } else {
+                    Integer instituteCode = userStudentOpt.get().getInstitute().getInstituteCode();
+
+                    // Lazy-load the institute's remaining capacity once per institute per request
+                    if (!remainingByInstitute.containsKey(instituteCode)) {
+                        // Use primitive int to hit the custom findById(int) overload
+                        // (the inherited JpaRepository.findById(Integer) returns Optional)
+                        com.kccitm.api.model.career9.school.InstituteDetail institute =
+                                instituteDetailRepository.findById(instituteCode.intValue());
+                        Integer max = (institute != null) ? institute.getMaxAssessments() : null;
+                        if (max == null) {
+                            // Null = unlimited
+                            remainingByInstitute.put(instituteCode, Long.MAX_VALUE);
+                        } else {
+                            long current = studentAssessmentMappingRepository.countByInstituteCode(instituteCode);
+                            remainingByInstitute.put(instituteCode, Math.max(0, max - current));
+                        }
+                    }
+
+                    long remaining = remainingByInstitute.get(instituteCode);
+                    if (remaining <= 0) {
+                        // Institute is at or over its cap — reject this request with details.
+                        java.util.Map<String, Object> err = new java.util.HashMap<>();
+                        err.put("error", "Institute assessment limit reached");
+                        err.put("instituteCode", instituteCode);
+                        err.put("createdSoFar", savedMappings.size());
+                        err.put("remainingForInstitute", 0);
+                        return ResponseEntity
+                            .status(org.springframework.http.HttpStatus.CONFLICT)
+                            .body(err);
+                    }
+
+                    remainingByInstitute.put(instituteCode, remaining - 1);
+                }
 
                 // Check if mapping already exists in database
                 java.util.Optional<StudentAssessmentMapping> existingMapping = studentAssessmentMappingRepository
@@ -362,7 +405,7 @@ public class StudentInfoController {
                 // If mapping exists, skip (don't create duplicate)
             }
         }
-        return savedMappings;
+        return ResponseEntity.ok(savedMappings);
     }
 
     @GetMapping("/getByInstituteId/{instituteId}")
@@ -627,6 +670,24 @@ public class StudentInfoController {
                 .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("StudentAssessmentMapping", "userStudentId/assessmentId", userStudentId + "/" + assessmentId));
 
+        // Enforce per-assessment reset cap before doing any destructive work.
+        // Pull current cap from AssessmentTable.maxResetsPerStudent (null = unlimited).
+        java.util.Optional<com.kccitm.api.model.career9.AssessmentTable> assessmentOpt =
+                assessmentTableRepository.findById(assessmentId);
+        Integer maxResets = assessmentOpt.map(a -> a.getMaxResetsPerStudent()).orElse(null);
+        int alreadyReset = mapping.getResetCount();
+        if (maxResets != null && alreadyReset >= maxResets) {
+            Map<String, Object> err = new HashMap<>();
+            err.put("error", "Reset limit reached for this assessment");
+            err.put("assessmentId", assessmentId);
+            err.put("userStudentId", userStudentId);
+            err.put("resetCount", alreadyReset);
+            err.put("maxResetsPerStudent", maxResets);
+            return ResponseEntity
+                .status(org.springframework.http.HttpStatus.CONFLICT)
+                .body(err);
+        }
+
         // Delete assessment answers for this student + assessment
         assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(
                 userStudentId, assessmentId);
@@ -647,13 +708,19 @@ public class StudentInfoController {
         assessmentSessionService.deletePartialAnswers(userStudentId, assessmentId);
         assessmentSessionService.deleteSubmittedAnswers(userStudentId, assessmentId);
 
-        // Reset status to 'notstarted'
+        // Reset status to 'notstarted' + bump the reset counter
         mapping.setStatus("notstarted");
+        mapping.setResetCount(alreadyReset + 1);
         studentAssessmentMappingRepository.save(mapping);
 
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         response.put("message", "Assessment reset successfully");
+        response.put("resetCount", mapping.getResetCount());
+        if (maxResets != null) {
+            response.put("maxResetsPerStudent", maxResets);
+            response.put("remaining", Math.max(0, maxResets - mapping.getResetCount()));
+        }
         return ResponseEntity.ok(response);
     }
 

@@ -63,6 +63,7 @@ type Question = {
     options: Option[];
     languageQuestions?: LanguageQuestion[];
     maxOptionsAllowed: number;
+    minOptionsAllowed?: number;
   };
 };
 
@@ -109,6 +110,9 @@ const SectionQuestionPage: React.FC = () => {
   const [showWarning, setShowWarning] = useState<boolean>(false);
   const [showConfirmSubmit, setShowConfirmSubmit] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [showInactivityWarning, setShowInactivityWarning] =
+    useState<boolean>(false);
+  const inactivityTimerRef = useRef<number | null>(null);
 
   // Track which sections have already shown their instructions (only show once)
   const [seenSectionInstructions, setSeenSectionInstructions] = useState<
@@ -265,6 +269,42 @@ const SectionQuestionPage: React.FC = () => {
     }
   }, [sectionId, questionIndex, assessmentData]);
 
+  // Inactivity watcher: if the student does not interact with the question
+  // for 40 seconds, show a focus reminder popup.
+  useEffect(() => {
+    if (showInactivityWarning) return;
+
+    const resetTimer = () => {
+      if (inactivityTimerRef.current !== null) {
+        window.clearTimeout(inactivityTimerRef.current);
+      }
+      inactivityTimerRef.current = window.setTimeout(() => {
+        setShowInactivityWarning(true);
+      }, 40000);
+    };
+
+    const events: Array<keyof WindowEventMap> = [
+      "mousemove",
+      "mousedown",
+      "keydown",
+      "touchstart",
+      "scroll",
+      "wheel",
+    ];
+    events.forEach((evt) =>
+      window.addEventListener(evt, resetTimer, { passive: true } as any),
+    );
+    resetTimer();
+
+    return () => {
+      if (inactivityTimerRef.current !== null) {
+        window.clearTimeout(inactivityTimerRef.current);
+        inactivityTimerRef.current = null;
+      }
+      events.forEach((evt) => window.removeEventListener(evt, resetTimer));
+    };
+  }, [sectionId, currentIndex, showInactivityWarning]);
+
   // Save answers to DB in background on section transitions (safety net)
   // Only sends if answers have actually changed since last save.
   const prevSectionIdRef = useRef<string | null>(null);
@@ -385,19 +425,19 @@ const SectionQuestionPage: React.FC = () => {
   const getQuestionColor = useCallback(
     (secId: string, questionId: number) => {
       if (answers[secId]?.[questionId]?.length)
-        return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+        return "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)";
       const rankingCount = Object.keys(
         rankingAnswers[secId]?.[questionId] || {},
       ).length;
       if (rankingCount > 0)
-        return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+        return "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)";
       const textCount = Object.values(
         textAnswers[secId]?.[questionId] || {},
       ).filter((t: string) => t.trim()).length;
       if (textCount > 0)
-        return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+        return "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)";
       if (completedGameQuestionIds.has(questionId))
-        return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+        return "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)";
       if (savedForLater[secId]?.has(questionId))
         return "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)";
       if (skipped[secId]?.has(questionId))
@@ -417,6 +457,36 @@ const SectionQuestionPage: React.FC = () => {
   const qId = question.questionnaireQuestionId;
 
   const selectedOptions = answers[sectionId!]?.[qId] || [];
+
+  // --- Min-selection enforcement (defaults minOptionsAllowed = maxOptionsAllowed) ---
+  const currentIsRanking = question.question.questionType === "ranking";
+  const currentIsText =
+    question.question.questionType === "text" ||
+    question.question.isMQTtyped === true;
+
+  const currentSelectionCount = (() => {
+    if (currentIsText) {
+      const texts = textAnswers[sectionId!]?.[qId] || {};
+      return Object.values(texts).filter(
+        (t) => typeof t === "string" && t.trim().length > 0,
+      ).length;
+    }
+    if (currentIsRanking) {
+      return Object.keys(rankingAnswers[sectionId!]?.[qId] || {}).length;
+    }
+    return selectedOptions.length;
+  })();
+
+  const maxOptionsAllowed = question.question.maxOptionsAllowed;
+  // maxOptionsAllowed === 0 means "unlimited" — no minimum either.
+  // Otherwise default min to max (must select exactly maxOptionsAllowed).
+  const effectiveMin =
+    maxOptionsAllowed === 0
+      ? 0
+      : (question.question.minOptionsAllowed ?? maxOptionsAllowed);
+
+  const belowMin = currentSelectionCount < effectiveMin;
+  const remainingToMin = Math.max(effectiveMin - currentSelectionCount, 0);
 
   // Filter languages to only those that have actual translations for the current question
   // Prevents English text from being repeated side-by-side when translations are missing
@@ -1091,12 +1161,11 @@ const SectionQuestionPage: React.FC = () => {
     return (
       <div
         style={{
-          fontSize: "0.85rem",
-          color: "#9ca3af",
-          marginTop: "4px",
-          lineHeight: "1.4",
+          fontSize: "0.95rem",
+          color: "#475569",
+          marginTop: "6px",
+          lineHeight: "1.55",
           fontWeight: 400,
-          fontStyle: "italic",
         }}
       >
         {opt.optionDescription}
@@ -1189,7 +1258,7 @@ const SectionQuestionPage: React.FC = () => {
         display: "flex",
         height: "100dvh",
         minHeight: "100vh",
-        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        background: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
         colorScheme: "light",
         overflow: "hidden",
       }}
@@ -1261,7 +1330,7 @@ const SectionQuestionPage: React.FC = () => {
                     style={{
                       fontSize: "0.85rem",
                       fontWeight: 600,
-                      color: "#667eea",
+                      color: "#f43f5e",
                       marginBottom: "6px",
                     }}
                   >
@@ -1286,7 +1355,7 @@ const SectionQuestionPage: React.FC = () => {
                 onClick={() => setShowSectionInstruction(false)}
                 style={{
                   background:
-                    "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                    "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
                   color: "#fff",
                   border: "none",
                   borderRadius: "8px",
@@ -1311,7 +1380,7 @@ const SectionQuestionPage: React.FC = () => {
             borderBottom: "2px solid #e2e8f0",
             padding: "16px 20px",
             background:
-              "linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%)",
+              "linear-gradient(135deg, rgba(244, 63, 94, 0.08) 0%, rgba(225, 29, 72, 0.08) 100%)",
           }}
         >
           {/* KCC Logo */}
@@ -1346,7 +1415,7 @@ const SectionQuestionPage: React.FC = () => {
               style={{
                 width: "6px",
                 height: "18px",
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                background: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
                 borderRadius: "3px",
               }}
             />
@@ -1366,9 +1435,9 @@ const SectionQuestionPage: React.FC = () => {
                   height: 14,
                   borderRadius: "50%",
                   background:
-                    "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                    "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
                   flexShrink: 0,
-                  boxShadow: "0 2px 6px rgba(102, 126, 234, 0.4)",
+                  boxShadow: "0 2px 6px rgba(244, 63, 94, 0.4)",
                 }}
               />
               <span
@@ -1466,7 +1535,7 @@ const SectionQuestionPage: React.FC = () => {
               style={{
                 width: "6px",
                 height: "20px",
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                background: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
                 borderRadius: "3px",
               }}
             />
@@ -1481,9 +1550,9 @@ const SectionQuestionPage: React.FC = () => {
                   color: "#4a5568",
                   marginBottom: "10px",
                   padding: "6px 12px",
-                  background: "rgba(102, 126, 234, 0.08)",
+                  background: "rgba(244, 63, 94, 0.08)",
                   borderRadius: "8px",
-                  borderLeft: "3px solid #667eea",
+                  borderLeft: "3px solid #f43f5e",
                 }}
               >
                 {sec.section.sectionName}
@@ -1535,14 +1604,14 @@ const SectionQuestionPage: React.FC = () => {
               <span
                 style={{
                   background:
-                    "linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%)",
-                  color: "#667eea",
+                    "linear-gradient(135deg, rgba(244, 63, 94, 0.15) 0%, rgba(225, 29, 72, 0.15) 100%)",
+                  color: "#f43f5e",
                   padding: "8px 20px",
                   borderRadius: "30px",
                   fontSize: "0.9rem",
                   fontWeight: 600,
                   display: "inline-block",
-                  border: "1px solid rgba(102, 126, 234, 0.3)",
+                  border: "1px solid rgba(244, 63, 94, 0.3)",
                 }}
               >
                 {currentSection?.section?.sectionName}
@@ -1565,13 +1634,13 @@ const SectionQuestionPage: React.FC = () => {
                   <div
                     style={{
                       background:
-                        "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                        "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
                       padding: "8px 18px",
                       borderRadius: "30px",
                       fontWeight: 700,
                       fontSize: "0.9rem",
                       color: "white",
-                      boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)",
+                      boxShadow: "0 4px 15px rgba(244, 63, 94, 0.4)",
                     }}
                   >
                     ⏱️ {formatTime(elapsedTime)}
@@ -1580,18 +1649,26 @@ const SectionQuestionPage: React.FC = () => {
                 {isLastQuestionOfLastSection() && (
                   <button
                     onClick={handleSubmitAssessment}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || belowMin}
+                    title={
+                      belowMin
+                        ? `Select ${remainingToMin} more option${remainingToMin === 1 ? "" : "s"} to continue`
+                        : undefined
+                    }
                     style={{
-                      background:
-                        "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
-                      color: "white",
+                      background: belowMin
+                        ? "#e2e8f0"
+                        : "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+                      color: belowMin ? "#9ca3af" : "white",
                       border: "none",
                       borderRadius: "30px",
                       padding: "8px 20px",
                       fontWeight: 700,
                       fontSize: "0.9rem",
-                      cursor: isSubmitting ? "not-allowed" : "pointer",
-                      boxShadow: "0 4px 15px rgba(34, 197, 94, 0.4)",
+                      cursor: isSubmitting || belowMin ? "not-allowed" : "pointer",
+                      boxShadow: belowMin
+                        ? "none"
+                        : "0 4px 15px rgba(34, 197, 94, 0.4)",
                       transition: "all 0.2s ease",
                       opacity: isSubmitting ? 0.7 : 1,
                       whiteSpace: "nowrap",
@@ -1696,7 +1773,7 @@ const SectionQuestionPage: React.FC = () => {
                       onClick={goToFirstUnanswered}
                       style={{
                         background:
-                          "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                          "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
                         color: "#fff",
                         border: "none",
                         borderRadius: "10px",
@@ -1704,10 +1781,104 @@ const SectionQuestionPage: React.FC = () => {
                         fontWeight: 600,
                         fontSize: "0.95rem",
                         cursor: "pointer",
-                        boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)",
+                        boxShadow: "0 4px 15px rgba(244, 63, 94, 0.4)",
                       }}
                     >
                       Continue →
+                    </button>
+                  </div>
+                </div>
+              </div>
+            , document.body)}
+
+            {/* Inactivity Reminder Popup - portaled to body for mobile compatibility */}
+            {showInactivityWarning && createPortal(
+              <div
+                style={{
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: "rgba(0, 0, 0, 0.5)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 9999,
+                }}
+                onClick={() => setShowInactivityWarning(false)}
+              >
+                <div
+                  style={{
+                    background: "#fff",
+                    borderRadius: "16px",
+                    padding: "32px 36px",
+                    maxWidth: "440px",
+                    width: "90%",
+                    textAlign: "center",
+                    boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+                    color: "#2d3748",
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div
+                    style={{
+                      width: "60px",
+                      height: "60px",
+                      borderRadius: "50%",
+                      background:
+                        "linear-gradient(135deg, #06b6d4 0%, #0e7490 100%)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      margin: "0 auto 16px",
+                      fontSize: "1.8rem",
+                    }}
+                  >
+                    👀
+                  </div>
+                  <h5
+                    style={{
+                      fontWeight: 700,
+                      marginBottom: "12px",
+                      color: "#1a202c",
+                      fontSize: "1.2rem",
+                    }}
+                  >
+                    Please focus!
+                  </h5>
+                  <p
+                    style={{
+                      color: "#6b7280",
+                      fontSize: "0.95rem",
+                      lineHeight: 1.6,
+                      marginBottom: "24px",
+                    }}
+                  >
+                    In case you need help please talk to supervising adult.
+                  </p>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <button
+                      onClick={() => setShowInactivityWarning(false)}
+                      style={{
+                        background:
+                          "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: "10px",
+                        padding: "10px 28px",
+                        fontWeight: 600,
+                        fontSize: "0.95rem",
+                        cursor: "pointer",
+                        boxShadow: "0 4px 15px rgba(15, 23, 42, 0.3)",
+                      }}
+                    >
+                      Continue
                     </button>
                   </div>
                 </div>
@@ -1894,18 +2065,25 @@ const SectionQuestionPage: React.FC = () => {
                   fontWeight: 500,
                 }}
               >
-                {question.question.questionType === "text" ||
-                question.question.isMQTtyped === true ? (
+                {currentIsText ? (
+                  effectiveMin > 0 ? (
+                    <>
+                      Please type exactly{" "}
+                      <strong>{effectiveMin}</strong> response(s) below.
+                    </>
+                  ) : (
+                    <>Please type your response(s) below.</>
+                  )
+                ) : currentIsRanking ? (
                   <>
-                    Please type your response(s) below. You can enter up to{" "}
-                    <strong>{question.question.maxOptionsAllowed || 1}</strong>{" "}
-                    response(s).
-                  </>
-                ) : question.question.questionType === "ranking" ? (
-                  <>
-                    Please rank{" "}
-                    <strong>{question.question.maxOptionsAllowed}</strong>{" "}
+                    Please rank exactly{" "}
+                    <strong>{effectiveMin || question.question.maxOptionsAllowed}</strong>{" "}
                     option(s) in order of preference (1 = most important).
+                  </>
+                ) : effectiveMin > 0 ? (
+                  <>
+                    Please select exactly{" "}
+                    <strong>{effectiveMin}</strong> option(s) to continue.
                   </>
                 ) : (
                   <></>
@@ -2389,7 +2567,7 @@ const SectionQuestionPage: React.FC = () => {
                           checked={selectedOptions.includes(opt.optionId)}
                           onChange={() => toggleOption(opt.optionId)}
                           disabled={
-                            question.question.maxOptionsAllowed > 0 &&
+                            question.question.maxOptionsAllowed > 1 &&
                             !selectedOptions.includes(opt.optionId) &&
                             selectedOptions.length >=
                               question.question.maxOptionsAllowed
@@ -2516,29 +2694,47 @@ const SectionQuestionPage: React.FC = () => {
                   </button>
                 )} */}
                 {!isLastQuestionOfLastSection() && (
-                <button
-                  onClick={goNext}
-                  style={{
-                    background: currentIndex === questions.length - 1
-                      ? "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)"
-                      : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                    color: "white",
-                    border: "none",
-                    borderRadius: "12px",
-                    padding: "12px 32px",
-                    fontWeight: 600,
-                    fontSize: "0.95rem",
-                    cursor: "pointer",
-                    boxShadow: currentIndex === questions.length - 1
-                      ? "0 4px 15px rgba(14, 165, 233, 0.4)"
-                      : "0 4px 15px rgba(102, 126, 234, 0.4)",
-                    transition: "all 0.2s ease",
-                  }}
-                >
-                  {currentIndex === questions.length - 1
-                    ? "NEXT SECTION →"
-                    : "NEXT →"}
-                </button>
+                <div className="d-flex flex-column align-items-end gap-2">
+                  {belowMin && (
+                    <small
+                      style={{
+                        color: "#b91c1c",
+                        fontSize: "0.8rem",
+                        fontWeight: 500,
+                      }}
+                    >
+                      Select {remainingToMin} more option{remainingToMin === 1 ? "" : "s"} to continue
+                    </small>
+                  )}
+                  <button
+                    onClick={goNext}
+                    disabled={belowMin}
+                    style={{
+                      background: belowMin
+                        ? "#e2e8f0"
+                        : currentIndex === questions.length - 1
+                          ? "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)"
+                          : "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
+                      color: belowMin ? "#9ca3af" : "white",
+                      border: "none",
+                      borderRadius: "12px",
+                      padding: "12px 32px",
+                      fontWeight: 600,
+                      fontSize: "0.95rem",
+                      cursor: belowMin ? "not-allowed" : "pointer",
+                      boxShadow: belowMin
+                        ? "none"
+                        : currentIndex === questions.length - 1
+                          ? "0 4px 15px rgba(14, 165, 233, 0.4)"
+                          : "0 4px 15px rgba(244, 63, 94, 0.4)",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    {currentIndex === questions.length - 1
+                      ? "NEXT SECTION →"
+                      : "NEXT →"}
+                  </button>
+                </div>
                 )}
             </div>
           </div>
