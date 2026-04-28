@@ -83,6 +83,11 @@ export function AsideMenuMain() {
     allowed("/admin/counsellors") ||
     allowed("/admin/counselling-slots") || allowed("/admin/counselling-students") || allowed("/admin/counselling-notifications");
 
+  const showStudentPortal =
+    allowed("/student/dashboard") || allowed("/student/navigator-360") ||
+    allowed("/student/assessments") || allowed("/student/reports") ||
+    allowed("/student/counselling") || allowed("/student/student-info");
+
   return (
     <>
       <AsideMenuItem
@@ -598,6 +603,43 @@ export function AsideMenuMain() {
             )}
             {allowed("/admin/counselling-notifications") && (
               <AsideMenuItem to="/admin/counselling-notifications" title="Notifications" hasBullet={true} />
+            )}
+          </AsideMenuItemWithSub>
+        </>
+      )}
+
+      {showStudentPortal && (
+        <>
+          <div className="menu-item">
+            <div className="menu-content pt-8 pb-2">
+              <span className="menu-section text-muted text-uppercase fs-8 ls-1">
+                Student Portal
+              </span>
+            </div>
+          </div>
+          <AsideMenuItemWithSub
+            to="/student"
+            title="Student Portal"
+            fontIcon="bi-app-indicator"
+            icon="/media/icons/duotune/general/gen049.svg"
+          >
+            {allowed("/student/dashboard") && (
+              <AsideMenuItem to="/student/dashboard" title="Dashboard" hasBullet={true} />
+            )}
+            {allowed("/student/student-info") && (
+              <AsideMenuItem to="/student/student-info" title="My Info" hasBullet={true} />
+            )}
+            {allowed("/student/navigator-360") && (
+              <AsideMenuItem to="/student/navigator-360" title="Navigator 360" hasBullet={true} />
+            )}
+            {allowed("/student/assessments") && (
+              <AsideMenuItem to="/student/assessments" title="My Assessments" hasBullet={true} />
+            )}
+            {allowed("/student/reports") && (
+              <AsideMenuItem to="/student/reports" title="My Reports" hasBullet={true} />
+            )}
+            {allowed("/student/counselling") && (
+              <AsideMenuItem to="/student/counselling" title="Counselling" hasBullet={true} />
             )}
           </AsideMenuItemWithSub>
         </>

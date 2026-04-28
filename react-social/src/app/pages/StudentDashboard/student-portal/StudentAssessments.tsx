@@ -1,8 +1,6 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import PortalLayout from '../../portal/PortalLayout'
 import { DashboardApiResponse, DashboardApiAssessmentData } from '../API/Dashboard_APIs'
-import { STUDENT_MENU_ITEMS, STUDENT_STORAGE_KEYS } from './studentMenuConfig'
 import './StudentPortal.css'
 
 const ASSESSMENT_URL = 'https://assessment.career-9.com'
@@ -40,12 +38,7 @@ const StudentAssessments: React.FC = () => {
   }
 
   return (
-    <PortalLayout
-      title='Career Navigator 360'
-      menuItems={STUDENT_MENU_ITEMS}
-      storageKeys={STUDENT_STORAGE_KEYS}
-      loginPath='/student/login'
-    >
+    <>
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1A1A1A', margin: 0 }}>
           My Assessments
@@ -157,7 +150,7 @@ const StudentAssessments: React.FC = () => {
           })}
         </div>
       )}
-    </PortalLayout>
+    </>
   )
 }
 

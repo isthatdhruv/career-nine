@@ -166,6 +166,31 @@ const PrivateRoutes = () => {
     () => import("../pages/StudentInformation/StudentProfile")
   );
 
+  const StudentDashboardLogin = lazy(
+    () => import("../pages/StudentDashboard/student-portal/StudentDashboardLogin")
+  );
+  const StudentPortalDashboard = lazy(
+    () => import("../pages/StudentDashboard/student-portal/StudentPortalDashboard")
+  );
+  const StudentInfoForm = lazy(
+    () => import("../pages/StudentDashboard/student-portal/StudentInfoForm")
+  );
+  const StudentPortalNavigator360 = lazy(
+    () => import("../pages/StudentDashboard/student-portal/StudentNavigator360Page")
+  );
+  const StudentPortalAssessments = lazy(
+    () => import("../pages/StudentDashboard/student-portal/StudentAssessments")
+  );
+  const StudentPortalReports = lazy(
+    () => import("../pages/StudentDashboard/student-portal/StudentReports")
+  );
+  const StudentCounsellingPage = lazy(
+    () => import("../pages/Counselling/student/StudentCounsellingPage")
+  );
+  const SlotBookingPage = lazy(
+    () => import("../pages/Counselling/student/SlotBookingPage")
+  );
+
   // const Compiler = lazy(() => import("../pages/Compiler/compiler"));
 
   const MeasuredQualityTypes = lazy(
@@ -366,6 +391,48 @@ const PrivateRoutes = () => {
         <Route path="/student-dashboard/:studentId" element={
           <SuspensedView>
             <StudentDashboard />
+          </SuspensedView>
+        } />
+
+        {/* Student portal — nested inside the main app shell. Access controlled via roles. */}
+        <Route path="/student/login" element={
+          <SuspensedView>
+            <StudentDashboardLogin />
+          </SuspensedView>
+        } />
+        <Route path="/student/student-info" element={
+          <SuspensedView>
+            <StudentInfoForm />
+          </SuspensedView>
+        } />
+        <Route path="/student/dashboard" element={
+          <SuspensedView>
+            <StudentPortalDashboard />
+          </SuspensedView>
+        } />
+        <Route path="/student/navigator-360" element={
+          <SuspensedView>
+            <StudentPortalNavigator360 />
+          </SuspensedView>
+        } />
+        <Route path="/student/assessments" element={
+          <SuspensedView>
+            <StudentPortalAssessments />
+          </SuspensedView>
+        } />
+        <Route path="/student/reports" element={
+          <SuspensedView>
+            <StudentPortalReports />
+          </SuspensedView>
+        } />
+        <Route path="/student/counselling" element={
+          <SuspensedView>
+            <StudentCounsellingPage />
+          </SuspensedView>
+        } />
+        <Route path="/student/counselling/book" element={
+          <SuspensedView>
+            <SlotBookingPage />
           </SuspensedView>
         } />
 
