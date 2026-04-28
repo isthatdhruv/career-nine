@@ -44,6 +44,10 @@ import com.kccitm.api.repository.Career9.OptionScoreBasedOnMeasuredQualityTypesR
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
+import com.kccitm.api.repository.AssessmentSubmissionFailureRepository;
+import com.kccitm.api.repository.AssessmentAdminActionRepository;
+import com.kccitm.api.model.career9.AssessmentAdminAction;
+import com.kccitm.api.model.career9.AssessmentSubmissionFailure;
 import com.kccitm.api.model.userDefinedModel.StudentDashboardResponse;
 import com.kccitm.api.model.userDefinedModel.StudentDashboardResponse.*;
 import com.kccitm.api.model.career9.MeasuredQualities;
@@ -112,6 +116,12 @@ public class AssessmentAnswerController {
     @Autowired
     private com.kccitm.api.service.AssessmentCompletionService completionService;
 
+    @Autowired
+    private AssessmentSubmissionFailureRepository submissionFailureRepository;
+
+    @Autowired
+    private AssessmentAdminActionRepository adminActionRepository;
+
     @GetMapping(value = "/getByStudent/{studentId}", headers = "Accept=application/json")
     public List<AssessmentAnswer> getAssessmentAnswersByStudent(@PathVariable("studentId") Long studentId) {
         UserStudent userStudent = userStudentRepository.findById(studentId).orElse(null);
@@ -132,14 +142,52 @@ public class AssessmentAnswerController {
         Long userStudentId = ((Number) submissionData.get("userStudentId")).longValue();
         Long assessmentId = ((Number) submissionData.get("assessmentId")).longValue();
 
-        // Idempotency check — SET NX prevents duplicate processing
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> answers = (List<Map<String, Object>>) submissionData.get("answers");
+        if (answers == null || answers.isEmpty()) {
+            return ResponseEntity.badRequest().body("No answers provided");
+        }
+
+        // 2. Excess-payload guards.
+        // Note: `answers.length` can legitimately exceed question count for
+        // multi-select + ranking + text questions (one entry per option/text).
+        // The meaningful check is on DISTINCT questionIds.
+        //
+        //   distinctQuestionIds > expected          → corrupted payload (unknown questions)
+        //   answers.length > expected * 10          → DOS/corruption ceiling
+        int expectedQuestionCount = completionService.getTotalQuestions(assessmentId);
+        int distinctQuestionIds = 0;
+        {
+            java.util.Set<Long> seen = new java.util.HashSet<>();
+            for (Map<String, Object> a : answers) {
+                Object raw = a.get("questionnaireQuestionId");
+                if (raw instanceof Number) seen.add(((Number) raw).longValue());
+            }
+            distinctQuestionIds = seen.size();
+        }
+        if (expectedQuestionCount > 0) {
+            if (distinctQuestionIds > expectedQuestionCount
+                    || answers.size() > expectedQuestionCount * 10) {
+                logger.error("Rejecting submission: distinctQuestions={} answers={} expected={} for assessment {}",
+                        distinctQuestionIds, answers.size(), expectedQuestionCount, assessmentId);
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "Submission payload is corrupted (too many questions or entries)",
+                        "answersReceived", answers.size(),
+                        "distinctQuestions", distinctQuestionIds,
+                        "expected", expectedQuestionCount
+                ));
+            }
+        }
+
+        // 3. Idempotency: short-lived in-flight lock (90s auto-expire).
+        // If a previous submission just finished, return its cached result.
         if (!assessmentSessionService.acquireSubmissionLock(userStudentId, assessmentId)) {
             Object cachedResult = assessmentSessionService.getSubmissionResult(userStudentId, assessmentId);
             if (cachedResult != null && !"processing".equals(cachedResult)) {
                 return ResponseEntity.ok(cachedResult);
             }
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
-                    "error", "Submission already in progress or completed",
+                    "error", "Submission already in progress",
                     "status", "duplicate"
             ));
         }
@@ -151,54 +199,51 @@ public class AssessmentAnswerController {
             AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
                     .orElseThrow(() -> new ResourceNotFoundException("Assessment", "id", assessmentId));
 
-                // 2. Extract status if provided
-                String status = submissionData.containsKey("status")
-                        ? (String) submissionData.get("status")
-                        : null;
-
-                // 3. Manage Mapping with race condition fix
-                StudentAssessmentMapping mapping;
-                try {
-                    mapping = studentAssessmentMappingRepository
-                            .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
-                            .orElseGet(() -> {
-                                StudentAssessmentMapping newMapping = new StudentAssessmentMapping();
-                                newMapping.setUserStudent(userStudent);
-                                newMapping.setAssessmentId(assessmentId);
-                                return studentAssessmentMappingRepository.save(newMapping);
-                            });
-                } catch (org.springframework.dao.DataIntegrityViolationException e) {
-                    mapping = studentAssessmentMappingRepository
-                            .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
-                            .orElseThrow(() -> new ServiceException("Failed to create/find assessment mapping"));
-                }
-
-                // Update status if provided
-                if (status != null) {
-                    mapping.setStatus(status);
-                    studentAssessmentMappingRepository.save(mapping);
-                }
-
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> answers = (List<Map<String, Object>>) submissionData.get("answers");
-                if (answers == null || answers.isEmpty()) {
-                    assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
-                    return ResponseEntity.badRequest().body("No answers provided");
-                }
-
-                // 4. Save full submission to Redis for async processing
-                assessmentSessionService.saveSubmittedAnswers(userStudentId, assessmentId, submissionData);
-
-                // 5. Fire async processing (non-blocking)
-                submissionProcessorService.processSubmissionAsync(userStudentId, assessmentId);
-
-                logger.info("Submission accepted for async processing: student={} assessment={}", userStudentId, assessmentId);
-                return ResponseEntity.ok(Map.of("status", "accepted"));
-
-            } catch (Exception e) {
-                assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
-                throw e;
+            // 4. Find or create mapping (race-safe)
+            StudentAssessmentMapping mapping;
+            try {
+                mapping = studentAssessmentMappingRepository
+                        .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                        .orElseGet(() -> {
+                            StudentAssessmentMapping newMapping = new StudentAssessmentMapping();
+                            newMapping.setUserStudent(userStudent);
+                            newMapping.setAssessmentId(assessmentId);
+                            return studentAssessmentMappingRepository.save(newMapping);
+                        });
+            } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                mapping = studentAssessmentMappingRepository
+                        .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                        .orElseThrow(() -> new ServiceException("Failed to create/find assessment mapping"));
             }
+
+            // 5. SERVER-SIDE status contract (ignore anything client sent):
+            //   - status = "completed"     → student has finished (Redis holds the submission)
+            //   - persistenceState = "pending" → answers not in MySQL yet
+            // The async processor flips persistenceState to "persisted" /
+            // "persisted_with_warnings" / "failed" once it runs. Resetting the
+            // mapping's persistenceState here ensures a retry after a prior
+            // "failed" starts cleanly.
+            mapping.setStatus("completed");
+            mapping.setPersistenceState("pending");
+            studentAssessmentMappingRepository.save(mapping);
+
+            // 6. Save full submission to Redis for async processing
+            assessmentSessionService.saveSubmittedAnswers(userStudentId, assessmentId, submissionData);
+
+            // 7. Fire async processing (non-blocking)
+            submissionProcessorService.processSubmissionAsync(userStudentId, assessmentId);
+
+            logger.info("Submission accepted: student={} assessment={} answers={}",
+                    userStudentId, assessmentId, answers.size());
+            return ResponseEntity.ok(Map.of(
+                    "status", "accepted",
+                    "answersReceived", answers.size()
+            ));
+
+        } catch (Exception e) {
+            assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
+            throw e;
+        }
     }
 
     @PutMapping(value = "/feedback-rating", headers = "Accept=application/json")
@@ -1481,6 +1526,16 @@ public class AssessmentAnswerController {
      * Frontend calls this fire-and-forget on every section transition.
      */
     @Transactional
+    /**
+     * Buffer partial answers in Redis. Called on every section transition.
+     * Redis-only by design: MySQL is only written by the final /submit pipeline,
+     * so there is exactly one MySQL writer (the async processor). This
+     * eliminates the prior save-partial vs submit race.
+     *
+     * On Redis failure: returns 503. The student's localStorage remains the
+     * source of truth; the only consequence is that admin live-tracking loses
+     * visibility of in-progress state until Redis recovers.
+     */
     @PostMapping(value = "/save-partial", headers = "Accept=application/json")
     public ResponseEntity<?> savePartialAnswers(@RequestBody Map<String, Object> submissionData) {
         if (submissionData.get("userStudentId") == null || submissionData.get("assessmentId") == null) {
@@ -1489,119 +1544,48 @@ public class AssessmentAnswerController {
         Long userStudentId = ((Number) submissionData.get("userStudentId")).longValue();
         Long assessmentId = ((Number) submissionData.get("assessmentId")).longValue();
 
-            UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
-            AssessmentTable assessment = assessmentTableRepository.findById(assessmentId).orElse(null);
-            if (userStudent == null || assessment == null) {
-                return ResponseEntity.badRequest().body("Invalid userStudentId or assessmentId");
-            }
+        UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
+        AssessmentTable assessment = assessmentTableRepository.findById(assessmentId).orElse(null);
+        if (userStudent == null || assessment == null) {
+            return ResponseEntity.badRequest().body("Invalid userStudentId or assessmentId");
+        }
 
-            // Ensure mapping exists (find or create), do NOT change status
-            try {
-                studentAssessmentMappingRepository
-                        .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
-                        .orElseGet(() -> {
-                            StudentAssessmentMapping newMapping = new StudentAssessmentMapping();
-                            newMapping.setUserStudent(userStudent);
-                            newMapping.setAssessmentId(assessmentId);
-                            return studentAssessmentMappingRepository.save(newMapping);
-                        });
-            } catch (org.springframework.dao.DataIntegrityViolationException e) {
-                // Race condition — mapping was created by another thread, that's fine
-            }
+        // Ensure mapping exists (find or create), do NOT change status.
+        try {
+            studentAssessmentMappingRepository
+                    .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                    .orElseGet(() -> {
+                        StudentAssessmentMapping newMapping = new StudentAssessmentMapping();
+                        newMapping.setUserStudent(userStudent);
+                        newMapping.setAssessmentId(assessmentId);
+                        return studentAssessmentMappingRepository.save(newMapping);
+                    });
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // Race condition — mapping was created by another thread, that's fine
+        }
 
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> answers = (List<Map<String, Object>>) submissionData.get("answers");
-            if (answers == null || answers.isEmpty()) {
-                return ResponseEntity.ok(Map.of("saved", 0, "status", "no_answers"));
-            }
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> answers = (List<Map<String, Object>>) submissionData.get("answers");
+        if (answers == null || answers.isEmpty()) {
+            return ResponseEntity.ok(Map.of("saved", 0, "status", "no_answers"));
+        }
 
-            // Redis-first: buffer partial answers in Redis for speed
-            try {
-                assessmentSessionService.savePartialAnswers(userStudentId, assessmentId, answers);
-                return ResponseEntity.ok(Map.of(
-                        "status", "saved",
-                        "saved", answers.size(),
-                        "storage", "redis"
-                ));
-            } catch (Exception redisEx) {
-                // Redis failed — fall back to MySQL DELETE+INSERT
-                logger.warn("Redis save failed for student={} assessment={}, falling back to MySQL",
-                        userStudentId, assessmentId, redisEx);
-            }
-
-            // MySQL fallback: bulk fetch, build entities, delete-and-replace
-            List<Long> questionIds = new ArrayList<>();
-            List<Long> optionIds = new ArrayList<>();
-            for (Map<String, Object> ansMap : answers) {
-                questionIds.add(((Number) ansMap.get("questionnaireQuestionId")).longValue());
-                if (ansMap.containsKey("optionId")) {
-                    optionIds.add(((Number) ansMap.get("optionId")).longValue());
-                }
-            }
-
-            Map<Long, QuestionnaireQuestion> questionCache = new HashMap<>();
-            if (!questionIds.isEmpty()) {
-                questionnaireQuestionRepository.findAllByIdIn(questionIds)
-                        .forEach(qq -> questionCache.put(qq.getQuestionnaireQuestionId(), qq));
-            }
-
-            Map<Long, AssessmentQuestionOptions> optionCache = new HashMap<>();
-            if (!optionIds.isEmpty()) {
-                assessmentQuestionOptionsRepository.findAllById(optionIds)
-                        .forEach(opt -> optionCache.put(opt.getOptionId(), opt));
-            }
-
-            List<AssessmentAnswer> answersToSave = new ArrayList<>();
-            int skippedCount = 0;
-
-            for (Map<String, Object> ansMap : answers) {
-                Long qId = ((Number) ansMap.get("questionnaireQuestionId")).longValue();
-                QuestionnaireQuestion question = questionCache.get(qId);
-
-                String textResponse = ansMap.containsKey("textResponse")
-                        ? (String) ansMap.get("textResponse")
-                        : null;
-
-                if (textResponse != null && question != null) {
-                    AssessmentAnswer ans = new AssessmentAnswer();
-                    ans.setUserStudent(userStudent);
-                    ans.setAssessment(assessment);
-                    ans.setQuestionnaireQuestion(question);
-                    ans.setTextResponse(textResponse);
-                    answersToSave.add(ans);
-                } else if (ansMap.containsKey("optionId")) {
-                    Long oId = ((Number) ansMap.get("optionId")).longValue();
-                    Integer rankOrder = ansMap.containsKey("rankOrder")
-                            ? ((Number) ansMap.get("rankOrder")).intValue()
-                            : null;
-
-                    AssessmentQuestionOptions option = optionCache.get(oId);
-                    if (question == null || option == null) {
-                        skippedCount++;
-                        continue;
-                    }
-
-                    AssessmentAnswer ans = new AssessmentAnswer();
-                    ans.setUserStudent(userStudent);
-                    ans.setAssessment(assessment);
-                    ans.setQuestionnaireQuestion(question);
-                    ans.setOption(option);
-                    if (rankOrder != null) {
-                        ans.setRankOrder(rankOrder);
-                    }
-                    answersToSave.add(ans);
-                }
-            }
-
-            assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(userStudentId, assessmentId);
-            assessmentAnswerRepository.saveAll(answersToSave);
-
+        try {
+            assessmentSessionService.savePartialAnswers(userStudentId, assessmentId, answers);
             return ResponseEntity.ok(Map.of(
                     "status", "saved",
-                    "saved", answersToSave.size(),
-                    "skipped", skippedCount,
-                    "storage", "mysql"
+                    "saved", answers.size(),
+                    "storage", "redis"
             ));
+        } catch (Exception redisEx) {
+            logger.warn("Redis save-partial failed for student={} assessment={}",
+                    userStudentId, assessmentId, redisEx);
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                    "status", "error",
+                    "error", "partial buffer unavailable",
+                    "message", "Keep answering; localStorage still has your work. Your final submit will persist everything."
+            ));
+        }
     }
 
     /**
@@ -1688,7 +1672,7 @@ public class AssessmentAnswerController {
             AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
                     .orElseThrow(() -> new ResourceNotFoundException("Assessment", "id", assessmentId));
 
-            // Find/create mapping and set status completed
+            // Find/create mapping (race-safe)
             StudentAssessmentMapping mapping;
             try {
                 mapping = studentAssessmentMappingRepository
@@ -1704,15 +1688,18 @@ public class AssessmentAnswerController {
                         .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
                         .orElseThrow(() -> new ServiceException("Failed to create/find assessment mapping"));
             }
-            // NOTE: do NOT set status to "completed" here. The async processor will
-            // run completionService.markCompletedIfFullyAnswered after persisting answers,
-            // which is the only place the answer count can be verified accurately.
+
+            // Admin is finalizing this student's partial as a submission.
+            // Apply the same server-side contract as /submit:
+            //   status = "completed", persistenceState = "pending"
+            mapping.setStatus("completed");
+            mapping.setPersistenceState("pending");
+            studentAssessmentMappingRepository.save(mapping);
 
             // Build submission payload and save to Redis for async processing
             Map<String, Object> submissionData = new HashMap<>();
             submissionData.put("userStudentId", userStudentId);
             submissionData.put("assessmentId", assessmentId);
-            submissionData.put("status", "ongoing");
             submissionData.put("answers", answers);
 
             assessmentSessionService.saveSubmittedAnswers(userStudentId, assessmentId, submissionData);
@@ -1902,5 +1889,538 @@ public class AssessmentAnswerController {
         result.put("calculatedTotals", new ArrayList<>(mqtTotals.values()));
         result.put("storedRawScores", storedScores);
         return ResponseEntity.ok(result);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  PENDING PERSISTENCE — admin diagnostics for submitted-but-not-persisted
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Lists all submissions that may need admin attention for an assessment.
+     * Covers three buckets:
+     *
+     *   (a) status=completed + persistenceState IN (pending|failed|persisted_with_warnings|null)
+     *   (b) status=completed + persistenceState=persisted BUT dbCount &lt; expected
+     *       (shouldn't happen in new code but catches legacy ghost completions)
+     *   (c) status=ongoing + Redis has submitted: payload
+     *       (student got as far as submit but something blocked it — admin
+     *        can retry from Redis on their behalf)
+     *
+     * Diagnostics:
+     *   awaiting_processor           Redis ✓, DB 0/N              → Retry Now
+     *   partial_inflight             Redis ✓, DB &lt;N               → Retry Now
+     *   duplicate_cleanup_needed     Redis ✓, DB =N                → Clean Up Redis
+     *   excess_pending               Redis (&gt;N), DB 0/N            → Inspect → Retry
+     *   excess_already_persisted     Redis (&gt;N), DB =N             → Clean Up Redis
+     *   excess_partial_db            Redis (&gt;N), DB &lt;N             → Inspect → Reset
+     *   reconcile_only               Redis ✗, DB =N                → Mark as Persisted
+     *   ghost_partial                Redis ✗, DB &lt;N (and &gt;0)       → Reset
+     *   ghost_empty                  Redis ✗, DB 0                 → Reset
+     *   persisted_with_warnings      persistenceState warnings, DB complete → Retry or dismiss
+     *   persisted_incomplete         DB &lt;N but flagged persisted   → Retry (if Redis) or Reset
+     *   stuck_ongoing                status=ongoing + Redis submitted present → Finalize from Redis
+     */
+    @GetMapping(value = "/pending-persistence")
+    public ResponseEntity<?> getPendingPersistence(
+            @RequestParam(value = "assessmentId", required = false) Long assessmentId) {
+
+        if (assessmentId == null) {
+            return ResponseEntity.badRequest().body("assessmentId is required");
+        }
+
+        List<StudentAssessmentMapping> completedRows =
+                studentAssessmentMappingRepository.findCompletedForAssessment(assessmentId);
+        List<StudentAssessmentMapping> ongoingRows =
+                studentAssessmentMappingRepository.findOngoingForAssessment(assessmentId);
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        int expected = completionService.getTotalQuestions(assessmentId);
+
+        // ── (a)/(b) completed rows ────────────────────────────────────────
+        for (StudentAssessmentMapping m : completedRows) {
+            Long studentId = m.getUserStudent() != null
+                    ? m.getUserStudent().getUserStudentId() : null;
+            Long aId = m.getAssessmentId();
+            if (studentId == null || aId == null) continue;
+
+            int dbCount = completionService.getAnsweredCount(studentId, aId);
+            boolean redisPresent = assessmentSessionService.hasSubmittedAnswers(studentId, aId);
+
+            // Filter out truly-done rows: persistenceState=persisted AND DB is
+            // complete. Redis may still contain the archived payload — that's
+            // fine, it's just a backup, doesn't need admin attention.
+            boolean isFullyResolved =
+                    "persisted".equals(m.getPersistenceState())
+                            && (expected == 0 || dbCount >= expected);
+            if (isFullyResolved) continue;
+
+            Integer redisRawCount = null;
+            Integer redisDistinctQuestionCount = null;
+            Integer duplicatesDeduped = null;
+            Integer skippedUnknown = null;
+            String submitArchivedAt = null;
+            if (redisPresent) {
+                Map<String, Object> submitted = assessmentSessionService.getSubmittedAnswers(studentId, aId);
+                if (submitted != null) {
+                    Object ansObj = submitted.get("answers");
+                    if (ansObj instanceof List) {
+                        List<?> list = (List<?>) ansObj;
+                        redisRawCount = list.size();
+                        java.util.Set<Long> distinct = new java.util.HashSet<>();
+                        for (Object a : list) {
+                            if (a instanceof Map) {
+                                Object q = ((Map<?, ?>) a).get("questionnaireQuestionId");
+                                if (q instanceof Number) distinct.add(((Number) q).longValue());
+                            }
+                        }
+                        redisDistinctQuestionCount = distinct.size();
+                    }
+                    Object dup = submitted.get("duplicatesDeduped");
+                    if (dup instanceof Number) duplicatesDeduped = ((Number) dup).intValue();
+                    Object skip = submitted.get("skippedUnknown");
+                    if (skip instanceof Number) skippedUnknown = ((Number) skip).intValue();
+                    Object ts = submitted.get("archivedAt");
+                    if (ts instanceof String) submitArchivedAt = (String) ts;
+                }
+            }
+
+            String diagnostic = classifyDiagnosticForCompleted(
+                    m.getPersistenceState(),
+                    redisPresent, redisDistinctQuestionCount,
+                    dbCount, expected);
+            String action = recommendedAction(diagnostic);
+            // Override: persisted_incomplete can't be retried without Redis —
+            // fall back to reset so the student can retake.
+            if ("persisted_incomplete".equals(diagnostic) && !redisPresent) {
+                action = "reset_assessment";
+            }
+
+            // Enrich with student info
+            UserStudent us = m.getUserStudent();
+            String studentName = null;
+            String username = null;
+            if (us != null && us.getStudentInfo() != null) {
+                studentName = us.getStudentInfo().getName();
+                if (us.getStudentInfo().getFamily() != null) {
+                    studentName += " " + us.getStudentInfo().getFamily();
+                }
+                if (us.getStudentInfo().getUser() != null) {
+                    username = us.getStudentInfo().getUser().getUsername();
+                }
+            }
+
+            // Failure context (if any)
+            Optional<AssessmentSubmissionFailure> failureOpt =
+                    submissionFailureRepository.findByUserStudentIdAndAssessmentId(studentId, aId);
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("userStudentId", studentId);
+            row.put("assessmentId", aId);
+            row.put("studentName", studentName);
+            row.put("username", username);
+            row.put("status", m.getStatus());
+            row.put("persistenceState", m.getPersistenceState());
+            row.put("expectedCount", expected);
+            row.put("dbAnswerCount", dbCount);
+            row.put("redisPresent", redisPresent);
+            row.put("redisAnswerCount", redisRawCount);
+            row.put("redisDistinctQuestionCount", redisDistinctQuestionCount);
+            row.put("duplicatesDeduped", duplicatesDeduped);
+            row.put("skippedUnknown", skippedUnknown);
+            row.put("submitArchivedAt", submitArchivedAt);
+            row.put("diagnostic", diagnostic);
+            row.put("recommendedAction", action);
+            failureOpt.ifPresent(f -> {
+                Map<String, Object> fmap = new LinkedHashMap<>();
+                fmap.put("attemptCount", f.getAttemptCount());
+                fmap.put("firstFailedAt", f.getFirstFailedAt());
+                fmap.put("lastAttemptAt", f.getLastAttemptAt());
+                fmap.put("nextRetryAt", f.getNextRetryAt());
+                fmap.put("lastErrorClass", f.getLastErrorClass());
+                fmap.put("lastErrorKind", f.getLastErrorKind());
+                fmap.put("consecutiveNonTransientCount", f.getConsecutiveNonTransientCount());
+                row.put("failure", fmap);
+            });
+
+            out.add(row);
+        }
+
+        // ── (c) stuck-ongoing rows ───────────────────────────────────────
+        for (StudentAssessmentMapping m : ongoingRows) {
+            Long studentId = m.getUserStudent() != null
+                    ? m.getUserStudent().getUserStudentId() : null;
+            Long aId = m.getAssessmentId();
+            if (studentId == null || aId == null) continue;
+
+            boolean redisSubmittedPresent = assessmentSessionService.hasSubmittedAnswers(studentId, aId);
+            if (!redisSubmittedPresent) continue;   // no submit attempt — nothing stuck
+
+            int dbCount = completionService.getAnsweredCount(studentId, aId);
+
+            Integer redisRawCount = null;
+            Integer redisDistinctQuestionCount = null;
+            Map<String, Object> submitted = assessmentSessionService.getSubmittedAnswers(studentId, aId);
+            if (submitted != null) {
+                Object ansObj = submitted.get("answers");
+                if (ansObj instanceof List) {
+                    List<?> list = (List<?>) ansObj;
+                    redisRawCount = list.size();
+                    java.util.Set<Long> distinct = new java.util.HashSet<>();
+                    for (Object a : list) {
+                        if (a instanceof Map) {
+                            Object q = ((Map<?, ?>) a).get("questionnaireQuestionId");
+                            if (q instanceof Number) distinct.add(((Number) q).longValue());
+                        }
+                    }
+                    redisDistinctQuestionCount = distinct.size();
+                }
+            }
+
+            UserStudent us = m.getUserStudent();
+            String studentName = null;
+            String username = null;
+            if (us != null && us.getStudentInfo() != null) {
+                studentName = us.getStudentInfo().getName();
+                if (us.getStudentInfo().getFamily() != null) {
+                    studentName += " " + us.getStudentInfo().getFamily();
+                }
+                if (us.getStudentInfo().getUser() != null) {
+                    username = us.getStudentInfo().getUser().getUsername();
+                }
+            }
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("userStudentId", studentId);
+            row.put("assessmentId", aId);
+            row.put("studentName", studentName);
+            row.put("username", username);
+            row.put("status", m.getStatus());
+            row.put("persistenceState", m.getPersistenceState());
+            row.put("expectedCount", expected);
+            row.put("dbAnswerCount", dbCount);
+            row.put("redisPresent", true);
+            row.put("redisAnswerCount", redisRawCount);
+            row.put("redisDistinctQuestionCount", redisDistinctQuestionCount);
+            row.put("diagnostic", "stuck_ongoing");
+            row.put("recommendedAction", "retry_now");
+            out.add(row);
+        }
+
+        return ResponseEntity.ok(out);
+    }
+
+    /**
+     * Classify a completed mapping's state. Considers persistenceState along
+     * with Redis/DB counts so we can catch:
+     *   - persisted_with_warnings: dedupe/unknown happened, mostly fine
+     *   - persisted_incomplete: flagged persisted but DB &lt; expected (bug or legacy)
+     */
+    private static String classifyDiagnosticForCompleted(
+            String persistenceState,
+            boolean redisPresent,
+            Integer redisDistinctQuestionCount,
+            int dbCount,
+            int expected) {
+        boolean expectedKnown = expected > 0;
+        boolean dbFull = expectedKnown && dbCount >= expected;
+        boolean dbPartial = dbCount > 0 && (!expectedKnown || dbCount < expected);
+        boolean dbEmpty = dbCount == 0;
+
+        // Explicit handling for already-processed states with DB mismatches.
+        if ("persisted".equals(persistenceState) && !dbFull && expectedKnown) {
+            return "persisted_incomplete";
+        }
+        if ("persisted_with_warnings".equals(persistenceState)) {
+            return dbFull ? "persisted_with_warnings" : "persisted_incomplete";
+        }
+
+        if (redisPresent) {
+            boolean excess = redisDistinctQuestionCount != null
+                    && expectedKnown
+                    && redisDistinctQuestionCount > expected;
+            if (excess) {
+                if (dbFull) return "excess_already_persisted";
+                if (dbEmpty) return "excess_pending";
+                return "excess_partial_db";
+            }
+            if (dbFull) return "duplicate_cleanup_needed";
+            if (dbEmpty) return "awaiting_processor";
+            return "partial_inflight";
+        }
+        // Redis absent
+        if (dbFull) return "reconcile_only";
+        if (dbPartial) return "ghost_partial";
+        return "ghost_empty";
+    }
+
+    private static String recommendedAction(String diagnostic) {
+        switch (diagnostic) {
+            case "awaiting_processor":
+            case "partial_inflight":
+            case "excess_pending":
+            case "stuck_ongoing":
+            case "persisted_incomplete":
+                return "retry_now";
+            case "duplicate_cleanup_needed":
+            case "excess_already_persisted":
+                return "cleanup_redis";
+            case "excess_partial_db":
+            case "ghost_partial":
+            case "ghost_empty":
+                return "reset_assessment";
+            case "reconcile_only":
+            case "persisted_with_warnings":
+                return "reconcile";
+            default:
+                return "inspect";
+        }
+    }
+
+    /**
+     * Admin action: mark a mapping's persistenceState as "persisted" when the
+     * DB already has the full answer set. Zero-destructive — used for the
+     * reconcile_only diagnostic.
+     */
+    @PostMapping(value = "/reconcile")
+    @javax.transaction.Transactional
+    public ResponseEntity<?> reconcilePersisted(@RequestBody Map<String, Object> request) {
+        Long userStudentId = asLong(request.get("userStudentId"));
+        Long assessmentId = asLong(request.get("assessmentId"));
+        if (userStudentId == null || assessmentId == null) {
+            return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
+        }
+        Long adminUserId = asLong(request.get("adminUserId"));
+        String reason = (String) request.get("reason");
+
+        StudentAssessmentMapping mapping = studentAssessmentMappingRepository
+                .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "StudentAssessmentMapping", "student/assessment",
+                        userStudentId + "/" + assessmentId));
+
+        // Safety check: don't mark persisted if DB doesn't actually have the data.
+        // Exception: if the row is already `persisted_with_warnings`, admin is
+        // explicitly acknowledging that some answers were skipped by the
+        // processor (unknown question/option) — allow the flip.
+        int expected = completionService.getTotalQuestions(assessmentId);
+        int dbCount = completionService.getAnsweredCount(userStudentId, assessmentId);
+        boolean isAcknowledgingWarnings =
+                "persisted_with_warnings".equals(mapping.getPersistenceState());
+        if (expected > 0 && dbCount < expected && !isAcknowledgingWarnings) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                    "error", "Cannot reconcile: DB has " + dbCount + " of " + expected + " answers",
+                    "dbAnswerCount", dbCount,
+                    "expectedCount", expected
+            ));
+        }
+
+        String beforeState = String.format(
+                "{\"status\":\"%s\",\"persistenceState\":\"%s\"}",
+                mapping.getStatus(), mapping.getPersistenceState());
+
+        mapping.setPersistenceState("persisted");
+        studentAssessmentMappingRepository.save(mapping);
+
+        // Resolve any failure row
+        submissionFailureRepository.findByUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                .ifPresent(row -> {
+                    row.setResolved(true);
+                    row.setResolvedAt(java.time.Instant.now());
+                    row.setNextRetryAt(null);
+                    submissionFailureRepository.save(row);
+                });
+
+        writeAudit("reconcile_persisted", userStudentId, assessmentId, adminUserId, reason,
+                beforeState,
+                String.format("{\"status\":\"%s\",\"persistenceState\":\"persisted\"}", mapping.getStatus()));
+
+        return ResponseEntity.ok(Map.of("status", "reconciled"));
+    }
+
+    /**
+     * Admin action: delete the Redis submitted: and partial: keys when the DB
+     * already has the full answer set. Used for duplicate_cleanup_needed and
+     * excess_already_persisted diagnostics. Also marks persistenceState=persisted.
+     */
+    @PostMapping(value = "/cleanup-redis")
+    @javax.transaction.Transactional
+    public ResponseEntity<?> cleanupRedis(@RequestBody Map<String, Object> request) {
+        Long userStudentId = asLong(request.get("userStudentId"));
+        Long assessmentId = asLong(request.get("assessmentId"));
+        if (userStudentId == null || assessmentId == null) {
+            return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
+        }
+        Long adminUserId = asLong(request.get("adminUserId"));
+        String reason = (String) request.get("reason");
+
+        StudentAssessmentMapping mapping = studentAssessmentMappingRepository
+                .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "StudentAssessmentMapping", "student/assessment",
+                        userStudentId + "/" + assessmentId));
+
+        // Safety check — only allow cleanup when DB has the data
+        int expected = completionService.getTotalQuestions(assessmentId);
+        int dbCount = completionService.getAnsweredCount(userStudentId, assessmentId);
+        if (expected > 0 && dbCount < expected) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                    "error", "Cannot cleanup: DB has " + dbCount + " of " + expected + " answers. Use reset instead.",
+                    "dbAnswerCount", dbCount,
+                    "expectedCount", expected
+            ));
+        }
+
+        String beforeState = String.format(
+                "{\"status\":\"%s\",\"persistenceState\":\"%s\"}",
+                mapping.getStatus(), mapping.getPersistenceState());
+
+        assessmentSessionService.deleteSubmittedAnswers(userStudentId, assessmentId);
+        assessmentSessionService.deletePartialAnswers(userStudentId, assessmentId);
+        assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
+
+        mapping.setPersistenceState("persisted");
+        studentAssessmentMappingRepository.save(mapping);
+
+        submissionFailureRepository.findByUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                .ifPresent(row -> {
+                    row.setResolved(true);
+                    row.setResolvedAt(java.time.Instant.now());
+                    row.setNextRetryAt(null);
+                    submissionFailureRepository.save(row);
+                });
+
+        writeAudit("cleanup_redis", userStudentId, assessmentId, adminUserId, reason,
+                beforeState,
+                String.format("{\"status\":\"%s\",\"persistenceState\":\"persisted\"}", mapping.getStatus()));
+
+        return ResponseEntity.ok(Map.of("status", "cleaned"));
+    }
+
+    /**
+     * Admin action: force an immediate retry attempt, bypassing backoff.
+     *
+     * Also acts as the "finalize stuck-ongoing" path: if a student is stuck at
+     * status=ongoing with a submitted: payload in Redis (their submit was
+     * blocked for some reason), admin can use this to push them through. We
+     * flip status=completed + persistenceState=pending to match what /submit
+     * would have done, then dispatch the processor.
+     */
+    @PostMapping(value = "/retry-now")
+    @javax.transaction.Transactional
+    public ResponseEntity<?> retryNow(@RequestBody Map<String, Object> request) {
+        Long userStudentId = asLong(request.get("userStudentId"));
+        Long assessmentId = asLong(request.get("assessmentId"));
+        if (userStudentId == null || assessmentId == null) {
+            return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
+        }
+        Long adminUserId = asLong(request.get("adminUserId"));
+        String reason = (String) request.get("reason");
+
+        // Require that Redis actually holds the submitted: payload
+        if (!assessmentSessionService.hasSubmittedAnswers(userStudentId, assessmentId)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                    "error", "No submitted: payload in Redis for this student/assessment",
+                    "hint", "Use reset if this is a ghost row"
+            ));
+        }
+
+        // Ensure mapping is in the right state for the processor. This is
+        // idempotent for already-completed rows and rescues stuck-ongoing ones.
+        StudentAssessmentMapping mapping = studentAssessmentMappingRepository
+                .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                .orElse(null);
+        if (mapping != null) {
+            mapping.setStatus("completed");
+            mapping.setPersistenceState("pending");
+            studentAssessmentMappingRepository.save(mapping);
+        }
+
+        // Clear any stale in-flight lock so dispatch isn't rejected by it
+        assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
+
+        writeAudit("retry_now", userStudentId, assessmentId, adminUserId, reason, null, null);
+
+        // Fire — processor handles its own lock + failure tracking
+        submissionProcessorService.processSubmissionAsync(userStudentId, assessmentId);
+
+        return ResponseEntity.accepted().body(Map.of("status", "dispatched"));
+    }
+
+    /**
+     * Admin inspection: return the raw Redis submitted: payload for a
+     * (student, assessment) pair. The payload is preserved for 7 days after
+     * submit so admin can inspect what the student actually sent, including
+     * any answers the processor had to skip (unknown optionId, unknown
+     * questionId). Lets admin reconcile without forcing the student to retake.
+     */
+    @GetMapping(value = "/submitted-detail")
+    public ResponseEntity<?> getSubmittedDetail(
+            @RequestParam("userStudentId") Long userStudentId,
+            @RequestParam("assessmentId") Long assessmentId) {
+        Map<String, Object> data = assessmentSessionService.getSubmittedAnswers(userStudentId, assessmentId);
+        if (data == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(data);
+    }
+
+    /**
+     * View the full failure history and diagnostic context for a single row.
+     * Used by the admin UI "View Errors" modal.
+     */
+    @GetMapping(value = "/submission-failure-detail")
+    public ResponseEntity<?> getSubmissionFailureDetail(
+            @RequestParam("userStudentId") Long userStudentId,
+            @RequestParam("assessmentId") Long assessmentId) {
+        Optional<AssessmentSubmissionFailure> failureOpt =
+                submissionFailureRepository.findByUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+
+        if (failureOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        AssessmentSubmissionFailure f = failureOpt.get();
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("userStudentId", userStudentId);
+        result.put("assessmentId", assessmentId);
+        result.put("firstFailedAt", f.getFirstFailedAt());
+        result.put("lastAttemptAt", f.getLastAttemptAt());
+        result.put("nextRetryAt", f.getNextRetryAt());
+        result.put("attemptCount", f.getAttemptCount());
+        result.put("consecutiveNonTransientCount", f.getConsecutiveNonTransientCount());
+        result.put("lastErrorClass", f.getLastErrorClass());
+        result.put("lastErrorMessage", f.getLastErrorMessage());
+        result.put("lastErrorKind", f.getLastErrorKind());
+        result.put("resolved", f.getResolved());
+        result.put("resolvedAt", f.getResolvedAt());
+        return ResponseEntity.ok(result);
+    }
+
+    // ─── helpers ────────────────────────────────────────────────────────────
+
+    private static Long asLong(Object v) {
+        if (v == null) return null;
+        if (v instanceof Number) return ((Number) v).longValue();
+        try { return Long.parseLong(v.toString()); } catch (NumberFormatException e) { return null; }
+    }
+
+    private void writeAudit(String actionType, Long userStudentId, Long assessmentId,
+                            Long adminUserId, String reason,
+                            String beforeStateJson, String afterStateJson) {
+        try {
+            AssessmentAdminAction audit = new AssessmentAdminAction();
+            audit.setActionType(actionType);
+            audit.setUserStudentId(userStudentId);
+            audit.setAssessmentId(assessmentId);
+            audit.setAdminUserId(adminUserId);
+            audit.setActionAt(java.time.Instant.now());
+            audit.setReason(reason);
+            audit.setBeforeStateJson(beforeStateJson);
+            audit.setAfterStateJson(afterStateJson);
+            adminActionRepository.save(audit);
+        } catch (Exception e) {
+            logger.warn("Audit write failed for action={} student={} assessment={}",
+                    actionType, userStudentId, assessmentId, e);
+        }
     }
 }
