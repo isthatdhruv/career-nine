@@ -101,6 +101,8 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
     questionText: "",
     questionType: "",
     maxOptionsAllowed: "",
+    optionsRule: "equal" as "min" | "max" | "equal",
+    optionsCount: "",
     questionOptions: [""],
     sectionId: ""
   };
@@ -334,7 +336,9 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
         questionMediaType: questionMediaType,
         questionImageUrl: questionImageUrl || null,
         questionVideoUrl: questionVideoUrl || null,
-        maxOptionsAllowed: Number(formikValues.maxOptionsAllowed) || 0,
+        maxOptionsAllowed: Number(formikValues.optionsCount) || 0,
+        optionsRule: formikValues.optionsRule,
+        optionsCount: Number(formikValues.optionsCount) || 0,
         options,
         section: { sectionId: Number(formikValues.sectionId) },
         flag : useMQTAsOptions ? 1 : 0
@@ -655,17 +659,47 @@ const QuestionCreateModal: React.FC<QuestionCreateModalProps> = ({ show, onHide,
             )}
           </div>
 
-          {/* Max Options Allowed */}
+          {/* Options Selection Rule */}
           <div className="mb-3">
-            <label className="form-label fw-bold">Max Options Allowed:</label>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={formikValues.maxOptionsAllowed}
-              onChange={e => setFormikValues(v => ({ ...v, maxOptionsAllowed: e.target.value }))}
-              className="form-control w-25"
-            />
+            <label className="form-label fw-bold">Options Selection Rule:</label>
+            <div className="d-flex gap-3 align-items-center">
+              <select
+                className="form-select"
+                style={{ width: 180 }}
+                value={formikValues.optionsRule}
+                onChange={e =>
+                  setFormikValues(v => ({
+                    ...v,
+                    optionsRule: e.target.value as "min" | "max" | "equal"
+                  }))
+                }
+              >
+                <option value="min">At least (Min)</option>
+                <option value="max">At most (Max)</option>
+                <option value="equal">Exactly (Equal)</option>
+              </select>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={formikValues.optionsCount}
+                onChange={e =>
+                  setFormikValues(v => ({
+                    ...v,
+                    optionsCount: e.target.value,
+                    maxOptionsAllowed: e.target.value
+                  }))
+                }
+                placeholder="N"
+                className="form-control"
+                style={{ width: 120 }}
+              />
+              <span className="text-muted small">
+                {formikValues.optionsRule === "min" && "Student must select at least N options"}
+                {formikValues.optionsRule === "max" && "Student can select up to N options"}
+                {formikValues.optionsRule === "equal" && "Question is answered only when exactly N options are selected"}
+              </span>
+            </div>
           </div>
 
           {/* Use MQT as Options / Use Game as Option */}

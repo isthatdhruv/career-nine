@@ -58,6 +58,21 @@ public class PaymentController {
     @Autowired
     private PaymentNotificationLogRepository notificationLogRepository;
 
+    @Autowired(required = false)
+    private com.kccitm.api.repository.Career9.b2c.CampaignRepository campaignRepository;
+
+    @Autowired(required = false)
+    private com.kccitm.api.repository.Career9.b2c.CampaignAssessmentMappingRepository campaignAssessmentMappingRepository;
+
+    @Autowired(required = false)
+    private com.kccitm.api.repository.Career9.b2c.CampaignAssessmentTierRepository campaignAssessmentTierRepository;
+
+    @Autowired(required = false)
+    private com.kccitm.api.repository.Career9.b2c.PricingTierRepository pricingTierRepository;
+
+    @Autowired(required = false)
+    private com.kccitm.api.service.b2c.EntitlementService entitlementService;
+
     @Value("${app.razorpay.callback-base-url:}")
     private String callbackBaseUrl;
 
@@ -129,6 +144,122 @@ public class PaymentController {
             logger.error("Failed to generate payment link", e);
             return ResponseEntity.internalServerError().body("Failed to generate payment link: " + e.getMessage());
         }
+    }
+
+    /**
+     * B2C campaign payment link generation. Used by campaign landing pages.
+     * Body: { campaignId, assessmentId, campaignAssessmentTierId,
+     *         studentName, studentEmail, studentPhone, promoCode? }
+     * Response: { transactionId, paymentLinkUrl, shortUrl, amount }
+     */
+    @PostMapping("/generate-campaign-link")
+    public ResponseEntity<?> generateCampaignPaymentLink(@RequestBody Map<String, Object> request) {
+        if (entitlementService == null || campaignRepository == null
+                || campaignAssessmentMappingRepository == null
+                || campaignAssessmentTierRepository == null
+                || pricingTierRepository == null) {
+            return ResponseEntity.status(503).body("B2C module not enabled on this server");
+        }
+        try {
+            Long campaignId = toLong(request.get("campaignId"));
+            Long assessmentId = toLong(request.get("assessmentId"));
+            Long campaignAssessmentTierId = toLong(request.get("campaignAssessmentTierId"));
+            if (campaignId == null || assessmentId == null || campaignAssessmentTierId == null) {
+                return ResponseEntity.badRequest()
+                        .body("campaignId, assessmentId, and campaignAssessmentTierId are required");
+            }
+            String studentName = (String) request.get("studentName");
+            String studentEmail = (String) request.get("studentEmail");
+            String studentPhone = (String) request.get("studentPhone");
+            if (studentName == null || studentEmail == null) {
+                return ResponseEntity.badRequest().body("studentName and studentEmail are required");
+            }
+
+            var campaignOpt = campaignRepository.findById(campaignId);
+            if (!campaignOpt.isPresent() || Boolean.TRUE.equals(campaignOpt.get().getIsDeleted())) {
+                return ResponseEntity.badRequest().body("Campaign not found");
+            }
+            var mappingOpt = campaignAssessmentMappingRepository
+                    .findByCampaignIdAndAssessmentIdAndIsDeletedFalse(campaignId, assessmentId);
+            if (!mappingOpt.isPresent()) {
+                return ResponseEntity.badRequest().body("Assessment is not part of this campaign");
+            }
+            var tierMapOpt = campaignAssessmentTierRepository.findById(campaignAssessmentTierId);
+            if (!tierMapOpt.isPresent()
+                    || !mappingOpt.get().getId().equals(tierMapOpt.get().getCampaignAssessmentMappingId())) {
+                return ResponseEntity.badRequest().body("Tier does not belong to this campaign-assessment");
+            }
+            var pricingTierOpt = pricingTierRepository.findById(tierMapOpt.get().getPricingTierId());
+            if (!pricingTierOpt.isPresent()) {
+                return ResponseEntity.badRequest().body("Pricing tier not found");
+            }
+
+            Long priceInr = tierMapOpt.get().getPriceOverrideInr() != null
+                    ? tierMapOpt.get().getPriceOverrideInr()
+                    : pricingTierOpt.get().getBasePriceInr();
+            if (priceInr == null || priceInr <= 0) {
+                return ResponseEntity.badRequest().body("Tier price is not set");
+            }
+
+            String assessmentName = assessmentTableRepository.findById(assessmentId)
+                    .map(a -> a.getAssessmentName()).orElse("Assessment");
+            String description = "Career-9: " + campaignOpt.get().getName() + " — " + assessmentName;
+            String referenceId = "CAM-" + campaignId + "-" + campaignAssessmentTierId + "-" + System.currentTimeMillis();
+
+            String callbackUrl = null;
+            if (callbackBaseUrl != null && !callbackBaseUrl.isEmpty()) {
+                callbackUrl = callbackBaseUrl + "/payment-status?ref=" + referenceId;
+            }
+
+            Map<String, String> notes = new HashMap<>();
+            notes.put("campaignId", campaignId.toString());
+            notes.put("assessmentId", assessmentId.toString());
+            notes.put("campaignAssessmentTierId", campaignAssessmentTierId.toString());
+            notes.put("referenceId", referenceId);
+            if (studentName != null) notes.put("customerName", studentName);
+
+            Map<String, String> linkResult = razorpayService.createPaymentLink(
+                    priceInr, "INR", description, callbackUrl, referenceId, notes);
+
+            // Resolve purchase path for analytics on the txn
+            String purchasePath = mappingOpt.get().getPurchasePath();
+            if (purchasePath == null) purchasePath = campaignOpt.get().getDefaultPurchasePath();
+            if (purchasePath == null) purchasePath = "B";
+
+            PaymentTransaction txn = new PaymentTransaction();
+            txn.setAssessmentId(assessmentId);
+            txn.setCampaignId(campaignId);
+            txn.setCampaignAssessmentTierId(campaignAssessmentTierId);
+            txn.setPurchasePath(purchasePath);
+            txn.setAmount(priceInr);
+            txn.setStudentName(studentName);
+            txn.setStudentEmail(studentEmail);
+            txn.setStudentPhone(studentPhone);
+            txn.setRazorpayLinkId(linkResult.get("linkId"));
+            txn.setPaymentLinkUrl(linkResult.get("paymentLinkUrl"));
+            txn.setShortUrl(linkResult.get("shortUrl"));
+            txn.setStatus("created");
+            txn = paymentTransactionRepository.save(txn);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("transactionId", txn.getTransactionId());
+            response.put("paymentLinkUrl", txn.getShortUrl());
+            response.put("shortUrl", txn.getShortUrl());
+            response.put("razorpayLinkId", txn.getRazorpayLinkId());
+            response.put("amount", priceInr);
+            response.put("status", "created");
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            logger.error("Failed to generate campaign payment link", e);
+            return ResponseEntity.internalServerError().body("Failed: " + e.getMessage());
+        }
+    }
+
+    private static Long toLong(Object o) {
+        if (o == null) return null;
+        if (o instanceof Number) return ((Number) o).longValue();
+        return Long.parseLong(o.toString());
     }
 
     @GetMapping("/transactions")

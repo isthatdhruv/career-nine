@@ -122,6 +122,9 @@ public class AssessmentAnswerController {
     @Autowired
     private AssessmentAdminActionRepository adminActionRepository;
 
+    @Autowired(required = false)
+    private com.kccitm.api.service.b2c.EntitlementService entitlementService;
+
     @GetMapping(value = "/getByStudent/{studentId}", headers = "Accept=application/json")
     public List<AssessmentAnswer> getAssessmentAnswersByStudent(@PathVariable("studentId") Long studentId) {
         UserStudent userStudent = userStudentRepository.findById(studentId).orElse(null);
@@ -235,6 +238,22 @@ public class AssessmentAnswerController {
 
             logger.info("Submission accepted: student={} assessment={} answers={}",
                     userStudentId, assessmentId, answers.size());
+
+            // B2C entitlement: if this submission belongs to an active entitlement, fire the
+            // post-completion notification (1-pager / final report email). Best-effort.
+            try {
+                if (entitlementService != null) {
+                    String studentEmail = null;
+                    UserStudent us = userStudentRepository.findById(userStudentId).orElse(null);
+                    if (us != null && us.getStudentInfo() != null) {
+                        studentEmail = us.getStudentInfo().getEmail();
+                    }
+                    entitlementService.onAssessmentCompleted(userStudentId, assessmentId, studentEmail);
+                }
+            } catch (Exception entitlementEx) {
+                logger.warn("B2C entitlement post-completion hook failed (non-fatal)", entitlementEx);
+            }
+
             return ResponseEntity.ok(Map.of(
                     "status", "accepted",
                     "answersReceived", answers.size()

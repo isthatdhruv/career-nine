@@ -21,4 +21,8 @@ public interface StudentDemographicResponseRepository extends JpaRepository<Stud
     List<StudentDemographicResponse> findByUserStudentId(Long userStudentId);
     List<StudentDemographicResponse> findByUserStudentIdAndFieldDefinitionFieldId(
             Long userStudentId, Long fieldId);
+
+    // Bulk lookup for many students against a fixed set of field IDs
+    List<StudentDemographicResponse> findByUserStudentIdInAndFieldDefinitionFieldIdIn(
+            List<Long> userStudentIds, List<Long> fieldIds);
 }

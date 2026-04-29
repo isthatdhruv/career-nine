@@ -57,6 +57,12 @@ public class AssessmentTable implements java.io.Serializable {
     @Column(name = "collect_email_and_phone", columnDefinition = "BOOLEAN DEFAULT TRUE")
     private Boolean collectEmailAndPhone = true;
 
+    @Column(name = "default_purchase_path", length = 1, columnDefinition = "char(1) default 'B'")
+    private String defaultPurchasePath = "B";
+
+    @Column(name = "default_counselling_model", length = 1, columnDefinition = "char(1) default '1'")
+    private String defaultCounsellingModel = "1";
+
     /**
      * Max number of times this assessment can be reset for a single student.
      * Once reset count for (assessmentId, userStudentId) hits this value,
@@ -179,6 +185,22 @@ public class AssessmentTable implements java.io.Serializable {
 
     public void setCollectEmailAndPhone(Boolean collectEmailAndPhone) {
         this.collectEmailAndPhone = collectEmailAndPhone;
+    }
+
+    public String getDefaultPurchasePath() {
+        return defaultPurchasePath;
+    }
+
+    public void setDefaultPurchasePath(String defaultPurchasePath) {
+        this.defaultPurchasePath = defaultPurchasePath;
+    }
+
+    public String getDefaultCounsellingModel() {
+        return defaultCounsellingModel;
+    }
+
+    public void setDefaultCounsellingModel(String defaultCounsellingModel) {
+        this.defaultCounsellingModel = defaultCounsellingModel;
     }
 
 }

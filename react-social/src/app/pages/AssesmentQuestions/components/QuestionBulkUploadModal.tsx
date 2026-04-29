@@ -11,6 +11,8 @@ interface ParsedQuestion {
   questionType: string;
   sectionId: string;
   maxOptionsAllowed: number;
+  optionsRule: "min" | "max" | "equal";
+  optionsCount: number;
   options: ParsedOption[];
 }
 
@@ -182,11 +184,19 @@ const QuestionBulkUploadModal: React.FC<QuestionBulkUploadModalProps> = ({
       }
 
       // Create question object
+      const parsedCount = Number(row["Options Count"] ?? row["Max Options Allowed"]) || 0;
+      const ruleRaw = String(row["Options Rule"] || "").trim().toLowerCase();
+      const parsedRule: "min" | "max" | "equal" =
+        ruleRaw === "min" || ruleRaw === "max" || ruleRaw === "equal"
+          ? (ruleRaw as "min" | "max" | "equal")
+          : "equal";
       const question: ParsedQuestion = {
         questionText,
         questionType: row["Question Type"]?.trim() || "",
         sectionId: String(row["Section ID"] || ""),
-        maxOptionsAllowed: Number(row["Max Options Allowed"]) || 0,
+        maxOptionsAllowed: parsedCount,
+        optionsRule: parsedRule,
+        optionsCount: parsedCount,
         options,
       };
 
@@ -447,7 +457,9 @@ const QuestionBulkUploadModal: React.FC<QuestionBulkUploadModalProps> = ({
     return {
       questionText: question.questionText,
       questionType: question.questionType,
-      maxOptionsAllowed: question.maxOptionsAllowed,
+      maxOptionsAllowed: question.optionsCount || question.maxOptionsAllowed,
+      optionsRule: question.optionsRule,
+      optionsCount: question.optionsCount || question.maxOptionsAllowed,
       section: { sectionId: Number(question.sectionId) },
       flag: 0,
       options: question.options.map((opt) => ({
@@ -758,22 +770,47 @@ const QuestionBulkUploadModal: React.FC<QuestionBulkUploadModalProps> = ({
               </select>
             </div>
 
-            {/* Max Options Allowed */}
+            {/* Options Selection Rule */}
             <div className="fv-row mb-4">
-              <label className="fs-6 fw-bold mb-2">Max Options Allowed:</label>
-              <input
-                type="number"
-                min={0}
-                max={100}
-                className="form-control form-control-lg form-control-solid w-25"
-                value={currentQuestion.maxOptionsAllowed}
-                onChange={(e) =>
-                  updateCurrentQuestion({
-                    ...currentQuestion,
-                    maxOptionsAllowed: Number(e.target.value),
-                  })
-                }
-              />
+              <label className="fs-6 fw-bold mb-2">Options Selection Rule:</label>
+              <div className="d-flex gap-3 align-items-center">
+                <select
+                  className="form-select form-select-lg form-select-solid"
+                  style={{ width: 180 }}
+                  value={currentQuestion.optionsRule}
+                  onChange={(e) =>
+                    updateCurrentQuestion({
+                      ...currentQuestion,
+                      optionsRule: e.target.value as "min" | "max" | "equal",
+                    })
+                  }
+                >
+                  <option value="min">At least (Min)</option>
+                  <option value="max">At most (Max)</option>
+                  <option value="equal">Exactly (Equal)</option>
+                </select>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  placeholder="N"
+                  className="form-control form-control-lg form-control-solid"
+                  style={{ width: 120 }}
+                  value={currentQuestion.optionsCount}
+                  onChange={(e) =>
+                    updateCurrentQuestion({
+                      ...currentQuestion,
+                      optionsCount: Number(e.target.value),
+                      maxOptionsAllowed: Number(e.target.value),
+                    })
+                  }
+                />
+                <span className="text-muted fs-7">
+                  {currentQuestion.optionsRule === "min" && "Student must select at least N options"}
+                  {currentQuestion.optionsRule === "max" && "Student can select up to N options"}
+                  {currentQuestion.optionsRule === "equal" && "Question is answered only when exactly N options are selected"}
+                </span>
+              </div>
             </div>
 
             {/* Options */}

@@ -64,6 +64,10 @@ type Question = {
     languageQuestions?: LanguageQuestion[];
     maxOptionsAllowed: number;
     minOptionsAllowed?: number;
+    // New rule-based selection model. When optionsRule is set, it overrides the
+    // legacy "min defaults to max" behavior.
+    optionsRule?: "min" | "max" | "equal" | null;
+    optionsCount?: number | null;
   };
 };
 
@@ -458,7 +462,10 @@ const SectionQuestionPage: React.FC = () => {
 
   const selectedOptions = answers[sectionId!]?.[qId] || [];
 
-  // --- Min-selection enforcement (defaults minOptionsAllowed = maxOptionsAllowed) ---
+  // --- Selection rule: derive effectiveMin (required to mark answered) and
+  //     effectiveMax (cap on how many can be selected; 0 = unlimited) from the
+  //     new optionsRule + optionsCount, with a legacy fallback when these are
+  //     unset (defaults minOptionsAllowed = maxOptionsAllowed). ---
   const currentIsRanking = question.question.questionType === "ranking";
   const currentIsText =
     question.question.questionType === "text" ||
@@ -478,12 +485,25 @@ const SectionQuestionPage: React.FC = () => {
   })();
 
   const maxOptionsAllowed = question.question.maxOptionsAllowed;
-  // maxOptionsAllowed === 0 means "unlimited" — no minimum either.
-  // Otherwise default min to max (must select exactly maxOptionsAllowed).
-  const effectiveMin =
-    maxOptionsAllowed === 0
-      ? 0
-      : (question.question.minOptionsAllowed ?? maxOptionsAllowed);
+  const optionsRule = question.question.optionsRule ?? null;
+  const optionsCount =
+    typeof question.question.optionsCount === "number"
+      ? question.question.optionsCount
+      : null;
+
+  const { effectiveMin, effectiveMax } = (() => {
+    if (optionsRule && optionsCount != null && optionsCount > 0) {
+      if (optionsRule === "min") return { effectiveMin: optionsCount, effectiveMax: 0 };
+      if (optionsRule === "max") return { effectiveMin: 1, effectiveMax: optionsCount };
+      return { effectiveMin: optionsCount, effectiveMax: optionsCount }; // equal
+    }
+    // Legacy fallback
+    if (maxOptionsAllowed === 0) return { effectiveMin: 0, effectiveMax: 0 };
+    return {
+      effectiveMin: question.question.minOptionsAllowed ?? maxOptionsAllowed,
+      effectiveMax: maxOptionsAllowed,
+    };
+  })();
 
   const belowMin = currentSelectionCount < effectiveMin;
   const remainingToMin = Math.max(effectiveMin - currentSelectionCount, 0);
@@ -700,39 +720,41 @@ const SectionQuestionPage: React.FC = () => {
   const toggleOption = (optionId: number) => {
     const currentSelectedCount = selectedOptions.length;
     const isAlreadySelected = selectedOptions.includes(optionId);
-    const maxAllowed = question.question.maxOptionsAllowed;
 
-    // Determine if this selection will trigger auto-advance
-    // Auto-advance when: adding an option (not removing), and new count equals maxAllowed
-    // When maxAllowed === 0 (no limit set), auto-advance after 1 selection
-    const effectiveMax = maxAllowed === 0 ? 1 : maxAllowed;
-    const willAutoAdvance =
-      !isAlreadySelected &&
-      currentSelectedCount + 1 === effectiveMax;
+    // Auto-advance only when the question becomes unambiguously "answered":
+    //   - "equal" rule: when count + 1 reaches the exact target N
+    //   - legacy (no rule): when count + 1 reaches maxOptionsAllowed (preserves
+    //     existing behaviour, including auto-advancing after 1 selection if
+    //     maxOptionsAllowed === 0)
+    //   - "min" / "max" rules: never auto-advance — the student decides when
+    //     they are done within the constraint.
+    const willAutoAdvance = (() => {
+      if (isAlreadySelected) return false;
+      if (optionsRule === "equal") return currentSelectedCount + 1 === effectiveMax;
+      if (optionsRule === "min" || optionsRule === "max") return false;
+      const legacyTarget = maxOptionsAllowed === 0 ? 1 : maxOptionsAllowed;
+      return currentSelectedCount + 1 === legacyTarget;
+    })();
 
     setAnswers((prev) => {
       const sec = prev[sectionId!] || {};
       const arr = sec[qId] || [];
 
-      // Check if the maximum number of options is already selected
+      // Check if the option is already selected — toggle off
       if (arr.includes(optionId)) {
-        // If the option is already selected, remove it
         const updated = arr.filter((x) => x !== optionId);
         return {
           ...prev,
           [sectionId!]: { ...sec, [qId]: updated },
         };
-      } else if (
-        question.question.maxOptionsAllowed === 0 || // Allow unlimited selection if maxOptionsAllowed is 0
-        arr.length < question.question.maxOptionsAllowed
-      ) {
-        // If the maximum number of options is not reached, add the option
+      } else if (effectiveMax === 0 || arr.length < effectiveMax) {
+        // Either unlimited, or we still have room under the cap
         const updated = [...arr, optionId];
         return {
           ...prev,
           [sectionId!]: { ...sec, [qId]: updated },
         };
-      } else if (question.question.maxOptionsAllowed === 1) {
+      } else if (effectiveMax === 1) {
         // Single-choice: replace the previous selection with the new one
         return {
           ...prev,
@@ -740,7 +762,7 @@ const SectionQuestionPage: React.FC = () => {
         };
       }
 
-      // If the maximum number of options is reached, return the current state
+      // Cap reached — keep current state
       return prev;
     });
 
@@ -773,11 +795,16 @@ const SectionQuestionPage: React.FC = () => {
     // Calculate current rank count before update to determine if we should auto-advance
     const currentRankings = rankingAnswers[sectionId!]?.[qId] || {};
     const currentRankCount = Object.keys(currentRankings).length;
-    const maxAllowed = question.question.maxOptionsAllowed;
 
-    // Will auto-advance if: setting a rank (not removing), and this will reach maxAllowed
+    // Auto-advance only for "equal" rule or legacy (where the cap doubles as
+    // the target). For "min" / "max" rules, the student decides when done.
     const isAddingRank = rank !== null && !currentRankings[optionId];
-    const willAutoAdvance = isAddingRank && currentRankCount + 1 === maxAllowed;
+    const willAutoAdvance = (() => {
+      if (!isAddingRank) return false;
+      if (optionsRule === "equal") return currentRankCount + 1 === effectiveMax;
+      if (optionsRule === "min" || optionsRule === "max") return false;
+      return currentRankCount + 1 === maxOptionsAllowed;
+    })();
 
     setRankingAnswers((prev) => {
       const sec = prev[sectionId!] || {};
@@ -837,7 +864,14 @@ const SectionQuestionPage: React.FC = () => {
         .map(([, rank]) => rank),
     );
 
-    const maxRanks = question.question.maxOptionsAllowed;
+    // Number of rank slots: prefer the cap from the rule; "min" rule allows
+    // ranking up to the number of options. Falls back to legacy maxOptionsAllowed.
+    const totalOptions = (question.question.options || []).length;
+    const maxRanks = (() => {
+      if (optionsRule === "equal" || optionsRule === "max") return effectiveMax;
+      if (optionsRule === "min") return totalOptions;
+      return question.question.maxOptionsAllowed || totalOptions;
+    })();
     const availableRanks: number[] = [];
 
     for (let i = 1; i <= maxRanks; i++) {
@@ -2093,7 +2127,7 @@ const SectionQuestionPage: React.FC = () => {
               </h4>
             )}
 
-            {/* Display maxOptionsAllowed */}
+            {/* Display selection-rule hint */}
             <div className="text-muted mb-3">
               <small
                 style={{
@@ -2102,29 +2136,51 @@ const SectionQuestionPage: React.FC = () => {
                   fontWeight: 500,
                 }}
               >
-                {currentIsText ? (
-                  effectiveMin > 0 ? (
-                    <>
-                      Please type exactly{" "}
-                      <strong>{effectiveMin}</strong> response(s) below.
-                    </>
-                  ) : (
-                    <>Please type your response(s) below.</>
-                  )
-                ) : currentIsRanking ? (
-                  <>
-                    Please rank exactly{" "}
-                    <strong>{effectiveMin || question.question.maxOptionsAllowed}</strong>{" "}
-                    option(s) in order of preference (1 = most important).
-                  </>
-                ) : effectiveMin > 0 ? (
-                  <>
-                    Please select exactly{" "}
-                    <strong>{effectiveMin}</strong> option(s) to continue.
-                  </>
-                ) : (
-                  <></>
-                )}
+                {(() => {
+                  // Phrasing differs by rule. For "min" we say "at least N",
+                  // for "max" we say "up to N", for "equal"/legacy "exactly N".
+                  const verb = currentIsText
+                    ? "type"
+                    : currentIsRanking
+                      ? "rank"
+                      : "select";
+                  const noun = currentIsText
+                    ? "response(s)"
+                    : "option(s)";
+                  const trailing = currentIsRanking
+                    ? " in order of preference (1 = most important)"
+                    : currentIsText
+                      ? " below"
+                      : " to continue";
+                  if (optionsRule === "min" && effectiveMin > 0) {
+                    return (
+                      <>
+                        Please {verb} at least <strong>{effectiveMin}</strong>{" "}
+                        {noun}{trailing}.
+                      </>
+                    );
+                  }
+                  if (optionsRule === "max" && effectiveMax > 0) {
+                    return (
+                      <>
+                        You can {verb} up to <strong>{effectiveMax}</strong>{" "}
+                        {noun}{trailing}.
+                      </>
+                    );
+                  }
+                  // equal or legacy
+                  const exact = effectiveMin || question.question.maxOptionsAllowed;
+                  if (exact > 0) {
+                    return (
+                      <>
+                        Please {verb} exactly <strong>{exact}</strong>{" "}
+                        {noun}{trailing}.
+                      </>
+                    );
+                  }
+                  if (currentIsText) return <>Please type your response(s) below.</>;
+                  return <></>;
+                })()}
               </small>
             </div>
 
@@ -2139,7 +2195,14 @@ const SectionQuestionPage: React.FC = () => {
 
                 // Text-type or isMQT question: render text input boxes with autocomplete
                 if (isTextQuestion) {
-                  const maxInputs = question.question.maxOptionsAllowed || 1;
+                  // Number of text-input boxes to render. Prefer the cap from
+                  // the rule; for "min" rule (no cap) use the required count.
+                  const maxInputs =
+                    effectiveMax > 0
+                      ? effectiveMax
+                      : effectiveMin > 0
+                        ? effectiveMin
+                        : question.question.maxOptionsAllowed || 1;
                   const currentTexts = textAnswers[sectionId!]?.[qId] || {};
 
                   const handleTextInput = (inputIdx: number, value: string) => {
@@ -2604,10 +2667,12 @@ const SectionQuestionPage: React.FC = () => {
                           checked={selectedOptions.includes(opt.optionId)}
                           onChange={() => toggleOption(opt.optionId)}
                           disabled={
-                            question.question.maxOptionsAllowed > 1 &&
+                            // effectiveMax === 0 means unlimited (e.g. "min" rule)
+                            // — never disable. Otherwise disable un-checked
+                            // boxes once the cap is reached.
+                            effectiveMax > 1 &&
                             !selectedOptions.includes(opt.optionId) &&
-                            selectedOptions.length >=
-                              question.question.maxOptionsAllowed
+                            selectedOptions.length >= effectiveMax
                           }
                         />
                         <div style={{ flex: 1 }}>

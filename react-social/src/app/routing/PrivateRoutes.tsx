@@ -84,6 +84,7 @@ const ALWAYS_ALLOWED = [
   "/general-instructions",
   "/demographics",
   "/login/reset-password",
+  "/b2c",
 ];
 
 const AuthorizedLayout = () => {
@@ -258,6 +259,10 @@ const PrivateRoutes = () => {
   const PromoCodePage = lazy(() => import("../pages/PromoCode/PromoCodePage"));
   const PaymentStatusPage = lazy(() => import("../pages/PaymentTracking/PaymentStatusPage"));
   const PaymentRegisterPage = lazy(() => import("../pages/PaymentTracking/PaymentRegisterPage"));
+  const B2CPricingTierPage = lazy(() => import("../pages/B2C/PricingTier/PricingTierPage"));
+  const B2CCampaignPage = lazy(() => import("../pages/B2C/Campaign/CampaignPage"));
+  const B2CCampaignEditPage = lazy(() => import("../pages/B2C/Campaign/CampaignEditPage"));
+  const B2CTrackerPage = lazy(() => import("../pages/B2C/Tracker/TrackerPage"));
   // const UniversityAllResultDashboard = lazy(
   //   () => import("../pages/UniversityResult/UniversityAllResultDashboard")
   // );
@@ -1182,6 +1187,46 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <PromoCodePage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/b2c/pricing-tiers"
+          element={
+            <SuspensedView>
+              <B2CPricingTierPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/b2c/campaigns"
+          element={
+            <SuspensedView>
+              <B2CCampaignPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/b2c/campaigns/create"
+          element={
+            <SuspensedView>
+              <B2CCampaignEditPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/b2c/campaigns/edit/:id"
+          element={
+            <SuspensedView>
+              <B2CCampaignEditPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/b2c/tracker"
+          element={
+            <SuspensedView>
+              <B2CTrackerPage />
             </SuspensedView>
           }
         />

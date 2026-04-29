@@ -370,6 +370,49 @@ export function AsideMenuMain() {
         </>
       )}
 
+      {(allowed("/b2c/campaigns") || allowed("/b2c/pricing-tiers") || allowed("/b2c/tracker")) && (
+        <>
+          <div className="menu-item">
+            <div className="menu-content pt-8 pb-2">
+              <span className="menu-section text-muted text-uppercase fs-8 ls-1">
+                B2C Portal
+              </span>
+            </div>
+          </div>
+          <AsideMenuItemWithSub
+            to="/b2c"
+            title="B2C"
+            fontIcon="bi-shop"
+            icon="/media/icons/duotune/ecommerce/ecm001.svg"
+          >
+            {allowed("/b2c/campaigns") && (
+              <AsideMenuItem
+                to="/b2c/campaigns"
+                icon="/media/icons/duotune/ecommerce/ecm005.svg"
+                title="Campaigns"
+                fontIcon="bi-megaphone"
+              />
+            )}
+            {allowed("/b2c/pricing-tiers") && (
+              <AsideMenuItem
+                to="/b2c/pricing-tiers"
+                icon="/media/icons/duotune/finance/fin010.svg"
+                title="Pricing Tiers"
+                fontIcon="bi-tag-fill"
+              />
+            )}
+            {allowed("/b2c/tracker") && (
+              <AsideMenuItem
+                to="/b2c/tracker"
+                icon="/media/icons/duotune/graphs/gra007.svg"
+                title="Payments & Allotments"
+                fontIcon="bi-clipboard-data"
+              />
+            )}
+          </AsideMenuItemWithSub>
+        </>
+      )}
+
       {showReports && (
         <>
           <div className="menu-item">
