@@ -1,10 +1,8 @@
 import React, { useState, useMemo } from 'react'
-import PortalLayout from '../../portal/PortalLayout'
 import {
   getVisibleReportsForStudent,
   GeneratedReport,
 } from '../../ReportGeneration/API/GeneratedReport_APIs'
-import { STUDENT_MENU_ITEMS, STUDENT_STORAGE_KEYS } from './studentMenuConfig'
 import { useAutoRefresh } from '../../../utils/useAutoRefresh'
 import './StudentPortal.css'
 
@@ -67,12 +65,7 @@ const StudentReports: React.FC = () => {
   }
 
   return (
-    <PortalLayout
-      title='Career Navigator 360'
-      menuItems={STUDENT_MENU_ITEMS}
-      storageKeys={STUDENT_STORAGE_KEYS}
-      loginPath='/student/login'
-    >
+    <>
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1A1A1A', margin: 0 }}>
           My Reports
@@ -273,7 +266,7 @@ const StudentReports: React.FC = () => {
           </div>
         </div>
       )}
-    </PortalLayout>
+    </>
   )
 }
 

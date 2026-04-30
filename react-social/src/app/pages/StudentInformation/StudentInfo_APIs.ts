@@ -53,6 +53,7 @@ export interface StudentWithMapping {
     studentDob?: string;
     username?: string;
     schoolSectionId?: number;
+    gender?: string;
     assessments?: AssessmentDetail[];
     assignedAssessmentIds?: number[];
 }

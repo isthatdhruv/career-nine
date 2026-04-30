@@ -2,14 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import '../Counselling.css'
 import { showErrorToast } from '../../../utils/toast'
-import PortalLayout from '../../portal/PortalLayout'
 import { getAvailableSlots } from '../API/SlotAPI'
 import { bookSlot, rescheduleAppointment } from '../API/AppointmentAPI'
 import { getStudentEligibility, EligibilityResponse } from '../API/EligibilityAPI'
 import SlotGrid from './components/SlotGrid'
 import BookingForm from './components/BookingForm'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
-import { STUDENT_MENU_ITEMS, STUDENT_STORAGE_KEYS } from '../../StudentDashboard/student-portal/studentMenuConfig'
 
 interface Slot {
   slotId: number
@@ -189,18 +187,15 @@ const SlotBookingPage: React.FC = () => {
   // Block access if not eligible
   if (eligibilityLoading) {
     return (
-      <PortalLayout title='Career Navigator 360' menuItems={STUDENT_MENU_ITEMS} storageKeys={STUDENT_STORAGE_KEYS} loginPath='/student/login'>
-        <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--sp-muted, #5C7A72)', fontSize: 14 }}>
-          Checking eligibility...
-        </div>
-      </PortalLayout>
+      <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--sp-muted, #5C7A72)', fontSize: 14 }}>
+        Checking eligibility...
+      </div>
     )
   }
 
   if (!isReschedule && (!eligibility || eligibility.action !== 'BOOK_COUNSELLING')) {
     return (
-      <PortalLayout title='Career Navigator 360' menuItems={STUDENT_MENU_ITEMS} storageKeys={STUDENT_STORAGE_KEYS} loginPath='/student/login'>
-        <div style={{ maxWidth: 560, margin: '0 auto' }}>
+      <div style={{ maxWidth: 560, margin: '0 auto' }}>
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
             <button onClick={() => navigate('/student/counselling')} style={{
@@ -294,51 +289,43 @@ const SlotBookingPage: React.FC = () => {
             </div>
           </div>
         </div>
-      </PortalLayout>
     )
   }
 
   if (booked) {
     return (
-      <PortalLayout title='Career Navigator 360' menuItems={STUDENT_MENU_ITEMS} storageKeys={STUDENT_STORAGE_KEYS} loginPath='/student/login'>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
-          <div className='cl-card' style={{ maxWidth: 480, width: '100%', textAlign: 'center', padding: 40 }}>
-            <div
-              style={{
-                width: 64, height: 64, borderRadius: '50%',
-                background: 'var(--sp-primary-light, #EEFABD)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 20px',
-              }}
-            >
-              <svg width='28' height='28' viewBox='0 0 24 24' fill='none' stroke='var(--sp-primary, #263B6A)' strokeWidth='2.5'>
-                <path d='M20 6L9 17l-5-5' />
-              </svg>
-            </div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--sp-text)', margin: '0 0 8px' }}>
-              {isReschedule ? 'Session Rescheduled!' : 'Session Booked!'}
-            </h2>
-            <p style={{ fontSize: 13, color: 'var(--sp-muted)', marginBottom: 28, lineHeight: 1.6 }}>
-              {isReschedule
-                ? 'Your counselling session has been moved to the new slot. You will receive a notification with the updated details.'
-                : 'Your counselling session has been confirmed. A counsellor has been assigned automatically. You will receive a notification with session details.'}
-            </p>
-            <button className='cl-btn-primary' onClick={() => navigate('/student/counselling')} style={{ fontSize: 13 }}>
-              Back to My Sessions
-            </button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
+        <div className='cl-card' style={{ maxWidth: 480, width: '100%', textAlign: 'center', padding: 40 }}>
+          <div
+            style={{
+              width: 64, height: 64, borderRadius: '50%',
+              background: 'var(--sp-primary-light, #EEFABD)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 20px',
+            }}
+          >
+            <svg width='28' height='28' viewBox='0 0 24 24' fill='none' stroke='var(--sp-primary, #263B6A)' strokeWidth='2.5'>
+              <path d='M20 6L9 17l-5-5' />
+            </svg>
           </div>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--sp-text)', margin: '0 0 8px' }}>
+            {isReschedule ? 'Session Rescheduled!' : 'Session Booked!'}
+          </h2>
+          <p style={{ fontSize: 13, color: 'var(--sp-muted)', marginBottom: 28, lineHeight: 1.6 }}>
+            {isReschedule
+              ? 'Your counselling session has been moved to the new slot. You will receive a notification with the updated details.'
+              : 'Your counselling session has been confirmed. A counsellor has been assigned automatically. You will receive a notification with session details.'}
+          </p>
+          <button className='cl-btn-primary' onClick={() => navigate('/student/counselling')} style={{ fontSize: 13 }}>
+            Back to My Sessions
+          </button>
         </div>
-      </PortalLayout>
+      </div>
     )
   }
 
   return (
-    <PortalLayout
-      title='Career Navigator 360'
-      menuItems={STUDENT_MENU_ITEMS}
-      storageKeys={STUDENT_STORAGE_KEYS}
-      loginPath='/student/login'
-    >
+    <>
       <div style={{ maxWidth: 860 }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
@@ -461,7 +448,7 @@ const SlotBookingPage: React.FC = () => {
           </div>
         </div>
       )}
-    </PortalLayout>
+    </>
   )
 }
 

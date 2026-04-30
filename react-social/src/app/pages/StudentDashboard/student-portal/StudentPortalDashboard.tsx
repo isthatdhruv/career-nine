@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toAbsoluteUrl } from '../../../../_metronic/helpers'
-import PortalLayout from '../../portal/PortalLayout'
 import PendingRatingPrompt from '../../Counselling/student/components/PendingRatingPrompt'
 import { fetchNavigator360Scores } from '../../ReportsHub/navigator360/Navigator360API'
 import { computeNavigator360 } from '../../ReportsHub/navigator360/Navigator360Engine'
@@ -17,7 +16,6 @@ import {
 import { buildFourPagerPlaceholders } from '../../ReportsHub/fourPager/FourPagerEngine'
 import { PlaceholderMap, StudentMeta } from '../../ReportsHub/fourPager/FourPagerTypes'
 import { DashboardApiResponse } from '../API/Dashboard_APIs'
-import { STUDENT_MENU_ITEMS, STUDENT_STORAGE_KEYS } from './studentMenuConfig'
 import './StudentPortal.css'
 
 const LIBRARY_URL = 'https://library.career-9.com/'
@@ -96,12 +94,7 @@ const StudentPortalDashboard: React.FC = () => {
   if (!profile) return null
 
   return (
-    <PortalLayout
-      title='Career Navigator 360'
-      menuItems={STUDENT_MENU_ITEMS}
-      storageKeys={STUDENT_STORAGE_KEYS}
-      loginPath='/student/login'
-    >
+    <>
       <div className='sp-dash'>
         {!hasCompletedAssessment && !reportError && <EmptyState />}
         {reportError && <ErrorState message={reportError} />}
@@ -111,7 +104,7 @@ const StudentPortalDashboard: React.FC = () => {
       </div>
 
       {profile?.userStudentId > 0 && <PendingRatingPrompt studentId={profile.userStudentId} />}
-    </PortalLayout>
+    </>
   )
 }
 

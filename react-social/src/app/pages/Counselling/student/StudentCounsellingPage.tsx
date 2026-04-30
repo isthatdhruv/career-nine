@@ -1,14 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import '../Counselling.css'
-import PortalLayout from '../../portal/PortalLayout'
 import NotificationBell from '../shared/NotificationBell'
 import { getStudentAppointments } from '../API/AppointmentAPI'
 import UpcomingSessionCard from './components/UpcomingSessionCard'
 import PastSessionCard from './components/PastSessionCard'
 import PendingRatingPrompt from './components/PendingRatingPrompt'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
-import { STUDENT_MENU_ITEMS, STUDENT_STORAGE_KEYS } from '../../StudentDashboard/student-portal/studentMenuConfig'
 
 interface Slot {
   date: string
@@ -224,12 +222,7 @@ const StudentCounsellingPage: React.FC = () => {
   }
 
   return (
-    <PortalLayout
-      title='Career Navigator 360'
-      menuItems={STUDENT_MENU_ITEMS}
-      storageKeys={STUDENT_STORAGE_KEYS}
-      loginPath='/student/login'
-    >
+    <>
       <div style={{ maxWidth: 760 }}>
         {/* Header */}
         <div
@@ -309,7 +302,7 @@ const StudentCounsellingPage: React.FC = () => {
         {renderContent()}
       </div>
       {studentId > 0 && <PendingRatingPrompt studentId={studentId} />}
-    </PortalLayout>
+    </>
   )
 }
 

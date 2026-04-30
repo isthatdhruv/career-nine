@@ -439,6 +439,8 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
       questionText: questionData.questionText || "",
       questionType: questionData.questionType || "",
       maxOptionsAllowed: questionData.maxOptionsAllowed || 0,
+      optionsRule: (questionData.optionsRule as "min" | "max" | "equal") || "equal",
+      optionsCount: (questionData.optionsCount ?? questionData.maxOptionsAllowed) || 0,
       isMQT: questionData.isMQT ?? false,
       isMQTtyped: questionData.isMQTtyped ?? false,
       section: questionData.section && typeof questionData.section === "object" && "sectionId" in questionData.section
@@ -564,7 +566,9 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
           questionMediaType: questionMediaType,
           questionImageUrl: questionImageUrl || null,
           questionVideoUrl: questionVideoUrl || null,
-          maxOptionsAllowed: Number(values.maxOptionsAllowed) || 0,
+          maxOptionsAllowed: Number(values.optionsCount) || 0,
+          optionsRule: values.optionsRule,
+          optionsCount: Number(values.optionsCount) || 0,
           isMQT: values.isMQT,
           isMQTtyped: values.isMQTtyped,
           options,
@@ -1257,23 +1261,43 @@ const QuestionEditPage = (props?: { setPageLoading?: any }) => {
               )}
             </div>
 
-            {/* Max Options Allowed */}
+            {/* Options Selection Rule */}
             <div className="fv-row mb-7">
               <label className="fs-6 fw-bold mb-2">
-                {formik.values.questionType === "text" ? "Number of Text Input Boxes" : "Max Options Allowed"}
+                {formik.values.questionType === "text" ? "Number of Text Input Boxes" : "Options Selection Rule"}
               </label>
-              <input
-                type="number"
-                min={0}
-                max={100}
-                value={formik.values.maxOptionsAllowed}
-                onChange={e =>
-                  formik.setFieldValue("maxOptionsAllowed", e.target.value)
-                }
-                placeholder={formik.values.questionType === "text" ? "Number of text input boxes" : "Max Options Allowed"}
-                className="form-control form-control-lg form-control-solid"
-                style={{ width: 200 }}
-              />
+              <div className="d-flex gap-3 align-items-center">
+                <select
+                  className="form-select form-select-lg form-select-solid"
+                  style={{ width: 180 }}
+                  value={formik.values.optionsRule}
+                  onChange={e =>
+                    formik.setFieldValue("optionsRule", e.target.value)
+                  }
+                >
+                  <option value="min">At least (Min)</option>
+                  <option value="max">At most (Max)</option>
+                  <option value="equal">Exactly (Equal)</option>
+                </select>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={formik.values.optionsCount}
+                  onChange={e => {
+                    formik.setFieldValue("optionsCount", e.target.value);
+                    formik.setFieldValue("maxOptionsAllowed", e.target.value);
+                  }}
+                  placeholder="N"
+                  className="form-control form-control-lg form-control-solid"
+                  style={{ width: 120 }}
+                />
+                <span className="text-muted fs-7">
+                  {formik.values.optionsRule === "min" && "Student must select at least N options"}
+                  {formik.values.optionsRule === "max" && "Student can select up to N options"}
+                  {formik.values.optionsRule === "equal" && "Question is answered only when exactly N options are selected"}
+                </span>
+              </div>
             </div>
             {formik.values.questionType === "text" && (
               <div className="alert alert-info mb-7">

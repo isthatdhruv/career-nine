@@ -97,6 +97,10 @@ public class StudentInfoController {
     private AssessmentSubmissionFailureRepository submissionFailureRepository;
     @Autowired
     private AssessmentAdminActionRepository adminActionRepository;
+    @Autowired
+    private com.kccitm.api.repository.Career9.DemographicFieldDefinitionRepository demographicFieldDefinitionRepository;
+    @Autowired
+    private com.kccitm.api.repository.Career9.StudentDemographicResponseRepository studentDemographicResponseRepository;
 
     @GetMapping("/getAll")
     public List<StudentInfo> getAllStudentInfo() {
@@ -472,6 +476,59 @@ public class StudentInfoController {
                 }
             }
 
+            // 5b. Bulk load latest gender from demographic responses (CUSTOM fields).
+            //     SYSTEM gender writes back to studentInfo.gender, but if the gender
+            //     field is configured as CUSTOM, the value lives in
+            //     student_demographic_response. The stored responseValue is the
+            //     option's `option_value` (often a numeric id like "1") — we resolve
+            //     it to the human-readable `option_label` via the field's options.
+            //     We prefer the demographic response value and fall back to
+            //     studentInfo.gender otherwise.
+            Map<Long, String> genderByUserStudentId = new HashMap<>();
+            try {
+                List<com.kccitm.api.model.career9.DemographicFieldDefinition> genderFields =
+                        demographicFieldDefinitionRepository.findGenderLikeFields("gender");
+                if (!genderFields.isEmpty() && !allUserStudentIds.isEmpty()) {
+                    // fieldId -> (optionValue -> optionLabel)
+                    Map<Long, Map<String, String>> optionLabelByField = new HashMap<>();
+                    List<Long> genderFieldIds = new ArrayList<>();
+                    for (com.kccitm.api.model.career9.DemographicFieldDefinition f : genderFields) {
+                        genderFieldIds.add(f.getFieldId());
+                        Map<String, String> optionMap = new HashMap<>();
+                        if (f.getOptions() != null) {
+                            for (com.kccitm.api.model.career9.DemographicFieldOption opt : f.getOptions()) {
+                                if (opt.getOptionValue() != null) {
+                                    optionMap.put(opt.getOptionValue(),
+                                            opt.getOptionLabel() != null
+                                                    ? opt.getOptionLabel()
+                                                    : opt.getOptionValue());
+                                }
+                            }
+                        }
+                        optionLabelByField.put(f.getFieldId(), optionMap);
+                    }
+
+                    List<com.kccitm.api.model.career9.StudentDemographicResponse> responses =
+                            studentDemographicResponseRepository
+                                    .findByUserStudentIdInAndFieldDefinitionFieldIdIn(
+                                            allUserStudentIds, genderFieldIds);
+                    for (com.kccitm.api.model.career9.StudentDemographicResponse r : responses) {
+                        String raw = r.getResponseValue();
+                        if (raw == null || raw.trim().isEmpty()) continue;
+                        Long fieldId = r.getFieldDefinition() != null
+                                ? r.getFieldDefinition().getFieldId() : null;
+                        Map<String, String> optionMap = fieldId != null
+                                ? optionLabelByField.get(fieldId) : null;
+                        String resolved = (optionMap != null && optionMap.containsKey(raw))
+                                ? optionMap.get(raw)
+                                : raw;
+                        genderByUserStudentId.put(r.getUserStudentId(), resolved);
+                    }
+                }
+            } catch (Exception ex) {
+                System.out.println("Warning: failed to load demographic gender data: " + ex.getMessage());
+            }
+
             // 6. Assemble response in memory — no more DB queries
             List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
 
@@ -486,6 +543,18 @@ public class StudentInfoController {
                 studentData.put("studentDob", si.getStudentDob());
                 studentData.put("schoolSectionId", si.getSchoolSectionId());
                 studentData.put("controlNumber", si.getControlNumber());
+                try {
+                    UserStudent usForGender = studentInfoToUserStudent.get(si.getId());
+                    Long usId = usForGender != null ? usForGender.getUserStudentId() : null;
+                    String demographicGender = usId != null ? genderByUserStudentId.get(usId) : null;
+                    String fallbackGender = si.getGender();
+                    String resolvedGender = (demographicGender != null && !demographicGender.trim().isEmpty())
+                            ? demographicGender
+                            : fallbackGender;
+                    studentData.put("gender", resolvedGender);
+                } catch (Exception e) {
+                    studentData.put("gender", si.getGender());
+                }
                 try {
                     studentData.put("username", si.getUser() != null ? si.getUser().getUsername() : null);
                     studentData.put("loginDob", si.getUser() != null ? si.getUser().getDobDate() : null);

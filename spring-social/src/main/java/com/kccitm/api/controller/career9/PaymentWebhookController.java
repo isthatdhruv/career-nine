@@ -64,6 +64,9 @@ public class PaymentWebhookController {
     @Autowired private SchoolClassesRepository schoolClassesRepository;
     @Autowired private SchoolAssessmentConfigRepository schoolAssessmentConfigRepository;
 
+    @Autowired(required = false)
+    private com.kccitm.api.service.b2c.EntitlementService entitlementService;
+
     @PostMapping("/razorpay")
     @Transactional
     public ResponseEntity<?> handleRazorpayWebhook(
@@ -276,7 +279,83 @@ public class PaymentWebhookController {
         }
 
         paymentTransactionRepository.save(txn);
-        createStudentAndAllotAssessment(txn);
+
+        // Branch: B2C (campaign-linked) vs legacy school payment.
+        if (txn.getCampaignId() != null && txn.getCampaignAssessmentTierId() != null) {
+            provisionB2CStudentAndEntitlement(txn);
+        } else {
+            createStudentAndAllotAssessment(txn);
+        }
+    }
+
+    private void provisionB2CStudentAndEntitlement(PaymentTransaction txn) {
+        try {
+            Long assessmentId = txn.getAssessmentId();
+            if (assessmentId == null) {
+                logger.error("B2C txn {} missing assessmentId", txn.getTransactionId());
+                return;
+            }
+
+            String email = txn.getStudentEmail();
+            String name = txn.getStudentName() != null ? txn.getStudentName() : "Student";
+            Date dob = txn.getStudentDob() != null ? txn.getStudentDob() : new Date();
+            String phone = txn.getStudentPhone();
+
+            // Look up an existing student globally (no instituteCode for B2C).
+            UserStudent userStudent = null;
+            if (email != null) {
+                List<StudentInfo> existing = studentInfoRepository.findByEmail(email);
+                if (existing != null && !existing.isEmpty()) {
+                    StudentInfo info = existing.get(0);
+                    List<UserStudent> us = userStudentRepository.findByStudentInfoId(info.getId());
+                    if (!us.isEmpty()) userStudent = us.get(0);
+                }
+            }
+
+            if (userStudent == null) {
+                User user = new User((int) (Math.random() * 100000), dob);
+                user.setName(name);
+                user.setEmail(email);
+                user.setPhone(phone);
+                user = userRepository.save(user);
+
+                StudentInfo studentInfo = new StudentInfo();
+                studentInfo.setName(name);
+                studentInfo.setEmail(email);
+                studentInfo.setStudentDob(dob);
+                studentInfo.setPhoneNumber(phone);
+                studentInfo.setUser(user);
+                studentInfo = studentInfoRepository.save(studentInfo);
+
+                userStudent = new UserStudent(user, studentInfo, null);
+                userStudent = userStudentRepository.save(userStudent);
+            }
+
+            // Ensure StudentAssessmentMapping exists so they can take the assessment.
+            Optional<StudentAssessmentMapping> samOpt = studentAssessmentMappingRepository
+                    .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudent.getUserStudentId(), assessmentId);
+            if (!samOpt.isPresent()) {
+                StudentAssessmentMapping sam = new StudentAssessmentMapping(userStudent.getUserStudentId(), assessmentId);
+                studentAssessmentMappingRepository.save(sam);
+            }
+
+            txn.setUserStudentId(userStudent.getUserStudentId());
+            paymentTransactionRepository.save(txn);
+
+            // Now activate the entitlement — sends welcome + assessment link with token.
+            if (entitlementService != null) {
+                entitlementService.activateOnPayment(txn.getTransactionId());
+            }
+
+            logger.info("B2C student provisioned + entitlement activated. UserStudentId: {}, TxnId: {}",
+                    userStudent.getUserStudentId(), txn.getTransactionId());
+
+        } catch (Exception e) {
+            logger.error("B2C provisioning failed for txn {}", txn.getTransactionId(), e);
+            txn.setStatus("paid_provisioning_failed");
+            txn.setFailureReason("B2C provisioning failed: " + e.getMessage());
+            paymentTransactionRepository.save(txn);
+        }
     }
 
     private void handlePaymentLinkStatusChange(JSONObject payloadObj, String status) {
@@ -386,7 +465,7 @@ public class PaymentWebhookController {
                 classId = mapping.getClassId();
                 sectionId = mapping.getSectionId();
             } else {
-                logger.error("Transaction {} has neither mappingId nor schoolConfigId", txn.getTransactionId());
+                logger.error("Transaction {} has neither mappingId, schoolConfigId, nor campaignId", txn.getTransactionId());
                 return;
             }
 

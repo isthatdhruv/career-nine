@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import PortalLayout from '../../portal/PortalLayout'
-import { STUDENT_MENU_ITEMS, STUDENT_STORAGE_KEYS } from './studentMenuConfig'
 import { DashboardApiResponse } from '../API/Dashboard_APIs'
 import { fetchNavigator360Scores } from '../../ReportsHub/navigator360/Navigator360API'
 import {
@@ -297,24 +295,21 @@ const StudentNavigator360Page: React.FC = () => {
 
   if (loading) {
     return (
-      <PortalLayout title='Navigator 360' menuItems={STUDENT_MENU_ITEMS} storageKeys={STUDENT_STORAGE_KEYS} loginPath='/student/login'>
-        <div style={{ textAlign: 'center', padding: 80 }}>
-          <div style={{
-            width: 48, height: 48, borderRadius: '50%', margin: '0 auto 16px',
-            background: V.heroGrad, animation: 'pulse 1.5s infinite',
-          }} />
-          <div style={{ fontSize: 14, fontWeight: 600, color: V.muted }}>Computing your Navigator 360 profile...</div>
-          <div style={{ fontSize: 12, color: V.muted, marginTop: 4 }}>Analyzing personality, abilities, intelligences & career matches</div>
-          <style>{`@keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(0.95); } }`}</style>
-        </div>
-      </PortalLayout>
+      <div style={{ textAlign: 'center', padding: 80 }}>
+        <div style={{
+          width: 48, height: 48, borderRadius: '50%', margin: '0 auto 16px',
+          background: V.heroGrad, animation: 'pulse 1.5s infinite',
+        }} />
+        <div style={{ fontSize: 14, fontWeight: 600, color: V.muted }}>Computing your Navigator 360 profile...</div>
+        <div style={{ fontSize: 12, color: V.muted, marginTop: 4 }}>Analyzing personality, abilities, intelligences & career matches</div>
+        <style>{`@keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.5; transform:scale(0.95); } }`}</style>
+      </div>
     )
   }
 
   if (error || !result) {
     return (
-      <PortalLayout title='Navigator 360' menuItems={STUDENT_MENU_ITEMS} storageKeys={STUDENT_STORAGE_KEYS} loginPath='/student/login'>
-        <GlowCard gradient={V.cardGrad1}>
+      <GlowCard gradient={V.cardGrad1}>
           <div style={{ textAlign: 'center', padding: 40 }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>&#128640;</div>
             <h3 style={{ fontSize: 18, fontWeight: 700, color: V.text, marginBottom: 8 }}>
@@ -329,11 +324,10 @@ const StudentNavigator360Page: React.FC = () => {
                 marginTop: 16, padding: '10px 24px', borderRadius: 10, border: 'none',
                 background: V.heroGrad, color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer',
               }}>
-              View Assessments
-            </button>
-          </div>
-        </GlowCard>
-      </PortalLayout>
+            View Assessments
+          </button>
+        </div>
+      </GlowCard>
     )
   }
 
@@ -345,7 +339,7 @@ const StudentNavigator360Page: React.FC = () => {
   const top3Abilities = [...result.abilities].sort((a, b) => b.normPct - a.normPct).slice(0, 3)
 
   return (
-    <PortalLayout title='Navigator 360' menuItems={STUDENT_MENU_ITEMS} storageKeys={STUDENT_STORAGE_KEYS} loginPath='/student/login'>
+    <>
       {/* ── HERO BANNER ── */}
       <div style={{
         background: V.heroGrad, borderRadius: 20, padding: '28px 32px', marginBottom: 24,
@@ -666,7 +660,7 @@ const StudentNavigator360Page: React.FC = () => {
           .sp-grid-2, .sp-grid-3 { grid-template-columns: 1fr !important; }
         }
       `}</style>
-    </PortalLayout>
+    </>
   )
 }
 
