@@ -117,7 +117,7 @@ const ThankYouPage: React.FC = () => {
 
                                 <h1
                                     style={{
-                                        background: 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)',
+                                        background: 'linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)',
                                         WebkitBackgroundClip: 'text',
                                         WebkitTextFillColor: 'transparent',
                                         backgroundClip: 'text',
@@ -219,7 +219,7 @@ const ThankYouPage: React.FC = () => {
                                 {/* Divider */}
                                 <div style={{
                                     height: '2px',
-                                    background: 'linear-gradient(90deg, transparent, rgba(244, 63, 94, 0.3), transparent)',
+                                    background: 'linear-gradient(90deg, transparent, rgba(93, 214, 141, 0.3), transparent)',
                                     margin: '0 auto 1.5rem auto',
                                     width: '80%',
                                 }} />
@@ -230,7 +230,7 @@ const ThankYouPage: React.FC = () => {
                                         onClick={handleExploreCareerLibrary}
                                         className="text-center"
                                         style={{
-                                            background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                                            background: 'linear-gradient(135deg, #86EFAC 0%, #34D399 100%)',
                                             borderRadius: '16px',
                                             padding: '1.25rem 1.5rem',
                                             cursor: 'pointer',

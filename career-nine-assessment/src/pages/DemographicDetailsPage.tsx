@@ -412,14 +412,14 @@ const DemographicDetailsPage: React.FC = () => {
                         error && isTouched
                           ? '#e53e3e'
                           : values[field.fieldId] === option.optionValue
-                          ? '#f43f5e'
+                          ? '#5DD68D'
                           : '#e2e8f0'
                       }`,
                       borderRadius: '10px',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
                       background:
-                        values[field.fieldId] === option.optionValue ? '#fff1f2' : 'white',
+                        values[field.fieldId] === option.optionValue ? '#ECFDF5' : 'white',
                       display: 'flex',
                       alignItems: 'center',
                     }}
@@ -431,7 +431,7 @@ const DemographicDetailsPage: React.FC = () => {
                       checked={values[field.fieldId] === option.optionValue}
                       onChange={(e) => handleChange(field.fieldId, e.target.value)}
                       onBlur={() => handleBlur(field.fieldId)}
-                      style={{ width: '18px', height: '18px', marginRight: '0.5rem', cursor: 'pointer', accentColor: '#f43f5e' }}
+                      style={{ width: '18px', height: '18px', marginRight: '0.5rem', cursor: 'pointer', accentColor: '#5DD68D' }}
                     />
                     <span style={{ fontSize: '0.9rem', color: '#2d3748' }}>{option.optionLabel}</span>
                   </label>
@@ -529,10 +529,10 @@ const DemographicDetailsPage: React.FC = () => {
                     key={option.optionId}
                     style={{
                       padding: '0.4rem 0.85rem',
-                      border: `2px solid ${isChecked ? '#f43f5e' : '#e2e8f0'}`,
+                      border: `2px solid ${isChecked ? '#5DD68D' : '#e2e8f0'}`,
                       borderRadius: '10px',
                       cursor: 'pointer',
-                      background: isChecked ? '#fff1f2' : 'white',
+                      background: isChecked ? '#ECFDF5' : 'white',
                       display: 'flex',
                       alignItems: 'center',
                       transition: 'all 0.2s ease',
@@ -543,7 +543,7 @@ const DemographicDetailsPage: React.FC = () => {
                       checked={isChecked}
                       onChange={(e) => handleMultiChange(field.fieldId, option.optionValue, e.target.checked)}
                       onBlur={() => handleBlur(field.fieldId)}
-                      style={{ width: '16px', height: '16px', marginRight: '0.5rem', cursor: 'pointer', accentColor: '#f43f5e' }}
+                      style={{ width: '16px', height: '16px', marginRight: '0.5rem', cursor: 'pointer', accentColor: '#5DD68D' }}
                     />
                     <span style={{ fontSize: '0.9rem', color: '#2d3748' }}>{option.optionLabel}</span>
                   </label>
@@ -572,7 +572,7 @@ const DemographicDetailsPage: React.FC = () => {
   });
 
   return (
-    <div className="assessment-bg">
+    <div className="assessment-bg assessment-bg--scrollable">
       {isLoading ? (
         <div className="text-center">
           <div className="spinner-border text-light" role="status" style={{ width: "3rem", height: "3rem" }}>

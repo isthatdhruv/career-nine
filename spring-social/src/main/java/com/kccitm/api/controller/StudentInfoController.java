@@ -429,8 +429,30 @@ public class StudentInfoController {
     public List<java.util.Map<String, Object>> getStudentsWithMappingByInstituteId(
             @PathVariable("instituteId") Integer instituteId) {
         try {
-            // 1. Bulk load all students for this institute (1 query)
             List<StudentInfo> students = studentInfoRepository.findByInstituteId(instituteId);
+            return assembleStudentsWithMapping(students);
+        } catch (Exception e) {
+            System.out.println("Error in getStudentsWithMappingByInstituteId: " + e.getMessage());
+            e.printStackTrace();
+            return new java.util.ArrayList<>();
+        }
+    }
+
+    @Transactional
+    @GetMapping("/getAllStudentsWithMapping")
+    public List<java.util.Map<String, Object>> getAllStudentsWithMapping() {
+        try {
+            List<StudentInfo> students = studentInfoRepository.findAll();
+            return assembleStudentsWithMapping(students);
+        } catch (Exception e) {
+            System.out.println("Error in getAllStudentsWithMapping: " + e.getMessage());
+            e.printStackTrace();
+            return new java.util.ArrayList<>();
+        }
+    }
+
+    private List<java.util.Map<String, Object>> assembleStudentsWithMapping(List<StudentInfo> students) {
+        try {
             if (students.isEmpty()) return new java.util.ArrayList<>();
 
             // 2. Collect all studentInfo IDs
@@ -607,7 +629,7 @@ public class StudentInfoController {
 
             return result;
         } catch (Exception e) {
-            System.out.println("Error in getStudentsWithMappingByInstituteId: " + e.getMessage());
+            System.out.println("Error in assembleStudentsWithMapping: " + e.getMessage());
             e.printStackTrace();
             return new java.util.ArrayList<>();
         }

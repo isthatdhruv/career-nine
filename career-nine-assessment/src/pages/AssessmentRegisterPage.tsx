@@ -207,7 +207,7 @@ const AssessmentRegisterPage = () => {
               <div
                 className="card-header-gradient"
                 style={{
-                  background: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
+                  background: "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
                   padding: "1.25rem 1.5rem",
                   color: "white",
                 }}

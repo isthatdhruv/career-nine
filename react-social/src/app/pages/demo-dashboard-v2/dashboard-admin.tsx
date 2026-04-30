@@ -14,7 +14,7 @@ import {
   fetchInstitutes,
   fetchLogins,
   fetchStudents,
-  fetchStudentsWithMapping,
+  fetchAllStudentsWithMapping,
 } from "./dashboard-admin.api";
 
 /* ============================================================
@@ -234,38 +234,35 @@ const DashboardAdminContent: FC = () => {
     };
   }, [refreshNonce]);
 
-  // Second pass: once institutes are known, fetch student+mapping data per institute
-  // and flatten. This unlocks accurate "attempted vs report generated" numbers in the drill-down.
+  // Second pass: fetch student+mapping data for all institutes in a single call.
+  // Backed by /student-info/getAllStudentsWithMapping (replaces the previous N+1 per-institute loop).
   useEffect(() => {
-    if (institutes.length === 0) return;
     let cancelled = false;
     setMappingsLoading(true);
     (async () => {
-      const instituteIds = institutes
-        .map((i) => pick(i, ["id", "instituteId", "instituteCode"]))
-        .filter((v) => v != null);
-      const results = await Promise.allSettled(
-        instituteIds.map((id) => fetchStudentsWithMapping(id))
-      );
-      if (cancelled) return;
-      const flat: any[] = [];
-      results.forEach((r) => {
-        if (r.status === "fulfilled") flat.push(...r.value);
-      });
-      const failed = results.filter((r) => r.status === "rejected").length;
-      if (failed > 0) {
-        setErrors((prev) => ({
-          ...prev,
-          mappings: `${failed}/${instituteIds.length} institutes failed`,
-        }));
+      try {
+        const data = await fetchAllStudentsWithMapping();
+        if (cancelled) return;
+        setStudentMappings(data);
+        setErrors((prev) => {
+          const { mappings: _omit, ...rest } = prev;
+          return rest;
+        });
+      } catch (e: any) {
+        if (cancelled) return;
+        const status = e?.response?.status;
+        const msg = status ? `HTTP ${status}` : e?.message || "request failed";
+        setErrors((prev) => ({ ...prev, mappings: msg }));
+        // eslint-disable-next-line no-console
+        console.error("[admin dashboard] mappings failed:", e);
+      } finally {
+        if (!cancelled) setMappingsLoading(false);
       }
-      setStudentMappings(flat);
-      setMappingsLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [institutes]);
+  }, [refreshNonce]);
 
   // Logins: re-fetch whenever the date range changes
   useEffect(() => {

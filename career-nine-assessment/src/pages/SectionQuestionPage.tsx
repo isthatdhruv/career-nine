@@ -429,19 +429,19 @@ const SectionQuestionPage: React.FC = () => {
   const getQuestionColor = useCallback(
     (secId: string, questionId: number) => {
       if (answers[secId]?.[questionId]?.length)
-        return "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)";
+        return "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)";
       const rankingCount = Object.keys(
         rankingAnswers[secId]?.[questionId] || {},
       ).length;
       if (rankingCount > 0)
-        return "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)";
+        return "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)";
       const textCount = Object.values(
         textAnswers[secId]?.[questionId] || {},
       ).filter((t: string) => t.trim()).length;
       if (textCount > 0)
-        return "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)";
+        return "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)";
       if (completedGameQuestionIds.has(questionId))
-        return "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)";
+        return "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)";
       if (savedForLater[secId]?.has(questionId))
         return "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)";
       if (skipped[secId]?.has(questionId))
@@ -1329,7 +1329,7 @@ const SectionQuestionPage: React.FC = () => {
         display: "flex",
         height: "100dvh",
         minHeight: "100vh",
-        background: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
+        background: "linear-gradient(135deg, #0f172a 0%, #1a2238 50%, #1e293b 100%)",
         colorScheme: "light",
         overflow: "hidden",
       }}
@@ -1401,7 +1401,7 @@ const SectionQuestionPage: React.FC = () => {
                     style={{
                       fontSize: "0.85rem",
                       fontWeight: 600,
-                      color: "#f43f5e",
+                      color: "#5DD68D",
                       marginBottom: "6px",
                     }}
                   >
@@ -1426,7 +1426,7 @@ const SectionQuestionPage: React.FC = () => {
                 onClick={() => setShowSectionInstruction(false)}
                 style={{
                   background:
-                    "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
+                    "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
                   color: "#fff",
                   border: "none",
                   borderRadius: "8px",
@@ -1451,7 +1451,7 @@ const SectionQuestionPage: React.FC = () => {
             borderBottom: "2px solid #e2e8f0",
             padding: "16px 20px",
             background:
-              "linear-gradient(135deg, rgba(244, 63, 94, 0.08) 0%, rgba(225, 29, 72, 0.08) 100%)",
+              "linear-gradient(135deg, rgba(15, 23, 42, 0.08) 0%, rgba(30, 41, 59, 0.08) 100%)",
           }}
         >
           {/* KCC Logo */}
@@ -1486,7 +1486,7 @@ const SectionQuestionPage: React.FC = () => {
               style={{
                 width: "6px",
                 height: "18px",
-                background: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
+                background: "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
                 borderRadius: "3px",
               }}
             />
@@ -1506,9 +1506,9 @@ const SectionQuestionPage: React.FC = () => {
                   height: 14,
                   borderRadius: "50%",
                   background:
-                    "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
+                    "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
                   flexShrink: 0,
-                  boxShadow: "0 2px 6px rgba(244, 63, 94, 0.4)",
+                  boxShadow: "0 2px 6px rgba(93, 214, 141, 0.4)",
                 }}
               />
               <span
@@ -1606,7 +1606,7 @@ const SectionQuestionPage: React.FC = () => {
               style={{
                 width: "6px",
                 height: "20px",
-                background: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
+                background: "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
                 borderRadius: "3px",
               }}
             />
@@ -1621,9 +1621,9 @@ const SectionQuestionPage: React.FC = () => {
                   color: "#4a5568",
                   marginBottom: "10px",
                   padding: "6px 12px",
-                  background: "rgba(244, 63, 94, 0.08)",
+                  background: "rgba(93, 214, 141, 0.08)",
                   borderRadius: "8px",
-                  borderLeft: "3px solid #f43f5e",
+                  borderLeft: "3px solid #5DD68D",
                 }}
               >
                 {sec.section.sectionName}
@@ -1675,14 +1675,14 @@ const SectionQuestionPage: React.FC = () => {
               <span
                 style={{
                   background:
-                    "linear-gradient(135deg, rgba(244, 63, 94, 0.15) 0%, rgba(225, 29, 72, 0.15) 100%)",
-                  color: "#f43f5e",
+                    "linear-gradient(135deg, rgba(93, 214, 141, 0.15) 0%, rgba(63, 184, 118, 0.15) 100%)",
+                  color: "#5DD68D",
                   padding: "8px 20px",
                   borderRadius: "30px",
                   fontSize: "0.9rem",
                   fontWeight: 600,
                   display: "inline-block",
-                  border: "1px solid rgba(244, 63, 94, 0.3)",
+                  border: "1px solid rgba(93, 214, 141, 0.3)",
                 }}
               >
                 {currentSection?.section?.sectionName}
@@ -1705,13 +1705,13 @@ const SectionQuestionPage: React.FC = () => {
                   <div
                     style={{
                       background:
-                        "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
+                        "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
                       padding: "8px 18px",
                       borderRadius: "30px",
                       fontWeight: 700,
                       fontSize: "0.9rem",
                       color: "white",
-                      boxShadow: "0 4px 15px rgba(244, 63, 94, 0.4)",
+                      boxShadow: "0 4px 15px rgba(93, 214, 141, 0.4)",
                     }}
                   >
                     ⏱️ {formatTime(elapsedTime)}
@@ -1844,7 +1844,7 @@ const SectionQuestionPage: React.FC = () => {
                       onClick={goToFirstUnanswered}
                       style={{
                         background:
-                          "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
+                          "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
                         color: "#fff",
                         border: "none",
                         borderRadius: "10px",
@@ -1852,7 +1852,7 @@ const SectionQuestionPage: React.FC = () => {
                         fontWeight: 600,
                         fontSize: "0.95rem",
                         cursor: "pointer",
-                        boxShadow: "0 4px 15px rgba(244, 63, 94, 0.4)",
+                        boxShadow: "0 4px 15px rgba(93, 214, 141, 0.4)",
                       }}
                     >
                       Continue →
@@ -2816,7 +2816,7 @@ const SectionQuestionPage: React.FC = () => {
                         ? "#e2e8f0"
                         : currentIndex === questions.length - 1
                           ? "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)"
-                          : "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
+                          : "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
                       color: belowMin ? "#9ca3af" : "white",
                       border: "none",
                       borderRadius: "12px",
@@ -2828,7 +2828,7 @@ const SectionQuestionPage: React.FC = () => {
                         ? "none"
                         : currentIndex === questions.length - 1
                           ? "0 4px 15px rgba(14, 165, 233, 0.4)"
-                          : "0 4px 15px rgba(244, 63, 94, 0.4)",
+                          : "0 4px 15px rgba(93, 214, 141, 0.4)",
                       transition: "all 0.2s ease",
                     }}
                   >

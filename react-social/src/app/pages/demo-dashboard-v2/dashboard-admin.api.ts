@@ -47,6 +47,11 @@ export async function fetchStudentsWithMapping(instituteId: number | string): Pr
   return safeList(data);
 }
 
+export async function fetchAllStudentsWithMapping(): Promise<any[]> {
+  const { data } = await axios.get(`${API_URL}/student-info/getAllStudentsWithMapping`);
+  return safeList(data);
+}
+
 export async function fetchCounsellingAppointments(): Promise<any[]> {
   const { data } = await axios.get(`${API_URL}/api/counselling-appointment/getAll`);
   return safeList(data);

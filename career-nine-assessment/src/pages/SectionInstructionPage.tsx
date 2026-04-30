@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAssessment } from '../contexts/AssessmentContext';
 import { usePreventReload } from '../hooks/usePreventReload';
 import { useHeartbeat } from '../hooks/useHeartbeat';
+import { MarkdownInstructions } from '../utils/instructionMarkdown';
 
 type Language = {
   languageId: number;
@@ -100,7 +101,9 @@ const SectionInstructionPage: React.FC = () => {
                             </svg>
                             {inst.language.languageName}
                           </div>
-                          <div className="instruction-box">{inst.instructionText}</div>
+                          <div className="instruction-box">
+                            <MarkdownInstructions text={inst.instructionText} />
+                          </div>
                         </div>
                         {index === 0 && instructions.length > 1 && (
                           <div className="instructions-divider" />
@@ -117,7 +120,7 @@ const SectionInstructionPage: React.FC = () => {
                       width: "36px",
                       height: "36px",
                       minWidth: "36px",
-                      background: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
+                      background: "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
                       borderRadius: "50%",
                       display: "flex",
                       alignItems: "center",

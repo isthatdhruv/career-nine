@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAssessment } from '../contexts/AssessmentContext';
 import { usePreventReload } from '../hooks/usePreventReload';
 import { useHeartbeat } from '../hooks/useHeartbeat';
+import { MarkdownInstructions } from '../utils/instructionMarkdown';
 
 const isNA = (text: string | null | undefined): boolean => {
   if (!text) return false;
@@ -88,7 +89,9 @@ const GeneralInstructionsPage: React.FC = () => {
                             </svg>
                             {lang.language.languageName}
                           </div>
-                          <div className="instruction-box">{lang.instructions}</div>
+                          <div className="instruction-box">
+                            <MarkdownInstructions text={lang.instructions} />
+                          </div>
                         </div>
                         {index === 0 && languageInstructions.length > 1 && (
                           <div className="instructions-divider" />
@@ -99,9 +102,9 @@ const GeneralInstructionsPage: React.FC = () => {
                 ) : (
                   <div className="d-flex flex-column gap-3 mb-4">
                     {[
-                      { icon: "\u{1F4DD}", text: 'This is <strong style="color: #f43f5e">NOT a school exam</strong>. You won\'t get a "grade" like A or B.' },
-                      { icon: "\u{1F4AD}", text: 'There are <strong style="color: #f43f5e">no wrong answers</strong>. We just want to see how you think and how you feel.' },
-                      { icon: "\u{2728}", text: 'Just <strong style="color: #f43f5e">be yourself</strong>! Some parts are games and some parts are questions. Take your time and have fun!' },
+                      { icon: "\u{1F4DD}", text: 'This is <strong style="color: #5DD68D">NOT a school exam</strong>. You won\'t get a "grade" like A or B.' },
+                      { icon: "\u{1F4AD}", text: 'There are <strong style="color: #5DD68D">no wrong answers</strong>. We just want to see how you think and how you feel.' },
+                      { icon: "\u{2728}", text: 'Just <strong style="color: #5DD68D">be yourself</strong>! Some parts are games and some parts are questions. Take your time and have fun!' },
                     ].map((item, idx) => (
                       <div key={idx} className="instruction-card-item">
                         <div
@@ -110,13 +113,13 @@ const GeneralInstructionsPage: React.FC = () => {
                             width: "45px",
                             height: "45px",
                             minWidth: "45px",
-                            background: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
+                            background: "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
                             borderRadius: "12px",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
                             fontSize: "1.5rem",
-                            boxShadow: "0 4px 12px rgba(244, 63, 94, 0.32)",
+                            boxShadow: "0 4px 12px rgba(93, 214, 141, 0.32)",
                           }}
                         >
                           {item.icon}
@@ -136,7 +139,7 @@ const GeneralInstructionsPage: React.FC = () => {
                       width: "36px",
                       height: "36px",
                       minWidth: "36px",
-                      background: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
+                      background: "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
                       borderRadius: "50%",
                       display: "flex",
                       alignItems: "center",

@@ -22,6 +22,7 @@ import QuestionLanguageModal from "../../../AssesmentQuestions/components/Questi
 import SectionQuestionSelector from "../SectionQuestionSelector";
 import { CreateQuestionaire} from "../../API/Create_Questionaire_APIs";
 import PageHeader from "../../../../components/PageHeader";
+import MarkdownInstructionEditor from "../../../../components/MarkdownInstructionEditor";
 
 const validationSchema = Yup.object().shape({
   // Basic Info
@@ -764,15 +765,13 @@ const QuestionareCreateSinglePage: React.FC = () => {
                           English Instructions (Default):
                         </label>
                         <Field name="instructions.English">
-                          {({ field }: any) => (
-                            <textarea
+                          {({ field, form }: any) => (
+                            <MarkdownInstructionEditor
                               name={field.name}
                               value={field.value || ""}
-                              rows={4}
+                              rows={5}
                               placeholder="Enter general instructions for the questionare in English"
-                              className="form-control form-control-lg form-control-solid"
-                              style={{ resize: "vertical" }}
-                              onChange={field.onChange}
+                              onChange={(v) => form.setFieldValue(field.name, v)}
                               onBlur={field.onBlur}
                             />
                           )}
@@ -795,15 +794,13 @@ const QuestionareCreateSinglePage: React.FC = () => {
                                 {language} Instructions:
                               </label>
                               <Field name={`instructions.${language}`}>
-                                {({ field }: any) => (
-                                  <textarea
+                                {({ field, form }: any) => (
+                                  <MarkdownInstructionEditor
                                     name={field.name}
                                     value={field.value || ""}
-                                    rows={4}
+                                    rows={5}
                                     placeholder={`Enter general instructions for the questionare in ${language}`}
-                                    className="form-control form-control-lg form-control-solid"
-                                    style={{ resize: "vertical" }}
-                                    onChange={field.onChange}
+                                    onChange={(v) => form.setFieldValue(field.name, v)}
                                     onBlur={field.onBlur}
                                   />
                                 )}
@@ -1031,15 +1028,13 @@ const QuestionareCreateSinglePage: React.FC = () => {
                                     English Instructions (Optional):
                                   </label>
                                   <Field name={`sectionInstructions.${sectionId}.English`}>
-                                    {({ field }: any) => (
-                                      <textarea
+                                    {({ field, form }: any) => (
+                                      <MarkdownInstructionEditor
                                         name={field.name}
                                         value={field.value || ""}
-                                        rows={3}
+                                        rows={4}
                                         placeholder={`Enter specific instructions for ${sectionName} in English`}
-                                        className="form-control form-control-solid"
-                                        style={{ resize: "vertical" }}
-                                        onChange={field.onChange}
+                                        onChange={(v) => form.setFieldValue(field.name, v)}
                                         onBlur={field.onBlur}
                                       />
                                     )}
@@ -1058,15 +1053,13 @@ const QuestionareCreateSinglePage: React.FC = () => {
                                             {language} Instructions (Optional):
                                           </label>
                                           <Field name={`sectionInstructions.${sectionId}.${language}`}>
-                                            {({ field }: any) => (
-                                              <textarea
+                                            {({ field, form }: any) => (
+                                              <MarkdownInstructionEditor
                                                 name={field.name}
                                                 value={field.value || ""}
-                                                rows={3}
+                                                rows={4}
                                                 placeholder={`Enter specific instructions for ${sectionName} in ${language} (optional)`}
-                                                className="form-control form-control-solid"
-                                                style={{ resize: "vertical" }}
-                                                onChange={field.onChange}
+                                                onChange={(v) => form.setFieldValue(field.name, v)}
                                                 onBlur={field.onBlur}
                                               />
                                             )}
