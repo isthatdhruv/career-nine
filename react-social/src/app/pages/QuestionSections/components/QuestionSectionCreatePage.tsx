@@ -8,6 +8,7 @@ import { CreateQuestionSectionData } from "../API/Question_Section_APIs";
 const validationSchema = Yup.object().shape({
   sectionName: Yup.string().required("Section name is required"),
   sectionDescription: Yup.string().required("Section description is required"),
+  toBeLinkedWith: Yup.string(),
 });
 
 const QuestionSectionCreatePage = ({ setPageLoading }: { setPageLoading?: any }) => {
@@ -17,16 +18,22 @@ const QuestionSectionCreatePage = ({ setPageLoading }: { setPageLoading?: any })
   const initialValues = {
     sectionName: "",
     sectionDescription: "",
+    toBeLinkedWith: "",
   };
 
   const formik = useFormik({
     enableReinitialize: true,
     initialValues,
-    validationSchema: validationSchema, 
+    validationSchema: validationSchema,
     onSubmit: async (values) => {
       setLoading(true);
       try {
-        await CreateQuestionSectionData(values);
+        const payload = {
+          sectionName: values.sectionName,
+          sectionDescription: values.sectionDescription,
+          toBeLinkedWith: values.toBeLinkedWith,
+        };
+        await CreateQuestionSectionData(payload);
         formik.resetForm();
         navigate("/question-sections");
       } catch (error) {
@@ -104,6 +111,45 @@ const QuestionSectionCreatePage = ({ setPageLoading }: { setPageLoading?: any })
                 <div className="fv-plugins-message-container">
                   <div className="fv-help-block text-danger">
                     <span role="alert">{formik.errors.sectionDescription}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* To Be Linked With */}
+            <div className="fv-row mb-7">
+              <label className="fs-6 fw-bold mb-2">
+                To Be Linked With :
+              </label>
+              <textarea
+                placeholder="e.g. another section name, assessment, tool, or any related context"
+                {...formik.getFieldProps("toBeLinkedWith")}
+                className={clsx(
+                  "form-control form-control-lg form-control-solid",
+                  {
+                    "is-invalid text-danger":
+                      formik.touched.toBeLinkedWith &&
+                      formik.errors.toBeLinkedWith,
+                  },
+                  {
+                    "is-valid":
+                      formik.touched.toBeLinkedWith &&
+                      !formik.errors.toBeLinkedWith &&
+                      !!formik.values.toBeLinkedWith,
+                  }
+                )}
+              >
+              </textarea>
+              <div
+                className="form-text"
+                style={{ fontSize: "0.78rem", color: "#64748b", marginTop: 4 }}
+              >
+                Optional — note any section, tool, or content this section should connect to.
+              </div>
+              {formik.touched.toBeLinkedWith && formik.errors.toBeLinkedWith && (
+                <div className="fv-plugins-message-container">
+                  <div className="fv-help-block text-danger">
+                    <span role="alert">{formik.errors.toBeLinkedWith}</span>
                   </div>
                 </div>
               )}
