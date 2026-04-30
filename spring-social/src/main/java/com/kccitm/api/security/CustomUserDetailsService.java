@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.kccitm.api.exception.ResourceNotFoundException;
+import com.kccitm.api.model.AuthProvider;
 import com.kccitm.api.model.User;
 import com.kccitm.api.repository.UserRepository;
 
@@ -25,7 +26,7 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Transactional
     public UserDetails loadUserByUsername(String email)
             throws UsernameNotFoundException {
-        User user = userRepository.findByEmail(email);
+        User user = userRepository.findByEmailAndProvider(email, AuthProvider.local);
 
         return UserPrincipal.create(user);
     }
