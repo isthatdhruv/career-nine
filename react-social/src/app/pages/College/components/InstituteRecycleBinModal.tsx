@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Modal, Button } from "react-bootstrap";
 import { GetDeletedInstitutes, RestoreInstitute } from "../API/College_APIs";
-import { MdRestorePage } from "react-icons/md";
+import { ActionIcon } from "../../../components/ActionIcon";
 import { showErrorToast } from '../../../utils/toast';
 
 interface InstituteRecycleBinModalProps {
@@ -98,7 +98,7 @@ const InstituteRecycleBinModal = ({
                         {isActionLoading ? (
                           <span className="spinner-border spinner-border-sm" role="status" />
                         ) : (
-                          <MdRestorePage size={16} />
+                          <ActionIcon type="refresh" size="sm" />
                         )}
                       </button>
                     </td>

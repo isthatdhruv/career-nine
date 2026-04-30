@@ -18,7 +18,7 @@ const BlockDateForm: React.FC<BlockDateFormProps> = ({ counsellorId, onSaved }) 
     setError('')
     setSuccess('')
     if (!date) {
-      setError('Please select a date to block.')
+      setError('Please select a date for your leave request.')
       return
     }
     setSaving(true)
@@ -30,10 +30,10 @@ const BlockDateForm: React.FC<BlockDateFormProps> = ({ counsellorId, onSaved }) 
       })
       setDate('')
       setReason('')
-      setSuccess('Date blocked successfully.')
+      setSuccess('Leave request submitted.')
       onSaved()
     } catch {
-      setError('Failed to block date. Please try again.')
+      setError('Failed to submit leave request. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -42,7 +42,7 @@ const BlockDateForm: React.FC<BlockDateFormProps> = ({ counsellorId, onSaved }) 
   return (
     <div>
       <h5 style={{ fontSize: 14, fontWeight: 700, color: 'var(--sp-text, #1A2B28)', marginBottom: 12 }}>
-        Block a Date
+        Ask for Leave
       </h5>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
@@ -98,7 +98,7 @@ const BlockDateForm: React.FC<BlockDateFormProps> = ({ counsellorId, onSaved }) 
       )}
 
       <button className='cl-btn-danger' onClick={handleBlock} disabled={saving}>
-        {saving ? 'Blocking...' : 'Block Date'}
+        {saving ? 'Submitting...' : 'Ask for Leave'}
       </button>
     </div>
   )

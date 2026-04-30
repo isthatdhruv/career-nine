@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ReadQuestionSectionDataList } from "./API/Question_Section_APIs";
 import QuestionSectionTable from "./components/QuestionSectionTable";
 import QuestionSectionRecycleBinModal from "./components/QuestionSectionRecycleBinModal";
+import PageHeader from "../../components/PageHeader";
 
 const QuestionSectionPage = () => {
   const [questionSectionData, setQuestionSectionData] = useState([]);
@@ -24,42 +25,34 @@ const QuestionSectionPage = () => {
   }, [pageLoading]);
 
   return (
-    <div style={{ background: "#f8fafc", minHeight: "100vh", padding: "24px" }}>
-      {/* Page Header */}
-      <div className="d-flex align-items-center justify-content-between flex-wrap gap-3" style={{ marginBottom: "24px" }}>
-        <div className="d-flex align-items-center gap-3">
-          <div style={{ width: "40px", height: "40px", borderRadius: "8px", background: "#7c3aed", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <i className="bi bi-collection-fill text-white" style={{ fontSize: "1.1rem" }}></i>
-          </div>
-          <div>
-            <h4 style={{ margin: 0, color: "#111827", fontWeight: 700, fontSize: "1.3rem" }}>
-              Assessment Sections
-            </h4>
-            <p style={{ margin: 0, color: "#6b7280", fontSize: "0.82rem" }}>
-              {loading ? "Loading..." : `${questionSectionData.length} sections`}
-            </p>
-          </div>
-        </div>
-
-        <div className="d-flex gap-2">
-          <button
-            className="btn btn-sm d-flex align-items-center gap-1"
-            onClick={() => setShowRecycleBin(true)}
-            style={{ background: "#fff", color: "#dc2626", border: "2px solid #dc2626", borderRadius: "6px", padding: "8px 14px", fontWeight: 600, fontSize: "0.82rem" }}
-          >
-            <i className="bi bi-recycle"></i>
-            Recycle Bin
-          </button>
-          <button
-            className="btn btn-sm d-flex align-items-center gap-1"
-            onClick={() => navigate("/question-sections/create")}
-            style={{ background: "#7c3aed", color: "#fff", border: "none", borderRadius: "6px", padding: "8px 14px", fontWeight: 600, fontSize: "0.82rem" }}
-          >
-            <i className="bi bi-plus-lg"></i>
-            Add Section
-          </button>
-        </div>
-      </div>
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className="bi bi-collection" />}
+        title="Assessment Sections"
+        subtitle={
+          loading ? (
+            "Loading..."
+          ) : (
+            <>
+              <strong>{questionSectionData.length}</strong> sections
+            </>
+          )
+        }
+        actions={[
+          {
+            label: "Add Section",
+            iconClass: "bi-plus-lg",
+            onClick: () => navigate("/question-sections/create"),
+            variant: "primary",
+          },
+          {
+            label: "Recycle Bin",
+            iconClass: "bi-recycle",
+            onClick: () => setShowRecycleBin(true),
+            variant: "danger",
+          },
+        ]}
+      />
 
       {/* Loading State */}
       {loading && (

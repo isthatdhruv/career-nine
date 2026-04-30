@@ -51,6 +51,14 @@ public class InstituteDetail implements Serializable {
     private Integer maxStudents;
     private Integer maxContactPersons;
 
+    /**
+     * Max number of assessment allotments allowed for this institute.
+     * Once the count of StudentAssessmentMapping rows for this institute hits
+     * this value, new allotments should be rejected. Null = unlimited.
+     */
+    @Column(name = "max_assessments")
+    private Integer maxAssessments;
+
     private Boolean isSchool;
 
     @Lob
@@ -195,6 +203,14 @@ public class InstituteDetail implements Serializable {
 
     public void setMaxContactPersons(Integer maxContactPersons) {
         this.maxContactPersons = maxContactPersons;
+    }
+
+    public Integer getMaxAssessments() {
+        return maxAssessments;
+    }
+
+    public void setMaxAssessments(Integer maxAssessments) {
+        this.maxAssessments = maxAssessments;
     }
 
     public void setIsSchool(Boolean isSchool) {

@@ -1,10 +1,10 @@
 import { Checkbox, FormControl, InputLabel, ListItemText, MenuItem, OutlinedInput, Select } from "@mui/material";
 import { MDBDataTableV5 } from "mdbreact";
 import { useEffect, useState } from "react";
-import { AiFillEdit } from "react-icons/ai";
 import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
+import { ActionIcon } from "../../../components/ActionIcon";
 import {
     AssignMeasuredQualityTypeToCareer,
     DeleteCareerData,
@@ -92,7 +92,7 @@ const CareerTable = (props: { data: any; setLoading: any; setPageLoading: any; }
             onClick={() => navigate(`/career/edit/${data.career_id}`, { state: { data } })}
             className="btn btn-icon btn-primary btn-sm me-3"
           >
-            <AiFillEdit size={16} />
+            <ActionIcon type="edit" size="sm" />
           </button>
           <button
             onClick={async () => {

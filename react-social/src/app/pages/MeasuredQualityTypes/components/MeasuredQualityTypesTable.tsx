@@ -1,10 +1,10 @@
 import { FormControl, InputLabel, MenuItem, Select } from "@mui/material";
 import { MDBDataTableV5 } from "mdbreact";
 import { useEffect, useState } from "react";
-import { AiFillEdit } from "react-icons/ai";
 import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
+import { ActionIcon } from "../../../components/ActionIcon";
 import { ReadMeasuredQualitiesData } from "../../MeasuredQualities/API/Measured_Qualities_APIs";
 import { AssignMeasuredQualityTypeToQuality, DeleteMeasuredQualityTypesData, RemoveMeasuredQualityTypeFromQuality } from "../API/Measured_Quality_Types_APIs";
 import { showErrorToast } from '../../../utils/toast';
@@ -146,7 +146,7 @@ const MeasuredQualityTypesTable = (props: {
             }}
             className="btn btn-icon btn-primary btn-sm me-3"
           >
-            <AiFillEdit size={16} />
+            <ActionIcon type="edit" size="sm" />
           </button>
           <button
             onClick={async () => {

@@ -825,4 +825,63 @@ public class AssessmentTableController {
         return ResponseEntity.ok(response);
     }
 
+    // ============================================================
+    // Per-assessment reset policy
+    // ============================================================
+
+    @GetMapping("/{id}/reset-policy")
+    public ResponseEntity<?> getResetPolicy(@PathVariable("id") Long assessmentId) {
+        Optional<AssessmentTable> opt = assessmentTableRepository.findById(assessmentId);
+        if (!opt.isPresent()) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
+                .body(Collections.singletonMap("error", "Assessment not found"));
+        }
+        HashMap<String, Object> body = new HashMap<>();
+        body.put("assessmentId", assessmentId);
+        body.put("maxResetsPerStudent", opt.get().getMaxResetsPerStudent());
+        return ResponseEntity.ok(body);
+    }
+
+    @PutMapping("/{id}/reset-policy")
+    public ResponseEntity<?> updateResetPolicy(
+            @PathVariable("id") Long assessmentId,
+            @RequestBody java.util.Map<String, Object> payload) {
+        Optional<AssessmentTable> opt = assessmentTableRepository.findById(assessmentId);
+        if (!opt.isPresent()) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
+                .body(Collections.singletonMap("error", "Assessment not found"));
+        }
+        Object raw = payload.get("maxResetsPerStudent");
+        Integer next;
+        if (raw == null) {
+            next = null;
+        } else if (raw instanceof Number) {
+            int v = ((Number) raw).intValue();
+            if (v < 0) {
+                return ResponseEntity.badRequest()
+                    .body(Collections.singletonMap("error", "maxResetsPerStudent must be non-negative"));
+            }
+            next = v;
+        } else {
+            try {
+                int v = Integer.parseInt(String.valueOf(raw).trim());
+                if (v < 0) {
+                    return ResponseEntity.badRequest()
+                        .body(Collections.singletonMap("error", "maxResetsPerStudent must be non-negative"));
+                }
+                next = v;
+            } catch (NumberFormatException ex) {
+                return ResponseEntity.badRequest()
+                    .body(Collections.singletonMap("error", "maxResetsPerStudent must be an integer"));
+            }
+        }
+        AssessmentTable a = opt.get();
+        a.setMaxResetsPerStudent(next);
+        assessmentTableRepository.save(a);
+        HashMap<String, Object> body = new HashMap<>();
+        body.put("assessmentId", assessmentId);
+        body.put("maxResetsPerStudent", a.getMaxResetsPerStudent());
+        return ResponseEntity.ok(body);
+    }
+
 }

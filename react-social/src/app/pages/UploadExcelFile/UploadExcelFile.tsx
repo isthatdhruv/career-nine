@@ -6,6 +6,8 @@ import { setData } from "./StudentDataComputationExcel";
 import { SchoolOMRRow } from "./DataStructure";
 import { addStudentInfo, StudentInfo, getAllAssessments, Assessment } from "../StudentInformation/StudentInfo_APIs";
 import { ReadCollegeData, GetSessionsByInstituteCode, ResolveOrCreateSection } from "../College/API/College_APIs";
+import PageHeader from "../../components/PageHeader";
+import { ActionIcon } from "../../components/ActionIcon";
 
 /* ================= MASTER SCHEMA ================= */
 
@@ -354,19 +356,27 @@ export default function UploadExcelFile() {
   const getMappedFieldsCount = () => Object.values(columnMap).filter(v => v).length;
 
   return (
-    <div className="min-vh-100" style={{ background: 'linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%)', padding: '2rem' }}>
-      {/* Header Section */}
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className="bi bi-file-earmark-spreadsheet" />}
+        title="Bulk Upload"
+        subtitle={
+          <>
+            Upload and map Excel files to import student information
+            {rawExcelData.length > 0 && (
+              <>
+                {" · "}<strong>{rawExcelData.length}</strong> rows loaded
+              </>
+            )}
+          </>
+        }
+      />
+
+      {/* Institute + Assessment selectors */}
       <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '16px', overflow: 'hidden' }}>
         <div className="card-body p-4">
-          <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
-            <div>
-              <h2 className="mb-1 fw-bold" style={{ color: '#1a1a2e' }}>
-                <i className="bi bi-file-earmark-spreadsheet me-2" style={{ color: '#4361ee' }}></i>
-                Student Data Import
-              </h2>
-              <p className="text-muted mb-0">Upload and map Excel files to import student information</p>
-            </div>
-            <div className="d-flex align-items-center gap-3">
+          <div className="d-flex align-items-center justify-content-end flex-wrap gap-3">
+            <div className="d-flex align-items-center gap-3 flex-wrap">
               <div className="position-relative">
                 <select
                   className="form-select shadow-sm"
@@ -383,7 +393,7 @@ export default function UploadExcelFile() {
                     setSelectedInstitute(e.target.value ? Number(e.target.value) : "");
                   }}
                 >
-                  <option value="">🏫 Select Institute</option>
+                  <option value="">Select Institute</option>
                   {institutes.map((inst) => (
                     <option key={inst.instituteCode} value={inst.instituteCode}>
                       {inst.instituteName}
@@ -407,7 +417,7 @@ export default function UploadExcelFile() {
                     setSelectedAssessment(e.target.value ? Number(e.target.value) : "");
                   }}
                 >
-                  <option value="">📝 Select Assessment</option>
+                  <option value="">Select Assessment</option>
                   {assessments.map((assessment) => (
                     <option key={assessment.id} value={assessment.id}>
                       {assessment.assessmentName}
@@ -632,7 +642,7 @@ export default function UploadExcelFile() {
                         setColumnMap({ ...columnMap, [col]: e.target.value })
                       }
                     >
-                      <option value="">⏭️ Ignore this column</option>
+                      <option value="">Ignore this column</option>
                       {SCHEMA_FIELDS.map((f) => (
                         <option key={f} value={f}>
                           ✓ {f}
@@ -659,7 +669,7 @@ export default function UploadExcelFile() {
                   transition: 'all 0.3s ease'
                 }}
               >
-                <i className="bi bi-eye me-2"></i>
+                <ActionIcon type="view" size="sm" className="me-2" />
                 Preview Data
               </Button>
             </div>
@@ -750,7 +760,7 @@ export default function UploadExcelFile() {
                     </>
                   ) : (
                     <>
-                      <i className="bi bi-cloud-upload me-2"></i>
+                      <ActionIcon type="upload" size="sm" className="me-2" />
                       Submit {tableData.rows.length} Students
                     </>
                   )}

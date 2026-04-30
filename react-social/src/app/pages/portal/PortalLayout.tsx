@@ -7,6 +7,9 @@ export interface MenuItem {
   label: string
   path: string
   icon: React.ReactNode
+  /** When set, the item renders as an external link opening in a new tab,
+   * instead of an in-app NavLink. `path` is still used as the React key. */
+  externalHref?: string
 }
 
 interface PortalLayoutProps {
@@ -69,19 +72,33 @@ const PortalLayout: React.FC<PortalLayoutProps> = ({
         {/* Aside Menu */}
         <aside className={`portal-aside ${asideCollapsed ? 'collapsed' : ''}`}>
           <nav className='portal-aside-nav'>
-            {menuItems.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                className={({ isActive }) =>
-                  `portal-aside-item ${isActive ? 'active' : ''}`
-                }
-                title={item.label}
-              >
-                <span className='portal-aside-icon'>{item.icon}</span>
-                <span className='portal-aside-label'>{item.label}</span>
-              </NavLink>
-            ))}
+            {menuItems.map((item) =>
+              item.externalHref ? (
+                <a
+                  key={item.path}
+                  href={item.externalHref}
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  className='portal-aside-item'
+                  title={item.label}
+                >
+                  <span className='portal-aside-icon'>{item.icon}</span>
+                  <span className='portal-aside-label'>{item.label}</span>
+                </a>
+              ) : (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) =>
+                    `portal-aside-item ${isActive ? 'active' : ''}`
+                  }
+                  title={item.label}
+                >
+                  <span className='portal-aside-icon'>{item.icon}</span>
+                  <span className='portal-aside-label'>{item.label}</span>
+                </NavLink>
+              )
+            )}
           </nav>
         </aside>
 

@@ -179,6 +179,39 @@ public class CounsellingNotificationService {
         }
     }
 
+    /**
+     * Sent when a counsellor goes on leave and no replacement was available, so
+     * the student's session has been cancelled. Asks the student to rebook.
+     * Used by the block-date-request approval flow (item 6 fallback path).
+     */
+    @Async
+    public void sendCounsellorLeaveCancellationEmail(CounsellingAppointment appointment) {
+        try {
+            String studentEmail = appointment.getStudent().getStudentInfo().getEmail();
+            String studentName = appointment.getStudent().getStudentInfo().getName();
+            String date = appointment.getSlot().getDate().format(DATE_FMT);
+            String time = appointment.getSlot().getStartTime().format(TIME_FMT);
+            String counsellorName = appointment.getCounsellor() != null
+                    ? appointment.getCounsellor().getName()
+                    : "your counsellor";
+
+            String subject = "Counselling Session Cancelled — Please Rebook";
+            String body = "Dear " + studentName + ",\n\n"
+                    + "Unfortunately, " + counsellorName + " is on leave on "
+                    + date + ", and no other counsellor was available at "
+                    + time + ".\n\n"
+                    + "Your session has been cancelled. Please log in to the student portal "
+                    + "and book a new session at a time that works for you.\n\n"
+                    + "We apologise for the inconvenience.\n\n"
+                    + "Regards,\nCareer-Nine Team";
+
+            sendEmail(studentEmail, subject, body);
+        } catch (Exception e) {
+            logger.error("Failed to send counsellor-leave cancellation email for appointment ID: {}. Error: {}",
+                    appointment != null ? appointment.getId() : "null", e.getMessage());
+        }
+    }
+
     @Async
     public void sendRescheduleEmail(CounsellingAppointment oldAppointment, CounsellingAppointment newAppointment) {
         try {

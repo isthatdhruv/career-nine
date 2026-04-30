@@ -21,6 +21,7 @@ import QuestionCreateModal from "../../../AssesmentQuestions/components/Question
 import QuestionLanguageModal from "../../../AssesmentQuestions/components/QuestionLanguageModal";
 import SectionQuestionSelector from "../SectionQuestionSelector";
 import { CreateQuestionaire} from "../../API/Create_Questionaire_APIs";
+import PageHeader from "../../../../components/PageHeader";
 
 const validationSchema = Yup.object().shape({
   // Basic Info
@@ -411,7 +412,7 @@ const QuestionareCreateSinglePage: React.FC = () => {
 
       const response = await CreateQuestionaire(completePayload);
       if (response.status === 200 || response.status === 201) {
-        showSuccessToast("✅ Questionare created successfully!");
+        showSuccessToast("Questionare created successfully!");
         navigate("/questionaire/List");
       } else {
         throw new Error("Failed to create questionare");
@@ -419,7 +420,7 @@ const QuestionareCreateSinglePage: React.FC = () => {
       
     } catch (error) {
       console.error("Error creating questionare:", error);
-      showErrorToast("❌ Error creating questionare. Please try again.");
+      showErrorToast("Error creating questionare. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -495,24 +496,46 @@ const QuestionareCreateSinglePage: React.FC = () => {
   }
 
   return (
-    <div className="container-fluid py-5">
-      <div className="row justify-content-center">
-        <div className="col-12 col-xl-10">
+    <div className="ph-page">
+      <div className="container-fluid py-5">
+        <div className="row justify-content-center">
+          <div className="col-12 col-xl-10">
+            <PageHeader
+              icon={<i className="bi bi-journal-plus" />}
+              title="Create Questionnaire"
+              subtitle={
+                questionareData ? (
+                  <>
+                    <strong>{questionareData.name}</strong>
+                    {" · Mode: "}
+                    <strong>{questionareData.mode?.toUpperCase?.()}</strong>
+                    {" · College: "}
+                    <strong>
+                      {colleges.find(
+                        (c) =>
+                          c.instituteCode === questionareData.collegeId ||
+                          c.id === questionareData.collegeId
+                      )?.instituteName || questionareData.collegeId}
+                    </strong>
+                    {questionareData.schoolContactIds?.length > 0 && (
+                      <>
+                        {" · School Contacts: "}
+                        <strong>{questionareData.schoolContactIds.length}</strong>
+                      </>
+                    )}
+                    {questionareData.career9ContactIds?.length > 0 && (
+                      <>
+                        {" · Career-9 Contacts: "}
+                        <strong>{questionareData.career9ContactIds.length}</strong>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  "Complete questionnaire setup"
+                )
+              }
+            />
           <div className="card shadow-sm">
-            <div className="card-header text-center">
-              <h1 className="mb-2 py-3">Complete Questionare Setup</h1>
-              {questionareData && (
-                <div className="mb-3">
-                  <h4 className="text-primary mb-1">{questionareData.name}</h4>
-                  <small className="text-muted">
-                    Mode: {questionareData.mode.toUpperCase()} | 
-                    College: {colleges.find(c => c.instituteCode === questionareData.collegeId || c.id === questionareData.collegeId)?.instituteName || questionareData.collegeId}
-                    {questionareData.schoolContactIds?.length > 0 && ` | School Contacts: ${questionareData.schoolContactIds.length}`}
-                    {questionareData.career9ContactIds?.length > 0 && ` | Career-9 Contacts: ${questionareData.career9ContactIds.length}`}
-                  </small>
-                </div>
-              )}
-            </div>
 
         <Formik
           enableReinitialize
@@ -1289,11 +1312,12 @@ const QuestionareCreateSinglePage: React.FC = () => {
           onHide={() => setShowTranslationModal(false)}
           questionId={translationQuestionId}
           targetLanguage={translationTargetLanguage}
-          setPageLoading={(isLoading) => setPageLoadingState(prev => [String(isLoading)])} 
+          setPageLoading={(isLoading) => setPageLoadingState(prev => [String(isLoading)])}
         />
 
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

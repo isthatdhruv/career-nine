@@ -4,7 +4,7 @@ import { GetDeletedQuestionSections, RestoreQuestionSection, PermanentDeleteQues
 import { showErrorToast } from '../../../utils/toast';
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
-import { MdRestorePage } from "react-icons/md";
+import { ActionIcon } from "../../../components/ActionIcon";
 
 interface QuestionSectionRecycleBinModalProps {
   show: boolean;
@@ -116,7 +116,7 @@ const QuestionSectionRecycleBinModal = ({
                           {isActionLoading ? (
                             <span className="spinner-border spinner-border-sm" role="status" />
                           ) : (
-                            <MdRestorePage size={16} />
+                            <ActionIcon type="refresh" size="sm" />
                           )}
                         </button>
                         <button

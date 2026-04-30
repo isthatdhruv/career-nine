@@ -146,12 +146,15 @@ public class CounsellingAppointmentController {
     public ResponseEntity<?> reschedule(@PathVariable Long id, @RequestBody Map<String, Object> request) {
         Long newSlotId = Long.valueOf(request.get("newSlotId").toString());
         Long userId = Long.valueOf(request.get("userId").toString());
+        // Frontend passes isAdmin=true from admin reschedule UI to bypass the
+        // single-reschedule cap on students. Defaults to false for student calls.
+        boolean isAdmin = Boolean.TRUE.equals(request.get("isAdmin"));
 
         Optional<User> userOpt = userRepository.findById(userId);
         User user = userOpt.orElse(null);
 
         try {
-            CounsellingAppointment appointment = appointmentService.reschedule(id, newSlotId, user);
+            CounsellingAppointment appointment = appointmentService.reschedule(id, newSlotId, user, isAdmin);
             return ResponseEntity.ok(appointment);
         } catch (RuntimeException e) {
             logger.warn("Reschedule failed for appointment {}: {}", id, e.getMessage());
@@ -185,5 +188,10 @@ public class CounsellingAppointmentController {
     @GetMapping("/stats")
     public ResponseEntity<Map<String, Long>> getStats() {
         return ResponseEntity.ok(appointmentService.getStats());
+    }
+
+    @GetMapping("/getAll")
+    public ResponseEntity<List<CounsellingAppointment>> getAll() {
+        return ResponseEntity.ok(appointmentRepository.findAll());
     }
 }

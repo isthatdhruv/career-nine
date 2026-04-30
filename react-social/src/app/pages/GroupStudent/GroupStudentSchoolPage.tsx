@@ -18,6 +18,7 @@ import {
   assignStudentsToContactPerson,
 } from "../StudentInformation/StudentInfo_APIs";
 import * as XLSX from "xlsx";
+import { ActionIcon } from "../../components/ActionIcon";
 
 type Student = {
   id: number;
@@ -1272,7 +1273,7 @@ export default function GroupStudentSchoolPage() {
                 fontSize: "0.9rem",
               }}
             >
-              <i className="bi bi-funnel-fill"></i>
+              <ActionIcon type="filter" size="sm" />
               Filters
               {isFiltered && (
                 <span
@@ -1357,7 +1358,7 @@ export default function GroupStudentSchoolPage() {
                     fontSize: "0.85rem",
                   }}
                 >
-                  <i className="bi bi-x-circle"></i>
+                  <ActionIcon type="reject" size="sm" />
                   Clear All
                 </button>
               </>
@@ -1388,7 +1389,7 @@ export default function GroupStudentSchoolPage() {
                   onClick={() => setShowFilterPanel(false)}
                   style={{ color: "#fff", background: "rgba(255,255,255,0.2)", border: "none", borderRadius: "8px", padding: "4px 10px" }}
                 >
-                  <i className="bi bi-x fs-5"></i>
+                  <ActionIcon type="reject" size="sm" />
                 </button>
               </div>
               <div style={{ display: "flex", minHeight: "300px" }}>
@@ -2159,7 +2160,7 @@ export default function GroupStudentSchoolPage() {
                     fontWeight: 600,
                   }}
                 >
-                  {groupAssigning ? <><span className="spinner-border spinner-border-sm me-2"></span>Assigning...</> : <><i className="bi bi-check2-circle me-1"></i>Confirm & Assign</>}
+                  {groupAssigning ? <><span className="spinner-border spinner-border-sm me-2"></span>Assigning...</> : <><ActionIcon type="approve" size="sm" className="me-1" />Confirm & Assign</>}
                 </button>
               </div>
             )}
@@ -2808,7 +2809,7 @@ export default function GroupStudentSchoolPage() {
                       </>
                     ) : (
                       <>
-                        <i className="bi bi-download me-2"></i>
+                        <ActionIcon type="download" size="sm" className="me-2" />
                         Download Excel
                       </>
                     )}
@@ -3298,7 +3299,7 @@ export default function GroupStudentSchoolPage() {
                       </>
                     ) : (
                       <>
-                        <i className="bi bi-download me-2"></i>
+                        <ActionIcon type="download" size="sm" className="me-2" />
                         Download Excel ({pivotedBulkData.rows.length} students)
                       </>
                     )}

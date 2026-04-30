@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import '../Counselling.css'
 import { createSlotConfig, getAllSlotConfigs, deleteSlotConfig, cleanupLegacy, SlotConfig } from '../API/SlotConfigurationAPI'
+import PageHeader from '../../../components/PageHeader'
 
 const SlotManagementPage: React.FC = () => {
   const [configs, setConfigs] = useState<SlotConfig[]>([])
@@ -120,35 +121,28 @@ const SlotManagementPage: React.FC = () => {
   const formatTime = (t: string) => t?.slice(0, 5) || t
 
   return (
+    <div className="ph-page">
     <div style={{ padding: '24px 28px', background: 'var(--sp-bg, #F2F7F5)', minHeight: '100vh' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--sp-text, #1A2B28)' }}>
-            Create Slots
-          </h2>
-          <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--sp-muted, #5C7A72)' }}>
-            Create slot configurations and assign them to counsellors from Manage Counsellors page
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={handleCleanupLegacy}
-            disabled={cleaning}
-            style={{
-              fontSize: 13, padding: '7px 14px', fontWeight: 600,
-              border: '1.5px solid #FECACA', borderRadius: 6,
-              background: '#fff', color: '#991B1B',
-              cursor: cleaning ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {cleaning ? 'Cleaning...' : 'Cleanup Legacy Slots'}
-          </button>
-          <button className='cl-btn-primary' onClick={() => setShowForm(!showForm)} style={{ fontSize: 13 }}>
-            {showForm ? 'Cancel' : 'New Configuration'}
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        icon={<i className="bi bi-calendar-week" />}
+        title="Counselling Slots"
+        subtitle="Create slot configurations and assign them to counsellors from Manage Counsellors page"
+        actions={[
+          {
+            label: showForm ? 'Cancel' : 'New Configuration',
+            iconClass: showForm ? 'bi-x-lg' : 'bi-plus-lg',
+            onClick: () => setShowForm(!showForm),
+            variant: 'primary',
+          },
+          {
+            label: cleaning ? 'Cleaning...' : 'Cleanup Legacy Slots',
+            iconClass: 'bi-trash',
+            onClick: handleCleanupLegacy,
+            variant: 'danger',
+            disabled: cleaning,
+          },
+        ]}
+      />
 
       {/* Alerts */}
       {error && (
@@ -291,6 +285,7 @@ const SlotManagementPage: React.FC = () => {
           ))}
         </div>
       )}
+    </div>
     </div>
   )
 }

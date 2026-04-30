@@ -46,3 +46,13 @@ export async function fetchStudentsWithMapping(instituteId: number | string): Pr
   );
   return safeList(data);
 }
+
+export async function fetchCounsellingAppointments(): Promise<any[]> {
+  const { data } = await axios.get(`${API_URL}/api/counselling-appointment/getAll`);
+  return safeList(data);
+}
+
+export async function fetchCounsellorRatingSummary(): Promise<any[]> {
+  const { data } = await axios.get(`${API_URL}/api/counselling-rating/summary-by-counsellor`);
+  return safeList(data);
+}

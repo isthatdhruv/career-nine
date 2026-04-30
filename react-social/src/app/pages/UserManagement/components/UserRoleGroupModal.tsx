@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import Select from "react-select";
 import { showErrorToast, showSuccessToast } from "../../../utils/toast";
+import { ActionIcon } from "../../../components/ActionIcon";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -177,7 +178,7 @@ const UserRoleGroupModal = ({ show, onHide, user }: Props) => {
               color: "#fff", border: "none", borderRadius: "6px", fontWeight: 600, padding: "6px 16px",
             }}
           >
-            {saving ? <><span className="spinner-border spinner-border-sm me-1"></span>Saving...</> : <><i className="bi bi-check2 me-1"></i>Save</>}
+            {saving ? <><span className="spinner-border spinner-border-sm me-1"></span>Saving...</> : <><ActionIcon type="approve" size="sm" className="me-1" />Save</>}
           </button>
         </div>
       </div>

@@ -110,6 +110,16 @@ public class Counsellor implements Serializable {
     @Column(name = "max_sessions_per_day")
     private Integer maxSessionsPerDay;
 
+    // Full-time vs Part-time engagement type chosen at registration.
+    // Values: 'FULL_TIME', 'PART_TIME'.
+    @Column(name = "work_time", length = 20, columnDefinition = "VARCHAR(20) DEFAULT 'FULL_TIME'")
+    private String workTime = "FULL_TIME";
+
+    // Counsellor specialism: school-level guidance vs career counselling.
+    // Values: 'SCHOOL', 'CAREER'.
+    @Column(name = "counsellor_type", length = 20, columnDefinition = "VARCHAR(20) DEFAULT 'CAREER'")
+    private String counsellorType = "CAREER";
+
     @Column(name = "password_hash", length = 255)
     private String passwordHash;
 
@@ -275,6 +285,12 @@ public class Counsellor implements Serializable {
 
     public Integer getMaxSessionsPerDay() { return maxSessionsPerDay; }
     public void setMaxSessionsPerDay(Integer maxSessionsPerDay) { this.maxSessionsPerDay = maxSessionsPerDay; }
+
+    public String getWorkTime() { return workTime; }
+    public void setWorkTime(String workTime) { this.workTime = workTime; }
+
+    public String getCounsellorType() { return counsellorType; }
+    public void setCounsellorType(String counsellorType) { this.counsellorType = counsellorType; }
 
     @com.fasterxml.jackson.annotation.JsonIgnore
     public String getPasswordHash() { return passwordHash; }

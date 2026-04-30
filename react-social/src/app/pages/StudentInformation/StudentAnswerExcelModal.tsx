@@ -4,6 +4,7 @@ import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import { Student } from "./StudentsList";
 import { getStudentAnswersWithDetails, StudentAnswerDetail, getStudentScores, StudentScoreDetail } from "./StudentInfo_APIs";
 import * as XLSX from "xlsx";
+import { ActionIcon } from "../../components/ActionIcon";
 
 interface StudentAnswerExcelModalProps {
   show: boolean;
@@ -563,7 +564,7 @@ const StudentAnswerExcelModal: React.FC<StudentAnswerExcelModalProps> = ({ show,
                   </>
                 ) : (
                   <>
-                    <i className="bi bi-download me-2"></i>
+                    <ActionIcon type="download" size="sm" className="me-2" />
                     Download {activeTab === "answers" ? "Answers" : "Scores"}
                   </>
                 )}

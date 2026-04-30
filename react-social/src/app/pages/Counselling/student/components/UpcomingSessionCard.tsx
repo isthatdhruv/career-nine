@@ -41,6 +41,7 @@ interface Appointment {
   meetingLink?: string
   slot: Slot
   counsellorName?: string
+  studentRescheduleCount?: number
 }
 
 interface UpcomingSessionCardProps {
@@ -69,7 +70,7 @@ function formatTime(timeStr: string): string {
 }
 
 const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, onReschedule }) => {
-  const { appointmentId, status, meetingLink, slot, counsellorName, reason } = appointment
+  const { appointmentId, status, meetingLink, slot, counsellorName, reason, studentRescheduleCount } = appointment
 
   const [now, setNow] = useState<number>(() => Date.now())
   useEffect(() => {
@@ -87,7 +88,9 @@ const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, 
     now < endMs
 
   const msUntilStart = isNaN(startMs) ? Infinity : startMs - now
-  const rescheduleBlocked = msUntilStart < RESCHEDULE_CUTOFF_MS
+  const rescheduleWithinCutoff = msUntilStart < RESCHEDULE_CUTOFF_MS
+  const rescheduleCapReached = (studentRescheduleCount ?? 0) >= 1
+  const rescheduleBlocked = rescheduleWithinCutoff || rescheduleCapReached
 
   return (
     <div className='cl-card cl-card-accent' style={{ marginBottom: 16 }}>
@@ -168,7 +171,7 @@ const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, 
       ) : null}
 
       {/* Reschedule cutoff warning (shown when session is within 4 hours) */}
-      {rescheduleBlocked && (
+      {rescheduleWithinCutoff && (
         <div
           role='alert'
           style={{
@@ -190,13 +193,41 @@ const UpcomingSessionCard: React.FC<UpcomingSessionCardProps> = ({ appointment, 
         </div>
       )}
 
+      {/* Reschedule cap reached (only one self-reschedule allowed per session) */}
+      {!rescheduleWithinCutoff && rescheduleCapReached && (
+        <div
+          role='alert'
+          style={{
+            marginBottom: 12, padding: '10px 12px',
+            background: '#FEF3C7', border: '1px solid #FCD34D', borderRadius: 8,
+            display: 'flex', alignItems: 'flex-start', gap: 8,
+            fontSize: 12.5, color: '#78350F', lineHeight: 1.5,
+          }}
+        >
+          <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' style={{ flexShrink: 0, marginTop: 1 }}>
+            <circle cx='12' cy='12' r='10' />
+            <line x1='12' y1='8' x2='12' y2='12' />
+            <line x1='12' y1='16' x2='12.01' y2='16' />
+          </svg>
+          <span>
+            You have already rescheduled this session once. Please contact your administrator if you need another change.
+          </span>
+        </div>
+      )}
+
       {/* Actions */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 10, borderTop: '1px solid var(--sp-border, #D1E5DF)' }}>
         <button
           className='cl-btn-outline'
           onClick={() => onReschedule(appointmentId)}
           disabled={rescheduleBlocked}
-          title={rescheduleBlocked ? 'Session starts in under 4 hours — rescheduling is disabled.' : undefined}
+          title={
+            rescheduleWithinCutoff
+              ? 'Session starts in under 4 hours — rescheduling is disabled.'
+              : rescheduleCapReached
+                ? 'You have already rescheduled this session once.'
+                : undefined
+          }
           style={{
             fontSize: 13,
             opacity: rescheduleBlocked ? 0.5 : 1,

@@ -68,6 +68,13 @@ public class CounsellingAppointment implements Serializable {
     @Column(name = "rescheduled_from_appointment_id")
     private Long rescheduledFromAppointmentId;
 
+    // Tracks how many times THE STUDENT has rescheduled this booking chain.
+    // Counts only student-initiated reschedules; admin reschedules do not
+    // increment this so admins remain unlimited (item 7). Value carries forward
+    // when a new appointment is created via reschedule (chain it from the old).
+    @Column(name = "student_reschedule_count", columnDefinition = "INT DEFAULT 0")
+    private Integer studentRescheduleCount = 0;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -83,6 +90,7 @@ public class CounsellingAppointment implements Serializable {
         if (this.meetingLinkSource == null) this.meetingLinkSource = "AUTO";
         if (this.reminder24hSent == null) this.reminder24hSent = false;
         if (this.reminder1hSent == null) this.reminder1hSent = false;
+        if (this.studentRescheduleCount == null) this.studentRescheduleCount = 0;
     }
 
     @PreUpdate
@@ -189,6 +197,14 @@ public class CounsellingAppointment implements Serializable {
 
     public void setRescheduledFromAppointmentId(Long rescheduledFromAppointmentId) {
         this.rescheduledFromAppointmentId = rescheduledFromAppointmentId;
+    }
+
+    public Integer getStudentRescheduleCount() {
+        return studentRescheduleCount == null ? 0 : studentRescheduleCount;
+    }
+
+    public void setStudentRescheduleCount(Integer studentRescheduleCount) {
+        this.studentRescheduleCount = studentRescheduleCount;
     }
 
     public LocalDateTime getCreatedAt() {

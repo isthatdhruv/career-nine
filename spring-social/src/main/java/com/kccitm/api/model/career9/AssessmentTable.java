@@ -57,6 +57,22 @@ public class AssessmentTable implements java.io.Serializable {
     @Column(name = "collect_email_and_phone", columnDefinition = "BOOLEAN DEFAULT TRUE")
     private Boolean collectEmailAndPhone = true;
 
+    /**
+     * Max number of times this assessment can be reset for a single student.
+     * Once reset count for (assessmentId, userStudentId) hits this value,
+     * further resets should be blocked. Null = unlimited.
+     */
+    @Column(name = "max_resets_per_student")
+    private Integer maxResetsPerStudent;
+
+    public Integer getMaxResetsPerStudent() {
+        return maxResetsPerStudent;
+    }
+
+    public void setMaxResetsPerStudent(Integer maxResetsPerStudent) {
+        this.maxResetsPerStudent = maxResetsPerStudent;
+    }
+
 
     public Long getId() {
         return id;

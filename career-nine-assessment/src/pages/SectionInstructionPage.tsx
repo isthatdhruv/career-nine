@@ -117,7 +117,7 @@ const SectionInstructionPage: React.FC = () => {
                       width: "36px",
                       height: "36px",
                       minWidth: "36px",
-                      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                      background: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
                       borderRadius: "50%",
                       display: "flex",
                       alignItems: "center",

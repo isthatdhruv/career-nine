@@ -313,9 +313,23 @@ public class AppointmentService {
      * Enforces the {@value #CANCELLATION_WINDOW_HOURS}-hour window on the old slot,
      * verifies the new slot is AVAILABLE, marks the old appointment RESCHEDULED,
      * and creates a new CONFIRMED appointment on the new slot.
+     *
+     * Backwards-compatible overload that defaults to student behaviour
+     * (counts toward the student cap of 1).
      */
     @Transactional
     public CounsellingAppointment reschedule(Long appointmentId, Long newSlotId, User counsellorUser) {
+        return reschedule(appointmentId, newSlotId, counsellorUser, false);
+    }
+
+    /**
+     * Reschedule with an explicit admin flag. When {@code isAdmin} is true the
+     * student-side cap of one reschedule per booking chain is bypassed and the
+     * counter is NOT incremented, so the student still has their one chance
+     * regardless of how many times an admin moves the session (item 7).
+     */
+    @Transactional
+    public CounsellingAppointment reschedule(Long appointmentId, Long newSlotId, User counsellorUser, boolean isAdmin) {
         CounsellingAppointment oldAppointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", appointmentId));
 
@@ -327,6 +341,14 @@ public class AppointmentService {
             throw new BadRequestException(
                     "Cannot reschedule: session starts within " + CANCELLATION_WINDOW_HOURS
                             + " hours. Please contact support directly.");
+        }
+
+        // Item 5: students may reschedule a session at most once.
+        // Admins bypass via the isAdmin flag (item 7).
+        int existingStudentReschedules = oldAppointment.getStudentRescheduleCount();
+        if (!isAdmin && existingStudentReschedules >= 1) {
+            throw new BadRequestException(
+                    "You have already rescheduled this session once. Please contact your administrator for further changes.");
         }
 
         CounsellingSlot newSlot = slotRepository.findById(newSlotId)
@@ -355,6 +377,10 @@ public class AppointmentService {
         newAppointment.setStudentReason(oldAppointment.getStudentReason());
         newAppointment.setStatus("CONFIRMED");
         newAppointment.setRescheduledFromAppointmentId(appointmentId);
+        // Carry the count forward across the chain. Only student-initiated
+        // reschedules increment it; admin reschedules preserve the existing value.
+        newAppointment.setStudentRescheduleCount(
+                isAdmin ? existingStudentReschedules : existingStudentReschedules + 1);
 
         // Transition new slot to CONFIRMED
         newSlot.setStatus("CONFIRMED");

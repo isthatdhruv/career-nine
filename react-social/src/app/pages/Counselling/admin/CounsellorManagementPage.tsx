@@ -8,6 +8,7 @@ import { getAllSlotConfigs, applySlotConfig, SlotConfig } from '../API/SlotConfi
 import { getSlotsByCounsellor } from '../API/SlotAPI'
 import CounsellorForm from './components/CounsellorForm'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
+import PageHeader from '../../../components/PageHeader'
 
 const API_URL = process.env.REACT_APP_API_URL
 
@@ -501,28 +502,17 @@ const CounsellorManagementPage: React.FC = () => {
   }
 
   return (
+    <div className="ph-page">
     <div style={{ padding: '24px 28px', background: 'var(--sp-bg, #F2F7F5)', minHeight: '100vh' }}>
-      {/* Page Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--sp-text, #1A2B28)' }}>
-            Manage Counsellors
-          </h2>
-          <p style={{ margin: '4px 0 0', fontSize: 14, color: 'var(--sp-muted, #5C7A72)' }}>
-            Review, approve, and manage counsellor profiles
-          </p>
-        </div>
-        {selectedIds.size > 0 && (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className='cl-btn-primary' onClick={() => setShowAllocateModal(true)} style={{ fontSize: 13 }}>
-              Institute Allocation ({selectedIds.size})
-            </button>
-            <button className='cl-btn-blue' onClick={openSlotModal} style={{ fontSize: 13 }}>
-              Create Slots ({selectedIds.size})
-            </button>
-          </div>
-        )}
-      </div>
+      <PageHeader
+        icon={<i className="bi bi-headset" />}
+        title="Manage Counsellors"
+        subtitle="Review, approve, and manage counsellor profiles"
+        actions={selectedIds.size > 0 ? [
+          { label: `Institute Allocation (${selectedIds.size})`, iconClass: 'bi-building', onClick: () => setShowAllocateModal(true), variant: 'primary' },
+          { label: `Create Slots (${selectedIds.size})`, iconClass: 'bi-calendar-plus', onClick: openSlotModal, variant: 'ghost' },
+        ] : []}
+      />
 
       {/* Allocation Modal */}
       {showAllocateModal && (
@@ -995,6 +985,7 @@ const CounsellorManagementPage: React.FC = () => {
           </div>
         </div>
       )}
+    </div>
     </div>
   )
 }

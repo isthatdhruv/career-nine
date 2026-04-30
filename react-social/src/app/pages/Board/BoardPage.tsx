@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
-import { Button } from "react-bootstrap";
-import { IconContext } from "react-icons";
-import { MdSchool } from "react-icons/md";
 import { ReadBoardData } from "./API/Board_APIs";
 import BoardCreateModal from "./components/BoardCreateModal";
 import BoardTable from "./components/BoardTable";
+import PageHeader from "../../components/PageHeader";
 
 const BoardPage = () => {
   const [modalShowCreate, setModalShowCreate] = useState(false);
@@ -26,48 +24,47 @@ const BoardPage = () => {
   }, [pageLoading]);
 
   return (
-    <div className="card">
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className="bi bi-easel" />}
+        title="Board List"
+        subtitle={
+          loading ? (
+            "Loading..."
+          ) : (
+            <>
+              <strong>{boardData.length}</strong> boards
+            </>
+          )
+        }
+        actions={[
+          {
+            label: "Add Board",
+            iconClass: "bi-plus-lg",
+            onClick: () => setModalShowCreate(true),
+            variant: "primary",
+          },
+        ]}
+      />
+
       {loading && (
-        <span className="indicator-progress m-5" style={{ display: "block" }}>
-          Please wait...{" "}
-          <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
-        </span>
-      )}
-
-      {!loading && (
-        <div className="card-header border-0 pt-6">
-          <div className="card-title">
-            <h1>Board List</h1>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "48px", textAlign: "center" }}>
+          <div className="spinner-border" style={{ color: "#0ea5e9" }} role="status">
+            <span className="visually-hidden">Loading...</span>
           </div>
-
-          <div className="card-toolbar">
-            <div className="d-flex justify-content-end">
-              <Button
-                variant="primary"
-                onClick={() => {
-                  setModalShowCreate(true);
-                }}
-              >
-                <IconContext.Provider
-                  value={{ style: { paddingBottom: "4px" } }}
-                >
-                  <div>
-                    Add Board <MdSchool size={21} />
-                  </div>
-                </IconContext.Provider>
-              </Button>
-            </div>
-          </div>
+          <p className="mt-3" style={{ color: "#6b7280" }}>Loading boards...</p>
         </div>
       )}
 
       {!loading && (
-        <div className="card-body pt-5">
-          <BoardTable
-            data={boardData}
-            setLoading={setLoading}
-            setPageLoading={setPageLoading}
-          />
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", overflow: "hidden" }}>
+          <div style={{ padding: "16px" }}>
+            <BoardTable
+              data={boardData}
+              setLoading={setLoading}
+              setPageLoading={setPageLoading}
+            />
+          </div>
         </div>
       )}
 

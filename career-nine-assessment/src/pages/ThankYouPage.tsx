@@ -1,8 +1,13 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const ThankYouPage: React.FC = () => {
     const navigate = useNavigate();
+
+    const [hoveredRating, setHoveredRating] = useState<number>(0);
+    const [submittedRating, setSubmittedRating] = useState<number>(0);
+    const [isSubmittingRating, setIsSubmittingRating] = useState<boolean>(false);
+    const [ratingError, setRatingError] = useState<string>('');
 
     useEffect(() => {
         const webgazerVideo = document.getElementById('webgazerVideoFeed') as HTMLVideoElement | null;
@@ -19,6 +24,51 @@ const ThankYouPage: React.FC = () => {
     const handleExploreCareerLibrary = () => {
         window.open('https://library.career-9.com', '_blank');
     };
+
+    const submitRating = async (rating: number) => {
+        if (submittedRating > 0 || isSubmittingRating) return;
+
+        const userStudentId = localStorage.getItem('userStudentId');
+        const assessmentId = localStorage.getItem('assessmentId');
+
+        if (!userStudentId || !assessmentId) {
+            setRatingError('Unable to record rating — session info missing.');
+            return;
+        }
+
+        setIsSubmittingRating(true);
+        setRatingError('');
+
+        try {
+            const res = await fetch(
+                `${import.meta.env.VITE_API_URL}/assessment-answer/feedback-rating`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                    },
+                    body: JSON.stringify({
+                        userStudentId: parseInt(userStudentId, 10),
+                        assessmentId: parseInt(assessmentId, 10),
+                        rating,
+                    }),
+                },
+            );
+
+            if (!res.ok) {
+                throw new Error(`Request failed: ${res.status}`);
+            }
+
+            setSubmittedRating(rating);
+        } catch (err) {
+            setRatingError('Could not save your rating. Please try again.');
+        } finally {
+            setIsSubmittingRating(false);
+        }
+    };
+
+    const displayRating = submittedRating || hoveredRating;
 
     return (
         <>
@@ -67,7 +117,7 @@ const ThankYouPage: React.FC = () => {
 
                                 <h1
                                     style={{
-                                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                        background: 'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)',
                                         WebkitBackgroundClip: 'text',
                                         WebkitTextFillColor: 'transparent',
                                         backgroundClip: 'text',
@@ -89,10 +139,87 @@ const ThankYouPage: React.FC = () => {
                                     Now explore your personalized insights and career possibilities!
                                 </p>
 
+                                {/* 5-star feedback rating */}
+                                <div
+                                    style={{
+                                        background: '#f8fafc',
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: '14px',
+                                        padding: '1rem 1.25rem',
+                                        marginBottom: '1.5rem',
+                                    }}
+                                >
+                                    <p
+                                        style={{
+                                            color: '#2d3748',
+                                            fontSize: '0.95rem',
+                                            fontWeight: 600,
+                                            margin: '0 0 0.5rem 0',
+                                        }}
+                                    >
+                                        How did you find the assessment?
+                                    </p>
+                                    <div
+                                        style={{
+                                            display: 'flex',
+                                            justifyContent: 'center',
+                                            gap: '6px',
+                                            marginBottom: submittedRating || ratingError ? '0.5rem' : 0,
+                                        }}
+                                        onMouseLeave={() => setHoveredRating(0)}
+                                    >
+                                        {[1, 2, 3, 4, 5].map((star) => {
+                                            const isActive = star <= displayRating;
+                                            const isLocked = submittedRating > 0 || isSubmittingRating;
+                                            return (
+                                                <button
+                                                    key={star}
+                                                    type="button"
+                                                    aria-label={`${star} star${star > 1 ? 's' : ''}`}
+                                                    onMouseEnter={() => !isLocked && setHoveredRating(star)}
+                                                    onClick={() => submitRating(star)}
+                                                    disabled={isLocked}
+                                                    style={{
+                                                        background: 'transparent',
+                                                        border: 'none',
+                                                        padding: '4px',
+                                                        cursor: isLocked ? 'default' : 'pointer',
+                                                        transition: 'transform 0.15s ease',
+                                                        transform: isActive && !submittedRating ? 'scale(1.1)' : 'scale(1)',
+                                                    }}
+                                                >
+                                                    <svg
+                                                        width="32"
+                                                        height="32"
+                                                        viewBox="0 0 24 24"
+                                                        fill={isActive ? '#f59e0b' : 'none'}
+                                                        stroke={isActive ? '#f59e0b' : '#cbd5e0'}
+                                                        strokeWidth="2"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                    >
+                                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                                                    </svg>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                    {submittedRating > 0 && (
+                                        <p style={{ color: '#059669', fontSize: '0.85rem', margin: 0, fontWeight: 500 }}>
+                                            Thanks for your feedback!
+                                        </p>
+                                    )}
+                                    {ratingError && (
+                                        <p style={{ color: '#dc2626', fontSize: '0.85rem', margin: 0 }}>
+                                            {ratingError}
+                                        </p>
+                                    )}
+                                </div>
+
                                 {/* Divider */}
                                 <div style={{
                                     height: '2px',
-                                    background: 'linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.3), transparent)',
+                                    background: 'linear-gradient(90deg, transparent, rgba(244, 63, 94, 0.3), transparent)',
                                     margin: '0 auto 1.5rem auto',
                                     width: '80%',
                                 }} />

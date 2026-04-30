@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Modal, Button, Form, Spinner } from "react-bootstrap";
-import { MdContentCopy, MdQrCode, MdPayment, MdEmail, MdWhatsapp } from "react-icons/md";
+import { MdQrCode, MdPayment, MdWhatsapp } from "react-icons/md";
+import { ActionIcon } from "../../../components/ActionIcon";
 import { QRCodeCanvas } from "qrcode.react";
 import { generatePaymentLink, sendPaymentLinkEmail, sendPaymentLinkWhatsApp } from "../../PaymentTracking/API/Payment_APIs";
 
@@ -298,7 +299,7 @@ const PaymentLinkModal = ({
                           cursor: "pointer",
                         }}
                       >
-                        <MdContentCopy size={14} />
+                        <ActionIcon type="copy" size="sm" />
                         {copySuccess === link.registrationUrl ? "Copied!" : "Copy Link"}
                       </button>
                       <button
@@ -391,7 +392,7 @@ const PaymentLinkModal = ({
                           fontWeight: 600, fontSize: "0.75rem", cursor: "pointer",
                         }}
                       >
-                        <MdEmail size={14} />
+                        <ActionIcon type="send" size="sm" />
                         {sendSuccess === "email" ? "Sent!" : "Email"}
                       </button>
                     </div>
