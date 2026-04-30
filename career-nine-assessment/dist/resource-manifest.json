@@ -1,6 +1,6 @@
 {
-  "version": "mo9mnuhv",
-  "generated": "2026-04-22T05:44:05.923Z",
+  "version": "mol4iuul",
+  "generated": "2026-04-30T06:49:34.125Z",
   "resources": [
     {
       "url": "/assessment-cache/30/config.json",
@@ -138,33 +138,33 @@
       "priority": "deferred"
     },
     {
-      "url": "/assets/HydroTubeGame-4IuqtALg.js",
+      "url": "/assets/HydroTubeGame-CShMZ4tS.js",
       "size": 23331,
       "priority": "critical"
     },
     {
-      "url": "/assets/JungleSpotGame-OAd_9UKF.js",
+      "url": "/assets/JungleSpotGame-Blr9yI8m.js",
       "size": 23397,
       "priority": "critical"
     },
     {
-      "url": "/assets/RabbitPathGame-DiEjYZuM.js",
+      "url": "/assets/RabbitPathGame-CUY2vN0S.js",
       "size": 26981,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionInstructionPage-BIDPmQy0.js",
+      "url": "/assets/SectionInstructionPage-DY-Rp-NE.js",
       "size": 4188,
       "priority": "critical"
     },
     {
-      "url": "/assets/SectionQuestionPage-D-tib-Y3.js",
-      "size": 170198,
+      "url": "/assets/SectionQuestionPage-C5xycuN5.js",
+      "size": 173337,
       "priority": "critical"
     },
     {
-      "url": "/assets/SelectSectionPage-DSDtJU7E.js",
-      "size": 4581,
+      "url": "/assets/SelectSectionPage-BbRNw0du.js",
+      "size": 4576,
       "priority": "critical"
     },
     {
@@ -178,13 +178,13 @@
       "priority": "critical"
     },
     {
-      "url": "/assets/index-BuOQ-10m.js",
-      "size": 282218,
+      "url": "/assets/index-92mDzMKo.css",
+      "size": 245470,
       "priority": "critical"
     },
     {
-      "url": "/assets/index-DpwdMkRA.css",
-      "size": 244127,
+      "url": "/assets/index-DTKcNiuj.js",
+      "size": 285171,
       "priority": "critical"
     },
     {
@@ -235,7 +235,7 @@
   ],
   "summary": {
     "total": 46,
-    "totalSize": 23880787,
+    "totalSize": 23888217,
     "byPriority": {
       "assessment": {
         "count": 4,
@@ -251,7 +251,7 @@
       },
       "critical": {
         "count": 15,
-        "size": 2351541
+        "size": 2358971
       },
       "other": {
         "count": 4,
