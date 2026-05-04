@@ -265,6 +265,69 @@ public class AssessmentAnswerController {
         }
     }
 
+    /**
+     * Admin submission on behalf of a student.
+     * Wraps the standard /submit pipeline, then writes an audit row to
+     * assessment_admin_action so it's traceable later. Accepts the same
+     * payload as /submit plus optional adminUserId and reason fields.
+     */
+    @PostMapping(value = "/admin-submit", headers = "Accept=application/json")
+    public ResponseEntity<?> adminSubmitOnBehalfOfStudent(@RequestBody Map<String, Object> submissionData) {
+        if (submissionData.get("userStudentId") == null || submissionData.get("assessmentId") == null) {
+            return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
+        }
+        Long userStudentId = ((Number) submissionData.get("userStudentId")).longValue();
+        Long assessmentId = ((Number) submissionData.get("assessmentId")).longValue();
+        Long adminUserId = submissionData.get("adminUserId") instanceof Number
+                ? ((Number) submissionData.get("adminUserId")).longValue()
+                : null;
+        String reason = submissionData.get("reason") != null
+                ? submissionData.get("reason").toString()
+                : "Admin submission on behalf of student";
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> answers = (List<Map<String, Object>>) submissionData.get("answers");
+        int submittedCount = answers != null ? answers.size() : 0;
+
+        long priorAnswerCount = 0L;
+        try {
+            UserStudent us = userStudentRepository.findById(userStudentId).orElse(null);
+            if (us != null) {
+                priorAnswerCount = assessmentAnswerRepository.findByUserStudent(us).stream()
+                        .filter(a -> a.getAssessment() != null
+                                && assessmentId.equals(a.getAssessment().getId()))
+                        .count();
+            }
+        } catch (Exception e) {
+            logger.warn("Could not snapshot prior answers for admin-submit audit", e);
+        }
+
+        // Write audit FIRST so the action is recorded even if submission fails.
+        try {
+            AssessmentAdminAction action = new AssessmentAdminAction();
+            action.setActionType("admin_on_behalf_submission");
+            action.setUserStudentId(userStudentId);
+            action.setAssessmentId(assessmentId);
+            action.setAdminUserId(adminUserId);
+            action.setActionAt(java.time.Instant.now());
+            action.setReason(reason);
+            action.setBeforeStateJson(String.format(
+                    "{\"priorAnswerCount\":%d}", priorAnswerCount));
+            action.setAfterStateJson(String.format(
+                    "{\"submittedAnswerCount\":%d}", submittedCount));
+            adminActionRepository.save(action);
+        } catch (Exception e) {
+            logger.error("Failed to write admin-submit audit row (continuing with submission)", e);
+        }
+
+        // Strip admin-only fields before delegating to the standard pipeline.
+        Map<String, Object> cleaned = new HashMap<>(submissionData);
+        cleaned.remove("adminUserId");
+        cleaned.remove("reason");
+
+        return submitAssessmentAnswers(cleaned);
+    }
+
     @PutMapping(value = "/feedback-rating", headers = "Accept=application/json")
     public ResponseEntity<?> saveFeedbackRating(@RequestBody Map<String, Object> body) {
         if (body.get("userStudentId") == null || body.get("assessmentId") == null || body.get("rating") == null) {
