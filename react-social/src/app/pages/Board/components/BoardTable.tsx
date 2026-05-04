@@ -1,9 +1,8 @@
 import { MDBDataTableV5 } from "mdbreact";
 import { useState } from "react";
-import { AiFillEdit } from "react-icons/ai";
-
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
+import { ActionIcon } from "../../../components/ActionIcon";
 import BoardEditModal from "./BoardEditModal";
 import { DeleteBoardData } from "../API/Board_APIs";
 
@@ -48,7 +47,7 @@ const BoardTable = (props: {
                   }}
                   className="btn btn-icon btn-primary btn-sm me-3"
                 >
-                  <AiFillEdit size={16} />
+                  <ActionIcon type="edit" size="sm" />
                 </button>
 
                 <button

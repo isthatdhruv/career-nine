@@ -32,11 +32,13 @@ public class AvailabilityTemplateController {
     private SlotMaterializationService materializationService;
 
     @PostMapping("/create")
-    public ResponseEntity<AvailabilityTemplate> create(@RequestBody AvailabilityTemplate template) {
-        logger.info("Creating availability template for counsellor id: {}",
-                template.getCounsellor() != null ? template.getCounsellor().getId() : null);
+    public ResponseEntity<AvailabilityTemplate> create(
+            @RequestBody AvailabilityTemplate template,
+            @org.springframework.web.bind.annotation.RequestParam(required = false, defaultValue = "30") int days) {
+        logger.info("Creating availability template for counsellor id: {}, days: {}",
+                template.getCounsellor() != null ? template.getCounsellor().getId() : null, days);
         AvailabilityTemplate saved = templateRepository.save(template);
-        materializationService.materializeSlotsForCounsellor(saved.getCounsellor().getId());
+        materializationService.materializeSlotsForCounsellor(saved.getCounsellor().getId(), days);
         return ResponseEntity.ok(saved);
     }
 

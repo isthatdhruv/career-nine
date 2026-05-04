@@ -84,6 +84,15 @@ public class PaymentTransaction implements Serializable {
     @Column(name = "promo_code", length = 50)
     private String promoCode;
 
+    @Column(name = "campaign_id")
+    private Long campaignId;
+
+    @Column(name = "campaign_assessment_tier_id")
+    private Long campaignAssessmentTierId;
+
+    @Column(name = "purchase_path", length = 1)
+    private String purchasePath;
+
     @Column(name = "promo_discount_percent")
     private Integer promoDiscountPercent;
 
@@ -178,6 +187,15 @@ public class PaymentTransaction implements Serializable {
 
     public String getPromoCode() { return promoCode; }
     public void setPromoCode(String promoCode) { this.promoCode = promoCode; }
+
+    public Long getCampaignId() { return campaignId; }
+    public void setCampaignId(Long campaignId) { this.campaignId = campaignId; }
+
+    public Long getCampaignAssessmentTierId() { return campaignAssessmentTierId; }
+    public void setCampaignAssessmentTierId(Long v) { this.campaignAssessmentTierId = v; }
+
+    public String getPurchasePath() { return purchasePath; }
+    public void setPurchasePath(String purchasePath) { this.purchasePath = purchasePath; }
 
     public Integer getPromoDiscountPercent() { return promoDiscountPercent; }
     public void setPromoDiscountPercent(Integer promoDiscountPercent) { this.promoDiscountPercent = promoDiscountPercent; }

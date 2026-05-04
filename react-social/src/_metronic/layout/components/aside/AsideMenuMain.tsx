@@ -44,7 +44,7 @@ export function AsideMenuMain() {
     allowed("/college") || allowed("/contact-person") || allowed("/group-student") ||
     allowed("/admin/group-student") || allowed("/school/group-student") ||
     allowed("/school/assigned-students") ||
-    allowed("/board") || allowed("/upload-excel") || allowed("/studentlist");
+    allowed("/board") || allowed("/upload-excel");
 
   const showQuestionnaire =
     allowed("/questionare/create") || allowed("/questionaire/List") ||
@@ -69,14 +69,6 @@ export function AsideMenuMain() {
 
   const showReports = allowed("/reports") || allowed("/report-generation") || allowed("/send-reports");
 
-  const showTeacherDashboards =
-    allowed("/teacher/class-dashboard") || allowed("/principal/dashboard");
-
-  const showTeacherRegistration =
-    allowed("/faculty/registration-details") || allowed("/faculty/registration-form");
-
-  const showTeacher = showTeacherDashboards || showTeacherRegistration;
-
   const showRoles =
     allowed("/roles/role") ||
     allowed("/roles/role_roleGroup") || allowed("/roles/roleUser") ||
@@ -88,8 +80,13 @@ export function AsideMenuMain() {
   const showScoreDebug = allowed("/score-debug");
 
   const showCounselling =
-    allowed("/admin/counselling-queue") || allowed("/admin/counsellors") ||
-    allowed("/counsellor/dashboard") || allowed("/counsellor/availability");
+    allowed("/admin/counsellors") ||
+    allowed("/admin/counselling-slots") || allowed("/admin/counselling-students") || allowed("/admin/counselling-notifications");
+
+  const showStudentPortal =
+    allowed("/student/dashboard") || allowed("/student/navigator-360") ||
+    allowed("/student/assessments") || allowed("/student/reports") ||
+    allowed("/student/counselling") || allowed("/student/student-info");
 
   return (
     <>
@@ -170,14 +167,6 @@ export function AsideMenuMain() {
                 icon="/media/icons/duotune/general/gen044.svg"
                 title="Add Students in Bulk"
                 fontIcon="bi-app-indicator"
-              />
-            )}
-            {allowed("/studentlist") && (
-              <AsideMenuItem
-                to="/studentlist"
-                title="Student's List & Profile"
-                fontIcon="bi-app-indicator"
-                icon="/media/icons/duotune/communication/com006.svg"
               />
             )}
           </AsideMenuItemWithSub>
@@ -381,6 +370,49 @@ export function AsideMenuMain() {
         </>
       )}
 
+      {(allowed("/b2c/campaigns") || allowed("/b2c/pricing-tiers") || allowed("/b2c/tracker")) && (
+        <>
+          <div className="menu-item">
+            <div className="menu-content pt-8 pb-2">
+              <span className="menu-section text-muted text-uppercase fs-8 ls-1">
+                B2C Portal
+              </span>
+            </div>
+          </div>
+          <AsideMenuItemWithSub
+            to="/b2c"
+            title="B2C"
+            fontIcon="bi-shop"
+            icon="/media/icons/duotune/ecommerce/ecm001.svg"
+          >
+            {allowed("/b2c/campaigns") && (
+              <AsideMenuItem
+                to="/b2c/campaigns"
+                icon="/media/icons/duotune/ecommerce/ecm005.svg"
+                title="Campaigns"
+                fontIcon="bi-megaphone"
+              />
+            )}
+            {allowed("/b2c/pricing-tiers") && (
+              <AsideMenuItem
+                to="/b2c/pricing-tiers"
+                icon="/media/icons/duotune/finance/fin010.svg"
+                title="Pricing Tiers"
+                fontIcon="bi-tag-fill"
+              />
+            )}
+            {allowed("/b2c/tracker") && (
+              <AsideMenuItem
+                to="/b2c/tracker"
+                icon="/media/icons/duotune/graphs/gra007.svg"
+                title="Payments & Allotments"
+                fontIcon="bi-clipboard-data"
+              />
+            )}
+          </AsideMenuItemWithSub>
+        </>
+      )}
+
       {showReports && (
         <>
           <div className="menu-item">
@@ -491,63 +523,6 @@ export function AsideMenuMain() {
         fontIcon="bi-app-indicator"
       /> */}
 
-      {showTeacher && (
-        <>
-          <div className="menu-item">
-            <div className="menu-content pt-8 pb-2">
-              <span className="menu-section text-muted text-uppercase fs-8 ls-1">
-                TEACHER
-              </span>
-            </div>
-          </div>
-          {showTeacherDashboards && (
-            <AsideMenuItemWithSub
-              to=""
-              title="Dashboards"
-              fontIcon="bi-speedometer2"
-              icon="/media/icons/duotune/general/gen019.svg"
-            >
-              {allowed("/teacher/class-dashboard") && (
-                <AsideMenuItem
-                  to="/teacher/class-dashboard"
-                  title="Class Teacher Dashboard"
-                  hasBullet={true}
-                />
-              )}
-              {allowed("/principal/dashboard") && (
-                <AsideMenuItem
-                  to="/principal/dashboard"
-                  title="Principal Dashboard"
-                  hasBullet={true}
-                />
-              )}
-            </AsideMenuItemWithSub>
-          )}
-          {showTeacherRegistration && (
-            <AsideMenuItemWithSub
-              to=""
-              title="Teachers Registration"
-              fontIcon="bi-app-indicator"
-              icon="/media/icons/duotune/communication/com006.svg"
-            >
-              {allowed("/faculty/registration-details") && (
-                <AsideMenuItem
-                  to="/faculty/registration-details"
-                  title="Registrations List"
-                  hasBullet={true}
-                />
-              )}
-              {allowed("/faculty/registration-form") && (
-                <AsideMenuItem
-                  to="/faculty/registration-form"
-                  title="Registration Form"
-                  hasBullet={true}
-                />
-              )}
-            </AsideMenuItemWithSub>
-          )}
-        </>
-      )}
 
       {showRoles && (
         <>
@@ -660,17 +635,54 @@ export function AsideMenuMain() {
             fontIcon="bi-app-indicator"
             icon="/media/icons/duotune/general/gen049.svg"
           >
-            {allowed("/admin/counselling-queue") && (
-              <AsideMenuItem to="/admin/counselling-queue" title="Request Queue" hasBullet={true} />
-            )}
             {allowed("/admin/counsellors") && (
               <AsideMenuItem to="/admin/counsellors" title="Manage Counsellors" hasBullet={true} />
             )}
-            {allowed("/counsellor/dashboard") && (
-              <AsideMenuItem to="/counsellor/dashboard" title="My Schedule" hasBullet={true} />
+            {allowed("/admin/counselling-students") && (
+              <AsideMenuItem to="/admin/counselling-students" title="Manage Students" hasBullet={true} />
             )}
-            {allowed("/counsellor/availability") && (
-              <AsideMenuItem to="/counsellor/availability" title="My Availability" hasBullet={true} />
+            {allowed("/admin/counselling-slots") && (
+              <AsideMenuItem to="/admin/counselling-slots" title="Create Slots" hasBullet={true} />
+            )}
+            {allowed("/admin/counselling-notifications") && (
+              <AsideMenuItem to="/admin/counselling-notifications" title="Notifications" hasBullet={true} />
+            )}
+          </AsideMenuItemWithSub>
+        </>
+      )}
+
+      {showStudentPortal && (
+        <>
+          <div className="menu-item">
+            <div className="menu-content pt-8 pb-2">
+              <span className="menu-section text-muted text-uppercase fs-8 ls-1">
+                Student Portal
+              </span>
+            </div>
+          </div>
+          <AsideMenuItemWithSub
+            to="/student"
+            title="Student Portal"
+            fontIcon="bi-app-indicator"
+            icon="/media/icons/duotune/general/gen049.svg"
+          >
+            {allowed("/student/dashboard") && (
+              <AsideMenuItem to="/student/dashboard" title="Dashboard" hasBullet={true} />
+            )}
+            {allowed("/student/student-info") && (
+              <AsideMenuItem to="/student/student-info" title="My Info" hasBullet={true} />
+            )}
+            {allowed("/student/navigator-360") && (
+              <AsideMenuItem to="/student/navigator-360" title="Navigator 360" hasBullet={true} />
+            )}
+            {allowed("/student/assessments") && (
+              <AsideMenuItem to="/student/assessments" title="My Assessments" hasBullet={true} />
+            )}
+            {allowed("/student/reports") && (
+              <AsideMenuItem to="/student/reports" title="My Reports" hasBullet={true} />
+            )}
+            {allowed("/student/counselling") && (
+              <AsideMenuItem to="/student/counselling" title="Counselling" hasBullet={true} />
             )}
           </AsideMenuItemWithSub>
         </>

@@ -11,6 +11,7 @@ import {
   cancelAppointment,
 } from '../API/AppointmentAPI'
 import { getCounsellorByUserId } from '../API/CounsellorAPI'
+import { useRefreshInterval } from '../../../utils/useAutoRefresh'
 import '../Counselling.css'
 
 type TabKey = 'schedule' | 'availability' | 'history' | 'pending'
@@ -60,6 +61,13 @@ const CounsellorDashboardPage: React.FC = () => {
 
     fetchData()
   }, [userId])
+
+  useRefreshInterval(() => {
+    if (!counsellor?.id) return
+    getCounsellorAppointments(counsellor.id)
+      .then((res) => setAppointments(res.data || []))
+      .catch(() => {})
+  }, { skip: !counsellor?.id })
 
   const refreshAppointments = async () => {
     if (!counsellor?.id) return

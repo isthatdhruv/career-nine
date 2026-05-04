@@ -63,6 +63,11 @@ type Question = {
     options: Option[];
     languageQuestions?: LanguageQuestion[];
     maxOptionsAllowed: number;
+    minOptionsAllowed?: number;
+    // New rule-based selection model. When optionsRule is set, it overrides the
+    // legacy "min defaults to max" behavior.
+    optionsRule?: "min" | "max" | "equal" | null;
+    optionsCount?: number | null;
   };
 };
 
@@ -109,6 +114,9 @@ const SectionQuestionPage: React.FC = () => {
   const [showWarning, setShowWarning] = useState<boolean>(false);
   const [showConfirmSubmit, setShowConfirmSubmit] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [showInactivityWarning, setShowInactivityWarning] =
+    useState<boolean>(false);
+  const inactivityTimerRef = useRef<number | null>(null);
 
   // Track which sections have already shown their instructions (only show once)
   const [seenSectionInstructions, setSeenSectionInstructions] = useState<
@@ -265,6 +273,42 @@ const SectionQuestionPage: React.FC = () => {
     }
   }, [sectionId, questionIndex, assessmentData]);
 
+  // Inactivity watcher: if the student does not interact with the question
+  // for 40 seconds, show a focus reminder popup.
+  useEffect(() => {
+    if (showInactivityWarning) return;
+
+    const resetTimer = () => {
+      if (inactivityTimerRef.current !== null) {
+        window.clearTimeout(inactivityTimerRef.current);
+      }
+      inactivityTimerRef.current = window.setTimeout(() => {
+        setShowInactivityWarning(true);
+      }, 40000);
+    };
+
+    const events: Array<keyof WindowEventMap> = [
+      "mousemove",
+      "mousedown",
+      "keydown",
+      "touchstart",
+      "scroll",
+      "wheel",
+    ];
+    events.forEach((evt) =>
+      window.addEventListener(evt, resetTimer, { passive: true } as any),
+    );
+    resetTimer();
+
+    return () => {
+      if (inactivityTimerRef.current !== null) {
+        window.clearTimeout(inactivityTimerRef.current);
+        inactivityTimerRef.current = null;
+      }
+      events.forEach((evt) => window.removeEventListener(evt, resetTimer));
+    };
+  }, [sectionId, currentIndex, showInactivityWarning]);
+
   // Save answers to DB in background on section transitions (safety net)
   // Only sends if answers have actually changed since last save.
   const prevSectionIdRef = useRef<string | null>(null);
@@ -385,19 +429,19 @@ const SectionQuestionPage: React.FC = () => {
   const getQuestionColor = useCallback(
     (secId: string, questionId: number) => {
       if (answers[secId]?.[questionId]?.length)
-        return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+        return "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)";
       const rankingCount = Object.keys(
         rankingAnswers[secId]?.[questionId] || {},
       ).length;
       if (rankingCount > 0)
-        return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+        return "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)";
       const textCount = Object.values(
         textAnswers[secId]?.[questionId] || {},
       ).filter((t: string) => t.trim()).length;
       if (textCount > 0)
-        return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+        return "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)";
       if (completedGameQuestionIds.has(questionId))
-        return "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+        return "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)";
       if (savedForLater[secId]?.has(questionId))
         return "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)";
       if (skipped[secId]?.has(questionId))
@@ -417,6 +461,52 @@ const SectionQuestionPage: React.FC = () => {
   const qId = question.questionnaireQuestionId;
 
   const selectedOptions = answers[sectionId!]?.[qId] || [];
+
+  // --- Selection rule: derive effectiveMin (required to mark answered) and
+  //     effectiveMax (cap on how many can be selected; 0 = unlimited) from the
+  //     new optionsRule + optionsCount, with a legacy fallback when these are
+  //     unset (defaults minOptionsAllowed = maxOptionsAllowed). ---
+  const currentIsRanking = question.question.questionType === "ranking";
+  const currentIsText =
+    question.question.questionType === "text" ||
+    question.question.isMQTtyped === true;
+
+  const currentSelectionCount = (() => {
+    if (currentIsText) {
+      const texts = textAnswers[sectionId!]?.[qId] || {};
+      return Object.values(texts).filter(
+        (t) => typeof t === "string" && t.trim().length > 0,
+      ).length;
+    }
+    if (currentIsRanking) {
+      return Object.keys(rankingAnswers[sectionId!]?.[qId] || {}).length;
+    }
+    return selectedOptions.length;
+  })();
+
+  const maxOptionsAllowed = question.question.maxOptionsAllowed;
+  const optionsRule = question.question.optionsRule ?? null;
+  const optionsCount =
+    typeof question.question.optionsCount === "number"
+      ? question.question.optionsCount
+      : null;
+
+  const { effectiveMin, effectiveMax } = (() => {
+    if (optionsRule && optionsCount != null && optionsCount > 0) {
+      if (optionsRule === "min") return { effectiveMin: optionsCount, effectiveMax: 0 };
+      if (optionsRule === "max") return { effectiveMin: 1, effectiveMax: optionsCount };
+      return { effectiveMin: optionsCount, effectiveMax: optionsCount }; // equal
+    }
+    // Legacy fallback
+    if (maxOptionsAllowed === 0) return { effectiveMin: 0, effectiveMax: 0 };
+    return {
+      effectiveMin: question.question.minOptionsAllowed ?? maxOptionsAllowed,
+      effectiveMax: maxOptionsAllowed,
+    };
+  })();
+
+  const belowMin = currentSelectionCount < effectiveMin;
+  const remainingToMin = Math.max(effectiveMin - currentSelectionCount, 0);
 
   // Filter languages to only those that have actual translations for the current question
   // Prevents English text from being repeated side-by-side when translations are missing
@@ -572,11 +662,48 @@ const SectionQuestionPage: React.FC = () => {
       ? parseInt(localStorage.getItem("assessmentId")!)
       : null;
 
+    // Defensive dedupe on composite key (questionId, optionId) or
+    // (questionId, textResponse). Multi-select / ranking / text questions
+    // legitimately have multiple entries per questionId — we only strip
+    // exact duplicates of the same pair, which shouldn't happen and would
+    // double-count scores server-side.
+    const seen = new Set<string>();
+    const deduped: any[] = [];
+    for (const a of answersList) {
+      const qId = a?.questionnaireQuestionId;
+      if (qId == null) continue;
+      let key: string;
+      if (typeof a.optionId === "number") {
+        key = `q:${qId}|o:${a.optionId}`;
+      } else if (typeof a.textResponse === "string") {
+        key = `q:${qId}|t:${a.textResponse.trim()}`;
+      } else {
+        continue; // malformed entry
+      }
+      if (seen.has(key)) {
+        // Keep the last occurrence (same policy as backend dedupe)
+        for (let i = deduped.length - 1; i >= 0; i--) {
+          const prev = deduped[i];
+          const prevKey =
+            typeof prev.optionId === "number"
+              ? `q:${prev.questionnaireQuestionId}|o:${prev.optionId}`
+              : `q:${prev.questionnaireQuestionId}|t:${(prev.textResponse || "").trim()}`;
+          if (prevKey === key) {
+            deduped[i] = a;
+            break;
+          }
+        }
+        continue;
+      }
+      seen.add(key);
+      deduped.push(a);
+    }
+
+    // status/persistenceState are server-controlled now — not included in payload.
     const submissionData: Record<string, any> = {
       userStudentId: userStudentId,
       assessmentId: assessmentId,
-      status: "completed",
-      answers: answersList,
+      answers: deduped,
     };
 
     return submissionData;
@@ -593,39 +720,41 @@ const SectionQuestionPage: React.FC = () => {
   const toggleOption = (optionId: number) => {
     const currentSelectedCount = selectedOptions.length;
     const isAlreadySelected = selectedOptions.includes(optionId);
-    const maxAllowed = question.question.maxOptionsAllowed;
 
-    // Determine if this selection will trigger auto-advance
-    // Auto-advance when: adding an option (not removing), and new count equals maxAllowed
-    // When maxAllowed === 0 (no limit set), auto-advance after 1 selection
-    const effectiveMax = maxAllowed === 0 ? 1 : maxAllowed;
-    const willAutoAdvance =
-      !isAlreadySelected &&
-      currentSelectedCount + 1 === effectiveMax;
+    // Auto-advance only when the question becomes unambiguously "answered":
+    //   - "equal" rule: when count + 1 reaches the exact target N
+    //   - legacy (no rule): when count + 1 reaches maxOptionsAllowed (preserves
+    //     existing behaviour, including auto-advancing after 1 selection if
+    //     maxOptionsAllowed === 0)
+    //   - "min" / "max" rules: never auto-advance — the student decides when
+    //     they are done within the constraint.
+    const willAutoAdvance = (() => {
+      if (isAlreadySelected) return false;
+      if (optionsRule === "equal") return currentSelectedCount + 1 === effectiveMax;
+      if (optionsRule === "min" || optionsRule === "max") return false;
+      const legacyTarget = maxOptionsAllowed === 0 ? 1 : maxOptionsAllowed;
+      return currentSelectedCount + 1 === legacyTarget;
+    })();
 
     setAnswers((prev) => {
       const sec = prev[sectionId!] || {};
       const arr = sec[qId] || [];
 
-      // Check if the maximum number of options is already selected
+      // Check if the option is already selected — toggle off
       if (arr.includes(optionId)) {
-        // If the option is already selected, remove it
         const updated = arr.filter((x) => x !== optionId);
         return {
           ...prev,
           [sectionId!]: { ...sec, [qId]: updated },
         };
-      } else if (
-        question.question.maxOptionsAllowed === 0 || // Allow unlimited selection if maxOptionsAllowed is 0
-        arr.length < question.question.maxOptionsAllowed
-      ) {
-        // If the maximum number of options is not reached, add the option
+      } else if (effectiveMax === 0 || arr.length < effectiveMax) {
+        // Either unlimited, or we still have room under the cap
         const updated = [...arr, optionId];
         return {
           ...prev,
           [sectionId!]: { ...sec, [qId]: updated },
         };
-      } else if (question.question.maxOptionsAllowed === 1) {
+      } else if (effectiveMax === 1) {
         // Single-choice: replace the previous selection with the new one
         return {
           ...prev,
@@ -633,7 +762,7 @@ const SectionQuestionPage: React.FC = () => {
         };
       }
 
-      // If the maximum number of options is reached, return the current state
+      // Cap reached — keep current state
       return prev;
     });
 
@@ -666,11 +795,16 @@ const SectionQuestionPage: React.FC = () => {
     // Calculate current rank count before update to determine if we should auto-advance
     const currentRankings = rankingAnswers[sectionId!]?.[qId] || {};
     const currentRankCount = Object.keys(currentRankings).length;
-    const maxAllowed = question.question.maxOptionsAllowed;
 
-    // Will auto-advance if: setting a rank (not removing), and this will reach maxAllowed
+    // Auto-advance only for "equal" rule or legacy (where the cap doubles as
+    // the target). For "min" / "max" rules, the student decides when done.
     const isAddingRank = rank !== null && !currentRankings[optionId];
-    const willAutoAdvance = isAddingRank && currentRankCount + 1 === maxAllowed;
+    const willAutoAdvance = (() => {
+      if (!isAddingRank) return false;
+      if (optionsRule === "equal") return currentRankCount + 1 === effectiveMax;
+      if (optionsRule === "min" || optionsRule === "max") return false;
+      return currentRankCount + 1 === maxOptionsAllowed;
+    })();
 
     setRankingAnswers((prev) => {
       const sec = prev[sectionId!] || {};
@@ -730,7 +864,14 @@ const SectionQuestionPage: React.FC = () => {
         .map(([, rank]) => rank),
     );
 
-    const maxRanks = question.question.maxOptionsAllowed;
+    // Number of rank slots: prefer the cap from the rule; "min" rule allows
+    // ranking up to the number of options. Falls back to legacy maxOptionsAllowed.
+    const totalOptions = (question.question.options || []).length;
+    const maxRanks = (() => {
+      if (optionsRule === "equal" || optionsRule === "max") return effectiveMax;
+      if (optionsRule === "min") return totalOptions;
+      return question.question.maxOptionsAllowed || totalOptions;
+    })();
     const availableRanks: number[] = [];
 
     for (let i = 1; i <= maxRanks; i++) {
@@ -1091,12 +1232,11 @@ const SectionQuestionPage: React.FC = () => {
     return (
       <div
         style={{
-          fontSize: "0.85rem",
-          color: "#9ca3af",
-          marginTop: "4px",
-          lineHeight: "1.4",
+          fontSize: "0.95rem",
+          color: "#475569",
+          marginTop: "6px",
+          lineHeight: "1.55",
           fontWeight: 400,
-          fontStyle: "italic",
         }}
       >
         {opt.optionDescription}
@@ -1189,7 +1329,7 @@ const SectionQuestionPage: React.FC = () => {
         display: "flex",
         height: "100dvh",
         minHeight: "100vh",
-        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        background: "linear-gradient(135deg, #0f172a 0%, #1a2238 50%, #1e293b 100%)",
         colorScheme: "light",
         overflow: "hidden",
       }}
@@ -1261,7 +1401,7 @@ const SectionQuestionPage: React.FC = () => {
                     style={{
                       fontSize: "0.85rem",
                       fontWeight: 600,
-                      color: "#667eea",
+                      color: "#5DD68D",
                       marginBottom: "6px",
                     }}
                   >
@@ -1286,7 +1426,7 @@ const SectionQuestionPage: React.FC = () => {
                 onClick={() => setShowSectionInstruction(false)}
                 style={{
                   background:
-                    "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                    "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
                   color: "#fff",
                   border: "none",
                   borderRadius: "8px",
@@ -1311,7 +1451,7 @@ const SectionQuestionPage: React.FC = () => {
             borderBottom: "2px solid #e2e8f0",
             padding: "16px 20px",
             background:
-              "linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%)",
+              "linear-gradient(135deg, rgba(15, 23, 42, 0.08) 0%, rgba(30, 41, 59, 0.08) 100%)",
           }}
         >
           {/* KCC Logo */}
@@ -1346,7 +1486,7 @@ const SectionQuestionPage: React.FC = () => {
               style={{
                 width: "6px",
                 height: "18px",
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                background: "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
                 borderRadius: "3px",
               }}
             />
@@ -1366,9 +1506,9 @@ const SectionQuestionPage: React.FC = () => {
                   height: 14,
                   borderRadius: "50%",
                   background:
-                    "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                    "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
                   flexShrink: 0,
-                  boxShadow: "0 2px 6px rgba(102, 126, 234, 0.4)",
+                  boxShadow: "0 2px 6px rgba(93, 214, 141, 0.4)",
                 }}
               />
               <span
@@ -1466,7 +1606,7 @@ const SectionQuestionPage: React.FC = () => {
               style={{
                 width: "6px",
                 height: "20px",
-                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                background: "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
                 borderRadius: "3px",
               }}
             />
@@ -1481,9 +1621,9 @@ const SectionQuestionPage: React.FC = () => {
                   color: "#4a5568",
                   marginBottom: "10px",
                   padding: "6px 12px",
-                  background: "rgba(102, 126, 234, 0.08)",
+                  background: "rgba(93, 214, 141, 0.08)",
                   borderRadius: "8px",
-                  borderLeft: "3px solid #667eea",
+                  borderLeft: "3px solid #5DD68D",
                 }}
               >
                 {sec.section.sectionName}
@@ -1535,14 +1675,14 @@ const SectionQuestionPage: React.FC = () => {
               <span
                 style={{
                   background:
-                    "linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%)",
-                  color: "#667eea",
+                    "linear-gradient(135deg, rgba(93, 214, 141, 0.15) 0%, rgba(63, 184, 118, 0.15) 100%)",
+                  color: "#5DD68D",
                   padding: "8px 20px",
                   borderRadius: "30px",
                   fontSize: "0.9rem",
                   fontWeight: 600,
                   display: "inline-block",
-                  border: "1px solid rgba(102, 126, 234, 0.3)",
+                  border: "1px solid rgba(93, 214, 141, 0.3)",
                 }}
               >
                 {currentSection?.section?.sectionName}
@@ -1565,13 +1705,13 @@ const SectionQuestionPage: React.FC = () => {
                   <div
                     style={{
                       background:
-                        "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                        "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
                       padding: "8px 18px",
                       borderRadius: "30px",
                       fontWeight: 700,
                       fontSize: "0.9rem",
                       color: "white",
-                      boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)",
+                      boxShadow: "0 4px 15px rgba(93, 214, 141, 0.4)",
                     }}
                   >
                     ⏱️ {formatTime(elapsedTime)}
@@ -1580,18 +1720,26 @@ const SectionQuestionPage: React.FC = () => {
                 {isLastQuestionOfLastSection() && (
                   <button
                     onClick={handleSubmitAssessment}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || belowMin}
+                    title={
+                      belowMin
+                        ? `Select ${remainingToMin} more option${remainingToMin === 1 ? "" : "s"} to continue`
+                        : undefined
+                    }
                     style={{
-                      background:
-                        "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
-                      color: "white",
+                      background: belowMin
+                        ? "#e2e8f0"
+                        : "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)",
+                      color: belowMin ? "#9ca3af" : "white",
                       border: "none",
                       borderRadius: "30px",
                       padding: "8px 20px",
                       fontWeight: 700,
                       fontSize: "0.9rem",
-                      cursor: isSubmitting ? "not-allowed" : "pointer",
-                      boxShadow: "0 4px 15px rgba(34, 197, 94, 0.4)",
+                      cursor: isSubmitting || belowMin ? "not-allowed" : "pointer",
+                      boxShadow: belowMin
+                        ? "none"
+                        : "0 4px 15px rgba(34, 197, 94, 0.4)",
                       transition: "all 0.2s ease",
                       opacity: isSubmitting ? 0.7 : 1,
                       whiteSpace: "nowrap",
@@ -1696,7 +1844,7 @@ const SectionQuestionPage: React.FC = () => {
                       onClick={goToFirstUnanswered}
                       style={{
                         background:
-                          "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                          "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
                         color: "#fff",
                         border: "none",
                         borderRadius: "10px",
@@ -1704,10 +1852,104 @@ const SectionQuestionPage: React.FC = () => {
                         fontWeight: 600,
                         fontSize: "0.95rem",
                         cursor: "pointer",
-                        boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)",
+                        boxShadow: "0 4px 15px rgba(93, 214, 141, 0.4)",
                       }}
                     >
                       Continue →
+                    </button>
+                  </div>
+                </div>
+              </div>
+            , document.body)}
+
+            {/* Inactivity Reminder Popup - portaled to body for mobile compatibility */}
+            {showInactivityWarning && createPortal(
+              <div
+                style={{
+                  position: "fixed",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: "rgba(0, 0, 0, 0.5)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 9999,
+                }}
+                onClick={() => setShowInactivityWarning(false)}
+              >
+                <div
+                  style={{
+                    background: "#fff",
+                    borderRadius: "16px",
+                    padding: "32px 36px",
+                    maxWidth: "440px",
+                    width: "90%",
+                    textAlign: "center",
+                    boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+                    color: "#2d3748",
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div
+                    style={{
+                      width: "60px",
+                      height: "60px",
+                      borderRadius: "50%",
+                      background:
+                        "linear-gradient(135deg, #06b6d4 0%, #0e7490 100%)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      margin: "0 auto 16px",
+                      fontSize: "1.8rem",
+                    }}
+                  >
+                    👀
+                  </div>
+                  <h5
+                    style={{
+                      fontWeight: 700,
+                      marginBottom: "12px",
+                      color: "#1a202c",
+                      fontSize: "1.2rem",
+                    }}
+                  >
+                    Please focus!
+                  </h5>
+                  <p
+                    style={{
+                      color: "#6b7280",
+                      fontSize: "0.95rem",
+                      lineHeight: 1.6,
+                      marginBottom: "24px",
+                    }}
+                  >
+                    In case you need help please talk to supervising adult.
+                  </p>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <button
+                      onClick={() => setShowInactivityWarning(false)}
+                      style={{
+                        background:
+                          "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: "10px",
+                        padding: "10px 28px",
+                        fontWeight: 600,
+                        fontSize: "0.95rem",
+                        cursor: "pointer",
+                        boxShadow: "0 4px 15px rgba(15, 23, 42, 0.3)",
+                      }}
+                    >
+                      Continue
                     </button>
                   </div>
                 </div>
@@ -1885,7 +2127,7 @@ const SectionQuestionPage: React.FC = () => {
               </h4>
             )}
 
-            {/* Display maxOptionsAllowed */}
+            {/* Display selection-rule hint */}
             <div className="text-muted mb-3">
               <small
                 style={{
@@ -1894,22 +2136,51 @@ const SectionQuestionPage: React.FC = () => {
                   fontWeight: 500,
                 }}
               >
-                {question.question.questionType === "text" ||
-                question.question.isMQTtyped === true ? (
-                  <>
-                    Please type your response(s) below. You can enter up to{" "}
-                    <strong>{question.question.maxOptionsAllowed || 1}</strong>{" "}
-                    response(s).
-                  </>
-                ) : question.question.questionType === "ranking" ? (
-                  <>
-                    Please rank{" "}
-                    <strong>{question.question.maxOptionsAllowed}</strong>{" "}
-                    option(s) in order of preference (1 = most important).
-                  </>
-                ) : (
-                  <></>
-                )}
+                {(() => {
+                  // Phrasing differs by rule. For "min" we say "at least N",
+                  // for "max" we say "up to N", for "equal"/legacy "exactly N".
+                  const verb = currentIsText
+                    ? "type"
+                    : currentIsRanking
+                      ? "rank"
+                      : "select";
+                  const noun = currentIsText
+                    ? "response(s)"
+                    : "option(s)";
+                  const trailing = currentIsRanking
+                    ? " in order of preference (1 = most important)"
+                    : currentIsText
+                      ? " below"
+                      : " to continue";
+                  if (optionsRule === "min" && effectiveMin > 0) {
+                    return (
+                      <>
+                        Please {verb} at least <strong>{effectiveMin}</strong>{" "}
+                        {noun}{trailing}.
+                      </>
+                    );
+                  }
+                  if (optionsRule === "max" && effectiveMax > 0) {
+                    return (
+                      <>
+                        You can {verb} up to <strong>{effectiveMax}</strong>{" "}
+                        {noun}{trailing}.
+                      </>
+                    );
+                  }
+                  // equal or legacy
+                  const exact = effectiveMin || question.question.maxOptionsAllowed;
+                  if (exact > 0) {
+                    return (
+                      <>
+                        Please {verb} exactly <strong>{exact}</strong>{" "}
+                        {noun}{trailing}.
+                      </>
+                    );
+                  }
+                  if (currentIsText) return <>Please type your response(s) below.</>;
+                  return <></>;
+                })()}
               </small>
             </div>
 
@@ -1924,7 +2195,14 @@ const SectionQuestionPage: React.FC = () => {
 
                 // Text-type or isMQT question: render text input boxes with autocomplete
                 if (isTextQuestion) {
-                  const maxInputs = question.question.maxOptionsAllowed || 1;
+                  // Number of text-input boxes to render. Prefer the cap from
+                  // the rule; for "min" rule (no cap) use the required count.
+                  const maxInputs =
+                    effectiveMax > 0
+                      ? effectiveMax
+                      : effectiveMin > 0
+                        ? effectiveMin
+                        : question.question.maxOptionsAllowed || 1;
                   const currentTexts = textAnswers[sectionId!]?.[qId] || {};
 
                   const handleTextInput = (inputIdx: number, value: string) => {
@@ -2389,10 +2667,12 @@ const SectionQuestionPage: React.FC = () => {
                           checked={selectedOptions.includes(opt.optionId)}
                           onChange={() => toggleOption(opt.optionId)}
                           disabled={
-                            question.question.maxOptionsAllowed > 0 &&
+                            // effectiveMax === 0 means unlimited (e.g. "min" rule)
+                            // — never disable. Otherwise disable un-checked
+                            // boxes once the cap is reached.
+                            effectiveMax > 1 &&
                             !selectedOptions.includes(opt.optionId) &&
-                            selectedOptions.length >=
-                              question.question.maxOptionsAllowed
+                            selectedOptions.length >= effectiveMax
                           }
                         />
                         <div style={{ flex: 1 }}>
@@ -2516,29 +2796,47 @@ const SectionQuestionPage: React.FC = () => {
                   </button>
                 )} */}
                 {!isLastQuestionOfLastSection() && (
-                <button
-                  onClick={goNext}
-                  style={{
-                    background: currentIndex === questions.length - 1
-                      ? "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)"
-                      : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                    color: "white",
-                    border: "none",
-                    borderRadius: "12px",
-                    padding: "12px 32px",
-                    fontWeight: 600,
-                    fontSize: "0.95rem",
-                    cursor: "pointer",
-                    boxShadow: currentIndex === questions.length - 1
-                      ? "0 4px 15px rgba(14, 165, 233, 0.4)"
-                      : "0 4px 15px rgba(102, 126, 234, 0.4)",
-                    transition: "all 0.2s ease",
-                  }}
-                >
-                  {currentIndex === questions.length - 1
-                    ? "NEXT SECTION →"
-                    : "NEXT →"}
-                </button>
+                <div className="d-flex flex-column align-items-end gap-2">
+                  {belowMin && (
+                    <small
+                      style={{
+                        color: "#b91c1c",
+                        fontSize: "0.8rem",
+                        fontWeight: 500,
+                      }}
+                    >
+                      Select {remainingToMin} more option{remainingToMin === 1 ? "" : "s"} to continue
+                    </small>
+                  )}
+                  <button
+                    onClick={goNext}
+                    disabled={belowMin}
+                    style={{
+                      background: belowMin
+                        ? "#e2e8f0"
+                        : currentIndex === questions.length - 1
+                          ? "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)"
+                          : "linear-gradient(135deg, #5DD68D 0%, #3FB876 100%)",
+                      color: belowMin ? "#9ca3af" : "white",
+                      border: "none",
+                      borderRadius: "12px",
+                      padding: "12px 32px",
+                      fontWeight: 600,
+                      fontSize: "0.95rem",
+                      cursor: belowMin ? "not-allowed" : "pointer",
+                      boxShadow: belowMin
+                        ? "none"
+                        : currentIndex === questions.length - 1
+                          ? "0 4px 15px rgba(14, 165, 233, 0.4)"
+                          : "0 4px 15px rgba(93, 214, 141, 0.4)",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    {currentIndex === questions.length - 1
+                      ? "NEXT SECTION →"
+                      : "NEXT →"}
+                  </button>
+                </div>
                 )}
             </div>
           </div>

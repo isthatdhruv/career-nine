@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useReducer, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { showErrorToast, showSuccessToast } from '../../utils/toast';
+import PageHeader from "../../components/PageHeader";
+import { ActionIcon } from "../../components/ActionIcon";
 import { ReadCollegeList, GetSessionsByInstituteCode } from "../College/API/College_APIs";
 import {
   getStudentsWithMappingByInstituteId,
@@ -51,6 +53,7 @@ type Student = {
   username?: string;
   email?: string;
   schoolSectionId?: number;
+  gender?: string;
   assessments?: StudentAssessmentInfo[];
   assignedAssessmentIds: number[];
 };
@@ -161,8 +164,8 @@ export default function GroupStudentPage() {
   const setShowDemographicsModal = (v: boolean) => v ? undefined : closeModal();
 
   // ── Filter state (consolidated into one object) ──
-  type FilterSet = { assessmentIds: Set<number>; sessions: Set<string>; grades: Set<string>; sections: Set<string>; statuses: Set<string>; enabled: Set<string>; };
-  const emptyFilters = (): FilterSet => ({ assessmentIds: new Set(), sessions: new Set(), grades: new Set(), sections: new Set(), statuses: new Set(), enabled: new Set() });
+  type FilterSet = { assessmentIds: Set<number>; sessions: Set<string>; grades: Set<string>; sections: Set<string>; statuses: Set<string>; genders: Set<string>; enabled: Set<string>; };
+  const emptyFilters = (): FilterSet => ({ assessmentIds: new Set(), sessions: new Set(), grades: new Set(), sections: new Set(), statuses: new Set(), genders: new Set(), enabled: new Set() });
   const [pending, setPending] = useState<FilterSet>(emptyFilters());
   const [applied, setApplied] = useState<FilterSet>(emptyFilters());
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -175,12 +178,14 @@ export default function GroupStudentPage() {
   const pendingGrades = pending.grades;
   const pendingSections = pending.sections;
   const pendingStatuses = pending.statuses;
+  const pendingGenders = pending.genders;
   const pendingEnabled = pending.enabled;
   const appliedAssessmentIds = applied.assessmentIds;
   const appliedSessions = applied.sessions;
   const appliedGrades = applied.grades;
   const appliedSections = applied.sections;
   const appliedStatuses = applied.statuses;
+  const appliedGenders = applied.genders;
   const appliedEnabled = applied.enabled;
 
   // Setter helpers for filters
@@ -189,12 +194,14 @@ export default function GroupStudentPage() {
   const setPendingGrades = (v: Set<string> | ((p: Set<string>) => Set<string>)) => setPending((p) => ({ ...p, grades: typeof v === "function" ? v(p.grades) : v }));
   const setPendingSections = (v: Set<string> | ((p: Set<string>) => Set<string>)) => setPending((p) => ({ ...p, sections: typeof v === "function" ? v(p.sections) : v }));
   const setPendingStatuses = (v: Set<string> | ((p: Set<string>) => Set<string>)) => setPending((p) => ({ ...p, statuses: typeof v === "function" ? v(p.statuses) : v }));
+  const setPendingGenders = (v: Set<string> | ((p: Set<string>) => Set<string>)) => setPending((p) => ({ ...p, genders: typeof v === "function" ? v(p.genders) : v }));
   const setPendingEnabled = (v: Set<string> | ((p: Set<string>) => Set<string>)) => setPending((p) => ({ ...p, enabled: typeof v === "function" ? v(p.enabled) : v }));
   const setAppliedAssessmentIds = (v: Set<number>) => setApplied((a) => ({ ...a, assessmentIds: v }));
   const setAppliedSessions = (v: Set<string>) => setApplied((a) => ({ ...a, sessions: v }));
   const setAppliedGrades = (v: Set<string>) => setApplied((a) => ({ ...a, grades: v }));
   const setAppliedSections = (v: Set<string>) => setApplied((a) => ({ ...a, sections: v }));
   const setAppliedStatuses = (v: Set<string>) => setApplied((a) => ({ ...a, statuses: v }));
+  const setAppliedGenders = (v: Set<string>) => setApplied((a) => ({ ...a, genders: v }));
   const setAppliedEnabled = (v: Set<string>) => setApplied((a) => ({ ...a, enabled: v }));
 
   const normalizeAnswers = (data: any): StudentAnswerDetail[] => {
@@ -326,6 +333,8 @@ export default function GroupStudentPage() {
   const hasAssessmentFilter = appliedEnabled.has("assessment") && appliedAssessmentIds.size > 0;
   // Whether status filter is active
   const hasStatusFilter = appliedEnabled.has("status") && appliedStatuses.size > 0;
+  // Whether gender filter is active
+  const hasGenderFilter = appliedEnabled.has("gender") && appliedGenders.size > 0;
 
   // Status filter options
   const statusOptions = [
@@ -358,8 +367,11 @@ export default function GroupStudentPage() {
         .map(so => so.label);
       parts.push(labels.length === 1 ? labels[0] : `${labels.length} statuses`);
     }
+    if (hasGenderFilter) {
+      parts.push(appliedGenders.size === 1 ? Array.from(appliedGenders)[0] : `${appliedGenders.size} genders`);
+    }
     return parts.join(', ');
-  }, [hasAssessmentFilter, appliedAssessmentIds, appliedEnabled, appliedSessions, appliedGrades, appliedSections, hasStatusFilter, appliedStatuses, assessments]);
+  }, [hasAssessmentFilter, appliedAssessmentIds, appliedEnabled, appliedSessions, appliedGrades, appliedSections, hasStatusFilter, appliedStatuses, hasGenderFilter, appliedGenders, assessments]);
 
   const isFiltered = activeFilterLabel.length > 0;
 
@@ -426,6 +438,7 @@ export default function GroupStudentPage() {
             username: student.username || "",
             email: student.email || "",
             schoolSectionId: student.schoolSectionId ?? undefined,
+            gender: student.gender || "",
             assessments: student.assessments || [],
             assignedAssessmentIds: assignedIds,
           };
@@ -552,6 +565,7 @@ export default function GroupStudentPage() {
             username: student.username || "",
             email: student.email || "",
             schoolSectionId: student.schoolSectionId ?? undefined,
+            gender: student.gender || "",
             assessments: student.assessments || [],
             assignedAssessmentIds: assignedIds,
           };
@@ -637,6 +651,7 @@ export default function GroupStudentPage() {
               username: student.username || "",
               email: student.email || "",
               schoolSectionId: student.schoolSectionId ?? undefined,
+              gender: student.gender || "",
               assessments: student.assessments || [],
               assignedAssessmentIds: assignedIds,
             };
@@ -649,6 +664,16 @@ export default function GroupStudentPage() {
         .finally(() => setLoading(false));
     }
   }, [selectedInstitute]);
+
+  // Distinct gender values present in the loaded students
+  const allGenders = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of students) {
+      const g = (s.gender || "").trim();
+      if (g) set.add(g);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [students]);
 
   // Set of active assessment IDs — memoized
   const activeAssessmentIds = useMemo(() => new Set(assessments.map((a) => a.id)), [assessments]);
@@ -715,9 +740,16 @@ export default function GroupStudentPage() {
         }
       }
 
-      return matchesQuery && matchesSection && matchesAssessment && matchesStatus;
+      // Gender filter
+      let matchesGender = true;
+      if (hasGenderFilter) {
+        const g = (s.gender || "").trim();
+        matchesGender = g.length > 0 && appliedGenders.has(g);
+      }
+
+      return matchesQuery && matchesSection && matchesAssessment && matchesStatus && matchesGender;
     });
-  }, [students, query, filteredSectionIds, hasAssessmentFilter, appliedAssessmentIds, hasStatusFilter, appliedStatuses, activeAssessmentIds]);
+  }, [students, query, filteredSectionIds, hasAssessmentFilter, appliedAssessmentIds, hasStatusFilter, appliedStatuses, hasGenderFilter, appliedGenders, activeAssessmentIds]);
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(filteredStudents.length / pageSize));
@@ -729,7 +761,7 @@ export default function GroupStudentPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [query, filteredSectionIds, appliedAssessmentIds, appliedStatuses]);
+  }, [query, filteredSectionIds, appliedAssessmentIds, appliedStatuses, appliedGenders]);
 
   const getSelectedInstituteName = () => {
     const institute = institutes.find(
@@ -1295,13 +1327,26 @@ export default function GroupStudentPage() {
   };
 
   return (
-    <div
-      className="min-vh-100"
-      style={{
-        background: "linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%)",
-        padding: "1rem 1.25rem",
-      }}
-    >
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className="bi bi-people" />}
+        title="Group Students"
+        subtitle={
+          selectedInstitute ? (
+            <>
+              <strong>{students.length}</strong> student{students.length === 1 ? "" : "s"} ·{" "}
+              {getSelectedInstituteName()}
+            </>
+          ) : (
+            "Select an institute to manage student assessments"
+          )
+        }
+      />
+      <div
+        style={{
+          padding: "0",
+        }}
+      >
       <style>{`
         .form-select-custom {
           width: 100%;
@@ -1361,7 +1406,7 @@ export default function GroupStudentPage() {
             }
           }}
         >
-          <option value="">🏫 Select Institute</option>
+          <option value="">Select Institute</option>
           {institutes.map((inst) => (
             <option key={inst.instituteCode} value={inst.instituteCode}>
               {inst.instituteName}
@@ -1424,7 +1469,7 @@ export default function GroupStudentPage() {
                 fontSize: "0.9rem",
               }}
             >
-              <i className="bi bi-funnel-fill"></i>
+              <ActionIcon type="filter" size="sm" />
               Filters
               {isFiltered && (
                 <span
@@ -1446,7 +1491,8 @@ export default function GroupStudentPage() {
                     + (appliedEnabled.has("session") && appliedSessions.size > 0 ? 1 : 0)
                     + (appliedEnabled.has("grade") && appliedGrades.size > 0 ? 1 : 0)
                     + (appliedEnabled.has("section") && appliedSections.size > 0 ? 1 : 0)
-                    + (hasStatusFilter ? 1 : 0)}
+                    + (hasStatusFilter ? 1 : 0)
+                    + (hasGenderFilter ? 1 : 0)}
                 </span>
               )}
             </button>
@@ -1482,6 +1528,11 @@ export default function GroupStudentPage() {
                       {st === "notstarted" ? "Not Started" : st === "ongoing" ? "In Progress" : "Completed"}
                     </span>
                   ))}
+                  {hasGenderFilter && Array.from(appliedGenders).map(g => (
+                    <span key={g} style={{ background: "rgba(6, 182, 212, 0.1)", color: "#0891b2", padding: "4px 12px", borderRadius: "16px", fontSize: "0.8rem", fontWeight: 600 }}>
+                      {g}
+                    </span>
+                  ))}
                 </div>
                 <button
                   className="btn btn-sm d-flex align-items-center gap-1"
@@ -1492,12 +1543,14 @@ export default function GroupStudentPage() {
                     setAppliedGrades(new Set());
                     setAppliedSections(new Set());
                     setAppliedStatuses(new Set());
+                    setAppliedGenders(new Set());
                     setPendingEnabled(new Set());
                     setPendingAssessmentIds(new Set());
                     setPendingSessions(new Set());
                     setPendingGrades(new Set());
                     setPendingSections(new Set());
                     setPendingStatuses(new Set());
+                    setPendingGenders(new Set());
                   }}
                   style={{
                     background: "rgba(241, 65, 108, 0.1)",
@@ -1509,7 +1562,7 @@ export default function GroupStudentPage() {
                     fontSize: "0.85rem",
                   }}
                 >
-                  <i className="bi bi-x-circle"></i>
+                  <ActionIcon type="reject" size="sm" />
                   Clear All
                 </button>
               </>
@@ -1540,7 +1593,7 @@ export default function GroupStudentPage() {
                   onClick={() => setShowFilterPanel(false)}
                   style={{ color: "#fff", background: "rgba(255,255,255,0.2)", border: "none", borderRadius: "8px", padding: "4px 10px" }}
                 >
-                  <i className="bi bi-x fs-5"></i>
+                  <ActionIcon type="reject" size="sm" />
                 </button>
               </div>
               <div style={{ display: "flex", minHeight: "300px" }}>
@@ -1552,6 +1605,7 @@ export default function GroupStudentPage() {
                     { key: "grade", label: "Grade / Class", icon: "bi-mortarboard" },
                     { key: "section", label: "Section", icon: "bi-diagram-3" },
                     { key: "status", label: "Assessment Status", icon: "bi-check2-circle" },
+                    { key: "gender", label: "Gender", icon: "bi-person-fill" },
                   ].map((cat) => (
                     <div
                       key={cat.key}
@@ -1608,7 +1662,8 @@ export default function GroupStudentPage() {
                             : cat.key === "session" ? pendingSessions.size
                             : cat.key === "grade" ? pendingGrades.size
                             : cat.key === "section" ? pendingSections.size
-                            : pendingStatuses.size}
+                            : cat.key === "status" ? pendingStatuses.size
+                            : pendingGenders.size}
                         </span>
                       )}
                     </div>
@@ -1864,6 +1919,51 @@ export default function GroupStudentPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Gender options */}
+                  {activeFilterCategory === "gender" && pendingEnabled.has("gender") && (
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                        <span style={{ fontWeight: 700, color: "#1a1a2e" }}>Select Gender</span>
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => {
+                            if (pendingGenders.size === allGenders.length) {
+                              setPendingGenders(new Set());
+                            } else {
+                              setPendingGenders(new Set(allGenders));
+                            }
+                          }}
+                          style={{ background: "rgba(67, 97, 238, 0.1)", color: "#4361ee", border: "none", borderRadius: "8px", padding: "4px 12px", fontWeight: 600, fontSize: "0.8rem" }}
+                        >
+                          {pendingGenders.size === allGenders.length && allGenders.length > 0 ? 'Deselect All' : 'Select All'}
+                        </button>
+                      </div>
+                      <div style={{ maxHeight: "220px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "4px" }}>
+                        {allGenders.map((g) => (
+                          <label key={g} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "8px 12px", borderRadius: "8px", cursor: "pointer", background: pendingGenders.has(g) ? "rgba(6, 182, 212, 0.08)" : "transparent" }}>
+                            <input
+                              type="checkbox"
+                              className="custom-checkbox"
+                              style={{ width: "18px", height: "18px" }}
+                              checked={pendingGenders.has(g)}
+                              onChange={() => {
+                                const next = new Set(Array.from(pendingGenders));
+                                if (next.has(g)) next.delete(g); else next.add(g);
+                                setPendingGenders(next);
+                              }}
+                            />
+                            <span style={{ fontWeight: 500, color: "#333" }}>{g}</span>
+                          </label>
+                        ))}
+                        {allGenders.length === 0 && (
+                          <div style={{ textAlign: "center", color: "#999", padding: "20px" }}>
+                            No gender data available for the loaded students
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1887,6 +1987,7 @@ export default function GroupStudentPage() {
                     setPendingGrades(new Set());
                     setPendingSections(new Set());
                     setPendingStatuses(new Set());
+                    setPendingGenders(new Set());
                   }}
                   style={{
                     background: "#f5f5f5",
@@ -1908,6 +2009,7 @@ export default function GroupStudentPage() {
                     setAppliedGrades(new Set(Array.from(pendingGrades)));
                     setAppliedSections(new Set(Array.from(pendingSections)));
                     setAppliedStatuses(new Set(Array.from(pendingStatuses)));
+                    setAppliedGenders(new Set(Array.from(pendingGenders)));
                     setShowFilterPanel(false);
                   }}
                   style={{
@@ -2002,7 +2104,7 @@ export default function GroupStudentPage() {
                       transition: "all 0.3s ease",
                     }}
                   >
-                    <i className="bi bi-download"></i>
+                    <ActionIcon type="download" size="sm" />
                     Student List
                   </button>
                   <button
@@ -2023,7 +2125,7 @@ export default function GroupStudentPage() {
                       transition: "all 0.3s ease",
                     }}
                   >
-                    <i className="bi bi-file-earmark-spreadsheet"></i>
+                    <ActionIcon type="excel" size="sm" />
                     Download All Answers
                   </button>
                   <button
@@ -2405,7 +2507,7 @@ export default function GroupStudentPage() {
                                   whiteSpace: "nowrap",
                                 }}
                               >
-                                <i className="bi bi-pencil-square"></i>
+                                <ActionIcon type="edit" size="sm" />
                                 Edit
                               </button>
                               <button
@@ -2532,7 +2634,7 @@ export default function GroupStudentPage() {
                       </>
                     ) : (
                       <>
-                        <i className="bi bi-check2-circle"></i>
+                        <ActionIcon type="approve" size="sm" />
                         Save Changes
                       </>
                     )}
@@ -2749,7 +2851,7 @@ export default function GroupStudentPage() {
                             border: "1px solid rgba(67, 97, 238, 0.2)",
                           }}
                         >
-                          <i className="bi bi-download"></i>
+                          <ActionIcon type="download" size="sm" />
                           Answers
                         </button>
                         <button
@@ -2799,7 +2901,7 @@ export default function GroupStudentPage() {
                             border: `1px solid ${assessment.status === "notstarted" ? "#e2e8f0" : "rgba(245, 158, 11, 0.2)"}`,
                           }}
                         >
-                          <i className="bi bi-arrow-counterclockwise"></i>
+                          <ActionIcon type="refresh" size="sm" />
                           Reset
                         </button>
 
@@ -2826,7 +2928,7 @@ export default function GroupStudentPage() {
                                   border: "none",
                                 }}
                               >
-                                <i className="bi bi-eye"></i>
+                                <ActionIcon type="view" size="sm" />
                                 View Report
                               </button>
                             ) : (
@@ -2865,7 +2967,7 @@ export default function GroupStudentPage() {
                                   border: `1px solid ${isGenerating ? "#e2e8f0" : "rgba(16, 185, 129, 0.2)"}`,
                                 }}
                               >
-                                <i className={isGenerating ? "bi bi-hourglass-split" : "bi bi-file-earmark-arrow-down"}></i>
+                                {isGenerating ? <i className="bi bi-hourglass-split"></i> : <ActionIcon type="download" size="sm" />}
                                 {isGenerating ? "Generating..." : "Generate"}
                               </button>
                             )}
@@ -2906,7 +3008,7 @@ export default function GroupStudentPage() {
                                 border: `1px solid ${isGenerating ? "#e2e8f0" : "rgba(245, 158, 11, 0.2)"}`,
                               }}
                             >
-                              <i className="bi bi-arrow-clockwise"></i>
+                              <ActionIcon type="refresh" size="sm" />
                               Regenerate
                             </button>
 
@@ -2947,7 +3049,7 @@ export default function GroupStudentPage() {
                                   border: "1px solid rgba(100, 116, 139, 0.2)",
                                 }}
                               >
-                                <i className="bi bi-envelope"></i>
+                                <ActionIcon type="send" size="sm" />
                                 Email
                               </button>
                               </>
@@ -3052,7 +3154,15 @@ export default function GroupStudentPage() {
                 </div>
               ) : (
                 <div className="d-flex flex-column gap-2">
-                  {demographicsData.map((field: any) => (
+                  {demographicsData.map((field: any) => {
+                    const opts = Array.isArray(field.options) ? field.options : [];
+                    const matched = field.currentValue != null && field.currentValue !== ""
+                      ? opts.find((o: any) => String(o.optionValue) === String(field.currentValue))
+                      : null;
+                    const displayValue = matched
+                      ? (matched.optionLabel ?? matched.optionValue ?? field.currentValue)
+                      : field.currentValue;
+                    return (
                     <div
                       key={field.fieldId}
                       className="p-3"
@@ -3072,9 +3182,9 @@ export default function GroupStudentPage() {
                           </div>
                           <div
                             className="mt-1 fw-semibold"
-                            style={{ fontSize: "0.95rem", color: field.currentValue ? "#1a1a2e" : "#a0aec0" }}
+                            style={{ fontSize: "0.95rem", color: displayValue ? "#1a1a2e" : "#a0aec0" }}
                           >
-                            {field.currentValue || "Not provided"}
+                            {displayValue || "Not provided"}
                           </div>
                         </div>
                         {field.isMandatory && (
@@ -3093,7 +3203,8 @@ export default function GroupStudentPage() {
                         )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -3485,7 +3596,7 @@ export default function GroupStudentPage() {
                       </>
                     ) : (
                       <>
-                        <i className="bi bi-download me-2"></i>
+                        <ActionIcon type="download" size="sm" className="me-2" />
                         Download Excel
                       </>
                     )}
@@ -3975,7 +4086,7 @@ export default function GroupStudentPage() {
                       </>
                     ) : (
                       <>
-                        <i className="bi bi-download me-2"></i>
+                        <ActionIcon type="download" size="sm" className="me-2" />
                         Download Excel ({pivotedBulkData.rows.length} students)
                       </>
                     )}
@@ -4359,7 +4470,7 @@ export default function GroupStudentPage() {
                     fontWeight: 600,
                   }}
                 >
-                  {sendingEmail ? <><span className="spinner-border spinner-border-sm me-2" />Sending...</> : <><i className="bi bi-send me-1"></i>Send</>}
+                  {sendingEmail ? <><span className="spinner-border spinner-border-sm me-2" />Sending...</> : <><ActionIcon type="send" size="sm" className="me-1" />Send</>}
                 </button>
               </div>
             </div>
@@ -4507,7 +4618,7 @@ export default function GroupStudentPage() {
                   </>
                 ) : (
                   <>
-                    <i className="bi bi-check-lg me-1"></i>
+                    <ActionIcon type="approve" size="sm" className="me-1" />
                     Save Changes
                   </>
                 )}
@@ -4516,6 +4627,7 @@ export default function GroupStudentPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

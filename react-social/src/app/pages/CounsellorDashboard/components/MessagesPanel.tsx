@@ -1,40 +1,30 @@
 import React from 'react'
-import { showSuccessToast } from '../../../utils/toast'
-
-const DEMO_MESSAGES = [
-  { from: 'Principal', body: 'Please prepare the career guidance report for Grade 10 by end of this week. Board review meeting on Monday.', time: '2 hours ago', unread: true },
-  { from: 'Class Teacher - 9B', body: 'Vikram Singh has been absent for 3 days. His parents mentioned he is anxious about upcoming assessments. Could you schedule a session?', time: '1 day ago', unread: true },
-  { from: 'Parent - Priya Patel', body: 'Thank you for the career counselling session last week. Priya is very excited about the Science stream now.', time: '3 days ago', unread: false },
-]
 
 const MessagesPanel: React.FC = () => {
   return (
     <div className='cp-card'>
-      <div className='cp-card-title' style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span>Messages</span>
-        <span style={{ background: '#DC2626', color: '#fff', borderRadius: 10, padding: '1px 7px', fontSize: 10, fontWeight: 700, textTransform: 'none', letterSpacing: 0 }}>
-          {DEMO_MESSAGES.filter((m) => m.unread).length} new
-        </span>
+      <div className='cp-card-header'>
+        <h3 className='cp-card-title'>Messages</h3>
       </div>
-
-      {DEMO_MESSAGES.map((msg, i) => (
-        <div className='cp-msg-item' key={i}>
-          <div className='cp-msg-from'>
-            {msg.unread && <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#DC2626', marginRight: 6, verticalAlign: 'middle' }} />}
-            {msg.from}
-          </div>
-          <div className='cp-msg-body'>{msg.body}</div>
-          <div className='cp-msg-time'>{msg.time}</div>
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        justifyContent: 'center', padding: '32px 16px', textAlign: 'center',
+      }}>
+        <div style={{
+          width: 48, height: 48, borderRadius: '50%', background: '#E8F5E9',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14,
+        }}>
+          <svg width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='#0C6B5A' strokeWidth='1.5'>
+            <path d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' />
+          </svg>
         </div>
-      ))}
-
-      <button
-        className='cp-action-btn'
-        style={{ width: '100%', marginTop: 8, textAlign: 'center' }}
-        onClick={() => showSuccessToast('Messaging coming soon!')}
-      >
-        View All Messages
-      </button>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#1A2B28', marginBottom: 4 }}>
+          Messaging Coming Soon
+        </div>
+        <div style={{ fontSize: 12, color: '#9CA3AF', lineHeight: 1.6 }}>
+          You will be able to communicate with students and administrators here.
+        </div>
+      </div>
     </div>
   )
 }

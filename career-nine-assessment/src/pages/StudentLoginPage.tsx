@@ -199,9 +199,9 @@ const StudentLoginPage: React.FC = () => {
                           }}>
                             {days.map(d => (
                               <div key={d} onClick={() => handleDobSelect('day', d)}
-                                style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.95rem', color: '#2d3748', background: dobDay === d ? 'rgba(102,126,234,0.1)' : '#fff' }}
-                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(102,126,234,0.08)'}
-                                onMouseLeave={e => e.currentTarget.style.background = dobDay === d ? 'rgba(102,126,234,0.1)' : '#fff'}
+                                style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.95rem', color: '#2d3748', background: dobDay === d ? 'rgba(93, 214, 141,0.1)' : '#fff' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(93, 214, 141,0.08)'}
+                                onMouseLeave={e => e.currentTarget.style.background = dobDay === d ? 'rgba(93, 214, 141,0.1)' : '#fff'}
                               >{d}</div>
                             ))}
                           </div>
@@ -229,9 +229,9 @@ const StudentLoginPage: React.FC = () => {
                           }}>
                             {months.map(m => (
                               <div key={m.value} onClick={() => handleDobSelect('month', m.value)}
-                                style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.95rem', color: '#2d3748', background: dobMonth === m.value ? 'rgba(102,126,234,0.1)' : '#fff' }}
-                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(102,126,234,0.08)'}
-                                onMouseLeave={e => e.currentTarget.style.background = dobMonth === m.value ? 'rgba(102,126,234,0.1)' : '#fff'}
+                                style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.95rem', color: '#2d3748', background: dobMonth === m.value ? 'rgba(93, 214, 141,0.1)' : '#fff' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(93, 214, 141,0.08)'}
+                                onMouseLeave={e => e.currentTarget.style.background = dobMonth === m.value ? 'rgba(93, 214, 141,0.1)' : '#fff'}
                               >{m.label}</div>
                             ))}
                           </div>
@@ -259,9 +259,9 @@ const StudentLoginPage: React.FC = () => {
                           }}>
                             {years.map(y => (
                               <div key={y} onClick={() => handleDobSelect('year', y)}
-                                style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.95rem', color: '#2d3748', background: dobYear === y ? 'rgba(102,126,234,0.1)' : '#fff' }}
-                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(102,126,234,0.08)'}
-                                onMouseLeave={e => e.currentTarget.style.background = dobYear === y ? 'rgba(102,126,234,0.1)' : '#fff'}
+                                style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '0.95rem', color: '#2d3748', background: dobYear === y ? 'rgba(93, 214, 141,0.1)' : '#fff' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'rgba(93, 214, 141,0.08)'}
+                                onMouseLeave={e => e.currentTarget.style.background = dobYear === y ? 'rgba(93, 214, 141,0.1)' : '#fff'}
                               >{y}</div>
                             ))}
                           </div>

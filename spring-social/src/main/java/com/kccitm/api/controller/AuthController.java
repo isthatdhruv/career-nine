@@ -56,7 +56,7 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest,
             HttpServletRequest request) {
-        User user = userRepository.findByEmail(loginRequest.getEmail());
+        User user = userRepository.findByEmailAndProvider(loginRequest.getEmail(), AuthProvider.local);
         if (user == null) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ApiResponse(false, "Invalid email or password."));

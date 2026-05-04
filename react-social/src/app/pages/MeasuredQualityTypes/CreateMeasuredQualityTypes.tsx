@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "react-bootstrap";
-import { IconContext } from "react-icons";
-import { MdQuestionAnswer, MdDeleteSweep } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import { FormControl, InputLabel, MenuItem, Select } from "@mui/material";
 import { ReadMeasuredQualityTypesData } from "./API/Measured_Quality_Types_APIs";
 import { ReadMeasuredQualitiesData } from "../MeasuredQualities/API/Measured_Qualities_APIs";
 import { MeasuredQualityTypesTable } from "./components";
 import MeasuredQualityTypesRecycleBinModal from "./components/MeasuredQualityTypesRecycleBinModal";
+import PageHeader from "../../components/PageHeader";
 
 const MeasuredQualityTypesPage = () => {
   const [measuredQualityTypesData, setMeasuredQualityTypesData] = useState<any[]>([]);
@@ -63,22 +61,38 @@ const MeasuredQualityTypesPage = () => {
   }, [measuredQualityTypesData, selectedQualityFilter]);
 
   return (
-    <div className="card">
-      {loading && (
-        <span className="indicator-progress m-5" style={{ display: "block" }}>
-          Please wait...{" "}
-          <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
-        </span>
-      )}
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className='bi bi-bookmarks' />}
+        title="Measured Quality Types"
+        subtitle={<><strong>{filteredData.length}</strong> quality types</>}
+        actions={[
+          {
+            label: "Add Quality Type",
+            iconClass: "bi-plus-lg",
+            onClick: () => navigate("/measured-quality-types/create"),
+            variant: "primary",
+          },
+          {
+            label: "Recycle Bin",
+            iconClass: "bi-trash",
+            onClick: () => setShowRecycleBin(true),
+            variant: "danger",
+          },
+        ]}
+      />
 
-      {!loading && (
-        <div className="card-header border-0 pt-6">
-          <div className="card-title">
-            <h1>Measured Quality Types</h1>
-          </div>
+      <div className="card">
+        {loading && (
+          <span className="indicator-progress m-5" style={{ display: "block" }}>
+            Please wait...{" "}
+            <span className="spinner-border spinner-border-sm align-middle ms-2"></span>
+          </span>
+        )}
 
-          <div className="card-toolbar">
-            <div className="d-flex justify-content-end align-items-center gap-3">
+        {!loading && (
+          <div className="card-header border-0 pt-6">
+            <div className="card-toolbar ms-auto">
               <FormControl sx={{ minWidth: 220 }} size="small">
                 <InputLabel id="quality-filter-label">Filter by Measured Quality</InputLabel>
                 <Select
@@ -100,46 +114,20 @@ const MeasuredQualityTypesPage = () => {
                   ))}
                 </Select>
               </FormControl>
-              <Button
-                variant="outline-danger"
-                onClick={() => setShowRecycleBin(true)}
-              >
-                <IconContext.Provider
-                  value={{ style: { paddingBottom: "4px" } }}
-                >
-                  <div>
-                    Recycle Bin <MdDeleteSweep size={21} />
-                  </div>
-                </IconContext.Provider>
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => {
-                  navigate("/measured-quality-types/create");
-                }}
-              >
-                <IconContext.Provider
-                  value={{ style: { paddingBottom: "4px" } }}
-                >
-                  <div>
-                    Add Measured Quality Type <MdQuestionAnswer size={21} />
-                  </div>
-                </IconContext.Provider>
-              </Button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {!loading && (
-        <div className="card-body pt-5">
-          <MeasuredQualityTypesTable
-            data={filteredData}
-            setLoading={setLoading}
-            setPageLoading={setPageLoading}
-          />
-        </div>
-      )}
+        {!loading && (
+          <div className="card-body pt-5">
+            <MeasuredQualityTypesTable
+              data={filteredData}
+              setLoading={setLoading}
+              setPageLoading={setPageLoading}
+            />
+          </div>
+        )}
+      </div>
 
       <MeasuredQualityTypesRecycleBinModal
         show={showRecycleBin}

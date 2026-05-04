@@ -17,7 +17,7 @@ interface SlotGridProps {
   weekStart: string
 }
 
-const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 function formatTime(timeStr: string): string {
   try {
@@ -44,7 +44,7 @@ function getWeekDates(weekStart: string): string[] {
   const dates: string[] = []
   try {
     const start = new Date(weekStart + 'T00:00:00')
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 6; i++) {
       const d = new Date(start)
       d.setDate(start.getDate() + i)
       const year = d.getFullYear()
@@ -101,20 +101,17 @@ const SlotGrid: React.FC<SlotGridProps> = ({ slots, selectedSlotId, onSelectSlot
                 No slots
               </div>
             ) : (
-              daySlots.map((slot) => (
-                <div
-                  key={slot.slotId}
-                  className={`cl-slot-item${selectedSlotId === slot.slotId ? ' selected' : ''}`}
-                  onClick={() => onSelectSlot(slot)}
-                >
-                  {formatTime(slot.startTime)}
-                  {slot.durationMinutes > 0 && (
-                    <div style={{ fontSize: 11, marginTop: 2, opacity: 0.8 }}>
-                      {slot.durationMinutes}m
-                    </div>
-                  )}
-                </div>
-              ))
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 360, overflowY: 'auto' }}>
+                {daySlots.map((slot) => (
+                  <div
+                    key={slot.slotId}
+                    className={`cl-slot-item${selectedSlotId === slot.slotId ? ' selected' : ''}`}
+                    onClick={() => onSelectSlot(slot)}
+                  >
+                    {formatTime(slot.startTime)}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )

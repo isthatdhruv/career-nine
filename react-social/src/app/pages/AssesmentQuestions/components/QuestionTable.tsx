@@ -13,6 +13,7 @@ import {
 import QuestionLanguageModal from "./QuestionLanguageModal";
 import QuestionBulkUploadModal from "./QuestionBulkUploadModal";
 import * as XLSX from "xlsx";
+import { ActionIcon } from "../../../components/ActionIcon";
 
 const QuestionTable = (props: {
   data: any;
@@ -133,10 +134,11 @@ const QuestionTable = (props: {
   });
 
   const actionBtnStyle = (color: string) => ({
-    width: "36px", height: "36px", padding: 0,
+    width: "34px", height: "34px", padding: 0,
     display: "flex" as const, alignItems: "center" as const, justifyContent: "center" as const,
-    background: "#fff", color: color, border: `2px solid ${color}`, borderRadius: "6px",
+    background: "transparent", color: color, border: "none", borderRadius: "8px",
     cursor: "pointer" as const,
+    transition: "background-color 150ms ease",
   });
 
   const datatable = {
@@ -197,7 +199,7 @@ const QuestionTable = (props: {
               className="btn btn-sm" title="Edit"
               style={actionBtnStyle("#2563eb")}
             >
-              <i className="bi bi-pencil-fill" style={{ fontSize: "0.85rem" }}></i>
+              <ActionIcon type="edit" size="sm" />
             </button>
             <button
               onClick={() => {
@@ -227,7 +229,7 @@ const QuestionTable = (props: {
               className="btn btn-sm" title="Delete"
               style={actionBtnStyle("#dc2626")}
             >
-              <i className="bi bi-trash-fill" style={{ fontSize: "0.85rem" }}></i>
+              <ActionIcon type="delete" size="sm" />
             </button>
           </div>
         ),
@@ -298,7 +300,7 @@ const QuestionTable = (props: {
           disabled={exporting}
           style={toolbarBtnStyle("#059669")}
         >
-          <i className="bi bi-download"></i>
+          <ActionIcon type="excel" size="sm" />
           {exporting ? "Exporting..." : "Export Excel"}
         </button>
 
@@ -308,7 +310,7 @@ const QuestionTable = (props: {
           disabled={downloadingTemplate}
           style={toolbarBtnStyle("#0369a1")}
         >
-          <i className="bi bi-file-earmark-arrow-down"></i>
+          <ActionIcon type="download" size="sm" />
           {downloadingTemplate ? "Downloading..." : "Template"}
         </button>
 
@@ -317,7 +319,7 @@ const QuestionTable = (props: {
           className="btn btn-sm d-flex align-items-center gap-1"
           style={toolbarBtnStyle("#7c3aed")}
         >
-          <i className="bi bi-upload"></i>
+          <ActionIcon type="upload" size="sm" />
           Upload Excel
         </button>
       </div>

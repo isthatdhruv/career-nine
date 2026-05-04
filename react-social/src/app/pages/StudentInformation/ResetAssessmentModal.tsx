@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { showErrorToast, showSuccessToast } from '../../utils/toast';
 import { getAllAssessments, resetAssessment } from "./StudentInfo_APIs";
 import axios from "axios";
+import { ActionIcon } from "../../components/ActionIcon";
 
 type StudentAssessmentInfo = {
   assessmentId: number;
@@ -274,7 +275,7 @@ export default function ResetAssessmentModal({
                             : "Reset this assessment"
                         }
                       >
-                        <i className="bi bi-arrow-counterclockwise"></i>
+                        <ActionIcon type="refresh" size="sm" />
                         Reset
                       </button>
                     </div>

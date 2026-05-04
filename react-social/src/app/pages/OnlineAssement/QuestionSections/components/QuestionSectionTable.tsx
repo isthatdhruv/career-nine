@@ -1,8 +1,8 @@
 import { MDBDataTableV5 } from "mdbreact";
-import { AiFillEdit } from "react-icons/ai";
 import { useNavigate } from "react-router-dom";
 import UseAnimations from "react-useanimations";
 import trash from "react-useanimations/lib/trash";
+import { ActionIcon } from "../../../../components/ActionIcon";
 import { DeleteQuestionSectionData } from "../API/Question_Section_APIs";
 
 const QuestionSectionTable = (props: {
@@ -51,7 +51,7 @@ const QuestionSectionTable = (props: {
             }}
             className="btn btn-icon btn-primary btn-sm me-3"
           >
-            <AiFillEdit size={16} />
+            <ActionIcon type="edit" size="sm" />
           </button>
 
           <button

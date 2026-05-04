@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -233,6 +234,64 @@ public class InstituteDetailController {
 		result.put("contactPersons", contacts);
 		result.put("boards", boards);
 		return ResponseEntity.ok(result);
+	}
+
+	// ============================================================
+	// Per-institute limits (max assessments allowed before allotment is blocked)
+	// ============================================================
+
+	@GetMapping("/{id}/limits")
+	public ResponseEntity<?> getInstituteLimits(@PathVariable("id") int instituteCode) {
+		InstituteDetail institute = instituteDetailRepository.findById(instituteCode);
+		if (institute == null) {
+			return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
+				.body(new ApiResponse(false, "Institute not found"));
+		}
+		Map<String, Object> body = new java.util.HashMap<>();
+		body.put("instituteCode", institute.getInstituteCode());
+		body.put("maxAssessments", institute.getMaxAssessments());
+		return ResponseEntity.ok(body);
+	}
+
+	@PutMapping("/{id}/limits")
+	public ResponseEntity<?> updateInstituteLimits(
+			@PathVariable("id") int instituteCode,
+			@RequestBody Map<String, Object> payload) {
+		InstituteDetail institute = instituteDetailRepository.findById(instituteCode);
+		if (institute == null) {
+			return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
+				.body(new ApiResponse(false, "Institute not found"));
+		}
+		Object raw = payload.get("maxAssessments");
+		Integer next;
+		if (raw == null) {
+			next = null;
+		} else if (raw instanceof Number) {
+			int v = ((Number) raw).intValue();
+			if (v < 0) {
+				return ResponseEntity.badRequest()
+					.body(new ApiResponse(false, "maxAssessments must be non-negative"));
+			}
+			next = v;
+		} else {
+			try {
+				int v = Integer.parseInt(String.valueOf(raw).trim());
+				if (v < 0) {
+					return ResponseEntity.badRequest()
+						.body(new ApiResponse(false, "maxAssessments must be non-negative"));
+				}
+				next = v;
+			} catch (NumberFormatException ex) {
+				return ResponseEntity.badRequest()
+					.body(new ApiResponse(false, "maxAssessments must be an integer"));
+			}
+		}
+		institute.setMaxAssessments(next);
+		instituteDetailRepository.save(institute);
+		Map<String, Object> body = new java.util.HashMap<>();
+		body.put("instituteCode", institute.getInstituteCode());
+		body.put("maxAssessments", institute.getMaxAssessments());
+		return ResponseEntity.ok(body);
 	}
 
 }

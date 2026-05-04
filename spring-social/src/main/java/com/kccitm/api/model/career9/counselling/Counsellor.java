@@ -63,6 +63,66 @@ public class Counsellor implements Serializable {
     @Column(name = "profile_image_url", length = 500)
     private String profileImageUrl;
 
+    // ── Onboarding fields ──
+
+    @Column(name = "languages_spoken", length = 500)
+    private String languagesSpoken;
+
+    @Column(name = "mode_capability", length = 20, columnDefinition = "VARCHAR(20) DEFAULT 'BOTH'")
+    private String modeCapability = "BOTH";
+
+    @Column(name = "qualifications", columnDefinition = "TEXT")
+    private String qualifications;
+
+    @Column(name = "certifications_url", length = 500)
+    private String certificationsUrl;
+
+    @Column(name = "govt_id_last4", length = 4)
+    private String govtIdLast4;
+
+    @Column(name = "govt_id_hash", length = 255)
+    private String govtIdHash;
+
+    @Column(name = "bank_name", length = 200)
+    private String bankName;
+
+    @Column(name = "bank_account", length = 50)
+    private String bankAccount;
+
+    @Column(name = "bank_ifsc", length = 20)
+    private String bankIfsc;
+
+    @Column(name = "bank_branch", length = 200)
+    private String bankBranch;
+
+    @Column(name = "signed_agreement_url", length = 500)
+    private String signedAgreementUrl;
+
+    @Column(name = "years_of_experience")
+    private Integer yearsOfExperience;
+
+    @Column(name = "linkedin_profile", length = 500)
+    private String linkedinProfile;
+
+    @Column(name = "hourly_rate_preference")
+    private Integer hourlyRatePreference;
+
+    @Column(name = "max_sessions_per_day")
+    private Integer maxSessionsPerDay;
+
+    // Full-time vs Part-time engagement type chosen at registration.
+    // Values: 'FULL_TIME', 'PART_TIME'.
+    @Column(name = "work_time", length = 20, columnDefinition = "VARCHAR(20) DEFAULT 'FULL_TIME'")
+    private String workTime = "FULL_TIME";
+
+    // Counsellor specialism: school-level guidance vs career counselling.
+    // Values: 'SCHOOL', 'CAREER'.
+    @Column(name = "counsellor_type", length = 20, columnDefinition = "VARCHAR(20) DEFAULT 'CAREER'")
+    private String counsellorType = "CAREER";
+
+    @Column(name = "password_hash", length = 255)
+    private String passwordHash;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -180,6 +240,61 @@ public class Counsellor implements Serializable {
     public void setProfileImageUrl(String profileImageUrl) {
         this.profileImageUrl = profileImageUrl;
     }
+
+    public String getLanguagesSpoken() { return languagesSpoken; }
+    public void setLanguagesSpoken(String languagesSpoken) { this.languagesSpoken = languagesSpoken; }
+
+    public String getModeCapability() { return modeCapability; }
+    public void setModeCapability(String modeCapability) { this.modeCapability = modeCapability; }
+
+    public String getQualifications() { return qualifications; }
+    public void setQualifications(String qualifications) { this.qualifications = qualifications; }
+
+    public String getCertificationsUrl() { return certificationsUrl; }
+    public void setCertificationsUrl(String certificationsUrl) { this.certificationsUrl = certificationsUrl; }
+
+    public String getGovtIdLast4() { return govtIdLast4; }
+    public void setGovtIdLast4(String govtIdLast4) { this.govtIdLast4 = govtIdLast4; }
+
+    public String getGovtIdHash() { return govtIdHash; }
+    public void setGovtIdHash(String govtIdHash) { this.govtIdHash = govtIdHash; }
+
+    public String getBankName() { return bankName; }
+    public void setBankName(String bankName) { this.bankName = bankName; }
+
+    public String getBankAccount() { return bankAccount; }
+    public void setBankAccount(String bankAccount) { this.bankAccount = bankAccount; }
+
+    public String getBankIfsc() { return bankIfsc; }
+    public void setBankIfsc(String bankIfsc) { this.bankIfsc = bankIfsc; }
+
+    public String getBankBranch() { return bankBranch; }
+    public void setBankBranch(String bankBranch) { this.bankBranch = bankBranch; }
+
+    public String getSignedAgreementUrl() { return signedAgreementUrl; }
+    public void setSignedAgreementUrl(String signedAgreementUrl) { this.signedAgreementUrl = signedAgreementUrl; }
+
+    public Integer getYearsOfExperience() { return yearsOfExperience; }
+    public void setYearsOfExperience(Integer yearsOfExperience) { this.yearsOfExperience = yearsOfExperience; }
+
+    public String getLinkedinProfile() { return linkedinProfile; }
+    public void setLinkedinProfile(String linkedinProfile) { this.linkedinProfile = linkedinProfile; }
+
+    public Integer getHourlyRatePreference() { return hourlyRatePreference; }
+    public void setHourlyRatePreference(Integer hourlyRatePreference) { this.hourlyRatePreference = hourlyRatePreference; }
+
+    public Integer getMaxSessionsPerDay() { return maxSessionsPerDay; }
+    public void setMaxSessionsPerDay(Integer maxSessionsPerDay) { this.maxSessionsPerDay = maxSessionsPerDay; }
+
+    public String getWorkTime() { return workTime; }
+    public void setWorkTime(String workTime) { this.workTime = workTime; }
+
+    public String getCounsellorType() { return counsellorType; }
+    public void setCounsellorType(String counsellorType) { this.counsellorType = counsellorType; }
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public String getPasswordHash() { return passwordHash; }
+    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
 
     public LocalDateTime getCreatedAt() {
         return createdAt;

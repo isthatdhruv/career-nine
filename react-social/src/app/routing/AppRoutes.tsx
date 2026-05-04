@@ -19,7 +19,6 @@ import StudentDetailPage from "../pages/StudentRegistration/StudentRegistrationF
 import { ThankYouPage } from "../pages/StudentRegistration/ThankYou";
 import { UniRollNoUpdate } from "../pages/StudentRegistration/UniRollNoUpdate";
 import { PrivateRoutes } from "./PrivateRoutes";
-import StudentRoutes from "./StudentRoutes";
 import CounsellorRoutes from "./CounsellorRoutes";
 // import CompilerPageEdit from "../pages/Compiler/compilerEdit";
 import PrincipalDashboard from "../pages/PrincipalDashboard/PrincipalDashboard";
@@ -78,7 +77,6 @@ const AppRoutes: FC = () => {
   return (
     <Routes>
       {/* Role Portals — standalone layout, no Metronic MasterLayout */}
-      <Route path="/student/*" element={<StudentRoutes />} />
       <Route path="/counsellor/*" element={<CounsellorRoutes />} />
 
       <Route element={<App />}>

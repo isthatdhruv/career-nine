@@ -147,6 +147,9 @@ public class FirebaseDataMappingController {
     @Autowired
     private FirebaseStudentDeletionService firebaseStudentDeletionService;
 
+    @Autowired
+    private com.kccitm.api.service.AssessmentCompletionService completionService;
+
     @GetMapping("/getAll")
     public List<FirebaseDataMapping> getAll() {
         return firebaseDataMappingRepository.findAll();
@@ -372,30 +375,23 @@ public class FirebaseDataMappingController {
             }
             int scoresCalculated = scoreBatch.size();
 
-            // Determine completeness
-            String status = "ongoing";
+            // Determine completeness using the authoritative question count from the
+            // linked questionnaire — not the client-supplied `totalMappedQuestions`,
+            // which previously defaulted to `uniqueQuestionsAnswered.size()` and
+            // caused partial imports to flip to "completed".
             int questionsAnswered = uniqueQuestionsAnswered.size();
-            Long totalMappedFromPayload = getLong(payload, "totalMappedQuestions");
-            int totalMappedQuestions = (totalMappedFromPayload != null)
-                    ? totalMappedFromPayload.intValue()
-                    : uniqueQuestionsAnswered.size();
-
-            if (totalMappedQuestions > 0 && questionsAnswered >= totalMappedQuestions) {
-                status = "completed";
-            }
-
-            sam.setStatus(status);
-            studentAssessmentMappingRepository.save(sam);
+            int totalQuestions = completionService.getTotalQuestions(assessmentId);
+            String status = completionService.markCompletedIfFullyAnswered(sam);
 
             return ResponseEntity.ok(Map.of(
                 "saved", saved,
                 "questionsAnswered", questionsAnswered,
                 "scoresCalculated", scoresCalculated,
-                "totalMappedQuestions", totalMappedQuestions,
+                "totalQuestions", totalQuestions,
                 "status", status,
-                "message", questionsAnswered >= totalMappedQuestions
+                "message", "completed".equals(status)
                     ? "Answers imported and scores calculated successfully"
-                    : "Partial answers imported (" + questionsAnswered + "/" + totalMappedQuestions + " questions), status set to ongoing"
+                    : "Partial answers imported (" + questionsAnswered + "/" + totalQuestions + " questions), status set to ongoing"
             ));
     }
 
@@ -1398,14 +1394,15 @@ public class FirebaseDataMappingController {
                     mapping = new StudentAssessmentMapping();
                     mapping.setUserStudent(usOpt.get());
                     mapping.setAssessmentId(assessmentId);
-                    mapping.setStatus("completed");
+                    mapping.setStatus("ongoing");
                     mapping = studentAssessmentMappingRepository.save(mapping);
                     totalMappings++;
                 } else {
                     mapping = mappingOpt.get();
-                    mapping.setStatus("completed");
-                    studentAssessmentMappingRepository.save(mapping);
                 }
+                // Guarded completion: only mark "completed" if the student answered
+                // every question in the linked questionnaire. Otherwise leave as "ongoing".
+                completionService.markCompletedIfFullyAnswered(mapping);
 
                 // Process score map
                 @SuppressWarnings("unchecked")

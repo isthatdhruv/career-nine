@@ -1,9 +1,11 @@
 package com.kccitm.api.service.counselling;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import javax.transaction.Transactional;
 
@@ -19,6 +21,7 @@ import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
 import com.kccitm.api.model.career9.counselling.CounsellingSlot;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
 import com.kccitm.api.repository.Career9.counselling.CounsellingSlotRepository;
+import com.kccitm.api.service.counselling.CounsellorInstituteMappingService;
 
 @Service
 public class BookingService {
@@ -37,20 +40,62 @@ public class BookingService {
     @Autowired
     private AuditLogService auditLogService;
 
+    @Autowired
+    private CounsellorInstituteMappingService counsellorInstituteMappingService;
+
+    @Autowired
+    private CounsellingActivityLogService activityLogService;
+
     /**
      * Returns all available slots for the week starting at weekStart (inclusive)
-     * through weekStart + 6 days (inclusive).
+     * through weekStart + 6 days (inclusive). Past dates are excluded.
      */
     public List<CounsellingSlot> getAvailableSlots(LocalDate weekStart) {
         LocalDate weekEnd = weekStart.plusDays(6);
-        logger.info("Fetching available slots from {} to {}", weekStart, weekEnd);
-        return slotRepository.findAvailableSlots(weekStart, weekEnd);
+        LocalDate today = LocalDate.now();
+        LocalDate effectiveStart = weekStart.isBefore(today) ? today : weekStart;
+        logger.info("Fetching available slots from {} to {}", effectiveStart, weekEnd);
+        if (effectiveStart.isAfter(weekEnd)) return List.of();
+        return filterOutPastSlots(slotRepository.findAvailableSlots(effectiveStart, weekEnd));
+    }
+
+    /**
+     * Returns available slots filtered to only counsellors allocated to the given institute.
+     * Students see only slots from counsellors assigned to their school. Past dates are excluded.
+     */
+    public List<CounsellingSlot> getAvailableSlotsForInstitute(LocalDate weekStart, Integer instituteCode) {
+        LocalDate weekEnd = weekStart.plusDays(6);
+        LocalDate today = LocalDate.now();
+        LocalDate effectiveStart = weekStart.isBefore(today) ? today : weekStart;
+
+        if (effectiveStart.isAfter(weekEnd)) return List.of();
+
+        List<Long> counsellorIds = counsellorInstituteMappingService.getActiveCounsellorIdsForInstitute(instituteCode);
+
+        if (counsellorIds.isEmpty()) {
+            logger.info("No counsellors allocated to institute {} — returning empty slots", instituteCode);
+            return List.of();
+        }
+
+        logger.info("Fetching available slots from {} to {} for institute {} ({} counsellors)",
+                effectiveStart, weekEnd, instituteCode, counsellorIds.size());
+        return filterOutPastSlots(
+                slotRepository.findAvailableSlotsForCounsellors(counsellorIds, effectiveStart, weekEnd));
+    }
+
+    private List<CounsellingSlot> filterOutPastSlots(List<CounsellingSlot> slots) {
+        LocalDate today = LocalDate.now();
+        LocalTime now = LocalTime.now();
+        return slots.stream()
+                .filter(s -> !s.getDate().equals(today) || s.getStartTime().isAfter(now))
+                .collect(Collectors.toList());
     }
 
     /**
      * Books a slot for the given student.
      * Verifies the slot is AVAILABLE, transitions it to REQUESTED,
-     * creates a PENDING appointment, and fires notifications.
+     * creates an appointment with the counsellor auto-assigned from the slot,
+     * and fires notifications.
      */
     @Transactional
     public CounsellingAppointment bookSlot(Long slotId, UserStudent student, String reason) {
@@ -64,16 +109,23 @@ public class BookingService {
                     "Slot " + slotId + " is not available for booking. Current status: " + slot.getStatus());
         }
 
+        LocalDate today = LocalDate.now();
+        if (slot.getDate().isBefore(today)
+                || (slot.getDate().equals(today) && !slot.getStartTime().isAfter(LocalTime.now()))) {
+            throw new BadRequestException("Slot " + slotId + " is in the past and cannot be booked.");
+        }
+
         // Transition slot to REQUESTED
         slot.setStatus("REQUESTED");
         slotRepository.save(slot);
 
-        // Create appointment
+        // Create appointment — auto-assign counsellor from the slot
         CounsellingAppointment appointment = new CounsellingAppointment();
         appointment.setSlot(slot);
         appointment.setStudent(student);
+        appointment.setCounsellor(slot.getCounsellor());
         appointment.setStudentReason(reason);
-        appointment.setStatus("PENDING");
+        appointment.setStatus("CONFIRMED");
         appointment = appointmentRepository.save(appointment);
 
         logger.info("Created appointment {} for student {} on slot {}",
@@ -105,6 +157,11 @@ public class BookingService {
         newValues.put("slotId", slotId);
         newValues.put("studentId", student.getUserStudentId());
         auditLogService.log(appointment, "BOOKING_CREATED", null, reason, null, newValues);
+
+        activityLogService.log("SLOT_BOOKED", "Session Booked",
+                "Student " + student.getUserStudentId() + " booked a session with " + slot.getCounsellor().getName()
+                + " on " + slot.getDate() + " at " + slot.getStartTime(),
+                slot.getCounsellor(), "Student");
 
         return appointment;
     }

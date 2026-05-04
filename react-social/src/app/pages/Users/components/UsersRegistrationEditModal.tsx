@@ -1,5 +1,6 @@
 import { FC, useEffect, useState } from "react";
 import axios from "axios";
+import { ActionIcon } from "../../../components/ActionIcon";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -405,7 +406,7 @@ const UsersRegistrationEditModal: FC<UsersRegistrationEditModalProps> = ({
               onClick={onClose}
               disabled={saving}
             >
-              <i className="bi bi-x-lg me-2"></i>
+              <ActionIcon type="reject" size="sm" className="me-2" />
               Cancel
             </button>
             <button
@@ -417,7 +418,7 @@ const UsersRegistrationEditModal: FC<UsersRegistrationEditModalProps> = ({
               {saving ? (
                 <span className="spinner-border spinner-border-sm me-2" role="status" />
               ) : (
-                <i className="bi bi-check-lg me-2"></i>
+                <ActionIcon type="approve" size="sm" className="me-2" />
               )}
               Save Changes
             </button>

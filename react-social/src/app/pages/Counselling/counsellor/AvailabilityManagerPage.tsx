@@ -3,6 +3,7 @@ import { useAuth } from '../../../modules/auth'
 import { showErrorToast } from '../../../utils/toast'
 import { getSlotsByCounsellor, deleteSlot } from '../API/SlotAPI'
 import { getCounsellorByUserId } from '../API/CounsellorAPI'
+import { useRefreshInterval } from '../../../utils/useAutoRefresh'
 import axios from 'axios'
 import RecurringTemplateForm from './components/RecurringTemplateForm'
 import ManualSlotForm from './components/ManualSlotForm'
@@ -76,6 +77,10 @@ const AvailabilityManagerPage: React.FC = () => {
   const handleRefresh = () => {
     if (counsellor?.id) fetchAll(counsellor.id)
   }
+
+  useRefreshInterval(() => {
+    if (counsellor?.id) fetchAll(counsellor.id)
+  }, { skip: !counsellor?.id })
 
   const handleDeleteSlot = async (id: number) => {
     try {

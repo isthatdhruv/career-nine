@@ -17,6 +17,7 @@ interface BookingFormProps {
   onSubmit: () => void
   onCancel: () => void
   loading: boolean
+  mode?: 'book' | 'reschedule'
 }
 
 function formatDate(dateStr: string): string {
@@ -46,9 +47,11 @@ const BookingForm: React.FC<BookingFormProps> = ({
   onSubmit,
   onCancel,
   loading,
+  mode = 'book',
 }) => {
+  const isReschedule = mode === 'reschedule'
   return (
-    <div className='cl-card' style={{ marginTop: 24 }}>
+    <div className='cl-card' style={{ marginTop: 0, borderRadius: 12 }}>
       <h3
         style={{
           fontSize: 15,
@@ -58,7 +61,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
           marginTop: 0,
         }}
       >
-        Confirm Booking
+        {isReschedule ? 'Confirm Reschedule' : 'Confirm Booking'}
       </h3>
 
       {/* Slot summary */}
@@ -98,7 +101,7 @@ const BookingForm: React.FC<BookingFormProps> = ({
       </div>
 
       {/* Reason textarea */}
-      <div style={{ marginBottom: 20 }}>
+      <div style={{ marginBottom: 20, display: isReschedule ? 'none' : 'block' }}>
         <label
           htmlFor='booking-reason'
           style={{
@@ -154,17 +157,17 @@ const BookingForm: React.FC<BookingFormProps> = ({
         <button
           className='cl-btn-primary'
           onClick={onSubmit}
-          disabled={loading || !reason.trim()}
+          disabled={loading || (!isReschedule && !reason.trim())}
           style={{ fontSize: 13 }}
         >
           {loading ? (
-            'Booking...'
+            isReschedule ? 'Rescheduling...' : 'Booking...'
           ) : (
             <>
               <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
                 <path d='M20 6L9 17l-5-5' />
               </svg>
-              Book Slot
+              {isReschedule ? 'Reschedule' : 'Book Slot'}
             </>
           )}
         </button>

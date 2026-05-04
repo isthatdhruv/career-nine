@@ -594,21 +594,35 @@ public class AssessmentTableController {
 
         StudentAssessmentMapping mapping = mappingOpt.get();
 
-        // Only update if not completed
-        if (!"completed".equals(mapping.getStatus())) {
-            mapping.setStatus("ongoing");
-            studentAssessmentMappingRepository.save(mapping);
+        // Do not let a completed student restart an assessment. If admin wants
+        // to let them retake, they must first go through the explicit reset
+        // flow (which deletes answers + scores and flips status to notstarted).
+        if ("completed".equals(mapping.getStatus())) {
+            response.put("success", false);
+            response.put("error", "Assessment already completed");
+            response.put("status", mapping.getStatus());
+            return ResponseEntity.status(409).body(response);
         }
 
-        // Create a Redis-backed session and return the token
+        // Idempotent resume contract: clear ALL stale Redis state for this
+        // (student, assessment) before starting. This ensures:
+        //   - a prior failed submission's payload (submitted:) is not later
+        //     replayed by the retry scheduler while the student is re-taking
+        //   - a prior partial: from an abandoned session is wiped (student
+        //     starts from 0 — localStorage was cleared too)
+        //   - no stale lock blocks the new session
+        assessmentSessionService.clearAllForMapping(userStudentId, assessmentId);
+
+        // Reset persistenceState — any prior pending/failed state is moot now
+        // that the student is taking the assessment fresh.
+        mapping.setStatus("ongoing");
+        mapping.setPersistenceState(null);
+        studentAssessmentMappingRepository.save(mapping);
+
+        // Create a fresh Redis-backed session and return the token
         AssessmentSession session = assessmentSessionService.createSession(userStudentId, assessmentId);
 
-        // Clear any stale submission lock from a previous attempt
-        // This allows re-assessment after admin resets the student's status
-        assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
-
         response.put("sessionToken", session.getSessionToken());
-
         response.put("success", true);
         response.put("status", mapping.getStatus());
         return ResponseEntity.ok(response);
@@ -809,6 +823,65 @@ public class AssessmentTableController {
         response.put("correctedCount", correctedCount);
         response.put("correctedStudents", correctedStudents);
         return ResponseEntity.ok(response);
+    }
+
+    // ============================================================
+    // Per-assessment reset policy
+    // ============================================================
+
+    @GetMapping("/{id}/reset-policy")
+    public ResponseEntity<?> getResetPolicy(@PathVariable("id") Long assessmentId) {
+        Optional<AssessmentTable> opt = assessmentTableRepository.findById(assessmentId);
+        if (!opt.isPresent()) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
+                .body(Collections.singletonMap("error", "Assessment not found"));
+        }
+        HashMap<String, Object> body = new HashMap<>();
+        body.put("assessmentId", assessmentId);
+        body.put("maxResetsPerStudent", opt.get().getMaxResetsPerStudent());
+        return ResponseEntity.ok(body);
+    }
+
+    @PutMapping("/{id}/reset-policy")
+    public ResponseEntity<?> updateResetPolicy(
+            @PathVariable("id") Long assessmentId,
+            @RequestBody java.util.Map<String, Object> payload) {
+        Optional<AssessmentTable> opt = assessmentTableRepository.findById(assessmentId);
+        if (!opt.isPresent()) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.NOT_FOUND)
+                .body(Collections.singletonMap("error", "Assessment not found"));
+        }
+        Object raw = payload.get("maxResetsPerStudent");
+        Integer next;
+        if (raw == null) {
+            next = null;
+        } else if (raw instanceof Number) {
+            int v = ((Number) raw).intValue();
+            if (v < 0) {
+                return ResponseEntity.badRequest()
+                    .body(Collections.singletonMap("error", "maxResetsPerStudent must be non-negative"));
+            }
+            next = v;
+        } else {
+            try {
+                int v = Integer.parseInt(String.valueOf(raw).trim());
+                if (v < 0) {
+                    return ResponseEntity.badRequest()
+                        .body(Collections.singletonMap("error", "maxResetsPerStudent must be non-negative"));
+                }
+                next = v;
+            } catch (NumberFormatException ex) {
+                return ResponseEntity.badRequest()
+                    .body(Collections.singletonMap("error", "maxResetsPerStudent must be an integer"));
+            }
+        }
+        AssessmentTable a = opt.get();
+        a.setMaxResetsPerStudent(next);
+        assessmentTableRepository.save(a);
+        HashMap<String, Object> body = new HashMap<>();
+        body.put("assessmentId", assessmentId);
+        body.put("maxResetsPerStudent", a.getMaxResetsPerStudent());
+        return ResponseEntity.ok(body);
     }
 
 }

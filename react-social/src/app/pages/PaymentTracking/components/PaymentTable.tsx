@@ -1,5 +1,6 @@
 import { Badge, Button, Spinner } from "react-bootstrap";
-import { MdEmail, MdNotifications } from "react-icons/md";
+import { MdNotifications } from "react-icons/md";
+import { ActionIcon } from "../../../components/ActionIcon";
 
 export interface PaymentRow {
   transactionId: number;
@@ -134,7 +135,7 @@ const PaymentTable = ({
                       <Button size="sm" onClick={() => onResendWelcome(txn.transactionId)} disabled={actionLoading === txn.transactionId}
                         style={{ background: "#dcfce7", border: "1px solid #86efac", color: "#166534", fontWeight: 600, fontSize: "0.72rem", borderRadius: 6, padding: "4px 10px" }}>
                         {actionLoading === txn.transactionId ? <Spinner animation="border" size="sm" /> : (
-                          <><MdEmail size={12} style={{ marginRight: 4 }} />Resend Welcome</>
+                          <><span style={{ marginRight: 4 }}><ActionIcon type="send" size="sm" /></span>Resend Welcome</>
                         )}
                       </Button>
                     )}

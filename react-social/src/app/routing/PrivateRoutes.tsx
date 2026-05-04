@@ -84,6 +84,7 @@ const ALWAYS_ALLOWED = [
   "/general-instructions",
   "/demographics",
   "/login/reset-password",
+  "/b2c",
 ];
 
 const AuthorizedLayout = () => {
@@ -166,6 +167,31 @@ const PrivateRoutes = () => {
     () => import("../pages/StudentInformation/StudentProfile")
   );
 
+  const StudentDashboardLogin = lazy(
+    () => import("../pages/StudentDashboard/student-portal/StudentDashboardLogin")
+  );
+  const StudentPortalDashboard = lazy(
+    () => import("../pages/StudentDashboard/student-portal/StudentPortalDashboard")
+  );
+  const StudentInfoForm = lazy(
+    () => import("../pages/StudentDashboard/student-portal/StudentInfoForm")
+  );
+  const StudentPortalNavigator360 = lazy(
+    () => import("../pages/StudentDashboard/student-portal/StudentNavigator360Page")
+  );
+  const StudentPortalAssessments = lazy(
+    () => import("../pages/StudentDashboard/student-portal/StudentAssessments")
+  );
+  const StudentPortalReports = lazy(
+    () => import("../pages/StudentDashboard/student-portal/StudentReports")
+  );
+  const StudentCounsellingPage = lazy(
+    () => import("../pages/Counselling/student/StudentCounsellingPage")
+  );
+  const SlotBookingPage = lazy(
+    () => import("../pages/Counselling/student/SlotBookingPage")
+  );
+
   // const Compiler = lazy(() => import("../pages/Compiler/compiler"));
 
   const MeasuredQualityTypes = lazy(
@@ -225,12 +251,18 @@ const PrivateRoutes = () => {
   const CounsellorDashboardPage = lazy(() => import("../pages/Counselling/counsellor/CounsellorDashboardPage"));
   const AvailabilityManagerPage = lazy(() => import("../pages/Counselling/counsellor/AvailabilityManagerPage"));
   const SessionNotesPage = lazy(() => import("../pages/Counselling/counsellor/SessionNotesPage"));
-  const AdminCounsellingQueuePage = lazy(() => import("../pages/Counselling/admin/AdminCounsellingQueuePage"));
   const CounsellorManagementPage = lazy(() => import("../pages/Counselling/admin/CounsellorManagementPage"));
+  const SlotManagementPage = lazy(() => import("../pages/Counselling/admin/SlotManagementPage"));
+  const ManageStudentsPage = lazy(() => import("../pages/Counselling/admin/ManageStudentsPage"));
+  const CounsellingNotificationsPage = lazy(() => import("../pages/Counselling/admin/CounsellingNotificationsPage"));
   const PaymentTrackingPage = lazy(() => import("../pages/PaymentTracking/PaymentTrackingPage"));
   const PromoCodePage = lazy(() => import("../pages/PromoCode/PromoCodePage"));
   const PaymentStatusPage = lazy(() => import("../pages/PaymentTracking/PaymentStatusPage"));
   const PaymentRegisterPage = lazy(() => import("../pages/PaymentTracking/PaymentRegisterPage"));
+  const B2CPricingTierPage = lazy(() => import("../pages/B2C/PricingTier/PricingTierPage"));
+  const B2CCampaignPage = lazy(() => import("../pages/B2C/Campaign/CampaignPage"));
+  const B2CCampaignEditPage = lazy(() => import("../pages/B2C/Campaign/CampaignEditPage"));
+  const B2CTrackerPage = lazy(() => import("../pages/B2C/Tracker/TrackerPage"));
   // const UniversityAllResultDashboard = lazy(
   //   () => import("../pages/UniversityResult/UniversityAllResultDashboard")
   // );
@@ -364,6 +396,48 @@ const PrivateRoutes = () => {
         <Route path="/student-dashboard/:studentId" element={
           <SuspensedView>
             <StudentDashboard />
+          </SuspensedView>
+        } />
+
+        {/* Student portal — nested inside the main app shell. Access controlled via roles. */}
+        <Route path="/student/login" element={
+          <SuspensedView>
+            <StudentDashboardLogin />
+          </SuspensedView>
+        } />
+        <Route path="/student/student-info" element={
+          <SuspensedView>
+            <StudentInfoForm />
+          </SuspensedView>
+        } />
+        <Route path="/student/dashboard" element={
+          <SuspensedView>
+            <StudentPortalDashboard />
+          </SuspensedView>
+        } />
+        <Route path="/student/navigator-360" element={
+          <SuspensedView>
+            <StudentPortalNavigator360 />
+          </SuspensedView>
+        } />
+        <Route path="/student/assessments" element={
+          <SuspensedView>
+            <StudentPortalAssessments />
+          </SuspensedView>
+        } />
+        <Route path="/student/reports" element={
+          <SuspensedView>
+            <StudentPortalReports />
+          </SuspensedView>
+        } />
+        <Route path="/student/counselling" element={
+          <SuspensedView>
+            <StudentCounsellingPage />
+          </SuspensedView>
+        } />
+        <Route path="/student/counselling/book" element={
+          <SuspensedView>
+            <SlotBookingPage />
           </SuspensedView>
         } />
 
@@ -1068,18 +1142,34 @@ const PrivateRoutes = () => {
           }
         />
         <Route
-          path="/admin/counselling-queue"
-          element={
-            <SuspensedView>
-              <AdminCounsellingQueuePage />
-            </SuspensedView>
-          }
-        />
-        <Route
           path="/admin/counsellors"
           element={
             <SuspensedView>
               <CounsellorManagementPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/admin/counselling-students"
+          element={
+            <SuspensedView>
+              <ManageStudentsPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/admin/counselling-slots"
+          element={
+            <SuspensedView>
+              <SlotManagementPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/admin/counselling-notifications"
+          element={
+            <SuspensedView>
+              <CounsellingNotificationsPage />
             </SuspensedView>
           }
         />
@@ -1097,6 +1187,46 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <PromoCodePage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/b2c/pricing-tiers"
+          element={
+            <SuspensedView>
+              <B2CPricingTierPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/b2c/campaigns"
+          element={
+            <SuspensedView>
+              <B2CCampaignPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/b2c/campaigns/create"
+          element={
+            <SuspensedView>
+              <B2CCampaignEditPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/b2c/campaigns/edit/:id"
+          element={
+            <SuspensedView>
+              <B2CCampaignEditPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/b2c/tracker"
+          element={
+            <SuspensedView>
+              <B2CTrackerPage />
             </SuspensedView>
           }
         />

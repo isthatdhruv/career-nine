@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react'
-import PortalLayout from '../../portal/PortalLayout'
+import React, { useState, useMemo } from 'react'
 import {
   getVisibleReportsForStudent,
   GeneratedReport,
 } from '../../ReportGeneration/API/GeneratedReport_APIs'
-import { STUDENT_MENU_ITEMS, STUDENT_STORAGE_KEYS } from './studentMenuConfig'
+import { useAutoRefresh } from '../../../utils/useAutoRefresh'
 import './StudentPortal.css'
 
 function getReportLabel(type: string): string {
@@ -42,48 +41,31 @@ function formatDate(dateStr: string | null | undefined): string {
 }
 
 const StudentReports: React.FC = () => {
-  const [reports, setReports] = useState<GeneratedReport[]>([])
-  const [loading, setLoading] = useState(true)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
-  useEffect(() => {
-    const profileStr = localStorage.getItem('studentPortalProfile')
-    if (!profileStr) {
-      setLoading(false)
-      return
-    }
+  const userStudentId = useMemo<number | null>(() => {
     try {
-      const profile = JSON.parse(profileStr)
-      const userStudentId = profile.userStudentId
-      if (!userStudentId) {
-        setLoading(false)
-        return
-      }
-      getVisibleReportsForStudent(userStudentId)
-        .then((res) => {
-          const visible = (res.data || []).filter(
-            (r) => r.reportStatus === 'generated' && r.reportUrl
-          )
-          setReports(visible)
-        })
-        .catch(() => setReports([]))
-        .finally(() => setLoading(false))
-    } catch {
-      setLoading(false)
-    }
+      const profile = JSON.parse(localStorage.getItem('studentPortalProfile') || 'null')
+      return profile?.userStudentId ?? null
+    } catch { return null }
   }, [])
+
+  const { data, loading } = useAutoRefresh<GeneratedReport[]>(
+    async () => {
+      if (!userStudentId) return []
+      const res = await getVisibleReportsForStudent(userStudentId)
+      return (res.data || []).filter((r) => r.reportStatus === 'generated' && r.reportUrl)
+    },
+    { skip: !userStudentId }
+  )
+  const reports = data ?? []
 
   const handleDownload = (url: string) => {
     window.open(url, '_blank')
   }
 
   return (
-    <PortalLayout
-      title='Career Navigator 360'
-      menuItems={STUDENT_MENU_ITEMS}
-      storageKeys={STUDENT_STORAGE_KEYS}
-      loginPath='/student/login'
-    >
+    <>
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1A1A1A', margin: 0 }}>
           My Reports
@@ -284,7 +266,7 @@ const StudentReports: React.FC = () => {
           </div>
         </div>
       )}
-    </PortalLayout>
+    </>
   )
 }
 

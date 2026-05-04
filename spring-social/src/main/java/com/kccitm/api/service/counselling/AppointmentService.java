@@ -313,9 +313,23 @@ public class AppointmentService {
      * Enforces the {@value #CANCELLATION_WINDOW_HOURS}-hour window on the old slot,
      * verifies the new slot is AVAILABLE, marks the old appointment RESCHEDULED,
      * and creates a new CONFIRMED appointment on the new slot.
+     *
+     * Backwards-compatible overload that defaults to student behaviour
+     * (counts toward the student cap of 1).
      */
     @Transactional
     public CounsellingAppointment reschedule(Long appointmentId, Long newSlotId, User counsellorUser) {
+        return reschedule(appointmentId, newSlotId, counsellorUser, false);
+    }
+
+    /**
+     * Reschedule with an explicit admin flag. When {@code isAdmin} is true the
+     * student-side cap of one reschedule per booking chain is bypassed and the
+     * counter is NOT incremented, so the student still has their one chance
+     * regardless of how many times an admin moves the session (item 7).
+     */
+    @Transactional
+    public CounsellingAppointment reschedule(Long appointmentId, Long newSlotId, User counsellorUser, boolean isAdmin) {
         CounsellingAppointment oldAppointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment", "id", appointmentId));
 
@@ -329,6 +343,14 @@ public class AppointmentService {
                             + " hours. Please contact support directly.");
         }
 
+        // Item 5: students may reschedule a session at most once.
+        // Admins bypass via the isAdmin flag (item 7).
+        int existingStudentReschedules = oldAppointment.getStudentRescheduleCount();
+        if (!isAdmin && existingStudentReschedules >= 1) {
+            throw new BadRequestException(
+                    "You have already rescheduled this session once. Please contact your administrator for further changes.");
+        }
+
         CounsellingSlot newSlot = slotRepository.findById(newSlotId)
                 .orElseThrow(() -> new ResourceNotFoundException("Slot", "id", newSlotId));
 
@@ -337,9 +359,12 @@ public class AppointmentService {
                     "New slot " + newSlotId + " is not available. Current status: " + newSlot.getStatus());
         }
 
-        // Mark old appointment and slot
+        // Mark old appointment as rescheduled and release the old slot so
+        // other students can book it again. Blocked/manual slots stay bookable
+        // exactly as they were; only the status flips back to AVAILABLE.
         oldAppointment.setStatus("RESCHEDULED");
-        oldSlot.setStatus("CANCELLED");
+        oldSlot.setStatus("AVAILABLE");
+        oldSlot.setIsBlocked(false);
         slotRepository.save(oldSlot);
         appointmentRepository.save(oldAppointment);
 
@@ -351,6 +376,11 @@ public class AppointmentService {
         newAppointment.setAssignedBy(oldAppointment.getAssignedBy());
         newAppointment.setStudentReason(oldAppointment.getStudentReason());
         newAppointment.setStatus("CONFIRMED");
+        newAppointment.setRescheduledFromAppointmentId(appointmentId);
+        // Carry the count forward across the chain. Only student-initiated
+        // reschedules increment it; admin reschedules preserve the existing value.
+        newAppointment.setStudentRescheduleCount(
+                isAdmin ? existingStudentReschedules : existingStudentReschedules + 1);
 
         // Transition new slot to CONFIRMED
         newSlot.setStatus("CONFIRMED");
@@ -373,6 +403,22 @@ public class AppointmentService {
 
         // Notify student of reschedule
         notificationService.sendRescheduleEmail(oldAppointment, newAppointment);
+
+        // In-app notification to student — UserStudent stores userId (Long),
+        // not a User entity. Build a lightweight User reference using the stored userId.
+        try {
+            User studentUser = new User();
+            studentUser.setId(newAppointment.getStudent().getUserId());
+            notificationService.createInAppNotification(
+                    studentUser,
+                    "APPOINTMENT_RESCHEDULED",
+                    "Counselling Rescheduled",
+                    "Your counselling session has been rescheduled. Check your email for the updated schedule.",
+                    newAppointment.getId(),
+                    "APPOINTMENT");
+        } catch (Exception e) {
+            logger.warn("Failed to create in-app reschedule notification for student: {}", e.getMessage());
+        }
 
         // Audit log for old appointment
         Map<String, Object> oldAuditValues = new HashMap<>();

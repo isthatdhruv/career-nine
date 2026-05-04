@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Modal, Button, Form, Spinner, Badge } from "react-bootstrap";
-import { MdDelete, MdSchool } from "react-icons/md";
+import { MdSchool } from "react-icons/md";
+import { ActionIcon } from "../../../components/ActionIcon";
 import { ReadCollegeData } from "../../College/API/College_APIs";
 import { GetSessionsByInstituteCode } from "../../College/API/College_APIs";
 import {
@@ -314,7 +315,7 @@ const UserCollegeMappingModal = (props: UserCollegeMappingModalProps) => {
                             }}
                             title="Unmap from institute"
                           >
-                            <MdDelete size={16} />
+                            <ActionIcon type="delete" size="sm" />
                           </Button>
                         </div>
                       </div>
@@ -446,7 +447,7 @@ const UserCollegeMappingModal = (props: UserCollegeMappingModalProps) => {
                                         handleDeleteAccess(level.id)
                                       }
                                     >
-                                      <MdDelete size={14} />
+                                      <ActionIcon type="delete" size="sm" />
                                     </Button>
                                   </td>
                                 </tr>

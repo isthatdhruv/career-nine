@@ -194,6 +194,8 @@ public class AssessmentQuestionController {
         existingQuestion.setQuestionText(assessmentQuestions.getQuestionText());
         existingQuestion.setQuestionType(assessmentQuestions.getQuestionType());
         existingQuestion.setMaxOptionsAllowed(assessmentQuestions.getMaxOptionsAllowed());
+        existingQuestion.setOptionsRule(assessmentQuestions.getOptionsRule());
+        existingQuestion.setOptionsCount(assessmentQuestions.getOptionsCount());
         existingQuestion.setIsMQT(assessmentQuestions.getIsMQT());
         existingQuestion.setQuestionMediaType(assessmentQuestions.getQuestionMediaType());
         existingQuestion.setQuestionImageUrl(assessmentQuestions.getQuestionImageUrl());

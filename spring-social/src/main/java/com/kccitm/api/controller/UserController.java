@@ -173,6 +173,7 @@ public class UserController {
         // Build student profile info
         Map<String, Object> profile = new HashMap<>();
         profile.put("userStudentId", userStudentId);
+        profile.put("userId", user.getId());
         profile.put("infoCompleted", Boolean.TRUE.equals(userStudent.getInfoCompleted()));
 
         // Fields from User entity

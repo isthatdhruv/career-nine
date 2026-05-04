@@ -37,10 +37,18 @@ public class CounsellingSlotController {
 
     @GetMapping("/available")
     public ResponseEntity<List<CounsellingSlot>> getAvailable(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate week) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate week,
+            @RequestParam(required = false) Integer instituteCode) {
         LocalDate weekStart = (week != null) ? week : LocalDate.now();
-        logger.info("Fetching available slots for week starting: {}", weekStart);
-        List<CounsellingSlot> slots = bookingService.getAvailableSlots(weekStart);
+
+        List<CounsellingSlot> slots;
+        if (instituteCode != null) {
+            logger.info("Fetching available slots for week {} filtered by institute {}", weekStart, instituteCode);
+            slots = bookingService.getAvailableSlotsForInstitute(weekStart, instituteCode);
+        } else {
+            logger.info("Fetching available slots for week starting: {}", weekStart);
+            slots = bookingService.getAvailableSlots(weekStart);
+        }
         return ResponseEntity.ok(slots);
     }
 

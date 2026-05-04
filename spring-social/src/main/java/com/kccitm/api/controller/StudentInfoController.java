@@ -57,6 +57,9 @@ import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
+import com.kccitm.api.repository.AssessmentSubmissionFailureRepository;
+import com.kccitm.api.repository.AssessmentAdminActionRepository;
+import com.kccitm.api.model.career9.AssessmentAdminAction;
 import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.exception.ServiceException;
 import com.kccitm.api.repository.UserRepository;
@@ -90,6 +93,14 @@ public class StudentInfoController {
     private com.kccitm.api.service.AssessmentSessionService assessmentSessionService;
     @Autowired
     private com.kccitm.api.repository.Career9.School.SchoolSectionsRepository schoolSectionsRepository;
+    @Autowired
+    private AssessmentSubmissionFailureRepository submissionFailureRepository;
+    @Autowired
+    private AssessmentAdminActionRepository adminActionRepository;
+    @Autowired
+    private com.kccitm.api.repository.Career9.DemographicFieldDefinitionRepository demographicFieldDefinitionRepository;
+    @Autowired
+    private com.kccitm.api.repository.Career9.StudentDemographicResponseRepository studentDemographicResponseRepository;
 
     @GetMapping("/getAll")
     public List<StudentInfo> getAllStudentInfo() {
@@ -330,12 +341,16 @@ public class StudentInfoController {
 
     @PostMapping("/bulkAlotAssessment")
     @org.springframework.transaction.annotation.Transactional
-    public synchronized List<StudentAssessmentMapping> bulkAlotAssessment(
+    public synchronized ResponseEntity<?> bulkAlotAssessment(
             @RequestBody List<java.util.Map<String, Long>> assignments) {
         List<StudentAssessmentMapping> savedMappings = new java.util.ArrayList<>();
 
         // Deduplicate assignments in the request itself
         java.util.Set<String> processedKeys = new java.util.HashSet<>();
+
+        // Cache per-institute remaining capacity so we don't re-query mid-loop
+        // and so we honor the cumulative limit across the request batch.
+        java.util.Map<Integer, Long> remainingByInstitute = new java.util.HashMap<>();
 
         for (java.util.Map<String, Long> assignment : assignments) {
             Long userStudentId = assignment.get("userStudentId");
@@ -348,6 +363,45 @@ public class StudentInfoController {
                     continue; // Skip duplicate in same request
                 }
                 processedKeys.add(key);
+
+                // Resolve institute for this student so we can enforce the per-institute cap
+                java.util.Optional<UserStudent> userStudentOpt = userStudentRepository.findById(userStudentId);
+                if (!userStudentOpt.isPresent() || userStudentOpt.get().getInstitute() == null) {
+                    // Couldn't resolve institute — skip enforcement, fall through to existing flow
+                } else {
+                    Integer instituteCode = userStudentOpt.get().getInstitute().getInstituteCode();
+
+                    // Lazy-load the institute's remaining capacity once per institute per request
+                    if (!remainingByInstitute.containsKey(instituteCode)) {
+                        // Use primitive int to hit the custom findById(int) overload
+                        // (the inherited JpaRepository.findById(Integer) returns Optional)
+                        com.kccitm.api.model.career9.school.InstituteDetail institute =
+                                instituteDetailRepository.findById(instituteCode.intValue());
+                        Integer max = (institute != null) ? institute.getMaxAssessments() : null;
+                        if (max == null) {
+                            // Null = unlimited
+                            remainingByInstitute.put(instituteCode, Long.MAX_VALUE);
+                        } else {
+                            long current = studentAssessmentMappingRepository.countByInstituteCode(instituteCode);
+                            remainingByInstitute.put(instituteCode, Math.max(0, max - current));
+                        }
+                    }
+
+                    long remaining = remainingByInstitute.get(instituteCode);
+                    if (remaining <= 0) {
+                        // Institute is at or over its cap — reject this request with details.
+                        java.util.Map<String, Object> err = new java.util.HashMap<>();
+                        err.put("error", "Institute assessment limit reached");
+                        err.put("instituteCode", instituteCode);
+                        err.put("createdSoFar", savedMappings.size());
+                        err.put("remainingForInstitute", 0);
+                        return ResponseEntity
+                            .status(org.springframework.http.HttpStatus.CONFLICT)
+                            .body(err);
+                    }
+
+                    remainingByInstitute.put(instituteCode, remaining - 1);
+                }
 
                 // Check if mapping already exists in database
                 java.util.Optional<StudentAssessmentMapping> existingMapping = studentAssessmentMappingRepository
@@ -362,7 +416,7 @@ public class StudentInfoController {
                 // If mapping exists, skip (don't create duplicate)
             }
         }
-        return savedMappings;
+        return ResponseEntity.ok(savedMappings);
     }
 
     @GetMapping("/getByInstituteId/{instituteId}")
@@ -375,8 +429,30 @@ public class StudentInfoController {
     public List<java.util.Map<String, Object>> getStudentsWithMappingByInstituteId(
             @PathVariable("instituteId") Integer instituteId) {
         try {
-            // 1. Bulk load all students for this institute (1 query)
             List<StudentInfo> students = studentInfoRepository.findByInstituteId(instituteId);
+            return assembleStudentsWithMapping(students);
+        } catch (Exception e) {
+            System.out.println("Error in getStudentsWithMappingByInstituteId: " + e.getMessage());
+            e.printStackTrace();
+            return new java.util.ArrayList<>();
+        }
+    }
+
+    @Transactional
+    @GetMapping("/getAllStudentsWithMapping")
+    public List<java.util.Map<String, Object>> getAllStudentsWithMapping() {
+        try {
+            List<StudentInfo> students = studentInfoRepository.findAll();
+            return assembleStudentsWithMapping(students);
+        } catch (Exception e) {
+            System.out.println("Error in getAllStudentsWithMapping: " + e.getMessage());
+            e.printStackTrace();
+            return new java.util.ArrayList<>();
+        }
+    }
+
+    private List<java.util.Map<String, Object>> assembleStudentsWithMapping(List<StudentInfo> students) {
+        try {
             if (students.isEmpty()) return new java.util.ArrayList<>();
 
             // 2. Collect all studentInfo IDs
@@ -422,6 +498,59 @@ public class StudentInfoController {
                 }
             }
 
+            // 5b. Bulk load latest gender from demographic responses (CUSTOM fields).
+            //     SYSTEM gender writes back to studentInfo.gender, but if the gender
+            //     field is configured as CUSTOM, the value lives in
+            //     student_demographic_response. The stored responseValue is the
+            //     option's `option_value` (often a numeric id like "1") — we resolve
+            //     it to the human-readable `option_label` via the field's options.
+            //     We prefer the demographic response value and fall back to
+            //     studentInfo.gender otherwise.
+            Map<Long, String> genderByUserStudentId = new HashMap<>();
+            try {
+                List<com.kccitm.api.model.career9.DemographicFieldDefinition> genderFields =
+                        demographicFieldDefinitionRepository.findGenderLikeFields("gender");
+                if (!genderFields.isEmpty() && !allUserStudentIds.isEmpty()) {
+                    // fieldId -> (optionValue -> optionLabel)
+                    Map<Long, Map<String, String>> optionLabelByField = new HashMap<>();
+                    List<Long> genderFieldIds = new ArrayList<>();
+                    for (com.kccitm.api.model.career9.DemographicFieldDefinition f : genderFields) {
+                        genderFieldIds.add(f.getFieldId());
+                        Map<String, String> optionMap = new HashMap<>();
+                        if (f.getOptions() != null) {
+                            for (com.kccitm.api.model.career9.DemographicFieldOption opt : f.getOptions()) {
+                                if (opt.getOptionValue() != null) {
+                                    optionMap.put(opt.getOptionValue(),
+                                            opt.getOptionLabel() != null
+                                                    ? opt.getOptionLabel()
+                                                    : opt.getOptionValue());
+                                }
+                            }
+                        }
+                        optionLabelByField.put(f.getFieldId(), optionMap);
+                    }
+
+                    List<com.kccitm.api.model.career9.StudentDemographicResponse> responses =
+                            studentDemographicResponseRepository
+                                    .findByUserStudentIdInAndFieldDefinitionFieldIdIn(
+                                            allUserStudentIds, genderFieldIds);
+                    for (com.kccitm.api.model.career9.StudentDemographicResponse r : responses) {
+                        String raw = r.getResponseValue();
+                        if (raw == null || raw.trim().isEmpty()) continue;
+                        Long fieldId = r.getFieldDefinition() != null
+                                ? r.getFieldDefinition().getFieldId() : null;
+                        Map<String, String> optionMap = fieldId != null
+                                ? optionLabelByField.get(fieldId) : null;
+                        String resolved = (optionMap != null && optionMap.containsKey(raw))
+                                ? optionMap.get(raw)
+                                : raw;
+                        genderByUserStudentId.put(r.getUserStudentId(), resolved);
+                    }
+                }
+            } catch (Exception ex) {
+                System.out.println("Warning: failed to load demographic gender data: " + ex.getMessage());
+            }
+
             // 6. Assemble response in memory — no more DB queries
             List<java.util.Map<String, Object>> result = new java.util.ArrayList<>();
 
@@ -436,6 +565,18 @@ public class StudentInfoController {
                 studentData.put("studentDob", si.getStudentDob());
                 studentData.put("schoolSectionId", si.getSchoolSectionId());
                 studentData.put("controlNumber", si.getControlNumber());
+                try {
+                    UserStudent usForGender = studentInfoToUserStudent.get(si.getId());
+                    Long usId = usForGender != null ? usForGender.getUserStudentId() : null;
+                    String demographicGender = usId != null ? genderByUserStudentId.get(usId) : null;
+                    String fallbackGender = si.getGender();
+                    String resolvedGender = (demographicGender != null && !demographicGender.trim().isEmpty())
+                            ? demographicGender
+                            : fallbackGender;
+                    studentData.put("gender", resolvedGender);
+                } catch (Exception e) {
+                    studentData.put("gender", si.getGender());
+                }
                 try {
                     studentData.put("username", si.getUser() != null ? si.getUser().getUsername() : null);
                     studentData.put("loginDob", si.getUser() != null ? si.getUser().getDobDate() : null);
@@ -488,7 +629,7 @@ public class StudentInfoController {
 
             return result;
         } catch (Exception e) {
-            System.out.println("Error in getStudentsWithMappingByInstituteId: " + e.getMessage());
+            System.out.println("Error in assembleStudentsWithMapping: " + e.getMessage());
             e.printStackTrace();
             return new java.util.ArrayList<>();
         }
@@ -612,9 +753,14 @@ public class StudentInfoController {
 
     @PostMapping("/resetAssessment")
     @javax.transaction.Transactional
-    public ResponseEntity<?> resetAssessment(@RequestBody Map<String, Long> request) {
-        Long userStudentId = request.get("userStudentId");
-        Long assessmentId = request.get("assessmentId");
+    public ResponseEntity<?> resetAssessment(@RequestBody Map<String, Object> request) {
+        Object usIdRaw = request.get("userStudentId");
+        Object asIdRaw = request.get("assessmentId");
+        Long userStudentId = usIdRaw instanceof Number ? ((Number) usIdRaw).longValue() : null;
+        Long assessmentId = asIdRaw instanceof Number ? ((Number) asIdRaw).longValue() : null;
+        String reason = request.get("reason") instanceof String ? (String) request.get("reason") : null;
+        Object adminRaw = request.get("adminUserId");
+        Long adminUserId = adminRaw instanceof Number ? ((Number) adminRaw).longValue() : null;
 
         if (userStudentId == null || assessmentId == null) {
             Map<String, String> error = new HashMap<>();
@@ -626,6 +772,29 @@ public class StudentInfoController {
         StudentAssessmentMapping mapping = studentAssessmentMappingRepository
                 .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("StudentAssessmentMapping", "userStudentId/assessmentId", userStudentId + "/" + assessmentId));
+
+        // Enforce per-assessment reset cap before doing any destructive work.
+        // Pull current cap from AssessmentTable.maxResetsPerStudent (null = unlimited).
+        java.util.Optional<com.kccitm.api.model.career9.AssessmentTable> assessmentOpt =
+                assessmentTableRepository.findById(assessmentId);
+        Integer maxResets = assessmentOpt.map(a -> a.getMaxResetsPerStudent()).orElse(null);
+        int alreadyReset = mapping.getResetCount();
+        if (maxResets != null && alreadyReset >= maxResets) {
+            Map<String, Object> err = new HashMap<>();
+            err.put("error", "Reset limit reached for this assessment");
+            err.put("assessmentId", assessmentId);
+            err.put("userStudentId", userStudentId);
+            err.put("resetCount", alreadyReset);
+            err.put("maxResetsPerStudent", maxResets);
+            return ResponseEntity
+                .status(org.springframework.http.HttpStatus.CONFLICT)
+                .body(err);
+        }
+
+        // Capture before-state for audit
+        String beforeState = String.format(
+                "{\"status\":\"%s\",\"persistenceState\":\"%s\"}",
+                mapping.getStatus(), mapping.getPersistenceState());
 
         // Delete assessment answers for this student + assessment
         assessmentAnswerRepository.deleteByUserStudent_UserStudentIdAndAssessment_Id(
@@ -642,18 +811,44 @@ public class StudentInfoController {
         // Clear all Redis state for this student+assessment to prevent:
         // 1. Auto-flush writing stale partial answers back to MySQL
         // 2. Retry scheduler re-processing old submitted answers
-        assessmentSessionService.deleteSession(userStudentId, assessmentId);
-        assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
-        assessmentSessionService.deletePartialAnswers(userStudentId, assessmentId);
-        assessmentSessionService.deleteSubmittedAnswers(userStudentId, assessmentId);
+        assessmentSessionService.clearAllForMapping(userStudentId, assessmentId);
 
-        // Reset status to 'notstarted'
+        // Resolve any submission failure row so the retry scheduler forgets about it
+        submissionFailureRepository
+                .findByUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                .ifPresent(row -> {
+                    row.setResolved(true);
+                    row.setResolvedAt(java.time.Instant.now());
+                    row.setNextRetryAt(null);
+                    submissionFailureRepository.save(row);
+                });
+
+        // Reset status to 'notstarted', clear persistenceState, and bump the reset counter
         mapping.setStatus("notstarted");
+        mapping.setPersistenceState(null);
+        mapping.setResetCount(alreadyReset + 1);
         studentAssessmentMappingRepository.save(mapping);
+
+        // Audit trail
+        AssessmentAdminAction audit = new AssessmentAdminAction();
+        audit.setActionType("reset");
+        audit.setUserStudentId(userStudentId);
+        audit.setAssessmentId(assessmentId);
+        audit.setAdminUserId(adminUserId);
+        audit.setActionAt(java.time.Instant.now());
+        audit.setReason(reason);
+        audit.setBeforeStateJson(beforeState);
+        audit.setAfterStateJson("{\"status\":\"notstarted\",\"persistenceState\":null}");
+        adminActionRepository.save(audit);
 
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         response.put("message", "Assessment reset successfully");
+        response.put("resetCount", mapping.getResetCount());
+        if (maxResets != null) {
+            response.put("maxResetsPerStudent", maxResets);
+            response.put("remaining", Math.max(0, maxResets - mapping.getResetCount()));
+        }
         return ResponseEntity.ok(response);
     }
 

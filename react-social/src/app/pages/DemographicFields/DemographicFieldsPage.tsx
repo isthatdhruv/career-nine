@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAllDemographicFields } from './API/DemographicField_APIs';
 import DemographicFieldTable from './components/DemographicFieldTable';
+import PageHeader from '../../components/PageHeader';
 
 const DemographicFieldsPage = () => {
   const navigate = useNavigate();
@@ -26,29 +27,28 @@ const DemographicFieldsPage = () => {
   }, []);
 
   return (
-    <div style={{ background: "#f8fafc", minHeight: "100vh", padding: "24px" }}>
-      {/* Page Header */}
-      <div className="d-flex align-items-center justify-content-between flex-wrap gap-3" style={{ marginBottom: "24px" }}>
-        <div className="d-flex align-items-center gap-3">
-          <div style={{ width: "40px", height: "40px", borderRadius: "8px", background: "#d97706", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <i className="bi bi-person-vcard-fill text-white" style={{ fontSize: "1.1rem" }}></i>
-          </div>
-          <div>
-            <h4 style={{ margin: 0, color: "#111827", fontWeight: 700, fontSize: "1.3rem" }}>Demographic Fields</h4>
-            <p style={{ margin: 0, color: "#6b7280", fontSize: "0.82rem" }}>
-              {loading ? "Loading..." : `${data.length} fields configured`}
-            </p>
-          </div>
-        </div>
-        <button
-          className="btn d-flex align-items-center gap-2"
-          onClick={() => navigate('/demographic-fields/create')}
-          style={{ background: "#d97706", color: "#fff", border: "none", borderRadius: "6px", padding: "8px 16px", fontWeight: 600, fontSize: "0.85rem" }}
-        >
-          <i className="bi bi-plus-lg"></i>
-          Create New Field
-        </button>
-      </div>
+    <div className="ph-page">
+      <PageHeader
+        icon={<i className="bi bi-person-vcard" />}
+        title="Demographic Fields"
+        subtitle={
+          loading ? (
+            "Loading..."
+          ) : (
+            <>
+              <strong>{data.length}</strong> fields configured
+            </>
+          )
+        }
+        actions={[
+          {
+            label: "Create New Field",
+            iconClass: "bi-plus-lg",
+            onClick: () => navigate('/demographic-fields/create'),
+            variant: "primary",
+          },
+        ]}
+      />
 
       {/* Loading */}
       {loading && (

@@ -1,21 +1,12 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import '../Counselling.css'
-import { showErrorToast } from '../../../utils/toast'
-import PortalLayout, { MenuItem } from '../../portal/PortalLayout'
-import StatusBadge from '../shared/StatusBadge'
 import NotificationBell from '../shared/NotificationBell'
-import { getStudentAppointments, cancelAppointment } from '../API/AppointmentAPI'
+import { getStudentAppointments } from '../API/AppointmentAPI'
 import UpcomingSessionCard from './components/UpcomingSessionCard'
 import PastSessionCard from './components/PastSessionCard'
-
-const STUDENT_MENU_ITEMS: MenuItem[] = [
-  { label: 'Dashboard', path: '/student/dashboard', icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><rect x='3' y='3' width='7' height='7' rx='1'/><rect x='14' y='3' width='7' height='7' rx='1'/><rect x='3' y='14' width='7' height='7' rx='1'/><rect x='14' y='14' width='7' height='7' rx='1'/></svg> },
-  { label: 'Assessments', path: '/student/assessments', icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><path d='M9 11l3 3L22 4'/><path d='M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'/></svg> },
-  { label: 'My Reports', path: '/student/reports', icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><path d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/><polyline points='14 2 14 8 20 8'/><line x1='16' y1='13' x2='8' y2='13'/><line x1='16' y1='17' x2='8' y2='17'/></svg> },
-  { label: 'Counselling', path: '/student/counselling', icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><path d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/></svg> },
-]
-const STUDENT_STORAGE_KEYS = ['studentPortalProfile', 'studentPortalDashboard', 'studentPortalLoggedIn']
+import PendingRatingPrompt from './components/PendingRatingPrompt'
+import { useRefreshInterval } from '../../../utils/useAutoRefresh'
 
 interface Slot {
   date: string
@@ -31,14 +22,14 @@ interface Appointment {
   meetingLink?: string
   slot: Slot
   counsellorName?: string
+  studentRescheduleCount?: number
 }
 
-type TabKey = 'upcoming' | 'past' | 'pending'
+type TabKey = 'upcoming' | 'past'
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'upcoming', label: 'Upcoming' },
   { key: 'past', label: 'Past Sessions' },
-  { key: 'pending', label: 'Pending Requests' },
 ]
 
 function getTodayISODate(): string {
@@ -49,24 +40,10 @@ function getTodayISODate(): string {
   return `${y}-${m}-${d}`
 }
 
-function formatDate(dateStr: string): string {
-  try {
-    const d = new Date(dateStr + 'T00:00:00')
-    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-  } catch {
-    return dateStr
-  }
-}
-
-function formatTime(timeStr: string): string {
-  try {
-    const [hours, minutes] = timeStr.split(':').map(Number)
-    const period = hours >= 12 ? 'PM' : 'AM'
-    const displayHours = hours % 12 || 12
-    return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`
-  } catch {
-    return timeStr
-  }
+function hasSlotEnded(slot: Slot): boolean {
+  if (!slot?.date || !slot?.endTime) return false
+  const end = new Date(`${slot.date}T${slot.endTime}`)
+  return !isNaN(end.getTime()) && end.getTime() <= Date.now()
 }
 
 const StudentCounsellingPage: React.FC = () => {
@@ -74,7 +51,9 @@ const StudentCounsellingPage: React.FC = () => {
 
   const studentId: number = (() => {
     try {
-      return JSON.parse(localStorage.getItem('studentPortalDashboard') || '{}')?.userStudentId || 0
+      const profile = JSON.parse(localStorage.getItem('studentPortalProfile') || '{}')
+      const dashboard = JSON.parse(localStorage.getItem('studentPortalDashboard') || '{}')
+      return profile?.userStudentId || dashboard?.userStudentId || 0
     } catch {
       return 0
     }
@@ -92,50 +71,57 @@ const StudentCounsellingPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabKey>('upcoming')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [cancellingId, setCancellingId] = useState<number | null>(null)
 
-  useEffect(() => {
-    if (!studentId) {
-      setLoading(false)
-      return
-    }
-    setLoading(true)
+  const fetchAppointments = useCallback((opts?: { silent?: boolean }) => {
+    if (!studentId) { setLoading(false); return }
+    if (!opts?.silent) setLoading(true)
     getStudentAppointments(studentId)
       .then((res) => {
-        const data: Appointment[] = Array.isArray(res.data) ? res.data : []
+        const raw = Array.isArray(res.data) ? res.data : []
+        const data: Appointment[] = raw.map((a: any) => ({
+          appointmentId: a.id ?? a.appointmentId,
+          status: a.status,
+          reason: a.studentReason ?? a.reason,
+          meetingLink: a.meetingLink,
+          counsellorName: a.counsellor?.name ?? a.counsellorName,
+          studentRescheduleCount: a.studentRescheduleCount ?? 0,
+          slot: a.slot
+            ? {
+                date: a.slot.date,
+                startTime: a.slot.startTime,
+                endTime: a.slot.endTime,
+                durationMinutes: a.slot.durationMinutes,
+              }
+            : { date: '', startTime: '', endTime: '', durationMinutes: 0 },
+        }))
         setAppointments(data)
       })
       .catch(() => {
-        setError('Failed to load appointments. Please try again.')
+        if (!opts?.silent) setError('Failed to load appointments. Please try again.')
       })
-      .finally(() => setLoading(false))
+      .finally(() => { if (!opts?.silent) setLoading(false) })
   }, [studentId])
+
+  useEffect(() => { fetchAppointments() }, [fetchAppointments])
+  useRefreshInterval(() => fetchAppointments({ silent: true }), { skip: !studentId })
 
   const today = getTodayISODate()
 
   const upcomingAppointments = appointments.filter(
-    (a) => a.status === 'CONFIRMED' && a.slot?.date >= today
+    (a) => a.status === 'CONFIRMED' && a.slot?.date >= today && !hasSlotEnded(a.slot)
   )
-  const pastAppointments = appointments.filter((a) => a.status === 'COMPLETED')
-  const pendingAppointments = appointments.filter(
-    (a) => a.status === 'PENDING' || a.status === 'ASSIGNED'
-  )
+  const pastAppointments = appointments
+    .filter(
+      (a) =>
+        a.status === 'COMPLETED' ||
+        (a.status === 'CONFIRMED' && hasSlotEnded(a.slot))
+    )
+    .map((a) =>
+      a.status === 'CONFIRMED' && hasSlotEnded(a.slot) ? { ...a, status: 'ENDED' } : a
+    )
 
-  const handleCancel = (appointmentId: number) => {
-    if (!window.confirm('Are you sure you want to cancel this session?')) return
-    setCancellingId(appointmentId)
-    cancelAppointment(appointmentId, userId, 'Cancelled by student')
-      .then(() => {
-        setAppointments((prev) =>
-          prev.map((a) =>
-            a.appointmentId === appointmentId ? { ...a, status: 'CANCELLED' } : a
-          )
-        )
-      })
-      .catch(() => {
-        showErrorToast('Could not cancel the session. Please try again.')
-      })
-      .finally(() => setCancellingId(null))
+  const handleReschedule = (appointmentId: number) => {
+    navigate('/student/counselling/book', { state: { rescheduleAppointmentId: appointmentId } })
   }
 
   const handleBookSession = () => {
@@ -145,7 +131,6 @@ const StudentCounsellingPage: React.FC = () => {
   const getTabCount = (key: TabKey): number => {
     if (key === 'upcoming') return upcomingAppointments.length
     if (key === 'past') return pastAppointments.length
-    if (key === 'pending') return pendingAppointments.length
     return 0
   }
 
@@ -202,7 +187,7 @@ const StudentCounsellingPage: React.FC = () => {
             <UpcomingSessionCard
               key={appt.appointmentId}
               appointment={appt}
-              onCancel={handleCancel}
+              onReschedule={handleReschedule}
             />
           ))}
         </div>
@@ -233,70 +218,11 @@ const StudentCounsellingPage: React.FC = () => {
       )
     }
 
-    if (activeTab === 'pending') {
-      if (pendingAppointments.length === 0) {
-        return (
-          <div className='cl-card' style={{ textAlign: 'center', padding: '48px 24px' }}>
-            <svg width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='#B0BEC5' strokeWidth='1.5' style={{ marginBottom: 16 }}>
-              <circle cx='12' cy='12' r='10' />
-              <line x1='12' y1='8' x2='12' y2='12' />
-              <line x1='12' y1='16' x2='12.01' y2='16' />
-            </svg>
-            <div style={{ fontSize: 15, fontWeight: 600, color: '#455A64' }}>No pending requests</div>
-            <div style={{ fontSize: 13, color: '#78909C', marginTop: 4 }}>
-              Requests awaiting counsellor assignment will appear here
-            </div>
-          </div>
-        )
-      }
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {pendingAppointments.map((appt) => (
-            <div key={appt.appointmentId} className='cl-card cl-card-warning'>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <StatusBadge status={appt.status} />
-                {appt.slot?.date && (
-                  <span style={{ fontSize: 12, color: 'var(--sp-muted, #5C7A72)' }}>
-                    Requested for {formatDate(appt.slot.date)}
-                  </span>
-                )}
-              </div>
-              {appt.slot && (
-                <div style={{ fontSize: 13, color: 'var(--sp-muted, #5C7A72)', marginBottom: 8 }}>
-                  <svg width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' style={{ verticalAlign: 'middle', marginRight: 4 }}>
-                    <circle cx='12' cy='12' r='10' />
-                    <polyline points='12 6 12 12 16 14' />
-                  </svg>
-                  {formatTime(appt.slot.startTime)} – {formatTime(appt.slot.endTime)}
-                </div>
-              )}
-              {appt.reason && (
-                <div style={{ fontSize: 13, color: 'var(--sp-text, #1A2B28)', lineHeight: 1.5 }}>
-                  <span style={{ fontWeight: 500 }}>Reason: </span>
-                  {appt.reason}
-                </div>
-              )}
-              {appt.status === 'ASSIGNED' && (
-                <div style={{ marginTop: 8, fontSize: 12, color: '#1E40AF', fontStyle: 'italic' }}>
-                  A counsellor has been assigned — awaiting confirmation
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )
-    }
-
     return null
   }
 
   return (
-    <PortalLayout
-      title='Career Navigator 360'
-      menuItems={STUDENT_MENU_ITEMS}
-      storageKeys={STUDENT_STORAGE_KEYS}
-      loginPath='/student/login'
-    >
+    <>
       <div style={{ maxWidth: 760 }}>
         {/* Header */}
         <div
@@ -375,7 +301,8 @@ const StudentCounsellingPage: React.FC = () => {
         {/* Tab content */}
         {renderContent()}
       </div>
-    </PortalLayout>
+      {studentId > 0 && <PendingRatingPrompt studentId={studentId} />}
+    </>
   )
 }
 

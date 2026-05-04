@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { ReadCollegeData } from "../College/API/College_APIs";
 import { getAllAssessments, getBetReport, BetReportResponse, exportScoresByInstitute } from "../StudentInformation/StudentInfo_APIs";
+import { ActionIcon } from "../../components/ActionIcon";
 
 interface Institute {
   instituteCode: number;
@@ -320,7 +321,7 @@ const ReportsPage: React.FC = () => {
                       </>
                     ) : (
                       <>
-                        <i className="bi bi-file-earmark-excel me-2"></i>
+                        <ActionIcon type="excel" size="sm" className="me-2" />
                         Download Raw Scores
                       </>
                     )}

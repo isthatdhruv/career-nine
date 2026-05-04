@@ -5,6 +5,7 @@ import { getStudentsWithMappingByInstituteId, getAllAssessments, bulkAlotAssessm
 import StudentAnswerExcelModal from "./StudentAnswerExcelModal";
 import ResetAssessmentModal from "./ResetAssessmentModal";
 import CreateStudentModal from "./CreateStudentModal";
+import { ActionIcon } from "../../components/ActionIcon";
 
 export type Student = {
   id: number;
@@ -39,10 +40,40 @@ export default function StudentsList() {
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetStudent, setResetStudent] = useState<Student | null>(null);
 
-  useEffect(() => {
+  const refreshStudents = () => {
     const instituteId = localStorage.getItem('instituteId');
+    if (!instituteId) {
+      setStudentsLoading(false);
+      return;
+    }
+    setStudentsLoading(true);
+    getStudentsWithMappingByInstituteId(Number(instituteId))
+      .then(response => {
+        const studentData = response.data.map((student: any) => {
+          const assignedIds = Array.isArray(student.assignedAssessmentIds)
+            ? student.assignedAssessmentIds
+            : [];
+          return {
+            id: student.id,
+            name: student.name || "",
+            schoolRollNumber: student.schoolRollNumber || "",
+            controlNumber: student.controlNumber ?? undefined,
+            selectedAssessment: "",
+            userStudentId: student.userStudentId,
+            assignedAssessmentIds: assignedIds,
+          };
+        });
+        setStudents(studentData);
+      })
+      .catch(error => {
+        console.error("Error fetching student info:", error);
+      })
+      .finally(() => {
+        setStudentsLoading(false);
+      });
+  };
 
-    // Fetch assessments
+  useEffect(() => {
     setAssessmentsLoading(true);
     getAllAssessments()
       .then(response => {
@@ -56,37 +87,7 @@ export default function StudentsList() {
         setAssessmentsLoading(false);
       });
 
-    // Fetch students
-    if (instituteId) {
-      setStudentsLoading(true);
-      getStudentsWithMappingByInstituteId(Number(instituteId))
-        .then(response => {
-          const studentData = response.data.map((student: any) => {
-            // Ensure assignedAssessmentIds is always an array
-            const assignedIds = Array.isArray(student.assignedAssessmentIds)
-              ? student.assignedAssessmentIds
-              : [];
-            return {
-              id: student.id,
-              name: student.name || "",
-              schoolRollNumber: student.schoolRollNumber || "",
-              controlNumber: student.controlNumber ?? undefined,
-              selectedAssessment: "",
-              userStudentId: student.userStudentId,
-              assignedAssessmentIds: assignedIds,
-            };
-          });
-          setStudents(studentData);
-        })
-        .catch(error => {
-          console.error("Error fetching student info:", error);
-        })
-        .finally(() => {
-          setStudentsLoading(false);
-        });
-    } else {
-      setStudentsLoading(false);
-    }
+    refreshStudents();
   }, []);
 
   const handleAssessmentChange = (studentId: number, assessmentId: string) => {
@@ -240,7 +241,7 @@ export default function StudentsList() {
               }}
               onClick={() => setShowAddModal(true)}
             >
-              <i className="bi bi-plus-lg"></i>
+              <ActionIcon type="add" size="sm" />
               Add Student
             </button>
           </div>
@@ -435,7 +436,7 @@ export default function StudentsList() {
                               transition: 'all 0.2s'
                             }}
                           >
-                            <i className="bi bi-download"></i>
+                            <ActionIcon type="download" size="sm" />
                             Download
                           </button>
                           <button
@@ -450,7 +451,7 @@ export default function StudentsList() {
                               transition: 'all 0.2s'
                             }}
                           >
-                            <i className="bi bi-arrow-counterclockwise"></i>
+                            <ActionIcon type="refresh" size="sm" />
                             Reset
                           </button>
                         </div>
@@ -499,7 +500,7 @@ export default function StudentsList() {
                   </>
                 ) : (
                   <>
-                    <i className="bi bi-check2-circle"></i>
+                    <ActionIcon type="approve" size="sm" />
                     Save Changes
                   </>
                 )}
@@ -533,6 +534,7 @@ export default function StudentsList() {
       <CreateStudentModal
         show={showAddModal}
         onHide={() => setShowAddModal(false)}
+        onSave={() => refreshStudents()}
       />
     </div>
   );

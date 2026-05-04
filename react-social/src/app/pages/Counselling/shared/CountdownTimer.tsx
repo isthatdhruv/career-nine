@@ -9,7 +9,15 @@ interface CountdownTimerProps {
 }
 
 function computeTimeLeft(targetDate: string, targetTime: string): string {
-  const target = new Date(`${targetDate}T${targetTime}:00`)
+  // Normalize to HH:mm:ss regardless of input format (HH:mm or HH:mm:ss)
+  const parts = (targetTime || '00:00:00').split(':')
+  const hh = (parts[0] || '00').padStart(2, '0')
+  const mm = (parts[1] || '00').padStart(2, '0')
+  const ss = (parts[2] || '00').padStart(2, '0')
+  const target = new Date(`${targetDate}T${hh}:${mm}:${ss}`)
+
+  if (isNaN(target.getTime())) return '—'
+
   const now = new Date()
   const diffMs = target.getTime() - now.getTime()
 

@@ -46,6 +46,18 @@ public class AssessmentQuestions implements Serializable {
     @Column(name = "max_options_allowed")
     private int maxOptionsAllowed;
 
+    // New rule-based selection model. The admin chooses one of:
+    //   "min"   — student must select AT LEAST optionsCount options
+    //   "max"   — student must select AT MOST optionsCount options
+    //   "equal" — student must select EXACTLY optionsCount options
+    // For backward compatibility, legacy rows have optionsRule = null and the
+    // student portal falls back to the "equal maxOptionsAllowed" behavior.
+    @Column(name = "options_rule", length = 16)
+    private String optionsRule;
+
+    @Column(name = "options_count")
+    private Integer optionsCount;
+
     @Column(name = "question_media_type")
     private String questionMediaType;
 
@@ -215,5 +227,21 @@ public class AssessmentQuestions implements Serializable {
 
     public void setQuestionVideoUrl(String questionVideoUrl) {
         this.questionVideoUrl = questionVideoUrl;
+    }
+
+    public String getOptionsRule() {
+        return optionsRule;
+    }
+
+    public void setOptionsRule(String optionsRule) {
+        this.optionsRule = optionsRule;
+    }
+
+    public Integer getOptionsCount() {
+        return optionsCount;
+    }
+
+    public void setOptionsCount(Integer optionsCount) {
+        this.optionsCount = optionsCount;
     }
 }

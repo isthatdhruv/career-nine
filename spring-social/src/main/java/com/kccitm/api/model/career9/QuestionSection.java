@@ -31,6 +31,14 @@ public class QuestionSection implements Serializable {
     private String sectionName;
     private String sectionDescription;
 
+    /**
+     * Free-text reference to other content this section is meant to link to —
+     * e.g. another section, an assessment, a tool, or any related context.
+     * Captured during section creation, optional.
+     */
+    @Column(name = "to_be_linked_with", length = 500)
+    private String toBeLinkedWith;
+
     @Column(name = "is_deleted")
     private Boolean isDeleted = false;
 
@@ -76,6 +84,14 @@ public QuestionSection() {
 
     public void setSectionDescription(String sectionDescription) {
         this.sectionDescription = sectionDescription;
+    }
+
+    public String getToBeLinkedWith() {
+        return toBeLinkedWith;
+    }
+
+    public void setToBeLinkedWith(String toBeLinkedWith) {
+        this.toBeLinkedWith = toBeLinkedWith;
     }
 
     // keep the domain getter but prevent full objects from being serialized

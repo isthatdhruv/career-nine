@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PortalLayout, { MenuItem } from '../portal/PortalLayout'
 import {
@@ -8,6 +8,7 @@ import {
   cancelAppointment,
 } from '../Counselling/API/AppointmentAPI'
 import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
+import { useRefreshInterval } from '../../utils/useAutoRefresh'
 import './CounsellorPortal.css'
 
 const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
@@ -20,18 +21,6 @@ const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
         <rect x='14' y='3' width='7' height='7' rx='1' />
         <rect x='3' y='14' width='7' height='7' rx='1' />
         <rect x='14' y='14' width='7' height='7' rx='1' />
-      </svg>
-    ),
-  },
-  {
-    label: 'Students',
-    path: '/counsellor/students',
-    icon: (
-      <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
-        <path d='M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2' />
-        <circle cx='9' cy='7' r='4' />
-        <path d='M23 21v-2a4 4 0 0 0-3-3.87' />
-        <path d='M16 3.13a4 4 0 0 1 0 7.75' />
       </svg>
     ),
   },
@@ -68,15 +57,6 @@ const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
     ),
   },
   {
-    label: 'Messages',
-    path: '/counsellor/messages',
-    icon: (
-      <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
-        <path d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' />
-      </svg>
-    ),
-  },
-  {
     label: 'Reports',
     path: '/counsellor/reports',
     icon: (
@@ -87,11 +67,21 @@ const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
       </svg>
     ),
   },
+  {
+    label: 'My Profile',
+    path: '/counsellor/profile',
+    icon: (
+      <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+        <path d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2' />
+        <circle cx='12' cy='7' r='4' />
+      </svg>
+    ),
+  },
 ]
 
 const COUNSELLOR_STORAGE_KEYS = ['counsellorPortalToken', 'counsellorPortalUser', 'counsellorPortalLoggedIn']
 
-type FilterTab = 'all' | 'today' | 'upcoming' | 'completed' | 'pending'
+type FilterTab = 'all' | 'today' | 'upcoming' | 'completed' | 'pending' | 'cancelled'
 
 function getStatusBadgeStyle(status: string): React.CSSProperties {
   switch ((status || '').toUpperCase()) {
@@ -102,6 +92,7 @@ function getStatusBadgeStyle(status: string): React.CSSProperties {
     case 'PENDING':
       return { background: '#DBEAFE', color: '#1E40AF', padding: '2px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600 }
     case 'COMPLETED':
+    case 'ENDED':
       return { background: '#F3F4F6', color: '#374151', padding: '2px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600 }
     case 'CANCELLED':
     case 'DECLINED':
@@ -111,20 +102,29 @@ function getStatusBadgeStyle(status: string): React.CSSProperties {
   }
 }
 
-function formatDateTime(dateStr: string): string {
-  if (!dateStr) return '—'
-  try {
-    const d = new Date(dateStr)
-    return d.toLocaleString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  } catch {
-    return dateStr
-  }
+/** Build a Date from slot's date ("YYYY-MM-DD") + startTime ("HH:mm:ss"). */
+function buildSlotDate(appt: any): Date | null {
+  const date = appt?.slot?.date
+  const time = appt?.slot?.startTime
+  if (!date) return null
+  const parts = (time || '00:00:00').split(':')
+  const hh = (parts[0] || '00').padStart(2, '0')
+  const mm = (parts[1] || '00').padStart(2, '0')
+  const ss = (parts[2] || '00').padStart(2, '0')
+  const d = new Date(`${date}T${hh}:${mm}:${ss}`)
+  return isNaN(d.getTime()) ? null : d
+}
+
+function formatDateTime(appt: any): string {
+  const d = buildSlotDate(appt)
+  if (!d) return '—'
+  return d.toLocaleString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 function getStudentName(appt: any): string {
@@ -135,31 +135,37 @@ function getStudentName(appt: any): string {
   return appt.studentName || 'Unknown Student'
 }
 
-function isToday(dateStr: string): boolean {
-  if (!dateStr) return false
-  try {
-    const d = new Date(dateStr)
-    const now = new Date()
-    return (
-      d.getDate() === now.getDate() &&
-      d.getMonth() === now.getMonth() &&
-      d.getFullYear() === now.getFullYear()
-    )
-  } catch {
-    return false
-  }
+function hasSlotEnded(appt: any): boolean {
+  const date = appt?.slot?.date
+  const endTime = appt?.slot?.endTime
+  if (!date || !endTime) return false
+  const end = new Date(`${date}T${endTime}`)
+  return !isNaN(end.getTime()) && end.getTime() <= Date.now()
+}
+
+function isEndedConfirmed(appt: any): boolean {
+  return (appt.status || '').toUpperCase() === 'CONFIRMED' && hasSlotEnded(appt)
+}
+
+function isToday(appt: any): boolean {
+  const d = buildSlotDate(appt)
+  if (!d) return false
+  if (isEndedConfirmed(appt)) return false
+  const now = new Date()
+  return (
+    d.getDate() === now.getDate() &&
+    d.getMonth() === now.getMonth() &&
+    d.getFullYear() === now.getFullYear()
+  )
 }
 
 function isUpcoming(appt: any): boolean {
   const status = (appt.status || '').toUpperCase()
   if (status === 'COMPLETED' || status === 'CANCELLED' || status === 'DECLINED') return false
-  const slotDate = appt.slot?.startTime || appt.scheduledAt || ''
-  if (!slotDate) return false
-  try {
-    return new Date(slotDate) > new Date()
-  } catch {
-    return false
-  }
+  if (isEndedConfirmed(appt)) return false
+  const d = buildSlotDate(appt)
+  if (!d) return false
+  return d > new Date()
 }
 
 const CounsellorAppointmentsPage: React.FC = () => {
@@ -176,6 +182,15 @@ const CounsellorAppointmentsPage: React.FC = () => {
   const [cancelModal, setCancelModal] = useState<{ appointmentId: number } | null>(null)
   const [cancelReason, setCancelReason] = useState('')
 
+  const refreshAppointments = useCallback(() => {
+    if (!counsellorId) return
+    getCounsellorAppointments(counsellorId)
+      .then((apptRes) => setAppointments(apptRes.data || []))
+      .catch(() => {})
+  }, [counsellorId])
+
+  useRefreshInterval(refreshAppointments, { skip: !counsellorId })
+
   useEffect(() => {
     const isLoggedIn = localStorage.getItem('counsellorPortalLoggedIn')
     if (!isLoggedIn) {
@@ -186,22 +201,36 @@ const CounsellorAppointmentsPage: React.FC = () => {
       const userStr = localStorage.getItem('counsellorPortalUser')
       if (userStr) {
         const user = JSON.parse(userStr)
-        setUserId(user.id)
-        getCounsellorByUserId(user.id)
-          .then((res) => {
-            const cId = res.data?.id
-            if (!cId) {
-              setError('Counsellor profile not linked yet. Please contact admin to set up your profile.')
-              setLoading(false)
-              return
-            }
-            setCounsellorId(cId)
-            return getCounsellorAppointments(cId).then((apptRes) => {
-              setAppointments(apptRes.data || [])
+        setUserId(user.counsellorId || user.id)
+
+        // New login flow stores counsellorId directly
+        const cId = user.counsellorId || null
+        if (cId) {
+          setCounsellorId(cId)
+          getCounsellorAppointments(cId)
+            .then((apptRes) => setAppointments(apptRes.data || []))
+            .catch(() => setError('Failed to load appointments.'))
+            .finally(() => setLoading(false))
+        } else if (user.id) {
+          // Legacy flow
+          getCounsellorByUserId(user.id)
+            .then((res) => {
+              const resolvedId = res.data?.id
+              if (!resolvedId) {
+                setError('Counsellor profile not found.')
+                setLoading(false)
+                return
+              }
+              setCounsellorId(resolvedId)
+              return getCounsellorAppointments(resolvedId).then((apptRes) => {
+                setAppointments(apptRes.data || [])
+              })
             })
-          })
-          .catch(() => setError('Counsellor profile not found. Please contact admin to set up your profile.'))
-          .finally(() => setLoading(false))
+            .catch(() => setError('Counsellor profile not found.'))
+            .finally(() => setLoading(false))
+        } else {
+          setLoading(false)
+        }
       }
     } catch {
       navigate('/counsellor/login')
@@ -258,46 +287,67 @@ const CounsellorAppointmentsPage: React.FC = () => {
     }
   }
 
-  // Stats
-  const today = appointments.filter((a) => isToday(a.slot?.startTime || a.scheduledAt || ''))
-  const thisWeek = appointments.filter((a) => {
-    const d = a.slot?.startTime || a.scheduledAt || ''
-    if (!d) return false
-    try {
-      const apptDate = new Date(d)
-      const now = new Date()
-      const startOfWeek = new Date(now)
-      startOfWeek.setDate(now.getDate() - now.getDay())
-      startOfWeek.setHours(0, 0, 0, 0)
-      const endOfWeek = new Date(startOfWeek)
-      endOfWeek.setDate(startOfWeek.getDate() + 7)
-      return apptDate >= startOfWeek && apptDate < endOfWeek
-    } catch {
-      return false
-    }
+  // Stats — exclude RESCHEDULED (superseded by their replacement)
+  const activeAppointments = appointments.filter(
+    (a) => (a.status || '').toUpperCase() !== 'RESCHEDULED'
+  )
+  const today = activeAppointments.filter((a) => isToday(a))
+  const thisWeek = activeAppointments.filter((a) => {
+    const apptDate = buildSlotDate(a)
+    if (!apptDate) return false
+    const now = new Date()
+    const startOfWeek = new Date(now)
+    startOfWeek.setDate(now.getDate() - now.getDay())
+    startOfWeek.setHours(0, 0, 0, 0)
+    const endOfWeek = new Date(startOfWeek)
+    endOfWeek.setDate(startOfWeek.getDate() + 7)
+    return apptDate >= startOfWeek && apptDate < endOfWeek
   })
-  const pending = appointments.filter(
+  const pending = activeAppointments.filter(
     (a) => (a.status || '').toUpperCase() === 'ASSIGNED' || (a.status || '').toUpperCase() === 'PENDING'
   )
-  const completed = appointments.filter((a) => (a.status || '').toUpperCase() === 'COMPLETED')
-
-  // Filter
-  const filtered = appointments.filter((a) => {
-    const status = (a.status || '').toUpperCase()
-    const slotDate = a.slot?.startTime || a.scheduledAt || ''
-    switch (activeTab) {
-      case 'today':
-        return isToday(slotDate)
-      case 'upcoming':
-        return isUpcoming(a)
-      case 'completed':
-        return status === 'COMPLETED'
-      case 'pending':
-        return status === 'ASSIGNED' || status === 'PENDING'
-      default:
-        return true
-    }
+  const completed = activeAppointments.filter(
+    (a) => (a.status || '').toUpperCase() === 'COMPLETED' || isEndedConfirmed(a)
+  )
+  const cancelled = activeAppointments.filter((a) => {
+    const s = (a.status || '').toUpperCase()
+    return s === 'CANCELLED' || s === 'DECLINED'
   })
+
+  // Lookup: id -> appointment (used to show "Rescheduled from ..." under replacements)
+  const appointmentsById = new Map<number, any>()
+  appointments.forEach((a) => { if (a.id != null) appointmentsById.set(a.id, a) })
+
+  // Filter out RESCHEDULED rows — they're represented by their replacement,
+  // which carries `rescheduledFromAppointmentId`.
+  const visible = appointments.filter(
+    (a) => (a.status || '').toUpperCase() !== 'RESCHEDULED'
+  )
+
+  const filtered = visible
+    .filter((a) => {
+      const status = (a.status || '').toUpperCase()
+      switch (activeTab) {
+        case 'today':
+          return isToday(a)
+        case 'upcoming':
+          return isUpcoming(a)
+        case 'completed':
+          return status === 'COMPLETED' || isEndedConfirmed(a)
+        case 'pending':
+          return status === 'ASSIGNED' || status === 'PENDING'
+        case 'cancelled':
+          return status === 'CANCELLED' || status === 'DECLINED'
+        default:
+          return true
+      }
+    })
+    .slice()
+    .sort((a, b) => {
+      const ta = new Date(a.updatedAt || a.createdAt || 0).getTime()
+      const tb = new Date(b.updatedAt || b.createdAt || 0).getTime()
+      return tb - ta
+    })
 
   const tabs: { key: FilterTab; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -305,6 +355,7 @@ const CounsellorAppointmentsPage: React.FC = () => {
     { key: 'upcoming', label: 'Upcoming' },
     { key: 'completed', label: 'Completed' },
     { key: 'pending', label: 'Pending' },
+    { key: 'cancelled', label: `Cancelled${cancelled.length ? ` (${cancelled.length})` : ''}` },
   ]
 
   return (
@@ -392,10 +443,16 @@ const CounsellorAppointmentsPage: React.FC = () => {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {filtered.map((appt) => {
-            const status = (appt.status || '').toUpperCase()
-            const slotDate = appt.slot?.startTime || appt.scheduledAt || ''
+            const rawStatus = (appt.status || '').toUpperCase()
+            const ended = isEndedConfirmed(appt)
+            const status = ended ? 'ENDED' : rawStatus
             const studentName = getStudentName(appt)
             const meetingLink = appt.meetingLink || appt.slot?.meetingLink || ''
+            const reason = appt.studentReason || appt.reason || ''
+            const rescheduledFrom = appt.rescheduledFromAppointmentId
+              ? appointmentsById.get(appt.rescheduledFromAppointmentId)
+              : null
+            const rescheduledFromLabel = rescheduledFrom ? formatDateTime(rescheduledFrom) : null
 
             return (
               <div
@@ -408,16 +465,25 @@ const CounsellorAppointmentsPage: React.FC = () => {
                   <div style={{ flex: 1, minWidth: 200 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: '#263B6A' }}>
-                        {formatDateTime(slotDate)}
+                        {formatDateTime(appt)}
                       </span>
                       <span style={getStatusBadgeStyle(status)}>{status}</span>
                     </div>
                     <div style={{ fontSize: 14, fontWeight: 600, color: '#1A1F2E', marginBottom: 4 }}>
                       {studentName}
                     </div>
-                    {appt.reason && (
+                    {reason && (
                       <div style={{ fontSize: 12, color: '#6B7A8D' }}>
-                        Reason: {appt.reason}
+                        Reason: {reason}
+                      </div>
+                    )}
+                    {rescheduledFromLabel && (
+                      <div style={{ fontSize: 12, color: '#92400E', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <svg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+                          <polyline points='23 4 23 10 17 10' />
+                          <path d='M20.49 15a9 9 0 1 1-2.12-9.36L23 10' />
+                        </svg>
+                        Rescheduled from {rescheduledFromLabel}
                       </div>
                     )}
                   </div>
@@ -474,7 +540,7 @@ const CounsellorAppointmentsPage: React.FC = () => {
                       </>
                     )}
 
-                    {status === 'COMPLETED' && (
+                    {(status === 'COMPLETED' || status === 'ENDED') && (
                       <button
                         className='cp-action-btn'
                         onClick={() => navigate('/counsellor/notes')}
