@@ -34,7 +34,7 @@ export function deleteSchoolConfig(configId: number) {
   return axios.delete(`${API_URL}/school-registration/config/delete/${configId}`);
 }
 
-export function generateSchoolLink(data: { instituteCode: number; sessionId: number }) {
+export function generateSchoolLink(data: { instituteCode: number; sessionId: number; maxRegistrations?: number }) {
   return axios.post(`${API_URL}/school-registration/link/generate`, data);
 }
 
@@ -44,6 +44,10 @@ export function getSchoolLink(instituteCode: number, sessionId: number) {
 
 export function toggleSchoolLink(linkId: number) {
   return axios.put(`${API_URL}/school-registration/link/toggle/${linkId}`);
+}
+
+export function updateLinkMaxRegistrations(linkId: number, maxRegistrations: number) {
+  return axios.put(`${API_URL}/school-registration/link/${linkId}/max-registrations`, { maxRegistrations });
 }
 
 // ── Public APIs ──
@@ -63,4 +67,8 @@ export function registerSchoolStudent(token: string, studentData: {
   promoCode?: string;
 }) {
   return axios.post(`${API_URL}/school-registration/public/register/${token}`, studentData);
+}
+
+export function verifyStudentDetails(token: string, body: { email: string; phone: string; dob: string }) {
+  return axios.post(`${API_URL}/school-registration/public/verify-details/${token}`, body);
 }

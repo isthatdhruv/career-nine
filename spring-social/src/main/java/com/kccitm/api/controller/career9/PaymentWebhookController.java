@@ -37,8 +37,10 @@ import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.model.career9.SchoolAssessmentConfig;
+import com.kccitm.api.model.career9.SchoolRegistrationLink;
 import com.kccitm.api.model.career9.school.SchoolClasses;
 import com.kccitm.api.repository.Career9.SchoolAssessmentConfigRepository;
+import com.kccitm.api.repository.Career9.SchoolRegistrationLinkRepository;
 import com.kccitm.api.repository.Career9.School.SchoolClassesRepository;
 import com.kccitm.api.service.CareerNineRollNumberService;
 import com.kccitm.api.service.PaymentEmailService;
@@ -63,6 +65,7 @@ public class PaymentWebhookController {
     @Autowired private PaymentEmailService paymentEmailService;
     @Autowired private SchoolClassesRepository schoolClassesRepository;
     @Autowired private SchoolAssessmentConfigRepository schoolAssessmentConfigRepository;
+    @Autowired private SchoolRegistrationLinkRepository schoolRegistrationLinkRepository;
 
     @Autowired(required = false)
     private com.kccitm.api.service.b2c.EntitlementService entitlementService;
@@ -511,6 +514,8 @@ public class PaymentWebhookController {
             UserStudent userStudent = new UserStudent(user, studentInfo, institute);
             userStudent = userStudentRepository.save(userStudent);
 
+            tryIncrementSchoolLink(txn);
+
             StudentAssessmentMapping sam = new StudentAssessmentMapping(
                     userStudent.getUserStudentId(), assessmentId);
             studentAssessmentMappingRepository.save(sam);
@@ -552,6 +557,7 @@ public class PaymentWebhookController {
             }
             UserStudent newUs = new UserStudent(existingUser, existingStudent, institute);
             newUs = userStudentRepository.save(newUs);
+            tryIncrementSchoolLink(txn);
             userStudents = List.of(newUs);
         }
 
@@ -581,6 +587,33 @@ public class PaymentWebhookController {
         }
 
         logger.info("Existing student assigned assessment via payment. UserStudentId: {}", userStudent.getUserStudentId());
+    }
+
+    private void tryIncrementSchoolLink(PaymentTransaction txn) {
+        if (txn == null || txn.getSchoolConfigId() == null) return;
+        Optional<SchoolAssessmentConfig> configOpt = schoolAssessmentConfigRepository.findById(txn.getSchoolConfigId());
+        if (!configOpt.isPresent()) return;
+        SchoolAssessmentConfig config = configOpt.get();
+        Optional<SchoolRegistrationLink> linkOpt = schoolRegistrationLinkRepository
+                .findByInstituteCodeAndSessionId(config.getInstituteCode(), config.getSessionId());
+        if (!linkOpt.isPresent()) return;
+        Long linkId = linkOpt.get().getLinkId();
+        int rows = schoolRegistrationLinkRepository.tryIncrementCount(linkId);
+        logger.info("School link increment (webhook): linkId={}, rowsAffected={}", linkId, rows);
+        if (rows == 0) {
+            logger.warn("Cap already hit on SchoolRegistrationLink {} when processing payment txn {}; allowing this paid registration through.",
+                    linkId, txn.getTransactionId());
+            return;
+        }
+        schoolRegistrationLinkRepository.findById(linkId).ifPresent(refreshed -> {
+            int max = refreshed.getMaxRegistrations() != null ? refreshed.getMaxRegistrations() : 0;
+            int current = refreshed.getCurrentCount() != null ? refreshed.getCurrentCount() : 0;
+            if (max > 0 && current >= max) {
+                refreshed.setIsActive(false);
+                schoolRegistrationLinkRepository.save(refreshed);
+                logger.info("School link {} hit cap ({}/{}) via webhook, deactivated", linkId, current, max);
+            }
+        });
     }
 
     private Integer parseClassNumber(Integer classId) {

@@ -44,7 +44,7 @@ export function AsideMenuMain() {
     allowed("/college") || allowed("/contact-person") || allowed("/group-student") ||
     allowed("/admin/group-student") || allowed("/school/group-student") ||
     allowed("/school/assigned-students") ||
-    allowed("/board") || allowed("/upload-excel");
+    allowed("/board") || allowed("/upload-excel") || allowed("/assessment-mapping");
 
   const showQuestionnaire =
     allowed("/questionare/create") || allowed("/questionaire/List") ||
@@ -166,6 +166,14 @@ export function AsideMenuMain() {
                 to="/upload-excel"
                 icon="/media/icons/duotune/general/gen044.svg"
                 title="Add Students in Bulk"
+                fontIcon="bi-app-indicator"
+              />
+            )}
+            {allowed("/assessment-mapping") && (
+              <AsideMenuItem
+                to="/assessment-mapping"
+                icon="/media/icons/duotune/general/gen001.svg"
+                title="Assessment Mapping"
                 fontIcon="bi-app-indicator"
               />
             )}

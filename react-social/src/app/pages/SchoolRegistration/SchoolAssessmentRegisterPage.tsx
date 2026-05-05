@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { showErrorToast } from "../../utils/toast";
-import { getSchoolInfo, registerSchoolStudent } from "./API/SchoolRegistration_APIs";
+import { getSchoolInfo, registerSchoolStudent, verifyStudentDetails } from "./API/SchoolRegistration_APIs";
 import { validatePromoCode } from "../PromoCode/API/PromoCode_APIs";
 
 const SchoolAssessmentRegisterPage = () => {
@@ -29,6 +29,11 @@ const SchoolAssessmentRegisterPage = () => {
   const [promoError, setPromoError] = useState("");
   const [promoValidating, setPromoValidating] = useState(false);
 
+  // Pre-submit duplicate verification
+  type VerifyStatus = "idle" | "verifying" | "verified" | "partial" | "duplicate";
+  const [verifyStatus, setVerifyStatus] = useState<VerifyStatus>("idle");
+  const [verifyResult, setVerifyResult] = useState<{ username?: string; password?: string } | null>(null);
+
   useEffect(() => {
     if (token) {
       getSchoolInfo(token)
@@ -36,6 +41,52 @@ const SchoolAssessmentRegisterPage = () => {
         .catch(() => { setError("Invalid or expired registration link."); setLoading(false); });
     }
   }, [token]);
+
+  useEffect(() => {
+    setVerifyStatus("idle");
+    setVerifyResult(null);
+
+    if (!token) return;
+    const trimmedEmail = email.trim();
+    const trimmedPhone = phone.trim();
+    const trimmedDob = dob.trim();
+    if (!trimmedEmail || !trimmedPhone || !trimmedDob) return;
+    if (!/^\d{2}-\d{2}-\d{4}$/.test(trimmedDob)) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) return;
+
+    let cancelled = false;
+    const handle = setTimeout(() => {
+      if (cancelled) return;
+      setVerifyStatus("verifying");
+      verifyStudentDetails(token, { email: trimmedEmail, phone: trimmedPhone, dob: trimmedDob })
+        .then((res) => {
+          if (cancelled) return;
+          const data = res.data || {};
+          if (data.status === "already_registered") {
+            setVerifyStatus("duplicate");
+            setVerifyResult({ username: data.username, password: data.dob });
+          } else if (data.status === "partial_match") {
+            setVerifyStatus("partial");
+            setVerifyResult({ username: data.username, password: data.dob });
+          } else {
+            setVerifyStatus("verified");
+            setVerifyResult(null);
+          }
+        })
+        .catch(() => {
+          if (cancelled) return;
+          // Fall back to verified so a transient backend hiccup doesn't permanently block submission;
+          // the existing submit-time duplicate check is still the backstop.
+          setVerifyStatus("verified");
+          setVerifyResult(null);
+        });
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [email, phone, dob, token]);
 
   // Derived: selected class config
   const classes: any[] = schoolInfo?.classes || [];
@@ -372,6 +423,41 @@ const SchoolAssessmentRegisterPage = () => {
               </div>
             </div>
 
+            {verifyStatus !== "idle" && (
+              <div
+                style={{
+                  borderRadius: 12,
+                  padding: "12px 16px",
+                  fontSize: "0.85rem",
+                  lineHeight: 1.5,
+                  ...(verifyStatus === "verifying" && { background: "#f1f5f9", color: "#475569", border: "1px solid #e2e8f0" }),
+                  ...(verifyStatus === "verified" && { background: "#ecfdf5", color: "#065f46", border: "1px solid #a7f3d0" }),
+                  ...(verifyStatus === "partial" && { background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" }),
+                  ...(verifyStatus === "duplicate" && { background: "#fef2f2", color: "#991b1b", border: "1px solid #fecaca" }),
+                }}
+              >
+                {verifyStatus === "verifying" && (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ ...s.spinner, width: 14, height: 14, borderWidth: 2 }} />
+                    Verifying details...
+                  </span>
+                )}
+                {verifyStatus === "verified" && <span>{"✓"} Verified</span>}
+                {verifyStatus === "partial" && verifyResult && (
+                  <span>
+                    We found existing details &mdash; username: <strong>{verifyResult.username}</strong>, password:{" "}
+                    <strong>{verifyResult.password}</strong>. Please login, or change your email or phone to register a new account.
+                  </span>
+                )}
+                {verifyStatus === "duplicate" && verifyResult && (
+                  <span>
+                    You are already registered. Please login with username <strong>{verifyResult.username}</strong> and password{" "}
+                    <strong>{verifyResult.password}</strong>, or use a different email and phone to register.
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* Promo Code */}
             {isPaid && selectedClassId && (
               <div>
@@ -408,21 +494,34 @@ const SchoolAssessmentRegisterPage = () => {
           </div>
 
           {/* Submit */}
-          <button type="submit" disabled={submitting || !selectedClassId}
-            style={{ ...s.btnPrimary, width: "100%", marginTop: 28, opacity: submitting || !selectedClassId ? 0.7 : 1, cursor: submitting || !selectedClassId ? "not-allowed" : "pointer" }}>
-            {submitting ? (
-              <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-                <div style={{ ...s.spinner, width: 18, height: 18, borderWidth: 2 }} />
-                {isPaid && discountedAmountRupees > 0 ? "Processing..." : "Registering..."}
-              </span>
-            ) : !selectedClassId ? (
-              "Select a class to continue"
-            ) : isPaid && discountedAmountRupees > 0 ? (
-              `Register & Pay INR ${discountedAmountRupees}`
-            ) : (
-              "Register"
-            )}
-          </button>
+          {(() => {
+            const submitBlocked = submitting || !selectedClassId || verifyStatus !== "verified";
+            return (
+              <button type="submit" disabled={submitBlocked}
+                style={{ ...s.btnPrimary, width: "100%", marginTop: 28, opacity: submitBlocked ? 0.7 : 1, cursor: submitBlocked ? "not-allowed" : "pointer" }}>
+                {submitting ? (
+                  <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+                    <div style={{ ...s.spinner, width: 18, height: 18, borderWidth: 2 }} />
+                    {isPaid && discountedAmountRupees > 0 ? "Processing..." : "Registering..."}
+                  </span>
+                ) : !selectedClassId ? (
+                  "Select a class to continue"
+                ) : verifyStatus === "verifying" ? (
+                  "Verifying details..."
+                ) : verifyStatus === "duplicate" ? (
+                  "Already registered — please login"
+                ) : verifyStatus === "partial" ? (
+                  "Change email or phone to continue"
+                ) : verifyStatus === "idle" ? (
+                  "Fill email, phone and date of birth"
+                ) : isPaid && discountedAmountRupees > 0 ? (
+                  `Register & Pay INR ${discountedAmountRupees}`
+                ) : (
+                  "Register"
+                )}
+              </button>
+            );
+          })()}
 
           <p style={{ textAlign: "center", color: "#94a3b8", fontSize: "0.78rem", marginTop: 16, marginBottom: 0 }}>
             By registering, you agree to the assessment terms and conditions.
