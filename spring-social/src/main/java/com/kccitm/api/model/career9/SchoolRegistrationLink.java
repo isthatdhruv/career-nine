@@ -43,6 +43,12 @@ public class SchoolRegistrationLink implements Serializable {
     @Column(name = "is_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
     private Boolean isActive = true;
 
+    @Column(name = "max_registrations", nullable = false, columnDefinition = "INTEGER NOT NULL DEFAULT 0")
+    private Integer maxRegistrations = 0;
+
+    @Column(name = "current_count", nullable = false, columnDefinition = "INTEGER NOT NULL DEFAULT 0")
+    private Integer currentCount = 0;
+
     @Column(name = "created_at")
     @Temporal(TemporalType.TIMESTAMP)
     @JsonFormat(pattern = "dd-MM-yyyy HH:mm:ss")
@@ -55,6 +61,12 @@ public class SchoolRegistrationLink implements Serializable {
         }
         if (this.isActive == null) {
             this.isActive = true;
+        }
+        if (this.maxRegistrations == null) {
+            this.maxRegistrations = 0;
+        }
+        if (this.currentCount == null) {
+            this.currentCount = 0;
         }
     }
 
@@ -74,6 +86,12 @@ public class SchoolRegistrationLink implements Serializable {
 
     public Boolean getIsActive() { return isActive; }
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }
+
+    public Integer getMaxRegistrations() { return maxRegistrations; }
+    public void setMaxRegistrations(Integer maxRegistrations) { this.maxRegistrations = maxRegistrations; }
+
+    public Integer getCurrentCount() { return currentCount; }
+    public void setCurrentCount(Integer currentCount) { this.currentCount = currentCount; }
 
     public Date getCreatedAt() { return createdAt; }
     public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }

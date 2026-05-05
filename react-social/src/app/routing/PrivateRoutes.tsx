@@ -205,6 +205,7 @@ const PrivateRoutes = () => {
   const College = lazy(() => import("../pages/College/CollegePage"));
   // Update the import path below to the correct location if the file exists elsewhere
   const CollegeCreatePage = lazy(() => import("../pages/College/CollegePage"));
+  const AssessmentMappingPage = lazy(() => import("../pages/AssessmentMapping/AssessmentMappingPage"));
   const AssessmentQuestions = lazy(
     () => import("../pages/AssesmentQuestions/CreateQuestion")
   );
@@ -644,6 +645,14 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <CollegeCreatePage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/assessment-mapping"
+          element={
+            <SuspensedView>
+              <AssessmentMappingPage />
             </SuspensedView>
           }
         />

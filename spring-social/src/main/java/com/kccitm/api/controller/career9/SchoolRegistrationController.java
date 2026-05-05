@@ -175,6 +175,9 @@ public class SchoolRegistrationController {
     public ResponseEntity<?> generateLink(@RequestBody Map<String, Object> data) {
         Integer instituteCode = (Integer) data.get("instituteCode");
         Integer sessionId = (Integer) data.get("sessionId");
+        Integer maxRegistrations = data.get("maxRegistrations") != null
+                ? Integer.valueOf(data.get("maxRegistrations").toString())
+                : 0;
 
         // Return existing link if already generated
         Optional<SchoolRegistrationLink> existing = linkRepository.findByInstituteCodeAndSessionId(instituteCode, sessionId);
@@ -186,6 +189,7 @@ public class SchoolRegistrationController {
         link.setInstituteCode(instituteCode);
         link.setSessionId(sessionId);
         link.setToken(UUID.randomUUID().toString());
+        link.setMaxRegistrations(maxRegistrations);
         linkRepository.save(link);
 
         return ResponseEntity.ok(link);
@@ -204,6 +208,24 @@ public class SchoolRegistrationController {
 
         SchoolRegistrationLink link = opt.get();
         link.setIsActive(!link.getIsActive());
+        linkRepository.save(link);
+        return ResponseEntity.ok(link);
+    }
+
+    @PutMapping("/link/{linkId}/max-registrations")
+    public ResponseEntity<?> updateMaxRegistrations(@PathVariable Long linkId, @RequestBody Map<String, Object> data) {
+        Optional<SchoolRegistrationLink> opt = linkRepository.findById(linkId);
+        if (!opt.isPresent()) return ResponseEntity.notFound().build();
+
+        Integer maxRegistrations = data.get("maxRegistrations") != null
+                ? Integer.valueOf(data.get("maxRegistrations").toString())
+                : 0;
+        if (maxRegistrations < 0) {
+            return ResponseEntity.badRequest().body("maxRegistrations cannot be negative");
+        }
+
+        SchoolRegistrationLink link = opt.get();
+        link.setMaxRegistrations(maxRegistrations);
         linkRepository.save(link);
         return ResponseEntity.ok(link);
     }
@@ -275,6 +297,104 @@ public class SchoolRegistrationController {
 
         info.put("classes", classes);
         return ResponseEntity.ok(info);
+    }
+
+    @PostMapping("/public/verify-details/{token}")
+    public ResponseEntity<?> verifyDetails(@PathVariable String token,
+            @RequestBody Map<String, Object> body) {
+
+        Optional<SchoolRegistrationLink> linkOpt = linkRepository.findByTokenAndIsActive(token, true);
+        if (!linkOpt.isPresent()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Invalid or expired registration link");
+        }
+
+        Integer instituteCode = linkOpt.get().getInstituteCode();
+        String email = body.get("email") != null ? ((String) body.get("email")).trim() : null;
+        String phone = body.get("phone") != null ? ((String) body.get("phone")).trim() : null;
+        String dobStr = body.get("dob") != null ? ((String) body.get("dob")).trim() : null;
+
+        if (email == null || email.isEmpty() || phone == null || phone.isEmpty()
+                || dobStr == null || dobStr.isEmpty()) {
+            return ResponseEntity.badRequest().body("email, phone and dob are all required");
+        }
+
+        SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
+        Date dob;
+        try {
+            dob = sdf.parse(dobStr);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Invalid date format. Use dd-MM-yyyy");
+        }
+
+        long dobDay = toDayKey(dob);
+        logger.info("verify-details: institute={} email='{}' phone='{}' dob='{}' dobDayKey={}",
+                instituteCode, email, phone, dobStr, dobDay);
+
+        List<StudentInfo> emailCandidates = studentInfoRepository
+                .findByEmailAndInstituteId(email, instituteCode);
+        List<StudentInfo> phoneCandidates = studentInfoRepository
+                .findByPhoneNumberAndInstituteId(phone, instituteCode);
+
+        logger.info("verify-details: emailCandidates={} phoneCandidates={}",
+                emailCandidates.size(), phoneCandidates.size());
+
+        StudentInfo emailMatch = pickWithMatchingDob(emailCandidates, dobDay);
+        StudentInfo phoneMatch = pickWithMatchingDob(phoneCandidates, dobDay);
+
+        logger.info("verify-details: emailMatchId={} phoneMatchId={}",
+                emailMatch != null ? emailMatch.getId() : null,
+                phoneMatch != null ? phoneMatch.getId() : null);
+
+        Map<String, Object> response = new HashMap<>();
+
+        if (emailMatch != null && phoneMatch != null
+                && emailMatch.getId().equals(phoneMatch.getId())) {
+            response.put("status", "already_registered");
+            putCredentials(response, emailMatch, dobStr);
+            return ResponseEntity.ok(response);
+        }
+
+        StudentInfo partial = emailMatch != null ? emailMatch : phoneMatch;
+        if (partial != null) {
+            if (emailMatch != null && phoneMatch != null) {
+                logger.warn("verify-details collision: email matches student {} and phone matches student {} "
+                        + "in institute {} for dob {} — returning email match",
+                        emailMatch.getId(), phoneMatch.getId(), instituteCode, dobStr);
+            }
+            response.put("status", "partial_match");
+            putCredentials(response, partial, dobStr);
+            return ResponseEntity.ok(response);
+        }
+
+        response.put("status", "no_match");
+        return ResponseEntity.ok(response);
+    }
+
+    private StudentInfo pickWithMatchingDob(List<StudentInfo> candidates, long dobDay) {
+        for (StudentInfo si : candidates) {
+            if (si.getStudentDob() != null && toDayKey(si.getStudentDob()) == dobDay) {
+                return si;
+            }
+        }
+        return null;
+    }
+
+    private long toDayKey(Date date) {
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.setTime(date);
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0);
+        cal.set(java.util.Calendar.MINUTE, 0);
+        cal.set(java.util.Calendar.SECOND, 0);
+        cal.set(java.util.Calendar.MILLISECOND, 0);
+        return cal.getTimeInMillis() / 86400000L;
+    }
+
+    private void putCredentials(Map<String, Object> response, StudentInfo si, String dobStr) {
+        User user = si.getUser();
+        if (user != null && user.getUsername() != null) {
+            response.put("username", user.getUsername());
+        }
+        response.put("dob", dobStr);
     }
 
     @PostMapping("/public/register/{token}")
@@ -363,7 +483,7 @@ public class SchoolRegistrationController {
                         config.getConfigId(), finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
                         name, email, dob, phone);
             }
-            return handleExistingStudent(byEmail.get(0), assessmentId, instituteCode);
+            return handleExistingStudent(byEmail.get(0), assessmentId, instituteCode, link.getLinkId());
         }
 
         // 8. Duplicate check by DOB + institute + class + name
@@ -376,7 +496,7 @@ public class SchoolRegistrationController {
                             config.getConfigId(), finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
                             name, email, dob, phone);
                 }
-                return handleExistingStudent(byDob.get(0), assessmentId, instituteCode);
+                return handleExistingStudent(byDob.get(0), assessmentId, instituteCode, link.getLinkId());
             }
         }
 
@@ -434,6 +554,8 @@ public class SchoolRegistrationController {
         UserStudent userStudent = new UserStudent(user, studentInfo, institute);
         userStudent = userStudentRepository.save(userStudent);
 
+        incrementLinkCountAndDeactivateIfFull(link.getLinkId());
+
         StudentAssessmentMapping sam = new StudentAssessmentMapping(
                 userStudent.getUserStudentId(), assessmentId);
         studentAssessmentMappingRepository.save(sam);
@@ -453,6 +575,22 @@ public class SchoolRegistrationController {
     }
 
     // ============ PRIVATE HELPERS ============
+
+    private void incrementLinkCountAndDeactivateIfFull(Long linkId) {
+        if (linkId == null) return;
+        int rows = linkRepository.tryIncrementCount(linkId);
+        logger.info("School link increment: linkId={}, rowsAffected={}", linkId, rows);
+        if (rows == 0) return;
+        linkRepository.findById(linkId).ifPresent(refreshed -> {
+            int max = refreshed.getMaxRegistrations() != null ? refreshed.getMaxRegistrations() : 0;
+            int current = refreshed.getCurrentCount() != null ? refreshed.getCurrentCount() : 0;
+            if (max > 0 && current >= max) {
+                refreshed.setIsActive(false);
+                linkRepository.save(refreshed);
+                logger.info("School link {} hit cap ({}/{}), deactivated", linkId, current, max);
+            }
+        });
+    }
 
     private ResponseEntity<?> createPaymentAndRedirect(Long schoolConfigId, Long assessmentId, Integer instituteCode,
             Long finalAmountPaise, Long originalAmountPaise, String promoCodeStr, Integer promoDiscountPercent,
@@ -544,7 +682,7 @@ public class SchoolRegistrationController {
     }
 
     private ResponseEntity<?> handleExistingStudent(StudentInfo existingStudentInfo, Long assessmentId,
-            Integer instituteCode) {
+            Integer instituteCode, Long linkId) {
         List<UserStudent> userStudents = userStudentRepository.findByStudentInfoId(existingStudentInfo.getId());
         if (userStudents.isEmpty()) {
             InstituteDetail institute = instituteDetailRepository.findById(instituteCode.intValue());
@@ -559,6 +697,7 @@ public class SchoolRegistrationController {
             }
             UserStudent newUs = new UserStudent(existingUser, existingStudentInfo, institute);
             newUs = userStudentRepository.save(newUs);
+            incrementLinkCountAndDeactivateIfFull(linkId);
             userStudents = List.of(newUs);
         }
 

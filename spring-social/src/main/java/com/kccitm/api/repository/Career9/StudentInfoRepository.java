@@ -34,4 +34,6 @@ public interface StudentInfoRepository extends JpaRepository<StudentInfo, Long> 
 
     List<StudentInfo> findByNameIgnoreCaseAndInstituteId(String name, Integer instituteId);
 
+    List<StudentInfo> findByPhoneNumberAndInstituteId(String phoneNumber, Integer instituteId);
+
 }
