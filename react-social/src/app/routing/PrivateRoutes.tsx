@@ -69,6 +69,7 @@ import LiveTrackingPage from "../pages/LiveTracking/LiveTrackingPage";
 import CommunicationLogsPage from "../pages/CommunicationLogs/CommunicationLogsPage";
 import ReportsPage from "../pages/Reports/ReportsPage";
 import ReportsHubPage from "../pages/ReportsHub/ReportsHubPage";
+import AdminAssessmentEditPage from "../pages/ReportsHub/AdminAssessmentEdit/AdminAssessmentEditPage";
 import StudentDashboard from "../pages/StudentDashboard/StudentDashboard";
 import ClassTeacherDashboard from "../pages/ClassTeacherDashboard/ClassTeacherDashboard";
 import { Error401 } from "../modules/errors/components/Error401";
@@ -1060,6 +1061,14 @@ const PrivateRoutes = () => {
           element={
             <SuspensedView>
               <ReportsHubPage />
+            </SuspensedView>
+          }
+        />
+        <Route
+          path="/admin-assessment-edit/:assessmentId/:studentId"
+          element={
+            <SuspensedView>
+              <AdminAssessmentEditPage />
             </SuspensedView>
           }
         />

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
 import { downloadReportAsPdf, htmlToPdfBlob } from "../ReportGeneration/utils/htmlToPdf";
 import JSZip from "jszip";
@@ -129,6 +130,9 @@ const ReportsHubPage: React.FC = () => {
   const pendingZipIds = useRef<number[]>([]);
   const pendingZipKind = useRef<"navigator" | "fourPager">("navigator");
   const [miraDesaiOpen, setMiraDesaiOpen] = useState(false);
+  // Secret admin edit mode — unlocked by typing "boom" in the username search.
+  const [adminEditMode, setAdminEditMode] = useState(false);
+  const navigate = useNavigate();
   const [schoolReportOpen, setSchoolReportOpen] = useState(false);
   const [bulkSendOpen, setBulkSendOpen] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
@@ -163,7 +167,8 @@ const ReportsHubPage: React.FC = () => {
       .catch(() => setAllAssessments([]));
   }, []);
 
-  // Load assessment mappings for selected institute (URM approach)
+  // Load assessment mappings for selected institute
+  // null = no institute selected, empty Set = institute selected but no assessments linked
   useEffect(() => {
     if (selectedInstitute === "") { setMappedAssessmentIds(null); return; }
     setAssessmentsLoading(true);
@@ -172,13 +177,14 @@ const ReportsHubPage: React.FC = () => {
         const ids = new Set<number>(
           (res.data || []).filter((m: any) => m.isActive !== false).map((m: any) => Number(m.assessmentId))
         );
-        setMappedAssessmentIds(ids.size > 0 ? ids : null);
+        setMappedAssessmentIds(ids);
       })
-      .catch(() => setMappedAssessmentIds(null))
+      .catch(() => setMappedAssessmentIds(new Set()))
       .finally(() => setAssessmentsLoading(false));
   }, [selectedInstitute]);
 
-  // Filter assessments by institute mapping
+  // Filter assessments by institute mapping; fall back to ALL assessments when
+  // the institute has no linked assessments (or mapping fetch failed).
   useEffect(() => {
     if (mappedAssessmentIds && mappedAssessmentIds.size > 0) {
       setAssessments(allAssessments.filter((a) => mappedAssessmentIds.has(a.id)));
@@ -341,6 +347,18 @@ const ReportsHubPage: React.FC = () => {
   );
 
   useEffect(() => { setCurrentPage(1); }, [nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus]);
+
+  // Secret unlock: typing exactly "boom" in the username search toggles admin edit mode.
+  useEffect(() => {
+    if (usernameQuery === "boom") {
+      setUsernameQuery("");
+      setAdminEditMode((prev) => {
+        const next = !prev;
+        showSuccessToast(next ? "Admin edit mode enabled" : "Admin edit mode disabled");
+        return next;
+      });
+    }
+  }, [usernameQuery]);
 
   // ═══════════════════════ HELPERS ═══════════════════════
 
@@ -985,6 +1003,15 @@ const ReportsHubPage: React.FC = () => {
                       ({visibleSelectedCount} selected)
                     </span>
                   )}
+                  {adminEditMode && (
+                    <span style={{
+                      marginLeft: 12, padding: "2px 10px", borderRadius: 999,
+                      background: "#fef3c7", color: "#92400e", fontWeight: 700,
+                      fontSize: "0.7rem", border: "1px solid #f59e0b",
+                    }}>
+                      ADMIN EDIT MODE
+                    </span>
+                  )}
                 </span>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {/* Mira Desai */}
@@ -1138,6 +1165,9 @@ const ReportsHubPage: React.FC = () => {
                       <th style={thStyle}>Preview / Download</th>
                       <th style={thStyle}>Nav 360</th>
                       <th style={{ ...thStyle, textAlign: "center" }}>Send</th>
+                      {adminEditMode && (
+                        <th style={{ ...thStyle, textAlign: "center" }}>Admin</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -1310,6 +1340,21 @@ const ReportsHubPage: React.FC = () => {
                               </div>
                             )}
                           </td>
+                          {adminEditMode && (
+                            <td style={{ ...tdStyle, textAlign: "center" }}>
+                              {selectedAssessmentObj ? (
+                                <button
+                                  className="btn btn-light-warning btn-sm"
+                                  onClick={() => navigate(`/admin-assessment-edit/${selectedAssessmentObj.id}/${s.userStudentId}`)}
+                                  title="View & edit student's assessment"
+                                  style={{ padding: "4px 10px", fontSize: "0.7rem", fontWeight: 600 }}>
+                                  Show
+                                </button>
+                              ) : (
+                                <span style={{ color: "#d1d5db", fontSize: "0.75rem" }}>-</span>
+                              )}
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
