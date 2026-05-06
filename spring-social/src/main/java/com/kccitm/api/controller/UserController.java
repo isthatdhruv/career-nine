@@ -99,42 +99,17 @@ public class UserController {
     @Autowired
     private com.kccitm.api.repository.Career9.AssessmentTableRepository assessmentTableRepository;
 
+    @Autowired
+    private com.kccitm.api.service.StudentSessionService studentSessionService;
+
     @PostMapping(value = "user/auth", headers = "Accept=application/json")
     public HashMap<String, Object> checkUser(@RequestBody User currentUser) {
         if (userRepository.findByUsernameAndDobDate(currentUser.getUsername(), currentUser.getDobDate()).isPresent()) {
             User user = userRepository.findByUsernameAndDobDate(currentUser.getUsername(), currentUser.getDobDate())
                     .get();
             if (userStudentRepository.getByUserId(user.getId()).isPresent()) {
-
                 UserStudent userStudent = userStudentRepository.getByUserId(user.getId()).get();
-                List<StudentAssessmentMapping> studentAssessmentMappings = studentAssessmentMappingRepository
-                        .findByUserStudentUserStudentId(userStudent.getUserStudentId());
-
-                // Build list of assessments with details
-                List<Map<String, Object>> assessmentsList = new ArrayList<>();
-                for (StudentAssessmentMapping mapping : studentAssessmentMappings) {
-                    Map<String, Object> assessmentInfo = new HashMap<>();
-                    assessmentInfo.put("assessmentId", mapping.getAssessmentId());
-                    assessmentInfo.put("studentStatus", mapping.getStatus());
-
-                    // Fetch assessment details
-                    Optional<com.kccitm.api.model.career9.AssessmentTable> assessment = assessmentTableRepository
-                            .findById(mapping.getAssessmentId());
-                    if (assessment.isPresent()) {
-                        assessmentInfo.put("assessmentName", assessment.get().getAssessmentName());
-                        assessmentInfo.put("isActive", assessment.get().getIsActive());
-                    } else {
-                        assessmentInfo.put("assessmentName", "Unknown Assessment");
-                        assessmentInfo.put("isActive", false);
-                    }
-
-                    assessmentsList.add(assessmentInfo);
-                }
-
-                HashMap<String, Object> response = new HashMap<>();
-                response.put("userStudentId", userStudent.getUserStudentId());
-                response.put("assessments", assessmentsList);
-                return response;
+                return new HashMap<>(studentSessionService.buildSessionPayload(userStudent.getUserStudentId()));
             } else {
                 return null;
             }
