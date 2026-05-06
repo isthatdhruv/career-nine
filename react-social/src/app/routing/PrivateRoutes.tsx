@@ -259,7 +259,6 @@ const PrivateRoutes = () => {
   const CounsellingNotificationsPage = lazy(() => import("../pages/Counselling/admin/CounsellingNotificationsPage"));
   const PaymentTrackingPage = lazy(() => import("../pages/PaymentTracking/PaymentTrackingPage"));
   const PromoCodePage = lazy(() => import("../pages/PromoCode/PromoCodePage"));
-  const PaymentStatusPage = lazy(() => import("../pages/PaymentTracking/PaymentStatusPage"));
   const PaymentRegisterPage = lazy(() => import("../pages/PaymentTracking/PaymentRegisterPage"));
   const B2CPricingTierPage = lazy(() => import("../pages/B2C/PricingTier/PricingTierPage"));
   const B2CCampaignPage = lazy(() => import("../pages/B2C/Campaign/CampaignPage"));
