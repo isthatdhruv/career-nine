@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Suspense, lazy } from 'react'
+import { ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 import { DataProvider } from './contexts/DataContext'
 import { AssessmentProvider } from './contexts/AssessmentContext'
 
@@ -9,6 +11,7 @@ import AllottedAssessmentPage from './pages/AllottedAssessmentPage'
 import GeneralInstructionsPage from './pages/GeneralInstructionsPage'
 import ThankYouPage from './pages/ThankYouPage'
 import AssessmentRegisterPage from './pages/AssessmentRegisterPage'
+import PaymentStatusPage from './pages/PaymentStatusPage'
 
 const SelectSectionPage = lazy(() => import('./pages/SelectSectionPage'))
 const SectionInstructionPage = lazy(() => import('./pages/SectionInstructionPage'))
@@ -25,6 +28,7 @@ const LoadingSpinner = () => (
 export default function App() {
   return (
     <BrowserRouter>
+      <ToastContainer />
       <DataProvider>
         <AssessmentProvider>
           <Suspense fallback={<LoadingSpinner />}>
@@ -39,6 +43,7 @@ export default function App() {
               <Route path="/studentAssessment/sections/:sectionId/questions/:questionIndex" element={<SectionQuestionPage />} />
               <Route path="/studentAssessment/completed" element={<ThankYouPage />} />
               <Route path="/assessment-register/:token" element={<AssessmentRegisterPage />} />
+              <Route path="/payment-status" element={<PaymentStatusPage />} />
               <Route path="*" element={<Navigate to="/student-login" replace />} />
             </Routes>
           </Suspense>
