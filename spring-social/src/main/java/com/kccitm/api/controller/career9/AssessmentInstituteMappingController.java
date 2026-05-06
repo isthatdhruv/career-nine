@@ -91,6 +91,9 @@ public class AssessmentInstituteMappingController {
     private com.kccitm.api.service.CareerNineRollNumberService rollNumberService;
 
     @Autowired
+    private com.kccitm.api.service.StudentSessionService studentSessionService;
+
+    @Autowired
     private RazorpayService razorpayService;
 
     @Autowired
@@ -425,12 +428,13 @@ public class AssessmentInstituteMappingController {
                 userStudent.getUserStudentId(), assessmentId);
         studentAssessmentMappingRepository.save(sam);
 
-        // Build response
+        // Build response (auto-login session merged in)
         Map<String, Object> response = new HashMap<>();
         response.put("status", "success");
         response.put("message", "Registration successful! Please save your login credentials.");
         response.put("username", user.getUsername());
         response.put("dob", dobStr);
+        response.putAll(studentSessionService.buildSessionPayload(userStudent.getUserStudentId()));
 
         // Send registration email with credentials
         String assessmentName = assessmentTableRepository.findById(assessmentId)
@@ -519,6 +523,7 @@ public class AssessmentInstituteMappingController {
                 Map<String, Object> response = new HashMap<>();
                 response.put("status", "already_registered");
                 response.put("message", "You are already registered for this assessment.");
+                response.putAll(studentSessionService.buildSessionPayload(userStudent.getUserStudentId()));
                 return ResponseEntity.ok(response);
             }
         }
@@ -601,6 +606,9 @@ public class AssessmentInstituteMappingController {
                         user.getUsername(), dobFormatted, assessmentName);
             }
         }
+
+        // Auto-login session payload — same shape /user/auth returns.
+        response.putAll(studentSessionService.buildSessionPayload(userStudent.getUserStudentId()));
 
         return ResponseEntity.ok(response);
     }
