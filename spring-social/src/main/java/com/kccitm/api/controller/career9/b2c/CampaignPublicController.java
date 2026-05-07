@@ -165,9 +165,10 @@ public class CampaignPublicController {
                 tDto.put("tierId", pt.getTierId());
                 tDto.put("name", pt.getName());
                 tDto.put("description", pt.getDescription());
-                tDto.put("basePriceInr", pt.getBasePriceInr());
-                long priceInr = t.getPriceOverrideInr() != null ? t.getPriceOverrideInr() : pt.getBasePriceInr();
-                tDto.put("priceInr", priceInr);
+                long basePaise = pt.getBasePriceInr() != null ? pt.getBasePriceInr() : 0L;
+                long pricePaise = t.getPriceOverrideInr() != null ? t.getPriceOverrideInr() : basePaise;
+                tDto.put("basePriceInr", basePaise / 100);
+                tDto.put("priceInr", pricePaise / 100);
                 tDto.put("currency", pt.getCurrency());
                 tDto.put("isDefault", t.getIsDefault());
                 tDto.put("includesFinalReport", pt.getIncludesFinalReport());
@@ -226,9 +227,9 @@ public class CampaignPublicController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Pricing tier not found");
         }
         PricingTier pricingTier = ptOpt.get();
-        long priceInr = tierMapping.getPriceOverrideInr() != null
-                ? tierMapping.getPriceOverrideInr() : pricingTier.getBasePriceInr();
-        long originalPaise = priceInr * 100L;
+        long originalPaise = tierMapping.getPriceOverrideInr() != null
+                ? tierMapping.getPriceOverrideInr()
+                : (pricingTier.getBasePriceInr() != null ? pricingTier.getBasePriceInr() : 0L);
 
         // 3. Validate input
         String name = strFromBody(body, "name");
