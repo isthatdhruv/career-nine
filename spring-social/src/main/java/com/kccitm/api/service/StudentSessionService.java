@@ -3,7 +3,7 @@ package com.kccitm.api.service;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
-import com.kccitm.api.repository.Career9.StudentAssessmentMappingRepository;
+import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
