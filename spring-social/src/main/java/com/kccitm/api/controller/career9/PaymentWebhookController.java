@@ -70,6 +70,9 @@ public class PaymentWebhookController {
     @Autowired(required = false)
     private com.kccitm.api.service.b2c.EntitlementService entitlementService;
 
+    @Autowired
+    private com.kccitm.api.service.StudentSessionService studentSessionService;
+
     @PostMapping("/razorpay")
     @Transactional
     public ResponseEntity<?> handleRazorpayWebhook(
@@ -145,6 +148,14 @@ public class PaymentWebhookController {
 
         if ("failed".equals(txn.getStatus()) && txn.getFailureReason() != null) {
             response.put("failureReason", txn.getFailureReason());
+        }
+
+        // Auto-login: when status flipped to paid AND student has been created
+        // (provisioning may lag the status update by a few hundred ms), include
+        // the session payload so the frontend can write localStorage and redirect.
+        // If userStudentId is null at this moment, the frontend keeps polling.
+        if ("paid".equals(txn.getStatus()) && txn.getUserStudentId() != null) {
+            response.putAll(studentSessionService.buildSessionPayload(txn.getUserStudentId()));
         }
 
         return ResponseEntity.ok(response);

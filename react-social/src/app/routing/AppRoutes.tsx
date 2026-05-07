@@ -6,7 +6,7 @@
  */
 
 import { FC, lazy, Suspense, useEffect } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import TopBarProgress from "react-topbar-progress-indicator";
 import { getCSSVariableValue } from "../../_metronic/assets/ts/_utils";
 import { WithChildren } from "../../_metronic/helpers";
@@ -35,14 +35,49 @@ const ExternalRedirect: FC<{ to: string }> = ({ to }) => {
   );
 };
 
-const AssessmentRegisterPage = lazy(
-  () => import("../pages/AssessmentRegister/AssessmentRegisterPage")
-);
+const AssessmentRegisterRedirect: FC = () => {
+  const { token } = useParams<{ token: string }>();
+  useEffect(() => {
+    const target = `${process.env.REACT_APP_ASSESSMENT_APP_URL}/assessment-register/${token}${window.location.search}`;
+    window.location.replace(target);
+  }, [token]);
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "sans-serif", color: "#555" }}>
+      Redirecting…
+    </div>
+  );
+};
+
+const PaymentStatusRedirect: FC = () => {
+  useEffect(() => {
+    const target = `${process.env.REACT_APP_ASSESSMENT_APP_URL}/payment-status${window.location.search}`;
+    window.location.replace(target);
+  }, []);
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "sans-serif", color: "#555" }}>
+      Redirecting…
+    </div>
+  );
+};
+
+const CampaignLandingRedirect: FC = () => {
+  const params = useParams<{ slug?: string; assessmentId?: string; tierId?: string }>();
+  useEffect(() => {
+    let path = `/c/${params.slug ?? ""}`;
+    if (params.assessmentId) path += `/${params.assessmentId}`;
+    if (params.tierId) path += `/${params.tierId}`;
+    const target = `${process.env.REACT_APP_ASSESSMENT_APP_URL}${path}${window.location.search}`;
+    window.location.replace(target);
+  }, [params.slug, params.assessmentId, params.tierId]);
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "sans-serif", color: "#555" }}>
+      Redirecting…
+    </div>
+  );
+};
+
 const SchoolAssessmentRegisterPage = lazy(
   () => import("../pages/SchoolRegistration/SchoolAssessmentRegisterPage")
-);
-const PaymentStatusPage = lazy(
-  () => import("../pages/PaymentTracking/PaymentStatusPage")
 );
 const PaymentRegisterPage = lazy(
   () => import("../pages/PaymentTracking/PaymentRegisterPage")
@@ -142,11 +177,7 @@ const AppRoutes: FC = () => {
             />
       <Route
               path="/assessment-register/:token"
-              element={
-                <SuspensedView>
-                  <AssessmentRegisterPage />
-                </SuspensedView>
-              }
+              element={<AssessmentRegisterRedirect />}
             />
       <Route
               path="/school-register/:token"
@@ -158,11 +189,19 @@ const AppRoutes: FC = () => {
             />
       <Route
               path="/payment-status"
-              element={
-                <SuspensedView>
-                  <PaymentStatusPage />
-                </SuspensedView>
-              }
+              element={<PaymentStatusRedirect />}
+            />
+      <Route
+              path="/c/:slug"
+              element={<CampaignLandingRedirect />}
+            />
+      <Route
+              path="/c/:slug/:assessmentId"
+              element={<CampaignLandingRedirect />}
+            />
+      <Route
+              path="/c/:slug/:assessmentId/:tierId"
+              element={<CampaignLandingRedirect />}
             />
       <Route
               path="/payment-register/:transactionId"

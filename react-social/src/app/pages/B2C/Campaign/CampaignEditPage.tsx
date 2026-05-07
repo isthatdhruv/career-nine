@@ -16,6 +16,7 @@ import {
   updateCampaign,
 } from "../API/Campaign_APIs";
 import { getActivePricingTiers, PricingTier } from "../API/PricingTier_APIs";
+import RegistrationLinks from "./components/RegistrationLinks";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -297,6 +298,23 @@ const CampaignEditPage = () => {
         onClose={() => setTierDrawerOpenFor(null)}
         onChanged={loadCampaign}
       />
+
+      {isEdit && campaign.slug && (
+        <RegistrationLinks
+          slug={campaign.slug}
+          assessments={assessmentRows.map(r => ({
+            assessmentId: r.assessmentId,
+            assessmentName: r.assessmentName || `Assessment #${r.assessmentId}`,
+            tiers: (r.tiers ?? [])
+              .filter(t => t.isActive !== false)
+              .map(t => ({
+                campaignAssessmentTierId: t.id,
+                pricingTierId: t.pricingTierId,
+                name: allTiers.find(pt => pt.tierId === t.pricingTierId)?.name,
+              })),
+          }))}
+        />
+      )}
     </div>
   );
 };

@@ -91,6 +91,9 @@ public class AssessmentInstituteMappingController {
     private com.kccitm.api.service.CareerNineRollNumberService rollNumberService;
 
     @Autowired
+    private com.kccitm.api.service.StudentSessionService studentSessionService;
+
+    @Autowired
     private RazorpayService razorpayService;
 
     @Autowired
@@ -328,13 +331,24 @@ public class AssessmentInstituteMappingController {
         // 6. Duplicate check by EMAIL
         List<StudentInfo> byEmail = studentInfoRepository.findByEmailAndInstituteId(email, instituteCode);
         if (!byEmail.isEmpty()) {
-            // If payment required, still need to handle payment for existing student
+            StudentInfo existing = byEmail.get(0);
+
+            // Require DOB match before accepting — prevents impersonation now that
+            // the registered-student path can return a session token.
+            Date existingDob = existing.getStudentDob();
+            if (existingDob == null || !sameDay(existingDob, dob)) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "status", "error",
+                        "message", "This email is already registered with a different date of birth. " +
+                                "If this is your account, please use your registered date of birth."));
+            }
+
             if (paymentRequired && finalAmount > 0) {
-                return handleExistingStudentWithPayment(byEmail.get(0), assessmentId, instituteCode,
+                return handleExistingStudentWithPayment(existing, assessmentId, instituteCode,
                         mapping.getMappingId(), finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
                         name, email, dob, phone);
             }
-            return handleExistingStudent(byEmail.get(0), assessmentId, instituteCode);
+            return handleExistingStudent(existing, assessmentId, instituteCode);
         }
 
         // 7. Duplicate check by DOB + institute + class + name
@@ -414,12 +428,13 @@ public class AssessmentInstituteMappingController {
                 userStudent.getUserStudentId(), assessmentId);
         studentAssessmentMappingRepository.save(sam);
 
-        // Build response
+        // Build response (auto-login session merged in)
         Map<String, Object> response = new HashMap<>();
         response.put("status", "success");
         response.put("message", "Registration successful! Please save your login credentials.");
         response.put("username", user.getUsername());
         response.put("dob", dobStr);
+        response.putAll(studentSessionService.buildSessionPayload(userStudent.getUserStudentId()));
 
         // Send registration email with credentials
         String assessmentName = assessmentTableRepository.findById(assessmentId)
@@ -508,6 +523,7 @@ public class AssessmentInstituteMappingController {
                 Map<String, Object> response = new HashMap<>();
                 response.put("status", "already_registered");
                 response.put("message", "You are already registered for this assessment.");
+                response.putAll(studentSessionService.buildSessionPayload(userStudent.getUserStudentId()));
                 return ResponseEntity.ok(response);
             }
         }
@@ -591,6 +607,9 @@ public class AssessmentInstituteMappingController {
             }
         }
 
+        // Auto-login session payload — same shape /user/auth returns.
+        response.putAll(studentSessionService.buildSessionPayload(userStudent.getUserStudentId()));
+
         return ResponseEntity.ok(response);
     }
 
@@ -645,5 +664,16 @@ public class AssessmentInstituteMappingController {
             logger.warn("Could not parse class number from className for classId: {}", classId);
         }
         return classId; // fallback to the ID itself
+    }
+
+    private static boolean sameDay(Date a, Date b) {
+        if (a == null || b == null) return false;
+        java.util.Calendar ca = java.util.Calendar.getInstance();
+        java.util.Calendar cb = java.util.Calendar.getInstance();
+        ca.setTime(a);
+        cb.setTime(b);
+        return ca.get(java.util.Calendar.YEAR) == cb.get(java.util.Calendar.YEAR)
+            && ca.get(java.util.Calendar.MONTH) == cb.get(java.util.Calendar.MONTH)
+            && ca.get(java.util.Calendar.DAY_OF_MONTH) == cb.get(java.util.Calendar.DAY_OF_MONTH);
     }
 }

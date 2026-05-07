@@ -17,7 +17,7 @@ public class LinkBuilder {
     private String assessmentBaseUrl;
 
     public String campaignLanding(String slug) {
-        return frontendBaseUrl + "/c/" + slug;
+        return assessmentBaseUrl + "/c/" + slug;
     }
 
     public String assessmentStart(String accessToken, Long entitlementId) {
@@ -49,6 +49,6 @@ public class LinkBuilder {
     }
 
     public String upgradeFromOnePager(String slug, Long entitlementId) {
-        return frontendBaseUrl + "/c/" + slug + "/upgrade?e=" + entitlementId;
+        return assessmentBaseUrl + "/c/" + slug + "/upgrade?e=" + entitlementId;
     }
 }
