@@ -409,7 +409,7 @@ const TierConfigDrawer = ({ show, row, allTiers, onClose, onChanged }: TierConfi
               <th>Sell?</th>
               <th>Tier</th>
               <th>Base price</th>
-              <th>Override price (paise)</th>
+              <th>Override price (rupees)</th>
               <th>Default?</th>
               <th></th>
             </tr>
@@ -434,7 +434,7 @@ const TierConfigDrawer = ({ show, row, allTiers, onClose, onChanged }: TierConfi
                       {t.includesLms && <span className="badge bg-success me-1">LMS</span>}
                     </div>
                   </td>
-                  <td>₹{((t.basePriceInr ?? 0) / 100).toLocaleString("en-IN")}</td>
+                  <td>₹{(t.basePriceInr ?? 0).toLocaleString("en-IN")}</td>
                   <td>
                     <Form.Control
                       size="sm"

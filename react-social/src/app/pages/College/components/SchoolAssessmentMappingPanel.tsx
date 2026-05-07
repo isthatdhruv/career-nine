@@ -77,7 +77,7 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
       for (const c of configRes.data || []) {
         configs[String(c.classId)] = {
           assessmentId: String(c.assessmentId),
-          amount: c.amount ? String(c.amount / 100) : "",
+          amount: c.amount ? String(c.amount) : "",
           configId: c.configId,
         };
       }
@@ -160,7 +160,7 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
           assessmentId: Number(cfg.assessmentId),
         };
         if (cfg.amount && Number(cfg.amount) > 0) {
-          cfgEntry.amount = Math.round(Number(cfg.amount) * 100);
+          cfgEntry.amount = Math.round(Number(cfg.amount));
         }
         return cfgEntry;
       });

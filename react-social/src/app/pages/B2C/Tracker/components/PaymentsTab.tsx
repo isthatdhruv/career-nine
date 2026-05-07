@@ -10,7 +10,7 @@ interface Props {
   onOpenEntitlement: (id: number) => void;
 }
 
-const fmtINR = (paise?: number) => paise == null ? "—" : `₹${(paise / 100).toLocaleString("en-IN")}`;
+const fmtINR = (rupees?: number) => rupees == null ? "—" : `₹${rupees.toLocaleString("en-IN")}`;
 const fmtDate = (s?: string) => s ? s.split(" ")[0] : "—";
 
 const statusVariant = (s?: string) => {
