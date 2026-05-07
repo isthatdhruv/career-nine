@@ -421,8 +421,9 @@ public class SchoolRegistrationController {
         Integer classId = studentData.get("classId") != null ? Integer.valueOf(studentData.get("classId").toString()) : null;
         Integer schoolSectionId = studentData.get("schoolSectionId") != null ? Integer.valueOf(studentData.get("schoolSectionId").toString()) : null;
 
-        if (name == null || email == null || dobStr == null || classId == null) {
-            return ResponseEntity.badRequest().body("Name, email, date of birth, and class are required");
+        if (name == null || email == null || dobStr == null || classId == null
+                || phone == null || phone.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Name, email, phone, date of birth, and class are required");
         }
 
         // 3. Parse DOB
@@ -593,7 +594,7 @@ public class SchoolRegistrationController {
     }
 
     private ResponseEntity<?> createPaymentAndRedirect(Long schoolConfigId, Long assessmentId, Integer instituteCode,
-            Long finalAmountPaise, Long originalAmountPaise, String promoCodeStr, Integer promoDiscountPercent,
+            Long finalAmountInr, Long originalAmountInr, String promoCodeStr, Integer promoDiscountPercent,
             String name, String email, Date dob, String dobStr, String phone, String gender,
             Integer classId, Integer schoolSectionId, Integer studentClass) {
         try {
@@ -615,13 +616,13 @@ public class SchoolRegistrationController {
 
             // BUG FIX: use correct key names from RazorpayService response
             Map<String, String> rzpResponse = razorpayService.createPaymentLink(
-                    finalAmountPaise, "INR", assessmentName + " - Payment",
+                    finalAmountInr, "INR", assessmentName + " - Payment",
                     callbackUrl, referenceId, notes);
 
             PaymentTransaction txn = new PaymentTransaction();
             txn.setSchoolConfigId(schoolConfigId);
-            txn.setAmount(finalAmountPaise);
-            txn.setOriginalAmount(originalAmountPaise);
+            txn.setAmount(finalAmountInr);
+            txn.setOriginalAmount(originalAmountInr);
             txn.setAssessmentId(assessmentId);
             txn.setInstituteCode(instituteCode);
             txn.setStudentName(name);
@@ -646,7 +647,7 @@ public class SchoolRegistrationController {
             // BUG FIX: use correct key
             response.put("paymentUrl", rzpResponse.get("shortUrl"));
             response.put("transactionId", txn.getTransactionId());
-            response.put("amount", finalAmountPaise);
+            response.put("amount", finalAmountInr);
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -657,7 +658,7 @@ public class SchoolRegistrationController {
     }
 
     private ResponseEntity<?> handleExistingStudentWithPayment(StudentInfo existingStudentInfo, Long assessmentId,
-            Integer instituteCode, Long schoolConfigId, Long finalAmountPaise, Long originalAmountPaise,
+            Integer instituteCode, Long schoolConfigId, Long finalAmountInr, Long originalAmountInr,
             String promoCodeStr, Integer promoDiscountPercent,
             String name, String email, Date dob, String phone) {
         List<UserStudent> userStudents = userStudentRepository.findByStudentInfoId(existingStudentInfo.getId());
@@ -677,7 +678,7 @@ public class SchoolRegistrationController {
         SimpleDateFormat sdfFmt = new SimpleDateFormat("dd-MM-yyyy");
         String dobStr = sdfFmt.format(dob);
         return createPaymentAndRedirect(schoolConfigId, assessmentId, instituteCode,
-                finalAmountPaise, originalAmountPaise, promoCodeStr, promoDiscountPercent,
+                finalAmountInr, originalAmountInr, promoCodeStr, promoDiscountPercent,
                 name, email, dob, dobStr, phone, null, null, null, null);
     }
 

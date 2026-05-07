@@ -61,7 +61,7 @@ public class RazorpayService {
     }
 
     public Map<String, String> createPaymentLink(
-            long amountInPaise,
+            long amountInr,
             String currency,
             String description,
             String callbackUrl,
@@ -69,7 +69,9 @@ public class RazorpayService {
             Map<String, String> notes) throws Exception {
 
         JSONObject request = new JSONObject();
-        request.put("amount", amountInPaise);
+        // Razorpay's API expects amount in paise — convert at the edge so the
+        // rest of the codebase can stay consistently in rupees.
+        request.put("amount", amountInr * 100L);
         request.put("currency", currency != null ? currency : "INR");
         request.put("description", description);
         request.put("reference_id", referenceId);

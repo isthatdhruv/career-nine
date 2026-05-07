@@ -52,7 +52,7 @@ public class PricingTierController {
             return ResponseEntity.badRequest().body("Tier name is required");
         }
         if (body.getBasePriceInr() == null || body.getBasePriceInr() < 0) {
-            return ResponseEntity.badRequest().body("Base price must be non-negative (in paise)");
+            return ResponseEntity.badRequest().body("Base price must be non-negative (in rupees)");
         }
         body.setTierId(null);
         PricingTier saved = pricingTierRepository.save(body);

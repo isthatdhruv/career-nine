@@ -86,11 +86,10 @@ public class PaymentController {
     public ResponseEntity<?> generatePaymentLink(@RequestBody Map<String, Object> request) {
         try {
             Long mappingId = Long.valueOf(request.get("mappingId").toString());
-            Long amountRupees = Long.valueOf(request.get("amount").toString());
-            if (amountRupees <= 0) {
+            Long amountInr = Long.valueOf(request.get("amount").toString());
+            if (amountInr <= 0) {
                 return ResponseEntity.badRequest().body("Amount must be positive");
             }
-            long amountPaise = amountRupees * 100;
 
             Optional<AssessmentInstituteMapping> mappingOpt = mappingRepository.findById(mappingId);
             if (!mappingOpt.isPresent()) {
@@ -117,13 +116,13 @@ public class PaymentController {
             notes.put("referenceId", referenceId);
 
             Map<String, String> linkResult = razorpayService.createPaymentLink(
-                    amountPaise, "INR", description, callbackUrl, referenceId, notes);
+                    amountInr, "INR", description, callbackUrl, referenceId, notes);
 
             PaymentTransaction txn = new PaymentTransaction();
             txn.setMappingId(mappingId);
             txn.setAssessmentId(mapping.getAssessmentId());
             txn.setInstituteCode(mapping.getInstituteCode());
-            txn.setAmount(amountPaise);
+            txn.setAmount(amountInr);
             txn.setRazorpayLinkId(linkResult.get("linkId"));
             txn.setPaymentLinkUrl(linkResult.get("paymentLinkUrl"));
             txn.setShortUrl(linkResult.get("shortUrl"));
@@ -135,7 +134,7 @@ public class PaymentController {
             response.put("paymentLinkUrl", txn.getShortUrl());
             response.put("shortUrl", txn.getShortUrl());
             response.put("razorpayLinkId", txn.getRazorpayLinkId());
-            response.put("amount", amountRupees);
+            response.put("amount", amountInr);
             response.put("status", "created");
 
             return ResponseEntity.ok(response);
@@ -417,9 +416,9 @@ public class PaymentController {
         String assessmentName = assessmentTableRepository.findById(txn.getAssessmentId())
                 .map(a -> a.getAssessmentName()).orElse("Assessment");
 
-        long amountRupees = txn.getAmount() / 100;
+        long amountInr = txn.getAmount() != null ? txn.getAmount() : 0L;
         String message = "Hi " + studentName + ",\n\n"
-                + "Please complete your payment of INR " + amountRupees + " for " + assessmentName + ".\n\n"
+                + "Please complete your payment of INR " + amountInr + " for " + assessmentName + ".\n\n"
                 + "Payment Link: " + getRegistrationUrl(txn) + "\n\n"
                 + "Thank you!";
 
