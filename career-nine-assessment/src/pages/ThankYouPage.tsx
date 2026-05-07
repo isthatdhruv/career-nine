@@ -1,5 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getUpgradeInfo } from '../api-clients/campaignAPI';
+
+type UpgradeInfo = {
+    entitlementId: number;
+    status: string;
+    purchasePath: string;
+    alreadyActive: boolean;
+    campaign: { campaignId: number; name: string; slug: string; brandLogoUrl?: string };
+    assessment: { assessmentId: number; assessmentName: string };
+    student: { name?: string; email?: string; phone?: string };
+    tiers: Array<{ campaignAssessmentTierId: number; name: string; priceInr: number }>;
+    activeTier: null | { name: string; includesDashboard: boolean };
+    dashboardUrl: string | null;
+    careerLibraryUrl: string;
+};
 
 const ThankYouPage: React.FC = () => {
     const navigate = useNavigate();
@@ -8,6 +23,7 @@ const ThankYouPage: React.FC = () => {
     const [submittedRating, setSubmittedRating] = useState<number>(0);
     const [isSubmittingRating, setIsSubmittingRating] = useState<boolean>(false);
     const [ratingError, setRatingError] = useState<string>('');
+    const [upgradeInfo, setUpgradeInfo] = useState<UpgradeInfo | null>(null);
 
     useEffect(() => {
         const webgazerVideo = document.getElementById('webgazerVideoFeed') as HTMLVideoElement | null;
@@ -21,9 +37,37 @@ const ThankYouPage: React.FC = () => {
         });
     }, []);
 
+    useEffect(() => {
+        const entitlementId = localStorage.getItem('entitlementId');
+        if (!entitlementId) return;
+        getUpgradeInfo(entitlementId)
+            .then((res) => setUpgradeInfo(res.data as UpgradeInfo))
+            .catch(() => setUpgradeInfo(null));
+    }, []);
+
     const handleExploreCareerLibrary = () => {
         window.open('https://library.career-9.com', '_blank');
     };
+
+    const handleGoToDashboard = () => {
+        if (upgradeInfo?.dashboardUrl) window.open(upgradeInfo.dashboardUrl, '_blank');
+    };
+
+    const handleGetReport = () => {
+        if (!upgradeInfo) return;
+        const slug = upgradeInfo.campaign.slug;
+        const aid = upgradeInfo.assessment.assessmentId;
+        const eid = upgradeInfo.entitlementId;
+        navigate(`/c/${slug}/${aid}/upgrade/${eid}`);
+    };
+
+    const showUpgradeCta =
+        !!upgradeInfo &&
+        upgradeInfo.status === 'pending' &&
+        upgradeInfo.purchasePath === 'B' &&
+        upgradeInfo.tiers.length > 0;
+    const showActiveButtons = !!upgradeInfo && upgradeInfo.alreadyActive;
+    const showDashboardButton = showActiveButtons && !!upgradeInfo?.dashboardUrl;
 
     const submitRating = async (rating: number) => {
         if (submittedRating > 0 || isSubmittingRating) return;
@@ -224,8 +268,119 @@ const ThankYouPage: React.FC = () => {
                                     width: '80%',
                                 }} />
 
-                                {/* Career Library Button */}
-                                <div className="d-flex justify-content-center">
+                                {/* Major upgrade CTA — Try-First students who haven't paid */}
+                                {showUpgradeCta && (
+                                    <div className="d-flex justify-content-center mb-3">
+                                        <div
+                                            onClick={handleGetReport}
+                                            className="text-center"
+                                            style={{
+                                                background: 'linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)',
+                                                borderRadius: '16px',
+                                                padding: '1.5rem 1.5rem',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.3s ease',
+                                                boxShadow: '0 10px 35px rgba(245, 158, 11, 0.45)',
+                                                width: '100%',
+                                                maxWidth: '420px',
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
+                                                e.currentTarget.style.boxShadow = '0 15px 45px rgba(245, 158, 11, 0.55)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                                                e.currentTarget.style.boxShadow = '0 10px 35px rgba(245, 158, 11, 0.45)';
+                                            }}
+                                        >
+                                            <div style={{
+                                                width: '48px',
+                                                height: '48px',
+                                                borderRadius: '12px',
+                                                background: 'rgba(255,255,255,0.22)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                margin: '0 auto 0.85rem auto',
+                                            }}>
+                                                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                                    <polyline points="14 2 14 8 20 8" />
+                                                    <line x1="16" y1="13" x2="8" y2="13" />
+                                                    <line x1="16" y1="17" x2="8" y2="17" />
+                                                    <polyline points="10 9 9 9 8 9" />
+                                                </svg>
+                                            </div>
+                                            <h3 style={{ color: 'white', fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.4rem' }}>
+                                                Get your detailed report
+                                            </h3>
+                                            <p style={{ color: 'rgba(255,255,255,0.92)', fontSize: '0.86rem', lineHeight: '1.45', margin: 0 }}>
+                                                Unlock your personalized career insights for {upgradeInfo?.assessment.assessmentName ?? 'this assessment'}.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Active state — student has already paid */}
+                                {showActiveButtons && (
+                                    <p style={{ color: '#059669', fontSize: '0.88rem', fontWeight: 600, margin: '0 0 1rem 0' }}>
+                                        ✓ Your report has been sent to your email.
+                                    </p>
+                                )}
+
+                                {/* CTA tiles row */}
+                                <div className="d-flex justify-content-center flex-wrap" style={{ gap: '14px' }}>
+                                    {/* Go to Dashboard — only when active and dashboard included */}
+                                    {showDashboardButton && (
+                                        <div
+                                            onClick={handleGoToDashboard}
+                                            className="text-center"
+                                            style={{
+                                                background: 'linear-gradient(135deg, #93C5FD 0%, #3B82F6 100%)',
+                                                borderRadius: '16px',
+                                                padding: '1.25rem 1.5rem',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.3s ease',
+                                                boxShadow: '0 10px 35px rgba(59, 130, 246, 0.4)',
+                                                width: '100%',
+                                                maxWidth: '280px',
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
+                                                e.currentTarget.style.boxShadow = '0 15px 45px rgba(59, 130, 246, 0.5)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                                                e.currentTarget.style.boxShadow = '0 10px 35px rgba(59, 130, 246, 0.4)';
+                                            }}
+                                        >
+                                            <div style={{
+                                                width: '42px',
+                                                height: '42px',
+                                                borderRadius: '10px',
+                                                background: 'rgba(255,255,255,0.2)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                margin: '0 auto 0.75rem auto',
+                                            }}>
+                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <rect x="3" y="3" width="7" height="9" />
+                                                    <rect x="14" y="3" width="7" height="5" />
+                                                    <rect x="14" y="12" width="7" height="9" />
+                                                    <rect x="3" y="16" width="7" height="5" />
+                                                </svg>
+                                            </div>
+                                            <h3 style={{ color: 'white', fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.4rem' }}>
+                                                Go to Dashboard
+                                            </h3>
+                                            <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.8rem', lineHeight: '1.4', margin: 0 }}>
+                                                See your personalized insights & report
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Career Library — always shown */}
                                     <div
                                         onClick={handleExploreCareerLibrary}
                                         className="text-center"
@@ -235,17 +390,17 @@ const ThankYouPage: React.FC = () => {
                                             padding: '1.25rem 1.5rem',
                                             cursor: 'pointer',
                                             transition: 'all 0.3s ease',
-                                            boxShadow: '0 10px 35px rgba(245, 87, 108, 0.4)',
+                                            boxShadow: '0 10px 35px rgba(52, 211, 153, 0.4)',
                                             width: '100%',
                                             maxWidth: '280px',
                                         }}
                                         onMouseEnter={(e) => {
                                             e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
-                                            e.currentTarget.style.boxShadow = '0 15px 45px rgba(245, 87, 108, 0.5)';
+                                            e.currentTarget.style.boxShadow = '0 15px 45px rgba(52, 211, 153, 0.5)';
                                         }}
                                         onMouseLeave={(e) => {
                                             e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                                            e.currentTarget.style.boxShadow = '0 10px 35px rgba(245, 87, 108, 0.4)';
+                                            e.currentTarget.style.boxShadow = '0 10px 35px rgba(52, 211, 153, 0.4)';
                                         }}
                                     >
                                         <div style={{
@@ -266,7 +421,7 @@ const ThankYouPage: React.FC = () => {
                                             </svg>
                                         </div>
                                         <h3 style={{ color: 'white', fontSize: '1.05rem', fontWeight: '700', marginBottom: '0.4rem' }}>
-                                            Explore Career Library
+                                            {showActiveButtons ? 'Go to Career Library' : 'Explore Career Library'}
                                         </h3>
                                         <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.8rem', lineHeight: '1.4', margin: 0 }}>
                                             Explore 200+ career options from 44+ career categories

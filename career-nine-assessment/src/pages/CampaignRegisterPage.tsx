@@ -6,6 +6,7 @@ import {
   getCampaignInfoByAssessment,
   getCampaignInfoByTier,
   registerForCampaignTier,
+  registerTrial,
 } from "../api-clients/campaignAPI"
 import { validatePromoCode } from "../api-clients/promoCodeAPI"
 
@@ -124,7 +125,8 @@ const CampaignRegisterPage = () => {
       ? selectedAssessment.tiers.find((t) => t.campaignAssessmentTierId === selectedTierId) || null
       : null
 
-  const isPaid = (selectedTier?.priceInr ?? 0) > 0
+  const isTryFirst = selectedAssessment?.purchasePath === "B"
+  const isPaid = !isTryFirst && (selectedTier?.priceInr ?? 0) > 0
   const discountedPriceInr = promoApplied && selectedTier
     ? selectedTier.priceInr * (100 - promoApplied.discountPercent) / 100
     : (selectedTier?.priceInr ?? 0)
@@ -162,7 +164,8 @@ const CampaignRegisterPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!info || !selectedAssessment || !selectedTier) return
+    if (!info || !selectedAssessment) return
+    if (!isTryFirst && !selectedTier) return
 
     setFormError("")
     if (!name.trim() || !email.trim() || !dob.trim() || !phone.trim()) {
@@ -187,14 +190,16 @@ const CampaignRegisterPage = () => {
         phone: phone.trim(),
         gender,
       }
-      if (promoApplied) data.promoCode = promoApplied.code
+      if (!isTryFirst && promoApplied) data.promoCode = promoApplied.code
 
-      const res = await registerForCampaignTier(
-        info.campaign.slug,
-        selectedAssessment.assessmentId,
-        selectedTier.campaignAssessmentTierId,
-        data,
-      )
+      const res = isTryFirst
+        ? await registerTrial(info.campaign.slug, selectedAssessment.assessmentId, data)
+        : await registerForCampaignTier(
+            info.campaign.slug,
+            selectedAssessment.assessmentId,
+            selectedTier!.campaignAssessmentTierId,
+            data,
+          )
 
       if (res.data.status === "payment_required") {
         if (res.data.paymentUrl) {
@@ -209,6 +214,18 @@ const CampaignRegisterPage = () => {
         localStorage.clear()
         localStorage.setItem("userStudentId", String(res.data.userStudentId))
         localStorage.setItem("allottedAssessments", JSON.stringify(res.data.assessments))
+        if (res.data.entitlementId) {
+          localStorage.setItem("entitlementId", String(res.data.entitlementId))
+        }
+        if (res.data.campaignId) {
+          localStorage.setItem("campaignId", String(res.data.campaignId))
+        }
+        if (res.data.campaignSlug) {
+          localStorage.setItem("campaignSlug", String(res.data.campaignSlug))
+        }
+        if (res.data.purchasePath) {
+          localStorage.setItem("purchasePath", String(res.data.purchasePath))
+        }
         navigate("/allotted-assessment")
         return
       }
@@ -279,8 +296,9 @@ const CampaignRegisterPage = () => {
   const onlyOneTierInUrl = tidFromUrl != null
   const showAssessmentPicker = !onlyOneAssessmentInUrl && info.assessments.length > 1
   const showTierPicker =
-    !onlyOneTierInUrl && selectedAssessment !== null && selectedAssessment.tiers.length > 1
-  const showForm = selectedTier !== null
+    !isTryFirst && !onlyOneTierInUrl && selectedAssessment !== null && selectedAssessment.tiers.length > 1
+  const showLockedTier = !isTryFirst && !showTierPicker && selectedTier !== null
+  const showForm = isTryFirst ? selectedAssessment !== null : selectedTier !== null
 
   // ── Main render ──
   return (
@@ -371,8 +389,8 @@ const CampaignRegisterPage = () => {
             </section>
           )}
 
-          {/* Locked-in tier summary */}
-          {!showTierPicker && selectedTier && (
+          {/* Locked-in tier summary (Pay-First only) */}
+          {showLockedTier && selectedTier && (
             <section style={{ marginBottom: 24 }}>
               <h3 style={s.sectionTitle}>Your selection</h3>
               <TierCard tier={selectedTier} selected={true} onSelect={() => {}} compact />
@@ -380,7 +398,7 @@ const CampaignRegisterPage = () => {
           )}
 
           {/* Registration form */}
-          {showForm && selectedTier && (
+          {showForm && (
             <form onSubmit={handleSubmit}>
               <h3 style={s.sectionTitle}>Your details</h3>
               {formError && (
@@ -575,10 +593,12 @@ const CampaignRegisterPage = () => {
                 {submitting ? (
                   <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
                     <div style={{ ...s.spinner, width: 18, height: 18, borderWidth: 2 }} />
-                    {isPaid && discountedPriceInr > 0 ? "Processing..." : "Registering..."}
+                    {isPaid && discountedPriceInr > 0 ? "Processing..." : isTryFirst ? "Starting..." : "Registering..."}
                   </span>
                 ) : isPaid && discountedPriceInr > 0 ? (
                   `Register & Pay INR ${discountedPriceInr}`
+                ) : isTryFirst ? (
+                  "Start Assessment"
                 ) : (
                   "Register"
                 )}

@@ -79,6 +79,8 @@ const PaymentStatusPage = () => {
 
   useEffect(() => {
     const linkId = searchParams.get("razorpay_payment_link_id")
+    const isUpgrade = searchParams.get("upgrade") === "1"
+    const eid = searchParams.get("eid")
 
     if (!linkId) {
       setStatus("error")
@@ -91,6 +93,15 @@ const PaymentStatusPage = () => {
         .then((res) => {
           const data = res.data
           setDetails(data)
+
+          if (data.status === "paid" && isUpgrade && eid) {
+            // Try-First upgrade: student already logged in. Keep their session,
+            // just refresh the entitlement pointer and bounce back to thank-you.
+            localStorage.setItem("entitlementId", eid)
+            setStatus("paid")
+            setTimeout(() => navigate("/studentAssessment/completed", { replace: true }), 1500)
+            return
+          }
 
           if (data.status === "paid" && data.userStudentId && data.assessments) {
             // Auto-login: webhook completed AND student was provisioned.
