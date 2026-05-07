@@ -13,6 +13,7 @@ import ThankYouPage from './pages/ThankYouPage'
 import AssessmentRegisterPage from './pages/AssessmentRegisterPage'
 import PaymentStatusPage from './pages/PaymentStatusPage'
 import CampaignRegisterPage from './pages/CampaignRegisterPage'
+import PayForReportPage from './pages/PayForReportPage'
 
 const SelectSectionPage = lazy(() => import('./pages/SelectSectionPage'))
 const SectionInstructionPage = lazy(() => import('./pages/SectionInstructionPage'))
@@ -47,6 +48,7 @@ export default function App() {
               <Route path="/payment-status" element={<PaymentStatusPage />} />
               <Route path="/c/:slug" element={<CampaignRegisterPage />} />
               <Route path="/c/:slug/:assessmentId" element={<CampaignRegisterPage />} />
+              <Route path="/c/:slug/:assessmentId/upgrade/:entitlementId" element={<PayForReportPage />} />
               <Route path="/c/:slug/:assessmentId/:tierId" element={<CampaignRegisterPage />} />
               <Route path="*" element={<Navigate to="/student-login" replace />} />
             </Routes>

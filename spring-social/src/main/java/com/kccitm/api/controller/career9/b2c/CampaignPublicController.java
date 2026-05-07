@@ -31,6 +31,7 @@ import com.kccitm.api.model.career9.b2c.Campaign;
 import com.kccitm.api.model.career9.b2c.CampaignAssessmentMapping;
 import com.kccitm.api.model.career9.b2c.CampaignAssessmentTier;
 import com.kccitm.api.model.career9.b2c.PricingTier;
+import com.kccitm.api.model.career9.b2c.StudentEntitlement;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
 import com.kccitm.api.repository.Career9.PromoCodeRepository;
@@ -69,6 +70,8 @@ public class CampaignPublicController {
     @Autowired private RazorpayService razorpayService;
     @Autowired private StudentSessionService studentSessionService;
     @Autowired(required = false) private com.kccitm.api.service.b2c.EntitlementService entitlementService;
+    @Autowired(required = false) private com.kccitm.api.repository.Career9.b2c.StudentEntitlementRepository studentEntitlementRepository;
+    @Autowired(required = false) private com.kccitm.api.service.b2c.LinkBuilder linkBuilder;
 
     @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:}")
     private String callbackBaseUrl;
@@ -298,6 +301,382 @@ public class CampaignPublicController {
         return createPaymentAndRedirect(campaign, mapping, tierMapping, pricingTier,
                 name, email, dob, dobStr, phone, gender,
                 finalInr, originalInr, promoCodeSaved, promoDiscountPercent);
+    }
+
+    /**
+     * Try-First (Path B) registration: creates a pending entitlement with no tier,
+     * lets the student start the assessment immediately. They pay for the report
+     * later via /pay-for-report.
+     */
+    @PostMapping("/register-trial/{slug}/{assessmentId}")
+    @Transactional
+    public ResponseEntity<?> registerTrial(@PathVariable String slug,
+                                           @PathVariable Long assessmentId,
+                                           @RequestBody Map<String, Object> body) {
+
+        Optional<Campaign> campaignOpt = campaignRepository.findBySlugIgnoreCaseAndIsDeletedFalse(slug);
+        if (!campaignOpt.isPresent() || Boolean.FALSE.equals(campaignOpt.get().getIsActive())) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Campaign not found");
+        }
+        Campaign campaign = campaignOpt.get();
+        if (campaign.getValidTo() != null && campaign.getValidTo().before(new Date())) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Campaign has expired");
+        }
+
+        Optional<CampaignAssessmentMapping> mOpt = mappingRepository
+                .findByCampaignIdAndAssessmentIdAndIsDeletedFalse(campaign.getCampaignId(), assessmentId);
+        if (!mOpt.isPresent() || !Boolean.TRUE.equals(mOpt.get().getIsActive())) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Assessment not in campaign");
+        }
+        CampaignAssessmentMapping mapping = mOpt.get();
+
+        String purchasePath = mapping.getPurchasePath();
+        if (purchasePath == null) purchasePath = campaign.getDefaultPurchasePath();
+        if (purchasePath == null) purchasePath = "B";
+        if (!"B".equals(purchasePath)) {
+            return ResponseEntity.badRequest().body("This assessment uses Pay-First — use the regular registration link");
+        }
+
+        String name = strFromBody(body, "name");
+        String email = strFromBody(body, "email");
+        String dobStr = strFromBody(body, "dob");
+        String phone = strFromBody(body, "phone");
+        String gender = strFromBody(body, "gender");
+
+        if (name == null || email == null || dobStr == null || phone == null) {
+            return ResponseEntity.badRequest().body("Name, email, phone, and date of birth are required");
+        }
+        SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
+        Date dob;
+        try { dob = sdf.parse(dobStr); }
+        catch (Exception e) { return ResponseEntity.badRequest().body("Invalid date format. Use dd-MM-yyyy"); }
+
+        // Email-DOB impersonation block
+        List<StudentInfo> existingByEmail = studentInfoRepository.findByEmail(email);
+        StudentInfo existing = existingByEmail.isEmpty() ? null : existingByEmail.get(0);
+        if (existing != null) {
+            Date existingDob = existing.getStudentDob();
+            if (existingDob == null || !sameDay(existingDob, dob)) {
+                return ResponseEntity.badRequest().body(java.util.Map.of(
+                    "status", "error",
+                    "message", "This email is already registered with a different date of birth. " +
+                               "If this is your account, please use your registered date of birth."));
+            }
+        }
+
+        // Find-or-create User + StudentInfo + UserStudent (mirrors provisionFreeAndRespond)
+        UserStudent userStudent;
+        User user;
+        if (existing != null) {
+            user = existing.getUser();
+            if (user == null) {
+                user = new User((int) (Math.random() * 100000), dob);
+                user.setName(existing.getName());
+                user.setEmail(existing.getEmail());
+                user = userRepository.save(user);
+                existing.setUser(user);
+                studentInfoRepository.save(existing);
+            }
+            List<UserStudent> us = userStudentRepository.findByStudentInfoId(existing.getId());
+            userStudent = us.isEmpty()
+                    ? userStudentRepository.save(new UserStudent(user, existing, null))
+                    : us.get(0);
+        } else {
+            user = new User((int) (Math.random() * 100000), dob);
+            user.setName(name);
+            user.setEmail(email);
+            user.setPhone(phone);
+            user = userRepository.save(user);
+
+            StudentInfo info = new StudentInfo();
+            info.setName(name);
+            info.setEmail(email);
+            info.setStudentDob(dob);
+            info.setPhoneNumber(phone);
+            info.setGender(gender);
+            info.setUser(user);
+            info = studentInfoRepository.save(info);
+
+            userStudent = userStudentRepository.save(new UserStudent(user, info, null));
+        }
+
+        Long userStudentId = userStudent.getUserStudentId();
+        Optional<StudentAssessmentMapping> samOpt = studentAssessmentMappingRepository
+                .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+        if (!samOpt.isPresent()) {
+            studentAssessmentMappingRepository.save(new StudentAssessmentMapping(userStudentId, assessmentId));
+        }
+
+        String counsellingModel = mapping.getCounsellingModel();
+        if (counsellingModel == null) counsellingModel = campaign.getDefaultCounsellingModel();
+        if (counsellingModel == null) counsellingModel = "1";
+
+        StudentEntitlement entitlement = entitlementService.createPending(
+                userStudentId, campaign.getCampaignId(), assessmentId, "B", counsellingModel);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("entitlementId", entitlement.getEntitlementId());
+        response.put("campaignId", campaign.getCampaignId());
+        response.put("campaignSlug", slug);
+        response.put("purchasePath", "B");
+        response.put("username", user.getUsername());
+        response.put("dob", dobStr);
+        response.putAll(studentSessionService.buildSessionPayload(userStudentId));
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Returns campaign + assessment + student + tier info for a given pending or active
+     * entitlement. Used by the thank-you page to decide what to render and by the
+     * pay-for-report page to render its form.
+     */
+    @GetMapping("/upgrade-info/{entitlementId}")
+    public ResponseEntity<?> upgradeInfo(@PathVariable Long entitlementId) {
+        Optional<StudentEntitlement> eOpt = studentEntitlementRepository.findById(entitlementId);
+        if (!eOpt.isPresent()) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Entitlement not found");
+        StudentEntitlement e = eOpt.get();
+
+        Optional<Campaign> cOpt = campaignRepository.findById(e.getCampaignId());
+        if (!cOpt.isPresent()) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Campaign not found");
+        Campaign campaign = cOpt.get();
+
+        Optional<AssessmentTable> aOpt = assessmentTableRepository.findById(e.getAssessmentId());
+        if (!aOpt.isPresent()) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Assessment not found");
+        AssessmentTable assessment = aOpt.get();
+
+        Optional<CampaignAssessmentMapping> mOpt = mappingRepository
+                .findByCampaignIdAndAssessmentIdAndIsDeletedFalse(e.getCampaignId(), e.getAssessmentId());
+        if (!mOpt.isPresent()) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Mapping not found");
+        CampaignAssessmentMapping mapping = mOpt.get();
+
+        Map<String, Object> studentDto = new HashMap<>();
+        Optional<UserStudent> usOpt = userStudentRepository.findById(e.getUserStudentId());
+        if (usOpt.isPresent() && usOpt.get().getStudentInfo() != null) {
+            StudentInfo si = usOpt.get().getStudentInfo();
+            studentDto.put("name", si.getName());
+            studentDto.put("email", si.getEmail());
+            studentDto.put("phone", si.getPhoneNumber());
+        }
+
+        Map<String, Object> campaignDto = new HashMap<>();
+        campaignDto.put("campaignId", campaign.getCampaignId());
+        campaignDto.put("name", campaign.getName());
+        campaignDto.put("slug", campaign.getSlug());
+        campaignDto.put("brandLogoUrl", campaign.getBrandLogoUrl());
+
+        Map<String, Object> assessmentDto = new HashMap<>();
+        assessmentDto.put("assessmentId", assessment.getId());
+        assessmentDto.put("assessmentName", assessment.getAssessmentName());
+
+        boolean alreadyActive = "active".equals(e.getStatus());
+
+        Map<String, Object> activeTier = null;
+        String dashboardUrl = null;
+        if (alreadyActive && e.getCampaignAssessmentTierId() != null) {
+            Optional<CampaignAssessmentTier> tOpt = tierMappingRepository.findById(e.getCampaignAssessmentTierId());
+            if (tOpt.isPresent()) {
+                Optional<PricingTier> ptOpt = pricingTierRepository.findById(tOpt.get().getPricingTierId());
+                if (ptOpt.isPresent()) {
+                    PricingTier pt = ptOpt.get();
+                    activeTier = new HashMap<>();
+                    activeTier.put("name", pt.getName());
+                    activeTier.put("includesFinalReport", pt.getIncludesFinalReport());
+                    activeTier.put("includesDashboard", pt.getIncludesDashboard());
+                    activeTier.put("includesCounselling", pt.getIncludesCounselling());
+                    activeTier.put("includesLms", pt.getIncludesLms());
+                    if (Boolean.TRUE.equals(pt.getIncludesDashboard())
+                            && e.getAccessToken() != null && linkBuilder != null) {
+                        dashboardUrl = linkBuilder.dashboard(e.getAccessToken(), e.getEntitlementId());
+                    }
+                }
+            }
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("entitlementId", e.getEntitlementId());
+        response.put("status", e.getStatus());
+        response.put("purchasePath", e.getPurchasePath());
+        response.put("alreadyActive", alreadyActive);
+        response.put("campaign", campaignDto);
+        response.put("assessment", assessmentDto);
+        response.put("student", studentDto);
+        response.put("tiers", buildTierDtos(mapping.getId()));
+        response.put("activeTier", activeTier);
+        response.put("dashboardUrl", dashboardUrl);
+        response.put("careerLibraryUrl", "https://library.career-9.com");
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Path B step 3: student paid for the detailed report after taking the free
+     * assessment. Creates a PaymentTransaction + Razorpay link. The webhook chain
+     * (activateOnPayment) finds the existing pending entitlement and upgrades it.
+     */
+    @PostMapping("/pay-for-report")
+    @Transactional
+    public ResponseEntity<?> payForReport(@RequestBody Map<String, Object> body) {
+        Long entitlementId = body.get("entitlementId") != null
+                ? Long.valueOf(body.get("entitlementId").toString()) : null;
+        Long campaignAssessmentTierId = body.get("campaignAssessmentTierId") != null
+                ? Long.valueOf(body.get("campaignAssessmentTierId").toString()) : null;
+        String promoCodeStr = strFromBody(body, "promoCode");
+
+        if (entitlementId == null || campaignAssessmentTierId == null) {
+            return ResponseEntity.badRequest().body("entitlementId and campaignAssessmentTierId are required");
+        }
+
+        Optional<StudentEntitlement> eOpt = studentEntitlementRepository.findById(entitlementId);
+        if (!eOpt.isPresent()) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Entitlement not found");
+        StudentEntitlement entitlement = eOpt.get();
+        if (!"pending".equals(entitlement.getStatus())) {
+            return ResponseEntity.badRequest().body("This entitlement is already active or closed");
+        }
+        if (!"B".equals(entitlement.getPurchasePath())) {
+            return ResponseEntity.badRequest().body("Upgrade only available for Try-First entitlements");
+        }
+
+        Optional<CampaignAssessmentTier> tOpt = tierMappingRepository.findById(campaignAssessmentTierId);
+        if (!tOpt.isPresent() || !Boolean.TRUE.equals(tOpt.get().getIsActive())) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Tier not found");
+        }
+        CampaignAssessmentTier tierMapping = tOpt.get();
+
+        Optional<CampaignAssessmentMapping> mOpt = mappingRepository.findById(tierMapping.getCampaignAssessmentMappingId());
+        if (!mOpt.isPresent()
+                || !mOpt.get().getCampaignId().equals(entitlement.getCampaignId())
+                || !mOpt.get().getAssessmentId().equals(entitlement.getAssessmentId())) {
+            return ResponseEntity.badRequest().body("Tier does not belong to this entitlement's campaign/assessment");
+        }
+        CampaignAssessmentMapping mapping = mOpt.get();
+
+        Optional<PricingTier> ptOpt = pricingTierRepository.findById(tierMapping.getPricingTierId());
+        if (!ptOpt.isPresent()) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Pricing tier not found");
+        PricingTier pricingTier = ptOpt.get();
+
+        long originalInr = tierMapping.getPriceOverrideInr() != null
+                ? tierMapping.getPriceOverrideInr()
+                : (pricingTier.getBasePriceInr() != null ? pricingTier.getBasePriceInr() : 0L);
+
+        Long finalInr = originalInr;
+        Integer promoDiscountPercent = null;
+        String promoCodeSaved = null;
+        if (promoCodeStr != null && !promoCodeStr.trim().isEmpty()) {
+            Optional<PromoCode> promoOpt = promoCodeRepository
+                    .findByCodeIgnoreCaseAndIsActive(promoCodeStr.trim().toUpperCase(), true);
+            if (!promoOpt.isPresent()) return ResponseEntity.badRequest().body("Invalid promo code");
+            PromoCode promo = promoOpt.get();
+            if (!promoCodeCampaignRepository.existsByPromoCodeIdAndCampaignId(promo.getId(), entitlement.getCampaignId())) {
+                return ResponseEntity.badRequest().body("Code not valid for this campaign");
+            }
+            if (promo.getExpiresAt() != null && promo.getExpiresAt().before(new Date())) {
+                return ResponseEntity.badRequest().body("Promo code has expired");
+            }
+            if (promo.getMaxUses() != null && promo.getCurrentUses() >= promo.getMaxUses()) {
+                return ResponseEntity.badRequest().body("Promo code usage limit reached");
+            }
+            promoDiscountPercent = promo.getDiscountPercent();
+            finalInr = originalInr * (100 - promoDiscountPercent) / 100;
+            promo.setCurrentUses(promo.getCurrentUses() + 1);
+            promoCodeRepository.save(promo);
+            promoCodeSaved = promo.getCode();
+        }
+
+        StudentInfo studentInfo = null;
+        Optional<UserStudent> usOpt = userStudentRepository.findById(entitlement.getUserStudentId());
+        if (usOpt.isPresent()) studentInfo = usOpt.get().getStudentInfo();
+        if (studentInfo == null) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Student not found");
+
+        Optional<Campaign> cOpt = campaignRepository.findById(entitlement.getCampaignId());
+        if (!cOpt.isPresent()) return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Campaign not found");
+        Campaign campaign = cOpt.get();
+
+        try {
+            String description = pricingTier.getName() + " — " + campaign.getName();
+            String callbackUrl = (callbackBaseUrl == null ? "" : callbackBaseUrl)
+                    + "/payment-status?upgrade=1&eid=" + entitlement.getEntitlementId();
+            String referenceId = "UPG-" + entitlement.getEntitlementId() + "-" + System.currentTimeMillis();
+
+            Map<String, String> notes = new HashMap<>();
+            notes.put("entitlementId", String.valueOf(entitlement.getEntitlementId()));
+            notes.put("campaignId", String.valueOf(entitlement.getCampaignId()));
+            notes.put("assessmentId", String.valueOf(entitlement.getAssessmentId()));
+            notes.put("campaignAssessmentTierId", String.valueOf(tierMapping.getId()));
+            notes.put("studentEmail", studentInfo.getEmail());
+
+            Map<String, String> rzpResponse = razorpayService.createPaymentLink(
+                    finalInr, "INR", description, callbackUrl, referenceId, notes);
+
+            PaymentTransaction txn = new PaymentTransaction();
+            txn.setAmount(finalInr);
+            txn.setOriginalAmount(originalInr);
+            txn.setUserStudentId(entitlement.getUserStudentId());
+            txn.setAssessmentId(mapping.getAssessmentId());
+            txn.setCampaignId(campaign.getCampaignId());
+            txn.setCampaignAssessmentTierId(tierMapping.getId());
+            txn.setPurchasePath("B");
+            txn.setStudentName(studentInfo.getName());
+            txn.setStudentEmail(studentInfo.getEmail());
+            txn.setStudentDob(studentInfo.getStudentDob());
+            txn.setStudentPhone(studentInfo.getPhoneNumber());
+            txn.setRazorpayLinkId(rzpResponse.get("linkId"));
+            txn.setPaymentLinkUrl(rzpResponse.get("shortUrl"));
+            txn.setShortUrl(rzpResponse.get("shortUrl"));
+            txn.setStatus("created");
+            if (promoCodeSaved != null) {
+                txn.setPromoCode(promoCodeSaved);
+                txn.setPromoDiscountPercent(promoDiscountPercent);
+            }
+            txn = paymentTransactionRepository.save(txn);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "payment_required");
+            response.put("paymentUrl", rzpResponse.get("shortUrl"));
+            response.put("transactionId", txn.getTransactionId());
+            response.put("amount", finalInr);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Failed to create upgrade payment link for entitlement {}", entitlement.getEntitlementId(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to create payment link. Please try again.");
+        }
+    }
+
+    /** Builds the tier DTO list for a given mapping; shared by /info and /upgrade-info. */
+    private List<Map<String, Object>> buildTierDtos(Long mappingId) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        List<CampaignAssessmentTier> tiers = tierMappingRepository
+                .findByCampaignAssessmentMappingIdOrderByIdAsc(mappingId)
+                .stream()
+                .filter(t -> Boolean.TRUE.equals(t.getIsActive()))
+                .collect(java.util.stream.Collectors.toList());
+        for (CampaignAssessmentTier t : tiers) {
+            Optional<PricingTier> ptOpt = pricingTierRepository.findById(t.getPricingTierId());
+            if (!ptOpt.isPresent()) continue;
+            PricingTier pt = ptOpt.get();
+            if (Boolean.FALSE.equals(pt.getIsActive()) || Boolean.TRUE.equals(pt.getIsDeleted())) continue;
+
+            long baseInr = pt.getBasePriceInr() != null ? pt.getBasePriceInr() : 0L;
+            long priceInr = t.getPriceOverrideInr() != null ? t.getPriceOverrideInr() : baseInr;
+            Map<String, Object> tDto = new HashMap<>();
+            tDto.put("campaignAssessmentTierId", t.getId());
+            tDto.put("tierId", pt.getTierId());
+            tDto.put("name", pt.getName());
+            tDto.put("description", pt.getDescription());
+            tDto.put("basePriceInr", baseInr);
+            tDto.put("priceInr", priceInr);
+            tDto.put("currency", pt.getCurrency());
+            tDto.put("isDefault", t.getIsDefault());
+            tDto.put("includesFinalReport", pt.getIncludesFinalReport());
+            tDto.put("includesDashboard", pt.getIncludesDashboard());
+            tDto.put("includesCounselling", pt.getIncludesCounselling());
+            tDto.put("counsellingSessionCount", pt.getCounsellingSessionCount());
+            tDto.put("includesLms", pt.getIncludesLms());
+            tDto.put("lmsValidityDays", pt.getLmsValidityDays());
+            tDto.put("dashboardValidityDays", pt.getDashboardValidityDays());
+            out.add(tDto);
+        }
+        return out;
     }
 
     private ResponseEntity<?> provisionFreeAndRespond(Campaign campaign,
