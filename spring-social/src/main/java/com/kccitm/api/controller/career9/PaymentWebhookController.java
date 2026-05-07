@@ -138,7 +138,7 @@ public class PaymentWebhookController {
         PaymentTransaction txn = txnOpt.get();
         Map<String, Object> response = new HashMap<>();
         response.put("status", txn.getStatus());
-        response.put("amount", txn.getAmount() / 100);
+        response.put("amount", txn.getAmount());
         response.put("transactionId", txn.getTransactionId());
         response.put("assessmentId", txn.getAssessmentId());
 
@@ -175,7 +175,7 @@ public class PaymentWebhookController {
         PaymentTransaction txn = txnOpt.get();
         Map<String, Object> response = new HashMap<>();
         response.put("transactionId", txn.getTransactionId());
-        response.put("amount", txn.getAmount() / 100);
+        response.put("amount", txn.getAmount());
         response.put("status", txn.getStatus());
         response.put("shortUrl", txn.getShortUrl());
 
@@ -215,9 +215,13 @@ public class PaymentWebhookController {
         String name = studentData.get("name");
         String email = studentData.get("email");
         String dobStr = studentData.get("dob");
+        String phone = studentData.get("phone");
 
-        if (name == null || name.isEmpty() || email == null || email.isEmpty() || dobStr == null || dobStr.isEmpty()) {
-            return ResponseEntity.badRequest().body("Name, email, and date of birth are required");
+        if (name == null || name.isEmpty()
+                || email == null || email.isEmpty()
+                || dobStr == null || dobStr.isEmpty()
+                || phone == null || phone.isEmpty()) {
+            return ResponseEntity.badRequest().body("Name, email, phone, and date of birth are required");
         }
 
         // Parse DOB
@@ -230,7 +234,7 @@ public class PaymentWebhookController {
 
         txn.setStudentName(name);
         txn.setStudentEmail(email);
-        txn.setStudentPhone(studentData.getOrDefault("phone", null));
+        txn.setStudentPhone(phone);
         paymentTransactionRepository.save(txn);
 
         Map<String, Object> response = new HashMap<>();

@@ -65,6 +65,7 @@ const CampaignRegisterPage = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState("")
 
   const [selectedAssessmentId, setSelectedAssessmentId] = useState<number | null>(aidFromUrl)
   const [selectedTierId, setSelectedTierId] = useState<number | null>(tidFromUrl)
@@ -163,8 +164,9 @@ const CampaignRegisterPage = () => {
     e.preventDefault()
     if (!info || !selectedAssessment || !selectedTier) return
 
-    if (!name.trim() || !email.trim() || !dob.trim()) {
-      showErrorToast("Please fill in all required fields (Name, Email, Date of Birth).")
+    setFormError("")
+    if (!name.trim() || !email.trim() || !dob.trim() || !phone.trim()) {
+      showErrorToast("Please fill in all required fields (Name, Email, Phone, Date of Birth).")
       return
     }
     if (!/^\d{2}-\d{2}-\d{4}$/.test(dob)) {
@@ -213,8 +215,15 @@ const CampaignRegisterPage = () => {
 
       showErrorToast("Unexpected response from server. Please try again.")
     } catch (err: any) {
-      const msg = err.response?.data?.message || err.response?.data || "Registration failed. Please try again."
-      showErrorToast(typeof msg === "string" ? msg : "Registration failed.")
+      const raw = err.response?.data?.message || err.response?.data || "Registration failed. Please try again."
+      const msg = typeof raw === "string" ? raw : "Registration failed."
+      // 400-class server validation errors render as an inline banner above
+      // the form; everything else falls through to the toast.
+      if (err.response?.status === 400) {
+        setFormError(msg)
+      } else {
+        showErrorToast(msg)
+      }
     } finally {
       setSubmitting(false)
     }
@@ -374,6 +383,20 @@ const CampaignRegisterPage = () => {
           {showForm && selectedTier && (
             <form onSubmit={handleSubmit}>
               <h3 style={s.sectionTitle}>Your details</h3>
+              {formError && (
+                <div style={s.errorBanner}>
+                  <div style={s.errorBannerIcon}>!</div>
+                  <span style={s.errorBannerText}>{formError}</span>
+                  <button
+                    type="button"
+                    aria-label="Dismiss"
+                    onClick={() => setFormError("")}
+                    style={s.errorBannerClose}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 18 }}>
                 <div>
                   <label style={s.label}>
@@ -427,12 +450,15 @@ const CampaignRegisterPage = () => {
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                   <div>
-                    <label style={s.label}>Phone Number</label>
+                    <label style={s.label}>
+                      Phone Number <span style={{ color: "#f43f5e" }}>*</span>
+                    </label>
                     <input
                       type="tel"
                       placeholder="Enter phone number"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
+                      required
                       style={s.input}
                       onFocus={(e) => Object.assign(e.target.style, s.inputFocus)}
                       onBlur={(e) => Object.assign(e.target.style, { borderColor: "#e2e8f0", boxShadow: "none" })}
@@ -863,6 +889,51 @@ const s: { [key: string]: React.CSSProperties } = {
     borderTopColor: "#10b981",
     borderRadius: "50%",
     animation: "spin 0.8s linear infinite",
+  },
+  errorBanner: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 12,
+    padding: "14px 16px",
+    marginBottom: 18,
+    background: "#fff5f5",
+    border: "1px solid #fecaca",
+    borderRadius: 12,
+    borderBottom: "3px solid #fecaca",
+    color: "#374151",
+    fontSize: "0.95rem",
+    lineHeight: 1.5,
+    position: "relative",
+  },
+  errorBannerIcon: {
+    flex: "0 0 auto",
+    width: 28,
+    height: 28,
+    borderRadius: "50%",
+    background: "#ef4444",
+    color: "#fff",
+    fontWeight: 800,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  errorBannerText: {
+    flex: "1 1 auto",
+    paddingRight: 24,
+    color: "#374151",
+  },
+  errorBannerClose: {
+    position: "absolute",
+    top: 6,
+    right: 8,
+    border: "none",
+    background: "transparent",
+    fontSize: "1.4rem",
+    lineHeight: 1,
+    color: "#9ca3af",
+    cursor: "pointer",
+    padding: "4px 8px",
   },
 }
 

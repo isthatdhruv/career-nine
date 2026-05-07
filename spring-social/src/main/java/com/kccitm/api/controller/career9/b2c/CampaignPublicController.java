@@ -165,10 +165,10 @@ public class CampaignPublicController {
                 tDto.put("tierId", pt.getTierId());
                 tDto.put("name", pt.getName());
                 tDto.put("description", pt.getDescription());
-                long basePaise = pt.getBasePriceInr() != null ? pt.getBasePriceInr() : 0L;
-                long pricePaise = t.getPriceOverrideInr() != null ? t.getPriceOverrideInr() : basePaise;
-                tDto.put("basePriceInr", basePaise / 100);
-                tDto.put("priceInr", pricePaise / 100);
+                long baseInr = pt.getBasePriceInr() != null ? pt.getBasePriceInr() : 0L;
+                long priceInr = t.getPriceOverrideInr() != null ? t.getPriceOverrideInr() : baseInr;
+                tDto.put("basePriceInr", baseInr);
+                tDto.put("priceInr", priceInr);
                 tDto.put("currency", pt.getCurrency());
                 tDto.put("isDefault", t.getIsDefault());
                 tDto.put("includesFinalReport", pt.getIncludesFinalReport());
@@ -227,7 +227,7 @@ public class CampaignPublicController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Pricing tier not found");
         }
         PricingTier pricingTier = ptOpt.get();
-        long originalPaise = tierMapping.getPriceOverrideInr() != null
+        long originalInr = tierMapping.getPriceOverrideInr() != null
                 ? tierMapping.getPriceOverrideInr()
                 : (pricingTier.getBasePriceInr() != null ? pricingTier.getBasePriceInr() : 0L);
 
@@ -239,8 +239,8 @@ public class CampaignPublicController {
         String gender = strFromBody(body, "gender");
         String promoCodeStr = strFromBody(body, "promoCode");
 
-        if (name == null || email == null || dobStr == null) {
-            return ResponseEntity.badRequest().body("Name, email, and date of birth are required");
+        if (name == null || email == null || dobStr == null || phone == null) {
+            return ResponseEntity.badRequest().body("Name, email, phone, and date of birth are required");
         }
         SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
         Date dob;
@@ -248,7 +248,7 @@ public class CampaignPublicController {
         catch (Exception e) { return ResponseEntity.badRequest().body("Invalid date format. Use dd-MM-yyyy"); }
 
         // 4. Apply promo code (if any)
-        Long finalPaise = originalPaise;
+        Long finalInr = originalInr;
         Integer promoDiscountPercent = null;
         String promoCodeSaved = null;
         if (promoCodeStr != null && !promoCodeStr.trim().isEmpty()) {
@@ -268,7 +268,7 @@ public class CampaignPublicController {
                 return ResponseEntity.badRequest().body("Promo code usage limit reached");
             }
             promoDiscountPercent = promo.getDiscountPercent();
-            finalPaise = originalPaise * (100 - promoDiscountPercent) / 100;
+            finalInr = originalInr * (100 - promoDiscountPercent) / 100;
             promo.setCurrentUses(promo.getCurrentUses() + 1);
             promoCodeRepository.save(promo);
             promoCodeSaved = promo.getCode();
@@ -288,23 +288,23 @@ public class CampaignPublicController {
         }
 
         // 6. Free path → inline-provision and return session
-        if (finalPaise == 0L) {
+        if (finalInr == 0L) {
             return provisionFreeAndRespond(campaign, mapping, tierMapping, pricingTier,
                     existing, name, email, dob, dobStr, phone, gender,
-                    promoCodeSaved, promoDiscountPercent, originalPaise);
+                    promoCodeSaved, promoDiscountPercent, originalInr);
         }
 
         // 7. Paid path → create Razorpay payment link + PaymentTransaction
         return createPaymentAndRedirect(campaign, mapping, tierMapping, pricingTier,
                 name, email, dob, dobStr, phone, gender,
-                finalPaise, originalPaise, promoCodeSaved, promoDiscountPercent);
+                finalInr, originalInr, promoCodeSaved, promoDiscountPercent);
     }
 
     private ResponseEntity<?> provisionFreeAndRespond(Campaign campaign,
             CampaignAssessmentMapping mapping, CampaignAssessmentTier tierMapping,
             PricingTier pricingTier, StudentInfo existing,
             String name, String email, Date dob, String dobStr, String phone, String gender,
-            String promoCodeSaved, Integer promoDiscountPercent, long originalPaise) {
+            String promoCodeSaved, Integer promoDiscountPercent, long originalInr) {
 
         // Create or reuse User+StudentInfo+UserStudent
         UserStudent userStudent;
@@ -358,7 +358,7 @@ public class CampaignPublicController {
         // Record zero-amount PaymentTransaction
         PaymentTransaction txn = new PaymentTransaction();
         txn.setAmount(0L);
-        txn.setOriginalAmount(originalPaise);
+        txn.setOriginalAmount(originalInr);
         txn.setStatus("paid");
         txn.setAssessmentId(assessmentId);
         txn.setCampaignId(campaign.getCampaignId());
@@ -394,7 +394,7 @@ public class CampaignPublicController {
             CampaignAssessmentMapping mapping, CampaignAssessmentTier tierMapping,
             PricingTier pricingTier,
             String name, String email, Date dob, String dobStr, String phone, String gender,
-            long finalPaise, long originalPaise, String promoCodeSaved, Integer promoDiscountPercent) {
+            long finalInr, long originalInr, String promoCodeSaved, Integer promoDiscountPercent) {
 
         try {
             String description = pricingTier.getName() + " — " + campaign.getName();
@@ -410,11 +410,11 @@ public class CampaignPublicController {
             notes.put("customerDob", dobStr);
 
             Map<String, String> rzpResponse = razorpayService.createPaymentLink(
-                    finalPaise, "INR", description, callbackUrl, referenceId, notes);
+                    finalInr, "INR", description, callbackUrl, referenceId, notes);
 
             PaymentTransaction txn = new PaymentTransaction();
-            txn.setAmount(finalPaise);
-            txn.setOriginalAmount(originalPaise);
+            txn.setAmount(finalInr);
+            txn.setOriginalAmount(originalInr);
             txn.setAssessmentId(mapping.getAssessmentId());
             txn.setCampaignId(campaign.getCampaignId());
             txn.setCampaignAssessmentTierId(tierMapping.getId());
@@ -436,7 +436,7 @@ public class CampaignPublicController {
             response.put("status", "payment_required");
             response.put("paymentUrl", rzpResponse.get("shortUrl"));
             response.put("transactionId", txn.getTransactionId());
-            response.put("amount", finalPaise);
+            response.put("amount", finalInr);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.error("Failed to create campaign payment link", e);

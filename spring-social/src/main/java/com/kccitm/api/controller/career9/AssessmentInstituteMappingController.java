@@ -258,8 +258,9 @@ public class AssessmentInstituteMappingController {
         String phone = (String) studentData.get("phone");
         String gender = (String) studentData.get("gender");
 
-        if (name == null || email == null || dobStr == null) {
-            return ResponseEntity.badRequest().body("Name, email, and date of birth are required");
+        if (name == null || email == null || dobStr == null
+                || phone == null || phone.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Name, email, phone, and date of birth are required");
         }
 
         // Parse DOB
@@ -298,7 +299,7 @@ public class AssessmentInstituteMappingController {
         }
 
         // 4. Check if payment is required
-        Long mappingAmount = mapping.getAmount(); // amount in paise
+        Long mappingAmount = mapping.getAmount(); // amount in rupees
         boolean paymentRequired = mappingAmount != null && mappingAmount > 0;
 
         // 5. Handle promo code if provided
@@ -448,7 +449,7 @@ public class AssessmentInstituteMappingController {
      * Create a PaymentTransaction and Razorpay payment link, return payment URL.
      */
     private ResponseEntity<?> createPaymentAndRedirect(Long mappingId, Long assessmentId, Integer instituteCode,
-            Long finalAmountPaise, Long originalAmountPaise, String promoCodeStr, Integer promoDiscountPercent,
+            Long finalAmountInr, Long originalAmountInr, String promoCodeStr, Integer promoDiscountPercent,
             String name, String email, Date dob, String dobStr, String phone, String gender) {
         try {
             String assessmentName = assessmentTableRepository.findById(assessmentId)
@@ -465,14 +466,14 @@ public class AssessmentInstituteMappingController {
             notes.put("studentName", name);
 
             Map<String, String> rzpResponse = razorpayService.createPaymentLink(
-                    finalAmountPaise, "INR", assessmentName + " - Payment",
+                    finalAmountInr, "INR", assessmentName + " - Payment",
                     callbackUrl, referenceId, notes);
 
             // Create PaymentTransaction
             PaymentTransaction txn = new PaymentTransaction();
             txn.setMappingId(mappingId);
-            txn.setAmount(finalAmountPaise);
-            txn.setOriginalAmount(originalAmountPaise);
+            txn.setAmount(finalAmountInr);
+            txn.setOriginalAmount(originalAmountInr);
             txn.setAssessmentId(assessmentId);
             txn.setInstituteCode(instituteCode);
             txn.setStudentName(name);
@@ -495,7 +496,7 @@ public class AssessmentInstituteMappingController {
             response.put("status", "payment_required");
             response.put("paymentUrl", rzpResponse.get("shortUrl"));
             response.put("transactionId", txn.getTransactionId());
-            response.put("amount", finalAmountPaise);
+            response.put("amount", finalAmountInr);
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -509,7 +510,7 @@ public class AssessmentInstituteMappingController {
      * Handle existing student who needs to pay.
      */
     private ResponseEntity<?> handleExistingStudentWithPayment(StudentInfo existingStudentInfo, Long assessmentId,
-            Integer instituteCode, Long mappingId, Long finalAmountPaise, Long originalAmountPaise,
+            Integer instituteCode, Long mappingId, Long finalAmountInr, Long originalAmountInr,
             String promoCodeStr, Integer promoDiscountPercent,
             String name, String email, Date dob, String phone) {
         // Check if already assigned
@@ -532,7 +533,7 @@ public class AssessmentInstituteMappingController {
         SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
         String dobStr = sdf.format(dob);
         return createPaymentAndRedirect(mappingId, assessmentId, instituteCode,
-                finalAmountPaise, originalAmountPaise, promoCodeStr, promoDiscountPercent,
+                finalAmountInr, originalAmountInr, promoCodeStr, promoDiscountPercent,
                 name, email, dob, dobStr, phone, null);
     }
 

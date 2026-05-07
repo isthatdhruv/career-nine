@@ -72,7 +72,7 @@ public class PaymentEmailService {
     @Async
     public void sendFailedOrPendingEmail(PaymentTransaction txn, String assessmentName, String status) {
         try {
-            long amountRupees = txn.getAmount() / 100;
+            long amountRupees = txn.getAmount() != null ? txn.getAmount() : 0L;
             String studentName = escapeHtml(txn.getStudentName() != null ? txn.getStudentName() : "Student");
             String safeAssessmentName = escapeHtml(assessmentName);
 
@@ -125,7 +125,7 @@ public class PaymentEmailService {
     @Async
     public void sendNudgeEmail(PaymentTransaction txn, String assessmentName) {
         try {
-            long amountRupees = txn.getAmount() / 100;
+            long amountRupees = txn.getAmount() != null ? txn.getAmount() : 0L;
             String studentName = escapeHtml(txn.getStudentName() != null ? txn.getStudentName() : "Student");
             String safeAssessmentName = escapeHtml(assessmentName);
 
@@ -153,7 +153,7 @@ public class PaymentEmailService {
 
     @Async
     public void sendPaymentLinkEmail(String email, String studentName, PaymentTransaction txn, String assessmentName) {
-        long amountRupees = txn.getAmount() / 100;
+        long amountRupees = txn.getAmount() != null ? txn.getAmount() : 0L;
         String safeName = escapeHtml(studentName);
         String safeAssessmentName = escapeHtml(assessmentName);
 

@@ -108,7 +108,7 @@ const PaymentTable = ({
                   {txn.studentDob || "-"}
                 </td>
                 <td style={{ padding: "12px 14px", borderBottom: "1px solid #f1f5f9", fontWeight: 700, fontSize: "0.9rem", color: "#1e293b" }}>
-                  INR {txn.amount / 100}
+                  INR {txn.amount}
                 </td>
                 <td style={{ padding: "12px 14px", borderBottom: "1px solid #f1f5f9" }}>
                   <span style={{ background: sc.bg, color: sc.color, padding: "4px 12px", borderRadius: 8, fontWeight: 600, fontSize: "0.75rem" }}>
