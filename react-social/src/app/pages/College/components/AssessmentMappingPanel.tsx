@@ -103,7 +103,7 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
     }
 
     if (amount && Number(amount) > 0) {
-      data.amount = Math.round(Number(amount) * 100);
+      data.amount = Math.round(Number(amount));
     }
 
     setSubmitting(true);
@@ -433,7 +433,7 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
                             fontWeight: 600, fontSize: "0.78rem",
                           }}>
                             {mapping.amount && mapping.amount > 0
-                              ? `INR ${(mapping.amount / 100).toFixed(0)}`
+                              ? `INR ${mapping.amount}`
                               : "Free"}
                           </span>
                         </td>

@@ -11,7 +11,7 @@ interface Props {
 }
 
 const fmtDate = (s?: string) => s ? s.split(" ")[0] : "—";
-const fmtINR = (paise?: number) => paise == null ? "—" : `₹${(paise / 100).toLocaleString("en-IN")}`;
+const fmtINR = (rupees?: number) => rupees == null ? "—" : `₹${rupees.toLocaleString("en-IN")}`;
 
 const statusVariant = (s?: string) => {
   if (s === "active") return "success";

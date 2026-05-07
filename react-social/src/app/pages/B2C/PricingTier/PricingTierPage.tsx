@@ -25,9 +25,9 @@ const emptyTier: PricingTier = {
   isActive: true,
 };
 
-const formatINR = (paise?: number) => {
-  if (paise == null) return "—";
-  return `₹${(paise / 100).toLocaleString("en-IN")}`;
+const formatINR = (rupees?: number) => {
+  if (rupees == null) return "—";
+  return `₹${rupees.toLocaleString("en-IN")}`;
 };
 
 const PricingTierPage = () => {
@@ -57,7 +57,7 @@ const PricingTierPage = () => {
   const handleSave = async () => {
     if (!editing.name?.trim()) { showErrorToast("Tier name is required"); return; }
     if (editing.basePriceInr == null || editing.basePriceInr < 0) {
-      showErrorToast("Base price must be 0 or higher (in paise)"); return;
+      showErrorToast("Base price must be 0 or higher (in rupees)"); return;
     }
     setSaving(true);
     try {
@@ -166,7 +166,7 @@ const PricingTierPage = () => {
             </Form.Group>
             <div className="row">
               <div className="col-md-6 mb-3">
-                <Form.Label>Base price (in paise)</Form.Label>
+                <Form.Label>Base price (in rupees)</Form.Label>
                 <Form.Control type="number" value={editing.basePriceInr} onChange={e => upd("basePriceInr", Number(e.target.value))} />
                 <Form.Text className="text-muted">Display: {formatINR(editing.basePriceInr)}</Form.Text>
               </div>

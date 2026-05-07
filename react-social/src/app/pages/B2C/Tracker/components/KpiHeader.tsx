@@ -2,7 +2,7 @@ interface Props {
   summary: any;
 }
 
-const fmtINR = (paise?: number) => paise == null ? "—" : `₹${(paise / 100).toLocaleString("en-IN")}`;
+const fmtINR = (rupees?: number) => rupees == null ? "—" : `₹${rupees.toLocaleString("en-IN")}`;
 
 const Card = ({ label, value, tone }: { label: string; value: any; tone?: "navy" | "emerald" | "cyan" | "slate" }) => {
   const bg = {
