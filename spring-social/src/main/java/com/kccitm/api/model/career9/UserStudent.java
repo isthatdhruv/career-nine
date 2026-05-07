@@ -28,9 +28,9 @@ public class UserStudent implements Serializable {
     @Column(name = "user_student_id")
     private Long userStudentId;
 
-    // Institute Id
+    // Institute Id (null for B2C campaign students — they don't belong to an institute)
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "institute_id", referencedColumnName = "institute_code", nullable = false)
+    @JoinColumn(name = "institute_id", referencedColumnName = "institute_code", nullable = true)
     private InstituteDetail institute;
 
     // Student Detail Id
