@@ -136,7 +136,7 @@ public class CampaignPublicController {
             if (Boolean.FALSE.equals(a.getIsActive())) continue;
 
             Map<String, Object> aDto = new HashMap<>();
-            aDto.put("assessmentId", a.getAssessmentId());
+            aDto.put("assessmentId", a.getId());
             aDto.put("assessmentName", a.getAssessmentName());
             aDto.put("isActive", a.getIsActive());
             aDto.put("purchasePath", m.getPurchasePath() != null ? m.getPurchasePath() : defaultPurchasePath);
