@@ -27,3 +27,11 @@ export function deletePromoCode(id: number) {
 export function validatePromoCode(code: string) {
   return axios.post(`${API_URL}/promo-codes/public/validate`, { code });
 }
+
+export function getPromoCodeCampaigns(id: number) {
+  return axios.get<number[]>(`${API_URL}/promo-codes/${id}/campaigns`);
+}
+
+export function setPromoCodeCampaigns(id: number, campaignIds: number[]) {
+  return axios.put(`${API_URL}/promo-codes/${id}/campaigns`, { campaignIds });
+}

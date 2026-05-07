@@ -6,9 +6,12 @@ import {
   getAllPromoCodes,
   updatePromoCode,
   deletePromoCode,
+  getPromoCodeCampaigns,
+  setPromoCodeCampaigns,
 } from "./API/PromoCode_APIs";
 import { showErrorToast } from "../../utils/toast";
 import PageHeader from "../../components/PageHeader";
+import CampaignPicker from "./components/CampaignPicker";
 
 interface PromoCodeItem {
   id: number;
@@ -35,6 +38,8 @@ const PromoCodePage = () => {
   const [description, setDescription] = useState("");
   const [maxUses, setMaxUses] = useState<string>("");
   const [expiresAt, setExpiresAt] = useState<string>("");
+  const [restrictMode, setRestrictMode] = useState<"global" | "campaigns">("global");
+  const [linkedCampaignIds, setLinkedCampaignIds] = useState<number[]>([]);
 
   useEffect(() => {
     loadPromoCodes();
@@ -58,17 +63,32 @@ const PromoCodePage = () => {
     setDescription("");
     setMaxUses("");
     setExpiresAt("");
+    setRestrictMode("global");
+    setLinkedCampaignIds([]);
     setShowModal(true);
   };
 
-  const openEditModal = (promo: PromoCodeItem) => {
+  const openEditModal = async (promo: PromoCodeItem) => {
     setEditingPromo(promo);
     setCode(promo.code);
     setDiscountPercent(promo.discountPercent);
     setDescription(promo.description || "");
     setMaxUses(promo.maxUses != null ? String(promo.maxUses) : "");
     setExpiresAt(promo.expiresAt ? formatDateForInput(promo.expiresAt) : "");
+    setRestrictMode("global");
+    setLinkedCampaignIds([]);
     setShowModal(true);
+    // Load existing campaign mappings
+    try {
+      const res = await getPromoCodeCampaigns(promo.id);
+      const ids: number[] = res.data || [];
+      if (ids.length > 0) {
+        setRestrictMode("campaigns");
+        setLinkedCampaignIds(ids);
+      }
+    } catch {
+      // ignore — defaults to global
+    }
   };
 
   const formatDateForInput = (dateStr: string) => {
@@ -102,10 +122,19 @@ const PromoCodePage = () => {
         expiresAt: expiresAt ? new Date(expiresAt + "T23:59:59").getTime() : null,
       };
 
+      let savedId: number;
       if (editingPromo) {
         await updatePromoCode(editingPromo.id, data);
+        savedId = editingPromo.id;
       } else {
-        await createPromoCode(data);
+        const createRes = await createPromoCode(data);
+        savedId = (createRes.data as any).id ?? (createRes.data as any).promoCodeId;
+      }
+
+      // Persist campaign mapping
+      const ids = restrictMode === "campaigns" ? linkedCampaignIds : [];
+      if (savedId != null) {
+        await setPromoCodeCampaigns(savedId, ids);
       }
 
       setShowModal(false);
@@ -385,6 +414,36 @@ const PromoCodePage = () => {
               />
             </Form.Group>
           </div>
+
+          <Form.Group className="mt-3">
+            <Form.Label style={{ fontWeight: 600, fontSize: "0.85rem", color: "#475569" }}>
+              Restrict to campaigns
+            </Form.Label>
+            <div>
+              <Form.Check
+                type="radio"
+                id="promo-restrict-global"
+                label="Available everywhere (school flow only — current behavior)"
+                checked={restrictMode === "global"}
+                onChange={() => { setRestrictMode("global"); setLinkedCampaignIds([]); }}
+              />
+              <Form.Check
+                type="radio"
+                id="promo-restrict-campaigns"
+                label="Restrict to specific campaigns"
+                checked={restrictMode === "campaigns"}
+                onChange={() => setRestrictMode("campaigns")}
+              />
+            </div>
+            {restrictMode === "campaigns" && (
+              <div style={{ marginTop: 12, paddingLeft: 24, borderLeft: "2px solid #e2e8f0" }}>
+                <CampaignPicker
+                  selectedIds={linkedCampaignIds}
+                  onChange={setLinkedCampaignIds}
+                />
+              </div>
+            )}
+          </Form.Group>
         </Modal.Body>
 
         <Modal.Footer style={{ padding: "16px 32px", borderTop: "1px solid #e2e8f0" }}>

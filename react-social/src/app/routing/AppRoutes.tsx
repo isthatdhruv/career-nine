@@ -60,6 +60,22 @@ const PaymentStatusRedirect: FC = () => {
   );
 };
 
+const CampaignLandingRedirect: FC = () => {
+  const params = useParams<{ slug?: string; assessmentId?: string; tierId?: string }>();
+  useEffect(() => {
+    let path = `/c/${params.slug ?? ""}`;
+    if (params.assessmentId) path += `/${params.assessmentId}`;
+    if (params.tierId) path += `/${params.tierId}`;
+    const target = `${process.env.REACT_APP_ASSESSMENT_APP_URL}${path}${window.location.search}`;
+    window.location.replace(target);
+  }, [params.slug, params.assessmentId, params.tierId]);
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "sans-serif", color: "#555" }}>
+      Redirecting…
+    </div>
+  );
+};
+
 const SchoolAssessmentRegisterPage = lazy(
   () => import("../pages/SchoolRegistration/SchoolAssessmentRegisterPage")
 );
@@ -174,6 +190,18 @@ const AppRoutes: FC = () => {
       <Route
               path="/payment-status"
               element={<PaymentStatusRedirect />}
+            />
+      <Route
+              path="/c/:slug"
+              element={<CampaignLandingRedirect />}
+            />
+      <Route
+              path="/c/:slug/:assessmentId"
+              element={<CampaignLandingRedirect />}
+            />
+      <Route
+              path="/c/:slug/:assessmentId/:tierId"
+              element={<CampaignLandingRedirect />}
             />
       <Route
               path="/payment-register/:transactionId"

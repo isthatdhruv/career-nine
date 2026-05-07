@@ -28,6 +28,9 @@ public class PromoCodeController {
     @Autowired
     private PromoCodeRepository promoCodeRepository;
 
+    @Autowired
+    private com.kccitm.api.repository.Career9.b2c.PromoCodeCampaignRepository promoCodeCampaignRepository;
+
     @PostMapping("/create")
     public ResponseEntity<?> createPromoCode(@RequestBody Map<String, Object> request) {
         String code = (String) request.get("code");
@@ -140,25 +143,45 @@ public class PromoCodeController {
     }
 
     @PostMapping("/public/validate")
-    public ResponseEntity<?> validatePromoCode(@RequestBody Map<String, String> request) {
-        String code = request.get("code");
-        if (code == null || code.trim().isEmpty()) {
+    public ResponseEntity<?> validatePromoCode(@RequestBody Map<String, Object> request) {
+        Object codeObj = request.get("code");
+        if (codeObj == null || codeObj.toString().trim().isEmpty()) {
             return ResponseEntity.badRequest().body("Promo code is required");
         }
+        String code = codeObj.toString().trim().toUpperCase();
 
-        Optional<PromoCode> optPromo = promoCodeRepository.findByCodeIgnoreCaseAndIsActive(
-                code.trim().toUpperCase(), true);
-
+        Optional<PromoCode> optPromo = promoCodeRepository.findByCodeIgnoreCaseAndIsActive(code, true);
         if (!optPromo.isPresent()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Invalid promo code");
         }
-
         PromoCode promo = optPromo.get();
+
+        // Campaign-scoping check
+        Object campaignIdObj = request.get("campaignId");
+        Long campaignId = null;
+        if (campaignIdObj != null) {
+            try { campaignId = Long.valueOf(campaignIdObj.toString()); }
+            catch (NumberFormatException e) { return ResponseEntity.badRequest().body("Invalid campaignId"); }
+        }
+        boolean codeIsCampaignScoped = promoCodeCampaignRepository.existsByPromoCodeId(promo.getId());
+
+        if (campaignId != null) {
+            // B2C flow — code must be mapped to this campaign
+            if (!codeIsCampaignScoped
+                    || !promoCodeCampaignRepository.existsByPromoCodeIdAndCampaignId(promo.getId(), campaignId)) {
+                return ResponseEntity.badRequest().body("Code not valid for this campaign");
+            }
+        } else {
+            // School flow — code must NOT be campaign-scoped
+            if (codeIsCampaignScoped) {
+                return ResponseEntity.badRequest().body(
+                    "This code is for a specific campaign — open the campaign link to use it");
+            }
+        }
 
         if (promo.getExpiresAt() != null && promo.getExpiresAt().before(new Date())) {
             return ResponseEntity.status(HttpStatus.GONE).body("Promo code has expired");
         }
-
         if (promo.getMaxUses() != null && promo.getCurrentUses() >= promo.getMaxUses()) {
             return ResponseEntity.status(HttpStatus.GONE).body("Promo code usage limit reached");
         }
@@ -167,7 +190,44 @@ public class PromoCodeController {
         response.put("code", promo.getCode());
         response.put("discountPercent", promo.getDiscountPercent());
         response.put("valid", true);
-
         return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{id}/campaigns")
+    public ResponseEntity<?> setCampaigns(@PathVariable Long id, @RequestBody Map<String, Object> req) {
+        if (!promoCodeRepository.findById(id).isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+        Object raw = req.get("campaignIds");
+        List<Long> campaignIds = new java.util.ArrayList<>();
+        if (raw instanceof List) {
+            for (Object o : (List<?>) raw) {
+                if (o == null) continue;
+                try { campaignIds.add(Long.valueOf(o.toString())); }
+                catch (NumberFormatException e) {
+                    return ResponseEntity.badRequest().body("campaignIds must be a list of numbers");
+                }
+            }
+        } else if (raw != null) {
+            return ResponseEntity.badRequest().body("campaignIds must be a list");
+        }
+
+        promoCodeCampaignRepository.deleteByPromoCodeId(id);
+        for (Long cid : campaignIds) {
+            com.kccitm.api.model.career9.b2c.PromoCodeCampaign m =
+                new com.kccitm.api.model.career9.b2c.PromoCodeCampaign();
+            m.setPromoCodeId(id);
+            m.setCampaignId(cid);
+            promoCodeCampaignRepository.save(m);
+        }
+        return ResponseEntity.ok(java.util.Map.of("status", "ok", "count", campaignIds.size()));
+    }
+
+    @GetMapping("/{id}/campaigns")
+    public ResponseEntity<?> getCampaigns(@PathVariable Long id) {
+        List<Long> ids = promoCodeCampaignRepository.findByPromoCodeId(id).stream()
+            .map(com.kccitm.api.model.career9.b2c.PromoCodeCampaign::getCampaignId)
+            .collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(ids);
     }
 }
