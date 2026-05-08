@@ -33,6 +33,8 @@ export interface PaymentRow {
   tierName?: string;
   finalReportActive?: boolean;
   assessmentStatus?: string;
+  instituteCode?: number;
+  instituteName?: string;
 }
 
 export interface AllotmentRow {
@@ -65,7 +67,22 @@ export interface AllotmentRow {
   studentPhone?: string;
   userStudentId?: number;
   assessmentStatus?: string;
+  instituteCode?: number;
+  instituteName?: string;
 }
+
+export interface InstituteOption {
+  instituteCode: number;
+  instituteName: string;
+}
+
+export const getInstituteList = () =>
+  axios.get<InstituteOption[]>(`${process.env.REACT_APP_API_URL}/instituteDetail/get/list`);
+
+export const assignStudentInstitute = (userStudentId: number, instituteCode: number) =>
+  axios.post<{ status: string; instituteCode: number }>(
+    `${process.env.REACT_APP_API_URL}/user-student/${userStudentId}/institute/${instituteCode}/assign-primary`
+  );
 
 export interface TrackerFilters {
   campaignId?: number;

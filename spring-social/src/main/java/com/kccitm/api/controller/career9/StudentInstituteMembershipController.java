@@ -117,6 +117,28 @@ public class StudentInstituteMembershipController {
     }
 
     /**
+     * One-shot assign: upserts the membership (creating it if needed, un-dropping
+     * it if it was dropped) AND promotes it to primary. Used by the B2C tracker
+     * institute dropdown so the admin doesn't need two clicks.
+     */
+    @PostMapping("/user-student/{id}/institute/{instituteCode}/assign-primary")
+    public ResponseEntity<?> assignPrimary(@PathVariable Long id, @PathVariable Integer instituteCode) {
+        if (!userStudentRepository.findById(id).isPresent()) return ResponseEntity.notFound().build();
+        if (instituteDetailRepository.findById(instituteCode.intValue()) == null) {
+            return ResponseEntity.badRequest().body("Institute does not exist");
+        }
+        try {
+            membershipService.upsertMembership(id, instituteCode, null, "admin-assign");
+            membershipService.setPrimary(id, instituteCode);
+            return ResponseEntity.ok(Map.of("status", "ok", "instituteCode", instituteCode));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
+    }
+
+    /**
      * Institute-side view: every student associated with an institute, with
      * drop state. Filtering by includeDropped lets the admin show or hide
      * dropped memberships.

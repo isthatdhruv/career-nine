@@ -1,15 +1,23 @@
 import { useState } from "react";
-import { Button, Pagination, Spinner, Table } from "react-bootstrap";
+import { Button, Form, Pagination, Spinner, Table } from "react-bootstrap";
 import { showErrorToast, showSuccessToast } from "../../../../utils/toast";
-import { PaymentRow, resendEntitlementService, sendPaymentLinkEmail } from "../../API/Tracker_APIs";
+import {
+  InstituteOption,
+  PaymentRow,
+  assignStudentInstitute,
+  resendEntitlementService,
+  sendPaymentLinkEmail,
+} from "../../API/Tracker_APIs";
 
 interface Props {
   rows: PaymentRow[];
   total: number;
   page: number;
   pageSize: number;
+  institutes: InstituteOption[];
   onPageChange: (p: number) => void;
   onOpenEntitlement: (id: number) => void;
+  onInstituteChanged?: () => void;
 }
 
 const fmtINR = (rupees?: number) => rupees == null ? "—" : `₹${rupees.toLocaleString("en-IN")}`;
@@ -36,9 +44,32 @@ const assessmentLabel = (s?: string) => {
   return "—";
 };
 
-const PaymentsTab = ({ rows, total, page, pageSize, onPageChange, onOpenEntitlement }: Props) => {
+const PaymentsTab = ({
+  rows, total, page, pageSize, institutes,
+  onPageChange, onOpenEntitlement, onInstituteChanged,
+}: Props) => {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const [busy, setBusy] = useState<{ id: number; type: string } | null>(null);
+  const [savingInstitute, setSavingInstitute] = useState<number | null>(null);
+
+  const changeInstitute = async (r: PaymentRow, instituteCode: number) => {
+    if (!r.userStudentId) {
+      showErrorToast("This transaction has no linked student yet — student is created on payment.");
+      return;
+    }
+    if (instituteCode === r.instituteCode) return;
+    setSavingInstitute(r.transactionId);
+    try {
+      await assignStudentInstitute(r.userStudentId, instituteCode);
+      const inst = institutes.find(i => i.instituteCode === instituteCode);
+      showSuccessToast(`Institute set to ${inst?.instituteName ?? instituteCode}`);
+      onInstituteChanged?.();
+    } catch (e: any) {
+      showErrorToast(e?.response?.data || "Failed to update institute");
+    } finally {
+      setSavingInstitute(null);
+    }
+  };
 
   const sendLink = async (r: PaymentRow) => {
     if (!r.studentEmail) {
@@ -113,6 +144,7 @@ const PaymentsTab = ({ rows, total, page, pageSize, onPageChange, onOpenEntitlem
             <th>Student</th>
             <th>Campaign · Assessment</th>
             <th>Tier · Path</th>
+            <th>Institute</th>
             <th>Amount</th>
             <th>Status</th>
             <th>Assessment</th>
@@ -121,7 +153,7 @@ const PaymentsTab = ({ rows, total, page, pageSize, onPageChange, onOpenEntitlem
         </thead>
         <tbody>
           {rows.length === 0 && (
-            <tr><td colSpan={9} className="text-center text-muted py-4">No payments match these filters.</td></tr>
+            <tr><td colSpan={10} className="text-center text-muted py-4">No payments match these filters.</td></tr>
           )}
           {rows.map(r => {
             const completed = r.assessmentStatus === "completed";
@@ -149,6 +181,23 @@ const PaymentsTab = ({ rows, total, page, pageSize, onPageChange, onOpenEntitlem
                 <td>
                   {r.tierName ?? <em className="text-muted">—</em>}
                   {r.purchasePath && <><br /><small>Path {r.purchasePath}</small></>}
+                </td>
+                <td style={{ minWidth: 180 }}>
+                  {r.userStudentId ? (
+                    <Form.Select
+                      size="sm"
+                      value={r.instituteCode ?? ""}
+                      disabled={savingInstitute === r.transactionId}
+                      onChange={(e) => changeInstitute(r, Number(e.target.value))}
+                    >
+                      <option value="" disabled>{r.instituteName ?? "— select —"}</option>
+                      {institutes.map(i => (
+                        <option key={i.instituteCode} value={i.instituteCode}>{i.instituteName}</option>
+                      ))}
+                    </Form.Select>
+                  ) : (
+                    <em className="text-muted small">no student yet</em>
+                  )}
                 </td>
                 <td>
                   {fmtINR(r.amount)}

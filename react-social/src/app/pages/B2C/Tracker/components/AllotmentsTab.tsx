@@ -1,15 +1,22 @@
 import { useState } from "react";
-import { Button, Pagination, Spinner, Table } from "react-bootstrap";
+import { Button, Form, Pagination, Spinner, Table } from "react-bootstrap";
 import { showErrorToast, showSuccessToast } from "../../../../utils/toast";
-import { AllotmentRow, resendEntitlementService } from "../../API/Tracker_APIs";
+import {
+  AllotmentRow,
+  InstituteOption,
+  assignStudentInstitute,
+  resendEntitlementService,
+} from "../../API/Tracker_APIs";
 
 interface Props {
   rows: AllotmentRow[];
   total: number;
   page: number;
   pageSize: number;
+  institutes: InstituteOption[];
   onPageChange: (p: number) => void;
   onOpenEntitlement: (id: number) => void;
+  onInstituteChanged?: () => void;
 }
 
 const fmtDate = (s?: string) => s ? s.split(" ")[0] : "—";
@@ -44,9 +51,32 @@ const Chip = ({ on, label, used, total }: { on?: boolean; label: string; used?: 
   </span>
 );
 
-const AllotmentsTab = ({ rows, total, page, pageSize, onPageChange, onOpenEntitlement }: Props) => {
+const AllotmentsTab = ({
+  rows, total, page, pageSize, institutes,
+  onPageChange, onOpenEntitlement, onInstituteChanged,
+}: Props) => {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const [busy, setBusy] = useState<{ id: number; type: string } | null>(null);
+  const [savingInstitute, setSavingInstitute] = useState<number | null>(null);
+
+  const changeInstitute = async (r: AllotmentRow, instituteCode: number) => {
+    if (!r.userStudentId) {
+      showErrorToast("This allotment has no linked student.");
+      return;
+    }
+    if (instituteCode === r.instituteCode) return;
+    setSavingInstitute(r.entitlementId);
+    try {
+      await assignStudentInstitute(r.userStudentId, instituteCode);
+      const inst = institutes.find(i => i.instituteCode === instituteCode);
+      showSuccessToast(`Institute set to ${inst?.instituteName ?? instituteCode}`);
+      onInstituteChanged?.();
+    } catch (e: any) {
+      showErrorToast(e?.response?.data || "Failed to update institute");
+    } finally {
+      setSavingInstitute(null);
+    }
+  };
 
   const sendService = async (r: AllotmentRow, serviceType: "assessment_invite" | "final_report") => {
     if (!r.studentEmail) {
@@ -75,6 +105,7 @@ const AllotmentsTab = ({ rows, total, page, pageSize, onPageChange, onOpenEntitl
             <th>Student</th>
             <th>Campaign · Assessment</th>
             <th>Tier · Path · Model</th>
+            <th>Institute</th>
             <th>Services</th>
             <th>Paid</th>
             <th>Expires</th>
@@ -85,7 +116,7 @@ const AllotmentsTab = ({ rows, total, page, pageSize, onPageChange, onOpenEntitl
         </thead>
         <tbody>
           {rows.length === 0 && (
-            <tr><td colSpan={10} className="text-center text-muted py-4">No allotments match these filters.</td></tr>
+            <tr><td colSpan={11} className="text-center text-muted py-4">No allotments match these filters.</td></tr>
           )}
           {rows.map(r => {
             const completed = r.assessmentStatus === "completed";
@@ -110,6 +141,23 @@ const AllotmentsTab = ({ rows, total, page, pageSize, onPageChange, onOpenEntitl
                   {r.tierName ?? <em className="text-muted">—</em>}
                   <br />
                   <small>Path {r.purchasePath ?? "—"} · Model {r.counsellingModel ?? "—"}</small>
+                </td>
+                <td style={{ minWidth: 180 }}>
+                  {r.userStudentId ? (
+                    <Form.Select
+                      size="sm"
+                      value={r.instituteCode ?? ""}
+                      disabled={savingInstitute === r.entitlementId}
+                      onChange={(e) => changeInstitute(r, Number(e.target.value))}
+                    >
+                      <option value="" disabled>{r.instituteName ?? "— select —"}</option>
+                      {institutes.map(i => (
+                        <option key={i.instituteCode} value={i.instituteCode}>{i.instituteName}</option>
+                      ))}
+                    </Form.Select>
+                  ) : (
+                    <em className="text-muted small">—</em>
+                  )}
                 </td>
                 <td>
                   <Chip on={r.finalReportActive} label="Report" />

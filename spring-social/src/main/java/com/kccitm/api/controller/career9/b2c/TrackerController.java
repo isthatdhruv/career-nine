@@ -158,6 +158,7 @@ public class TrackerController {
                     : null);
 
             row.put("assessmentStatus", lookupAssessmentStatus(t.getUserStudentId(), t.getAssessmentId()));
+            attachInstitute(row, t.getUserStudentId());
             rows.add(row);
         }
 
@@ -379,7 +380,22 @@ public class TrackerController {
         }
         row.put("userStudentId", e.getUserStudentId());
         row.put("assessmentStatus", lookupAssessmentStatus(e.getUserStudentId(), e.getAssessmentId()));
+        attachInstitute(row, e.getUserStudentId());
         return row;
+    }
+
+    /**
+     * Adds the student's primary institute (code + name) to a tracker row so
+     * the SPA can render it without an extra round-trip per row.
+     */
+    private void attachInstitute(Map<String, Object> row, Long userStudentId) {
+        if (userStudentId == null) return;
+        userStudentRepository.findById(userStudentId).ifPresent(us -> {
+            if (us.getInstitute() != null) {
+                row.put("instituteCode", us.getInstitute().getInstituteCode());
+                row.put("instituteName", us.getInstitute().getInstituteName());
+            }
+        });
     }
 
     private String lookupAssessmentStatus(Long userStudentId, Long assessmentId) {
