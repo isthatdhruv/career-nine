@@ -9,10 +9,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.UserStudentInstituteHistory;
 import com.kccitm.api.model.career9.b2c.Campaign;
 import com.kccitm.api.model.career9.school.InstituteDetail;
+import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.repository.Career9.UserStudentInstituteHistoryRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
@@ -39,6 +41,32 @@ public class StudentInstituteMembershipService {
     @Autowired private UserStudentInstituteHistoryRepository historyRepository;
     @Autowired private UserStudentRepository userStudentRepository;
     @Autowired private InstituteDetailRepository instituteDetailRepository;
+    @Autowired private StudentInfoRepository studentInfoRepository;
+
+    /**
+     * Single write entry point for "set the student's primary institute".
+     * Keeps student_info.institute_id (the column group-student filters on),
+     * user_student.institute_id (still read by legacy code paths), and the
+     * user_student_institute_history audit row in sync.
+     */
+    @Transactional
+    public void setPrimaryInstitute(UserStudent userStudent, Integer instituteCode,
+                                     Long campaignId, String source) {
+        if (userStudent == null || instituteCode == null) return;
+        InstituteDetail inst = instituteDetailRepository.findById(instituteCode.intValue());
+        if (inst == null) {
+            logger.warn("setPrimaryInstitute: missing institute_code {}", instituteCode);
+            return;
+        }
+        StudentInfo si = userStudent.getStudentInfo();
+        if (si != null) {
+            si.setInstituteId(instituteCode);
+            studentInfoRepository.save(si);
+        }
+        userStudent.setInstitute(inst);
+        userStudentRepository.save(userStudent);
+        upsertMembership(userStudent.getUserStudentId(), instituteCode, campaignId, source);
+    }
 
     /**
      * Called from every campaign-driven registration path. Sets the student's
@@ -54,12 +82,6 @@ public class StudentInstituteMembershipService {
         Integer newCode = campaign.getInstituteCode();
         if (newCode == null) return; // legacy campaign, nothing to do
 
-        InstituteDetail newInstitute = instituteDetailRepository.findById(newCode.intValue());
-        if (newInstitute == null) {
-            logger.warn("Campaign {} references missing institute_code {}", campaign.getCampaignId(), newCode);
-            return;
-        }
-
         InstituteDetail current = userStudent.getInstitute();
         Integer currentCode = current != null ? current.getInstituteCode() : null;
 
@@ -70,15 +92,9 @@ public class StudentInstituteMembershipService {
             ensureMembership(userStudent.getUserStudentId(), currentCode, null, "initial");
         }
 
-        // 2. Upsert a membership row for the campaign's institute (un-drops
-        //    the row if it had been dropped previously).
-        upsertMembership(userStudent.getUserStudentId(), newCode, campaign.getCampaignId(), source);
-
-        // 3. Set/overwrite primary on user_student if it differs.
-        if (currentCode == null || !currentCode.equals(newCode)) {
-            userStudent.setInstitute(newInstitute);
-            userStudentRepository.save(userStudent);
-        }
+        // 2. Promote the campaign's institute to primary across all three
+        //    persistence sites (student_info, user_student, history).
+        setPrimaryInstitute(userStudent, newCode, campaign.getCampaignId(), source);
     }
 
     /** Ensures a non-dropped membership row exists; creates one if missing. */
@@ -165,9 +181,9 @@ public class StudentInstituteMembershipService {
         if (Boolean.TRUE.equals(row.getIsDropped())) {
             throw new IllegalStateException("Cannot promote a dropped institute to primary. Un-drop it first.");
         }
-        InstituteDetail inst = instituteDetailRepository.findById(instituteCode.intValue());
-        if (inst == null) throw new IllegalArgumentException("Institute not found");
-        us.setInstitute(inst);
-        userStudentRepository.save(us);
+        if (instituteDetailRepository.findById(instituteCode.intValue()) == null) {
+            throw new IllegalArgumentException("Institute not found");
+        }
+        setPrimaryInstitute(us, instituteCode, row.getCampaignId(), "admin-set-primary");
     }
 }

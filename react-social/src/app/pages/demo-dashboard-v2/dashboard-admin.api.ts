@@ -61,3 +61,46 @@ export async function fetchCounsellorRatingSummary(): Promise<any[]> {
   const { data } = await axios.get(`${API_URL}/api/counselling-rating/summary-by-counsellor`);
   return safeList(data);
 }
+
+export interface AdminDashboardSnapshot {
+  students: any[];
+  institutes: any[];
+  counsellors: any[];
+  appointments: any[];
+  ratingSummary: any[];
+  assessments: any[];
+  reports: any[];
+  studentMappings: any[];
+  computedAt?: string;
+}
+
+const emptySnapshot = (): AdminDashboardSnapshot => ({
+  students: [], institutes: [], counsellors: [], appointments: [],
+  ratingSummary: [], assessments: [], reports: [], studentMappings: [],
+});
+
+const normalizeSnapshot = (data: any): AdminDashboardSnapshot => {
+  const base = emptySnapshot();
+  if (!data || typeof data !== "object") return base;
+  return {
+    students: safeList(data.students),
+    institutes: safeList(data.institutes),
+    counsellors: safeList(data.counsellors),
+    appointments: safeList(data.appointments),
+    ratingSummary: safeList(data.ratingSummary),
+    assessments: safeList(data.assessments),
+    reports: safeList(data.reports),
+    studentMappings: safeList(data.studentMappings),
+    computedAt: typeof data.computedAt === "string" ? data.computedAt : undefined,
+  };
+};
+
+export async function fetchAdminDashboardSnapshot(): Promise<AdminDashboardSnapshot> {
+  const { data } = await axios.get(`${API_URL}/dashboard/admin/snapshot`);
+  return normalizeSnapshot(data);
+}
+
+export async function refreshAdminDashboardSnapshot(): Promise<AdminDashboardSnapshot> {
+  const { data } = await axios.post(`${API_URL}/dashboard/admin/snapshot/refresh`);
+  return normalizeSnapshot(data);
+}

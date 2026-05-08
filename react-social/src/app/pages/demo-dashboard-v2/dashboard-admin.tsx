@@ -6,15 +6,9 @@ import { PageTitle } from "../../../_metronic/layout/core";
 import { useThemeMode } from "../../../_metronic/partials/layout/theme-mode/ThemeModeProvider";
 import { useAuth } from "../../modules/auth/core/Auth";
 import {
-  fetchAssessments,
-  fetchCounsellingAppointments,
-  fetchCounsellorRatingSummary,
-  fetchCounsellors,
-  fetchGeneratedReports,
-  fetchInstitutes,
+  fetchAdminDashboardSnapshot,
   fetchLogins,
-  fetchStudents,
-  fetchAllStudentsWithMapping,
+  refreshAdminDashboardSnapshot,
 } from "./dashboard-admin.api";
 
 /* ============================================================
@@ -143,12 +137,12 @@ const DashboardAdminContent: FC = () => {
   const [loginsLoading, setLoginsLoading] = useState(false);
   const [reports, setReports] = useState<any[]>([]);
   const [studentMappings, setStudentMappings] = useState<any[]>([]);
-  const [mappingsLoading, setMappingsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [refreshNonce, setRefreshNonce] = useState(0);
 
-  const refreshing = loading || mappingsLoading || loginsLoading;
+  const mappingsLoading = false;
+  const refreshing = loading || loginsLoading;
   const [manualRefresh, setManualRefresh] = useState(false);
 
   const handleRefresh = () => {
@@ -195,68 +189,38 @@ const DashboardAdminContent: FC = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Single cached snapshot call: returns a 24h-cached blob from the server (or
+  // recomputes server-side if older). Manual refresh forces a recompute.
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    setErrors({});
-    (async () => {
-      const calls: { key: string; fn: () => Promise<any[]>; setter: (v: any[]) => void }[] = [
-        { key: "students", fn: fetchStudents, setter: setStudents },
-        { key: "institutes", fn: fetchInstitutes, setter: setInstitutes },
-        { key: "counsellors", fn: fetchCounsellors, setter: setCounsellors },
-        { key: "appointments", fn: fetchCounsellingAppointments, setter: setAppointments },
-        { key: "ratingSummary", fn: fetchCounsellorRatingSummary, setter: setRatingSummary },
-        { key: "assessments", fn: fetchAssessments, setter: setAssessments },
-        { key: "reports", fn: fetchGeneratedReports, setter: setReports },
-      ];
-
-      const errs: Record<string, string> = {};
-      await Promise.all(
-        calls.map(async ({ key, fn, setter }) => {
-          try {
-            const data = await fn();
-            if (!cancelled) setter(data);
-          } catch (e: any) {
-            const status = e?.response?.status;
-            const msg = status ? `HTTP ${status}` : e?.message || "request failed";
-            errs[key] = msg;
-            // eslint-disable-next-line no-console
-            console.error(`[admin dashboard] ${key} failed:`, status, e?.response?.data || e);
-          }
-        })
-      );
-      if (cancelled) return;
-      setErrors(errs);
-      setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshNonce]);
-
-  // Second pass: fetch student+mapping data for all institutes in a single call.
-  // Backed by /student-info/getAllStudentsWithMapping (replaces the previous N+1 per-institute loop).
-  useEffect(() => {
-    let cancelled = false;
-    setMappingsLoading(true);
     (async () => {
       try {
-        const data = await fetchAllStudentsWithMapping();
+        const snap = manualRefresh
+          ? await refreshAdminDashboardSnapshot()
+          : await fetchAdminDashboardSnapshot();
         if (cancelled) return;
-        setStudentMappings(data);
+        setStudents(snap.students);
+        setInstitutes(snap.institutes);
+        setCounsellors(snap.counsellors);
+        setAppointments(snap.appointments);
+        setRatingSummary(snap.ratingSummary);
+        setAssessments(snap.assessments);
+        setReports(snap.reports);
+        setStudentMappings(snap.studentMappings);
         setErrors((prev) => {
-          const { mappings: _omit, ...rest } = prev;
+          const { snapshot: _omit, ...rest } = prev;
           return rest;
         });
       } catch (e: any) {
         if (cancelled) return;
         const status = e?.response?.status;
         const msg = status ? `HTTP ${status}` : e?.message || "request failed";
-        setErrors((prev) => ({ ...prev, mappings: msg }));
+        setErrors((prev) => ({ ...prev, snapshot: msg }));
         // eslint-disable-next-line no-console
-        console.error("[admin dashboard] mappings failed:", e);
+        console.error("[admin dashboard] snapshot failed:", status, e?.response?.data || e);
       } finally {
-        if (!cancelled) setMappingsLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
