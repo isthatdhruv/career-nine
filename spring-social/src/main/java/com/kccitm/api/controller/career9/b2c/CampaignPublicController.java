@@ -478,6 +478,7 @@ public class CampaignPublicController {
 
         Map<String, Object> activeTier = null;
         String dashboardUrl = null;
+        String finalReportUrl = null;
         if (alreadyActive && e.getCampaignAssessmentTierId() != null) {
             Optional<CampaignAssessmentTier> tOpt = tierMappingRepository.findById(e.getCampaignAssessmentTierId());
             if (tOpt.isPresent()) {
@@ -494,6 +495,10 @@ public class CampaignPublicController {
                             && e.getAccessToken() != null && linkBuilder != null) {
                         dashboardUrl = linkBuilder.dashboard(e.getAccessToken(), e.getEntitlementId());
                     }
+                    if (Boolean.TRUE.equals(pt.getIncludesFinalReport())
+                            && e.getAccessToken() != null && linkBuilder != null) {
+                        finalReportUrl = linkBuilder.finalReport(e.getAccessToken(), e.getEntitlementId());
+                    }
                 }
             }
         }
@@ -509,6 +514,7 @@ public class CampaignPublicController {
         response.put("tiers", buildTierDtos(mapping.getId()));
         response.put("activeTier", activeTier);
         response.put("dashboardUrl", dashboardUrl);
+        response.put("finalReportUrl", finalReportUrl);
         response.put("careerLibraryUrl", "https://library.career-9.com");
         return ResponseEntity.ok(response);
     }

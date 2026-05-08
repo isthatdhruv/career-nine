@@ -91,6 +91,87 @@ public class BetReportDataController {
     @Autowired private DigitalOceanSpacesService digitalOceanSpacesService;
     @Autowired private com.kccitm.api.repository.Career9.GeneratedReportRepository generatedReportRepository;
     @Autowired private com.kccitm.api.repository.Career9.SchoolReportRepository schoolReportRepository;
+    @Autowired(required = false) private com.kccitm.api.service.b2c.EntitlementService entitlementService;
+    @Autowired(required = false) private com.kccitm.api.service.PdfService pdfService;
+
+    // ═══════════════════════ PUBLIC TOKENIZED FINAL REPORT (PDF) ═══════════════════════
+
+    /**
+     * Public endpoint that backs the {@code /report/final?t=...&e=...} link
+     * emailed to B2C students by EntitlementService.onAssessmentCompleted.
+     *
+     * Validates the StudentEntitlement access token, generates the BET HTML
+     * report (reusing the same flow as /one-click-report) and streams it back
+     * as a downloadable PDF. No frontend page is needed — the browser
+     * downloads the PDF directly from the email link.
+     */
+    @GetMapping("/public/final")
+    public ResponseEntity<?> publicFinalReportPdf(
+            @org.springframework.web.bind.annotation.RequestParam("t") String token,
+            @org.springframework.web.bind.annotation.RequestParam("e") Long entitlementId) {
+
+        if (entitlementService == null || pdfService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body("Report download is not available on this deployment");
+        }
+        if (token == null || token.trim().isEmpty() || entitlementId == null) {
+            return ResponseEntity.badRequest().body("Invalid or missing token");
+        }
+
+        // redeemAccessToken handles: missing token, wrong entitlementId, status
+        // not in {active,pending}, and expired token.
+        com.kccitm.api.model.career9.b2c.StudentEntitlement e =
+                entitlementService.redeemAccessToken(token.trim(), entitlementId);
+        if (e == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Invalid or expired token");
+        }
+        if (!Boolean.TRUE.equals(e.getFinalReportActive())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Final report is not active for this entitlement");
+        }
+
+        Long userStudentId = e.getUserStudentId();
+        Long assessmentId = e.getAssessmentId();
+
+        // Reuse the existing oneClickReport data path: fetch or generate the
+        // BetReportData, then fill the HTML template.
+        Optional<BetReportData> existing = betReportDataRepository
+                .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+        if (!existing.isPresent()) {
+            BetReportData generated = generateForStudentLive(userStudentId, assessmentId);
+            if (generated == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("No completed assessment found for this entitlement");
+            }
+            existing = Optional.of(generated);
+        }
+        BetReportData report = existing.get();
+
+        String template = loadHtmlTemplate();
+        if (template == null) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Could not load BET HTML template");
+        }
+        String filledHtml = fillTemplate(template, report);
+
+        try {
+            java.io.ByteArrayInputStream pdfStream = pdfService.convertHtmlToPdf(filledHtml);
+            byte[] pdfBytes = org.apache.commons.io.IOUtils.toByteArray(pdfStream);
+
+            String safeName = (report.getStudentName() != null ? report.getStudentName() : "student")
+                    .replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
+            String fileName = safeName + "_" + userStudentId + "_career9_report.pdf";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"");
+            headers.setContentLength(pdfBytes.length);
+            return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to generate PDF: " + ex.getMessage());
+        }
+    }
 
     // ═══════════════════════ ONE-CLICK REPORT ═══════════════════════
 

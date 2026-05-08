@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button, Pagination, Spinner, Table } from "react-bootstrap";
 import { showErrorToast, showSuccessToast } from "../../../../utils/toast";
-import { PaymentRow, resendEntitlementService } from "../../API/Tracker_APIs";
+import { PaymentRow, resendEntitlementService, sendPaymentLinkEmail } from "../../API/Tracker_APIs";
 
 interface Props {
   rows: PaymentRow[];
@@ -39,6 +39,47 @@ const assessmentLabel = (s?: string) => {
 const PaymentsTab = ({ rows, total, page, pageSize, onPageChange, onOpenEntitlement }: Props) => {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const [busy, setBusy] = useState<{ id: number; type: string } | null>(null);
+
+  const sendLink = async (r: PaymentRow) => {
+    if (!r.studentEmail) {
+      showErrorToast("No registered email on this transaction.");
+      return;
+    }
+    setBusy({ id: r.transactionId, type: "payment_link" });
+    try {
+      await sendPaymentLinkEmail(r.transactionId, r.studentEmail, r.studentName);
+      showSuccessToast(`Payment link sent to ${r.studentEmail}`);
+    } catch (e: any) {
+      showErrorToast(e?.response?.data || "Failed to send payment link");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const copyLink = async (r: PaymentRow) => {
+    const link = r.shortUrl || r.paymentLinkUrl;
+    if (!link) {
+      showErrorToast("No payment link available for this transaction.");
+      return;
+    }
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(link);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = link;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      showSuccessToast("Payment link copied to clipboard");
+    } catch {
+      showErrorToast("Could not copy link to clipboard");
+    }
+  };
 
   const sendService = async (r: PaymentRow, serviceType: "assessment_invite" | "final_report") => {
     if (!r.entitlementId) {
@@ -86,8 +127,11 @@ const PaymentsTab = ({ rows, total, page, pageSize, onPageChange, onOpenEntitlem
             const completed = r.assessmentStatus === "completed";
             const canRemind = r.entitlementId != null && r.status === "paid" && !completed;
             const canSendReport = r.entitlementId != null && r.finalReportActive === true && completed;
+            const hasLink = !!(r.shortUrl || r.paymentLinkUrl);
+            const canSendLink = r.status === "created" && !!r.studentEmail;
             const remindBusy = busy?.id === r.transactionId && busy.type === "assessment_invite";
             const reportBusy = busy?.id === r.transactionId && busy.type === "final_report";
+            const linkBusy = busy?.id === r.transactionId && busy.type === "payment_link";
             return (
               <tr key={r.transactionId}>
                 <td><code>#{r.transactionId}</code></td>
@@ -130,6 +174,20 @@ const PaymentsTab = ({ rows, total, page, pageSize, onPageChange, onOpenEntitlem
                       <Button size="sm" variant="outline-success" disabled={reportBusy}
                         onClick={() => sendService(r, "final_report")}>
                         {reportBusy ? <Spinner animation="border" size="sm" /> : "Send report"}
+                      </Button>
+                    )}
+                    {canSendLink && (
+                      <Button size="sm" variant="outline-info" disabled={linkBusy}
+                        title={`Send payment link to ${r.studentEmail}`}
+                        onClick={() => sendLink(r)}>
+                        {linkBusy ? <Spinner animation="border" size="sm" /> : "Send link"}
+                      </Button>
+                    )}
+                    {hasLink && (
+                      <Button size="sm" variant="outline-secondary"
+                        title="Copy payment link to clipboard"
+                        onClick={() => copyLink(r)}>
+                        Copy
                       </Button>
                     )}
                     {r.entitlementId

@@ -11,8 +11,9 @@ type UpgradeInfo = {
     assessment: { assessmentId: number; assessmentName: string };
     student: { name?: string; email?: string; phone?: string };
     tiers: Array<{ campaignAssessmentTierId: number; name: string; priceInr: number }>;
-    activeTier: null | { name: string; includesDashboard: boolean };
+    activeTier: null | { name: string; includesDashboard: boolean; includesFinalReport?: boolean };
     dashboardUrl: string | null;
+    finalReportUrl: string | null;
     careerLibraryUrl: string;
 };
 
@@ -53,6 +54,10 @@ const ThankYouPage: React.FC = () => {
         if (upgradeInfo?.dashboardUrl) window.open(upgradeInfo.dashboardUrl, '_blank');
     };
 
+    const handleDownloadReport = () => {
+        if (upgradeInfo?.finalReportUrl) window.open(upgradeInfo.finalReportUrl, '_blank');
+    };
+
     const handleGetReport = () => {
         if (!upgradeInfo) return;
         const slug = upgradeInfo.campaign.slug;
@@ -68,6 +73,7 @@ const ThankYouPage: React.FC = () => {
         upgradeInfo.tiers.length > 0;
     const showActiveButtons = !!upgradeInfo && upgradeInfo.alreadyActive;
     const showDashboardButton = showActiveButtons && !!upgradeInfo?.dashboardUrl;
+    const showDownloadReportButton = showActiveButtons && !!upgradeInfo?.finalReportUrl;
 
     const submitRating = async (rating: number) => {
         if (submittedRating > 0 || isSubmittingRating) return;
@@ -330,6 +336,55 @@ const ThankYouPage: React.FC = () => {
 
                                 {/* CTA tiles row */}
                                 <div className="d-flex justify-content-center flex-wrap" style={{ gap: '14px' }}>
+                                    {/* Download Report — only when active and final report included */}
+                                    {showDownloadReportButton && (
+                                        <div
+                                            onClick={handleDownloadReport}
+                                            className="text-center"
+                                            style={{
+                                                background: 'linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%)',
+                                                borderRadius: '16px',
+                                                padding: '1.25rem 1.5rem',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.3s ease',
+                                                boxShadow: '0 10px 35px rgba(245, 158, 11, 0.4)',
+                                                width: '100%',
+                                                maxWidth: '280px',
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
+                                                e.currentTarget.style.boxShadow = '0 15px 45px rgba(245, 158, 11, 0.5)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                                                e.currentTarget.style.boxShadow = '0 10px 35px rgba(245, 158, 11, 0.4)';
+                                            }}
+                                        >
+                                            <div style={{
+                                                width: '42px',
+                                                height: '42px',
+                                                borderRadius: '10px',
+                                                background: 'rgba(255,255,255,0.22)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                margin: '0 auto 0.75rem auto',
+                                            }}>
+                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                                    <polyline points="7 10 12 15 17 10" />
+                                                    <line x1="12" y1="15" x2="12" y2="3" />
+                                                </svg>
+                                            </div>
+                                            <h3 style={{ color: 'white', fontSize: '1.05rem', fontWeight: 700, marginBottom: '0.4rem' }}>
+                                                Download Report
+                                            </h3>
+                                            <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.8rem', lineHeight: '1.4', margin: 0 }}>
+                                                Open your detailed Career-9 report
+                                            </p>
+                                        </div>
+                                    )}
+
                                     {/* Go to Dashboard — only when active and dashboard included */}
                                     {showDashboardButton && (
                                         <div

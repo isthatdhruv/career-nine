@@ -16,6 +16,13 @@ public class LinkBuilder {
     @Value("${app.b2c.assessmentBaseUrl:https://assessment.career-9.com}")
     private String assessmentBaseUrl;
 
+    /**
+     * Used for backend-served tokenized links (e.g. final report PDF download).
+     * Defaults to the production API host; override per-profile in application.yml.
+     */
+    @Value("${app.b2c.apiBaseUrl:https://api.career-9.com}")
+    private String apiBaseUrl;
+
     public String campaignLanding(String slug) {
         return assessmentBaseUrl + "/c/" + slug;
     }
@@ -29,7 +36,9 @@ public class LinkBuilder {
     }
 
     public String finalReport(String accessToken, Long entitlementId) {
-        return frontendBaseUrl + "/report/final?t=" + accessToken + "&e=" + entitlementId;
+        // Backend-hosted: token is validated server-side and a PDF is streamed
+        // back. No frontend page hop needed.
+        return apiBaseUrl + "/bet-report-data/public/final?t=" + accessToken + "&e=" + entitlementId;
     }
 
     public String dashboard(String accessToken, Long entitlementId) {
