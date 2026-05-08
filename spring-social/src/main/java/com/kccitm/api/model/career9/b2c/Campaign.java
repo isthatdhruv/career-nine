@@ -59,6 +59,14 @@ public class Campaign implements Serializable {
     @Column(name = "default_counselling_model", length = 1, columnDefinition = "char(1) default '1'")
     private String defaultCounsellingModel = "1";
 
+    /**
+     * FK → institute_detail.institute_code. Required for new campaigns; legacy
+     * campaigns may have NULL until the admin backfills via the UI. Once every
+     * campaign is filled, schema flips to NOT NULL (Phase 2 migration).
+     */
+    @Column(name = "institute_code")
+    private Integer instituteCode;
+
     @Column(name = "is_active", columnDefinition = "BOOLEAN DEFAULT TRUE")
     private Boolean isActive = true;
 
@@ -113,6 +121,8 @@ public class Campaign implements Serializable {
     public void setDefaultPurchasePath(String v) { this.defaultPurchasePath = v; }
     public String getDefaultCounsellingModel() { return defaultCounsellingModel; }
     public void setDefaultCounsellingModel(String v) { this.defaultCounsellingModel = v; }
+    public Integer getInstituteCode() { return instituteCode; }
+    public void setInstituteCode(Integer v) { this.instituteCode = v; }
     public Boolean getIsActive() { return isActive; }
     public void setIsActive(Boolean v) { this.isActive = v; }
     public Boolean getIsDeleted() { return isDeleted; }

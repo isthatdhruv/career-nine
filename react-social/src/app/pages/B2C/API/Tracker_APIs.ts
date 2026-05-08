@@ -14,6 +14,7 @@ export interface PaymentRow {
   studentName?: string;
   studentEmail?: string;
   studentPhone?: string;
+  userStudentId?: number;
   amount?: number;
   originalAmount?: number;
   currency?: string;
@@ -30,6 +31,8 @@ export interface PaymentRow {
   entitlementId?: number;
   entitlementStatus?: string;
   tierName?: string;
+  finalReportActive?: boolean;
+  assessmentStatus?: string;
 }
 
 export interface AllotmentRow {
@@ -60,6 +63,8 @@ export interface AllotmentRow {
   studentName?: string;
   studentEmail?: string;
   studentPhone?: string;
+  userStudentId?: number;
+  assessmentStatus?: string;
 }
 
 export interface TrackerFilters {

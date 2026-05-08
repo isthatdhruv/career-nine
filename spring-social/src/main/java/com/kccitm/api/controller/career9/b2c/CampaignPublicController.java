@@ -69,6 +69,7 @@ public class CampaignPublicController {
     @Autowired private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
     @Autowired private RazorpayService razorpayService;
     @Autowired private StudentSessionService studentSessionService;
+    @Autowired private com.kccitm.api.service.b2c.StudentInstituteMembershipService membershipService;
     @Autowired(required = false) private com.kccitm.api.service.b2c.EntitlementService entitlementService;
     @Autowired(required = false) private com.kccitm.api.repository.Career9.b2c.StudentEntitlementRepository studentEntitlementRepository;
     @Autowired(required = false) private com.kccitm.api.service.b2c.LinkBuilder linkBuilder;
@@ -400,6 +401,10 @@ public class CampaignPublicController {
             userStudent = userStudentRepository.save(new UserStudent(user, info, null));
         }
 
+        // Set the campaign's institute as primary + record membership.
+        // No-op when campaign has no institute mapped (legacy campaign pre-backfill).
+        membershipService.assignFromCampaign(userStudent, campaign, "campaign-register-trial");
+
         Long userStudentId = userStudent.getUserStudentId();
         Optional<StudentAssessmentMapping> samOpt = studentAssessmentMappingRepository
                 .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
@@ -724,6 +729,8 @@ public class CampaignPublicController {
             userStudent = new UserStudent(user, studentInfo, null);
             userStudent = userStudentRepository.save(userStudent);
         }
+
+        membershipService.assignFromCampaign(userStudent, campaign, "campaign-register");
 
         // Ensure StudentAssessmentMapping exists
         Long assessmentId = mapping.getAssessmentId();

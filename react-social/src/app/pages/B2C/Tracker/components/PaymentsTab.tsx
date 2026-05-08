@@ -1,5 +1,7 @@
-import { Button, Pagination, Table } from "react-bootstrap";
-import { PaymentRow } from "../../API/Tracker_APIs";
+import { useState } from "react";
+import { Button, Pagination, Spinner, Table } from "react-bootstrap";
+import { showErrorToast, showSuccessToast } from "../../../../utils/toast";
+import { PaymentRow, resendEntitlementService } from "../../API/Tracker_APIs";
 
 interface Props {
   rows: PaymentRow[];
@@ -20,8 +22,45 @@ const statusVariant = (s?: string) => {
   return "secondary";
 };
 
+const assessmentVariant = (s?: string) => {
+  if (s === "completed") return "success";
+  if (s === "ongoing") return "info";
+  if (s === "notstarted") return "secondary";
+  return "light text-muted";
+};
+
+const assessmentLabel = (s?: string) => {
+  if (s === "completed") return "Completed";
+  if (s === "ongoing") return "Ongoing";
+  if (s === "notstarted") return "Not started";
+  return "—";
+};
+
 const PaymentsTab = ({ rows, total, page, pageSize, onPageChange, onOpenEntitlement }: Props) => {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const [busy, setBusy] = useState<{ id: number; type: string } | null>(null);
+
+  const sendService = async (r: PaymentRow, serviceType: "assessment_invite" | "final_report") => {
+    if (!r.entitlementId) {
+      showErrorToast("No entitlement linked to this transaction yet.");
+      return;
+    }
+    if (!r.studentEmail) {
+      showErrorToast("Student email is missing.");
+      return;
+    }
+    setBusy({ id: r.transactionId, type: serviceType });
+    try {
+      await resendEntitlementService(r.entitlementId, serviceType, r.studentEmail);
+      showSuccessToast(serviceType === "assessment_invite"
+        ? `Assessment reminder sent to ${r.studentEmail}`
+        : `Report sent to ${r.studentEmail}`);
+    } catch (e: any) {
+      showErrorToast(e?.response?.data || "Failed to send email");
+    } finally {
+      setBusy(null);
+    }
+  };
 
   return (
     <>
@@ -35,46 +74,73 @@ const PaymentsTab = ({ rows, total, page, pageSize, onPageChange, onOpenEntitlem
             <th>Tier · Path</th>
             <th>Amount</th>
             <th>Status</th>
+            <th>Assessment</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 && (
-            <tr><td colSpan={8} className="text-center text-muted py-4">No payments match these filters.</td></tr>
+            <tr><td colSpan={9} className="text-center text-muted py-4">No payments match these filters.</td></tr>
           )}
-          {rows.map(r => (
-            <tr key={r.transactionId}>
-              <td><code>#{r.transactionId}</code></td>
-              <td>{fmtDate(r.createdAt)}</td>
-              <td>
-                <strong>{r.studentName ?? "—"}</strong>
-                <br />
-                <small className="text-muted">{r.studentEmail ?? ""} {r.studentPhone ? `· ${r.studentPhone}` : ""}</small>
-              </td>
-              <td>
-                {r.campaignName ?? <em className="text-muted">no campaign</em>}
-                <br />
-                <small className="text-muted">{r.assessmentName}</small>
-              </td>
-              <td>
-                {r.tierName ?? <em className="text-muted">—</em>}
-                {r.purchasePath && <><br /><small>Path {r.purchasePath}</small></>}
-              </td>
-              <td>
-                {fmtINR(r.amount)}
-                {r.promoCode && <><br /><small className="text-muted">promo: {r.promoCode}</small></>}
-              </td>
-              <td>
-                <span className={`badge bg-${statusVariant(r.status)}`}>{r.status}</span>
-              </td>
-              <td>
-                {r.entitlementId
-                  ? <Button size="sm" variant="outline-primary" onClick={() => onOpenEntitlement(r.entitlementId!)}>Manage</Button>
-                  : (r.shortUrl && <a href={r.shortUrl} target="_blank" rel="noreferrer" className="btn btn-sm btn-outline-secondary">Open link</a>)
-                }
-              </td>
-            </tr>
-          ))}
+          {rows.map(r => {
+            const completed = r.assessmentStatus === "completed";
+            const canRemind = r.entitlementId != null && r.status === "paid" && !completed;
+            const canSendReport = r.entitlementId != null && r.finalReportActive === true && completed;
+            const remindBusy = busy?.id === r.transactionId && busy.type === "assessment_invite";
+            const reportBusy = busy?.id === r.transactionId && busy.type === "final_report";
+            return (
+              <tr key={r.transactionId}>
+                <td><code>#{r.transactionId}</code></td>
+                <td>{fmtDate(r.createdAt)}</td>
+                <td>
+                  <strong>{r.studentName ?? "—"}</strong>
+                  <br />
+                  <small className="text-muted">{r.studentEmail ?? ""} {r.studentPhone ? `· ${r.studentPhone}` : ""}</small>
+                </td>
+                <td>
+                  {r.campaignName ?? <em className="text-muted">no campaign</em>}
+                  <br />
+                  <small className="text-muted">{r.assessmentName}</small>
+                </td>
+                <td>
+                  {r.tierName ?? <em className="text-muted">—</em>}
+                  {r.purchasePath && <><br /><small>Path {r.purchasePath}</small></>}
+                </td>
+                <td>
+                  {fmtINR(r.amount)}
+                  {r.promoCode && <><br /><small className="text-muted">promo: {r.promoCode}</small></>}
+                </td>
+                <td>
+                  <span className={`badge bg-${statusVariant(r.status)}`}>{r.status}</span>
+                </td>
+                <td>
+                  <span className={`badge bg-${assessmentVariant(r.assessmentStatus)}`}>
+                    {assessmentLabel(r.assessmentStatus)}
+                  </span>
+                </td>
+                <td>
+                  <div className="d-flex flex-wrap gap-1">
+                    {canRemind && (
+                      <Button size="sm" variant="outline-warning" disabled={remindBusy}
+                        onClick={() => sendService(r, "assessment_invite")}>
+                        {remindBusy ? <Spinner animation="border" size="sm" /> : "Remind"}
+                      </Button>
+                    )}
+                    {canSendReport && (
+                      <Button size="sm" variant="outline-success" disabled={reportBusy}
+                        onClick={() => sendService(r, "final_report")}>
+                        {reportBusy ? <Spinner animation="border" size="sm" /> : "Send report"}
+                      </Button>
+                    )}
+                    {r.entitlementId
+                      ? <Button size="sm" variant="outline-primary" onClick={() => onOpenEntitlement(r.entitlementId!)}>Manage</Button>
+                      : (r.shortUrl && <a href={r.shortUrl} target="_blank" rel="noreferrer" className="btn btn-sm btn-outline-secondary">Open link</a>)
+                    }
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </Table>
 

@@ -49,6 +49,7 @@ public class EntitlementController {
     @Autowired private StudentInfoRepository studentInfoRepository;
     @Autowired private UserStudentRepository userStudentRepository;
     @Autowired private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
+    @Autowired private com.kccitm.api.service.b2c.StudentInstituteMembershipService membershipService;
 
     /**
      * PUBLIC: Path B step 1 — student takes the free assessment from a campaign landing page.
@@ -117,6 +118,8 @@ public class EntitlementController {
             userStudent = new UserStudent(user, info, null);
             userStudent = userStudentRepository.save(userStudent);
         }
+
+        membershipService.assignFromCampaign(userStudent, campaignOpt.get(), "entitlement-create");
 
         // Ensure assessment mapping exists
         Optional<StudentAssessmentMapping> samOpt = studentAssessmentMappingRepository

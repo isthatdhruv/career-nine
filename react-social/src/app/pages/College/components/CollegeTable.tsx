@@ -18,6 +18,7 @@ import { showErrorToast } from '../../../utils/toast';
 import CollegeDetailModal from "./CollegeSectionSessionGradeModal";
 import AssessmentMappingModal from "./AssessmentMappingModal";
 import SchoolAssessmentMappingModal from "./SchoolAssessmentMappingModal";
+import InstituteStudentsModal from "./InstituteStudentsModal";
 
 // Layout reference image (local path)
 const layoutImagePath = "/mnt/data/556d6c4d-1033-4fd7-8d4f-f02d4f436ce2.png";
@@ -83,6 +84,12 @@ const CollegeTable = (props: {
   const [assessmentMappingModalShow, setAssessmentMappingModalShow] = useState(false);
   const [schoolMappingModalShow, setSchoolMappingModalShow] = useState(false);
   const [assessmentMappingInstitute, setAssessmentMappingInstitute] = useState<{
+    code: number;
+    name: string;
+  }>({ code: 0, name: "" });
+
+  const [studentsModalShow, setStudentsModalShow] = useState(false);
+  const [studentsModalInstitute, setStudentsModalInstitute] = useState<{
     code: number;
     name: string;
   }>({ code: 0, name: "" });
@@ -279,6 +286,20 @@ const CollegeTable = (props: {
                   <MdSchool size={18} className="me-2" />
                   School Registration Setup
                 </Dropdown.Item>
+
+                {/* Manage student memberships for this institute */}
+                <Dropdown.Item
+                  onClick={() => {
+                    setStudentsModalInstitute({
+                      code: Number(data.instituteCode),
+                      name: data.instituteName || "",
+                    });
+                    setStudentsModalShow(true);
+                  }}
+                >
+                  <MdSchool size={18} className="me-2" />
+                  Students at this institute
+                </Dropdown.Item>
               </Dropdown.Menu>
             </Dropdown>
 
@@ -414,6 +435,14 @@ const CollegeTable = (props: {
         onHide={() => setSchoolMappingModalShow(false)}
         instituteCode={assessmentMappingInstitute.code}
         instituteName={assessmentMappingInstitute.name}
+      />
+
+      {/* Student memberships for this institute */}
+      <InstituteStudentsModal
+        show={studentsModalShow}
+        onHide={() => setStudentsModalShow(false)}
+        instituteCode={studentsModalInstitute.code}
+        instituteName={studentsModalInstitute.name}
       />
     </>
   );

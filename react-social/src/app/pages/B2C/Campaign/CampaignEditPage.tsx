@@ -12,6 +12,8 @@ import {
   detachAssessment,
   detachTierFromMapping,
   getCampaign,
+  getInstituteList,
+  InstituteOption,
   updateAssessmentMapping,
   updateCampaign,
 } from "../API/Campaign_APIs";
@@ -28,6 +30,7 @@ const emptyCampaign: Campaign = {
   description: "",
   defaultPurchasePath: "B",
   defaultCounsellingModel: "1",
+  instituteCode: null,
   isActive: true,
 };
 
@@ -42,6 +45,7 @@ const CampaignEditPage = () => {
   const [assessmentRows, setAssessmentRows] = useState<CampaignAssessmentRow[]>([]);
   const [allAssessments, setAllAssessments] = useState<{ id: number; name: string }[]>([]);
   const [allTiers, setAllTiers] = useState<PricingTier[]>([]);
+  const [allInstitutes, setAllInstitutes] = useState<InstituteOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -73,6 +77,15 @@ const CampaignEditPage = () => {
     }
   };
 
+  const loadInstitutes = async () => {
+    try {
+      const res = await getInstituteList();
+      setAllInstitutes(res.data || []);
+    } catch (e: any) {
+      showErrorToast(e?.response?.data || "Failed to load institutes");
+    }
+  };
+
   const loadCampaign = async () => {
     if (!isEdit) return;
     setLoading(true);
@@ -87,11 +100,12 @@ const CampaignEditPage = () => {
     }
   };
 
-  useEffect(() => { loadAssessments(); loadTiers(); loadCampaign(); /* eslint-disable-next-line */ }, [id]);
+  useEffect(() => { loadAssessments(); loadTiers(); loadInstitutes(); loadCampaign(); /* eslint-disable-next-line */ }, [id]);
 
   const handleSaveBasics = async () => {
     if (!campaign.name?.trim()) { showErrorToast("Name is required"); return; }
     if (!campaign.slug?.trim()) { showErrorToast("Slug is required"); return; }
+    if (!campaign.instituteCode) { showErrorToast("Institute is required"); return; }
     setSaving(true);
     try {
       if (isEdit) {
@@ -187,6 +201,24 @@ const CampaignEditPage = () => {
               <div className="col-md-6 mb-3">
                 <Form.Label>Brand logo URL</Form.Label>
                 <Form.Control value={campaign.brandLogoUrl ?? ""} onChange={e => upd("brandLogoUrl", e.target.value)} />
+              </div>
+              <div className="col-md-6 mb-3">
+                <Form.Label>
+                  Mapped institute <span className="text-danger">*</span>
+                </Form.Label>
+                <Form.Select
+                  value={campaign.instituteCode ?? ""}
+                  onChange={e => upd("instituteCode", e.target.value === "" ? null : Number(e.target.value))}
+                  isInvalid={!campaign.instituteCode}
+                >
+                  <option value="">— select an institute —</option>
+                  {allInstitutes.map(i => (
+                    <option key={i.instituteCode} value={i.instituteCode}>{i.instituteName}</option>
+                  ))}
+                </Form.Select>
+                <Form.Text className="text-muted">
+                  Every student registering through this campaign will be linked to this institute.
+                </Form.Text>
               </div>
               <div className="col-12 mb-3">
                 <Form.Label>Description</Form.Label>

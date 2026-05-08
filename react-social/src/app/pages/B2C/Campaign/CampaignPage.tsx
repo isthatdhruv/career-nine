@@ -77,7 +77,12 @@ const CampaignPage = () => {
                   <td>
                     Path <strong>{c.defaultPurchasePath ?? "B"}</strong> · Model <strong>{c.defaultCounsellingModel ?? "1"}</strong>
                   </td>
-                  <td>{c.isActive ? <span className="badge bg-success">Active</span> : <span className="badge bg-secondary">Inactive</span>}</td>
+                  <td>
+                    {c.isActive ? <span className="badge bg-success">Active</span> : <span className="badge bg-secondary">Inactive</span>}
+                    {!c.instituteCode && (
+                      <><br /><span className="badge bg-warning text-dark mt-1" title="Open this campaign and pick an institute">⚠ no institute</span></>
+                    )}
+                  </td>
                   <td>
                     <Button size="sm" variant="outline-primary" className="me-1" onClick={() => navigate(`/b2c/campaigns/edit/${c.campaignId}`)}>Configure</Button>
                     <Button size="sm" variant="outline-danger" onClick={() => handleDelete(c)}>Delete</Button>
