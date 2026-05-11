@@ -168,7 +168,17 @@ const AllotmentsTab = ({
                 </td>
                 <td>{fmtINR(r.paidAmount)}</td>
                 <td>{fmtDate(r.expiresAt)}</td>
-                <td><span className={`badge bg-${statusVariant(r.status)}`}>{r.status}</span></td>
+                <td>
+                  <span className={`badge bg-${statusVariant(r.status)}`}>{r.status}</span>
+                  {r.lastReportError && (
+                    <span
+                      className="badge bg-danger ms-1"
+                      title={r.lastReportError.message}
+                    >
+                      ⚠ Report error
+                    </span>
+                  )}
+                </td>
                 <td>
                   <span className={`badge bg-${assessmentVariant(r.assessmentStatus)}`}>
                     {assessmentLabel(r.assessmentStatus)}

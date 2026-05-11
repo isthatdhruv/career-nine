@@ -93,6 +93,7 @@ public class BetReportDataController {
     @Autowired private com.kccitm.api.repository.Career9.SchoolReportRepository schoolReportRepository;
     @Autowired(required = false) private com.kccitm.api.service.b2c.EntitlementService entitlementService;
     @Autowired(required = false) private com.kccitm.api.service.PdfService pdfService;
+    @Autowired(required = false) private com.kccitm.api.service.b2c.ReportGenerationLogService reportGenerationLogService;
 
     // ═══════════════════════ PUBLIC TOKENIZED FINAL REPORT (PDF) ═══════════════════════
 
@@ -168,9 +169,72 @@ public class BetReportDataController {
             headers.setContentLength(pdfBytes.length);
             return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
         } catch (Exception ex) {
+            if (reportGenerationLogService != null) {
+                Integer studentClass = lookupStudentClass(userStudentId);
+                reportGenerationLogService.log(entitlementId, assessmentId, "bet",
+                        studentClass, "download", ex);
+            }
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed to generate PDF: " + ex.getMessage());
         }
+    }
+
+    /**
+     * Generates the BET report (if not yet generated), uploads to DO Spaces,
+     * syncs the unified GeneratedReport row, and returns the public CDN URL.
+     *
+     * Unlike {@link #oneClickReport(Map)} this method throws on failure (and
+     * does not return a fallback HTML body) so that callers — namely
+     * {@code ReportPreparationService} — can map exceptions to log rows + 500s.
+     */
+    @Transactional
+    public String prepareAndUploadForEntitlement(Long userStudentId, Long assessmentId) {
+        Optional<BetReportData> existing = betReportDataRepository
+                .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+
+        if (existing.isEmpty()) {
+            BetReportData generated = generateForStudentLive(userStudentId, assessmentId);
+            if (generated == null) {
+                throw new IllegalStateException(
+                        "No completed assessment found for user " + userStudentId
+                                + " / assessment " + assessmentId);
+            }
+            existing = Optional.of(generated);
+        }
+
+        BetReportData report = existing.get();
+        if ("generated".equals(report.getReportStatus()) && report.getReportUrl() != null) {
+            return report.getReportUrl();
+        }
+
+        String template = loadHtmlTemplate();
+        if (template == null) {
+            throw new IllegalStateException("Could not load BET HTML template");
+        }
+
+        String filledHtml = fillTemplate(template, report);
+        String safeName = (report.getStudentName() != null ? report.getStudentName() : "student")
+                .replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
+        String fileName = safeName + "_" + userStudentId + "_bet_report.html";
+        String folder = "bet-reports/assessment-" + assessmentId;
+
+        String reportUrl = digitalOceanSpacesService.uploadBytes(
+                filledHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                "text/html", folder, fileName);
+
+        report.setReportStatus("generated");
+        report.setReportUrl(reportUrl);
+        betReportDataRepository.save(report);
+        syncGeneratedReport(userStudentId, assessmentId, "generated", reportUrl);
+        return reportUrl;
+    }
+
+    private Integer lookupStudentClass(Long userStudentId) {
+        if (userStudentId == null) return null;
+        return userStudentRepository.findById(userStudentId)
+                .map(UserStudent::getStudentInfo)
+                .map(StudentInfo::getStudentClass)
+                .orElse(null);
     }
 
     // ═══════════════════════ ONE-CLICK REPORT ═══════════════════════

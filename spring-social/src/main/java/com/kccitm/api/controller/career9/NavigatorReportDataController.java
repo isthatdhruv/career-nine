@@ -188,6 +188,75 @@ public class NavigatorReportDataController {
         ));
     }
 
+    /**
+     * Generates the Navigator report (if not yet generated), uploads to DO Spaces,
+     * syncs the unified GeneratedReport row, and returns the public CDN URL.
+     *
+     * Class-based template + subtype resolution
+     * ({@link #resolveTemplateName} / {@link #resolveReportType}) happens
+     * automatically based on the NavigatorReportData.studentClass populated
+     * during generation. Throws on any failure so the dispatcher can map to
+     * a log row + 500.
+     */
+    @Transactional
+    public String prepareAndUploadForEntitlement(Long userStudentId, Long assessmentId) {
+        Optional<NavigatorReportData> existing = navigatorReportDataRepository
+                .findByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId);
+
+        boolean needsRegeneration = existing.isEmpty()
+                || existing.get().getSummary() == null
+                || existing.get().getSummary().isEmpty()
+                || existing.get().getSummary().startsWith("Summary generation failed");
+
+        if (needsRegeneration) {
+            if (existing.isPresent()) {
+                navigatorReportDataRepository.deleteByUserStudentUserStudentIdAndAssessmentId(
+                        userStudentId, assessmentId);
+            }
+            NavigatorReportData generated = navigatorReportGenerationService
+                    .generateForStudent(userStudentId, assessmentId, false);
+            if (generated == null) {
+                throw new IllegalStateException(
+                        "No completed assessment found for user " + userStudentId
+                                + " / assessment " + assessmentId);
+            }
+            existing = Optional.of(generated);
+        }
+
+        NavigatorReportData report = existing.get();
+        if (!report.isEligible()) {
+            throw new IllegalStateException("Student is ineligible for Navigator report: "
+                    + safe(report.getEligibilityIssues()));
+        }
+
+        if ("generated".equals(report.getReportStatus()) && report.getReportUrl() != null) {
+            return report.getReportUrl();
+        }
+
+        String templateName = resolveTemplateName(report.getStudentClass());
+        String template = loadNavigatorTemplate(templateName);
+        if (template == null) {
+            throw new IllegalStateException("Could not load Navigator template: " + templateName);
+        }
+
+        String filledHtml = fillTemplate(template, report);
+        String safeName = (report.getStudentName() != null ? report.getStudentName() : "student")
+                .replaceAll("[^a-zA-Z0-9]", "_").toLowerCase();
+        String reportSubtype = resolveReportType(report.getStudentClass());
+        String fileName = safeName + "_" + userStudentId + "_" + reportSubtype + ".html";
+        String folder = "navigator-reports/assessment-" + assessmentId;
+
+        String reportUrl = digitalOceanSpacesService.uploadBytes(
+                filledHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                "text/html", folder, fileName);
+
+        report.setReportStatus("generated");
+        report.setReportUrl(reportUrl);
+        navigatorReportDataRepository.save(report);
+        syncGeneratedReport(userStudentId, assessmentId, "generated", reportUrl);
+        return reportUrl;
+    }
+
     // ═══════════════════════ CRUD ═══════════════════════
 
     @GetMapping("/getAll")
