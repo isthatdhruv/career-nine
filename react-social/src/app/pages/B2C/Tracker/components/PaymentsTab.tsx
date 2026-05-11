@@ -6,6 +6,7 @@ import {
   PaymentRow,
   assignStudentInstitute,
   resendEntitlementService,
+  resetPayment,
   sendPaymentLinkEmail,
 } from "../../API/Tracker_APIs";
 
@@ -109,6 +110,29 @@ const PaymentsTab = ({
       showSuccessToast("Payment link copied to clipboard");
     } catch {
       showErrorToast("Could not copy link to clipboard");
+    }
+  };
+
+  const handleResetPayment = async (r: PaymentRow) => {
+    const wording = r.status === "paid"
+      ? `Reset transaction #${r.transactionId}?\n\nThis will:\n• Flip the payment to "not received" (status: created)\n• Revert the linked entitlement to pending (clears tier + dashboard/counselling/LMS/report flags)\n• Keep Razorpay IDs as audit evidence\n\nUse for test cleanup or to undo a mistakenly-marked-paid row. Continue?`
+      : `Reset transaction #${r.transactionId} back to "not received"? The linked entitlement (if any) will revert to pending.`;
+    if (!window.confirm(wording)) return;
+    const reason = window.prompt("Reason for reset (optional, kept on the txn for audit):") ?? undefined;
+    setBusy({ id: r.transactionId, type: "reset" });
+    try {
+      const res = await resetPayment(r.transactionId, reason || undefined);
+      const reverted = res.data?.entitlementReverted;
+      showSuccessToast(
+        reverted
+          ? `Transaction #${r.transactionId} reset · entitlement reverted to pending`
+          : `Transaction #${r.transactionId} reset to "not received"`
+      );
+      onInstituteChanged?.();
+    } catch (e: any) {
+      showErrorToast(e?.response?.data?.message ?? e?.response?.data ?? "Failed to reset payment");
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -251,6 +275,19 @@ const PaymentsTab = ({
                       ? <Button size="sm" variant="outline-primary" onClick={() => onOpenEntitlement(r.entitlementId!)}>Manage</Button>
                       : (r.shortUrl && <a href={r.shortUrl} target="_blank" rel="noreferrer" className="btn btn-sm btn-outline-secondary">Open link</a>)
                     }
+                    {r.status && r.status !== "created" && (
+                      <Button
+                        size="sm"
+                        variant="outline-danger"
+                        title="Reset this payment to 'not received' and revert the linked entitlement to pending"
+                        disabled={busy?.id === r.transactionId && busy.type === "reset"}
+                        onClick={() => handleResetPayment(r)}
+                      >
+                        {busy?.id === r.transactionId && busy.type === "reset"
+                          ? <Spinner animation="border" size="sm" />
+                          : "Reset"}
+                      </Button>
+                    )}
                   </div>
                 </td>
               </tr>

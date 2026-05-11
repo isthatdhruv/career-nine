@@ -157,6 +157,9 @@ export const getSummary = (filters: TrackerFilters = {}) =>
 export const resendPaymentLink = (transactionId: number) =>
   axios.post(`${API_URL}/admin/tracker/payments/${transactionId}/resend-link`);
 
+export const resetPayment = (transactionId: number, reason?: string, resetBy?: string) =>
+  axios.post(`${API_URL}/admin/tracker/payments/${transactionId}/reset`, { reason, resetBy });
+
 export const sendPaymentLinkEmail = (
   transactionId: number,
   email: string,

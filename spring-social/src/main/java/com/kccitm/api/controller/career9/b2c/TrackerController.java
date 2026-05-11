@@ -506,6 +506,72 @@ public class TrackerController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Resets a payment back to "not received". Flips PaymentTransaction.status
+     * to {@code "created"} and reverts the linked StudentEntitlement to its
+     * pre-activation shape (status="pending", tier + feature flags cleared,
+     * grant/expiry timestamps wiped). Razorpay IDs are kept as audit evidence.
+     *
+     * Used for test data cleanup and to undo mistakenly-marked-paid rows
+     * without deleting any history.
+     */
+    @PostMapping("/payments/{transactionId}/reset")
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<?> resetPayment(@PathVariable Long transactionId,
+                                          @RequestBody(required = false) Map<String, Object> body) {
+        Optional<PaymentTransaction> opt = paymentTransactionRepository.findById(transactionId);
+        if (!opt.isPresent()) return ResponseEntity.notFound().build();
+        PaymentTransaction txn = opt.get();
+
+        String reason = body != null && body.get("reason") != null
+                ? body.get("reason").toString() : null;
+        String resetBy = body != null && body.get("resetBy") != null
+                ? body.get("resetBy").toString() : "admin";
+        String previousStatus = txn.getStatus();
+
+        txn.setStatus("created");
+        String stamp = "Reset to unpaid by " + resetBy + " on " + new Date()
+                + (reason != null && !reason.isEmpty() ? ": " + reason : "")
+                + (previousStatus != null ? " (was " + previousStatus + ")" : "");
+        String existing = txn.getFailureReason();
+        txn.setFailureReason(existing == null || existing.isEmpty()
+                ? stamp
+                : existing + " | " + stamp);
+        paymentTransactionRepository.save(txn);
+
+        Optional<StudentEntitlement> eOpt = entitlementRepository.findByPaymentTransactionId(transactionId);
+        Long entitlementId = null;
+        if (eOpt.isPresent()) {
+            StudentEntitlement e = eOpt.get();
+            entitlementId = e.getEntitlementId();
+            e.setStatus("pending");
+            e.setPricingTierId(null);
+            e.setCampaignAssessmentTierId(null);
+            e.setPaymentTransactionId(null);
+            e.setGrantedAt(null);
+            e.setExpiresAt(null);
+            e.setDashboardActive(false);
+            e.setDashboardExpiresAt(null);
+            e.setCounsellingActive(false);
+            e.setLmsActive(false);
+            e.setLmsExpiresAt(null);
+            e.setFinalReportActive(false);
+            e.setCounsellingSessionsTotal(0);
+            // Intentionally NOT clearing counsellingSessionsUsed — if sessions
+            // were actually consumed before the reset, that history stays.
+            e.setReportPreparedAt(null);
+            entitlementRepository.save(e);
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("transactionId", transactionId);
+        response.put("status", "created");
+        response.put("previousStatus", previousStatus);
+        response.put("entitlementId", entitlementId);
+        response.put("entitlementReverted", entitlementId != null);
+        return ResponseEntity.ok(response);
+    }
+
     private Map<String, Object> entitlementToRow(StudentEntitlement e) {
         Map<String, Object> row = new HashMap<>();
         row.put("entitlementId", e.getEntitlementId());
