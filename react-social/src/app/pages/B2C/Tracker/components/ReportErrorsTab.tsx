@@ -80,7 +80,7 @@ const ReportErrorsTab = ({
 
   return (
     <div>
-      <div className="d-flex align-items-center mb-3 gap-2">
+      <div className="d-flex flex-wrap align-items-center mb-3 gap-2">
         <Form.Label className="small fw-bold mb-0 me-2">Filter</Form.Label>
         <Form.Select
           size="sm"
@@ -95,18 +95,18 @@ const ReportErrorsTab = ({
         <span className="text-muted small ms-2">{total} record{total === 1 ? "" : "s"}</span>
       </div>
 
-      <Table responsive hover size="sm" className="align-middle">
+      <Table responsive hover size="sm" className="align-middle" style={{ minWidth: 1100 }}>
         <thead>
           <tr>
-            <th>When</th>
-            <th>Student</th>
-            <th>Campaign · Assessment</th>
-            <th>Report</th>
-            <th>Class</th>
-            <th>Attempt</th>
-            <th>Error</th>
-            <th>Status</th>
-            <th></th>
+            <th style={{ whiteSpace: "nowrap" }}>When</th>
+            <th style={{ minWidth: 160 }}>Student</th>
+            <th style={{ minWidth: 180 }}>Campaign · Assessment</th>
+            <th style={{ whiteSpace: "nowrap" }}>Report</th>
+            <th style={{ whiteSpace: "nowrap" }}>Class</th>
+            <th style={{ whiteSpace: "nowrap" }}>Attempt</th>
+            <th style={{ minWidth: 260 }}>Error</th>
+            <th style={{ whiteSpace: "nowrap" }}>Status</th>
+            <th style={{ minWidth: 140 }}></th>
           </tr>
         </thead>
         <tbody>
@@ -239,7 +239,7 @@ const ReportErrorsTab = ({
       </Table>
 
       {totalPages > 1 && (
-        <Pagination className="justify-content-center mb-0">
+        <Pagination className="justify-content-center mb-0 flex-wrap">
           <Pagination.First disabled={page === 0} onClick={() => onPageChange(0)} />
           <Pagination.Prev disabled={page === 0} onClick={() => onPageChange(Math.max(0, page - 1))} />
           <Pagination.Item active>{page + 1} / {totalPages}</Pagination.Item>
