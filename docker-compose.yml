@@ -6,8 +6,8 @@ services:
   #   environment:
   #     MYSQL_DATABASE: 'career-9'
   #     MYSQL_USER: 'user'
-  #     MYSQL_PASSWORD: 'Career-qCsfeuECc3MW'
-  #     MYSQL_ROOT_PASSWORD: 'Career-qCsfeuECc3MW'
+  #     MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+  #     MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
   #   ports:
   #     - '3306:3306'
   #   volumes:
@@ -18,7 +18,7 @@ services:
   #       limits:
   #         memory: 2.5g
   #   healthcheck:
-  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pCareer-qCsfeuECc3MW"]
+  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
   #     interval: 10s
   #     timeout: 5s
   #     retries: 5
@@ -66,7 +66,26 @@ services:
   #   env_file:
   #     - .env
   #   environment:
+  #     # Critical (fail-fast — app will not start if unset):
+  #     - APP_AUTH_TOKEN_SECRET=${APP_AUTH_TOKEN_SECRET}
+  #     - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
+  #     - RAZORPAY_WEBHOOK_SECRET=${RAZORPAY_WEBHOOK_SECRET}
+  #     # OAuth client secrets — fail-fast in prod/staging/sandbox:
+  #     - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+  #     - FACEBOOK_CLIENT_SECRET=${FACEBOOK_CLIENT_SECRET}
+  #     - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+  #     # Optional (empty default in application.yml):
   #     - OPENAI_API_KEY=${OPENAI_API_KEY}
+  #     - APP_MANDRILL=${APP_MANDRILL}
+  #     - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
+  #     - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
+  #     - DO_SPACES_ACCESS_KEY=${DO_SPACES_ACCESS_KEY}
+  #     - DO_SPACES_SECRET_KEY=${DO_SPACES_SECRET_KEY}
+  #     - ODOO_URL=${ODOO_URL}
+  #     - ODOO_DATABASE=${ODOO_DATABASE}
+  #     - ODOO_USERNAME=${ODOO_USERNAME}
+  #     - ODOO_API_KEY=${ODOO_API_KEY}
+  #     # Fixed config (not secrets):
   #     - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
   #     - SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE=1GB
   #     - SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE=1GB
@@ -122,7 +141,26 @@ services:
   #   env_file:
   #     - .env
   #   environment:
+  #     # Critical (fail-fast — app will not start if unset):
+  #     - APP_AUTH_TOKEN_SECRET=${APP_AUTH_TOKEN_SECRET}
+  #     - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
+  #     - RAZORPAY_WEBHOOK_SECRET=${RAZORPAY_WEBHOOK_SECRET}
+  #     # OAuth client secrets — fail-fast in prod/staging/sandbox:
+  #     - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+  #     - FACEBOOK_CLIENT_SECRET=${FACEBOOK_CLIENT_SECRET}
+  #     - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+  #     # Optional (empty default in application.yml):
   #     - OPENAI_API_KEY=${OPENAI_API_KEY}
+  #     - APP_MANDRILL=${APP_MANDRILL}
+  #     - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
+  #     - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
+  #     - DO_SPACES_ACCESS_KEY=${DO_SPACES_ACCESS_KEY}
+  #     - DO_SPACES_SECRET_KEY=${DO_SPACES_SECRET_KEY}
+  #     - ODOO_URL=${ODOO_URL}
+  #     - ODOO_DATABASE=${ODOO_DATABASE}
+  #     - ODOO_USERNAME=${ODOO_USERNAME}
+  #     - ODOO_API_KEY=${ODOO_API_KEY}
+  #     # Fixed config (not secrets):
   #     - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
   #   deploy:
   #     resources:
@@ -142,8 +180,8 @@ services:
   #   environment:
   #     MYSQL_DATABASE: 'career-9-staging'
   #     MYSQL_USER: 'user'
-  #     MYSQL_PASSWORD: 'Career-qCsfeuECc3MW'
-  #     MYSQL_ROOT_PASSWORD: 'Career-qCsfeuECc3MW'
+  #     MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+  #     MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
   #   ports:
   #     - '3307:3306'
   #   volumes:
@@ -154,7 +192,7 @@ services:
   #       limits:
   #         memory: 1.5g
   #   healthcheck:
-  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pCareer-qCsfeuECc3MW"]
+  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
   #     interval: 10s
   #     timeout: 5s
   #     retries: 5
@@ -173,7 +211,7 @@ services:
   #     DB_NAME: 'career-9'
   #     STAGING_DB_NAME: 'career-9-staging'
   #     DB_USER: 'root'
-  #     DB_PASSWORD: 'Career-qCsfeuECc3MW'
+  #     DB_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
   #   deploy:
   #     resources:
   #       limits:

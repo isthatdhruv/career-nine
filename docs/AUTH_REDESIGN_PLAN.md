@@ -508,21 +508,20 @@ End-to-end, a Cypress run per role (super-admin, institute-admin, principal, tea
 
 ---
 
-## 12. Open questions to confirm before Phase 1
+## 12. Decisions & open questions
 
 Resolved by user direction:
 - ~~Class vs section terminology~~ — class = `InstituteCourse.course_code`, section = `Section.id`. One class has many sections; teachers can be assigned at class level (wildcard section) or per-section.
 - ~~Multi-institute admins~~ — yes, `INSTITUTE_ADMIN` can span multiple institutes via multiple `user_scope` rows.
 - ~~OAuth changes~~ — out of scope for this redesign.
+- ~~Session backfill strategy~~ — **map each student to their institute's currently-active `InstituteSession`** at backfill time. Unresolved rows (no active session / no institute) remain NULL and fail closed under ABAC. (Decision 2026-05-08.)
+- ~~Default scope for new staff users~~ — **no scope at creation; admin must explicitly grant**. Fail closed, principle of least privilege. (Decision 2026-05-08.)
+- ~~Teacher rostering data model~~ — **`user_scope` is the single source of truth**; the scope grant *is* the assignment. No separate `teacher_assignment` table for now. Per-assignment metadata (subject, class-teacher flag) can be added as columns on `user_scope` later if product needs it. (Decision 2026-05-08.)
+- ~~Workflow~~ — **GSD plugin** (`/gsd:plan-phase` → `/gsd:execute-phase` per phase, atomic commits, checkpoints, resumable). (Decision 2026-05-08.)
 
 Still open:
-1. **Session inference for backfill.** When backfilling `student_info.session_id`, do we map a student to "the active session of their institute at the time of their creation", or to "the current session"? Affects the migration script.
-2. **Default scope for new users.** When an admin creates a new staff user, what's the default scope until they're assigned one? Recommend: no scope = no access (fail closed), admin must explicitly grant.
-3. **Per-section-teacher vs per-class-teacher data model.** Today there's no `teacher_assignment` table linking a teacher User to specific sections. The `user_scope` table proposed here implicitly *is* that link for authorization purposes — confirm we're OK with that, vs. a separate `teacher_assignment` table that drives both rostering and auth.
-4. **Sub-institute hierarchy.** Above institute we have `InstituteBranch` (a branch of an institute). Does the multi-institute director also need branch-level scope, or is "institute" enough granularity above session? Currently the plan stops at institute.
-5. **Refresh token rotation on every use** vs **sliding refresh**. Recommend rotation-on-use (default) for stricter revocation.
-
-Answers feed into the Phase 1 migration and the seed `role_permission` mapping.
+1. **Sub-institute hierarchy.** Above institute we have `InstituteBranch`. Does the multi-institute director also need branch-level scope, or is "institute" enough granularity? Currently the plan stops at institute. Revisit if/when a director user reports they need to limit access to one branch.
+2. **Refresh token rotation on every use** vs **sliding refresh**. Recommend rotation-on-use (default) — stricter revocation. Defer final call to Phase 3 planning.
 
 ---
 

@@ -1,17 +1,21 @@
 package com.kccitm.api.service;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 
+import javax.annotation.PostConstruct;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -35,6 +39,9 @@ public class RazorpayService {
     @Value("${app.razorpay.webhook-secret:}")
     private String webhookSecret;
 
+    @Autowired
+    private Environment environment;
+
     private final RestTemplate restTemplate;
 
     public RazorpayService() {
@@ -47,6 +54,36 @@ public class RazorpayService {
     private void validateConfig() {
         if (keyId == null || keyId.isEmpty() || keySecret == null || keySecret.isEmpty()) {
             throw new IllegalStateException("Razorpay is not configured. Set app.razorpay.key-id and app.razorpay.key-secret.");
+        }
+    }
+
+    /**
+     * Fail-fast startup check: in any production-grade profile (production,
+     * staging, sandbox), the Razorpay webhook secret MUST be set to a
+     * non-empty value. Otherwise the webhook signature check would silently
+     * always return false and every callback would 401 — masking a real
+     * misconfiguration. The dev profile is exempt so engineers can run the
+     * app locally without Razorpay credentials.
+     *
+     * Wired via Phase 13, success criterion #4.
+     */
+    @PostConstruct
+    public void validateWebhookSecret() {
+        boolean isProductionGrade = Arrays.stream(environment.getActiveProfiles())
+                .anyMatch(p -> "production".equals(p)
+                        || "staging".equals(p)
+                        || "sandbox".equals(p));
+        if (isProductionGrade && (webhookSecret == null || webhookSecret.isEmpty())) {
+            throw new IllegalStateException(
+                    "RAZORPAY_WEBHOOK_SECRET env var is required in profile '"
+                            + String.join(",", environment.getActiveProfiles())
+                            + "'. Set the env var before starting the app.");
+        }
+        if (!isProductionGrade && (webhookSecret == null || webhookSecret.isEmpty())) {
+            logger.warn("Razorpay webhook secret is empty in profile '{}'. "
+                    + "Webhook signature verification will reject every callback "
+                    + "until RAZORPAY_WEBHOOK_SECRET is set.",
+                    String.join(",", environment.getActiveProfiles()));
         }
     }
 

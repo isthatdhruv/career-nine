@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** Students can reliably take assessments without data loss, wrong assessment loading, or submission failures — even under peak concurrent load.
-**Current focus:** Phase 12 — Frontend Resilience
+**Current focus:** Phase 13 — Critical Security Fixes (v1.0 Hybrid RBAC + ABAC Auth Redesign milestone)
 
 ## Current Position
 
-Phase: 12 of 12 (Frontend Resilience)
-Plan: 2 of 2 complete
-Status: Complete
-Last activity: 2026-03-07 — Completed 12-02 Assessment Page Migration
+Phase: 13 of 13 (Critical Security Fixes)
+Plan: 3 of 3 complete — Wave 2 closed; Phase 13 ready to ship pending user commits
+Status: 13-02 + 13-03 both complete (Wave 2 parallel). 13-02 carries a BREAKING-CHANGE callout — pre-merge user review of `13-02-COMMITS.md` required.
+Last activity: 2026-05-11 — Completed 13-02 Spring Security filter-chain hardening (parallel with 13-03)
 
-Progress: [██████████] 100%
+Progress: [██████████] 100% (3/3 plans in Phase 13)
 
 ## Performance Metrics
 
@@ -80,6 +80,22 @@ Recent decisions affecting current work:
 - All 3 startAssessment call sites updated for session token capture (12-01)
 - Promise.allSettled for parallel assessment fetches — independent error handling per request (12-02)
 - Submission state machine on Start Assessment flow with inline error banner replacing alert() (12-02)
+- All secrets externalized in application.yml across dev/production/sandbox/staging via ${ENV_VAR} placeholders (13-01)
+- JWT secret, DB password, Razorpay webhook secret: no default → fail-fast at startup (13-01)
+- OAuth client secrets (google/facebook/github) externalized as config-only — no Java code touched; fail-fast in prod-grade profiles, dev uses placeholder-dev-only default (13-01)
+- Staging profile gets newly added razorpay.webhook-secret block (was missing — consistency with other profiles) (13-01)
+- Spring Boot 2.5 placeholder semantics observed: unresolved ${VAR} resolves to literal string, fail-fast manifests as BeanCreationException at DB-init layer rather than at placeholder layer (13-01)
+- RazorpayService.validateWebhookSecret() @PostConstruct fail-fast in production/staging/sandbox profiles; dev profile WARNs and continues (13-03)
+- Used javax.annotation.PostConstruct (not jakarta.annotation) — Spring Boot 2.5.5 / Java 11 convention (13-03)
+- Plain @PostConstruct over Bean Validation / JSR-303 — matches existing codebase idiom; avoids scope expansion (13-03)
+- 13-03 Task 2 was a no-op verification pass — 13-01 had already externalized all 4 webhook-secret entries and added the staging block (13-03)
+- Spring Security permitAll() trimmed from ~70 entries to exactly 9 ROADMAP-mandated public-app paths + OPTIONS + static assets; .anyRequest().authenticated() enforces auth on everything else (~25 admin surfaces previously anonymously exposed) (13-02)
+- BREAKING CHANGE: /assessments/prefetch/**, /leads/capture, /bet-report-data/public/** moved behind .authenticated() — fix for student assessment app deferred to docs/AUTH_REDESIGN_PLAN.md §9; product confirmation needed for /leads/capture and /bet-report-data/public/** integrations (13-02)
+- StrictHttpFirewall reverted to defaults — semicolons, URL-encoded slashes, double-slashes, and non-standard HTTP verbs (TRACE/CONNECT) now rejected with 400 (13-02)
+- Firewall bean renamed allowedHttpMethods() → strictHttpFirewall() to reflect new behaviour; Spring wires by HttpFirewall type so no consumer impact (13-02)
+- CORS allowedHeaders set to explicit 7-header allowlist (Authorization, Content-Type, Accept, X-Assessment-Session, X-Assessment-Student-Id, X-Assessment-Id, X-Requested-With) — wildcard '*' no longer reflected (13-02)
+- Production CORS allowedOrigins dropped http://localhost:5173; dev/sandbox/staging keep their localhost entries per local-QA workflow (13-02)
+- /actuator/* moved behind auth (no longer in permitAll); LB/k8s health probes will need a JWT or a single permitAll('/actuator/health') line if confirmed required — flagged as open question (13-02)
 
 ### Roadmap Evolution
 
@@ -105,6 +121,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-07
-Stopped at: Completed 12-02-PLAN.md (Assessment Page Migration) — Phase 12 complete, v2.0 milestone complete
-Resume file: .planning/phases/12-frontend-resilience/12-02-SUMMARY.md
+Last session: 2026-05-11
+Stopped at: Completed 13-02-PLAN.md (Spring Security filter-chain hardening) — Wave 2 closed; Phase 13 done at 3/3 plans. BLOCKING REVIEW: 13-02 ships three known-breaking changes (/assessments/prefetch/**, /leads/capture, /bet-report-data/public/** now require auth). User must review .planning/phases/13-critical-security-fixes/13-02-COMMITS.md (BREAKING CHANGE section at top) BEFORE committing — or `git reset HEAD` the two 13-02 files to defer. 13-03 (RazorpayService.java) is independent and safe to commit on its own.
+Resume file: .planning/phases/13-critical-security-fixes/13-02-SUMMARY.md

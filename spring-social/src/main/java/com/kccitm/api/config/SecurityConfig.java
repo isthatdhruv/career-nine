@@ -62,12 +62,17 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     }
 
     @Bean
-    public HttpFirewall allowedHttpMethods() {
-        StrictHttpFirewall firewall = new StrictHttpFirewall();
-        firewall.setUnsafeAllowAnyHttpMethod(true);
-        firewall.setAllowUrlEncodedDoubleSlash(true);
-        firewall.setAllowSemicolon(true);
-        return firewall;
+    public HttpFirewall strictHttpFirewall() {
+        // Use all StrictHttpFirewall defaults. The defaults reject:
+        //  - non-standard HTTP methods (TRACE, CONNECT, custom verbs)
+        //  - URL-encoded slashes (%2F)
+        //  - double slashes (//)
+        //  - semicolons (;)
+        //  - backslashes (\)
+        //  - percent (%) in path
+        // Verified via grep: no controllers use matrix params, TRACE/CONNECT,
+        // or rely on semicolon paths.
+        return new StrictHttpFirewall();
     }
 
     /*
@@ -105,7 +110,14 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(Arrays.asList(allowedOrigins));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowedHeaders(Arrays.asList(
+                "Authorization",
+                "Content-Type",
+                "Accept",
+                "X-Assessment-Session",
+                "X-Assessment-Student-Id",
+                "X-Assessment-Id",
+                "X-Requested-With"));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -136,8 +148,11 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 })
                 .and()
                 .authorizeRequests()
+                // CORS preflight — must stay open for every path
                 .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .antMatchers("/",
+                // Root, error page, favicon, static assets
+                .antMatchers(
+                        "/",
                         "/error",
                         "/favicon.ico",
                         "/**/*.png",
@@ -148,39 +163,17 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                         "/**/*.css",
                         "/**/*.js")
                 .permitAll()
-.antMatchers("/assessment-mapping/public/**", "/campaign/public/**", "/school-registration/public/**", "/bet-report-data/public/**", "/assessments/prefetch/**", "/leads/capture", "/payment/webhook/**",
-                        "/user/*/*","/user/*","/assessment-section-instructions/**", "/language-question/create-with-options",
-                        "/**/**/**", "/**/**/**/**","/dashboard/game-results/*",
-                        "/languages/**","/game-results/*",
-                        "/question-sections/**", "/language-supported/*", "/contact-person/**",
-                        "/assessment-questions/*/*", "/assessment-questions/*", "/assessments/*", "/assessments/**", "/api/**",
-                        "/api/**/**", "/api/**/**/**", "/api/assessment-questions/**",
-                        "/api/question-sections/**", "/api/assessment-questions/*/*", "/api/firebase/*/*",
-                        "/api/firebase/*", "/api/firebase/*", "/actuator/*", "/auth/**", "/oauth2/callback/google/*",
-                        "/oauth2/**", "/user/me", "role/*", "/gender/get", "/api/questionnaire/**",
-                        "/category/*", "/board/*",
-                        "/rolegroup/*", "/user/*", "/instituteDetail/**", "/role/*", "/instituteBranch/getbybranchid/*",
-                        "/instituteBatch/getbyid/*", "/instituteCourse/getbyCollegeId/*",
-                        "/instituteBranch/getbyCourseId/*", "/instituteSession/getbyBatchId/*",
-                        "/section/get", "tools/**", "/tools/**", "measured-qualities/**",
-                        "/measured-qualities/**", "measured-quality-types/**", "/measured-quality-types/**",
-                        "/question-sections/**", "/assesment-questions/**",
-                        "/question-sections/getbyid/*", "/assesment-questions/getbyid/*",
-                        "/question-sections/getbycollegeid/*",
-                        "/assesment-questions/getbycollegeid/*", "/question-sections/getbyinstituteid/*",
-                        "/assesment-questions/getbyinstituteid/*",
-                        "/question-sections/getbybatchid/*", "/assesment-questions/getbybatchid/*",
-                        "/question-sections/getbycourseid/*",
-                        "/section/update", "/generate_pdf", "/codingquestion/save", "/testcase/save",
-                        "/student/update", "/student/getbyid/*", "/student/get", "/student/save-csv", "/userrolegroupmapping/update",
-                        "/util/**", "/util/file-get/getbyname/**", "/util/file-delete/deletebyname/**",
-                        "/google-api/**", "/util/file-delete/delete/**", "/codingquestion/*", "/instituteBatch/*",
-                        "/instituteBranch/*", "/instituteCourse/*", "/instituteDetail/getbyid/*", "/student/putmarks",
-                        "/student/emailChecker", "/email-validation-official",
-                        "/email-validation-official-confermation", "/getmarks/*", "/getmarks", "/coding/*",
-                        "/career/edit/*",
-                        "/google-api/email/get/*", "student/get-check", "instituteBranchBatchMapping/*", "/getmarks",
-                        "/getmarksArray")                
+                // Public application endpoints — must match ROADMAP success criterion #3 EXACTLY (11 patterns)
+                .antMatchers(
+                        "/auth/login",
+                        "/auth/signup",
+                        "/auth/refresh",
+                        "/oauth2/**",
+                        "/payment/webhook/**",
+                        "/campaign/public/**",
+                        "/assessment-mapping/public/**",
+                        "/school-registration/public/**",
+                        "/util/file-get/**")
                 .permitAll()
                 .anyRequest()
                 .authenticated()
