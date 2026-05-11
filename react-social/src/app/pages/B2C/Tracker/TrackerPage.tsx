@@ -128,10 +128,10 @@ const TrackerPage = () => {
   const setPage = (p: number) => setFilters(prev => ({ ...prev, page: p }));
 
   return (
-    <div className="card">
-      <div className="card-header border-0 pt-6">
-        <div className="card-title">
-          <h1>B2C Tracker</h1>
+    <div className="card b2c-tracker-page">
+      <div className="card-header border-0 pt-6 flex-wrap">
+        <div className="card-title flex-wrap">
+          <h1 className="fs-2 fs-md-1 mb-0 me-3">B2C Tracker</h1>
           <small className="text-muted">Payments and allotted services across campaigns</small>
         </div>
       </div>
@@ -139,24 +139,24 @@ const TrackerPage = () => {
       <div className="card-body pt-3">
         <KpiHeader summary={summary} />
 
-        <div className="row mb-3 mt-4">
-          <div className="col-md-3 mb-2">
+        <div className="row g-2 mb-3 mt-4">
+          <div className="col-12 col-sm-6 col-md-3">
             <Form.Label className="small fw-bold">Campaign</Form.Label>
             <Form.Select size="sm" value={filters.campaignId ?? ""} onChange={e => upd("campaignId", e.target.value ? Number(e.target.value) : undefined)}>
               <option value="">All campaigns</option>
               {campaigns.map(c => (<option key={c.campaignId} value={c.campaignId}>{c.name}</option>))}
             </Form.Select>
           </div>
-          <div className="col-md-2 mb-2">
+          <div className="col-6 col-sm-3 col-md-2">
             <Form.Label className="small fw-bold">From</Form.Label>
             <Form.Control type="date" size="sm" value={toDateInput(filters.from)} onChange={e => upd("from", fromDateInput(e.target.value))} max={toDateInput(filters.to)} />
           </div>
-          <div className="col-md-2 mb-2">
+          <div className="col-6 col-sm-3 col-md-2">
             <Form.Label className="small fw-bold">To</Form.Label>
             <Form.Control type="date" size="sm" value={toDateInput(filters.to)} onChange={e => upd("to", fromDateInput(e.target.value))} min={toDateInput(filters.from)} />
           </div>
           {activeTab !== "report-errors" && (
-            <div className="col-md-2 mb-2">
+            <div className="col-6 col-sm-3 col-md-2">
               <Form.Label className="small fw-bold">Status</Form.Label>
               {activeTab === "payments" ? (
                 <Form.Select size="sm" value={filters.status ?? ""} onChange={e => upd("status", e.target.value || undefined)}>
@@ -180,7 +180,7 @@ const TrackerPage = () => {
               )}
             </div>
           )}
-          <div className="col-md-3 mb-2">
+          <div className={activeTab !== "report-errors" ? "col-12 col-sm-6 col-md-3" : "col-12 col-sm-6 col-md-5"}>
             <Form.Label className="small fw-bold">Search</Form.Label>
             <Form.Control size="sm" value={filters.q ?? ""} onChange={e => upd("q", e.target.value || undefined)} placeholder="name / email / phone" />
           </div>
@@ -203,7 +203,7 @@ const TrackerPage = () => {
           </div>
         )}
 
-        <Tabs activeKey={activeTab} onSelect={(k) => setActiveTab(k || "payments")} className="mb-3">
+        <Tabs activeKey={activeTab} onSelect={(k) => setActiveTab(k || "payments")} className="mb-3 flex-nowrap b2c-tracker-tabs">
           <Tab eventKey="payments" title={`Payments (${paymentsTotal})`}>
             {loading && <Spinner animation="border" />}
             {!loading && (
@@ -258,6 +258,24 @@ const TrackerPage = () => {
         onClose={() => setDrawerEntitlementId(null)}
         onChanged={() => { loadPayments(); loadAllotments(); loadReportErrors(); loadSummary(); }}
       />
+
+      <style>{`
+        .b2c-tracker-page .b2c-tracker-tabs {
+          overflow-x: auto;
+          overflow-y: hidden;
+          -webkit-overflow-scrolling: touch;
+        }
+        .b2c-tracker-page .b2c-tracker-tabs .nav-link {
+          white-space: nowrap;
+        }
+        .b2c-tracker-page .table-responsive {
+          -webkit-overflow-scrolling: touch;
+        }
+        @media (max-width: 575.98px) {
+          .b2c-tracker-page .card-header { padding-left: 1rem; padding-right: 1rem; }
+          .b2c-tracker-page .card-body { padding-left: 1rem; padding-right: 1rem; }
+        }
+      `}</style>
     </div>
   );
 };
