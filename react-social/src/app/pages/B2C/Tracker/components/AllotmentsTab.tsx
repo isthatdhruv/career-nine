@@ -98,20 +98,20 @@ const AllotmentsTab = ({
 
   return (
     <>
-      <Table responsive striped hover size="sm" className="align-middle">
+      <Table responsive striped hover size="sm" className="align-middle" style={{ minWidth: 1200 }}>
         <thead>
           <tr>
-            <th>Granted</th>
-            <th>Student</th>
-            <th>Campaign · Assessment</th>
-            <th>Tier · Path · Model</th>
+            <th style={{ whiteSpace: "nowrap" }}>Granted</th>
+            <th style={{ minWidth: 180 }}>Student</th>
+            <th style={{ minWidth: 180 }}>Campaign · Assessment</th>
+            <th style={{ minWidth: 160 }}>Tier · Path · Model</th>
             <th>Institute</th>
-            <th>Services</th>
-            <th>Paid</th>
-            <th>Expires</th>
-            <th>Status</th>
-            <th>Assessment</th>
-            <th></th>
+            <th style={{ minWidth: 220 }}>Services</th>
+            <th style={{ whiteSpace: "nowrap" }}>Paid</th>
+            <th style={{ whiteSpace: "nowrap" }}>Expires</th>
+            <th style={{ whiteSpace: "nowrap" }}>Status</th>
+            <th style={{ whiteSpace: "nowrap" }}>Assessment</th>
+            <th style={{ minWidth: 160 }}></th>
           </tr>
         </thead>
         <tbody>
@@ -168,7 +168,17 @@ const AllotmentsTab = ({
                 </td>
                 <td>{fmtINR(r.paidAmount)}</td>
                 <td>{fmtDate(r.expiresAt)}</td>
-                <td><span className={`badge bg-${statusVariant(r.status)}`}>{r.status}</span></td>
+                <td>
+                  <span className={`badge bg-${statusVariant(r.status)}`}>{r.status}</span>
+                  {r.lastReportError && (
+                    <span
+                      className="badge bg-danger ms-1"
+                      title={r.lastReportError.message}
+                    >
+                      ⚠ Report error
+                    </span>
+                  )}
+                </td>
                 <td>
                   <span className={`badge bg-${assessmentVariant(r.assessmentStatus)}`}>
                     {assessmentLabel(r.assessmentStatus)}
@@ -197,9 +207,9 @@ const AllotmentsTab = ({
         </tbody>
       </Table>
 
-      <div className="d-flex justify-content-between align-items-center">
+      <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
         <small className="text-muted">{total} total · page {page + 1} of {totalPages}</small>
-        <Pagination size="sm" className="mb-0">
+        <Pagination size="sm" className="mb-0 flex-wrap">
           <Pagination.First disabled={page === 0} onClick={() => onPageChange(0)} />
           <Pagination.Prev disabled={page === 0} onClick={() => onPageChange(page - 1)} />
           <Pagination.Next disabled={page >= totalPages - 1} onClick={() => onPageChange(page + 1)} />

@@ -64,6 +64,15 @@ public class AssessmentTable implements java.io.Serializable {
     private String defaultCounsellingModel = "1";
 
     /**
+     * Selects which generator the post-completion prepare endpoint dispatches to.
+     * Allowed values: "bet" | "navigator". Null = legacy default of "bet"
+     * (historical behaviour for B2C entitlements before this column was added —
+     * content team should backfill explicitly for Navigator-typed assessments).
+     */
+    @Column(name = "report_type", length = 32)
+    private String reportType;
+
+    /**
      * Max number of times this assessment can be reset for a single student.
      * Once reset count for (assessmentId, userStudentId) hits this value,
      * further resets should be blocked. Null = unlimited.
@@ -201,6 +210,14 @@ public class AssessmentTable implements java.io.Serializable {
 
     public void setDefaultCounsellingModel(String defaultCounsellingModel) {
         this.defaultCounsellingModel = defaultCounsellingModel;
+    }
+
+    public String getReportType() {
+        return reportType;
+    }
+
+    public void setReportType(String reportType) {
+        this.reportType = reportType;
     }
 
 }

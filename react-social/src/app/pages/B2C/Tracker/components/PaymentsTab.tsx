@@ -6,6 +6,7 @@ import {
   PaymentRow,
   assignStudentInstitute,
   resendEntitlementService,
+  resetPayment,
   sendPaymentLinkEmail,
 } from "../../API/Tracker_APIs";
 
@@ -112,6 +113,29 @@ const PaymentsTab = ({
     }
   };
 
+  const handleResetPayment = async (r: PaymentRow) => {
+    const wording = r.status === "paid"
+      ? `Reset transaction #${r.transactionId}?\n\nThis will:\n• Flip the payment to "not received" (status: created)\n• Revert the linked entitlement to pending (clears tier + dashboard/counselling/LMS/report flags)\n• Keep Razorpay IDs as audit evidence\n\nUse for test cleanup or to undo a mistakenly-marked-paid row. Continue?`
+      : `Reset transaction #${r.transactionId} back to "not received"? The linked entitlement (if any) will revert to pending.`;
+    if (!window.confirm(wording)) return;
+    const reason = window.prompt("Reason for reset (optional, kept on the txn for audit):") ?? undefined;
+    setBusy({ id: r.transactionId, type: "reset" });
+    try {
+      const res = await resetPayment(r.transactionId, reason || undefined);
+      const reverted = res.data?.entitlementReverted;
+      showSuccessToast(
+        reverted
+          ? `Transaction #${r.transactionId} reset · entitlement reverted to pending`
+          : `Transaction #${r.transactionId} reset to "not received"`
+      );
+      onInstituteChanged?.();
+    } catch (e: any) {
+      showErrorToast(e?.response?.data?.message ?? e?.response?.data ?? "Failed to reset payment");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const sendService = async (r: PaymentRow, serviceType: "assessment_invite" | "final_report") => {
     if (!r.entitlementId) {
       showErrorToast("No entitlement linked to this transaction yet.");
@@ -136,19 +160,19 @@ const PaymentsTab = ({
 
   return (
     <>
-      <Table responsive striped hover size="sm" className="align-middle">
+      <Table responsive striped hover size="sm" className="align-middle" style={{ minWidth: 1100 }}>
         <thead>
           <tr>
-            <th>Txn</th>
-            <th>Created</th>
-            <th>Student</th>
-            <th>Campaign · Assessment</th>
-            <th>Tier · Path</th>
+            <th style={{ whiteSpace: "nowrap" }}>Txn</th>
+            <th style={{ whiteSpace: "nowrap" }}>Created</th>
+            <th style={{ minWidth: 180 }}>Student</th>
+            <th style={{ minWidth: 180 }}>Campaign · Assessment</th>
+            <th style={{ whiteSpace: "nowrap" }}>Tier · Path</th>
             <th>Institute</th>
-            <th>Amount</th>
-            <th>Status</th>
-            <th>Assessment</th>
-            <th></th>
+            <th style={{ whiteSpace: "nowrap" }}>Amount</th>
+            <th style={{ whiteSpace: "nowrap" }}>Status</th>
+            <th style={{ whiteSpace: "nowrap" }}>Assessment</th>
+            <th style={{ minWidth: 220 }}></th>
           </tr>
         </thead>
         <tbody>
@@ -205,6 +229,14 @@ const PaymentsTab = ({
                 </td>
                 <td>
                   <span className={`badge bg-${statusVariant(r.status)}`}>{r.status}</span>
+                  {r.lastReportError && (
+                    <span
+                      className="badge bg-danger ms-1"
+                      title={r.lastReportError.message}
+                    >
+                      ⚠ Report error
+                    </span>
+                  )}
                 </td>
                 <td>
                   <span className={`badge bg-${assessmentVariant(r.assessmentStatus)}`}>
@@ -243,6 +275,19 @@ const PaymentsTab = ({
                       ? <Button size="sm" variant="outline-primary" onClick={() => onOpenEntitlement(r.entitlementId!)}>Manage</Button>
                       : (r.shortUrl && <a href={r.shortUrl} target="_blank" rel="noreferrer" className="btn btn-sm btn-outline-secondary">Open link</a>)
                     }
+                    {r.status && r.status !== "created" && (
+                      <Button
+                        size="sm"
+                        variant="outline-danger"
+                        title="Reset this payment to 'not received' and revert the linked entitlement to pending"
+                        disabled={busy?.id === r.transactionId && busy.type === "reset"}
+                        onClick={() => handleResetPayment(r)}
+                      >
+                        {busy?.id === r.transactionId && busy.type === "reset"
+                          ? <Spinner animation="border" size="sm" />
+                          : "Reset"}
+                      </Button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -251,9 +296,9 @@ const PaymentsTab = ({
         </tbody>
       </Table>
 
-      <div className="d-flex justify-content-between align-items-center">
+      <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
         <small className="text-muted">{total} total · page {page + 1} of {totalPages}</small>
-        <Pagination size="sm" className="mb-0">
+        <Pagination size="sm" className="mb-0 flex-wrap">
           <Pagination.First disabled={page === 0} onClick={() => onPageChange(0)} />
           <Pagination.Prev disabled={page === 0} onClick={() => onPageChange(page - 1)} />
           <Pagination.Next disabled={page >= totalPages - 1} onClick={() => onPageChange(page + 1)} />

@@ -1,30 +1,30 @@
 version: '3.3'
 services:
-  mysql_db_api:
-    image: mysql:latest
-    restart: always
-    environment:
-      MYSQL_DATABASE: 'career-9'
-      MYSQL_USER: 'user'
-      MYSQL_PASSWORD: 'Career-qCsfeuECc3MW'
-      MYSQL_ROOT_PASSWORD: 'Career-qCsfeuECc3MW'
-    ports:
-      - '3306:3306'
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./mysql-custom.cnf:/etc/mysql/conf.d/custom.cnf
-    deploy:
-      resources:
-        limits:
-          memory: 2.5g
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pCareer-qCsfeuECc3MW"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    networks:
-      - career_shared_net
+  # mysql_db_api:
+  #   image: mysql:latest
+  #   restart: always
+  #   environment:
+  #     MYSQL_DATABASE: 'career-9'
+  #     MYSQL_USER: 'user'
+  #     MYSQL_PASSWORD: 'Career-qCsfeuECc3MW'
+  #     MYSQL_ROOT_PASSWORD: 'Career-qCsfeuECc3MW'
+  #   ports:
+  #     - '3306:3306'
+  #   volumes:
+  #     - mysql_data:/var/lib/mysql
+  #     - ./mysql-custom.cnf:/etc/mysql/conf.d/custom.cnf
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 2.5g
+  #   healthcheck:
+  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pCareer-qCsfeuECc3MW"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #     start_period: 30s
+  #   networks:
+  #     - career_shared_net
 
   redis_cache:
     image: redis:7.2-alpine
@@ -41,8 +41,8 @@ services:
       resources:
         limits:
           memory: 2.5g
-    networks:
-      - career_shared_net
+    # networks:
+    #   - career_shared_net
     volumes:
       - redis_data:/data
     healthcheck:
@@ -52,115 +52,115 @@ services:
       retries: 3
       start_period: 5s
 
-  api:
-    container_name: api
-    build:
-      context: ./spring-social
-      dockerfile: dockerfile
-    ports:
-      - 8080:8080
-    command: ["java", "-Xms1g", "-Xmx2g", "-jar", "/usr/local/lib/demo.jar"]
-    restart: always
-    volumes:
-      - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
-    env_file:
-      - .env
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
-      - SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE=1GB
-      - SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE=1GB
-    deploy:
-      resources:
-        limits:
-          memory: 3g
-    depends_on:
-      mysql_db_api:
-        condition: service_started
-      redis_cache:
-        condition: service_healthy
-    networks:
-      - career_shared_net
+  # api:
+  #   container_name: api
+  #   build:
+  #     context: ./spring-social
+  #     dockerfile: dockerfile
+  #   ports:
+  #     - 8080:8080
+  #   command: ["java", "-Xms1g", "-Xmx2g", "-jar", "/usr/local/lib/demo.jar"]
+  #   restart: always
+  #   volumes:
+  #     - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     - OPENAI_API_KEY=${OPENAI_API_KEY}
+  #     - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
+  #     - SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE=1GB
+  #     - SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE=1GB
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 3g
+  #   depends_on:
+  #     mysql_db_api:
+  #       condition: service_started
+  #     redis_cache:
+  #       condition: service_healthy
+  #   networks:
+  #     - career_shared_net
       
-  redis_staging:
-    image: redis:7.2-alpine
-    restart: always
-    command: >
-      redis-server
-      --maxmemory 384mb
-      --maxmemory-policy allkeys-lru
-      --appendonly yes
-      --appendfsync everysec
-    ports:
-      - '6380:6379'
-    deploy:
-      resources:
-        limits:
-          memory: 768m
-    networks:
-      - career_staging_net
-    volumes:
-      - redis_staging_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-      start_period: 5s
+  # redis_staging:
+  #   image: redis:7.2-alpine
+  #   restart: always
+  #   command: >
+  #     redis-server
+  #     --maxmemory 384mb
+  #     --maxmemory-policy allkeys-lru
+  #     --appendonly yes
+  #     --appendfsync everysec
+  #   ports:
+  #     - '6380:6379'
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 768m
+  #   networks:
+  #     - career_staging_net
+  #   volumes:
+  #     - redis_staging_data:/data
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 3s
+  #     retries: 3
+  #     start_period: 5s
 
-  api-staging:
-    container_name: api-staging
-    build:
-      context: ./spring-social
-      dockerfile: dockerfile
-    ports:
-      - 8081:8080
-    command: ["java", "-Xms512m", "-Xmx1g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=sandbox"]
-    restart: always
-    volumes:
-      - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
-    env_file:
-      - .env
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
-    deploy:
-      resources:
-        limits:
-          memory: 1.5g
-    depends_on:
-      mysql_db_staging:
-        condition: service_healthy
-      redis_staging:
-        condition: service_healthy
-    networks:
-      - career_staging_net
+  # api-staging:
+  #   container_name: api-staging
+  #   build:
+  #     context: ./spring-social
+  #     dockerfile: dockerfile
+  #   ports:
+  #     - 8081:8080
+  #   command: ["java", "-Xms512m", "-Xmx1g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=sandbox"]
+  #   restart: always
+  #   volumes:
+  #     - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     - OPENAI_API_KEY=${OPENAI_API_KEY}
+  #     - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 1.5g
+  #   depends_on:
+  #     mysql_db_staging:
+  #       condition: service_healthy
+  #     redis_staging:
+  #       condition: service_healthy
+  #   networks:
+  #     - career_staging_net
 
-  mysql_db_staging:
-    image: mysql:latest
-    restart: always
-    environment:
-      MYSQL_DATABASE: 'career-9-staging'
-      MYSQL_USER: 'user'
-      MYSQL_PASSWORD: 'Career-qCsfeuECc3MW'
-      MYSQL_ROOT_PASSWORD: 'Career-qCsfeuECc3MW'
-    ports:
-      - '3307:3306'
-    volumes:
-      - mysql_staging_data:/var/lib/mysql
-      - ./mysql-custom.cnf:/etc/mysql/conf.d/custom.cnf
-    deploy:
-      resources:
-        limits:
-          memory: 1.5g
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pCareer-qCsfeuECc3MW"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    networks:
-      - career_staging_net
+  # mysql_db_staging:
+  #   image: mysql:latest
+  #   restart: always
+  #   environment:
+  #     MYSQL_DATABASE: 'career-9-staging'
+  #     MYSQL_USER: 'user'
+  #     MYSQL_PASSWORD: 'Career-qCsfeuECc3MW'
+  #     MYSQL_ROOT_PASSWORD: 'Career-qCsfeuECc3MW'
+  #   ports:
+  #     - '3307:3306'
+  #   volumes:
+  #     - mysql_staging_data:/var/lib/mysql
+  #     - ./mysql-custom.cnf:/etc/mysql/conf.d/custom.cnf
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 1.5g
+  #   healthcheck:
+  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pCareer-qCsfeuECc3MW"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #     start_period: 30s
+  #   networks:
+  #     - career_staging_net
 
   # sync_cron:
   #   build:
@@ -209,8 +209,8 @@ volumes:
   redis_staging_data:
   redisinsight_data:
 
-networks:
-  career_shared_net:
-    external: true
-  career_staging_net:
-    external: true
+# networks:
+#   career_shared_net:
+#     external: true
+#   career_staging_net:
+#     external: true

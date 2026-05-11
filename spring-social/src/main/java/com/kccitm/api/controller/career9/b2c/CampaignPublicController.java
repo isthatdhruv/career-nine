@@ -515,6 +515,8 @@ public class CampaignPublicController {
         response.put("activeTier", activeTier);
         response.put("dashboardUrl", dashboardUrl);
         response.put("finalReportUrl", finalReportUrl);
+        response.put("accessToken", e.getAccessToken());
+        response.put("finalReportActive", e.getFinalReportActive());
         response.put("careerLibraryUrl", "https://library.career-9.com");
         return ResponseEntity.ok(response);
     }

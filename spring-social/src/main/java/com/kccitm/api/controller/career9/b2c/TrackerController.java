@@ -25,9 +25,11 @@ import org.springframework.web.bind.annotation.RestController;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.PaymentTransaction;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
+import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.b2c.Campaign;
 import com.kccitm.api.model.career9.b2c.PricingTier;
+import com.kccitm.api.model.career9.b2c.ReportGenerationLog;
 import com.kccitm.api.model.career9.b2c.ServiceDeliveryLog;
 import com.kccitm.api.model.career9.b2c.StudentEntitlement;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
@@ -35,9 +37,13 @@ import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.b2c.CampaignRepository;
 import com.kccitm.api.repository.Career9.b2c.PricingTierRepository;
+import com.kccitm.api.repository.Career9.b2c.ReportGenerationLogRepository;
 import com.kccitm.api.repository.Career9.b2c.ServiceDeliveryLogRepository;
 import com.kccitm.api.repository.Career9.b2c.StudentEntitlementRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
+import com.kccitm.api.service.b2c.ReportPreparationService;
+import com.kccitm.api.service.b2c.ReportPreparationService.PreparationResult;
+import com.kccitm.api.service.b2c.ReportPreparationService.ReportPreparationException;
 
 /**
  * Backing API for the /admin/b2c/tracker page. All endpoints are admin-gated by the
@@ -60,6 +66,9 @@ public class TrackerController {
     @Autowired private AssessmentTableRepository assessmentTableRepository;
     @Autowired private UserStudentRepository userStudentRepository;
     @Autowired private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
+    @Autowired private ReportGenerationLogRepository reportGenerationLogRepository;
+    @Autowired private ReportPreparationService reportPreparationService;
+    @Autowired private com.kccitm.api.service.b2c.EntitlementService entitlementService;
 
     private static final int MAX_PAGE_SIZE = 200;
 
@@ -159,6 +168,7 @@ public class TrackerController {
 
             row.put("assessmentStatus", lookupAssessmentStatus(t.getUserStudentId(), t.getAssessmentId()));
             attachInstitute(row, t.getUserStudentId());
+            row.put("lastReportError", latestReportError(eOpt.map(StudentEntitlement::getEntitlementId).orElse(null)));
             rows.add(row);
         }
 
@@ -273,7 +283,171 @@ public class TrackerController {
 
         List<ServiceDeliveryLog> comms = serviceDeliveryLogRepository.findByEntitlementIdOrderByCreatedAtDesc(id);
         response.put("communications", comms);
+
+        List<ReportGenerationLog> errs = reportGenerationLogRepository.findByEntitlementIdOrderByCreatedAtDesc(id);
+        List<Map<String, Object>> errRows = new ArrayList<>();
+        for (ReportGenerationLog log : errs) errRows.add(reportErrorToRow(log));
+        response.put("reportErrors", errRows);
         return ResponseEntity.ok(response);
+    }
+
+    // ═══════════════════════ REPORT ERRORS ═══════════════════════
+
+    @GetMapping("/report-errors")
+    public ResponseEntity<?> getReportErrors(@RequestParam(required = false) Long campaignId,
+                                             @RequestParam(required = false) String from,
+                                             @RequestParam(required = false) String to,
+                                             @RequestParam(required = false) String q,
+                                             @RequestParam(defaultValue = "failed") String status,
+                                             @RequestParam(defaultValue = "0") int page,
+                                             @RequestParam(defaultValue = "50") int size) {
+        size = clampPageSize(size);
+
+        StringBuilder jpql = new StringBuilder("SELECT l FROM ReportGenerationLog l WHERE 1=1");
+        StringBuilder countJpql = new StringBuilder("SELECT COUNT(l) FROM ReportGenerationLog l WHERE 1=1");
+        Map<String, Object> params = new HashMap<>();
+
+        if (status != null && !status.isEmpty() && !"all".equalsIgnoreCase(status)) {
+            jpql.append(" AND l.status = :status");
+            countJpql.append(" AND l.status = :status");
+            params.put("status", status);
+        }
+        if (campaignId != null) {
+            jpql.append(" AND l.campaignId = :campaignId");
+            countJpql.append(" AND l.campaignId = :campaignId");
+            params.put("campaignId", campaignId);
+        }
+        Date fromDate = parseDate(from);
+        Date toDate = parseDate(to);
+        if (fromDate != null) {
+            jpql.append(" AND l.createdAt >= :fromDate");
+            countJpql.append(" AND l.createdAt >= :fromDate");
+            params.put("fromDate", fromDate);
+        }
+        if (toDate != null) {
+            jpql.append(" AND l.createdAt <= :toDate");
+            countJpql.append(" AND l.createdAt <= :toDate");
+            params.put("toDate", endOfDay(toDate));
+        }
+        jpql.append(" ORDER BY l.createdAt DESC");
+
+        Query query = em.createQuery(jpql.toString());
+        params.forEach(query::setParameter);
+        query.setFirstResult(page * size);
+        query.setMaxResults(size);
+        @SuppressWarnings("unchecked")
+        List<ReportGenerationLog> logs = query.getResultList();
+
+        Query countQ = em.createQuery(countJpql.toString());
+        params.forEach(countQ::setParameter);
+        long total = ((Number) countQ.getSingleResult()).longValue();
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (ReportGenerationLog log : logs) {
+            Map<String, Object> row = reportErrorToRow(log);
+            if (q != null && !q.trim().isEmpty()) {
+                String qq = q.trim().toLowerCase();
+                String name = row.get("studentName") != null ? row.get("studentName").toString().toLowerCase() : "";
+                String email = row.get("studentEmail") != null ? row.get("studentEmail").toString().toLowerCase() : "";
+                String errMsg = row.get("errorMessage") != null ? row.get("errorMessage").toString().toLowerCase() : "";
+                if (!name.contains(qq) && !email.contains(qq) && !errMsg.contains(qq)) continue;
+            }
+            rows.add(row);
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("rows", rows);
+        response.put("total", total);
+        response.put("page", page);
+        response.put("size", size);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/report-errors/{logId}/retry")
+    public ResponseEntity<?> retryReport(@PathVariable Long logId,
+                                         @RequestBody(required = false) Map<String, Object> body) {
+        Optional<ReportGenerationLog> opt = reportGenerationLogRepository.findById(logId);
+        if (!opt.isPresent()) return ResponseEntity.notFound().build();
+        ReportGenerationLog log = opt.get();
+        if (!"failed".equals(log.getStatus())) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("status", "error", "message", "Log is not in failed state"));
+        }
+
+        String resolvedBy = body != null && body.get("resolvedBy") != null
+                ? body.get("resolvedBy").toString() : "admin";
+
+        try {
+            PreparationResult result = reportPreparationService.prepare(
+                    log.getEntitlementId(), log.getAssessmentId(), "retry");
+
+            log.setStatus("resolved");
+            log.setResolvedAt(new Date());
+            log.setResolvedBy(resolvedBy);
+            reportGenerationLogRepository.save(log);
+
+            String recipient = lookupStudentEmail(log.getUserStudentId());
+            boolean emailed = false;
+            String emailMessage = null;
+            if (recipient != null && !recipient.isEmpty()) {
+                com.kccitm.api.service.b2c.EntitlementService.ResendResult r =
+                        entitlementService.resendServiceLink(
+                                log.getEntitlementId(), "final_report", recipient);
+                emailed = r.ok;
+                emailMessage = r.message;
+            } else {
+                emailMessage = "Student email not on file — admin must forward report manually";
+            }
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "resolved");
+            response.put("logId", logId);
+            response.put("reportType", result.reportType);
+            response.put("reportUrl", result.reportUrl);
+            response.put("studentClassUsed", result.studentClassUsed);
+            response.put("emailed", emailed);
+            response.put("emailMessage", emailMessage);
+            return ResponseEntity.ok(response);
+        } catch (ReportPreparationException ex) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "failed");
+            response.put("logId", ex.logId);
+            response.put("reportType", ex.reportType);
+            response.put("studentClassUsed", ex.studentClassUsed);
+            response.put("message", ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    @PostMapping("/report-errors/{logId}/dismiss")
+    public ResponseEntity<?> dismissReport(@PathVariable Long logId,
+                                           @RequestBody(required = false) Map<String, Object> body) {
+        Optional<ReportGenerationLog> opt = reportGenerationLogRepository.findById(logId);
+        if (!opt.isPresent()) return ResponseEntity.notFound().build();
+        ReportGenerationLog log = opt.get();
+        if (!"failed".equals(log.getStatus())) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("status", "error", "message", "Log is not in failed state"));
+        }
+        String resolvedBy = body != null && body.get("resolvedBy") != null
+                ? body.get("resolvedBy").toString() : "admin";
+        String note = body != null && body.get("note") != null ? body.get("note").toString() : null;
+
+        log.setStatus("resolved");
+        log.setResolvedAt(new Date());
+        log.setResolvedBy(resolvedBy);
+        log.setResolutionNote(note);
+        reportGenerationLogRepository.save(log);
+
+        return ResponseEntity.ok(Map.of("status", "dismissed", "logId", logId));
+    }
+
+    private String lookupStudentEmail(Long userStudentId) {
+        if (userStudentId == null) return null;
+        return userStudentRepository.findById(userStudentId)
+                .map(UserStudent::getStudentInfo)
+                .map(StudentInfo::getEmail)
+                .orElse(null);
     }
 
     @GetMapping("/service-activity")
@@ -332,6 +506,72 @@ public class TrackerController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Resets a payment back to "not received". Flips PaymentTransaction.status
+     * to {@code "created"} and reverts the linked StudentEntitlement to its
+     * pre-activation shape (status="pending", tier + feature flags cleared,
+     * grant/expiry timestamps wiped). Razorpay IDs are kept as audit evidence.
+     *
+     * Used for test data cleanup and to undo mistakenly-marked-paid rows
+     * without deleting any history.
+     */
+    @PostMapping("/payments/{transactionId}/reset")
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<?> resetPayment(@PathVariable Long transactionId,
+                                          @RequestBody(required = false) Map<String, Object> body) {
+        Optional<PaymentTransaction> opt = paymentTransactionRepository.findById(transactionId);
+        if (!opt.isPresent()) return ResponseEntity.notFound().build();
+        PaymentTransaction txn = opt.get();
+
+        String reason = body != null && body.get("reason") != null
+                ? body.get("reason").toString() : null;
+        String resetBy = body != null && body.get("resetBy") != null
+                ? body.get("resetBy").toString() : "admin";
+        String previousStatus = txn.getStatus();
+
+        txn.setStatus("created");
+        String stamp = "Reset to unpaid by " + resetBy + " on " + new Date()
+                + (reason != null && !reason.isEmpty() ? ": " + reason : "")
+                + (previousStatus != null ? " (was " + previousStatus + ")" : "");
+        String existing = txn.getFailureReason();
+        txn.setFailureReason(existing == null || existing.isEmpty()
+                ? stamp
+                : existing + " | " + stamp);
+        paymentTransactionRepository.save(txn);
+
+        Optional<StudentEntitlement> eOpt = entitlementRepository.findByPaymentTransactionId(transactionId);
+        Long entitlementId = null;
+        if (eOpt.isPresent()) {
+            StudentEntitlement e = eOpt.get();
+            entitlementId = e.getEntitlementId();
+            e.setStatus("pending");
+            e.setPricingTierId(null);
+            e.setCampaignAssessmentTierId(null);
+            e.setPaymentTransactionId(null);
+            e.setGrantedAt(null);
+            e.setExpiresAt(null);
+            e.setDashboardActive(false);
+            e.setDashboardExpiresAt(null);
+            e.setCounsellingActive(false);
+            e.setLmsActive(false);
+            e.setLmsExpiresAt(null);
+            e.setFinalReportActive(false);
+            e.setCounsellingSessionsTotal(0);
+            // Intentionally NOT clearing counsellingSessionsUsed — if sessions
+            // were actually consumed before the reset, that history stays.
+            e.setReportPreparedAt(null);
+            entitlementRepository.save(e);
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("transactionId", transactionId);
+        response.put("status", "created");
+        response.put("previousStatus", previousStatus);
+        response.put("entitlementId", entitlementId);
+        response.put("entitlementReverted", entitlementId != null);
+        return ResponseEntity.ok(response);
+    }
+
     private Map<String, Object> entitlementToRow(StudentEntitlement e) {
         Map<String, Object> row = new HashMap<>();
         row.put("entitlementId", e.getEntitlementId());
@@ -381,6 +621,65 @@ public class TrackerController {
         row.put("userStudentId", e.getUserStudentId());
         row.put("assessmentStatus", lookupAssessmentStatus(e.getUserStudentId(), e.getAssessmentId()));
         attachInstitute(row, e.getUserStudentId());
+        row.put("lastReportError", latestReportError(e.getEntitlementId()));
+        return row;
+    }
+
+    /**
+     * Latest unresolved report-generation error for an entitlement, or null
+     * if none. Used by both list endpoints so the SPA can render the inline
+     * "⚠ Report error" badge without extra round-trips.
+     */
+    private Map<String, Object> latestReportError(Long entitlementId) {
+        if (entitlementId == null) return null;
+        return reportGenerationLogRepository
+                .findFirstByEntitlementIdAndStatusOrderByCreatedAtDesc(entitlementId, "failed")
+                .map(log -> {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("logId", log.getId());
+                    m.put("message", log.getErrorMessage());
+                    m.put("createdAt", log.getCreatedAt());
+                    m.put("reportType", log.getReportType());
+                    return m;
+                })
+                .orElse(null);
+    }
+
+    private Map<String, Object> reportErrorToRow(ReportGenerationLog log) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("logId", log.getId());
+        row.put("entitlementId", log.getEntitlementId());
+        row.put("userStudentId", log.getUserStudentId());
+        row.put("campaignId", log.getCampaignId());
+        row.put("assessmentId", log.getAssessmentId());
+        row.put("reportType", log.getReportType());
+        row.put("studentClassAtAttempt", log.getStudentClassAtAttempt());
+        row.put("attemptType", log.getAttemptType());
+        row.put("status", log.getStatus());
+        row.put("errorClass", log.getErrorClass());
+        row.put("errorMessage", log.getErrorMessage());
+        row.put("createdAt", log.getCreatedAt());
+        row.put("resolvedAt", log.getResolvedAt());
+        row.put("resolvedBy", log.getResolvedBy());
+        row.put("resolutionNote", log.getResolutionNote());
+
+        if (log.getCampaignId() != null) {
+            campaignRepository.findById(log.getCampaignId()).ifPresent(c ->
+                    row.put("campaignName", c.getName()));
+        }
+        if (log.getAssessmentId() != null) {
+            assessmentTableRepository.findById(log.getAssessmentId()).ifPresent(a ->
+                    row.put("assessmentName", a.getAssessmentName()));
+        }
+        if (log.getUserStudentId() != null) {
+            userStudentRepository.findById(log.getUserStudentId()).ifPresent(us -> {
+                StudentInfo si = us.getStudentInfo();
+                if (si != null) {
+                    row.put("studentName", si.getName());
+                    row.put("studentEmail", si.getEmail());
+                }
+            });
+        }
         return row;
     }
 

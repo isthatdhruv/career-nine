@@ -8,6 +8,35 @@ export interface TrackerListResponse<T> {
   size: number;
 }
 
+export interface ReportErrorSummary {
+  logId: number;
+  message: string;
+  createdAt: string;
+  reportType?: string;
+}
+
+export interface ReportErrorRow {
+  logId: number;
+  entitlementId: number;
+  userStudentId: number;
+  studentName?: string;
+  studentEmail?: string;
+  campaignId?: number;
+  campaignName?: string;
+  assessmentId?: number;
+  assessmentName?: string;
+  reportType?: string;
+  studentClassAtAttempt?: number | null;
+  attemptType: string;
+  status: string;
+  errorClass?: string;
+  errorMessage?: string;
+  createdAt: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
+  resolutionNote?: string;
+}
+
 export interface PaymentRow {
   transactionId: number;
   createdAt?: string;
@@ -35,6 +64,7 @@ export interface PaymentRow {
   assessmentStatus?: string;
   instituteCode?: number;
   instituteName?: string;
+  lastReportError?: ReportErrorSummary | null;
 }
 
 export interface AllotmentRow {
@@ -69,6 +99,7 @@ export interface AllotmentRow {
   assessmentStatus?: string;
   instituteCode?: number;
   instituteName?: string;
+  lastReportError?: ReportErrorSummary | null;
 }
 
 export interface InstituteOption {
@@ -126,6 +157,9 @@ export const getSummary = (filters: TrackerFilters = {}) =>
 export const resendPaymentLink = (transactionId: number) =>
   axios.post(`${API_URL}/admin/tracker/payments/${transactionId}/resend-link`);
 
+export const resetPayment = (transactionId: number, reason?: string, resetBy?: string) =>
+  axios.post(`${API_URL}/admin/tracker/payments/${transactionId}/reset`, { reason, resetBy });
+
 export const sendPaymentLinkEmail = (
   transactionId: number,
   email: string,
@@ -144,3 +178,14 @@ export const extendEntitlement = (entitlementId: number, newExpiresAt: string) =
 
 export const revokeEntitlement = (entitlementId: number, reason?: string) =>
   axios.post(`${API_URL}/entitlement/${entitlementId}/revoke`, { reason });
+
+export const getReportErrors = (filters: TrackerFilters & { status?: string } = {}) =>
+  axios.get<TrackerListResponse<ReportErrorRow>>(`${API_URL}/admin/tracker/report-errors`, {
+    params: buildParams(filters),
+  });
+
+export const retryReportGeneration = (logId: number, resolvedBy?: string) =>
+  axios.post(`${API_URL}/admin/tracker/report-errors/${logId}/retry`, resolvedBy ? { resolvedBy } : {});
+
+export const dismissReportError = (logId: number, note?: string, resolvedBy?: string) =>
+  axios.post(`${API_URL}/admin/tracker/report-errors/${logId}/dismiss`, { note, resolvedBy });

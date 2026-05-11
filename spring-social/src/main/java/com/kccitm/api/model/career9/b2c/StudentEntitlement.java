@@ -119,6 +119,11 @@ public class StudentEntitlement implements Serializable {
     @JsonFormat(pattern = "dd-MM-yyyy HH:mm:ss")
     private Date updatedAt;
 
+    @Column(name = "report_prepared_at")
+    @Temporal(TemporalType.TIMESTAMP)
+    @JsonFormat(pattern = "dd-MM-yyyy HH:mm:ss")
+    private Date reportPreparedAt;
+
     @PrePersist
     public void prePersist() {
         Date now = new Date();
@@ -186,4 +191,6 @@ public class StudentEntitlement implements Serializable {
     public void setCreatedAt(Date v) { this.createdAt = v; }
     public Date getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Date v) { this.updatedAt = v; }
+    public Date getReportPreparedAt() { return reportPreparedAt; }
+    public void setReportPreparedAt(Date v) { this.reportPreparedAt = v; }
 }

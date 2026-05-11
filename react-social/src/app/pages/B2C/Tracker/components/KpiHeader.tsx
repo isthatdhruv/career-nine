@@ -12,10 +12,10 @@ const Card = ({ label, value, tone }: { label: string; value: any; tone?: "navy"
     slate: "#475569",
   }[tone ?? "slate"];
   return (
-    <div className="col-md-2 col-6 mb-2">
+    <div className="col-6 col-sm-4 col-md-2 mb-2">
       <div style={{ background: bg, color: "white", borderRadius: 10, padding: "14px 16px" }}>
         <div style={{ fontSize: "0.78em", textTransform: "uppercase", letterSpacing: "0.05em", opacity: 0.85 }}>{label}</div>
-        <div style={{ fontSize: "1.45em", fontWeight: 700, marginTop: 4 }}>{value}</div>
+        <div style={{ fontSize: "1.45em", fontWeight: 700, marginTop: 4, wordBreak: "break-word" }}>{value}</div>
       </div>
     </div>
   );
@@ -23,7 +23,7 @@ const Card = ({ label, value, tone }: { label: string; value: any; tone?: "navy"
 
 const KpiHeader = ({ summary }: Props) => {
   return (
-    <div className="row">
+    <div className="row g-2">
       <Card label="Revenue" value={fmtINR(summary.totalRevenue)} tone="navy" />
       <Card label="Paid" value={summary.paidCount ?? 0} tone="emerald" />
       <Card label="Pending" value={summary.createdCount ?? 0} tone="slate" />
