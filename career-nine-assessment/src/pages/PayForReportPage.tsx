@@ -3,22 +3,7 @@ import { useParams, useNavigate } from "react-router-dom"
 import { showErrorToast } from "../utils/toast"
 import { getUpgradeInfo, payForReport } from "../api-clients/campaignAPI"
 import { validatePromoCode } from "../api-clients/promoCodeAPI"
-
-type Tier = {
-  campaignAssessmentTierId: number
-  name: string
-  description?: string
-  basePriceInr: number
-  priceInr: number
-  isDefault: boolean
-  includesFinalReport: boolean
-  includesDashboard: boolean
-  includesCounselling: boolean
-  counsellingSessionCount?: number | null
-  includesLms: boolean
-  lmsValidityDays?: number | null
-  dashboardValidityDays?: number | null
-}
+import { TierCard, Tier } from "../components/TierCard"
 
 type UpgradeInfo = {
   entitlementId: number
@@ -30,6 +15,21 @@ type UpgradeInfo = {
   student: { name?: string; email?: string; phone?: string }
   tiers: Tier[]
 }
+
+const FAQS: Array<{ q: string; a: string }> = [
+  {
+    q: "When do I get my report?",
+    a: "Your detailed report is generated and emailed within a few minutes of payment. You can also download it from this page or from your dashboard.",
+  },
+  {
+    q: "Is the payment secure?",
+    a: "Payments are processed by Razorpay. We never store your card details — all sensitive information goes directly to the payment provider over an encrypted channel.",
+  },
+  {
+    q: "Can I upgrade later?",
+    a: "Yes — you can always come back and pick a higher tier. Your existing entitlement gets upgraded; you don't have to retake the assessment.",
+  },
+]
 
 const PayForReportPage = () => {
   const { entitlementId: eidParam } = useParams<{ entitlementId: string }>()
@@ -271,6 +271,9 @@ const PayForReportPage = () => {
           >
             {submitting ? "Processing…" : `Pay INR ${discountedPriceInr}`}
           </button>
+
+          <h3 style={{ ...s.sectionTitle, marginTop: 32 }}>Frequently asked</h3>
+          <FaqAccordion items={FAQS} />
         </form>
       </div>
     </div>
@@ -284,42 +287,28 @@ const DetailRow = ({ label, value }: { label: string; value: string }) => (
   </div>
 )
 
-function TierCard({ tier, selected, onSelect, disabled }: {
-  tier: Tier; selected: boolean; onSelect: () => void; disabled?: boolean
-}) {
-  const features: string[] = []
-  if (tier.includesFinalReport) features.push("Final report")
-  if (tier.includesCounselling && tier.counsellingSessionCount) {
-    features.push(`${tier.counsellingSessionCount}× counselling session${tier.counsellingSessionCount > 1 ? "s" : ""}`)
-  }
-  if (tier.includesDashboard) {
-    features.push(tier.dashboardValidityDays ? `Dashboard (${tier.dashboardValidityDays} days)` : "Dashboard access")
-  }
-  if (tier.includesLms) {
-    features.push(tier.lmsValidityDays ? `LMS (${tier.lmsValidityDays} days)` : "LMS access")
-  }
+const FaqAccordion = ({ items }: { items: Array<{ q: string; a: string }> }) => {
+  const [open, setOpen] = useState<number | null>(0)
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      disabled={disabled}
-      style={selected ? { ...s.tierCard, ...s.tierCardSelected, cursor: disabled ? "default" : "pointer" } : s.tierCard}
-    >
-      {tier.isDefault && <span style={s.recommendedBadge}>Recommended</span>}
-      <div style={s.tierTitle}>{tier.name}</div>
-      <div style={s.tierPriceLine}>
-        {tier.priceInr !== tier.basePriceInr && (
-          <span style={s.tierBasePrice}>INR {tier.basePriceInr}</span>
-        )}
-        <span style={s.tierPrice}>INR {tier.priceInr}</span>
-      </div>
-      {tier.description && <p style={s.tierDescription}>{tier.description}</p>}
-      {features.length > 0 && (
-        <ul style={s.tierFeatures}>
-          {features.map((f) => <li key={f}>{f}</li>)}
-        </ul>
-      )}
-    </button>
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {items.map((item, idx) => {
+        const isOpen = open === idx
+        return (
+          <div key={item.q} style={s.faqItem}>
+            <button
+              type="button"
+              onClick={() => setOpen(isOpen ? null : idx)}
+              style={s.faqHeader}
+              aria-expanded={isOpen}
+            >
+              <span>{item.q}</span>
+              <span style={{ fontSize: "1.2rem", color: "#10b981" }}>{isOpen ? "−" : "+"}</span>
+            </button>
+            {isOpen && <div style={s.faqBody}>{item.a}</div>}
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
@@ -356,28 +345,32 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: 14, padding: "8px 18px",
   },
   tierGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 },
-  tierCard: {
-    position: "relative",
-    background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 14,
-    padding: "18px 16px", textAlign: "left", cursor: "pointer", transition: "all 0.2s",
+  faqItem: {
+    border: "1px solid #e2e8f0",
+    borderRadius: 12,
+    background: "#fff",
+    overflow: "hidden",
   },
-  tierCardSelected: {
-    borderColor: "#10b981",
-    background: "linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)",
-    boxShadow: "0 6px 18px rgba(16, 185, 129, 0.18)",
+  faqHeader: {
+    width: "100%",
+    background: "transparent",
+    border: "none",
+    padding: "12px 16px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    fontSize: "0.92rem",
+    fontWeight: 600,
+    color: "#0f172a",
+    cursor: "pointer",
+    textAlign: "left",
   },
-  recommendedBadge: {
-    position: "absolute", top: -10, right: 12,
-    background: "linear-gradient(135deg, #10b981, #059669)",
-    color: "white", fontSize: "0.65rem", fontWeight: 700,
-    padding: "3px 10px", borderRadius: 999, textTransform: "uppercase", letterSpacing: "0.05em",
+  faqBody: {
+    padding: "0 16px 14px",
+    color: "#475569",
+    fontSize: "0.88rem",
+    lineHeight: 1.55,
   },
-  tierTitle: { fontWeight: 700, color: "#0f172a", fontSize: "1.02rem", marginBottom: 6 },
-  tierPriceLine: { display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 },
-  tierBasePrice: { textDecoration: "line-through", color: "#94a3b8", fontSize: "0.85rem" },
-  tierPrice: { color: "#0f172a", fontWeight: 800, fontSize: "1.1rem" },
-  tierDescription: { color: "#64748b", fontSize: "0.83rem", lineHeight: 1.5, margin: "0 0 8px" },
-  tierFeatures: { margin: 0, paddingLeft: 18, color: "#475569", fontSize: "0.82rem", lineHeight: 1.6 },
   input: {
     border: "1.5px solid #e2e8f0", borderRadius: 12, padding: "10px 14px",
     fontSize: "0.92rem", color: "#0f172a", background: "#fff",
