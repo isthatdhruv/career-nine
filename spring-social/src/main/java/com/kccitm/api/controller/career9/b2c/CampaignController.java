@@ -28,6 +28,7 @@ import com.kccitm.api.repository.Career9.b2c.CampaignAssessmentMappingRepository
 import com.kccitm.api.repository.Career9.b2c.CampaignAssessmentTierRepository;
 import com.kccitm.api.repository.Career9.b2c.CampaignRepository;
 import com.kccitm.api.repository.Career9.b2c.PricingTierRepository;
+import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.service.b2c.CampaignResolutionService;
 
 @RestController
@@ -39,6 +40,7 @@ public class CampaignController {
     @Autowired private CampaignAssessmentTierRepository tierMappingRepository;
     @Autowired private PricingTierRepository pricingTierRepository;
     @Autowired private AssessmentTableRepository assessmentTableRepository;
+    @Autowired private InstituteDetailRepository instituteDetailRepository;
     @Autowired private CampaignResolutionService campaignResolutionService;
 
     @GetMapping("/getAll")
@@ -71,6 +73,15 @@ public class CampaignController {
         }
         if (body.getSlug() == null || body.getSlug().trim().isEmpty()) {
             return ResponseEntity.badRequest().body("Slug is required");
+        }
+        // New campaigns must be mapped to an institute. Legacy campaigns are
+        // grandfathered (handled in update() — see below) until the admin
+        // backfills them, after which Phase 2 migration enforces NOT NULL.
+        if (body.getInstituteCode() == null) {
+            return ResponseEntity.badRequest().body("Institute is required");
+        }
+        if (instituteDetailRepository.findById(body.getInstituteCode()) == null) {
+            return ResponseEntity.badRequest().body("Selected institute does not exist");
         }
         String slug = body.getSlug().trim().toLowerCase().replaceAll("[^a-z0-9-]", "-");
         if (campaignRepository.findBySlugIgnoreCase(slug).isPresent()) {
@@ -106,6 +117,18 @@ public class CampaignController {
         if (req.containsKey("validTo")) c.setValidTo(parseDate((String) req.get("validTo")));
         if (req.containsKey("defaultPurchasePath")) c.setDefaultPurchasePath((String) req.get("defaultPurchasePath"));
         if (req.containsKey("defaultCounsellingModel")) c.setDefaultCounsellingModel((String) req.get("defaultCounsellingModel"));
+        if (req.containsKey("instituteCode")) {
+            Integer instituteCode = toInt(req.get("instituteCode"));
+            // Editing a campaign cannot blank out an institute that's already set.
+            // Legacy campaigns (NULL) must be filled in; once filled they stay required.
+            if (instituteCode == null) {
+                return ResponseEntity.badRequest().body("Institute is required");
+            }
+            if (instituteDetailRepository.findById(instituteCode) == null) {
+                return ResponseEntity.badRequest().body("Selected institute does not exist");
+            }
+            c.setInstituteCode(instituteCode);
+        }
         if (req.containsKey("isActive")) c.setIsActive((Boolean) req.get("isActive"));
         normalizeDefaults(c);
         return ResponseEntity.ok(campaignRepository.save(c));
@@ -224,6 +247,19 @@ public class CampaignController {
     private Map<String, Object> toFullDto(Campaign c) {
         Map<String, Object> out = new HashMap<>();
         out.put("campaign", c);
+
+        // Resolve institute name for display so the edit page can show the
+        // currently-mapped institute without a second round trip.
+        if (c.getInstituteCode() != null) {
+            com.kccitm.api.model.career9.school.InstituteDetail inst =
+                    instituteDetailRepository.findById((int) c.getInstituteCode());
+            if (inst != null) {
+                Map<String, Object> instDto = new HashMap<>();
+                instDto.put("instituteCode", inst.getInstituteCode());
+                instDto.put("instituteName", inst.getInstituteName());
+                out.put("institute", instDto);
+            }
+        }
 
         List<CampaignAssessmentMapping> mappings = mappingRepository
                 .findByCampaignIdAndIsDeletedFalseOrderBySortOrderAscIdAsc(c.getCampaignId());

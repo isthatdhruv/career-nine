@@ -5,6 +5,7 @@ import { getStudentsWithMappingByInstituteId, getAllAssessments, bulkAlotAssessm
 import StudentAnswerExcelModal from "./StudentAnswerExcelModal";
 import ResetAssessmentModal from "./ResetAssessmentModal";
 import CreateStudentModal from "./CreateStudentModal";
+import StudentInstitutesModal from "./StudentInstitutesModal";
 import { ActionIcon } from "../../components/ActionIcon";
 
 export type Student = {
@@ -39,6 +40,8 @@ export default function StudentsList() {
   // Reset modal state
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetStudent, setResetStudent] = useState<Student | null>(null);
+
+  const [institutesModalStudent, setInstitutesModalStudent] = useState<Student | null>(null);
 
   const refreshStudents = () => {
     const instituteId = localStorage.getItem('instituteId');
@@ -454,6 +457,19 @@ export default function StudentsList() {
                             <ActionIcon type="refresh" size="sm" />
                             Reset
                           </button>
+                          <button
+                            className="btn btn-outline-info btn-sm d-flex align-items-center gap-1"
+                            onClick={() => setInstitutesModalStudent(student)}
+                            title="Manage institute memberships"
+                            style={{
+                              borderRadius: '8px',
+                              padding: '6px 12px',
+                              fontWeight: 500,
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            Institutes
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -536,6 +552,16 @@ export default function StudentsList() {
         onHide={() => setShowAddModal(false)}
         onSave={() => refreshStudents()}
       />
+
+      {/* Student Institutes Modal */}
+      {institutesModalStudent && (
+        <StudentInstitutesModal
+          show={!!institutesModalStudent}
+          onHide={() => setInstitutesModalStudent(null)}
+          userStudentId={institutesModalStudent.userStudentId}
+          studentName={institutesModalStudent.name}
+        />
+      )}
     </div>
   );
 }

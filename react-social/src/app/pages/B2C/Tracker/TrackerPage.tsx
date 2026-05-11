@@ -4,8 +4,10 @@ import { showErrorToast } from "../../../utils/toast";
 import { Campaign, getAllCampaigns } from "../API/Campaign_APIs";
 import {
   AllotmentRow,
+  InstituteOption,
   PaymentRow,
   getAllotments,
+  getInstituteList,
   getPayments,
   getSummary,
   TrackerFilters,
@@ -20,6 +22,7 @@ const PAGE_SIZE = 50;
 const TrackerPage = () => {
   const [activeTab, setActiveTab] = useState<string>("payments");
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [institutes, setInstitutes] = useState<InstituteOption[]>([]);
   const [filters, setFilters] = useState<TrackerFilters>({ page: 0, size: PAGE_SIZE });
 
   const [payments, setPayments] = useState<PaymentRow[]>([]);
@@ -36,6 +39,13 @@ const TrackerPage = () => {
     try {
       const res = await getAllCampaigns();
       setCampaigns(res.data);
+    } catch { /* non-fatal */ }
+  }, []);
+
+  const loadInstitutes = useCallback(async () => {
+    try {
+      const res = await getInstituteList();
+      setInstitutes(res.data);
     } catch { /* non-fatal */ }
   }, []);
 
@@ -73,6 +83,7 @@ const TrackerPage = () => {
   }, [filters]);
 
   useEffect(() => { loadCampaigns(); }, [loadCampaigns]);
+  useEffect(() => { loadInstitutes(); }, [loadInstitutes]);
   useEffect(() => { loadSummary(); }, [loadSummary]);
   useEffect(() => {
     if (activeTab === "payments") loadPayments();
@@ -150,8 +161,10 @@ const TrackerPage = () => {
                 total={paymentsTotal}
                 page={filters.page ?? 0}
                 pageSize={filters.size ?? PAGE_SIZE}
+                institutes={institutes}
                 onPageChange={setPage}
                 onOpenEntitlement={setDrawerEntitlementId}
+                onInstituteChanged={loadPayments}
               />
             )}
           </Tab>
@@ -163,8 +176,10 @@ const TrackerPage = () => {
                 total={allotmentsTotal}
                 page={filters.page ?? 0}
                 pageSize={filters.size ?? PAGE_SIZE}
+                institutes={institutes}
                 onPageChange={setPage}
                 onOpenEntitlement={setDrawerEntitlementId}
+                onInstituteChanged={loadAllotments}
               />
             )}
           </Tab>

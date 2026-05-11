@@ -1,4 +1,3 @@
-import axios from "axios";
 import { useEffect, useState } from "react";
 import { Button, Form, Modal, Spinner, Table } from "react-bootstrap";
 import { useNavigate, useParams } from "react-router-dom";
@@ -12,13 +11,14 @@ import {
   detachAssessment,
   detachTierFromMapping,
   getCampaign,
+  getInstituteList,
+  InstituteOption,
   updateAssessmentMapping,
   updateCampaign,
 } from "../API/Campaign_APIs";
 import { getActivePricingTiers, PricingTier } from "../API/PricingTier_APIs";
+import { getAssessmentSummariesByInstitute } from "../../AssessmentMapping/API/AssessmentMapping_APIs";
 import RegistrationLinks from "./components/RegistrationLinks";
-
-const API_URL = process.env.REACT_APP_API_URL;
 
 const emptyCampaign: Campaign = {
   name: "",
@@ -28,6 +28,7 @@ const emptyCampaign: Campaign = {
   description: "",
   defaultPurchasePath: "B",
   defaultCounsellingModel: "1",
+  instituteCode: null,
   isActive: true,
 };
 
@@ -42,22 +43,27 @@ const CampaignEditPage = () => {
   const [assessmentRows, setAssessmentRows] = useState<CampaignAssessmentRow[]>([]);
   const [allAssessments, setAllAssessments] = useState<{ id: number; name: string }[]>([]);
   const [allTiers, setAllTiers] = useState<PricingTier[]>([]);
+  const [allInstitutes, setAllInstitutes] = useState<InstituteOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Tier-config drawer state
-  const [tierDrawerOpenFor, setTierDrawerOpenFor] = useState<CampaignAssessmentRow | null>(null);
+  // Tier-config drawer state — track by mappingId so the row stays in sync with refreshed assessmentRows
+  const [tierDrawerMappingId, setTierDrawerMappingId] = useState<number | null>(null);
+  const tierDrawerRow = tierDrawerMappingId == null
+    ? null
+    : assessmentRows.find(r => r.mappingId === tierDrawerMappingId) ?? null;
 
   const upd = <K extends keyof Campaign>(k: K, v: Campaign[K]) =>
     setCampaign(prev => ({ ...prev, [k]: v }));
 
-  const loadAssessments = async () => {
+  const loadAssessments = async (instituteCode: number | null | undefined) => {
+    if (!instituteCode) {
+      setAllAssessments([]);
+      return;
+    }
     try {
-      const res = await axios.get(`${API_URL}/assessments/get/list`);
-      const list = (res.data as any[]).map(a => ({
-        id: a.assessment_id ?? a.assessmentId ?? a.id,
-        name: a.AssessmentName ?? a.assessmentName ?? a.name ?? `Assessment ${a.id}`,
-      }));
+      const res = await getAssessmentSummariesByInstitute(instituteCode);
+      const list = res.data.map(a => ({ id: a.id, name: a.assessmentName }));
       setAllAssessments(list);
     } catch {
       // non-fatal
@@ -70,6 +76,15 @@ const CampaignEditPage = () => {
       setAllTiers(res.data);
     } catch (e: any) {
       showErrorToast(e?.response?.data || "Failed to load pricing tiers");
+    }
+  };
+
+  const loadInstitutes = async () => {
+    try {
+      const res = await getInstituteList();
+      setAllInstitutes(res.data || []);
+    } catch (e: any) {
+      showErrorToast(e?.response?.data || "Failed to load institutes");
     }
   };
 
@@ -87,11 +102,27 @@ const CampaignEditPage = () => {
     }
   };
 
-  useEffect(() => { loadAssessments(); loadTiers(); loadCampaign(); /* eslint-disable-next-line */ }, [id]);
+  // Silent refresh — refetches campaign data without flipping the page-wide
+  // loading spinner (which would unmount the tier modal and any open dialogs).
+  const refreshCampaign = async () => {
+    if (!isEdit) return;
+    try {
+      const res = await getCampaign(Number(id));
+      setCampaign(res.data.campaign);
+      setAssessmentRows(res.data.assessments || []);
+    } catch (e: any) {
+      showErrorToast(e?.response?.data || "Failed to refresh campaign");
+    }
+  };
+
+  useEffect(() => { loadTiers(); loadInstitutes(); loadCampaign(); /* eslint-disable-next-line */ }, [id]);
+
+  useEffect(() => { loadAssessments(campaign.instituteCode); /* eslint-disable-next-line */ }, [campaign.instituteCode]);
 
   const handleSaveBasics = async () => {
     if (!campaign.name?.trim()) { showErrorToast("Name is required"); return; }
     if (!campaign.slug?.trim()) { showErrorToast("Slug is required"); return; }
+    if (!campaign.instituteCode) { showErrorToast("Institute is required"); return; }
     setSaving(true);
     try {
       if (isEdit) {
@@ -188,6 +219,24 @@ const CampaignEditPage = () => {
                 <Form.Label>Brand logo URL</Form.Label>
                 <Form.Control value={campaign.brandLogoUrl ?? ""} onChange={e => upd("brandLogoUrl", e.target.value)} />
               </div>
+              <div className="col-md-6 mb-3">
+                <Form.Label>
+                  Mapped institute <span className="text-danger">*</span>
+                </Form.Label>
+                <Form.Select
+                  value={campaign.instituteCode ?? ""}
+                  onChange={e => upd("instituteCode", e.target.value === "" ? null : Number(e.target.value))}
+                  isInvalid={!campaign.instituteCode}
+                >
+                  <option value="">— select an institute —</option>
+                  {allInstitutes.map(i => (
+                    <option key={i.instituteCode} value={i.instituteCode}>{i.instituteName}</option>
+                  ))}
+                </Form.Select>
+                <Form.Text className="text-muted">
+                  Every student registering through this campaign will be linked to this institute.
+                </Form.Text>
+              </div>
               <div className="col-12 mb-3">
                 <Form.Label>Description</Form.Label>
                 <Form.Control as="textarea" rows={2} value={campaign.description ?? ""} onChange={e => upd("description", e.target.value)} />
@@ -229,17 +278,24 @@ const CampaignEditPage = () => {
                 <h4 className="mb-3">Assessments in this campaign</h4>
                 <p className="text-muted">For each assessment you can override Path and Counselling Model, and pick which pricing tiers to sell.</p>
 
-                {availableAssessmentsToAttach.length > 0 && (
-                  <Form.Group className="mb-3">
-                    <Form.Label>Attach an assessment</Form.Label>
-                    <Form.Select onChange={e => { if (e.target.value) handleAttachAssessment(Number(e.target.value)); e.target.value = ""; }}>
-                      <option value="">— pick an assessment to attach —</option>
-                      {availableAssessmentsToAttach.map(a => (
-                        <option key={a.id} value={a.id}>{a.name}</option>
-                      ))}
-                    </Form.Select>
-                  </Form.Group>
-                )}
+                <Form.Group className="mb-3">
+                  <Form.Label>Attach an assessment</Form.Label>
+                  <Form.Select
+                    disabled={!campaign.instituteCode}
+                    onChange={e => { if (e.target.value) handleAttachAssessment(Number(e.target.value)); e.target.value = ""; }}
+                  >
+                    <option value="">
+                      {!campaign.instituteCode
+                        ? "— set institute first —"
+                        : availableAssessmentsToAttach.length === 0
+                          ? "— no assessments mapped to this institute —"
+                          : "— pick an assessment to attach —"}
+                    </option>
+                    {availableAssessmentsToAttach.map(a => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
 
                 <Table responsive striped hover className="align-middle">
                   <thead>
@@ -278,7 +334,7 @@ const CampaignEditPage = () => {
                           {(r.tiers ?? []).filter(t => t.isActive).length} active tier(s)
                         </td>
                         <td>
-                          <Button size="sm" variant="outline-primary" className="me-1" onClick={() => setTierDrawerOpenFor(r)}>Configure tiers</Button>
+                          <Button size="sm" variant="outline-primary" className="me-1" onClick={() => setTierDrawerMappingId(r.mappingId)}>Configure tiers</Button>
                           <Button size="sm" variant="outline-danger" onClick={() => handleDetach(r.mappingId)}>Detach</Button>
                         </td>
                       </tr>
@@ -292,11 +348,11 @@ const CampaignEditPage = () => {
       </div>
 
       <TierConfigDrawer
-        show={!!tierDrawerOpenFor}
-        row={tierDrawerOpenFor}
+        show={tierDrawerMappingId != null}
+        row={tierDrawerRow}
         allTiers={allTiers}
-        onClose={() => setTierDrawerOpenFor(null)}
-        onChanged={loadCampaign}
+        onClose={() => setTierDrawerMappingId(null)}
+        onChanged={refreshCampaign}
       />
 
       {isEdit && campaign.slug && (
@@ -420,10 +476,13 @@ const TierConfigDrawer = ({ show, row, allTiers, onClose, onChanged }: TierConfi
               return (
                 <tr key={t.tierId}>
                   <td>
-                    <Form.Check type="switch" id={`sell-${t.tierId}`}
-                      checked={!!att?.isActive}
-                      disabled={busy === t.tierId}
-                      onChange={e => toggleAttach(t, e.target.checked)} />
+                    <div className="d-flex align-items-center gap-2">
+                      <Form.Check type="switch" id={`sell-${t.tierId}`}
+                        checked={!!att?.isActive}
+                        disabled={busy === t.tierId}
+                        onChange={e => toggleAttach(t, e.target.checked)} />
+                      {busy === t.tierId && <Spinner animation="border" size="sm" />}
+                    </div>
                   </td>
                   <td>
                     <strong>{t.name}</strong>

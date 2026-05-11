@@ -12,10 +12,16 @@ export interface Campaign {
   validTo?: string;
   defaultPurchasePath?: "A" | "B";
   defaultCounsellingModel?: "1" | "2";
+  instituteCode?: number | null;
   isActive?: boolean;
   isDeleted?: boolean;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface InstituteOption {
+  instituteCode: number;
+  instituteName: string;
 }
 
 export interface CampaignAssessmentRow {
@@ -41,7 +47,11 @@ export interface CampaignAssessmentTier {
 export interface CampaignFullDto {
   campaign: Campaign;
   assessments: CampaignAssessmentRow[];
+  institute?: InstituteOption | null;
 }
+
+export const getInstituteList = () =>
+  axios.get<InstituteOption[]>(`${API_URL}/instituteDetail/get/list`);
 
 export const getAllCampaigns = () => axios.get<Campaign[]>(`${API_URL}/campaign/getAll`);
 export const getCampaign = (id: number) => axios.get<CampaignFullDto>(`${API_URL}/campaign/get/${id}`);

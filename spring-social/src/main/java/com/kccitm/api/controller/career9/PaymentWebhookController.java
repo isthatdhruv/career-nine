@@ -41,6 +41,7 @@ import com.kccitm.api.model.career9.SchoolRegistrationLink;
 import com.kccitm.api.model.career9.school.SchoolClasses;
 import com.kccitm.api.repository.Career9.SchoolAssessmentConfigRepository;
 import com.kccitm.api.repository.Career9.SchoolRegistrationLinkRepository;
+import com.kccitm.api.service.b2c.StudentInstituteMembershipService;
 import com.kccitm.api.repository.Career9.School.SchoolClassesRepository;
 import com.kccitm.api.service.CareerNineRollNumberService;
 import com.kccitm.api.service.PaymentEmailService;
@@ -66,6 +67,7 @@ public class PaymentWebhookController {
     @Autowired private SchoolClassesRepository schoolClassesRepository;
     @Autowired private SchoolAssessmentConfigRepository schoolAssessmentConfigRepository;
     @Autowired private SchoolRegistrationLinkRepository schoolRegistrationLinkRepository;
+    @Autowired private StudentInstituteMembershipService membershipService;
 
     @Autowired(required = false)
     private com.kccitm.api.service.b2c.EntitlementService entitlementService;
@@ -517,7 +519,6 @@ public class PaymentWebhookController {
             studentInfo.setEmail(email);
             studentInfo.setStudentDob(dob);
             studentInfo.setPhoneNumber(phone);
-            studentInfo.setInstituteId(instituteCode);
             studentInfo.setSchoolSectionId(sectionId);
             if (classId != null) {
                 studentInfo.setStudentClass(parseClassNumber(classId));
@@ -525,9 +526,10 @@ public class PaymentWebhookController {
             studentInfo.setUser(user);
             studentInfo = studentInfoRepository.save(studentInfo);
 
-            InstituteDetail institute = instituteDetailRepository.findById(instituteCode.intValue());
-            UserStudent userStudent = new UserStudent(user, studentInfo, institute);
+            UserStudent userStudent = new UserStudent(user, studentInfo, null);
             userStudent = userStudentRepository.save(userStudent);
+
+            membershipService.setPrimaryInstitute(userStudent, instituteCode, null, "payment-provision");
 
             tryIncrementSchoolLink(txn);
 

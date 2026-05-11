@@ -14,6 +14,7 @@ export interface PaymentRow {
   studentName?: string;
   studentEmail?: string;
   studentPhone?: string;
+  userStudentId?: number;
   amount?: number;
   originalAmount?: number;
   currency?: string;
@@ -30,6 +31,10 @@ export interface PaymentRow {
   entitlementId?: number;
   entitlementStatus?: string;
   tierName?: string;
+  finalReportActive?: boolean;
+  assessmentStatus?: string;
+  instituteCode?: number;
+  instituteName?: string;
 }
 
 export interface AllotmentRow {
@@ -60,7 +65,24 @@ export interface AllotmentRow {
   studentName?: string;
   studentEmail?: string;
   studentPhone?: string;
+  userStudentId?: number;
+  assessmentStatus?: string;
+  instituteCode?: number;
+  instituteName?: string;
 }
+
+export interface InstituteOption {
+  instituteCode: number;
+  instituteName: string;
+}
+
+export const getInstituteList = () =>
+  axios.get<InstituteOption[]>(`${process.env.REACT_APP_API_URL}/instituteDetail/get/list`);
+
+export const assignStudentInstitute = (userStudentId: number, instituteCode: number) =>
+  axios.post<{ status: string; instituteCode: number }>(
+    `${process.env.REACT_APP_API_URL}/user-student/${userStudentId}/institute/${instituteCode}/assign-primary`
+  );
 
 export interface TrackerFilters {
   campaignId?: number;
@@ -103,6 +125,16 @@ export const getSummary = (filters: TrackerFilters = {}) =>
 
 export const resendPaymentLink = (transactionId: number) =>
   axios.post(`${API_URL}/admin/tracker/payments/${transactionId}/resend-link`);
+
+export const sendPaymentLinkEmail = (
+  transactionId: number,
+  email: string,
+  studentName?: string,
+) =>
+  axios.post(`${API_URL}/payment/${transactionId}/send-email`, {
+    email,
+    studentName: studentName ?? "Student",
+  });
 
 export const resendEntitlementService = (entitlementId: number, serviceType: string, recipient: string) =>
   axios.post(`${API_URL}/entitlement/${entitlementId}/resend/${serviceType}`, { recipient });
