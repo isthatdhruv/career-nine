@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { Button, Form, Modal, Spinner, Table } from "react-bootstrap";
 import { showErrorToast, showSuccessToast } from "../../../../utils/toast";
 import {
+  dismissReportError,
   extendEntitlement,
   getAllotmentDetail,
   resendEntitlementService,
+  retryReportGeneration,
   revokeEntitlement,
 } from "../../API/Tracker_APIs";
 
@@ -23,6 +25,7 @@ const EntitlementDrawer = ({ entitlementId, onClose, onChanged }: Props) => {
   const [busyService, setBusyService] = useState<string | null>(null);
   const [extendDate, setExtendDate] = useState("");
   const [revokeReason, setRevokeReason] = useState("");
+  const [busyReportLogId, setBusyReportLogId] = useState<number | null>(null);
 
   const load = async () => {
     if (entitlementId == null) return;
@@ -65,6 +68,45 @@ const EntitlementDrawer = ({ entitlementId, onClose, onChanged }: Props) => {
       onChanged();
     } catch (e: any) {
       showErrorToast(e?.response?.data || "Failed");
+    }
+  };
+
+  const handleRetryReport = async (logId: number) => {
+    setBusyReportLogId(logId);
+    try {
+      const res = await retryReportGeneration(logId);
+      const ok = res.data?.status === "resolved";
+      if (ok) {
+        showSuccessToast(
+          res.data.emailed
+            ? "Report regenerated and emailed"
+            : `Report regenerated (${res.data.emailMessage ?? "email not sent"})`
+        );
+      } else {
+        showSuccessToast("Retry submitted");
+      }
+      load();
+      onChanged();
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || e?.response?.data || "Retry failed";
+      showErrorToast(typeof msg === "string" ? msg : "Retry failed");
+    } finally {
+      setBusyReportLogId(null);
+    }
+  };
+
+  const handleDismissReport = async (logId: number) => {
+    const note = window.prompt("Dismiss reason (optional):") ?? undefined;
+    setBusyReportLogId(logId);
+    try {
+      await dismissReportError(logId, note);
+      showSuccessToast("Error dismissed");
+      load();
+      onChanged();
+    } catch (e: any) {
+      showErrorToast(e?.response?.data?.message ?? "Could not dismiss");
+    } finally {
+      setBusyReportLogId(null);
     }
   };
 
@@ -183,6 +225,87 @@ const EntitlementDrawer = ({ entitlementId, onClose, onChanged }: Props) => {
                 </tr>
               </tbody>
             </Table>
+
+            <hr />
+
+            <h6 className="mb-3">Report generation errors</h6>
+            {(data.reportErrors ?? []).length === 0 ? (
+              <p className="text-muted small mb-3">No report generation issues recorded for this entitlement.</p>
+            ) : (
+              <Table size="sm" striped className="align-middle mb-3">
+                <thead>
+                  <tr>
+                    <th>When</th>
+                    <th>Report</th>
+                    <th>Class</th>
+                    <th>Attempt</th>
+                    <th>Error</th>
+                    <th>Status</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data.reportErrors ?? []).map((err: any) => {
+                    const isResolved = err.status === "resolved";
+                    const isBusy = busyReportLogId === err.logId;
+                    return (
+                      <tr key={err.logId}>
+                        <td>{fmtDate(err.createdAt)}</td>
+                        <td>
+                          <span className={`badge bg-${err.reportType === "navigator" ? "info" : "primary"}`}>
+                            {err.reportType ?? "—"}
+                          </span>
+                        </td>
+                        <td>{err.studentClassAtAttempt ?? "—"}</td>
+                        <td><span className="badge bg-secondary">{err.attemptType}</span></td>
+                        <td style={{ maxWidth: 280 }}>
+                          <div className="text-truncate" title={err.errorMessage ?? ""} style={{ maxWidth: 280 }}>
+                            {err.errorMessage ?? "—"}
+                          </div>
+                          {err.errorClass && (
+                            <small className="text-muted d-block text-truncate" style={{ maxWidth: 280 }}>
+                              {err.errorClass}
+                            </small>
+                          )}
+                        </td>
+                        <td>
+                          {isResolved ? (
+                            <>
+                              <span className="badge bg-success">resolved</span>
+                              {err.resolvedBy && <small className="text-muted d-block">by {err.resolvedBy}</small>}
+                            </>
+                          ) : (
+                            <span className="badge bg-danger">failed</span>
+                          )}
+                        </td>
+                        <td>
+                          {!isResolved && (
+                            <div className="d-flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline-success"
+                                disabled={isBusy}
+                                onClick={() => handleRetryReport(err.logId)}
+                              >
+                                {isBusy ? <Spinner size="sm" animation="border" /> : "Retry"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline-secondary"
+                                disabled={isBusy}
+                                onClick={() => handleDismissReport(err.logId)}
+                              >
+                                Dismiss
+                              </Button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </Table>
+            )}
 
             <hr />
 

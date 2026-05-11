@@ -59,3 +59,24 @@ export function payForReport(body: {
 }) {
   return http.post('/campaign/public/pay-for-report', body)
 }
+
+/**
+ * Asks the backend to pre-generate and cache the student's detailed report
+ * so the next click on "Download Report" returns instantly. The endpoint
+ * dispatches to the BET or Navigator generator based on
+ * AssessmentTable.reportType + StudentInfo.studentClass (looked up server-side).
+ *
+ * Resolves with { status: "ready", reportType, reportUrl, studentClassUsed }
+ * on success. Rejects (HTTP 500 body { status: "failed", logId }) on
+ * generator failure; the failure is already logged to ReportGenerationLog
+ * and surfaced on the admin B2C Tracker.
+ */
+export function prepareReport(
+  entitlementId: number | string,
+  accessToken: string,
+  assessmentId: number | string,
+) {
+  return http.post('/bet-report-data/public/prepare', null, {
+    params: { e: entitlementId, t: accessToken, assessmentId },
+  })
+}
