@@ -1,11 +1,6 @@
 {
-<<<<<<< HEAD
-  "version": "mp10084b",
-  "generated": "2026-05-11T09:27:25.211Z",
-=======
-  "version": "mp0vvbih",
-  "generated": "2026-05-11T07:31:37.865Z",
->>>>>>> f73c2d2a385644d2b01e92a08cbfb75c0b4f0f99
+  "version": "mp10r70r",
+  "generated": "2026-05-11T09:48:23.499Z",
   "resources": [
     {
       "url": "/assessment-cache/43/config.json",
@@ -153,57 +148,32 @@
       "priority": "deferred"
     },
     {
-<<<<<<< HEAD
       "url": "/assets/HydroTubeGame-D_RGraoh.js",
-=======
-      "url": "/assets/HydroTubeGame-B2TC_UB4.js",
->>>>>>> f73c2d2a385644d2b01e92a08cbfb75c0b4f0f99
       "size": 23331,
       "priority": "critical"
     },
     {
-<<<<<<< HEAD
       "url": "/assets/JungleSpotGame-DwTQcu9G.js",
-=======
-      "url": "/assets/JungleSpotGame-BQTObGiF.js",
->>>>>>> f73c2d2a385644d2b01e92a08cbfb75c0b4f0f99
       "size": 23397,
       "priority": "critical"
     },
     {
-<<<<<<< HEAD
       "url": "/assets/RabbitPathGame-CwMyPoMT.js",
-=======
-      "url": "/assets/RabbitPathGame-L32zsYxe.js",
->>>>>>> f73c2d2a385644d2b01e92a08cbfb75c0b4f0f99
       "size": 26981,
       "priority": "critical"
     },
     {
-<<<<<<< HEAD
       "url": "/assets/SectionInstructionPage-B4LsAxx3.js",
-=======
-      "url": "/assets/SectionInstructionPage-BwYseNvQ.js",
->>>>>>> f73c2d2a385644d2b01e92a08cbfb75c0b4f0f99
       "size": 4206,
       "priority": "critical"
     },
     {
-<<<<<<< HEAD
       "url": "/assets/SectionQuestionPage-B0rI4CzB.js",
       "size": 173221,
       "priority": "critical"
     },
     {
       "url": "/assets/SelectSectionPage-Ul-Gd6sy.js",
-=======
-      "url": "/assets/SectionQuestionPage-CO5eYMgt.js",
-      "size": 173245,
-      "priority": "critical"
-    },
-    {
-      "url": "/assets/SelectSectionPage-BuBLzfyR.js",
->>>>>>> f73c2d2a385644d2b01e92a08cbfb75c0b4f0f99
       "size": 4583,
       "priority": "critical"
     },
@@ -228,13 +198,8 @@
       "priority": "critical"
     },
     {
-<<<<<<< HEAD
       "url": "/assets/index-UrnWL7xQ.js",
       "size": 387925,
-=======
-      "url": "/assets/index-gNBVmjYM.js",
-      "size": 391514,
->>>>>>> f73c2d2a385644d2b01e92a08cbfb75c0b4f0f99
       "priority": "critical"
     },
     {
@@ -280,11 +245,7 @@
   ],
   "summary": {
     "total": 48,
-<<<<<<< HEAD
     "totalSize": 24626663,
-=======
-    "totalSize": 24630211,
->>>>>>> f73c2d2a385644d2b01e92a08cbfb75c0b4f0f99
     "byPriority": {
       "assessment": {
         "count": 6,
@@ -300,11 +261,7 @@
       },
       "critical": {
         "count": 15,
-<<<<<<< HEAD
         "size": 2473284
-=======
-        "size": 2476886
->>>>>>> f73c2d2a385644d2b01e92a08cbfb75c0b4f0f99
       },
       "other": {
         "count": 4,

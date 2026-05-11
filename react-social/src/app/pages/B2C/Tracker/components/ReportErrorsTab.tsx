@@ -95,8 +95,9 @@ const ReportErrorsTab = ({
         <span className="text-muted small ms-2">{total} record{total === 1 ? "" : "s"}</span>
       </div>
 
-      <Table responsive hover size="sm" className="align-middle" style={{ minWidth: 1100 }}>
-        <thead>
+      <div className="table-responsive" style={{ maxHeight: "65vh", minHeight: 200 }}>
+      <Table hover size="sm" className="align-middle mb-0" style={{ minWidth: 1100 }}>
+        <thead className="position-sticky top-0 bg-white" style={{ zIndex: 2, boxShadow: "inset 0 -1px 0 #dee2e6" }}>
           <tr>
             <th style={{ whiteSpace: "nowrap" }}>When</th>
             <th style={{ minWidth: 160 }}>Student</th>
@@ -237,9 +238,10 @@ const ReportErrorsTab = ({
           })}
         </tbody>
       </Table>
+      </div>
 
       {totalPages > 1 && (
-        <Pagination className="justify-content-center mb-0 flex-wrap">
+        <Pagination className="justify-content-center mb-0 mt-3 flex-wrap">
           <Pagination.First disabled={page === 0} onClick={() => onPageChange(0)} />
           <Pagination.Prev disabled={page === 0} onClick={() => onPageChange(Math.max(0, page - 1))} />
           <Pagination.Item active>{page + 1} / {totalPages}</Pagination.Item>

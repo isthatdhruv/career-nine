@@ -132,10 +132,10 @@ const EntitlementDrawer = ({ entitlementId, onClose, onChanged }: Props) => {
         {loading && <Spinner animation="border" />}
         {!loading && data && (
           <>
-            <div className="row mb-3">
-              <div className="col-md-6">
+            <div className="row mb-3 g-3">
+              <div className="col-12 col-md-6">
                 <h5>{data.studentName ?? "—"}</h5>
-                <div className="text-muted">{data.studentEmail} {data.studentPhone ? `· ${data.studentPhone}` : ""}</div>
+                <div className="text-muted text-break">{data.studentEmail} {data.studentPhone ? `· ${data.studentPhone}` : ""}</div>
                 <div className="mt-2">
                   <strong>{data.campaignName ?? "—"}</strong> · {data.assessmentName}
                 </div>
@@ -146,13 +146,13 @@ const EntitlementDrawer = ({ entitlementId, onClose, onChanged }: Props) => {
                   Granted: {fmtDate(data.grantedAt)} · Expires: {fmtDate(data.expiresAt)}
                 </div>
               </div>
-              <div className="col-md-6">
-                <div className="text-end">
+              <div className="col-12 col-md-6">
+                <div className="text-md-end">
                   <span className={`badge bg-${data.status === "active" ? "success" : "secondary"} fs-6`}>
                     {data.status}
                   </span>
                 </div>
-                <div className="mt-2 text-end">
+                <div className="mt-2 text-md-end">
                   Paid: <strong>{fmtINR(data.paidAmount)}</strong>
                   {data.payment?.razorpayPaymentId && <><br /><small className="text-muted">{data.payment.razorpayPaymentId}</small></>}
                 </div>
@@ -162,7 +162,7 @@ const EntitlementDrawer = ({ entitlementId, onClose, onChanged }: Props) => {
             <hr />
 
             <h6 className="mb-3">Services</h6>
-            <Table size="sm" className="align-middle">
+            <Table responsive size="sm" className="align-middle" style={{ minWidth: 480 }}>
               <thead>
                 <tr><th>Service</th><th>Status</th><th>Action</th></tr>
               </thead>
@@ -232,16 +232,16 @@ const EntitlementDrawer = ({ entitlementId, onClose, onChanged }: Props) => {
             {(data.reportErrors ?? []).length === 0 ? (
               <p className="text-muted small mb-3">No report generation issues recorded for this entitlement.</p>
             ) : (
-              <Table size="sm" striped className="align-middle mb-3">
+              <Table responsive size="sm" striped className="align-middle mb-3" style={{ minWidth: 720 }}>
                 <thead>
                   <tr>
-                    <th>When</th>
-                    <th>Report</th>
-                    <th>Class</th>
-                    <th>Attempt</th>
+                    <th style={{ whiteSpace: "nowrap" }}>When</th>
+                    <th style={{ whiteSpace: "nowrap" }}>Report</th>
+                    <th style={{ whiteSpace: "nowrap" }}>Class</th>
+                    <th style={{ whiteSpace: "nowrap" }}>Attempt</th>
                     <th>Error</th>
-                    <th>Status</th>
-                    <th></th>
+                    <th style={{ whiteSpace: "nowrap" }}>Status</th>
+                    <th style={{ minWidth: 140 }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -309,18 +309,18 @@ const EntitlementDrawer = ({ entitlementId, onClose, onChanged }: Props) => {
 
             <hr />
 
-            <div className="row">
-              <div className="col-md-6 mb-3">
+            <div className="row g-3">
+              <div className="col-12 col-md-6 mb-3">
                 <h6>Extend expiry</h6>
-                <div className="d-flex gap-2">
-                  <Form.Control size="sm" placeholder="dd-MM-yyyy" value={extendDate} onChange={e => setExtendDate(e.target.value)} />
+                <div className="d-flex flex-wrap gap-2">
+                  <Form.Control size="sm" placeholder="dd-MM-yyyy" value={extendDate} onChange={e => setExtendDate(e.target.value)} style={{ minWidth: 140, flex: 1 }} />
                   <Button size="sm" variant="primary" disabled={!extendDate} onClick={handleExtend}>Extend</Button>
                 </div>
               </div>
-              <div className="col-md-6 mb-3">
+              <div className="col-12 col-md-6 mb-3">
                 <h6>Revoke entitlement</h6>
-                <div className="d-flex gap-2">
-                  <Form.Control size="sm" placeholder="reason (optional)" value={revokeReason} onChange={e => setRevokeReason(e.target.value)} />
+                <div className="d-flex flex-wrap gap-2">
+                  <Form.Control size="sm" placeholder="reason (optional)" value={revokeReason} onChange={e => setRevokeReason(e.target.value)} style={{ minWidth: 140, flex: 1 }} />
                   <Button size="sm" variant="danger" onClick={handleRevoke}>Revoke</Button>
                 </div>
               </div>
@@ -329,8 +329,8 @@ const EntitlementDrawer = ({ entitlementId, onClose, onChanged }: Props) => {
             <hr />
 
             <h6 className="mb-3">Communications log</h6>
-            <Table size="sm" striped className="align-middle">
-              <thead><tr><th>When</th><th>Service</th><th>Channel</th><th>To</th><th>Status</th></tr></thead>
+            <Table responsive size="sm" striped className="align-middle" style={{ minWidth: 600 }}>
+              <thead><tr><th style={{ whiteSpace: "nowrap" }}>When</th><th style={{ whiteSpace: "nowrap" }}>Service</th><th style={{ whiteSpace: "nowrap" }}>Channel</th><th>To</th><th style={{ whiteSpace: "nowrap" }}>Status</th></tr></thead>
               <tbody>
                 {(data.communications ?? []).length === 0 && (
                   <tr><td colSpan={5} className="text-center text-muted py-3">No communications yet.</td></tr>
