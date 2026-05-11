@@ -16,7 +16,7 @@ echo "[$(date)] Syncing $MASTER_DB → $STAGING_DB ..."
 # Dump master
 echo "Dumping master..."
 mysqldump -h 127.0.0.1 -P $MASTER_PORT -u $DB_USER -p"$DB_PASSWORD" \
-  --single-transaction --routines --triggers \
+  --single-transaction --routines --triggers --set-gtid-purged=OFF \
   "$MASTER_DB" > "$DUMP_FILE"
 
 if [ $? -ne 0 ]; then
