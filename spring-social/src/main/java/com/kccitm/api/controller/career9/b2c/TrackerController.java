@@ -69,6 +69,8 @@ public class TrackerController {
     @Autowired private ReportGenerationLogRepository reportGenerationLogRepository;
     @Autowired private ReportPreparationService reportPreparationService;
     @Autowired private com.kccitm.api.service.b2c.EntitlementService entitlementService;
+    @Autowired(required = false) private com.kccitm.api.service.RazorpayService razorpayService;
+    @Autowired(required = false) private com.kccitm.api.controller.career9.PaymentWebhookController paymentWebhookController;
 
     private static final int MAX_PAGE_SIZE = 200;
 
@@ -504,6 +506,115 @@ public class TrackerController {
         response.put("paymentLinkUrl", opt.get().getShortUrl());
         response.put("status", opt.get().getStatus());
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Reconciles a single transaction against Razorpay. Used when the
+     * {@code payment_link.paid} webhook never landed (or arrived after a
+     * provisioning crash) and the txn is stuck in {@code "created"}. Calls
+     * Razorpay's {@code GET /payment_links/{id}} for the source-of-truth
+     * status; if Razorpay reports {@code paid}, runs the same mark-paid +
+     * provision pipeline the webhook would have, so the operator sees the
+     * txn flip plus the linked student/entitlement get created in one click.
+     */
+    @PostMapping("/payments/{transactionId}/check-status")
+    public ResponseEntity<?> checkPaymentStatus(@PathVariable Long transactionId) {
+        Optional<PaymentTransaction> opt = paymentTransactionRepository.findById(transactionId);
+        if (!opt.isPresent()) return ResponseEntity.notFound().build();
+        PaymentTransaction txn = opt.get();
+
+        if (razorpayService == null) {
+            return ResponseEntity.status(503)
+                    .body(Map.of("status", "error", "message", "Razorpay is not configured on this deployment"));
+        }
+        String linkId = txn.getRazorpayLinkId();
+        if (linkId == null || linkId.isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("status", "error", "message",
+                            "This transaction has no Razorpay link id — nothing to check."));
+        }
+
+        org.json.JSONObject link;
+        try {
+            link = razorpayService.fetchPaymentLink(linkId);
+        } catch (Exception e) {
+            return ResponseEntity.status(502).body(Map.of(
+                    "status", "error",
+                    "message", "Could not fetch payment link from Razorpay: " + e.getMessage()));
+        }
+
+        String razorpayStatus = link.optString("status", null);
+        String previousStatus = txn.getStatus();
+        boolean changed = false;
+        String message;
+
+        if ("paid".equals(razorpayStatus)) {
+            org.json.JSONObject paymentEntity = pickPaidPayment(link);
+            if (paymentWebhookController == null) {
+                // Fallback: at minimum flip the status so the operator sees it
+                // paid even if provisioning has to be redriven manually.
+                txn.setStatus("paid");
+                if (paymentEntity != null && paymentEntity.has("id")) {
+                    txn.setRazorpayPaymentId(paymentEntity.getString("id"));
+                }
+                paymentTransactionRepository.save(txn);
+                changed = !"paid".equals(previousStatus);
+                message = "Marked paid (provisioning skipped — webhook controller not wired)";
+            } else {
+                org.json.JSONObject notes = link.optJSONObject("notes");
+                changed = paymentWebhookController.markPaidAndProvision(txn, paymentEntity, notes);
+                message = changed
+                        ? "Razorpay reports paid — synced status and provisioned entitlement"
+                        : "Already paid in DB; nothing changed";
+            }
+        } else if (razorpayStatus != null && !razorpayStatus.equals(previousStatus)
+                && !"paid".equals(previousStatus)) {
+            // Sync non-terminal status flips (expired, cancelled). Never
+            // downgrade a "paid" txn just because the link expired later.
+            if ("expired".equals(razorpayStatus) || "cancelled".equals(razorpayStatus)) {
+                txn.setStatus(razorpayStatus);
+                paymentTransactionRepository.save(txn);
+                changed = true;
+                message = "Synced status to " + razorpayStatus + " from Razorpay";
+            } else {
+                message = "Razorpay reports " + razorpayStatus + " — no DB change needed";
+            }
+        } else {
+            message = razorpayStatus == null
+                    ? "Razorpay returned no status for this link"
+                    : "Razorpay reports " + razorpayStatus + " — no DB change needed";
+        }
+
+        Optional<StudentEntitlement> eOpt = entitlementRepository.findByPaymentTransactionId(transactionId);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("transactionId", transactionId);
+        response.put("previousStatus", previousStatus);
+        response.put("status", txn.getStatus());
+        response.put("razorpayStatus", razorpayStatus);
+        response.put("changed", changed);
+        response.put("message", message);
+        response.put("entitlementId", eOpt.map(StudentEntitlement::getEntitlementId).orElse(null));
+        response.put("entitlementStatus", eOpt.map(StudentEntitlement::getStatus).orElse(null));
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Picks the first captured/authorized payment from a payment-link response
+     * (Razorpay returns a {@code payments[]} array on the link entity). Returns
+     * null if no eligible payment is on the link — caller is expected to fall
+     * back to a status-only update in that case.
+     */
+    private org.json.JSONObject pickPaidPayment(org.json.JSONObject link) {
+        org.json.JSONArray payments = link.optJSONArray("payments");
+        if (payments == null) return null;
+        for (int i = 0; i < payments.length(); i++) {
+            org.json.JSONObject p = payments.optJSONObject(i);
+            if (p == null) continue;
+            String s = p.optString("status", "");
+            if ("captured".equals(s) || "authorized".equals(s)) return p;
+        }
+        return payments.length() > 0 ? payments.optJSONObject(0) : null;
     }
 
     /**

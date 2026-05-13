@@ -160,6 +160,22 @@ export const resendPaymentLink = (transactionId: number) =>
 export const resetPayment = (transactionId: number, reason?: string, resetBy?: string) =>
   axios.post(`${API_URL}/admin/tracker/payments/${transactionId}/reset`, { reason, resetBy });
 
+export type CheckPaymentStatusResponse = {
+  transactionId: number;
+  previousStatus?: string;
+  status: string;
+  razorpayStatus?: string | null;
+  changed: boolean;
+  message: string;
+  entitlementId?: number | null;
+  entitlementStatus?: string | null;
+};
+
+export const checkPaymentStatus = (transactionId: number) =>
+  axios.post<CheckPaymentStatusResponse>(
+    `${API_URL}/admin/tracker/payments/${transactionId}/check-status`,
+  );
+
 export const sendPaymentLinkEmail = (
   transactionId: number,
   email: string,

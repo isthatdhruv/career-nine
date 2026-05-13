@@ -258,46 +258,66 @@ public class PaymentWebhookController {
         }
 
         PaymentTransaction txn = txnOpt.get();
-
-        // Idempotency: skip if already processed
-        if ("paid".equals(txn.getStatus())) {
-            logger.info("Duplicate payment_link.paid webhook for linkId: {}, skipping", linkId);
-            return;
-        }
-
         JSONObject payment = payloadObj.getJSONObject("payment").getJSONObject("entity");
-        txn.setRazorpayPaymentId(payment.getString("id"));
-        if (payment.has("order_id") && !payment.isNull("order_id")) {
-            txn.setRazorpayOrderId(payment.getString("order_id"));
-        }
-        txn.setStatus("paid");
+        markPaidAndProvision(txn, payment, paymentLink.optJSONObject("notes"));
+    }
 
-        // Only fill from Razorpay payload if registration didn't already capture these
-        if ((txn.getStudentEmail() == null || txn.getStudentEmail().isEmpty())
-                && payment.has("email") && !payment.isNull("email")) {
-            txn.setStudentEmail(payment.getString("email"));
-        }
-        if ((txn.getStudentPhone() == null || txn.getStudentPhone().isEmpty())
-                && payment.has("contact") && !payment.isNull("contact")) {
-            txn.setStudentPhone(payment.getString("contact"));
+    /**
+     * Shared "mark-paid + provision student + activate entitlement" path.
+     * Used by:
+     *   - the {@code payment_link.paid} webhook (real-time, primary)
+     *   - the admin "Check status" action on the B2C Tracker, which fetches
+     *     Razorpay's view of a stuck transaction and reconciles when the
+     *     webhook was missed/delayed
+     *
+     * Idempotent: returns immediately when the txn is already marked paid.
+     * Inputs may be partial — paymentEntity / notes are optional. When
+     * Razorpay reports a paid link without a matching payment object (rare,
+     * old links), we still mark the txn paid and provision so the student
+     * isn't stuck.
+     */
+    @Transactional
+    public boolean markPaidAndProvision(PaymentTransaction txn,
+                                        JSONObject paymentEntity,
+                                        JSONObject linkNotes) {
+        if ("paid".equals(txn.getStatus())) {
+            logger.info("markPaidAndProvision: txn {} already paid, skipping", txn.getTransactionId());
+            return false;
         }
 
-        JSONObject notes = paymentLink.optJSONObject("notes");
-        if (notes != null) {
-            if ((txn.getStudentName() == null || txn.getStudentName().isEmpty())
-                    && notes.has("customerName")) {
-                txn.setStudentName(notes.getString("customerName"));
+        if (paymentEntity != null) {
+            if (paymentEntity.has("id") && !paymentEntity.isNull("id")) {
+                txn.setRazorpayPaymentId(paymentEntity.getString("id"));
             }
-            if (txn.getStudentDob() == null && notes.has("customerDob")) {
+            if (paymentEntity.has("order_id") && !paymentEntity.isNull("order_id")) {
+                txn.setRazorpayOrderId(paymentEntity.getString("order_id"));
+            }
+            if ((txn.getStudentEmail() == null || txn.getStudentEmail().isEmpty())
+                    && paymentEntity.has("email") && !paymentEntity.isNull("email")) {
+                txn.setStudentEmail(paymentEntity.getString("email"));
+            }
+            if ((txn.getStudentPhone() == null || txn.getStudentPhone().isEmpty())
+                    && paymentEntity.has("contact") && !paymentEntity.isNull("contact")) {
+                txn.setStudentPhone(paymentEntity.getString("contact"));
+            }
+        }
+
+        if (linkNotes != null) {
+            if ((txn.getStudentName() == null || txn.getStudentName().isEmpty())
+                    && linkNotes.has("customerName")) {
+                txn.setStudentName(linkNotes.getString("customerName"));
+            }
+            if (txn.getStudentDob() == null && linkNotes.has("customerDob")) {
                 try {
                     SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
-                    txn.setStudentDob(sdf.parse(notes.getString("customerDob")));
+                    txn.setStudentDob(sdf.parse(linkNotes.getString("customerDob")));
                 } catch (Exception e) {
                     logger.warn("Could not parse customer DOB from notes");
                 }
             }
         }
 
+        txn.setStatus("paid");
         paymentTransactionRepository.save(txn);
 
         // Branch: B2C (campaign-linked) vs legacy school payment.
@@ -306,6 +326,7 @@ public class PaymentWebhookController {
         } else {
             createStudentAndAllotAssessment(txn);
         }
+        return true;
     }
 
     private void provisionB2CStudentAndEntitlement(PaymentTransaction txn) {

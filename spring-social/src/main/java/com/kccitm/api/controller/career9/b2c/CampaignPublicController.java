@@ -65,6 +65,7 @@ public class CampaignPublicController {
     @Autowired private PaymentTransactionRepository paymentTransactionRepository;
     @Autowired private StudentInfoRepository studentInfoRepository;
     @Autowired private UserRepository userRepository;
+    @Autowired private com.kccitm.api.repository.InstituteDetailRepository instituteDetailRepository;
     @Autowired private UserStudentRepository userStudentRepository;
     @Autowired private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
     @Autowired private RazorpayService razorpayService;
@@ -284,10 +285,8 @@ public class CampaignPublicController {
         if (existing != null) {
             Date existingDob = existing.getStudentDob();
             if (existingDob == null || !sameDay(existingDob, dob)) {
-                return ResponseEntity.badRequest().body(java.util.Map.of(
-                    "status", "error",
-                    "message", "This email is already registered with a different date of birth. " +
-                               "If this is your account, please use your registered date of birth."));
+                return ResponseEntity.badRequest().body(
+                        com.kccitm.api.util.DuplicateEmailResponse.build(existing, instituteDetailRepository));
             }
         }
 
@@ -358,10 +357,8 @@ public class CampaignPublicController {
         if (existing != null) {
             Date existingDob = existing.getStudentDob();
             if (existingDob == null || !sameDay(existingDob, dob)) {
-                return ResponseEntity.badRequest().body(java.util.Map.of(
-                    "status", "error",
-                    "message", "This email is already registered with a different date of birth. " +
-                               "If this is your account, please use your registered date of birth."));
+                return ResponseEntity.badRequest().body(
+                        com.kccitm.api.util.DuplicateEmailResponse.build(existing, instituteDetailRepository));
             }
         }
 
