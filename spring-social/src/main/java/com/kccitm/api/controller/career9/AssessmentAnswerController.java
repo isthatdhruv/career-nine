@@ -131,6 +131,96 @@ public class AssessmentAnswerController {
         return assessmentAnswerRepository.findByUserStudent(userStudent);
     }
 
+    /**
+     * Admin/debug endpoint: returns every answer recorded for a student on a
+     * single assessment, grouped by question, with question + option text
+     * already resolved. Also surfaces:
+     *   - the StudentAssessmentMapping status (so we can tell ongoing vs completed)
+     *   - the Redis partial-answer count when an attempt is still in-flight
+     *
+     * Used by the B2C Tracker drawer's "View answers" button — works for both
+     * ongoing and completed attempts (whatever is in the DB is what shows).
+     */
+    @GetMapping(value = "/admin-view/{userStudentId}/{assessmentId}", headers = "Accept=application/json")
+    public ResponseEntity<?> adminViewAnswers(@PathVariable Long userStudentId,
+                                              @PathVariable Long assessmentId) {
+        UserStudent student = userStudentRepository.findById(userStudentId).orElse(null);
+        if (student == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Student not found"));
+        }
+        AssessmentTable assessment = assessmentTableRepository.findById(assessmentId).orElse(null);
+        if (assessment == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Assessment not found"));
+        }
+
+        List<AssessmentAnswer> rows = assessmentAnswerRepository
+                .findByAssessmentIdAndStudentIdForExport(assessmentId, userStudentId);
+
+        // Group by question so the UI can render one card per question with
+        // the chosen options underneath (multi-select / ranking produces
+        // multiple rows for the same questionnaireQuestionId).
+        Map<Long, Map<String, Object>> byQuestion = new LinkedHashMap<>();
+        for (AssessmentAnswer a : rows) {
+            QuestionnaireQuestion qq = a.getQuestionnaireQuestion();
+            Long qqId = qq != null ? qq.getQuestionnaireQuestionId() : null;
+            Map<String, Object> group = byQuestion.computeIfAbsent(qqId, k -> {
+                Map<String, Object> g = new LinkedHashMap<>();
+                g.put("questionnaireQuestionId", qqId);
+                AssessmentQuestions question = qq != null ? qq.getQuestion() : null;
+                g.put("questionText", question != null ? question.getQuestionText() : null);
+                g.put("questionType", question != null ? question.getQuestionType() : null);
+                QuestionnaireSection section = qq != null ? qq.getSection() : null;
+                QuestionSection inner = section != null ? section.getSection() : null;
+                g.put("sectionName", inner != null ? inner.getSectionName() : null);
+                g.put("orderIndex", qq != null ? qq.getOrder() : null);
+                g.put("selections", new ArrayList<Map<String, Object>>());
+                return g;
+            });
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> selections = (List<Map<String, Object>>) group.get("selections");
+            Map<String, Object> sel = new LinkedHashMap<>();
+            AssessmentQuestionOptions opt = a.getOption();
+            sel.put("optionId", opt != null ? opt.getOptionId() : null);
+            sel.put("optionText", opt != null ? opt.getOptionText() : null);
+            sel.put("rankOrder", a.getRankOrder());
+            sel.put("textResponse", a.getTextResponse());
+            AssessmentQuestionOptions mapped = a.getMappedOption();
+            if (mapped != null) {
+                sel.put("mappedOptionId", mapped.getOptionId());
+                sel.put("mappedOptionText", mapped.getOptionText());
+            }
+            selections.add(sel);
+        }
+
+        StudentAssessmentMapping mapping = studentAssessmentMappingRepository
+                .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                .orElse(null);
+
+        Map<String, Object> partial = assessmentSessionService
+                .getPartialAnswers(userStudentId, assessmentId);
+        Integer partialAnswerCount = null;
+        if (partial != null && partial.get("answers") instanceof List) {
+            partialAnswerCount = ((List<?>) partial.get("answers")).size();
+        }
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("userStudentId", userStudentId);
+        body.put("assessmentId", assessmentId);
+        body.put("assessmentName", assessment.getAssessmentName());
+        body.put("studentName", student.getStudentInfo() != null
+                ? student.getStudentInfo().getName() : null);
+        body.put("status", mapping != null ? mapping.getStatus() : "not_started");
+        body.put("persistenceState", mapping != null ? mapping.getPersistenceState() : null);
+        body.put("totalQuestions", completionService.getTotalQuestions(assessmentId));
+        body.put("answeredQuestions", byQuestion.size());
+        body.put("hasRedisDraft", partial != null);
+        body.put("redisAnswerCount", partialAnswerCount);
+        body.put("questions", new ArrayList<>(byQuestion.values()));
+        return ResponseEntity.ok(body);
+    }
+
     @GetMapping(value = "/getAll", headers = "Accept=application/json")
     public List<AssessmentAnswer> getAllAssessmentAnswers() {
         return assessmentAnswerRepository.findAll();

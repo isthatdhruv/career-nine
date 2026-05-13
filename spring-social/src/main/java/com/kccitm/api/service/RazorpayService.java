@@ -113,6 +113,29 @@ public class RazorpayService {
         return result;
     }
 
+    /**
+     * Queries Razorpay for the current state of a previously-created payment
+     * link. Used by the admin "Check status" action in the B2C Tracker — when
+     * a webhook is missed or delayed, the operator can manually reconcile a
+     * stuck "created" transaction against Razorpay's source of truth.
+     *
+     * Returns the raw JSON from {@code GET /payment_links/{id}}. The caller is
+     * responsible for inspecting {@code status} (typically "created" /
+     * "partially_paid" / "paid" / "expired" / "cancelled") and the
+     * {@code payments} array on the response when status is "paid".
+     */
+    public JSONObject fetchPaymentLink(String linkId) throws Exception {
+        if (linkId == null || linkId.isEmpty()) {
+            throw new IllegalArgumentException("linkId is required");
+        }
+        HttpEntity<Void> entity = new HttpEntity<>(getAuthHeaders());
+        ResponseEntity<String> response = restTemplate.exchange(
+                RAZORPAY_API_URL + "/" + linkId,
+                org.springframework.http.HttpMethod.GET,
+                entity, String.class);
+        return new JSONObject(response.getBody());
+    }
+
     public boolean verifyWebhookSignature(String payload, String signature) {
         try {
             if (webhookSecret == null || webhookSecret.isEmpty()) {

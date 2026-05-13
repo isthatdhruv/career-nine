@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { Button, Form, Modal, Spinner, Table } from "react-bootstrap";
 import { showErrorToast, showSuccessToast } from "../../../../utils/toast";
 import {
+  AdminAnswersResponse,
   dismissReportError,
   extendEntitlement,
   getAllotmentDetail,
+  getStudentAssessmentAnswers,
   resendEntitlementService,
   retryReportGeneration,
   revokeEntitlement,
@@ -26,6 +28,9 @@ const EntitlementDrawer = ({ entitlementId, onClose, onChanged }: Props) => {
   const [extendDate, setExtendDate] = useState("");
   const [revokeReason, setRevokeReason] = useState("");
   const [busyReportLogId, setBusyReportLogId] = useState<number | null>(null);
+  const [answersOpen, setAnswersOpen] = useState(false);
+  const [answersLoading, setAnswersLoading] = useState(false);
+  const [answers, setAnswers] = useState<AdminAnswersResponse | null>(null);
 
   const load = async () => {
     if (entitlementId == null) return;
@@ -123,6 +128,45 @@ const EntitlementDrawer = ({ entitlementId, onClose, onChanged }: Props) => {
     }
   };
 
+  const handleViewAnswers = async () => {
+    if (!data?.userStudentId || !data?.assessmentId) {
+      showErrorToast("Missing student / assessment IDs");
+      return;
+    }
+    setAnswersOpen(true);
+    setAnswersLoading(true);
+    setAnswers(null);
+    try {
+      const res = await getStudentAssessmentAnswers(data.userStudentId, data.assessmentId);
+      setAnswers(res.data);
+    } catch (e: any) {
+      showErrorToast(e?.response?.data?.error || e?.response?.data || "Failed to load answers");
+      setAnswersOpen(false);
+    } finally {
+      setAnswersLoading(false);
+    }
+  };
+
+  // Opens the assessment app's /studentAssessment/completed page for this
+  // student, passing the IDs via query params so the ThankYouPage can
+  // bootstrap upgrade-info + report generation without an in-progress
+  // assessment session. Testing aid only.
+  const handleOpenCompletedPage = () => {
+    if (!data?.entitlementId || !data?.userStudentId || !data?.assessmentId) {
+      showErrorToast("Missing entitlement / student / assessment IDs");
+      return;
+    }
+    const base =
+      process.env.REACT_APP_ASSESSMENT_APP_URL ||
+      "https://assessment.career-9.com";
+    const url =
+      `${base}/studentAssessment/completed` +
+      `?e=${data.entitlementId}` +
+      `&userStudentId=${data.userStudentId}` +
+      `&assessmentId=${data.assessmentId}`;
+    window.open(url, "_blank", "noopener");
+  };
+
   return (
     <Modal show={entitlementId != null} onHide={onClose} size="xl" scrollable>
       <Modal.Header closeButton>
@@ -171,11 +215,23 @@ const EntitlementDrawer = ({ entitlementId, onClose, onChanged }: Props) => {
                   <td>Assessment</td>
                   <td>{data.assessment?.status ?? "no mapping"}</td>
                   <td>
-                    <Button size="sm" variant="outline-primary"
-                      disabled={busyService === "assessment_invite"}
-                      onClick={() => handleResend("assessment_invite")}>
-                      {busyService === "assessment_invite" ? <Spinner size="sm" animation="border" /> : "Resend assessment link"}
-                    </Button>
+                    <div className="d-flex gap-2 flex-wrap">
+                      <Button size="sm" variant="outline-primary"
+                        disabled={busyService === "assessment_invite"}
+                        onClick={() => handleResend("assessment_invite")}>
+                        {busyService === "assessment_invite" ? <Spinner size="sm" animation="border" /> : "Resend assessment link"}
+                      </Button>
+                      <Button size="sm" variant="outline-info"
+                        onClick={handleOpenCompletedPage}
+                        title="Opens /studentAssessment/completed for this student in a new tab — same flow as a real submission (upgrade tiers, report generation, etc.)">
+                        Open completed page (test)
+                      </Button>
+                      <Button size="sm" variant="outline-secondary"
+                        onClick={handleViewAnswers}
+                        title="Shows every answer this student has submitted so far. Works for both ongoing and completed attempts.">
+                        View answers
+                      </Button>
+                    </div>
                   </td>
                 </tr>
                 <tr>
@@ -352,8 +408,126 @@ const EntitlementDrawer = ({ entitlementId, onClose, onChanged }: Props) => {
       <Modal.Footer>
         <Button variant="secondary" onClick={onClose}>Close</Button>
       </Modal.Footer>
+
+      <AnswersModal
+        show={answersOpen}
+        loading={answersLoading}
+        answers={answers}
+        onHide={() => setAnswersOpen(false)}
+      />
     </Modal>
   );
 };
+
+interface AnswersModalProps {
+  show: boolean;
+  loading: boolean;
+  answers: AdminAnswersResponse | null;
+  onHide: () => void;
+}
+
+const renderSelections = (q: AdminAnswersResponse["questions"][number]) => {
+  if (!q.selections || q.selections.length === 0) {
+    return <span className="text-muted fst-italic">— no selections recorded —</span>;
+  }
+  const isRanking = q.selections.some(s => s.rankOrder != null);
+  const ordered = isRanking
+    ? [...q.selections].sort((a, b) => (a.rankOrder ?? 0) - (b.rankOrder ?? 0))
+    : q.selections;
+
+  return (
+    <ul className="list-unstyled mb-0">
+      {ordered.map((s, idx) => (
+        <li key={`${s.optionId ?? "txt"}-${idx}`} className="mb-1">
+          {s.rankOrder != null && (
+            <span className="badge bg-secondary me-2">#{s.rankOrder}</span>
+          )}
+          {s.optionText && <span>{s.optionText}</span>}
+          {s.textResponse && (
+            <div className="ms-3 small text-muted">
+              <em>Text:</em> {s.textResponse}
+              {s.mappedOptionText && (
+                <span className="ms-2 text-success">→ mapped to "{s.mappedOptionText}"</span>
+              )}
+            </div>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+};
+
+const AnswersModal = ({ show, loading, answers, onHide }: AnswersModalProps) => (
+  <Modal show={show} onHide={onHide} size="lg" scrollable>
+    <Modal.Header closeButton>
+      <Modal.Title>
+        Student answers
+        {answers?.studentName && <small className="text-muted ms-2">· {answers.studentName}</small>}
+      </Modal.Title>
+    </Modal.Header>
+    <Modal.Body>
+      {loading && (
+        <div className="text-center py-4">
+          <Spinner animation="border" />
+        </div>
+      )}
+      {!loading && answers && (
+        <>
+          <div className="mb-3 small text-muted d-flex flex-wrap gap-3">
+            <span><strong>Assessment:</strong> {answers.assessmentName ?? answers.assessmentId}</span>
+            <span><strong>Status:</strong>{" "}
+              <span className={`badge bg-${answers.status === "completed" ? "success" : answers.status === "ongoing" ? "warning" : "secondary"}`}>
+                {answers.status}
+              </span>
+            </span>
+            <span><strong>Answered:</strong> {answers.answeredQuestions} / {answers.totalQuestions}</span>
+            {answers.hasRedisDraft && (
+              <span>
+                <strong>Redis draft:</strong>{" "}
+                <span className="badge bg-info">{answers.redisAnswerCount ?? "?"} entries (in flight)</span>
+              </span>
+            )}
+          </div>
+
+          {answers.questions.length === 0 ? (
+            <p className="text-muted">No answers persisted yet. {answers.hasRedisDraft && "Draft data exists in Redis but hasn't been flushed to the DB."}</p>
+          ) : (
+            <Table size="sm" striped className="align-middle">
+              <thead>
+                <tr>
+                  <th style={{ width: 60 }}>#</th>
+                  <th>Question</th>
+                  <th style={{ width: "45%" }}>Answer</th>
+                </tr>
+              </thead>
+              <tbody>
+                {answers.questions.map((q, idx) => (
+                  <tr key={q.questionnaireQuestionId}>
+                    <td>
+                      <div>{q.orderIndex ?? idx + 1}</div>
+                      {q.sectionName && (
+                        <small className="text-muted d-block">{q.sectionName}</small>
+                      )}
+                    </td>
+                    <td>
+                      <div>{q.questionText ?? "—"}</div>
+                      {q.questionType && (
+                        <small className="text-muted">{q.questionType}</small>
+                      )}
+                    </td>
+                    <td>{renderSelections(q)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </>
+      )}
+    </Modal.Body>
+    <Modal.Footer>
+      <Button variant="secondary" onClick={onHide}>Close</Button>
+    </Modal.Footer>
+  </Modal>
+);
 
 export default EntitlementDrawer;

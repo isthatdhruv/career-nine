@@ -5,6 +5,7 @@ import {
   InstituteOption,
   PaymentRow,
   assignStudentInstitute,
+  checkPaymentStatus,
   resendEntitlementService,
   resetPayment,
   sendPaymentLinkEmail,
@@ -110,6 +111,26 @@ const PaymentsTab = ({
       showSuccessToast("Payment link copied to clipboard");
     } catch {
       showErrorToast("Could not copy link to clipboard");
+    }
+  };
+
+  const handleCheckStatus = async (r: PaymentRow) => {
+    setBusy({ id: r.transactionId, type: "check_status" });
+    try {
+      const res = await checkPaymentStatus(r.transactionId);
+      const { status, previousStatus, razorpayStatus, changed, message } = res.data;
+      if (changed && status === "paid") {
+        showSuccessToast(`Txn #${r.transactionId}: ${previousStatus ?? "?"} → paid (synced from Razorpay)`);
+      } else if (changed) {
+        showSuccessToast(`Txn #${r.transactionId}: ${previousStatus ?? "?"} → ${status}`);
+      } else {
+        showSuccessToast(`Razorpay: ${razorpayStatus ?? "—"} · ${message}`);
+      }
+      onInstituteChanged?.();
+    } catch (e: any) {
+      showErrorToast(e?.response?.data?.message ?? e?.response?.data ?? "Failed to check status");
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -276,6 +297,19 @@ const PaymentsTab = ({
                       ? <Button size="sm" variant="outline-primary" onClick={() => onOpenEntitlement(r.entitlementId!)}>Manage</Button>
                       : (r.shortUrl && <a href={r.shortUrl} target="_blank" rel="noreferrer" className="btn btn-sm btn-outline-secondary">Open link</a>)
                     }
+                    {r.status !== "paid" && r.status !== "refunded" && (
+                      <Button
+                        size="sm"
+                        variant="outline-primary"
+                        title="Ask Razorpay for the live status of this payment link. If Razorpay reports paid, the txn will flip to paid and the entitlement will be provisioned."
+                        disabled={busy?.id === r.transactionId && busy.type === "check_status"}
+                        onClick={() => handleCheckStatus(r)}
+                      >
+                        {busy?.id === r.transactionId && busy.type === "check_status"
+                          ? <Spinner animation="border" size="sm" />
+                          : "Check status"}
+                      </Button>
+                    )}
                     {r.status && r.status !== "created" && (
                       <Button
                         size="sm"
