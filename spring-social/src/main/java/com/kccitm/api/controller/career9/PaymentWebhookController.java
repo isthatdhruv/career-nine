@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.User;
@@ -127,9 +128,19 @@ public class PaymentWebhookController {
      *
      * Returns the actual DB status (set by webhook), not the query param from Razorpay redirect.
      * Frontend polls until status != "created" (i.e., webhook has arrived and updated it).
+     *
+     * When called with {@code ?reconcile=1}, and the DB still shows "created"
+     * (i.e. webhook hasn't landed yet), we synchronously ask Razorpay for the
+     * authoritative state of the payment link and run the same mark-paid +
+     * provision pipeline the webhook would have. This is the safety net for
+     * the redirect-after-payment hop on environments where the webhook is
+     * misconfigured or delayed — the student lands on /payment-status, the
+     * page calls this with reconcile=1, and gets a real "paid" answer back
+     * within the same request instead of timing out the poll.
      */
     @GetMapping("/status/{razorpayLinkId}")
-    public ResponseEntity<?> getPaymentStatus(@PathVariable String razorpayLinkId) {
+    public ResponseEntity<?> getPaymentStatus(@PathVariable String razorpayLinkId,
+                                              @RequestParam(value = "reconcile", required = false) String reconcile) {
         Optional<PaymentTransaction> txnOpt = paymentTransactionRepository
                 .findByRazorpayLinkId(razorpayLinkId);
 
@@ -138,6 +149,31 @@ public class PaymentWebhookController {
         }
 
         PaymentTransaction txn = txnOpt.get();
+
+        // Reconcile against Razorpay if the caller asked and the DB still
+        // hasn't been flipped by the webhook. Cheap to skip when txn is
+        // already in a terminal state so we don't hammer Razorpay on every
+        // poll.
+        if ("1".equals(reconcile) && "created".equals(txn.getStatus())) {
+            try {
+                org.json.JSONObject link = razorpayService.fetchPaymentLink(razorpayLinkId);
+                String razorpayStatus = link.optString("status", null);
+                if ("paid".equals(razorpayStatus)) {
+                    org.json.JSONObject paymentEntity = pickPaidPaymentFromLink(link);
+                    markPaidAndProvision(txn, paymentEntity, link.optJSONObject("notes"));
+                    txn = paymentTransactionRepository.findById(txn.getTransactionId()).orElse(txn);
+                } else if ("expired".equals(razorpayStatus) || "cancelled".equals(razorpayStatus)) {
+                    txn.setStatus(razorpayStatus);
+                    paymentTransactionRepository.save(txn);
+                }
+            } catch (Exception e) {
+                // Reconciliation is best-effort; on Razorpay errors we fall
+                // through and return the DB state so the frontend keeps
+                // polling (webhook may still land).
+                logger.warn("Reconcile against Razorpay failed for link {}: {}", razorpayLinkId, e.getMessage());
+            }
+        }
+
         Map<String, Object> response = new HashMap<>();
         response.put("status", txn.getStatus());
         response.put("amount", txn.getAmount());
@@ -152,15 +188,35 @@ public class PaymentWebhookController {
             response.put("failureReason", txn.getFailureReason());
         }
 
-        // Auto-login: when status flipped to paid AND student has been created
-        // (provisioning may lag the status update by a few hundred ms), include
-        // the session payload so the frontend can write localStorage and redirect.
-        // If userStudentId is null at this moment, the frontend keeps polling.
-        if ("paid".equals(txn.getStatus()) && txn.getUserStudentId() != null) {
+        // Include the session payload whenever the txn already knows which
+        // student it belongs to. For Path B upgrade txns, userStudentId is
+        // stamped on the row before the Razorpay redirect, so this lets the
+        // /payment-status page build a self-contained redirect URL
+        // ("/studentAssessment/completed?e=…&userStudentId=…&assessmentId=…")
+        // from the very first poll — without waiting for the webhook to flip
+        // status to "paid". The auto-login branch on the frontend still gates
+        // on status==="paid", so this widening is safe.
+        if (txn.getUserStudentId() != null) {
             response.putAll(studentSessionService.buildSessionPayload(txn.getUserStudentId()));
         }
 
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Picks the first captured/authorized payment from a payment-link entity.
+     * Mirrors the helper used by the admin Tracker's check-status flow.
+     */
+    private org.json.JSONObject pickPaidPaymentFromLink(org.json.JSONObject link) {
+        org.json.JSONArray payments = link.optJSONArray("payments");
+        if (payments == null) return null;
+        for (int i = 0; i < payments.length(); i++) {
+            org.json.JSONObject p = payments.optJSONObject(i);
+            if (p == null) continue;
+            String s = p.optString("status", "");
+            if ("captured".equals(s) || "authorized".equals(s)) return p;
+        }
+        return payments.length() > 0 ? payments.optJSONObject(0) : null;
     }
 
     /**
