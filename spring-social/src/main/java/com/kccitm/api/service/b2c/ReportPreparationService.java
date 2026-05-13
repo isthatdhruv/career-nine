@@ -100,11 +100,22 @@ public class ReportPreparationService {
 
     private String resolveReportType(Long assessmentId) {
         if (assessmentId == null) return "bet";
-        return assessmentTableRepository.findById(assessmentId)
-                .map(AssessmentTable::getReportType)
-                .filter(s -> s != null && !s.trim().isEmpty())
-                .map(String::toLowerCase)
-                .orElse("bet");
+        Optional<AssessmentTable> opt = assessmentTableRepository.findById(assessmentId);
+        if (!opt.isPresent()) return "bet";
+        AssessmentTable assessment = opt.get();
+
+        String explicit = assessment.getReportType();
+        if (explicit != null && !explicit.trim().isEmpty()) {
+            return explicit.trim().toLowerCase();
+        }
+
+        // No explicit report_type set: fall back to the same rule the frontend
+        // uses to decide which generator applies — questionnaire.type === true
+        // is the legacy BET marker; everything else (false / null) is Navigator.
+        return assessment.getQuestionnaire() != null
+                && Boolean.TRUE.equals(assessment.getQuestionnaire().getType())
+                ? "bet"
+                : "navigator";
     }
 
     private Integer lookupStudentClass(Long userStudentId) {

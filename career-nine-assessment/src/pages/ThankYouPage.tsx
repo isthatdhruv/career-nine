@@ -30,8 +30,22 @@ const ThankYouPage: React.FC = () => {
     const [isSubmittingRating, setIsSubmittingRating] = useState<boolean>(false);
     const [ratingError, setRatingError] = useState<string>('');
     const [upgradeInfo, setUpgradeInfo] = useState<UpgradeInfo | null>(null);
+    const [upgradeInfoLoaded, setUpgradeInfoLoaded] = useState<boolean>(false);
     const [reportState, setReportState] = useState<ReportState>('idle');
     const [longWait, setLongWait] = useState<boolean>(false);
+
+    // Allow the B2C admin tracker (or a direct test link) to bootstrap the
+    // page without a real assessment session by passing the IDs via query
+    // params. Falls back to whatever localStorage already has.
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const eid = params.get('e') || params.get('entitlementId');
+        const usid = params.get('userStudentId');
+        const aid = params.get('assessmentId');
+        if (eid) localStorage.setItem('entitlementId', eid);
+        if (usid) localStorage.setItem('userStudentId', usid);
+        if (aid) localStorage.setItem('assessmentId', aid);
+    }, []);
 
     useEffect(() => {
         const webgazerVideo = document.getElementById('webgazerVideoFeed') as HTMLVideoElement | null;
@@ -47,10 +61,14 @@ const ThankYouPage: React.FC = () => {
 
     useEffect(() => {
         const entitlementId = localStorage.getItem('entitlementId');
-        if (!entitlementId) return;
+        if (!entitlementId) {
+            setUpgradeInfoLoaded(true);
+            return;
+        }
         getUpgradeInfo(entitlementId)
             .then((res) => setUpgradeInfo(res.data as UpgradeInfo))
-            .catch(() => setUpgradeInfo(null));
+            .catch(() => setUpgradeInfo(null))
+            .finally(() => setUpgradeInfoLoaded(true));
     }, []);
 
     // Once upgrade-info is loaded, if the entitlement is already active (the
@@ -103,10 +121,16 @@ const ThankYouPage: React.FC = () => {
     // the contract that makes "Download Report" instant rather than racing
     // a fresh generation on click.
     const expectsReport = showActiveButtons && !!upgradeInfo?.finalReportActive;
-    const showPreparingState = expectsReport && reportState === 'preparing';
     const showFailedState = expectsReport && reportState === 'failed';
     const showDownloadReportButton =
         showActiveButtons && !!upgradeInfo?.finalReportUrl && reportState === 'ready';
+
+    // Unified loading: cover both the upgrade-info fetch (so tiers/offers
+    // don't pop in silently) AND the eager prepareReport call for paid users,
+    // so the student sees one continuous "preparing your report" state until
+    // we either have a ready download or know it failed.
+    const isLoadingContent =
+        !upgradeInfoLoaded || (expectsReport && reportState === 'preparing');
 
     const handleChoosePlan = (campaignAssessmentTierId?: number) => {
         if (!upgradeInfo) return;
@@ -316,33 +340,38 @@ const ThankYouPage: React.FC = () => {
                                     width: '80%',
                                 }} />
 
+                                {/* Unified loading state — shown until upgrade-info has
+                                    loaded AND (if applicable) the eager report-prepare
+                                    call has either succeeded or failed. Keeps tiers,
+                                    CTAs and the report status from popping in piecemeal. */}
+                                {isLoadingContent && (
+                                    <div style={ts.preparingCard}>
+                                        <div className="spinner-border text-warning" role="status" style={{ width: '2.25rem', height: '2.25rem' }}>
+                                            <span className="visually-hidden">Loading...</span>
+                                        </div>
+                                        <h3 style={ts.preparingTitle}>
+                                            {expectsReport
+                                                ? "Hold on — we're preparing your detailed report"
+                                                : 'Loading your results…'}
+                                        </h3>
+                                        <p style={ts.preparingSub}>
+                                            {longWait
+                                                ? 'Almost done… this usually takes 10–20 seconds.'
+                                                : 'This usually takes a few seconds.'}
+                                        </p>
+                                    </div>
+                                )}
+
                                 {/* Try-First landing — students who haven't paid yet */}
-                                {showUpgradeCta && upgradeInfo && (
+                                {!isLoadingContent && showUpgradeCta && upgradeInfo && (
                                     <TryFirstLanding
                                         upgradeInfo={upgradeInfo}
                                         onChoosePlan={handleChoosePlan}
                                     />
                                 )}
 
-                                {/* Preparing state — Path A, paid, report being generated */}
-                                {showPreparingState && (
-                                    <div style={ts.preparingCard}>
-                                        <div className="spinner-border text-warning" role="status" style={{ width: '2.25rem', height: '2.25rem' }}>
-                                            <span className="visually-hidden">Loading...</span>
-                                        </div>
-                                        <h3 style={ts.preparingTitle}>
-                                            Hold on — we're preparing your detailed report
-                                        </h3>
-                                        <p style={ts.preparingSub}>
-                                            {longWait
-                                                ? 'Almost done… this usually takes 10–20 seconds.'
-                                                : 'This usually takes 10–20 seconds.'}
-                                        </p>
-                                    </div>
-                                )}
-
                                 {/* Failure state — generation threw, error already recorded */}
-                                {showFailedState && (
+                                {!isLoadingContent && showFailedState && (
                                     <div style={ts.failedCard}>
                                         <div style={ts.failedOrb}>!</div>
                                         <h3 style={ts.failedTitle}>
@@ -357,13 +386,15 @@ const ThankYouPage: React.FC = () => {
                                 )}
 
                                 {/* Active state — student paid AND report is ready */}
-                                {showActiveButtons && reportState === 'ready' && (
+                                {!isLoadingContent && showActiveButtons && reportState === 'ready' && (
                                     <p style={{ color: '#059669', fontSize: '0.88rem', fontWeight: 600, margin: '0 0 1rem 0' }}>
                                         ✓ Your report is ready. We've also sent it to your email.
                                     </p>
                                 )}
 
-                                {/* CTA tiles row */}
+                                {/* CTA tiles row — hide during loading so the page doesn't
+                                    jump as buttons fade in / out. */}
+                                {!isLoadingContent && (
                                 <div className="d-flex justify-content-center flex-wrap" style={{ gap: '14px' }}>
                                     {/* Download Report — only when active and final report included */}
                                     {showDownloadReportButton && (
@@ -512,6 +543,7 @@ const ThankYouPage: React.FC = () => {
                                         </p>
                                     </div>
                                 </div>
+                                )}
                             </div>
                         </div>
                     </div>

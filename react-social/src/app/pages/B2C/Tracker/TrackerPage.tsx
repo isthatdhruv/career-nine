@@ -268,7 +268,22 @@ const TrackerPage = () => {
         .b2c-tracker-page .b2c-tracker-tabs .nav-link {
           white-space: nowrap;
         }
+        /* Force horizontal scroll on tables even when an ancestor (.card,
+           .card-body, .tab-content) sets overflow:hidden or constrains width.
+           Without this, the inline minWidth on the table is honoured but the
+           overflow gets clipped instead of scrolled. */
+        .b2c-tracker-page .card-body,
+        .b2c-tracker-page .tab-content,
+        .b2c-tracker-page .tab-pane {
+          overflow: visible;
+          min-width: 0;
+        }
         .b2c-tracker-page .table-responsive {
+          display: block;
+          width: 100%;
+          max-width: 100%;
+          overflow-x: auto !important;
+          overflow-y: visible;
           -webkit-overflow-scrolling: touch;
         }
         @media (max-width: 575.98px) {
