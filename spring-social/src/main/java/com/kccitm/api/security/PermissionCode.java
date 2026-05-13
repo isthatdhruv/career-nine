@@ -199,6 +199,7 @@ public enum PermissionCode {
 
     // ── Payments + b2c ──────────────────────────────────────────────────
     PAYMENT_CREATE         ("payment.create",         "Create payments"),
+    PAYMENT_UPDATE         ("payment.update",         "Update payment state and send nudge / link-resend communications"),
     PAYMENT_VERIFY         ("payment.verify",         "Verify payments"),
     PAYMENT_READ           ("payment.read",           "View payments"),
     PAYMENT_READ_ALL       ("payment.read.all",       "View all payments across scopes"),

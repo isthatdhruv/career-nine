@@ -337,16 +337,27 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .successHandler(oAuth2AuthenticationSuccessHandler)
                 .failureHandler(oAuth2AuthenticationFailureHandler);
 
-        // Phase 20-01: per-IP rate limit runs BEFORE the JWT filter so unauthenticated
-        // brute-force on /auth/login is rejected without engaging the auth machinery.
-        http.addFilterBefore(rateLimitFilterIp(), TokenAuthenticationFilter.class);
+        // Phase 20-01 + 13-02 filter chain order:
+        //   rate-limit-IP  →  TokenAuthenticationFilter  →  UsernamePasswordAuthenticationFilter  →  rate-limit-user
+        //
+        // Anchor: UsernamePasswordAuthenticationFilter (a Spring Security built-in
+        // known to FilterOrderRegistration). DO NOT anchor on TokenAuthenticationFilter
+        // — it's a custom filter not in the registration map, and the lookup returns
+        // null which Spring then unboxes → NPE at boot.
+        //
+        // Spring resolves "same anchor" registrations in REGISTRATION ORDER, so the
+        // sequence below produces the chain above.
 
-        // Add our custom Token based authentication filter
+        // 1. Per-IP rate limit — first, so anonymous brute force on /auth/login is
+        //    rejected before any auth machinery is engaged.
+        http.addFilterBefore(rateLimitFilterIp(), UsernamePasswordAuthenticationFilter.class);
+
+        // 2. Token-based JWT auth filter (populates SecurityContext).
         http.addFilterBefore(tokenAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
 
-        // Phase 20-01: per-user rate limit runs AFTER the JWT filter so the security
-        // context holds the authenticated UserPrincipal we key buckets off.
-        http.addFilterAfter(rateLimitFilterUser(), TokenAuthenticationFilter.class);
+        // 3. Per-user rate limit — after UsernamePasswordAuthenticationFilter, so
+        //    SecurityContext holds the authenticated UserPrincipal we key buckets off.
+        http.addFilterAfter(rateLimitFilterUser(), UsernamePasswordAuthenticationFilter.class);
     }
 
     /**

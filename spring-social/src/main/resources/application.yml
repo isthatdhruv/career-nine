@@ -1,4 +1,13 @@
 spring:
+  # Load env vars from a .env file at repo root (Spring Boot 2.4+).
+  # File is OPTIONAL — Docker / CI / shell-exported envs work the same way.
+  # Looks for ./.env (repo root) first, then ./spring-social/.env as a fallback.
+  # Both files MUST be gitignored — they hold real secrets.
+  config:
+    import:
+      - optional:file:./.env[.properties]
+      - optional:file:./spring-social/.env[.properties]
+      - optional:file:../.env[.properties]
   profiles:
     active: dev
   servlet:
