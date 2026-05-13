@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -52,6 +53,8 @@ public class CounsellingAppointmentController {
     @Autowired
     private UserRepository userRepository;
 
+    // no scope arg: body is raw Map; student books appointment slot
+    @PreAuthorize("@auth.allows('counselling.appointment.create')")
     @PostMapping("/book")
     public ResponseEntity<?> book(@RequestBody Map<String, Object> request) {
         Long slotId = Long.valueOf(request.get("slotId").toString());
@@ -70,11 +73,15 @@ public class CounsellingAppointmentController {
         }
     }
 
+    // no scope arg: admin queue view
+    @PreAuthorize("@auth.allows('counselling.appointment.read')")
     @GetMapping("/queue")
     public ResponseEntity<List<CounsellingAppointment>> getQueue() {
         return ResponseEntity.ok(appointmentService.getPendingQueue());
     }
 
+    // no scope arg: admin assigns counsellor to appointment
+    @PreAuthorize("@auth.allows('counselling.appointment.update')")
     @PutMapping("/assign/{id}")
     public ResponseEntity<?> assign(@PathVariable Long id, @RequestBody Map<String, Object> request) {
         Long counsellorId = Long.valueOf(request.get("counsellorId").toString());
@@ -92,6 +99,8 @@ public class CounsellingAppointmentController {
         }
     }
 
+    // no scope arg: counsellor confirms appointment
+    @PreAuthorize("@auth.allows('counselling.appointment.update')")
     @PutMapping("/confirm/{id}")
     public ResponseEntity<?> confirm(@PathVariable Long id, @RequestBody Map<String, Object> request) {
         Long userId = Long.valueOf(request.get("userId").toString());
@@ -108,6 +117,8 @@ public class CounsellingAppointmentController {
         }
     }
 
+    // no scope arg: counsellor declines appointment
+    @PreAuthorize("@auth.allows('counselling.appointment.update')")
     @PutMapping("/decline/{id}")
     public ResponseEntity<?> decline(@PathVariable Long id, @RequestBody Map<String, Object> request) {
         Long userId = Long.valueOf(request.get("userId").toString());
@@ -125,6 +136,8 @@ public class CounsellingAppointmentController {
         }
     }
 
+    // no scope arg: cancel appointment by id
+    @PreAuthorize("@auth.allows('counselling.appointment.update')")
     @PutMapping("/cancel/{id}")
     public ResponseEntity<?> cancel(@PathVariable Long id, @RequestBody Map<String, Object> request) {
         Long userId = Long.valueOf(request.get("userId").toString());
@@ -142,6 +155,8 @@ public class CounsellingAppointmentController {
         }
     }
 
+    // no scope arg: reschedule appointment by id
+    @PreAuthorize("@auth.allows('counselling.appointment.update')")
     @PutMapping("/reschedule/{id}")
     public ResponseEntity<?> reschedule(@PathVariable Long id, @RequestBody Map<String, Object> request) {
         Long newSlotId = Long.valueOf(request.get("newSlotId").toString());
@@ -162,6 +177,8 @@ public class CounsellingAppointmentController {
         }
     }
 
+    // no scope arg: counsellor sets manual meeting link
+    @PreAuthorize("@auth.allows('counselling.appointment.update')")
     @PutMapping("/set-meeting-link/{id}")
     public ResponseEntity<?> setMeetingLink(@PathVariable Long id, @RequestBody Map<String, Object> request) {
         String link = request.get("link").toString();
@@ -175,21 +192,29 @@ public class CounsellingAppointmentController {
         return ResponseEntity.ok(saved);
     }
 
+    // no scope arg: identifies by studentId
+    @PreAuthorize("@auth.allows('counselling.appointment.read')")
     @GetMapping("/by-student/{studentId}")
     public ResponseEntity<List<CounsellingAppointment>> getByStudent(@PathVariable Long studentId) {
         return ResponseEntity.ok(appointmentService.getByStudent(studentId));
     }
 
+    // no scope arg: identifies by counsellorId
+    @PreAuthorize("@auth.allows('counselling.appointment.read')")
     @GetMapping("/by-counsellor/{counsellorId}")
     public ResponseEntity<List<CounsellingAppointment>> getByCounsellor(@PathVariable Long counsellorId) {
         return ResponseEntity.ok(appointmentService.getByCounsellor(counsellorId));
     }
 
+    // no scope arg: admin stats query
+    @PreAuthorize("@auth.allows('counselling.appointment.read')")
     @GetMapping("/stats")
     public ResponseEntity<Map<String, Long>> getStats() {
         return ResponseEntity.ok(appointmentService.getStats());
     }
 
+    // no scope arg: cross-counsellor admin list; scope-filter narrows result set
+    @PreAuthorize("@auth.allows('counselling.appointment.read')")
     @GetMapping("/getAll")
     public ResponseEntity<List<CounsellingAppointment>> getAll() {
         return ResponseEntity.ok(appointmentRepository.findAll());

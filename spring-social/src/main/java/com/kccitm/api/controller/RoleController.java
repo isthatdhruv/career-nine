@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import com.kccitm.api.exception.ResourceNotFoundException;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -24,19 +25,21 @@ public class RoleController {
 	@Autowired
 	private RoleRepository roleRepository;
 
-	// @PreAuthorize("hasAuthority('Role')")
+	@PreAuthorize("@auth.allows('role.read.all')")
 	@GetMapping(value = "/role/get", headers = "Accept=application/json")
 	public List<Role> getAllRoles() {
 		List<Role> roles = roleRepository.findByRole();
 		return roles;
 	}
 
+	@PreAuthorize("@auth.allows('role.read')")
 	@GetMapping(value = "role/getbyid/{id}", headers = "Accept=application/json")
 	public Optional<Role> getRoleById(@PathVariable("id") int roleId) {
 		Optional<Role> role = roleRepository.findById(roleId);
 		return role;
 	}
 
+	@PreAuthorize("@auth.allows('role.update')")
 	@PutMapping(value = "role/update")
 	public List<Role> updateUser(@RequestBody Map<String, Role> inputData) {
 		Role r = inputData.get("values");
@@ -54,6 +57,7 @@ public class RoleController {
 	// 	return r;
 	// }
 
+	@PreAuthorize("@auth.allows('role.delete')")
 	@DeleteMapping("/role/delete/{id}")
     public ResponseEntity<String> deleteRole(@PathVariable Integer id) {
         roleRepository.findById(id)

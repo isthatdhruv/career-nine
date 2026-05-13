@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../../modules/auth/core/Auth'
 import { DashboardApiResponse } from '../API/Dashboard_APIs'
 import { fetchNavigator360Scores } from '../../ReportsHub/navigator360/Navigator360API'
 import {
@@ -225,6 +226,7 @@ function VibrantCareerCard({ match, rank }: { match: CareerMatch; rank: number }
 
 const StudentNavigator360Page: React.FC = () => {
   const navigate = useNavigate()
+  const { currentUser } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<Navigator360Result | null>(null)
@@ -232,15 +234,15 @@ const StudentNavigator360Page: React.FC = () => {
   const [downloading, setDownloading] = useState(false)
 
   useEffect(() => {
-    const isLoggedIn = localStorage.getItem('studentPortalLoggedIn')
-    if (!isLoggedIn) { navigate('/student/login'); return }
+    // Phase 19 (19-02): auth gating moved to StudentAuthGuard / useAuth().
+    if (!currentUser) { navigate('/student/login'); return }
 
     try {
-      const profileStr = localStorage.getItem('studentPortalProfile')
+      // studentPortalDashboard remains a dashboard-data cache (out of scope for 19-02).
       const dashStr = localStorage.getItem('studentPortalDashboard')
-      if (!profileStr || !dashStr) { navigate('/student/login'); return }
+      if (!dashStr) { navigate('/student/login'); return }
 
-      const profileData = JSON.parse(profileStr)
+      const profileData = currentUser as any
       const rawData: DashboardApiResponse = JSON.parse(dashStr)
       setProfile(profileData)
 
@@ -263,7 +265,7 @@ const StudentNavigator360Page: React.FC = () => {
     } catch {
       navigate('/student/login')
     }
-  }, [navigate])
+  }, [navigate, currentUser])
 
   const handleDownloadPdf = useCallback(async () => {
     if (!result) return

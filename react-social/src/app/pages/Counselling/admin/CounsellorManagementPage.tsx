@@ -9,6 +9,7 @@ import { getSlotsByCounsellor } from '../API/SlotAPI'
 import CounsellorForm from './components/CounsellorForm'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
 import PageHeader from '../../../components/PageHeader'
+import { useAuth } from '../../../modules/auth'
 
 const API_URL = process.env.REACT_APP_API_URL
 
@@ -274,6 +275,7 @@ const SlotsSection: React.FC<{ counsellor: Counsellor; onClose: () => void }> = 
 }
 
 const CounsellorManagementPage: React.FC = () => {
+  const { currentUser } = useAuth()
   const [counsellors, setCounsellors] = useState<Counsellor[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingCounsellor, setEditingCounsellor] = useState<Counsellor | null>(null)
@@ -302,17 +304,10 @@ const CounsellorManagementPage: React.FC = () => {
   const [applyingSlots, setApplyingSlots] = useState(false)
 
 
-  // Resolve admin user ID from auth context — fall back to 0 if unavailable
-  let adminUserId = 0
-  try {
-    const stored = localStorage.getItem('counsellorPortalUser') || localStorage.getItem('authUser')
-    if (stored) {
-      const parsed = JSON.parse(stored)
-      adminUserId = parsed.id || parsed.userId || 0
-    }
-  } catch {
-    adminUserId = 0
-  }
+  // Phase 19: admin identity comes from the unified cookie session, not from
+  // legacy localStorage JSON blobs (counsellor-portal + authUser) — they were
+  // the audit hole in docs/AUTH_REDESIGN_PLAN.md §13 A13.
+  const adminUserId: number = currentUser?.id ?? 0
 
   const loadCounsellors = async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) { setLoading(true); setError(null) }

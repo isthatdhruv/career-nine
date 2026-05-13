@@ -10,6 +10,7 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -43,11 +44,13 @@ public class CampaignController {
     @Autowired private InstituteDetailRepository instituteDetailRepository;
     @Autowired private CampaignResolutionService campaignResolutionService;
 
+    @PreAuthorize("@auth.allows('campaign.read.all')")
     @GetMapping("/getAll")
     public ResponseEntity<List<Campaign>> getAll() {
         return ResponseEntity.ok(campaignRepository.findByIsDeletedFalseOrderByCreatedAtDesc());
     }
 
+    @PreAuthorize("@auth.allows('campaign.read')")
     @GetMapping("/get/{id}")
     public ResponseEntity<?> getById(@PathVariable Long id) {
         Optional<Campaign> opt = campaignRepository.findById(id);
@@ -59,6 +62,7 @@ public class CampaignController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("@auth.allows('campaign.read')")
     @GetMapping("/get/by-slug/{slug}")
     public ResponseEntity<?> getBySlug(@PathVariable String slug) {
         Optional<Campaign> opt = campaignRepository.findBySlugIgnoreCaseAndIsDeletedFalse(slug);
@@ -66,6 +70,7 @@ public class CampaignController {
         return ResponseEntity.ok(toFullDto(opt.get()));
     }
 
+    @PreAuthorize("@auth.allows('campaign.create')")
     @PostMapping("/create")
     public ResponseEntity<?> create(@RequestBody Campaign body) {
         if (body.getName() == null || body.getName().trim().isEmpty()) {
@@ -94,6 +99,7 @@ public class CampaignController {
         return ResponseEntity.ok(saved);
     }
 
+    @PreAuthorize("@auth.allows('campaign.update')")
     @PutMapping("/update/{id}")
     public ResponseEntity<?> update(@PathVariable Long id, @RequestBody Map<String, Object> req) {
         Optional<Campaign> opt = campaignRepository.findById(id);
@@ -134,6 +140,7 @@ public class CampaignController {
         return ResponseEntity.ok(campaignRepository.save(c));
     }
 
+    @PreAuthorize("@auth.allows('campaign.delete')")
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<?> softDelete(@PathVariable Long id) {
         Optional<Campaign> opt = campaignRepository.findById(id);
@@ -145,6 +152,7 @@ public class CampaignController {
         return ResponseEntity.ok("Campaign deleted");
     }
 
+    @PreAuthorize("@auth.allows('campaign.read')")
     @GetMapping("/{id}/resolved/{assessmentId}")
     public ResponseEntity<?> resolved(@PathVariable Long id, @PathVariable Long assessmentId) {
         Map<String, Object> response = campaignResolutionService.resolve(id, assessmentId);
@@ -152,6 +160,7 @@ public class CampaignController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("@auth.allows('campaign.update')")
     @PostMapping("/{campaignId}/assessment")
     public ResponseEntity<?> attachAssessment(@PathVariable Long campaignId,
                                               @RequestBody Map<String, Object> req) {
@@ -176,6 +185,7 @@ public class CampaignController {
         return ResponseEntity.ok(mappingRepository.save(m));
     }
 
+    @PreAuthorize("@auth.allows('campaign.update')")
     @PutMapping("/assessment/{mappingId}")
     public ResponseEntity<?> updateMapping(@PathVariable Long mappingId,
                                            @RequestBody Map<String, Object> req) {
@@ -189,6 +199,7 @@ public class CampaignController {
         return ResponseEntity.ok(mappingRepository.save(m));
     }
 
+    @PreAuthorize("@auth.allows('campaign.update')")
     @DeleteMapping("/assessment/{mappingId}")
     public ResponseEntity<?> detachAssessment(@PathVariable Long mappingId) {
         Optional<CampaignAssessmentMapping> opt = mappingRepository.findById(mappingId);
@@ -200,6 +211,7 @@ public class CampaignController {
         return ResponseEntity.ok("Assessment detached");
     }
 
+    @PreAuthorize("@auth.allows('campaign.update')")
     @PostMapping("/assessment/{mappingId}/tier")
     public ResponseEntity<?> attachTier(@PathVariable Long mappingId,
                                         @RequestBody Map<String, Object> req) {
@@ -234,6 +246,7 @@ public class CampaignController {
         return ResponseEntity.ok(tierMappingRepository.save(tm));
     }
 
+    @PreAuthorize("@auth.allows('campaign.update')")
     @DeleteMapping("/assessment/tier/{tierMapId}")
     public ResponseEntity<?> detachTier(@PathVariable Long tierMapId) {
         Optional<CampaignAssessmentTier> opt = tierMappingRepository.findById(tierMapId);

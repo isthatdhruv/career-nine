@@ -10,6 +10,8 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import com.kccitm.api.security.ScopeFilterInterceptor;
+
 import javax.servlet.MultipartConfigElement;
 
 @Configuration
@@ -23,6 +25,15 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Autowired
     private AssessmentSessionInterceptor sessionInterceptor;
 
+    /**
+     * Phase 15-06 — Hibernate ABAC row-level scope filter enable/disable.
+     * Runs on every request EXCEPT auth-establishment, public marketing, and
+     * health/webhook paths where {@link org.springframework.security.core.context.SecurityContextHolder}
+     * is empty (or the request is intentionally anonymous).
+     */
+    @Autowired
+    private ScopeFilterInterceptor scopeFilterInterceptor;
+
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(sessionInterceptor)
@@ -35,6 +46,23 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/assessments/delete/**",
                         "/assessments/prefetch/**",
                         "/assessments/startAssessment"
+                );
+
+        // Phase 15-06: ABAC row-level filter interceptor. Auth-establishment
+        // endpoints, the public lead-capture form, health/webhook endpoints,
+        // and static assets are excluded because SecurityContextHolder is empty
+        // there — the filter would no-op anyway, but the exclusion keeps the
+        // request-attribute machinery clean.
+        registry.addInterceptor(scopeFilterInterceptor)
+                .excludePathPatterns(
+                        "/auth/**",
+                        "/leads/capture",
+                        "/heartbeat/**",
+                        "/payment/webhook/**",
+                        "/campaign/public/**",
+                        "/school-registration/public/**",
+                        "/static/**",
+                        "/actuator/**"
                 );
     }
 

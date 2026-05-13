@@ -9,6 +9,7 @@ import com.kccitm.api.service.career9.CareerSuggestionService;
 import com.kccitm.api.service.career9.Qwen3CareerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -31,6 +32,8 @@ public class CareerSuggestionController {
     private StudentAssessmentMappingRepository mappingRepo;
 
     /** Returns students who have a mapping for the given assessment, for use in the frontend selector. */
+    // no scope arg: identifies by assessmentId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('career_suggestion.read')")
     @GetMapping("/assessment/{assessmentId}/students")
     public ResponseEntity<List<Map<String, Object>>> getStudentsForAssessment(
             @PathVariable Long assessmentId) {
@@ -50,6 +53,8 @@ public class CareerSuggestionController {
         return ResponseEntity.ok(result);
     }
 
+    // no scope arg: identifies by ids; scope-filter narrows access
+    @PreAuthorize("@auth.allows('career_suggestion.read')")
     @GetMapping("/suggest/{studentId}/{assessmentId}")
     public ResponseEntity<CareerSuggestionResult> suggest(
             @PathVariable Long studentId,
@@ -58,6 +63,8 @@ public class CareerSuggestionController {
         return ResponseEntity.ok(result);
     }
 
+    // no scope arg: identifies by ids; scope-filter narrows access
+    @PreAuthorize("@auth.allows('career_suggestion.read')")
     @GetMapping("/compare/{studentId}/{assessmentId}")
     public ResponseEntity<CareerComparisonResult> compare(
             @PathVariable Long studentId,

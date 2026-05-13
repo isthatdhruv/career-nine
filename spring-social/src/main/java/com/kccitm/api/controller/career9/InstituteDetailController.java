@@ -10,6 +10,7 @@ import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -61,11 +62,13 @@ public class InstituteDetailController {
 	@Autowired
 	private BoardNameRepository boardNameRepository;
 
+	@PreAuthorize("@auth.allows('institute_detail.read.all')")
 	@GetMapping("/get/list")
 	public List<Map<String, Object>> getInstituteList() {
 		return instituteDetailRepository.findAllIdAndName();
 	}
 
+	@PreAuthorize("@auth.allows('institute_detail.read.all')")
 	@GetMapping(value = "/get", headers = "Accept=application/json")
 	public List<InstituteDetail> getallInstituteDetail() {
 		List<InstituteDetail> allInstituteDetails = instituteDetailRepository.findAll();
@@ -79,6 +82,7 @@ public class InstituteDetailController {
 		return allInstituteDetailsNew;
 	}
 
+	@PreAuthorize("@auth.allows('institute_detail.read', #instituteDetailId)")
 	@GetMapping(value = "/getbyid/{id}", headers = "Accept=application/json")
 	public InstituteDetail getInstituteDetailById(@PathVariable("id") int instituteDetailId) {
 		InstituteDetail instituteDetail = instituteDetailRepository.findById(instituteDetailId);
@@ -127,6 +131,7 @@ public class InstituteDetailController {
 	// InstituteDetail r = instituteDetailRepository.save(instituteDetail);
 	// return r;
 	// }
+	@PreAuthorize("@auth.allows('institute_detail.delete', #id)")
 	@GetMapping("/delete/{id}")
 	public InstituteDetail deleteUser(@PathVariable("id") Integer id) {
 		InstituteDetail institute = instituteDetailRepository.findById(id.intValue());
@@ -137,11 +142,13 @@ public class InstituteDetailController {
 		return null;
 	}
 
+	@PreAuthorize("@auth.allows('institute_detail.read.all')")
 	@GetMapping("/deleted")
 	public List<InstituteDetail> getDeletedInstitutes() {
 		return instituteDetailRepository.findByDisplay(false);
 	}
 
+	@PreAuthorize("@auth.allows('institute_detail.update', #id)")
 	@GetMapping("/restore/{id}")
 	public InstituteDetail restoreInstitute(@PathVariable("id") Integer id) {
 		InstituteDetail institute = instituteDetailRepository.findById(id.intValue());
@@ -152,6 +159,7 @@ public class InstituteDetailController {
 		return null;
 	}
 
+	@PreAuthorize("@auth.allows('institute_detail.update')")
 	@PostMapping(value = "/update", consumes = "application/json", produces = "application/json")
 	public InstituteDetail updateInstituteDetail(@RequestBody Map<String, InstituteDetail> payload) {
 		if (payload == null || payload.isEmpty()) {
@@ -168,6 +176,7 @@ public class InstituteDetailController {
 	}
 
 	@SuppressWarnings("unchecked")
+	@PreAuthorize("@auth.allows('institute_detail.update')")
 	@PostMapping(value = "/map-contacts-boards")
 	public ResponseEntity<?> mapContactsAndBoards(@RequestBody Map<String, Object> payload) {
 		Integer instituteCode = (Integer) payload.get("instituteCode");
@@ -219,6 +228,7 @@ public class InstituteDetailController {
 		return ResponseEntity.ok(new ApiResponse(true, "Contacts and boards mapped successfully"));
 	}
 
+	@PreAuthorize("@auth.allows('institute_detail.read', #instituteCode)")
 	@GetMapping(value = "/get-mappings/{id}")
 	public ResponseEntity<?> getMappings(@PathVariable("id") int instituteCode) {
 		InstituteDetail institute = instituteDetailRepository.findById(instituteCode);
@@ -240,6 +250,7 @@ public class InstituteDetailController {
 	// Per-institute limits (max assessments allowed before allotment is blocked)
 	// ============================================================
 
+	@PreAuthorize("@auth.allows('institute_detail.read', #instituteCode)")
 	@GetMapping("/{id}/limits")
 	public ResponseEntity<?> getInstituteLimits(@PathVariable("id") int instituteCode) {
 		InstituteDetail institute = instituteDetailRepository.findById(instituteCode);
@@ -253,6 +264,7 @@ public class InstituteDetailController {
 		return ResponseEntity.ok(body);
 	}
 
+	@PreAuthorize("@auth.allows('institute_detail.update', #instituteCode)")
 	@PutMapping("/{id}/limits")
 	public ResponseEntity<?> updateInstituteLimits(
 			@PathVariable("id") int instituteCode,

@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -34,6 +35,7 @@ public class InstituteBranchController {
 	@Autowired
 	private InstituteBatchRepository instituteBatchRepository;
 
+	@PreAuthorize("@auth.allows('institute_branch.read.all')")
 	@GetMapping(value = "instituteBranch/get", headers = "Accept=application/json")
 	public List<InstituteBranch> getallInstituteBranch() {
 		List<InstituteBranch> allInstituteBranch = instituteBranchRepository.findAll();
@@ -47,6 +49,7 @@ public class InstituteBranchController {
 		return allInstituteBranch;
 	}
 
+    @PreAuthorize("@auth.allows('institute_branch.read')")
     @GetMapping(value = "instituteBranch/getbybranchid/{id}", headers = "Accept=application/json")
 	public InstituteBranch getById(@PathVariable("id") int instituteBranchId) {
 		InstituteBranch instituteBranch = instituteBranchRepository.findById(instituteBranchId);
@@ -60,12 +63,14 @@ public class InstituteBranchController {
 		return instituteBranch;
 	}
 
+	@PreAuthorize("@auth.allows('institute_branch.read')")
 	@GetMapping(value = "instituteBranch/getbyCourseId/{id}", headers = "Accept=application/json")
 	public List<InstituteBranch> getByCourseId(@PathVariable("id") int instituteCourseId) {
 		return instituteBranchRepository.findByCourseId(instituteCourseId);
 	}
 
 
+	@PreAuthorize("@auth.allows('institute_branch.update')")
 	@PostMapping(value = "instituteBranch/update", headers = "Accept=application/json")
 	public List<InstituteBranch> updateInstituteBranch(@RequestBody Map<String, InstituteBranch> inputData) {
 		InstituteBranch r = inputData.get("values"); 
@@ -74,6 +79,7 @@ public class InstituteBranchController {
 	}
 
 
+	@PreAuthorize("@auth.allows('institute_branch.delete')")
 	@GetMapping(value = "instituteBranch/delete/{id}", headers = "Accept=application/json")
 	public InstituteBranch deleteUser(@PathVariable("id") int instituteBranchId) {
 		InstituteBranch instituteBranch = instituteBranchRepository.getOne(instituteBranchId);

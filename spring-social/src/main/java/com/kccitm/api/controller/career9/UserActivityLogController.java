@@ -8,6 +8,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,6 +30,8 @@ public class UserActivityLogController {
     @Autowired
     private UserUrlAccessLogRepository urlAccessLogRepository;
 
+    // no scope arg: admin audit query — cross-institute by default
+    @PreAuthorize("@auth.allows('user_activity_log.read')")
     @GetMapping("/logins")
     public ResponseEntity<List<UserActivityLog>> getLogins(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -43,6 +46,8 @@ public class UserActivityLogController {
         return ResponseEntity.ok(logs);
     }
 
+    // no scope arg: identifies by userId; admin audit
+    @PreAuthorize("@auth.allows('user_activity_log.read')")
     @GetMapping("/urls/{userId}")
     public ResponseEntity<List<UserUrlAccessLog>> getUrlAccess(
             @PathVariable Long userId,

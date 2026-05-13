@@ -10,6 +10,7 @@ import java.util.Optional;
 import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -78,12 +79,16 @@ public class FacultyContoller {
   @Autowired
   private GoogleAPIAdmin gpa;
 
+  // no scope arg: cross-institute list — scope-filter narrows result set
+  @PreAuthorize("@auth.allows('faculty.read')")
   @GetMapping(value = "/faculty/get", headers = "Accept=application/json")
   public List<Faculty> getAllFaculties() {
     List<Faculty> faculty = facultyRepository.findAll();
     return faculty;
   }
 
+  // no scope arg: fetch by id; scope-filter narrows access
+  @PreAuthorize("@auth.allows('faculty.read')")
   @GetMapping(value = "faculty/getbyid/{id}", headers = "Accept=application/json")
   public Faculty getFacultyById(@PathVariable("id") int collegeIdentificationNumber) {
     Faculty faculty = facultyRepository.findById(collegeIdentificationNumber);
@@ -94,6 +99,8 @@ public class FacultyContoller {
     return faculty;
   }
 
+  // no scope arg: body is Map<String,Faculty>; SpEL cannot address nested map values
+  @PreAuthorize("@auth.allows('faculty.update')")
   @PostMapping(value = "faculty/update")
   public Faculty updateFaculty(@RequestBody Map<String, Faculty> inputData,
       @CurrentUser com.kccitm.api.security.UserPrincipal UserPrincipal)
@@ -114,6 +121,8 @@ public class FacultyContoller {
 
   }
 
+  // no scope arg: read email-existence check; admin-only utility
+  @PreAuthorize("@auth.allows('faculty.read')")
   @PostMapping(value = "faculty/emailChecker", headers = "Accept=application/json")
   public Boolean emailChecker(@RequestBody Map<String, String> email) {
     String r = email.get("values");
@@ -136,6 +145,8 @@ public class FacultyContoller {
   // return f;
   // }
 
+  // no scope arg: body is Map<String,Faculty>; SpEL cannot address nested map values
+  @PreAuthorize("@auth.allows('faculty.update')")
   @PostMapping(value = "faculty-email/update", headers = "Accept=application/json")
   public void email(
       @RequestBody Map<String, Faculty> currentFaculty,
@@ -159,6 +170,8 @@ public class FacultyContoller {
     // }
   }
 
+  // no scope arg: body is Map<String,ArrayList<Faculty>>; bulk save (create)
+  @PreAuthorize("@auth.allows('faculty.create')")
   @PostMapping(value = "faculty/getSavetoDatabase", headers = "Accept=application/json")
   public Boolean saveAllFacultiesCSV(
       @RequestBody Map<String, ArrayList<Faculty>> saveAllFacultiesCSV) {
@@ -171,6 +184,8 @@ public class FacultyContoller {
     return true;
   }
 
+  // no scope arg: identifies faculty by id query param; generates ID card PDF + email
+  @PreAuthorize("@auth.allows('faculty.update')")
   @GetMapping(value = "/generate_pdf_faculty")
   @ResponseBody
   public String generatePdf(@RequestParam(name = "id") String st, @RequestParam(name = "email") String email,

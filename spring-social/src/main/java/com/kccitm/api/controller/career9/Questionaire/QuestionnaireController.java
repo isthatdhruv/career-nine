@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -47,12 +48,14 @@ public class QuestionnaireController {
     private EntityManager entityManager;
 
     @PostMapping("/questionnaire-lelo")
+    @PreAuthorize("@auth.allows('questionnaire.read')")
     public Questionnaire questionnaireLelo(@RequestBody Long assessmentTableId) {
         return questionnaireRepository.findById(assessmentTableId)
                 .orElse(null);
     }
 
     @PostMapping("/create")
+    @PreAuthorize("@auth.allows('questionnaire.create')")
     public ResponseEntity<Questionnaire> create(
             @RequestBody Questionnaire questionnaire) {
 
@@ -106,17 +109,22 @@ public class QuestionnaireController {
         return new ResponseEntity<>(saved, HttpStatus.CREATED);
     }
 
+    // SCOPE: filtered by Hibernate scopeFilter (Plan 15-06) — non-super-admin callers see narrowed result set.
     @GetMapping(value = "/get", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('questionnaire.read.all')")
     public List<Questionnaire> getallQuestionnaire() {
         return questionnaireRepository.findByDisplayTrueOrDisplayIsNull();
     }
 
+    // SCOPE: filtered by Hibernate scopeFilter (Plan 15-06).
     @GetMapping(value = "/get/list", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('questionnaire.read.all')")
     public List<Questionnaire> getAllQuestionnaires() {
         return questionnaireRepository.findQuestionnaireList();
     }
 
     @GetMapping("/getbyid/{id}")
+    @PreAuthorize("@auth.allows('questionnaire.read')")
     @Transactional(readOnly = true)
     public ResponseEntity<Questionnaire> getById(
             @PathVariable Long id) {
@@ -129,6 +137,7 @@ public class QuestionnaireController {
     }
 
     @PutMapping("/update/{id}")
+    @PreAuthorize("@auth.allows('questionnaire.update')")
     @Transactional
     public ResponseEntity<Questionnaire> update(
             @PathVariable Long id,
@@ -197,6 +206,7 @@ public class QuestionnaireController {
     }
 
     @DeleteMapping("/delete/{id}")
+    @PreAuthorize("@auth.allows('questionnaire.delete')")
     public ResponseEntity<String> delete(@PathVariable Long id) {
         Optional<Questionnaire> opt = questionnaireRepository.findById(id);
         if (!opt.isPresent()) {
@@ -209,11 +219,13 @@ public class QuestionnaireController {
     }
 
     @GetMapping("/deleted")
+    @PreAuthorize("@auth.allows('questionnaire.read.all')")
     public ResponseEntity<List<Questionnaire>> getDeletedQuestionnaires() {
         return ResponseEntity.ok(questionnaireRepository.findByDisplayFalse());
     }
 
     @PutMapping("/restore/{id}")
+    @PreAuthorize("@auth.allows('questionnaire.update')")
     public ResponseEntity<String> restoreQuestionnaire(@PathVariable Long id) {
         Optional<Questionnaire> opt = questionnaireRepository.findById(id);
         if (!opt.isPresent()) return ResponseEntity.notFound().build();
@@ -224,6 +236,7 @@ public class QuestionnaireController {
     }
 
     @DeleteMapping("/permanent-delete/{id}")
+    @PreAuthorize("@auth.allows('questionnaire.delete')")
     public ResponseEntity<String> permanentDeleteQuestionnaire(@PathVariable Long id) {
         questionnaireRepository.deleteById(id);
         return ResponseEntity.ok("Permanently deleted.");

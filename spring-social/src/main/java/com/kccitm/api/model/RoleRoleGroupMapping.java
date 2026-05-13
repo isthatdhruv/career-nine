@@ -36,6 +36,24 @@ public class RoleRoleGroupMapping implements Serializable {
     @Column(name = "role_group_id")
     private Long roleGroup;
 
+    /**
+     * Read-only navigation handle for the role group (Phase 14 — bug B4 partial fix).
+     * Maps to the SAME {@code role_group_id} column as the {@link #roleGroup} Long
+     * above via {@code insertable=false, updatable=false}. Existing callsites
+     * that use {@code getRoleGroup()}/{@code setRoleGroup(Long)} are unaffected.
+     *
+     * <p>The previous {@code @OneToMany(mappedBy = "roleGroup")} on
+     * {@link RoleGroup#roleRoleGroupMappings} was JPA-spec non-compliant
+     * (pointed at a Long column, not a {@code @ManyToOne} relationship field)
+     * but tolerated by Hibernate 5.x. Pointing {@code mappedBy} at this real
+     * relationship field makes the bidirectional mapping spec-correct. Phase 15
+     * will use this for {@code AuthorizationService} traversal.
+     */
+    @javax.persistence.ManyToOne(fetch = javax.persistence.FetchType.LAZY)
+    @javax.persistence.JoinColumn(name = "role_group_id", insertable = false, updatable = false)
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private RoleGroup roleGroupRef;
+
     // public RoleRoleGroupMapping(int i, Role role2) {
     // this.roleGroup = (long) i;
     // this.display = true;
@@ -72,6 +90,11 @@ public class RoleRoleGroupMapping implements Serializable {
 
     public void setRoleGroup(Long roleGroup) {
         this.roleGroup = roleGroup;
+    }
+
+    /** @see #roleGroupRef */
+    public RoleGroup getRoleGroupRef() {
+        return this.roleGroupRef;
     }
 
 }

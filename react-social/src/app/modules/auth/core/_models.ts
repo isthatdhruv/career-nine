@@ -1,7 +1,6 @@
 export interface AuthModel {
   api_token: string;
   refreshToken?: string;
-  authorityUrls?: string[];
 }
 
 export interface UserAddressModel {
@@ -71,6 +70,10 @@ export interface User {
   id: number;
   name: string;
   email: string;
+  roles: string[];
+  permissions: string[];
+  scopes: Array<{ i?: number; s?: number; c?: number; x?: number }>;
+  superAdmin: boolean;
   provider?: any;
   providerId?: string;
   first_name?: string;
@@ -79,7 +82,6 @@ export interface User {
   occupation?: string;
   companyName?: string;
   phone?: string;
-  roles?: Array<number>;
   imageUrl?: string;
   language?: "en" | "de" | "es" | "fr" | "ja" | "zh" | "ru";
   timeZone?: string;
@@ -89,5 +91,6 @@ export interface User {
   communication?: UserCommunicationModel;
   address?: UserAddressModel;
   socialNetworks?: UserSocialNetworksModel;
-  authorityUrls?: string[];
 }
+
+export type Scope = { i?: number; s?: number; c?: number; x?: number };

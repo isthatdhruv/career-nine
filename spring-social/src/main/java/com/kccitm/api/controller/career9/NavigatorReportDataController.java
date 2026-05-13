@@ -25,6 +25,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -61,6 +62,7 @@ public class NavigatorReportDataController {
      * and returns an Excel file with the enriched Navigator data.
      */
     @PostMapping("/generate-export")
+    @PreAuthorize("@auth.allows('navigator_report_data.create')")
     @Transactional
     public ResponseEntity<?> generateAndExportExcel(@RequestBody Map<String, Object> request) {
         Long assessmentId = ((Number) request.get("assessmentId")).longValue();
@@ -104,6 +106,7 @@ public class NavigatorReportDataController {
      * Generates report data (if not exists) + generates HTML report + returns URL.
      */
     @PostMapping("/one-click-report")
+    @PreAuthorize("@auth.allows('navigator_report_data.create')")
     @Transactional
     public ResponseEntity<?> oneClickReport(@RequestBody Map<String, Object> request) {
         Long assessmentId = ((Number) request.get("assessmentId")).longValue();
@@ -259,12 +262,15 @@ public class NavigatorReportDataController {
 
     // ═══════════════════════ CRUD ═══════════════════════
 
+    // SCOPE: filtered by Hibernate scopeFilter (Plan 15-06) — narrowed result set for non-super-admin.
     @GetMapping("/getAll")
+    @PreAuthorize("@auth.allows('navigator_report_data.read.all')")
     public ResponseEntity<?> getAll() {
         return ResponseEntity.ok(navigatorReportDataRepository.findAll());
     }
 
     @GetMapping("/get/{id}")
+    @PreAuthorize("@auth.allows('navigator_report_data.read')")
     public ResponseEntity<?> getById(@PathVariable Long id) {
         return navigatorReportDataRepository.findById(id)
                 .map(ResponseEntity::ok)
@@ -272,16 +278,19 @@ public class NavigatorReportDataController {
     }
 
     @GetMapping("/by-assessment/{assessmentId}")
+    @PreAuthorize("@auth.allows('navigator_report_data.read')")
     public ResponseEntity<?> getByAssessment(@PathVariable Long assessmentId) {
         return ResponseEntity.ok(navigatorReportDataRepository.findByAssessmentId(assessmentId));
     }
 
     @GetMapping("/by-student/{userStudentId}")
+    @PreAuthorize("@auth.allows('navigator_report_data.read')")
     public ResponseEntity<?> getByStudent(@PathVariable Long userStudentId) {
         return ResponseEntity.ok(navigatorReportDataRepository.findByUserStudentUserStudentId(userStudentId));
     }
 
     @DeleteMapping("/delete/{id}")
+    @PreAuthorize("@auth.allows('navigator_report_data.delete')")
     public ResponseEntity<?> delete(@PathVariable Long id) {
         if (!navigatorReportDataRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
@@ -299,6 +308,7 @@ public class NavigatorReportDataController {
      * Call this when a student's assessment is reset so stale/insignificant data is removed.
      */
     @DeleteMapping("/reset/student/{userStudentId}/assessment/{assessmentId}")
+    @PreAuthorize("@auth.allows('navigator_report_data.delete')")
     @Transactional
     public ResponseEntity<?> resetForStudent(
             @PathVariable Long userStudentId, @PathVariable Long assessmentId) {
@@ -316,6 +326,7 @@ public class NavigatorReportDataController {
      * Call this when an assessment is fully reset.
      */
     @DeleteMapping("/reset/assessment/{assessmentId}")
+    @PreAuthorize("@auth.allows('navigator_report_data.delete')")
     @Transactional
     public ResponseEntity<?> resetForAssessment(@PathVariable Long assessmentId) {
         navigatorReportDataRepository.deleteByAssessmentId(assessmentId);
@@ -329,6 +340,7 @@ public class NavigatorReportDataController {
      * Returns only eligible students' report data for an assessment.
      */
     @GetMapping("/eligible/{assessmentId}")
+    @PreAuthorize("@auth.allows('navigator_report_data.read')")
     public ResponseEntity<?> getEligibleByAssessment(@PathVariable Long assessmentId) {
         return ResponseEntity.ok(
                 navigatorReportDataRepository.findByAssessmentIdAndEligible(assessmentId, true));
@@ -340,6 +352,7 @@ public class NavigatorReportDataController {
      * Returns only ineligible (insignificant) students' report data for an assessment.
      */
     @GetMapping("/ineligible/{assessmentId}")
+    @PreAuthorize("@auth.allows('navigator_report_data.read')")
     public ResponseEntity<?> getIneligibleByAssessment(@PathVariable Long assessmentId) {
         return ResponseEntity.ok(
                 navigatorReportDataRepository.findByAssessmentIdAndEligible(assessmentId, false));
@@ -348,6 +361,7 @@ public class NavigatorReportDataController {
     // ═══════════════════════ DOWNLOAD REPORT (HTML) ═══════════════════════
 
     @GetMapping("/download/{userStudentId}/{assessmentId}")
+    @PreAuthorize("@auth.allows('navigator_report_data.read')")
     public ResponseEntity<?> downloadReport(
             @PathVariable Long userStudentId,
             @PathVariable Long assessmentId) {
@@ -383,6 +397,7 @@ public class NavigatorReportDataController {
      * Returns report URLs for the given students (frontend handles PDF conversion + ZIP).
      */
     @PostMapping("/download-zip")
+    @PreAuthorize("@auth.allows('navigator_report_data.read')")
     public ResponseEntity<?> downloadZipInfo(@RequestBody Map<String, Object> request) {
         if (!request.containsKey("assessmentId") || !request.containsKey("userStudentIds")) {
             return ResponseEntity.badRequest()
@@ -418,6 +433,7 @@ public class NavigatorReportDataController {
     // ═══════════════════════ EXCEL EXPORT ═══════════════════════
 
     @GetMapping("/export-excel/{assessmentId}")
+    @PreAuthorize("@auth.allows('navigator_report_data.read')")
     public ResponseEntity<?> exportExcel(@PathVariable Long assessmentId) throws Exception {
         List<NavigatorReportData> reports = navigatorReportDataRepository.findByAssessmentId(assessmentId);
         if (reports.isEmpty()) {
@@ -546,6 +562,7 @@ public class NavigatorReportDataController {
      * and upserts into navigator_report_data.
      */
     @PostMapping("/generate")
+    @PreAuthorize("@auth.allows('navigator_report_data.create')")
     @Transactional
     public ResponseEntity<?> generateAndSave(@RequestBody Map<String, Object> request) {
         if (!request.containsKey("assessmentId") || !request.containsKey("userStudentIds")) {
@@ -594,6 +611,7 @@ public class NavigatorReportDataController {
      * DigitalOcean Spaces, and updates reportStatus/reportUrl.
      */
     @PostMapping("/generate-reports")
+    @PreAuthorize("@auth.allows('navigator_report_data.create')")
     @Transactional
     public ResponseEntity<?> generateHtmlReports(@RequestBody Map<String, Object> request) {
         if (!request.containsKey("assessmentId") || !request.containsKey("userStudentIds")) {
@@ -691,6 +709,7 @@ public class NavigatorReportDataController {
      * to DigitalOcean Spaces under navigator-template-assets/.
      */
     @PostMapping("/upload-template-assets")
+    @PreAuthorize("@auth.allows('navigator_report_data.update')")
     public ResponseEntity<?> uploadTemplateAssets() {
         String[] assetPaths = {
             // Static assets
@@ -1062,6 +1081,7 @@ public class NavigatorReportDataController {
      * without running the full report pipeline.
      */
     @GetMapping("/navigator-360/scores/{studentId}/{assessmentId}")
+    @PreAuthorize("@auth.allows('navigator_report_data.read')")
     public ResponseEntity<?> getNavigator360Scores(
             @PathVariable Long studentId,
             @PathVariable Long assessmentId) {

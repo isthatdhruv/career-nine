@@ -32,15 +32,20 @@ const CounsellorDashboardLogin: React.FC = () => {
     setError('')
 
     try {
-      const { data } = await axios.post(
-        `${API_BASE_URL}/api/counsellor/login`,
+      // Phase 19: counsellors authenticate via the unified /auth/login endpoint.
+      // Backend sets cn_at HttpOnly cookie + cn_csrf; AuthInit reads /auth/me
+      // on next mount to hydrate currentUser. NO localStorage writes — the
+      // legacy counsellor-portal JSON blobs are removed.
+      await axios.post(
+        `${API_BASE_URL}/auth/login`,
         { email: email.trim(), password },
-        { headers: { Accept: 'application/json', 'Content-Type': 'application/json' } }
+        {
+          headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+          withCredentials: true,
+        }
       )
 
-      localStorage.setItem('counsellorPortalUser', JSON.stringify(data))
-      localStorage.setItem('counsellorPortalLoggedIn', 'true')
-      navigate('/counsellor/dashboard')
+      navigate('/counsellor/dashboard', { replace: true })
     } catch (err: any) {
       if (err.response?.status === 401) {
         setError('Invalid email or password.')

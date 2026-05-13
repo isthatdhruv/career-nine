@@ -14,6 +14,7 @@ import javax.persistence.Query;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -72,6 +73,7 @@ public class TrackerController {
 
     private static final int MAX_PAGE_SIZE = 200;
 
+    @PreAuthorize("@auth.allows('tracker.read')")
     @GetMapping("/payments")
     public ResponseEntity<?> getPayments(@RequestParam(required = false) Long campaignId,
                                          @RequestParam(required = false) String status,
@@ -180,6 +182,7 @@ public class TrackerController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("@auth.allows('tracker.read')")
     @GetMapping("/allotments")
     public ResponseEntity<?> getAllotments(@RequestParam(required = false) Long campaignId,
                                            @RequestParam(required = false) String status,
@@ -255,6 +258,7 @@ public class TrackerController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("@auth.allows('tracker.read')")
     @GetMapping("/allotments/{id}")
     public ResponseEntity<?> getAllotmentDetail(@PathVariable Long id) {
         Optional<StudentEntitlement> opt = entitlementRepository.findById(id);
@@ -293,6 +297,7 @@ public class TrackerController {
 
     // ═══════════════════════ REPORT ERRORS ═══════════════════════
 
+    @PreAuthorize("@auth.allows('tracker.read')")
     @GetMapping("/report-errors")
     public ResponseEntity<?> getReportErrors(@RequestParam(required = false) Long campaignId,
                                              @RequestParam(required = false) String from,
@@ -363,6 +368,7 @@ public class TrackerController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("@auth.allows('tracker.update')")
     @PostMapping("/report-errors/{logId}/retry")
     public ResponseEntity<?> retryReport(@PathVariable Long logId,
                                          @RequestBody(required = false) Map<String, Object> body) {
@@ -419,6 +425,7 @@ public class TrackerController {
         }
     }
 
+    @PreAuthorize("@auth.allows('tracker.update')")
     @PostMapping("/report-errors/{logId}/dismiss")
     public ResponseEntity<?> dismissReport(@PathVariable Long logId,
                                            @RequestBody(required = false) Map<String, Object> body) {
@@ -450,6 +457,7 @@ public class TrackerController {
                 .orElse(null);
     }
 
+    @PreAuthorize("@auth.allows('tracker.read')")
     @GetMapping("/service-activity")
     public ResponseEntity<?> getServiceActivity(@RequestParam(defaultValue = "0") int page,
                                                 @RequestParam(defaultValue = "100") int size) {
@@ -461,6 +469,7 @@ public class TrackerController {
         return ResponseEntity.ok(q.getResultList());
     }
 
+    @PreAuthorize("@auth.allows('tracker.read')")
     @GetMapping("/summary")
     public ResponseEntity<?> getSummary(@RequestParam(required = false) Long campaignId,
                                         @RequestParam(required = false) String from,
@@ -492,6 +501,7 @@ public class TrackerController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("@auth.allows('tracker.update')")
     @PostMapping("/payments/{transactionId}/resend-link")
     public ResponseEntity<?> resendPaymentLink(@PathVariable Long transactionId,
                                                @RequestBody(required = false) Map<String, Object> body) {
@@ -515,6 +525,7 @@ public class TrackerController {
      * Used for test data cleanup and to undo mistakenly-marked-paid rows
      * without deleting any history.
      */
+    @PreAuthorize("@auth.allows('tracker.update')")
     @PostMapping("/payments/{transactionId}/reset")
     @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<?> resetPayment(@PathVariable Long transactionId,

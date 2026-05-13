@@ -5,6 +5,7 @@ import {
   confirmAppointment,
   declineAppointment,
 } from '../../Counselling/API/AppointmentAPI'
+import { useAuth } from '../../../modules/auth'
 
 interface AppointmentSlot {
   date: string
@@ -67,6 +68,7 @@ function getTodayString(): string {
 
 const AppointmentCalendar: React.FC<Props> = ({ counsellorId }) => {
   const navigate = useNavigate()
+  const { currentUser } = useAuth()
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -110,8 +112,8 @@ const AppointmentCalendar: React.FC<Props> = ({ counsellorId }) => {
   }, [counsellorId])
 
   const handleConfirm = async (appointmentId: number) => {
-    const user = JSON.parse(localStorage.getItem('counsellorPortalUser') || '{}')
-    const userId = user.id
+    // Phase 19: userId comes from useAuth().currentUser, not localStorage.
+    const userId = currentUser?.id
     if (!userId) return
 
     setActionLoading(appointmentId)
@@ -128,8 +130,8 @@ const AppointmentCalendar: React.FC<Props> = ({ counsellorId }) => {
   }
 
   const handleDecline = async (appointmentId: number) => {
-    const user = JSON.parse(localStorage.getItem('counsellorPortalUser') || '{}')
-    const userId = user.id
+    // Phase 19: userId comes from useAuth().currentUser, not localStorage.
+    const userId = currentUser?.id
     if (!userId) return
 
     setActionLoading(appointmentId)

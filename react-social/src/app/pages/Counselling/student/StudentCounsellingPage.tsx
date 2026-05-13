@@ -7,6 +7,7 @@ import UpcomingSessionCard from './components/UpcomingSessionCard'
 import PastSessionCard from './components/PastSessionCard'
 import PendingRatingPrompt from './components/PendingRatingPrompt'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
+import { useAuth } from '../../../modules/auth/core/Auth'
 
 interface Slot {
   date: string
@@ -48,23 +49,25 @@ function hasSlotEnded(slot: Slot): boolean {
 
 const StudentCounsellingPage: React.FC = () => {
   const navigate = useNavigate()
+  const { currentUser } = useAuth()
 
+  // Phase 19 (19-02): student identity now sourced from useAuth().currentUser
+  // (set by cookie-session /auth/me) instead of localStorage.studentPortalProfile.
+  // studentPortalDashboard remains as a data cache (out of scope) — used only
+  // as a fallback for userStudentId when currentUser hasn't surfaced it yet.
   const studentId: number = (() => {
     try {
-      const profile = JSON.parse(localStorage.getItem('studentPortalProfile') || '{}')
+      const u = (currentUser as any) || {}
       const dashboard = JSON.parse(localStorage.getItem('studentPortalDashboard') || '{}')
-      return profile?.userStudentId || dashboard?.userStudentId || 0
+      return u.userStudentId || dashboard?.userStudentId || 0
     } catch {
       return 0
     }
   })()
 
   const userId: number = (() => {
-    try {
-      return JSON.parse(localStorage.getItem('studentPortalProfile') || '{}')?.userId || 0
-    } catch {
-      return 0
-    }
+    const u = (currentUser as any) || {}
+    return u.userId || u.id || 0
   })()
 
   const [appointments, setAppointments] = useState<Appointment[]>([])

@@ -7,6 +7,7 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -40,6 +41,7 @@ public class FourPagerTemplateController {
     private DigitalOceanSpacesService spacesService;
 
     @PostMapping("/upload")
+    @PreAuthorize("@auth.allows('four_pager_template.update')")
     public ResponseEntity<?> uploadTemplates() {
         List<String> uploaded = new ArrayList<>();
         List<String> failed = new ArrayList<>();

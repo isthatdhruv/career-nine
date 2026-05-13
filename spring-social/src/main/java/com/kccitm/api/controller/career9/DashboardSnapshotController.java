@@ -4,6 +4,7 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,6 +20,7 @@ public class DashboardSnapshotController {
     private DashboardSnapshotService dashboardSnapshotService;
 
     @GetMapping("/admin/snapshot")
+    @PreAuthorize("@auth.allows('dashboard_snapshot.read')")
     public ResponseEntity<Map<String, Object>> getAdminSnapshot() {
         Map<String, Object> payload = dashboardSnapshotService.getOrCompute(
                 DashboardSnapshotService.ADMIN_DASHBOARD_KEY, false);
@@ -26,6 +28,7 @@ public class DashboardSnapshotController {
     }
 
     @PostMapping("/admin/snapshot/refresh")
+    @PreAuthorize("@auth.allows('dashboard_snapshot.update')")
     public ResponseEntity<Map<String, Object>> refreshAdminSnapshot() {
         Map<String, Object> payload = dashboardSnapshotService.getOrCompute(
                 DashboardSnapshotService.ADMIN_DASHBOARD_KEY, true);

@@ -5,6 +5,7 @@ import PortalLayout, { MenuItem } from '../portal/PortalLayout'
 import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
 import { getSlotsByCounsellor, createManualSlot, deleteSlot } from '../Counselling/API/SlotAPI'
 import { submitBlockDateRequest, getBlockRequestsByCounsellor, BlockDateRequest } from '../Counselling/API/BlockDateRequestAPI'
+import { useAuth } from '../../modules/auth'
 import { useRefreshInterval } from '../../utils/useAutoRefresh'
 import './CounsellorPortal.css'
 
@@ -78,8 +79,6 @@ const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
   },
 ]
 
-const COUNSELLOR_STORAGE_KEYS = ['counsellorPortalToken', 'counsellorPortalUser', 'counsellorPortalLoggedIn']
-
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 interface TemplateForm {
@@ -148,6 +147,7 @@ const labelStyle: React.CSSProperties = {
 
 const CounsellorAvailabilityPage: React.FC = () => {
   const navigate = useNavigate()
+  const { currentUser } = useAuth()
   const [counsellorId, setCounsellorId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -197,57 +197,42 @@ const CounsellorAvailabilityPage: React.FC = () => {
   useRefreshInterval(refreshAvailability, { skip: !counsellorId })
 
   useEffect(() => {
-    const isLoggedIn = localStorage.getItem('counsellorPortalLoggedIn')
-    if (!isLoggedIn) {
-      navigate('/counsellor/login')
+    // Phase 19: derive counsellorId from useAuth().currentUser.
+    // TODO(phase-19-followup): /auth/me does not yet expose counsellorId;
+    // resolve it via getCounsellorByUserId until the backend payload includes it.
+    if (!currentUser) {
+      navigate('/counsellor/login', { replace: true })
       return
     }
-    try {
-      const userStr = localStorage.getItem('counsellorPortalUser')
-      if (userStr) {
-        const user = JSON.parse(userStr)
-        const cId = user.counsellorId || null
 
-        const loadData = (id: number) => {
-          setCounsellorId(id)
-          return Promise.all([
-            axios.get(`${API_URL}/api/availability-template/get/by-counsellor/${id}`),
-            getSlotsByCounsellor(id),
-            getBlockRequestsByCounsellor(id).catch(() => ({ data: [] })),
-          ]).then(([tRes, sRes, brRes]) => {
-            setTemplates(tRes.data || [])
-            const slots: any[] = sRes.data || []
-            setManualSlots(slots.filter((s: any) => !s.isBlocked))
-            setBlockedDates(slots.filter((s: any) => s.isBlocked))
-            setBlockRequests(Array.isArray(brRes.data) ? brRes.data : [])
-          })
-        }
-
-        if (cId) {
-          loadData(cId)
-            .catch(() => setError('Failed to load availability data.'))
-            .finally(() => setLoading(false))
-        } else if (user.id) {
-          getCounsellorByUserId(user.id)
-            .then((res) => {
-              const resolvedId = res.data?.id
-              if (!resolvedId) {
-                setError('Counsellor profile not found.')
-                setLoading(false)
-                return
-              }
-              return loadData(resolvedId)
-            })
-            .catch(() => setError('Counsellor profile not found.'))
-            .finally(() => setLoading(false))
-        } else {
-          setLoading(false)
-        }
-      }
-    } catch {
-      navigate('/counsellor/login')
+    const loadData = (id: number) => {
+      setCounsellorId(id)
+      return Promise.all([
+        axios.get(`${API_URL}/api/availability-template/get/by-counsellor/${id}`),
+        getSlotsByCounsellor(id),
+        getBlockRequestsByCounsellor(id).catch(() => ({ data: [] })),
+      ]).then(([tRes, sRes, brRes]) => {
+        setTemplates(tRes.data || [])
+        const slots: any[] = sRes.data || []
+        setManualSlots(slots.filter((s: any) => !s.isBlocked))
+        setBlockedDates(slots.filter((s: any) => s.isBlocked))
+        setBlockRequests(Array.isArray(brRes.data) ? brRes.data : [])
+      })
     }
-  }, [navigate])
+
+    getCounsellorByUserId(currentUser.id)
+      .then((res) => {
+        const resolvedId = res.data?.id
+        if (!resolvedId) {
+          setError('Counsellor profile not found.')
+          setLoading(false)
+          return
+        }
+        return loadData(resolvedId)
+      })
+      .catch(() => setError('Counsellor profile not found.'))
+      .finally(() => setLoading(false))
+  }, [currentUser, navigate])
 
   const reloadTemplates = () => {
     if (!counsellorId) return
@@ -409,7 +394,7 @@ const CounsellorAvailabilityPage: React.FC = () => {
     <PortalLayout
       title='Counsellor Dashboard'
       menuItems={COUNSELLOR_MENU_ITEMS}
-      storageKeys={COUNSELLOR_STORAGE_KEYS}
+      storageKeys={[]}
       loginPath='/counsellor/login'
     >
       {/* Header */}

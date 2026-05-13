@@ -27,6 +27,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -102,11 +103,15 @@ public class StudentInfoController {
     @Autowired
     private com.kccitm.api.repository.Career9.StudentDemographicResponseRepository studentDemographicResponseRepository;
 
+    // no scope arg: cross-institute list — scope-filter (Plan 15-06) narrows result set
+    @PreAuthorize("@auth.allows('student_info.read.all')")
     @GetMapping("/getAll")
     public List<StudentInfo> getAllStudentInfo() {
         return studentInfoRepository.findAll();
     }
 
+    // no scope arg: identifies student by userStudentId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_info.read')")
     @GetMapping("/getStudentAnswersWithDetails")
     public List<Map<String, Object>> getStudentAnswersWithDetails(
             @RequestParam Long userStudentId,
@@ -189,6 +194,8 @@ public class StudentInfoController {
                 .collect(Collectors.toList());
     }
 
+    // no scope arg: body is list of id-pairs; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_info.read')")
     @PostMapping("/getBulkStudentAnswersWithDetails")
     public List<Map<String, Object>> getBulkStudentAnswersWithDetails(
             @RequestBody List<Map<String, Long>> studentAssessmentPairs) {
@@ -283,6 +290,7 @@ public class StudentInfoController {
         return allRows;
     }
 
+    @PreAuthorize("@auth.allows('student_info.create', #studentInfo.instituteId, null, null, null)")
     @PostMapping("/add")
     public StudentAssessmentMapping addStudentInfo(@RequestBody StudentInfo studentInfo) {
         try {
@@ -333,12 +341,16 @@ public class StudentInfoController {
         }
     }
 
+    // no scope arg: mapping body has only ids; scope enforcement via filter
+    @PreAuthorize("@auth.allows('student_info.update')")
     @PostMapping("/alotAssessmentToStudent")
     public StudentAssessmentMapping alotAssessmentToStudent(
             @RequestBody StudentAssessmentMapping studentAssessmentMapping) {
         return studentAssessmentMappingRepository.save(studentAssessmentMapping);
     }
 
+    // no scope arg: body is raw id-pair list; scope enforced via filter
+    @PreAuthorize("@auth.allows('student_info.update')")
     @PostMapping("/bulkAlotAssessment")
     @org.springframework.transaction.annotation.Transactional
     public synchronized ResponseEntity<?> bulkAlotAssessment(
@@ -419,11 +431,13 @@ public class StudentInfoController {
         return ResponseEntity.ok(savedMappings);
     }
 
+    @PreAuthorize("@auth.allows('student_info.read', #instituteId, null, null, null)")
     @GetMapping("/getByInstituteId/{instituteId}")
     public List<StudentInfo> getByInstituteId(@PathVariable("instituteId") Integer instituteId) {
         return studentInfoRepository.findByInstituteId(instituteId);
     }
 
+    @PreAuthorize("@auth.allows('student_info.read', #instituteId, null, null, null)")
     @Transactional
     @GetMapping("/getStudentsWithMappingByInstituteId/{instituteId}")
     public List<java.util.Map<String, Object>> getStudentsWithMappingByInstituteId(
@@ -438,6 +452,8 @@ public class StudentInfoController {
         }
     }
 
+    // no scope arg: cross-institute list — scope-filter narrows result set
+    @PreAuthorize("@auth.allows('student_info.read.all')")
     @Transactional
     @GetMapping("/getAllStudentsWithMapping")
     public List<java.util.Map<String, Object>> getAllStudentsWithMapping() {
@@ -635,16 +651,21 @@ public class StudentInfoController {
         }
     }
 
+    @PreAuthorize("@auth.allows('student_info.update', #studentInfo.instituteId, null, null, null)")
     @PostMapping("/update")
     public StudentInfo updateStudentInfo(@RequestBody StudentInfo studentInfo) {
         return studentInfoRepository.save(studentInfo);
     }
 
+    // no scope arg: delete by id alone; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_info.delete')")
     @PostMapping("/delete/{id}")
     public void deleteStudentInfo(@PathVariable("id") Long id) {
         studentInfoRepository.deleteById(id);
     }
 
+    // no scope arg: identifies by userStudentId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_info.read')")
     @GetMapping("/getDemographics/{userStudentId}")
     public ResponseEntity<?> getDemographics(@PathVariable("userStudentId") Long userStudentId) {
         UserStudent userStudent = userStudentRepository.findById(userStudentId)
@@ -683,6 +704,8 @@ public class StudentInfoController {
         return ResponseEntity.ok(response);
     }
 
+    // no scope arg: body is raw Map<String,Object>; SpEL cannot address its keys
+    @PreAuthorize("@auth.allows('student_info.update')")
     @PostMapping("/updateDemographics")
     public ResponseEntity<?> updateDemographics(@RequestBody Map<String, Object> request) {
         Long userStudentId = Long.valueOf(request.get("userStudentId").toString());
@@ -751,6 +774,8 @@ public class StudentInfoController {
         return ResponseEntity.ok(response);
     }
 
+    // no scope arg: body is raw Map<String,Object>; admin-only operation, scope enforced via filter
+    @PreAuthorize("@auth.allows('student_info.update')")
     @PostMapping("/resetAssessment")
     @javax.transaction.Transactional
     public ResponseEntity<?> resetAssessment(@RequestBody Map<String, Object> request) {
@@ -852,6 +877,8 @@ public class StudentInfoController {
         return ResponseEntity.ok(response);
     }
 
+    // no scope arg: identifies student by userStudentId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_info.read')")
     @GetMapping("/getStudentScores")
     public ResponseEntity<?> getStudentScores(
             @RequestParam Long userStudentId,
@@ -905,6 +932,7 @@ public class StudentInfoController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("@auth.allows('student_info.read', #instituteId, null, null, null)")
     @GetMapping("/exportScoresByInstitute/{instituteId}")
     public ResponseEntity<?> exportScoresByInstitute(
             @PathVariable("instituteId") Integer instituteId,
@@ -1143,6 +1171,7 @@ public class StudentInfoController {
         }
     }
 
+    @PreAuthorize("@auth.allows('student_info.read', #instituteId, null, null, null)")
     @GetMapping("/bet-report/{instituteId}/{assessmentId}")
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public ResponseEntity<?> getBetReport(
@@ -1288,6 +1317,8 @@ public class StudentInfoController {
         return ResponseEntity.ok(response);
     }
 
+    // no scope arg: body is raw id-pair list; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_info.delete')")
     @PostMapping("/bulkRemoveAssessment")
     @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<?> bulkRemoveAssessment(@RequestBody List<Map<String, Long>> removals) {

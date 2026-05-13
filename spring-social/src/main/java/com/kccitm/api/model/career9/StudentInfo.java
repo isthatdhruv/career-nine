@@ -14,10 +14,45 @@ import javax.persistence.OneToOne;
 import javax.persistence.Table;
 import javax.persistence.Transient;
 
+import org.hibernate.annotations.Filter;
+import org.hibernate.annotations.FilterDef;
+import org.hibernate.annotations.ParamDef;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.kccitm.api.model.User;
 
+/**
+ * <strong>Phase 15-06 — ABAC row-level filter.</strong>
+ *
+ * <p>The {@code @FilterDef} declared here is referenced by every scope-aware
+ * entity in the model layer (StudentInfo, UserStudent, AssessmentTable,
+ * Campaign, InstituteBranch). It declares the four ABAC parameter lists
+ * (institute / session / course / section) populated once per request by
+ * {@link com.kccitm.api.security.ScopeFilterInterceptor}.
+ *
+ * <p>Each entity then applies a {@code @Filter} with a SQL fragment using ONLY
+ * the columns that exist on that entity's table; missing dimensions are
+ * silently omitted from the condition.
+ *
+ * <p>Section is INTENTIONALLY EXCLUDED from this filter — it is a global
+ * lookup table (id/name/display) with no institute FK; filtering it on
+ * {@code id IN (:sectionIds) OR id IS NULL} would zero out every Section row
+ * for any caller without an explicit section-level scope grant. Section
+ * access cascades naturally via Branch → Institute and via StudentInfo →
+ * Section relationships, both of which ARE filtered through this defn.
+ */
+@FilterDef(name = "scopeFilter", parameters = {
+        @ParamDef(name = "instituteIds", type = "integer"),
+        @ParamDef(name = "sessionIds",   type = "integer"),
+        @ParamDef(name = "courseCodes",  type = "integer"),
+        @ParamDef(name = "sectionIds",   type = "long")
+})
+@Filter(name = "scopeFilter", condition =
+        "(institute_id IN (:instituteIds) OR institute_id IS NULL)"
+      + " AND (session_id IN (:sessionIds) OR session_id IS NULL)"
+      + " AND (course_code IN (:courseCodes) OR course_code IS NULL)"
+      + " AND (school_section_id IN (:sectionIds) OR school_section_id IS NULL)")
 @Entity
 @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
 @Table(name = "student_info")
@@ -53,6 +88,12 @@ public class StudentInfo implements Serializable {
 
     @Column(name = "institute_id")
     private Integer instituteId;
+
+    @Column(name = "session_id")
+    private Integer sessionId;
+
+    @Column(name = "course_code")
+    private Integer courseCode;
 
     @Column(name = "school_section_id")
     private Integer schoolSectionId;
@@ -141,6 +182,22 @@ public class StudentInfo implements Serializable {
 
     public void setInstituteId(Integer instituteId) {
         this.instituteId = instituteId;
+    }
+
+    public Integer getSessionId() {
+        return sessionId;
+    }
+
+    public void setSessionId(Integer sessionId) {
+        this.sessionId = sessionId;
+    }
+
+    public Integer getCourseCode() {
+        return courseCode;
+    }
+
+    public void setCourseCode(Integer courseCode) {
+        this.courseCode = courseCode;
     }
 
     public String getAssesment_id() {

@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,6 +33,7 @@ public class AssessmentQuestionOptionsController {
     private AssessmentQuestionRepository assessmentQuestionRepository;
 
     @GetMapping("/getAll")
+    @PreAuthorize("@auth.allows('assessment_question_option.read')")
     public List<AssessmentQuestionOptions> getAllAssessmentQuestionOptions() {
         List<AssessmentQuestionOptions> aqo =  assessmentQuestionOptionsRepository.findAll();
         aqo.iterator().forEachRemaining(option -> {
@@ -46,6 +48,7 @@ public class AssessmentQuestionOptionsController {
     }
 
     @GetMapping("/get/{id}")
+    @PreAuthorize("@auth.allows('assessment_question_option.read')")
     public ResponseEntity<AssessmentQuestionOptions> getAssessmentQuestionOptionsById(@PathVariable Long id) {
         AssessmentQuestionOptions option = assessmentQuestionOptionsRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("AssessmentQuestionOption", "id", id));
@@ -53,6 +56,7 @@ public class AssessmentQuestionOptionsController {
     }
 
     @PostMapping("/create")
+    @PreAuthorize("@auth.allows('assessment_question_option.create')")
     public ResponseEntity<AssessmentQuestionOptions> createAssessmentQuestionOptions(@RequestBody AssessmentQuestionOptions assessmentQuestionOptions) {
         try {
             // Validate that the question exists if provided
@@ -72,6 +76,7 @@ public class AssessmentQuestionOptionsController {
     }
     
     @PutMapping("/update/{id}")
+    @PreAuthorize("@auth.allows('assessment_question_option.update')")
     public ResponseEntity<AssessmentQuestionOptions> updateAssessmentQuestionOptions(@PathVariable Long id, @RequestBody AssessmentQuestionOptions assessmentQuestionOptions) {
         try {
             // Get existing option to preserve relationships
@@ -98,6 +103,7 @@ public class AssessmentQuestionOptionsController {
     }
     
     @DeleteMapping("/delete/{id}")
+    @PreAuthorize("@auth.allows('assessment_question_option.delete')")
     public ResponseEntity<String> deleteAssessmentQuestionOptions(@PathVariable Long id) {
         if (!assessmentQuestionOptionsRepository.existsById(id)) {
             throw new ResourceNotFoundException("AssessmentQuestionOption", "id", id);
@@ -108,6 +114,7 @@ public class AssessmentQuestionOptionsController {
     
     // Additional endpoints for relationship management
     @GetMapping("/by-question/{questionId}")
+    @PreAuthorize("@auth.allows('assessment_question_option.read')")
     public ResponseEntity<List<AssessmentQuestionOptions>> getOptionsByQuestion(@PathVariable Long questionId) {
         AssessmentQuestions question = assessmentQuestionRepository.findById(questionId)
             .orElseThrow(() -> new ResourceNotFoundException("AssessmentQuestion", "id", questionId));

@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,6 +32,8 @@ public class AvailabilityTemplateController {
     @Autowired
     private SlotMaterializationService materializationService;
 
+    // no scope arg: body is AvailabilityTemplate; counsellor-scoped admin
+    @PreAuthorize("@auth.allows('counselling.availability_template.create')")
     @PostMapping("/create")
     public ResponseEntity<AvailabilityTemplate> create(
             @RequestBody AvailabilityTemplate template,
@@ -42,11 +45,15 @@ public class AvailabilityTemplateController {
         return ResponseEntity.ok(saved);
     }
 
+    // no scope arg: identifies by counsellorId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('counselling.availability_template.read')")
     @GetMapping("/get/by-counsellor/{counsellorId}")
     public ResponseEntity<List<AvailabilityTemplate>> getByCounsellorId(@PathVariable Long counsellorId) {
         return ResponseEntity.ok(templateRepository.findByCounsellorId(counsellorId));
     }
 
+    // no scope arg: update by id; scope-filter narrows access
+    @PreAuthorize("@auth.allows('counselling.availability_template.update')")
     @PutMapping("/update/{id}")
     public ResponseEntity<AvailabilityTemplate> update(@PathVariable Long id,
             @RequestBody AvailabilityTemplate updated) {
@@ -68,6 +75,8 @@ public class AvailabilityTemplateController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
+    // no scope arg: delete by id; scope-filter narrows access
+    @PreAuthorize("@auth.allows('counselling.availability_template.delete')")
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         logger.info("Deleting availability template with id: {}", id);
@@ -75,6 +84,8 @@ public class AvailabilityTemplateController {
         return ResponseEntity.ok().build();
     }
 
+    // no scope arg: toggle by id; scope-filter narrows access
+    @PreAuthorize("@auth.allows('counselling.availability_template.update')")
     @PutMapping("/toggle-active/{id}")
     public ResponseEntity<AvailabilityTemplate> toggleActive(@PathVariable Long id) {
         return templateRepository.findById(id).map(template -> {

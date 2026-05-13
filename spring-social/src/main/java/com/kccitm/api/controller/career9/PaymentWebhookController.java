@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -75,6 +76,8 @@ public class PaymentWebhookController {
     @Autowired
     private com.kccitm.api.service.StudentSessionService studentSessionService;
 
+    // @PreAuthorize-Exempt: Razorpay HMAC signature auth, not user JWT — anonymous-by-design
+    // See ControllerPreAuthorizeCoverageTest.EXCLUSIONS (15-02 / 15-06)
     @PostMapping("/razorpay")
     @Transactional
     public ResponseEntity<?> handleRazorpayWebhook(
@@ -128,6 +131,7 @@ public class PaymentWebhookController {
      * Returns the actual DB status (set by webhook), not the query param from Razorpay redirect.
      * Frontend polls until status != "created" (i.e., webhook has arrived and updated it).
      */
+    @PreAuthorize("@auth.allows('payment_webhook.read')")
     @GetMapping("/status/{razorpayLinkId}")
     public ResponseEntity<?> getPaymentStatus(@PathVariable String razorpayLinkId) {
         Optional<PaymentTransaction> txnOpt = paymentTransactionRepository
@@ -167,6 +171,7 @@ public class PaymentWebhookController {
      * Public endpoint: get transaction info for registration form.
      * GET /payment/webhook/info/{transactionId}
      */
+    @PreAuthorize("@auth.allows('payment_webhook.read')")
     @GetMapping("/info/{transactionId}")
     public ResponseEntity<?> getTransactionInfo(@PathVariable Long transactionId) {
         Optional<PaymentTransaction> txnOpt = paymentTransactionRepository.findById(transactionId);
@@ -201,6 +206,8 @@ public class PaymentWebhookController {
      * POST /payment/webhook/register/{transactionId}
      * Body: { name, email, dob (dd-MM-yyyy), phone, gender, studentClass }
      */
+    // payment.update not in enum; use payment.create (creating pre-payment student-detail record)
+    @PreAuthorize("@auth.allows('payment.create')")
     @PostMapping("/register/{transactionId}")
     public ResponseEntity<?> registerStudentDetails(
             @PathVariable Long transactionId,

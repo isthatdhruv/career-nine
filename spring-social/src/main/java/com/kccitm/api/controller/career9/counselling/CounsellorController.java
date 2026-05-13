@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -47,6 +48,8 @@ public class CounsellorController {
      * Sets onboardingStatus = PENDING, isActive = false.
      * Counsellor cannot login until admin sets isActive = true.
      */
+    // PUBLIC?: flagged for 15-06 exclusions review — counsellor self-registration (anonymous pre-auth)
+    @PreAuthorize("@auth.allows('counsellor.create')")
     @PostMapping("/self-register")
     public ResponseEntity<?> selfRegister(@RequestBody Map<String, Object> body) {
         String name = (String) body.get("name");
@@ -114,6 +117,8 @@ public class CounsellorController {
      * Counsellor login with email + password.
      * Only allows login if isActive = true (admin approved).
      */
+    // PUBLIC?: flagged for 15-06 exclusions review — counsellor login (anonymous pre-auth)
+    @PreAuthorize("@auth.allows('counsellor.read')")
     @PostMapping("/login")
     public ResponseEntity<?> counsellorLogin(@RequestBody Map<String, Object> body) {
         String email = (String) body.get("email");
@@ -183,6 +188,8 @@ public class CounsellorController {
      * Upload a profile photo as base64 data URL.
      * Body: { "photo": "data:image/png;base64,..." }
      */
+    // no scope arg: update by id; counsellor self-update photo
+    @PreAuthorize("@auth.allows('counsellor.update')")
     @PostMapping("/upload-photo/{id}")
     public ResponseEntity<?> uploadPhoto(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         String photo = (String) body.get("photo");
@@ -208,22 +215,30 @@ public class CounsellorController {
         }
     }
 
+    // no scope arg: body is Counsellor entity; admin-only create
+    @PreAuthorize("@auth.allows('counsellor.create')")
     @PostMapping("/create")
     public ResponseEntity<Counsellor> create(@RequestBody Counsellor counsellor) {
         logger.info("Creating new counsellor: {}", counsellor.getName());
         return ResponseEntity.ok(counsellorService.create(counsellor));
     }
 
+    // no scope arg: catalog list — counsellor entries are global
+    @PreAuthorize("@auth.allows('counsellor.read')")
     @GetMapping("/getAll")
     public ResponseEntity<List<Counsellor>> getAll() {
         return ResponseEntity.ok(counsellorService.getAll());
     }
 
+    // no scope arg: catalog list — active counsellors
+    @PreAuthorize("@auth.allows('counsellor.read')")
     @GetMapping("/getActive")
     public ResponseEntity<List<Counsellor>> getActive() {
         return ResponseEntity.ok(counsellorService.getAllActive());
     }
 
+    // no scope arg: fetch by id
+    @PreAuthorize("@auth.allows('counsellor.read')")
     @GetMapping("/get/{id}")
     public ResponseEntity<Counsellor> getById(@PathVariable Long id) {
         return counsellorService.getById(id)
@@ -231,6 +246,8 @@ public class CounsellorController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    // no scope arg: fetch by user id
+    @PreAuthorize("@auth.allows('counsellor.read')")
     @GetMapping("/get/by-user/{userId}")
     public ResponseEntity<Counsellor> getByUserId(@PathVariable Long userId) {
         return counsellorService.getByUserId(userId)
@@ -238,12 +255,16 @@ public class CounsellorController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    // no scope arg: update by id; admin-only
+    @PreAuthorize("@auth.allows('counsellor.update')")
     @PutMapping("/update/{id}")
     public ResponseEntity<Counsellor> update(@PathVariable Long id, @RequestBody Counsellor counsellor) {
         logger.info("Updating counsellor with id: {}", id);
         return ResponseEntity.ok(counsellorService.update(id, counsellor));
     }
 
+    // no scope arg: toggle by id; admin-only approval action
+    @PreAuthorize("@auth.allows('counsellor.update')")
     @PutMapping("/toggle-active/{id}")
     public ResponseEntity<Counsellor> toggleActive(@PathVariable Long id) {
         logger.info("Toggling active status for counsellor with id: {}", id);

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import PortalLayout, { MenuItem } from '../portal/PortalLayout'
-import { getCounsellorById } from '../Counselling/API/CounsellorAPI'
+import { getCounsellorById, getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
+import { useAuth } from '../../modules/auth'
 import './CounsellorPortal.css'
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8091'
@@ -15,8 +16,6 @@ const MENU_ITEMS: MenuItem[] = [
   { label: 'Reports', path: '/counsellor/reports', icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><line x1='18' y1='20' x2='18' y2='10'/><line x1='12' y1='20' x2='12' y2='4'/><line x1='6' y1='20' x2='6' y2='14'/></svg> },
   { label: 'My Profile', path: '/counsellor/profile', icon: <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'><path d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/><circle cx='12' cy='7' r='4'/></svg> },
 ]
-const STORAGE_KEYS = ['counsellorPortalToken', 'counsellorPortalUser', 'counsellorPortalLoggedIn']
-
 interface ProfileForm {
   name: string
   email: string
@@ -39,6 +38,7 @@ interface ProfileForm {
 
 const CounsellorProfilePage: React.FC = () => {
   const navigate = useNavigate()
+  const { currentUser } = useAuth()
   const [loading, setLoading] = useState(true)
   const [counsellorId, setCounsellorId] = useState<number | null>(null)
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null)
@@ -54,15 +54,13 @@ const CounsellorProfilePage: React.FC = () => {
   const photoRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    const userStr = localStorage.getItem('counsellorPortalUser')
-    if (!userStr) { navigate('/counsellor/login'); return }
+    // Phase 19: derive counsellorId from currentUser via the existing
+    // getCounsellorByUserId lookup. TODO(phase-19-followup): when /auth/me
+    // starts exposing counsellorId directly, skip this extra round-trip.
+    if (!currentUser) { navigate('/counsellor/login', { replace: true }); return }
 
-    try {
-      const user = JSON.parse(userStr)
-      const cId = user.counsellorId
-      if (!cId) { navigate('/counsellor/dashboard'); return }
+    const loadProfile = (cId: number) => {
       setCounsellorId(cId)
-
       getCounsellorById(cId)
         .then((res) => {
           const d = res.data
@@ -89,10 +87,23 @@ const CounsellorProfilePage: React.FC = () => {
         })
         .catch(() => setError('Failed to load profile.'))
         .finally(() => setLoading(false))
-    } catch {
-      navigate('/counsellor/login')
     }
-  }, [navigate])
+
+    getCounsellorByUserId(currentUser.id)
+      .then((res) => {
+        const resolvedId = res.data?.id
+        if (!resolvedId) {
+          setError('Counsellor profile not found.')
+          setLoading(false)
+          return
+        }
+        loadProfile(resolvedId)
+      })
+      .catch(() => {
+        setError('Counsellor profile not found.')
+        setLoading(false)
+      })
+  }, [currentUser, navigate])
 
   const handleSave = async () => {
     if (!counsellorId) return
@@ -121,13 +132,11 @@ const CounsellorProfilePage: React.FC = () => {
         bankIfsc: form.bankIfsc.trim(),
         bankBranch: form.bankBranch.trim(),
       })
-      // Update localStorage
-      const stored = localStorage.getItem('counsellorPortalUser')
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        parsed.name = form.name.trim()
-        localStorage.setItem('counsellorPortalUser', JSON.stringify(parsed))
-      }
+      // Phase 19: no localStorage write-back. The legacy code denormalised
+      // the counsellor name into a local JSON blob; that blob is gone.
+      // currentUser.name comes from /auth/me, which the backend keeps in sync
+      // with the user record; if the displayed name needs to refresh, a future
+      // refactor can re-call /auth/me here.
       setSuccess('Profile updated successfully.')
       setTimeout(() => setSuccess(''), 4000)
     } catch {
@@ -169,14 +178,14 @@ const CounsellorProfilePage: React.FC = () => {
 
   if (loading) {
     return (
-      <PortalLayout title='Counsellor Dashboard' menuItems={MENU_ITEMS} storageKeys={STORAGE_KEYS} loginPath='/counsellor/login'>
+      <PortalLayout title='Counsellor Dashboard' menuItems={MENU_ITEMS} storageKeys={[]} loginPath='/counsellor/login'>
         <div style={{ textAlign: 'center', padding: '60px 0', color: '#5C7A72' }}>Loading profile...</div>
       </PortalLayout>
     )
   }
 
   return (
-    <PortalLayout title='Counsellor Dashboard' menuItems={MENU_ITEMS} storageKeys={STORAGE_KEYS} loginPath='/counsellor/login'>
+    <PortalLayout title='Counsellor Dashboard' menuItems={MENU_ITEMS} storageKeys={[]} loginPath='/counsellor/login'>
       <div style={{ maxWidth: 760, margin: '0 auto' }}>
 
         {/* Header */}

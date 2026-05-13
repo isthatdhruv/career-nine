@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -62,6 +63,8 @@ public class BlockDateRequestController {
      * Counsellor submits a block date request.
      * Status = PENDING. Email sent to admin.
      */
+    // no scope arg: body is raw Map; counsellor submits block-date request
+    @PreAuthorize("@auth.allows('counselling.block_date.create')")
     @PostMapping("/submit")
     public ResponseEntity<?> submit(@RequestBody Map<String, Object> body) {
         Long counsellorId = ((Number) body.get("counsellorId")).longValue();
@@ -88,18 +91,24 @@ public class BlockDateRequestController {
     }
 
     /** Get all pending requests (for admin) */
+    // no scope arg: admin view of pending requests
+    @PreAuthorize("@auth.allows('counselling.block_date.read')")
     @GetMapping("/pending")
     public ResponseEntity<List<BlockDateRequest>> getPending() {
         return ResponseEntity.ok(requestRepository.findByStatus("PENDING"));
     }
 
     /** Get requests for a specific counsellor */
+    // no scope arg: identifies by counsellorId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('counselling.block_date.read')")
     @GetMapping("/by-counsellor/{counsellorId}")
     public ResponseEntity<List<BlockDateRequest>> getByCounsellor(@PathVariable Long counsellorId) {
         return ResponseEntity.ok(requestRepository.findByCounsellorId(counsellorId));
     }
 
     /** Admin approves a request — actually blocks the date */
+    // no scope arg: approve by id; admin-only
+    @PreAuthorize("@auth.allows('counselling.block_date.update')")
     @PutMapping("/approve/{id}")
     public ResponseEntity<?> approve(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> body) {
         BlockDateRequest request = requestRepository.findById(id)
@@ -302,6 +311,8 @@ public class BlockDateRequestController {
     }
 
     /** Admin rejects a request */
+    // no scope arg: reject by id; admin-only
+    @PreAuthorize("@auth.allows('counselling.block_date.update')")
     @PutMapping("/reject/{id}")
     public ResponseEntity<?> reject(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> body) {
         BlockDateRequest request = requestRepository.findById(id)

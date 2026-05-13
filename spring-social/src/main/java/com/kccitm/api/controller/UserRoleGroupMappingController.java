@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,6 +24,7 @@ import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.repository.UserRoleGroupMappingRepository;
 import com.kccitm.api.security.CurrentUser;
 import com.kccitm.api.security.UserPrincipal;
+import com.kccitm.api.security.audit.SensitiveOp;
 import com.kccitm.api.service.GoogleAPIAdmin;
 
 @RestController
@@ -40,12 +42,27 @@ public class UserRoleGroupMappingController {
 	@Autowired
 	private RoleGroupRepository roleGroupRepository;
 
+	@PreAuthorize("@auth.allows('user_role_group_mapping.read.all')")
 	@GetMapping(value = "userrolegroupmapping/get", headers = "Accept=application/json")
 	public List<UserRoleGroupMapping> getAllRoles() {
 		List<UserRoleGroupMapping> allUserroleGroupMapping = userRoleGroupMappingRepository.findByDisplay(true);
 		return allUserroleGroupMapping;
 	}
 
+	/**
+	 * Replaces a user's role-group mappings with a new set. Annotated
+	 * {@code @SensitiveOp("role.assign")} per Plan 20-02 Task 2 Step C — every
+	 * invocation writes one {@code auth_audit} row via
+	 * {@link com.kccitm.api.security.audit.SensitiveOpAspect} (ALLOW on success,
+	 * DENY on exception).
+	 *
+	 * <p>Annotation lives on the controller because no
+	 * {@code UserRoleGroupMappingService} exists yet — Plan 15-06 (or a
+	 * follow-up plan that introduces the service layer) MUST relocate this
+	 * annotation to the service method and document the move.
+	 */
+	@SensitiveOp("role.assign")
+	@PreAuthorize("@auth.allows('user_role_group_mapping.update')")
 	@PostMapping(value = "userrolegroupmapping/update", headers = "Accept=application/json")
 	public List<UserRoleGroupMapping> updateUserRoleGroup(@RequestBody Map<String, UserRoleGroupMapping> inputData) {
 		UserRoleGroupMapping r = inputData.get("values");
@@ -64,6 +81,13 @@ public class UserRoleGroupMappingController {
 		return userRoleGroupMappingRepository.findByUser(r.getUser());
 	}
 
+	/**
+	 * Soft-deletes a single role-group mapping (sets {@code display=false}).
+	 * Annotated {@code @SensitiveOp("role.assign")} per Plan 20-02 — the audit
+	 * row captures the privileged revocation regardless of success/failure.
+	 */
+	@SensitiveOp("role.assign")
+	@PreAuthorize("@auth.allows('user_role_group_mapping.delete')")
 	@GetMapping(value = "userrolegroupmapping/delete/{id}", headers = "Accept=application/json")
 	public UserRoleGroupMapping deleteUserRoleGroup(@PathVariable("id") int roleGroupId) {
 		UserRoleGroupMapping roleGroup = userRoleGroupMappingRepository.getOne(roleGroupId);
@@ -72,6 +96,7 @@ public class UserRoleGroupMappingController {
 		return r;
 	}
 
+	@PreAuthorize("@auth.allows('user_role_group_mapping.read')")
 	@GetMapping(value = "/userrole/get/{email}", headers = "Accept=application/json")
 	public List<User> getUser(@PathVariable("email") String query, @CurrentUser UserPrincipal users)
 			throws GeneralSecurityException, IOException {
@@ -87,6 +112,14 @@ public class UserRoleGroupMappingController {
 		return returnUser;
 	}
 
+	/**
+	 * Replaces a user's role-group mappings keyed by Google Workspace email.
+	 * Also auto-provisions a {@code User} row if one doesn't exist for that
+	 * email yet. Annotated {@code @SensitiveOp("role.assign")} per Plan 20-02
+	 * — privileged role mutation, audit row written regardless of branch.
+	 */
+	@SensitiveOp("role.assign")
+	@PreAuthorize("@auth.allows('user_role_group_mapping.update')")
 	@PostMapping(value = "/userrole/update/{email}", headers = "Accept=application/json")
 	public List<Integer> updateUserRole(@PathVariable("email") String query,
 			@RequestBody Map<String, List<Integer>> inputData,

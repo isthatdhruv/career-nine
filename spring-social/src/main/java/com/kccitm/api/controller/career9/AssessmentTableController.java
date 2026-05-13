@@ -17,6 +17,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -153,18 +154,23 @@ public class AssessmentTableController {
 
     // ─── Endpoints ───
 
+    // SCOPE: filtered by Hibernate scopeFilter (Plan 15-06) for non-super-admin callers.
     @GetMapping("/getAll")
+    @PreAuthorize("@auth.allows('assessment.read.all')")
     public ResponseEntity<List<AssessmentTable>> getAllAssessments() {
         List<AssessmentTable> assessments = assessmentTableRepository.findByIsDeletedFalseOrIsDeletedIsNull();
         return ResponseEntity.ok(assessments);
     }
 
+    // SCOPE: filtered by Hibernate scopeFilter (Plan 15-06) for non-super-admin callers.
     @GetMapping("/get/list")
+    @PreAuthorize("@auth.allows('assessment.read.all')")
     public List<AssessmentTable> getAllAssessment() {
         return assessmentTableRepository.findByIsDeletedFalseOrIsDeletedIsNull();
     }
 
     @GetMapping("/get/by-institute/{instituteCode}")
+    @PreAuthorize("@auth.allows('assessment.read')")
     public ResponseEntity<List<AssessmentTable>> getAssessmentsByInstitute(@PathVariable Integer instituteCode) {
         List<Long> assessmentIds = studentAssessmentMappingRepository
                 .findDistinctAssessmentIdsByInstituteCode(instituteCode);
@@ -176,6 +182,7 @@ public class AssessmentTableController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@auth.allows('assessment.read')")
     public ResponseEntity<HashMap<String, Object>> getAssessmentById(@PathVariable Long id) {
         Optional<AssessmentTable> assessment = assessmentTableRepository.findById(id);
         HashMap<String, Object> response = new HashMap<>();
@@ -186,6 +193,7 @@ public class AssessmentTableController {
     }
 
     @GetMapping("/{assessmentId}/student/{userStudentId}")
+    @PreAuthorize("@auth.allows('assessment.read')")
     public ResponseEntity<HashMap<String, Object>> getAssessmentStatusForStudent(
             @PathVariable Long assessmentId, @PathVariable Long userStudentId) {
         Optional<AssessmentTable> assessment = assessmentTableRepository.findById(assessmentId);
@@ -209,6 +217,7 @@ public class AssessmentTableController {
     }
 
     @GetMapping("/student/{userStudentId}")
+    @PreAuthorize("@auth.allows('assessment.read')")
     public ResponseEntity<List<HashMap<String, Object>>> getAssessmentsForStudent(
             @PathVariable Long userStudentId) {
         List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
@@ -260,6 +269,7 @@ public class AssessmentTableController {
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     @Cacheable(value = "questionnaireQuestions", key = "#id")
     @GetMapping("/getby/{id}")
+    @PreAuthorize("@auth.allows('assessment.read')")
     public Object getQuestionnaireById(@PathVariable Long id) {
         Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
         if (assessmentOpt.isEmpty()) {
@@ -293,6 +303,7 @@ public class AssessmentTableController {
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     @Cacheable(value = "assessmentDetails", key = "#id")
     @GetMapping("/getById/{id}")
+    @PreAuthorize("@auth.allows('assessment.read')")
     public Object getAssessmentDetailsById(@PathVariable Long id) {
         Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
         if (assessmentOpt.isEmpty()) {
@@ -316,6 +327,7 @@ public class AssessmentTableController {
 
     @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true), @CacheEvict(value = "assessmentSummaryList", allEntries = true) })
     @PostMapping("/create")
+    @PreAuthorize("@auth.allows('assessment.create')")
     public ResponseEntity<AssessmentTable> createAssessment(@RequestBody java.util.Map<String, Object> requestBody) {
         AssessmentTable assessment = new AssessmentTable();
 
@@ -377,6 +389,7 @@ public class AssessmentTableController {
 
     @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true), @CacheEvict(value = "assessmentSummaryList", allEntries = true) })
     @PutMapping("/update/{id}")
+    @PreAuthorize("@auth.allows('assessment.update')")
     public ResponseEntity<AssessmentTable> updateAssessment(@PathVariable Long id,
             @RequestBody AssessmentTable assessment) {
         Optional<AssessmentTable> existingOpt = assessmentTableRepository.findById(id);
@@ -409,6 +422,7 @@ public class AssessmentTableController {
     // Soft-delete: sets isDeleted to true (moves to recycle bin)
     @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true), @CacheEvict(value = "assessmentSummaryList", allEntries = true) })
     @DeleteMapping("/{id}")
+    @PreAuthorize("@auth.allows('assessment.delete')")
     public ResponseEntity<Void> deleteAssessment(@PathVariable Long id) {
         Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
         if (assessmentOpt.isEmpty()) {
@@ -422,6 +436,7 @@ public class AssessmentTableController {
 
     // Get all soft-deleted assessments (recycle bin)
     @GetMapping("/deleted")
+    @PreAuthorize("@auth.allows('assessment.read.all')")
     public ResponseEntity<List<AssessmentTable>> getDeletedAssessments() {
         return ResponseEntity.ok(assessmentTableRepository.findByIsDeletedTrue());
     }
@@ -429,6 +444,7 @@ public class AssessmentTableController {
     // Restore a soft-deleted assessment
     @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true), @CacheEvict(value = "assessmentSummaryList", allEntries = true) })
     @PutMapping("/restore/{id}")
+    @PreAuthorize("@auth.allows('assessment.update')")
     public ResponseEntity<AssessmentTable> restoreAssessment(@PathVariable Long id) {
         Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
         if (assessmentOpt.isEmpty()) {
@@ -443,6 +459,7 @@ public class AssessmentTableController {
     @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true), @CacheEvict(value = "assessmentSummaryList", allEntries = true) })
     @org.springframework.transaction.annotation.Transactional
     @DeleteMapping("/permanent-delete/{id}")
+    @PreAuthorize("@auth.allows('assessment.delete')")
     public ResponseEntity<Void> permanentDeleteAssessment(@PathVariable Long id) {
         Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
         if (assessmentOpt.isEmpty()) {
@@ -467,11 +484,13 @@ public class AssessmentTableController {
     }
 
     @GetMapping("/get/list-summary")
+    @PreAuthorize("@auth.allows('assessment.read.all')")
     public List<AssessmentTableRepository.AssessmentSummary> getAssessmentSummaryList() {
         return assessmentTableRepository.findAssessmentSummaryListNotDeleted();
     }
 
     @GetMapping("/get/list-ids")
+    @PreAuthorize("@auth.allows('assessment.read.all')")
     public HashMap<Long, String> getAllAssessmentIds() {
         HashMap<Long, String> assessmentIdandName = new HashMap<>();
         assessmentTableRepository.findByIsDeletedFalseOrIsDeletedIsNull()
@@ -481,6 +500,7 @@ public class AssessmentTableController {
 
     // Get all locked assessment IDs (used by frontend build to sync static cache)
     @GetMapping("/locked-ids")
+    @PreAuthorize("@auth.allows('assessment.read.all')")
     public ResponseEntity<List<Long>> getLockedAssessmentIds() {
         List<Long> ids = assessmentTableRepository.findByIsLockedTrue()
                 .stream().map(AssessmentTable::getId).collect(java.util.stream.Collectors.toList());
@@ -490,6 +510,7 @@ public class AssessmentTableController {
     // Lock an assessment — generates a JSON snapshot of the full assessment data
     @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true), @CacheEvict(value = "assessmentSummaryList", allEntries = true) })
     @PutMapping("/{id}/lock")
+    @PreAuthorize("@auth.allows('assessment.update')")
     public ResponseEntity<AssessmentTable> lockAssessment(@PathVariable Long id) {
         Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
         if (assessmentOpt.isEmpty()) {
@@ -508,6 +529,7 @@ public class AssessmentTableController {
     // Unlock an assessment — deletes the JSON snapshot
     @Caching(evict = { @CacheEvict(value = "assessmentDetails", allEntries = true), @CacheEvict(value = "questionnaireQuestions", allEntries = true), @CacheEvict(value = "assessmentSummaryList", allEntries = true) })
     @PutMapping("/{id}/unlock")
+    @PreAuthorize("@auth.allows('assessment.update')")
     public ResponseEntity<AssessmentTable> unlockAssessment(@PathVariable Long id) {
         Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
         if (assessmentOpt.isEmpty()) {
@@ -525,6 +547,7 @@ public class AssessmentTableController {
 
     // Check if an assessment is locked by questionnaire ID
     @GetMapping("/is-locked-by-questionnaire/{questionnaireId}")
+    @PreAuthorize("@auth.allows('assessment.read')")
     public ResponseEntity<HashMap<String, Object>> isLockedByQuestionnaire(
             @PathVariable Long questionnaireId) {
         HashMap<String, Object> response = new HashMap<>();
@@ -546,6 +569,7 @@ public class AssessmentTableController {
 
     // Check if an assessment is locked by question ID (traverses question -> section -> questionnaire -> assessment)
     @GetMapping("/is-locked-by-question/{questionId}")
+    @PreAuthorize("@auth.allows('assessment.read')")
     public ResponseEntity<HashMap<String, Object>> isLockedByQuestion(
             @PathVariable Long questionId) {
         HashMap<String, Object> response = new HashMap<>();
@@ -570,6 +594,7 @@ public class AssessmentTableController {
     }
 
     @PostMapping("/startAssessment")
+    @PreAuthorize("@auth.allows('assessment.start')")
     public ResponseEntity<HashMap<String, Object>> startAssessment(
             @RequestBody java.util.Map<String, Long> request) {
         Long userStudentId = request.get("userStudentId");
@@ -634,8 +659,10 @@ public class AssessmentTableController {
      * Benefits from Redis cache - first request warms cache, rest are instant.
      * Uses "assessmentDetails" cache with prefixed key to share eviction with mutation endpoints.
      */
+    // PUBLIC?: kept in EXCLUSIONS for the unauthenticated assessment-app flow (Plan 15-06 review).
     @Cacheable(value = "assessmentDetails", key = "'prefetch-' + #userStudentId")
     @GetMapping("/prefetch/{userStudentId}")
+    @PreAuthorize("@auth.allows('assessment.prefetch')")
     public Object prefetchAssessmentData(@PathVariable Long userStudentId) {
         try {
             List<StudentAssessmentMapping> mappings = studentAssessmentMappingRepository
@@ -687,6 +714,7 @@ public class AssessmentTableController {
      * Export a locked assessment's full data bundle (questionnaire + config) as JSON.
      */
     @GetMapping("/{id}/export")
+    @PreAuthorize("@auth.allows('assessment.read')")
     public ResponseEntity<?> exportAssessmentBundle(@PathVariable Long id) {
         Optional<AssessmentTable> assessmentOpt = assessmentTableRepository.findById(id);
         if (assessmentOpt.isEmpty()) {
@@ -736,6 +764,7 @@ public class AssessmentTableController {
      * Used to copy Firebase question mappings to other assessments with the same questionnaire.
      */
     @GetMapping("/find-by-same-questionnaire/{assessmentId}")
+    @PreAuthorize("@auth.allows('assessment.read')")
     public ResponseEntity<?> findBySameQuestionnaire(@PathVariable Long assessmentId) {
         Optional<AssessmentTable> opt = assessmentTableRepository.findById(assessmentId);
         if (opt.isEmpty()) return ResponseEntity.notFound().build();
@@ -769,6 +798,7 @@ public class AssessmentTableController {
      */
     @org.springframework.transaction.annotation.Transactional
     @PutMapping("/{assessmentId}/fix-completion-status")
+    @PreAuthorize("@auth.allows('assessment.update')")
     public ResponseEntity<HashMap<String, Object>> fixCompletionStatus(@PathVariable Long assessmentId) {
         HashMap<String, Object> response = new HashMap<>();
 
@@ -830,6 +860,7 @@ public class AssessmentTableController {
     // ============================================================
 
     @GetMapping("/{id}/reset-policy")
+    @PreAuthorize("@auth.allows('assessment.read')")
     public ResponseEntity<?> getResetPolicy(@PathVariable("id") Long assessmentId) {
         Optional<AssessmentTable> opt = assessmentTableRepository.findById(assessmentId);
         if (!opt.isPresent()) {
@@ -843,6 +874,7 @@ public class AssessmentTableController {
     }
 
     @PutMapping("/{id}/reset-policy")
+    @PreAuthorize("@auth.allows('assessment.update')")
     public ResponseEntity<?> updateResetPolicy(
             @PathVariable("id") Long assessmentId,
             @RequestBody java.util.Map<String, Object> payload) {

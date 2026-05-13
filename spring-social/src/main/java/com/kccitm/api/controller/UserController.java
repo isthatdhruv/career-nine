@@ -11,6 +11,7 @@ import javax.servlet.http.HttpSession;
 import org.apache.http.HttpStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -57,8 +58,8 @@ public class UserController {
     @Autowired
     private StudentDashboardDataService studentDashboardDataService;
 
+    @PreAuthorize("@auth.allows('user.me')")
     @GetMapping("/user/me")
-    // @PreAuthorize("hasAuthority('USER_ME')")
     public User getCurrentUser(@CurrentUser UserPrincipal userPrincipal) {
         User us = userRepository.findById(userPrincipal.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userPrincipal.getId()));
@@ -78,18 +79,21 @@ public class UserController {
     // return users;
     // }
 
+    @PreAuthorize("@auth.allows('user.read.all')")
     @GetMapping(value = "user/get", headers = "Accept=application/json")
     public List<User> getAllRoles() {
         List<User> users = userRepository.findByDisplay(true);
         return users;
     }
 
+    @PreAuthorize("@auth.allows('user.read')")
     @GetMapping(value = "user/getbyid/{id}", headers = "Accept=application/json")
     public Optional<User> getRoleById(@PathVariable("id") Long userId) {
         Optional<User> user = userRepository.findById(userId);
         return user;
     }
 
+    @PreAuthorize("@auth.allows('user.update')")
     @PostMapping(value = "user/update", headers = "Accept=application/json")
     public List<User> updateUser(@RequestBody User currentUser) {
         userRepository.save(currentUser);
@@ -102,6 +106,7 @@ public class UserController {
     @Autowired
     private com.kccitm.api.service.StudentSessionService studentSessionService;
 
+    @PreAuthorize("@auth.allows('user.me')")
     @PostMapping(value = "user/auth", headers = "Accept=application/json")
     public HashMap<String, Object> checkUser(@RequestBody User currentUser) {
         if (userRepository.findByUsernameAndDobDate(currentUser.getUsername(), currentUser.getDobDate()).isPresent()) {
@@ -122,6 +127,7 @@ public class UserController {
      * Student auth for dashboard: authenticates with username + DOB and returns
      * full dashboard data (profile + assessment scores) in a single response.
      */
+    @PreAuthorize("@auth.allows('user.me')")
     @PostMapping(value = "user/student-auth", headers = "Accept=application/json")
     public ResponseEntity<?> studentDashboardAuth(@RequestBody User currentUser) {
         Optional<User> userOpt = userRepository.findByUsernameAndDobDate(
@@ -191,6 +197,7 @@ public class UserController {
      * Auto-generates careerNineRollNumber if missing.
      * Sets infoCompleted = true on success.
      */
+    @PreAuthorize("@auth.allows('student_info.update')")
     @PutMapping(value = "student-portal/update-info/{userStudentId}")
     public ResponseEntity<?> updateStudentInfo(
             @PathVariable Long userStudentId,
@@ -318,12 +325,14 @@ public class UserController {
      * Returns pre-computed student portal data: pillar scores, career matches,
      * CCI level, insight text, and trait tags.
      */
+    @PreAuthorize("@auth.allows('student_info.read')")
     @GetMapping(value = "student-portal/computed/{userStudentId}")
     public ResponseEntity<?> getComputedPortalData(@PathVariable Long userStudentId) {
         StudentPortalComputedData data = studentDashboardDataService.computePortalData(userStudentId);
         return ResponseEntity.ok(data);
     }
 
+    @PreAuthorize("@auth.allows('user.delete')")
     @GetMapping(value = "user/delete/{id}", headers = "Accept=application/json")
     public User deleteUser(@PathVariable("id") Long userId) {
         User user = userRepository.getOne(userId);
@@ -333,6 +342,7 @@ public class UserController {
         return r;
     }
 
+    @PreAuthorize("@auth.allows('user.read.all')")
     @GetMapping(value = "user/registered-users")
     public List<Map<String, Object>> getRegisteredUsers() {
         List<User> users = userRepository.findByProviderNot(AuthProvider.custom_student);
@@ -374,6 +384,7 @@ public class UserController {
         return result;
     }
 
+    @PreAuthorize("@auth.allows('user.toggle_active')")
     @PostMapping(value = "user/toggle-active/{id}")
     public ResponseEntity<?> toggleUserActive(@PathVariable("id") Long userId) {
 
@@ -393,6 +404,7 @@ public class UserController {
         return ResponseEntity.ok(new ApiResponse(true, newStatus ? "User activated" : "User deactivated"));
     }
 
+    @PreAuthorize("@auth.allows('user.update')")
     @PutMapping(value = "user/update-details/{id}")
     public ResponseEntity<?> updateUserDetails(@PathVariable("id") Long userId, @RequestBody Map<String, Object> body) {
         User user = userRepository.findById(userId)

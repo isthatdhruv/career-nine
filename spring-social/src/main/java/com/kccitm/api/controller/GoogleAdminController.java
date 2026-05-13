@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -66,12 +67,14 @@ public class GoogleAdminController {
     @Autowired
     InstituteSessionRepository instituteSessionRepository;
 
+    @PreAuthorize("@auth.allows('google_admin.read')")
     @GetMapping(value = "/email/get", headers = "Accept=application/json")
     public List<String> getAllEmail(@CurrentUser UserPrincipal user) throws GeneralSecurityException, IOException {
         List<String> allEmail = googleAPIAdmin.getAllUserFromAdmin(user);
         return allEmail;
     }
 
+    @PreAuthorize("@auth.allows('google_admin.read')")
     @GetMapping(value = "/groupemail/get", headers = "Accept=application/json")
     public List<GoogleGroupMapping> getAllGroupEmail(@CurrentUser UserPrincipal group)
             throws GeneralSecurityException, IOException {
@@ -114,6 +117,7 @@ public class GoogleAdminController {
         return groupsList;
     }
 
+    @PreAuthorize("@auth.allows('google_admin.read')")
     @GetMapping(value = "/orgunitname/get", headers = "Accept=application/json")
     public List<String> getAllOrgUnitName(@CurrentUser UserPrincipal orgUnit, Student student)
             throws GeneralSecurityException, IOException {
@@ -121,6 +125,7 @@ public class GoogleAdminController {
         return allOrgUnit;
     }
 
+    @PreAuthorize("@auth.allows('google_admin.read')")
     @GetMapping(value = "/username/get/{name}", headers = "Accept=application/json")
     public List<com.google.api.services.directory.model.User> getUser(@PathVariable("name") String query,
             @CurrentUser UserPrincipal users)
@@ -130,6 +135,7 @@ public class GoogleAdminController {
         return user;
     }
 
+    @PreAuthorize("@auth.allows('google_admin.update')")
     @PostMapping(value = "/password-reset/update", headers = "Accept=application/json")
     public String updatePassword(@RequestBody Map<String, ForgotPassword> forgotPassword,
             @CurrentUser UserPrincipal users)
@@ -150,6 +156,7 @@ public class GoogleAdminController {
         return user;
     }
 
+    @PreAuthorize("@auth.allows('google_admin.read')")
     @GetMapping(value = "/group/get/{name}", headers = "Accept=application/json")
     public List<Group> getGroup(@PathVariable("name") String query, @CurrentUser UserPrincipal groups)
             throws GeneralSecurityException, IOException {
@@ -157,6 +164,7 @@ public class GoogleAdminController {
         return group;
     }
 
+    @PreAuthorize("@auth.allows('google_admin.read')")
     @GetMapping(value = "/group-member/get/{name}", headers = "Accept=application/json")
     public List<String> getGroupMember(@PathVariable("name") String query, @CurrentUser UserPrincipal members)
             throws GeneralSecurityException, IOException {
@@ -164,6 +172,7 @@ public class GoogleAdminController {
         return group;
     }
 
+    @PreAuthorize("@auth.allows('google_admin.delete')")
     @GetMapping(value = "/group-member-delete/get/{name}/delete/{email}", headers = "Accept=application/json")
     public String deleteGroupMember(@PathVariable("name") String query, @PathVariable("email") String query1,
             @CurrentUser UserPrincipal members) throws GeneralSecurityException, IOException {
@@ -171,6 +180,7 @@ public class GoogleAdminController {
         return member;
     }
 
+    @PreAuthorize("@auth.allows('google_admin.delete')")
     @GetMapping(value = "/group-delete/get/{name}", headers = "Accept=application/json")
     public String deleteGroup(@PathVariable("name") String query, @CurrentUser UserPrincipal group)
             throws GeneralSecurityException, IOException {
@@ -178,6 +188,7 @@ public class GoogleAdminController {
         return grp;
     }
 
+    @PreAuthorize("@auth.allows('google_admin.create')")
     @PostMapping(value = "/group/add", headers = "Accept=application/json")
     public String addGroup(@RequestBody Map<String, GoogleGroup> group, @CurrentUser UserPrincipal users)
             throws GeneralSecurityException, IOException {
@@ -186,6 +197,7 @@ public class GoogleAdminController {
         return grp;
     }
 
+    @PreAuthorize("@auth.allows('google_admin.create')")
     @GetMapping(value = "/member-add/get/{name}", headers = "Accept=application/json")
     public String addMemberGroup(@PathVariable("name") String query, @CurrentUser UserPrincipal mamber)
             throws GeneralSecurityException, IOException {
@@ -193,6 +205,7 @@ public class GoogleAdminController {
         return mem;
     }
 
+    @PreAuthorize("@auth.allows('google_admin.read')")
     @GetMapping(value = "/email/get/list", headers = "Accept=application/json")
     public List<String> getEmailListGoogle(
             @CurrentUser UserPrincipal mamber) throws GeneralSecurityException, IOException {
@@ -200,6 +213,7 @@ public class GoogleAdminController {
         return mem;
     }
 
+    @PreAuthorize("@auth.allows('google_admin.read')")
     @GetMapping(value = "/email/get/{email}", headers = "Accept=application/json")
     public List<com.google.api.services.directory.model.User> getEmailGoogle(@PathVariable("email") String email,
             @CurrentUser UserPrincipal mamber) throws GeneralSecurityException, IOException {

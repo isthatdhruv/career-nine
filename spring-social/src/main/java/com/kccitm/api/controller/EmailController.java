@@ -4,6 +4,7 @@ import java.util.Arrays;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -27,6 +28,8 @@ EmailService emailService;
 @Autowired
 SmtpEmailService smtpEmailService;
 
+	// no scope arg: test email send (admin diagnostic); scope-less
+	@PreAuthorize("@auth.allows('email.send')")
 	@GetMapping(value = "email-test/get", headers = "Accept=application/json")
 	public SendMessageResponse getEmail() throws RequestFailedException {
         MandrillRecipient[] recipient = {
@@ -37,6 +40,8 @@ SmtpEmailService smtpEmailService;
 	    return emailService.sendMessage("testing", recipient, "Bhavya", "bhavya@kccitm.edu.in", "hello");
 	}
 
+	// no scope arg: email send with attachment; scope-less
+	@PreAuthorize("@auth.allows('email.send')")
 	@PostMapping("/email/send-with-attachment")
 	public ResponseEntity<String> sendWithAttachment(
 			@RequestParam("to") String to,

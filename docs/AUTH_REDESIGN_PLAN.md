@@ -211,6 +211,32 @@ Refresh token (7 days, opaque, server-side `refresh_token` table, rotated on use
 
 ---
 
+## 3.6 ⚡ Post-Phase-14 design update (2026-05-11)
+
+After Phase 14 shipped, a clarification landed: **scope attributes attach to each role-assignment, not to the user globally.** The data model and §3.3 wording above describe a single `user_scope` table keyed on `user_id`. That was superseded by `user_role_scope` keyed on `user_role_group_mapping_id` (the FK to the role assignment).
+
+**Why:** a single user can hold multiple roles with different scopes per role — a director who is both "Teacher of Section 10-A at School 5" and "Counsellor of Class 12 at School 7" gets two `user_role_scope` rows, each FK'd to a different `user_role_group_mapping` row. The previous `user_scope` design forced all of a user's roles to share one scope, which doesn't match how schools actually assign staff.
+
+**What changed (read these substitutions into §3.3, §3.4, §3.5, §4 below):**
+
+| Old (Phase 14 as-shipped) | New (post-Phase-14) |
+|---|---|
+| `user_scope` table | `user_role_scope` table |
+| `user_id BIGINT NOT NULL` column | `user_role_group_mapping_id INT NOT NULL` column (FK to `user_role_group_mapping.id`, ON DELETE CASCADE) |
+| `UserScope.java` JPA entity | `UserRoleScope.java` (links `@ManyToOne` to `UserRoleGroupMapping`, not `User`) |
+| `UserScopeRepository.findByUser_Id(userId)` | `UserRoleScopeRepository.findAllByUserId(userId)` (JPQL walks through `user_role_group_mapping`) |
+| `is_active` column on `user_scope` | Removed — admin deletes the row OR removes the underlying role assignment (cascades) |
+
+**Migrations shipped 2026-05-11:**
+- `V20260511006__supersede_user_scope_undo_seeds.sql` — drops `user_scope`, truncates `role_permission` (auto-seed only matched 1 of 8 roles) and `student_info_backfill_report` (auto-backfill resolved 0 of 1588 rows). Admin UI in Phase 15+ owns these assignments going forward.
+- `V20260511007__create_user_role_scope.sql` — creates `user_role_scope` with FK to `user_role_group_mapping`, composite index `(institute_id, session_id, course_code, section_id)`, and containment CHECK.
+
+**Wildcard semantics, containment rule, super-admin bypass, ABAC dimension types — all UNCHANGED.** Only the keying-column moves.
+
+A multi-institute admin still gets multiple rows; now they live across multiple role assignments rather than multiple `user_scope` rows for one user.
+
+---
+
 ## 4. Data model changes
 
 New tables:

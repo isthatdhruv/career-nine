@@ -9,6 +9,7 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -41,6 +42,8 @@ public class StudentInstituteMembershipController {
     @Autowired private InstituteDetailRepository instituteDetailRepository;
 
     /** Lists every institute this student is or was associated with, plus drop state. */
+    // no scope arg: identifies by user-student id; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_institute_membership.read')")
     @GetMapping("/user-student/{id}/institutes")
     public ResponseEntity<?> listMemberships(@PathVariable Long id) {
         Optional<UserStudent> usOpt = userStudentRepository.findById(id);
@@ -68,6 +71,8 @@ public class StudentInstituteMembershipController {
     }
 
     /** Adds a new membership row (un-dropped) for a student. Source = 'admin-add'. */
+    // no scope arg: instituteCode is read from raw Map body; admin operation
+    @PreAuthorize("@auth.allows('student_institute_membership.create')")
     @PostMapping("/user-student/{id}/institute")
     public ResponseEntity<?> addMembership(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         Integer instituteCode = toInt(body.get("instituteCode"));
@@ -81,6 +86,7 @@ public class StudentInstituteMembershipController {
         return ResponseEntity.ok(row);
     }
 
+    @PreAuthorize("@auth.allows('student_institute_membership.update', #instituteCode, null, null, null)")
     @PostMapping("/user-student/{id}/institute/{instituteCode}/drop")
     public ResponseEntity<?> drop(@PathVariable Long id,
                                   @PathVariable Integer instituteCode,
@@ -95,6 +101,7 @@ public class StudentInstituteMembershipController {
         }
     }
 
+    @PreAuthorize("@auth.allows('student_institute_membership.update', #instituteCode, null, null, null)")
     @PostMapping("/user-student/{id}/institute/{instituteCode}/undrop")
     public ResponseEntity<?> undrop(@PathVariable Long id, @PathVariable Integer instituteCode) {
         try {
@@ -104,6 +111,7 @@ public class StudentInstituteMembershipController {
         }
     }
 
+    @PreAuthorize("@auth.allows('student_institute_membership.update', #instituteCode, null, null, null)")
     @PostMapping("/user-student/{id}/institute/{instituteCode}/set-primary")
     public ResponseEntity<?> setPrimary(@PathVariable Long id, @PathVariable Integer instituteCode) {
         try {
@@ -121,6 +129,7 @@ public class StudentInstituteMembershipController {
      * it if it was dropped) AND promotes it to primary. Used by the B2C tracker
      * institute dropdown so the admin doesn't need two clicks.
      */
+    @PreAuthorize("@auth.allows('student_institute_membership.create', #instituteCode, null, null, null)")
     @PostMapping("/user-student/{id}/institute/{instituteCode}/assign-primary")
     public ResponseEntity<?> assignPrimary(@PathVariable Long id, @PathVariable Integer instituteCode) {
         if (!userStudentRepository.findById(id).isPresent()) return ResponseEntity.notFound().build();
@@ -143,6 +152,7 @@ public class StudentInstituteMembershipController {
      * drop state. Filtering by includeDropped lets the admin show or hide
      * dropped memberships.
      */
+    @PreAuthorize("@auth.allows('student_institute_membership.read', #instituteCode, null, null, null)")
     @GetMapping("/institute-detail/{instituteCode}/students")
     public ResponseEntity<?> studentsForInstitute(@PathVariable Integer instituteCode,
                                                   @RequestParam(defaultValue = "false") boolean includeDropped) {

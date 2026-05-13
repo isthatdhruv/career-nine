@@ -258,13 +258,13 @@ Phases (numbering continues from v2.0 — never restarts). Active phase has full
 | 11. Safe Submission Pattern | v2.0 | 2/2 | ✓ Complete | 2026-03-07 |
 | 12. Frontend Resilience | v2.0 | 2/2 | ✓ Complete | 2026-03-07 |
 | 13. Critical Security Fixes | v3.0 | 3/3 | ✓ Executed (pending user commit) | 2026-05-11 |
-| 14. ABAC Data Foundation | v3.0 | 0/? | Not started | — |
-| 15. Backend Authorization Layer | v3.0 | 0/? | Not started | — |
-| 16. Cookie-Based Session (FE) | v3.0 | 0/? | Not started | — |
-| 17. Permission-Aware UI | v3.0 | 0/? | Not started | — |
-| 18. Token Lifecycle | v3.0 | 0/? | Not started | — |
-| 19. Persona Unification + UX | v3.0 | 0/? | Not started | — |
-| 20. Hardening | v3.0 | 0/? | Not started | — |
+| 14. ABAC Data Foundation | v3.0 | 4/4 | ✓ Executed (pending user commit + data reconciliation) | 2026-05-11 |
+| 15. Backend Authorization Layer | v3.0 | 6/6 | ✓ Executed (log-only; ArchUnit gate active) | 2026-05-11 |
+| 16. Cookie-Based Session (FE) | v3.0 | 4/4 | ✓ Executed (cookie auth live end-to-end) | 2026-05-11 |
+| 17. Permission-Aware UI | v3.0 | 4/4 | ✓ Executed (staging=enforce; prod=log-only awaiting user) | 2026-05-11 |
+| 18. Token Lifecycle | v3.0 | 4/4 | ✓ Executed (60m access + 7d refresh + jti deny list + silent refresh) | 2026-05-11 |
+| 19. Persona Unification + UX | v3.0 | 5/5 | ✓ Executed (4 personas on cookie session; permission-denied UX) | 2026-05-11 |
+| 20. Hardening | v3.0 | 4/4 | ✓ Executed (rate-limit, audit, security headers, CORS prune, Actuator lockdown) | 2026-05-11 |
 
 ---
 

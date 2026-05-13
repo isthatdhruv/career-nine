@@ -136,6 +136,7 @@ const ThankYouPage: React.FC = () => {
                 `${import.meta.env.VITE_API_URL}/assessment-answer/feedback-rating`,
                 {
                     method: 'PUT',
+                    credentials: 'include', // Phase 19: send cn_at_asmnt cookie on rating submit
                     headers: {
                         'Content-Type': 'application/json',
                         Accept: 'application/json',

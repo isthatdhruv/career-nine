@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -42,6 +43,7 @@ public class GoogleGroupsController {
 
 	
     
+    @PreAuthorize("@auth.allows('google_groups.update')")
     @PostMapping(value = "batch-group/update", headers = "Accept=application/json")
 	public List<InstituteBatchGoogleGroup> updateInstituteBatchGoogleGroup(@RequestBody Map<String, InstituteBatchGoogleGroup> instituteBatchGoogleGroup) {
 		InstituteBatchGoogleGroup r = instituteBatchGoogleGroup.get("values");
@@ -49,6 +51,7 @@ public class GoogleGroupsController {
 		return instituteBatchGoogleGroupRepository.findByName(r.getName());
 	}
 
+	@PreAuthorize("@auth.allows('google_groups.read')")
 	@GetMapping(value = "batch-group/getbyid/{id}", headers = "Accept=application/json")
 	public InstituteBatchGoogleGroup getById(@PathVariable("id") int instituteCourseId) {
 		InstituteBatchGoogleGroup instituteCourse = instituteBatchGoogleGroupRepository.findById(instituteCourseId);
@@ -56,6 +59,7 @@ public class GoogleGroupsController {
 		return instituteCourse;
 	}
 
+    @PreAuthorize("@auth.allows('google_groups.update')")
     @PostMapping(value = "course-group/update", headers = "Accept=application/json")
 	public List<InstituteCourseGoogleGroup> updateInstituteCourseGoogleGroup(@RequestBody Map<String, InstituteCourseGoogleGroup> instituteCourseGoogleGroup) {
 		InstituteCourseGoogleGroup r = instituteCourseGoogleGroup.get("values");
@@ -63,6 +67,7 @@ public class GoogleGroupsController {
 		return instituteCourseGoogleGroupRepository.findByName(r.getName());
 	}
 
+    @PreAuthorize("@auth.allows('google_groups.update')")
     @PostMapping(value = "session-group/update", headers = "Accept=application/json")
 	public List<InstituteSessionGoogleGroup> updateInstituteSessionGoogleGroup(@RequestBody Map<String, InstituteSessionGoogleGroup> instituteSessionGoogleGroup) {
 		InstituteSessionGoogleGroup r = instituteSessionGoogleGroup.get("values");
@@ -70,6 +75,7 @@ public class GoogleGroupsController {
 		return instituteSessionGoogleGroupRepository.findByName(r.getName());
 	}
 
+    @PreAuthorize("@auth.allows('google_groups.update')")
     @PostMapping(value = "section-group/update", headers = "Accept=application/json")
 	public List<SectionGoogleGroup> updateSectionGoogleGroup(@RequestBody Map<String, SectionGoogleGroup> sectionGoogleGroup) {
 		SectionGoogleGroup r = sectionGoogleGroup.get("values");
@@ -77,6 +83,7 @@ public class GoogleGroupsController {
 		return sectionGoogleGroupRepository.findByName(r.getName());
 	}
 
+	@PreAuthorize("@auth.allows('google_groups.update')")
 	@PostMapping(value = "branch-group/update", headers = "Accept=application/json")
 	public List<InstituteBranchGoogleGroup> updateBranchGoogleGroup(@RequestBody Map<String, InstituteBranchGoogleGroup> branchGoogleGroup) {
 		InstituteBranchGoogleGroup r = branchGoogleGroup.get("values");

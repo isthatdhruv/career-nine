@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,6 +29,8 @@ public class StudentCounsellorMappingController {
     @Autowired
     private StudentCounsellorMappingService mappingService;
 
+    // no scope arg: body is raw Map; admin student-counsellor allocation
+    @PreAuthorize("@auth.allows('counselling.student_counsellor_mapping.create')")
     @PostMapping("/assign")
     public ResponseEntity<?> assign(@RequestBody Map<String, Object> body) {
         Long studentId = Long.valueOf(body.get("studentId").toString());
@@ -44,23 +47,31 @@ public class StudentCounsellorMappingController {
         }
     }
 
+    // no scope arg: identifies by counsellorId
+    @PreAuthorize("@auth.allows('counselling.student_counsellor_mapping.read')")
     @GetMapping("/by-counsellor/{counsellorId}")
     public ResponseEntity<List<StudentCounsellorMapping>> getStudentsForCounsellor(@PathVariable Long counsellorId) {
         logger.debug("Fetching students for counsellor {}", counsellorId);
         return ResponseEntity.ok(mappingService.getStudentsForCounsellor(counsellorId));
     }
 
+    // no scope arg: identifies by studentId
+    @PreAuthorize("@auth.allows('counselling.student_counsellor_mapping.read')")
     @GetMapping("/by-student/{studentId}")
     public ResponseEntity<List<StudentCounsellorMapping>> getCounsellorsForStudent(@PathVariable Long studentId) {
         logger.debug("Fetching counsellors for student {}", studentId);
         return ResponseEntity.ok(mappingService.getCounsellorsForStudent(studentId));
     }
 
+    // no scope arg: admin cross-institute list
+    @PreAuthorize("@auth.allows('counselling.student_counsellor_mapping.read')")
     @GetMapping("/getAll")
     public ResponseEntity<List<StudentCounsellorMapping>> getAllActiveMappings() {
         return ResponseEntity.ok(mappingService.getAllActiveMappings());
     }
 
+    // no scope arg: deactivate by id; admin-only
+    @PreAuthorize("@auth.allows('counselling.student_counsellor_mapping.delete')")
     @PutMapping("/deactivate/{id}")
     public ResponseEntity<?> deactivateMapping(@PathVariable Long id) {
         logger.info("Deactivating mapping with id {}", id);
@@ -68,6 +79,8 @@ public class StudentCounsellorMappingController {
         return ResponseEntity.ok("Mapping deactivated successfully");
     }
 
+    // no scope arg: body is raw Map; bulk admin allocation
+    @PreAuthorize("@auth.allows('counselling.student_counsellor_mapping.create')")
     @PostMapping("/bulk-assign")
     public ResponseEntity<List<StudentCounsellorMapping>> bulkAssign(@RequestBody Map<String, Object> body) {
         Long counsellorId = Long.valueOf(body.get("counsellorId").toString());

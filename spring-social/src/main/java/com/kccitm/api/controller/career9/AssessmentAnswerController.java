@@ -15,6 +15,7 @@ import javax.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -126,17 +127,20 @@ public class AssessmentAnswerController {
     private com.kccitm.api.service.b2c.EntitlementService entitlementService;
 
     @GetMapping(value = "/getByStudent/{studentId}", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_answer.read', #studentId)")
     public List<AssessmentAnswer> getAssessmentAnswersByStudent(@PathVariable("studentId") Long studentId) {
         UserStudent userStudent = userStudentRepository.findById(studentId).orElse(null);
         return assessmentAnswerRepository.findByUserStudent(userStudent);
     }
 
     @GetMapping(value = "/getAll", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_answer.read.all')") // SCOPE: filtered by Hibernate scopeFilter (Plan 15-06)
     public List<AssessmentAnswer> getAllAssessmentAnswers() {
         return assessmentAnswerRepository.findAll();
     }
 
     @PostMapping(value = "/submit", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_answer.submit')") // PUBLIC?: assessment app may call without admin JWT — flagged for 15-06 EXCLUSIONS review
     public ResponseEntity<?> submitAssessmentAnswers(@RequestBody Map<String, Object> submissionData) {
         // 1. Basic Extraction & Validation
         if (submissionData.get("userStudentId") == null || submissionData.get("assessmentId") == null) {
@@ -272,6 +276,7 @@ public class AssessmentAnswerController {
      * payload as /submit plus optional adminUserId and reason fields.
      */
     @PostMapping(value = "/admin-submit", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_answer.submit')")
     public ResponseEntity<?> adminSubmitOnBehalfOfStudent(@RequestBody Map<String, Object> submissionData) {
         if (submissionData.get("userStudentId") == null || submissionData.get("assessmentId") == null) {
             return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
@@ -329,6 +334,7 @@ public class AssessmentAnswerController {
     }
 
     @PutMapping(value = "/feedback-rating", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_answer.update')")
     public ResponseEntity<?> saveFeedbackRating(@RequestBody Map<String, Object> body) {
         if (body.get("userStudentId") == null || body.get("assessmentId") == null || body.get("rating") == null) {
             return ResponseEntity.badRequest().body("userStudentId, assessmentId and rating are required");
@@ -365,6 +371,7 @@ public class AssessmentAnswerController {
      * Accepts a JSON blob with userStudentId, assessmentId, and answer state.
      */
     @PostMapping(value = "/draft-save", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_answer.update')") // PUBLIC?: assessment app draft save — flagged for 15-06 EXCLUSIONS review
     public ResponseEntity<?> saveDraft(@RequestBody Map<String, Object> draftData) {
         Long studentId = ((Number) draftData.get("userStudentId")).longValue();
         Long assessmentId = ((Number) draftData.get("assessmentId")).longValue();
@@ -382,6 +389,7 @@ public class AssessmentAnswerController {
      * Returns 404 if no draft exists.
      */
     @GetMapping(value = "/draft-restore/{studentId}/{assessmentId}", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_answer.read', #studentId)")
     public ResponseEntity<?> restoreDraft(@PathVariable Long studentId, @PathVariable Long assessmentId) {
         Object draft = assessmentSessionService.getDraft(studentId, assessmentId);
 
@@ -400,6 +408,7 @@ public class AssessmentAnswerController {
      * Used by the frontend to build the Excel template and parse uploaded data.
      */
     @GetMapping(value = "/offline-mapping/{assessmentId}", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_answer.read', #assessmentId)")
     public ResponseEntity<?> getOfflineMapping(@PathVariable Long assessmentId) {
         AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assessment", "id", assessmentId));
@@ -513,6 +522,7 @@ public class AssessmentAnswerController {
      */
     @Transactional
     @PostMapping(value = "/bulk-submit", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_answer.submit')")
     public ResponseEntity<?> bulkSubmitAnswers(@RequestBody Map<String, Object> payload) {
         Long assessmentId = ((Number) payload.get("assessmentId")).longValue();
 
@@ -728,6 +738,7 @@ public class AssessmentAnswerController {
      */
     @Transactional
     @PostMapping(value = "/bulk-submit-with-students", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_answer.submit')")
     public ResponseEntity<?> bulkSubmitWithStudents(@RequestBody Map<String, Object> payload) {
         Long assessmentId = ((Number) payload.get("assessmentId")).longValue();
         Integer instituteId = ((Number) payload.get("instituteId")).intValue();
@@ -907,6 +918,7 @@ public class AssessmentAnswerController {
      */
     @Transactional
     @PostMapping(value = "/bulk-submit-by-rollnumber", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_answer.submit')")
     public ResponseEntity<?> bulkSubmitByRollNumber(@RequestBody Map<String, Object> payload) {
         Long assessmentId = ((Number) payload.get("assessmentId")).longValue();
         Integer instituteId = ((Number) payload.get("instituteId")).intValue();
@@ -1085,6 +1097,7 @@ public class AssessmentAnswerController {
      * Get all text responses for a given assessment (for admin mapping page).
      */
     @GetMapping(value = "/text-responses/{assessmentId}", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_answer.read', #assessmentId)")
     public ResponseEntity<?> getTextResponsesByAssessment(@PathVariable Long assessmentId) {
         List<AssessmentAnswer> textAnswers = assessmentAnswerRepository
                 .findByAssessment_IdAndTextResponseIsNotNull(assessmentId);
@@ -1170,6 +1183,7 @@ public class AssessmentAnswerController {
      * Map a text response to an existing option.
      */
     @PutMapping(value = "/map-text-response", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_answer.update')")
     public ResponseEntity<?> mapTextResponse(@RequestBody Map<String, Object> requestData) {
         Long assessmentAnswerId = ((Number) requestData.get("assessmentAnswerId")).longValue();
         Long optionId = ((Number) requestData.get("optionId")).longValue();
@@ -1215,6 +1229,7 @@ public class AssessmentAnswerController {
      */
     @Transactional
     @PostMapping(value = "/recalculate-scores/{assessmentId}", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_answer.update', #assessmentId)")
     public ResponseEntity<?> recalculateScores(@PathVariable Long assessmentId) {
         AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assessment", "id", assessmentId));
@@ -1301,6 +1316,7 @@ public class AssessmentAnswerController {
      */
     @Transactional
     @PostMapping(value = "/recalculate-all-scores", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_answer.update')")
     public ResponseEntity<?> recalculateAllScores() {
         List<StudentAssessmentMapping> allMappings = studentAssessmentMappingRepository.findAll();
             int studentsProcessed = 0;
@@ -1402,6 +1418,7 @@ public class AssessmentAnswerController {
      */
     @Transactional
     @PostMapping(value = "/dashboard", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_answer.read')")
     public ResponseEntity<?> getStudentDashboard(@RequestBody Map<String, Object> requestData) {
         // 1. Extract and validate userStudentId from request body
         if (!requestData.containsKey("userStudentId")) {
@@ -1619,6 +1636,7 @@ public class AssessmentAnswerController {
      * visibility of in-progress state until Redis recovers.
      */
     @PostMapping(value = "/save-partial", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_answer.update')") // PUBLIC?: assessment app partial save — flagged for 15-06 EXCLUSIONS review
     public ResponseEntity<?> savePartialAnswers(@RequestBody Map<String, Object> submissionData) {
         if (submissionData.get("userStudentId") == null || submissionData.get("assessmentId") == null) {
             return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
@@ -1676,6 +1694,7 @@ public class AssessmentAnswerController {
      * Optionally filter by assessmentId.
      */
     @GetMapping(value = "/redis-partials")
+    @PreAuthorize("@auth.allows('assessment_answer.read')")
     public ResponseEntity<?> getRedisPartials(
             @RequestParam(value = "assessmentId", required = false) Long assessmentId) {
         List<Map<String, Object>> entries = assessmentSessionService.getAllPartialAnswerEntries(assessmentId);
@@ -1705,6 +1724,7 @@ public class AssessmentAnswerController {
      * Dashboard endpoint: view the raw Redis JSON for a student's partial answers.
      */
     @GetMapping(value = "/redis-partial-detail")
+    @PreAuthorize("@auth.allows('assessment_answer.read')")
     public ResponseEntity<?> getRedisPartialDetail(
             @RequestParam("userStudentId") Long userStudentId,
             @RequestParam("assessmentId") Long assessmentId) {
@@ -1721,6 +1741,7 @@ public class AssessmentAnswerController {
      */
     @SuppressWarnings("unchecked")
     @PostMapping(value = "/submit-from-redis")
+    @PreAuthorize("@auth.allows('assessment_answer.submit')")
     public ResponseEntity<?> submitFromRedis(@RequestBody Map<String, Object> requestData) {
         if (requestData.get("userStudentId") == null || requestData.get("assessmentId") == null) {
             return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
@@ -1803,6 +1824,7 @@ public class AssessmentAnswerController {
      */
     @Transactional
     @PostMapping(value = "/flush-partial-to-db")
+    @PreAuthorize("@auth.allows('assessment_answer.update')")
     public ResponseEntity<?> flushPartialToDb(@RequestBody Map<String, Object> requestData) {
         if (requestData.get("assessmentId") == null) {
             return ResponseEntity.badRequest().body("assessmentId is required");
@@ -1843,6 +1865,7 @@ public class AssessmentAnswerController {
      * their MQT/MQ scores, and the totals — useful for backtracing score issues.
      */
     @GetMapping(value = "/score-debug/{userStudentId}/{assessmentId}", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_answer.read', #userStudentId, #assessmentId)")
     public ResponseEntity<?> scoreDebug(@PathVariable Long userStudentId, @PathVariable Long assessmentId) {
         Optional<UserStudent> usOpt = userStudentRepository.findById(userStudentId);
         if (!usOpt.isPresent()) {
@@ -2003,6 +2026,7 @@ public class AssessmentAnswerController {
      *   stuck_ongoing                status=ongoing + Redis submitted present → Finalize from Redis
      */
     @GetMapping(value = "/pending-persistence")
+    @PreAuthorize("@auth.allows('assessment_answer.read')")
     public ResponseEntity<?> getPendingPersistence(
             @RequestParam(value = "assessmentId", required = false) Long assessmentId) {
 
@@ -2264,6 +2288,7 @@ public class AssessmentAnswerController {
      * reconcile_only diagnostic.
      */
     @PostMapping(value = "/reconcile")
+    @PreAuthorize("@auth.allows('assessment_answer.update')")
     @javax.transaction.Transactional
     public ResponseEntity<?> reconcilePersisted(@RequestBody Map<String, Object> request) {
         Long userStudentId = asLong(request.get("userStudentId"));
@@ -2325,6 +2350,7 @@ public class AssessmentAnswerController {
      * excess_already_persisted diagnostics. Also marks persistenceState=persisted.
      */
     @PostMapping(value = "/cleanup-redis")
+    @PreAuthorize("@auth.allows('assessment_answer.delete')")
     @javax.transaction.Transactional
     public ResponseEntity<?> cleanupRedis(@RequestBody Map<String, Object> request) {
         Long userStudentId = asLong(request.get("userStudentId"));
@@ -2388,6 +2414,7 @@ public class AssessmentAnswerController {
      * would have done, then dispatch the processor.
      */
     @PostMapping(value = "/retry-now")
+    @PreAuthorize("@auth.allows('assessment_answer.submit')")
     @javax.transaction.Transactional
     public ResponseEntity<?> retryNow(@RequestBody Map<String, Object> request) {
         Long userStudentId = asLong(request.get("userStudentId"));
@@ -2436,6 +2463,7 @@ public class AssessmentAnswerController {
      * questionId). Lets admin reconcile without forcing the student to retake.
      */
     @GetMapping(value = "/submitted-detail")
+    @PreAuthorize("@auth.allows('assessment_answer.read')")
     public ResponseEntity<?> getSubmittedDetail(
             @RequestParam("userStudentId") Long userStudentId,
             @RequestParam("assessmentId") Long assessmentId) {
@@ -2451,6 +2479,7 @@ public class AssessmentAnswerController {
      * Used by the admin UI "View Errors" modal.
      */
     @GetMapping(value = "/submission-failure-detail")
+    @PreAuthorize("@auth.allows('assessment_answer.read')")
     public ResponseEntity<?> getSubmissionFailureDetail(
             @RequestParam("userStudentId") Long userStudentId,
             @RequestParam("assessmentId") Long assessmentId) {

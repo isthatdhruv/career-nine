@@ -6,6 +6,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -35,6 +36,7 @@ public class ReportPreparationController {
     @Autowired private EntitlementService entitlementService;
     @Autowired private ReportPreparationService reportPreparationService;
 
+    @PreAuthorize("@auth.allows('report_preparation.create')")
     @PostMapping("/prepare")
     public ResponseEntity<?> prepareReport(@RequestParam("t") String token,
                                            @RequestParam("e") Long entitlementId,

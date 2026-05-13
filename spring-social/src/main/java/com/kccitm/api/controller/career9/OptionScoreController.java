@@ -7,6 +7,7 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,11 +40,13 @@ public class OptionScoreController {
     private MeasuredQualityTypesRepository measuredQualityTypesRepository;
 
     @GetMapping("/getAll")
+    @PreAuthorize("@auth.allows('option_score.read')")
     public List<OptionScoreBasedOnMEasuredQualityTypes> getAllOptionScores() {
         return optionScoreRepository.findAll();
     }
 
     @GetMapping("/get/{id}")
+    @PreAuthorize("@auth.allows('option_score.read')")
     public ResponseEntity<OptionScoreBasedOnMEasuredQualityTypes> getOptionScoreById(@PathVariable Long id) {
         OptionScoreBasedOnMEasuredQualityTypes score = optionScoreRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("OptionScore", "id", id));
@@ -51,6 +54,7 @@ public class OptionScoreController {
     }
 
     @PostMapping("/create")
+    @PreAuthorize("@auth.allows('option_score.create')")
     public ResponseEntity<?> createOptionScores(@RequestBody List<OptionScoreBasedOnMEasuredQualityTypes> scores) {
         int skipped = 0;
         List<OptionScoreBasedOnMEasuredQualityTypes> toSave = new ArrayList<>();
@@ -86,6 +90,7 @@ public class OptionScoreController {
     }
 
     @PutMapping("/update/{id}")
+    @PreAuthorize("@auth.allows('option_score.update')")
     public ResponseEntity<OptionScoreBasedOnMEasuredQualityTypes> updateOptionScore(@PathVariable Long id, @RequestBody OptionScoreBasedOnMEasuredQualityTypes optionScore) {
         try {
             optionScore.setScoreId(id);
@@ -111,6 +116,7 @@ public class OptionScoreController {
     }
 
     @DeleteMapping("/delete/{id}")
+    @PreAuthorize("@auth.allows('option_score.delete')")
     public ResponseEntity<String> deleteOptionScore(@PathVariable Long id) {
         if (!optionScoreRepository.existsById(id)) {
             throw new ResourceNotFoundException("OptionScore", "id", id);
@@ -153,6 +159,7 @@ public class OptionScoreController {
      * keeps the first row (lowest scoreId) and deletes the rest.
      */
     @PostMapping("/cleanup-duplicates")
+    @PreAuthorize("@auth.allows('option_score.delete')")
     @Transactional
     public ResponseEntity<?> cleanupDuplicates() {
         List<OptionScoreBasedOnMEasuredQualityTypes> all = optionScoreRepository.findAll();

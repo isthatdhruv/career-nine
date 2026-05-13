@@ -8,6 +8,7 @@ import {
   cancelAppointment,
 } from '../Counselling/API/AppointmentAPI'
 import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
+import { useAuth } from '../../modules/auth'
 import { useRefreshInterval } from '../../utils/useAutoRefresh'
 import './CounsellorPortal.css'
 
@@ -78,8 +79,6 @@ const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
     ),
   },
 ]
-
-const COUNSELLOR_STORAGE_KEYS = ['counsellorPortalToken', 'counsellorPortalUser', 'counsellorPortalLoggedIn']
 
 type FilterTab = 'all' | 'today' | 'upcoming' | 'completed' | 'pending' | 'cancelled'
 
@@ -170,6 +169,7 @@ function isUpcoming(appt: any): boolean {
 
 const CounsellorAppointmentsPage: React.FC = () => {
   const navigate = useNavigate()
+  const { currentUser } = useAuth()
   const [appointments, setAppointments] = useState<any[]>([])
   const [counsellorId, setCounsellorId] = useState<number | null>(null)
   const [userId, setUserId] = useState<number | null>(null)
@@ -192,50 +192,31 @@ const CounsellorAppointmentsPage: React.FC = () => {
   useRefreshInterval(refreshAppointments, { skip: !counsellorId })
 
   useEffect(() => {
-    const isLoggedIn = localStorage.getItem('counsellorPortalLoggedIn')
-    if (!isLoggedIn) {
-      navigate('/counsellor/login')
+    // Phase 19: derive userId/counsellorId from useAuth().currentUser.
+    // The guard in CounsellorRoutes already enforces auth; this is defensive.
+    // TODO(phase-19-followup): /auth/me does not expose counsellorId; resolve
+    // it via getCounsellorByUserId until the backend payload includes it.
+    if (!currentUser) {
+      navigate('/counsellor/login', { replace: true })
       return
     }
-    try {
-      const userStr = localStorage.getItem('counsellorPortalUser')
-      if (userStr) {
-        const user = JSON.parse(userStr)
-        setUserId(user.counsellorId || user.id)
-
-        // New login flow stores counsellorId directly
-        const cId = user.counsellorId || null
-        if (cId) {
-          setCounsellorId(cId)
-          getCounsellorAppointments(cId)
-            .then((apptRes) => setAppointments(apptRes.data || []))
-            .catch(() => setError('Failed to load appointments.'))
-            .finally(() => setLoading(false))
-        } else if (user.id) {
-          // Legacy flow
-          getCounsellorByUserId(user.id)
-            .then((res) => {
-              const resolvedId = res.data?.id
-              if (!resolvedId) {
-                setError('Counsellor profile not found.')
-                setLoading(false)
-                return
-              }
-              setCounsellorId(resolvedId)
-              return getCounsellorAppointments(resolvedId).then((apptRes) => {
-                setAppointments(apptRes.data || [])
-              })
-            })
-            .catch(() => setError('Counsellor profile not found.'))
-            .finally(() => setLoading(false))
-        } else {
+    setUserId(currentUser.id)
+    getCounsellorByUserId(currentUser.id)
+      .then((res) => {
+        const resolvedId = res.data?.id
+        if (!resolvedId) {
+          setError('Counsellor profile not found.')
           setLoading(false)
+          return
         }
-      }
-    } catch {
-      navigate('/counsellor/login')
-    }
-  }, [navigate])
+        setCounsellorId(resolvedId)
+        return getCounsellorAppointments(resolvedId).then((apptRes) => {
+          setAppointments(apptRes.data || [])
+        })
+      })
+      .catch(() => setError('Counsellor profile not found.'))
+      .finally(() => setLoading(false))
+  }, [currentUser, navigate])
 
   const reload = () => {
     if (!counsellorId) return
@@ -362,7 +343,7 @@ const CounsellorAppointmentsPage: React.FC = () => {
     <PortalLayout
       title='Counsellor Dashboard'
       menuItems={COUNSELLOR_MENU_ITEMS}
-      storageKeys={COUNSELLOR_STORAGE_KEYS}
+      storageKeys={[]}
       loginPath='/counsellor/login'
     >
       <div className='cp-welcome'>

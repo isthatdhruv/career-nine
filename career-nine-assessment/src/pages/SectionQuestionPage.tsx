@@ -1018,6 +1018,7 @@ const SectionQuestionPage: React.FC = () => {
             `${import.meta.env.VITE_API_URL}/assessment-answer/submit`,
             {
               method: "POST",
+              credentials: "include", // Phase 19: send cn_at_asmnt cookie on assessment submit
               headers: {
                 "Content-Type": "application/json",
                 Accept: "application/json",

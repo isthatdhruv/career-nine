@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -58,6 +59,7 @@ public class EntitlementController {
      * Returns { entitlementId, accessToken, userStudentId, assessmentStartUrl } so the
      * student-facing site can deep-link into the assessment.
      */
+    @PreAuthorize("@auth.allows('entitlement.create')")
     @PostMapping("/start-free-trial")
     @Transactional
     public ResponseEntity<?> startFreeTrial(@RequestBody Map<String, Object> body) {
@@ -157,6 +159,7 @@ public class EntitlementController {
      * existing JWT pipeline. The SPA can use the entitlement reference to short-circuit the
      * assessment-start flow with the resolved userStudentId.
      */
+    @PreAuthorize("@auth.allows('entitlement.read')")
     @PostMapping("/redeem-token")
     public ResponseEntity<?> redeemToken(@RequestBody Map<String, Object> body) {
         String token = body.get("token") != null ? body.get("token").toString() : null;
@@ -180,6 +183,7 @@ public class EntitlementController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("@auth.allows('entitlement.read')")
     @GetMapping("/{id}")
     public ResponseEntity<?> getById(@PathVariable Long id) {
         Optional<StudentEntitlement> opt = entitlementRepository.findById(id);
@@ -187,11 +191,13 @@ public class EntitlementController {
         return ResponseEntity.ok(opt.get());
     }
 
+    @PreAuthorize("@auth.allows('entitlement.read')")
     @GetMapping("/{id}/communications")
     public ResponseEntity<List<ServiceDeliveryLog>> getCommunications(@PathVariable Long id) {
         return ResponseEntity.ok(serviceDeliveryLogRepository.findByEntitlementIdOrderByCreatedAtDesc(id));
     }
 
+    @PreAuthorize("@auth.allows('entitlement.update')")
     @PostMapping("/{id}/resend/{serviceType}")
     public ResponseEntity<?> resend(@PathVariable Long id,
                                     @PathVariable String serviceType,
@@ -208,6 +214,7 @@ public class EntitlementController {
         return ResponseEntity.ok(Map.of("status", "sent"));
     }
 
+    @PreAuthorize("@auth.allows('entitlement.update')")
     @PostMapping("/{id}/extend")
     public ResponseEntity<?> extend(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         if (body.get("newExpiresAt") == null) {
@@ -224,6 +231,7 @@ public class EntitlementController {
         return ResponseEntity.ok(e);
     }
 
+    @PreAuthorize("@auth.allows('entitlement.delete')")
     @PostMapping("/{id}/revoke")
     public ResponseEntity<?> revoke(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> body) {
         String reason = body != null && body.get("reason") != null ? body.get("reason").toString() : "manual";

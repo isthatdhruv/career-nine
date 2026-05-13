@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,6 +27,7 @@ public class LanguageQuestionController {
     private LanguageQuestionRepository languagequestionrepository;
 
     @PostMapping("/create-with-options")
+    @PreAuthorize("@auth.allows('language_question.create')")
     // @Transactional
     public ResponseEntity<?> createLanguageQuestion(@RequestBody LanguageQuestion languageQuestion) {
         try {
@@ -98,16 +100,19 @@ public class LanguageQuestionController {
     // }
 
     @GetMapping("/getAll")
+    @PreAuthorize("@auth.allows('language_question.read')")
     public List<LanguageQuestion> getAllLanguageQuestions() {
         return languagequestionrepository.findAll();
     }
 
     @GetMapping("/get/{id}")
+    @PreAuthorize("@auth.allows('language_question.read')")
     public LanguageQuestion getLanguageQuestionById(Long id) {
         return languagequestionrepository.findById(id).orElse(null);
     }
 
     @PostMapping("/create")
+    @PreAuthorize("@auth.allows('language_question.create')")
     public LanguageQuestion languageQuestionCreate(@RequestBody LanguageQuestion languageQuestion) {
         return languagequestionrepository.save(languageQuestion);
     }

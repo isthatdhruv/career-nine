@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -27,6 +28,7 @@ public class ReportZipController {
      * Returns the public CDN URL.
      */
     @PostMapping("/upload")
+    @PreAuthorize("@auth.allows('report_zip.create')")
     public ResponseEntity<Map<String, String>> uploadZip(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "fileName", required = false) String fileName
@@ -68,6 +70,7 @@ public class ReportZipController {
      * Used for bulk report zips that exceed the proxy body-size cap.
      */
     @GetMapping("/presign")
+    @PreAuthorize("@auth.allows('report_zip.create')")
     public ResponseEntity<Map<String, String>> presignUpload(
             @RequestParam(value = "fileName", required = false) String fileName) {
         try {
@@ -104,6 +107,7 @@ public class ReportZipController {
      * for the pre-signed PUT can succeed. Returns the origins that were set.
      */
     @PostMapping("/apply-cors")
+    @PreAuthorize("@auth.allows('report_zip.update')")
     public ResponseEntity<Map<String, Object>> applyBucketCors() {
         try {
             java.util.List<String> origins = spacesService.applyBucketCorsOrThrow();
@@ -119,6 +123,7 @@ public class ReportZipController {
      * confirm the policy took (returns empty list if the bucket has no CORS).
      */
     @GetMapping("/debug-cors")
+    @PreAuthorize("@auth.allows('report_zip.read')")
     public ResponseEntity<?> debugBucketCors() {
         try {
             java.util.List<com.amazonaws.services.s3.model.CORSRule> rules =
@@ -144,6 +149,7 @@ public class ReportZipController {
      * Delete a ZIP file from DigitalOcean Spaces by URL.
      */
     @DeleteMapping("/delete")
+    @PreAuthorize("@auth.allows('report_zip.update')")
     public ResponseEntity<Map<String, String>> deleteZip(@RequestParam String url) {
         try {
             spacesService.deleteFileByUrl(url);

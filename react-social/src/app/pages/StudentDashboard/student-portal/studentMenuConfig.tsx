@@ -35,4 +35,8 @@ export const STUDENT_MENU_ITEMS: MenuItem[] = [
   },
 ]
 
-export const STUDENT_STORAGE_KEYS = ['studentPortalProfile', 'studentPortalDashboard', 'studentPortalLoggedIn']
+// Phase 19 (19-02): removed 'studentPortalProfile' and 'studentPortalLoggedIn' —
+// auth state lives in the unified cookie session (cn_at) + useAuth() now, never
+// in localStorage. 'studentPortalDashboard' is dashboard-data cache (not auth)
+// and remains until a future plan migrates it to a server fetch.
+export const STUDENT_STORAGE_KEYS = ['studentPortalDashboard']

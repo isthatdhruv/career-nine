@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,18 +30,21 @@ public class RoleGroupController {
 	@Autowired
 	private RoleRoleGroupMappingRepository roleRoleGroupMappingRepository;
 
+	@PreAuthorize("@auth.allows('role_group.read.all')")
 	@GetMapping(value = "rolegroup/get", headers = "Accept=application/json")
 	public List<RoleGroup> getAllRoles() {
 		List<RoleGroup> allRoleGroups = roleGroupRepository.findByDisplay(true);
 		return allRoleGroups;
 	}
 
+	@PreAuthorize("@auth.allows('role_group.read')")
 	@GetMapping(value = "rolegroup/getbyid/{id}", headers = "Accept=application/json")
 	public Optional<RoleGroup> getRoleById(@PathVariable("id") int roleId) {
 		Optional<RoleGroup> roleGroup = roleGroupRepository.findById(roleId);
 		return roleGroup;
 	}
 
+	@PreAuthorize("@auth.allows('role_group.update')")
 	@PostMapping(value = "rolegroup/update", headers = "Accept=application/json")
 	public RoleGroup updaterRoleGroup(@RequestBody Map<String, RoleGroup> inputData) {
 		RoleGroup r = inputData.get("values");
@@ -53,6 +57,7 @@ public class RoleGroupController {
 		return roleGroupRepository.findById(rt.getId()).get();
 	}
 
+	@PreAuthorize("@auth.allows('role_group.delete')")
 	@GetMapping(value = "rolegroup/delete/{id}", headers = "Accept=application/json")
 	public RoleGroup deleteUser(@PathVariable("id") int roleGroupId) {
 		RoleGroup roleGroup = roleGroupRepository.getOne(roleGroupId);

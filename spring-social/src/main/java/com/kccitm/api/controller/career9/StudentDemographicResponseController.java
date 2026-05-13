@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -56,6 +57,8 @@ public class StudentDemographicResponseController {
      * Called from demographics page so the student can navigate immediately.
      * The actual DB save happens when assessment answers are submitted.
      */
+    // no scope arg: body is raw Map; demographic draft save during assessment flow
+    @PreAuthorize("@auth.allows('student_demographic_response.create')")
     @PostMapping("/draft-save")
     public ResponseEntity<?> saveDraft(@RequestBody Map<String, Object> request) {
         Long userStudentId = Long.valueOf(request.get("userStudentId").toString());
@@ -69,6 +72,8 @@ public class StudentDemographicResponseController {
         return ResponseEntity.ok(response);
     }
 
+    // no scope arg: identifies by userStudentId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_demographic_response.read')")
     @GetMapping("/contact-info/{userStudentId}")
     public ResponseEntity<?> getContactInfo(@PathVariable Long userStudentId) {
         UserStudent userStudent = userStudentRepository.findById(userStudentId).orElse(null);
@@ -83,6 +88,8 @@ public class StudentDemographicResponseController {
         return ResponseEntity.ok(result);
     }
 
+    // no scope arg: identifies by userStudentId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_demographic_response.update')")
     @PostMapping("/contact-info/{userStudentId}")
     @Transactional
     public ResponseEntity<?> updateContactInfo(
@@ -121,6 +128,8 @@ public class StudentDemographicResponseController {
         return ResponseEntity.ok(Map.of("success", true));
     }
 
+    // no scope arg: identifies by ids; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_demographic_response.read')")
     @GetMapping("/fields/{assessmentId}/{userStudentId}")
     public ResponseEntity<?> getFieldsForAssessment(
             @PathVariable Long assessmentId,
@@ -195,6 +204,8 @@ public class StudentDemographicResponseController {
         return ResponseEntity.ok(result);
     }
 
+    // no scope arg: body is raw Map; demographic responses submission
+    @PreAuthorize("@auth.allows('student_demographic_response.create')")
     @PostMapping("/submit")
     @Transactional
     public ResponseEntity<?> submit(@RequestBody Map<String, Object> request) {
@@ -311,6 +322,8 @@ public class StudentDemographicResponseController {
         return ResponseEntity.ok(successResponse);
     }
 
+    // no scope arg: identifies by ids; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_demographic_response.read')")
     @GetMapping("/status/{assessmentId}/{userStudentId}")
     public ResponseEntity<?> getStatus(
             @PathVariable Long assessmentId,
@@ -372,6 +385,8 @@ public class StudentDemographicResponseController {
         return ResponseEntity.ok(result);
     }
 
+    // no scope arg: body is List<Map>; bulk demographic read; scope-filter narrows access
+    @PreAuthorize("@auth.allows('student_demographic_response.read')")
     @PostMapping("/bulk-fields")
     public ResponseEntity<?> getBulkDemographicData(@RequestBody List<Map<String, Object>> pairs) {
         List<Map<String, Object>> result = new ArrayList<>();

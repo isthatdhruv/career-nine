@@ -8,6 +8,7 @@ import { getStudentEligibility, EligibilityResponse } from '../API/EligibilityAP
 import SlotGrid from './components/SlotGrid'
 import BookingForm from './components/BookingForm'
 import { useRefreshInterval } from '../../../utils/useAutoRefresh'
+import { useAuth } from '../../../modules/auth/core/Auth'
 
 interface Slot {
   slotId: number
@@ -69,18 +70,23 @@ function formatWeekLabel(weekStart: string): string {
 const SlotBookingPage: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
+  const { currentUser } = useAuth()
   const rescheduleAppointmentId: number | null =
     (location.state as { rescheduleAppointmentId?: number } | null)?.rescheduleAppointmentId ?? null
   const isReschedule = rescheduleAppointmentId != null
 
+  // Phase 19 (19-02): student identity sourced from useAuth().currentUser
+  // (cookie-session /auth/me) instead of localStorage.studentPortalProfile.
+  // studentPortalDashboard remains a data cache (out of scope for 19-02);
+  // used only as a fallback for userStudentId until /auth/me surfaces it.
   const { studentId, userId, instituteCode } = (() => {
     try {
-      const profile = JSON.parse(localStorage.getItem('studentPortalProfile') || '{}')
+      const u = (currentUser as any) || {}
       const dashboard = JSON.parse(localStorage.getItem('studentPortalDashboard') || '{}')
       return {
-        studentId: profile?.userStudentId || dashboard?.userStudentId || dashboard?.studentInfo?.userStudentId || 0,
-        userId: profile?.userId || 0,
-        instituteCode: profile?.instituteCode || profile?.institute?.instituteCode || 0,
+        studentId: u.userStudentId || dashboard?.userStudentId || dashboard?.studentInfo?.userStudentId || 0,
+        userId: u.userId || u.id || 0,
+        instituteCode: u.instituteCode || u.institute?.instituteCode || 0,
       }
     } catch {
       return { studentId: 0, userId: 0, instituteCode: 0 }

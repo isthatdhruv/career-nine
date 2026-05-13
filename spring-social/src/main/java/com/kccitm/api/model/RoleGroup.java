@@ -30,7 +30,11 @@ public class RoleGroup implements Serializable {
 	private String name;
 
 	// bi-directional many-to-one association to RoleRoleGroupMapping
-	@OneToMany(mappedBy = "roleGroup", fetch = FetchType.EAGER)
+	// mappedBy updated to "roleGroupRef" in Phase 14 Plan 14-04 — see B4 fix.
+	// The previous mappedBy = "roleGroup" was JPA-spec non-compliant
+	// (RoleRoleGroupMapping.roleGroup is a Long column, not a @ManyToOne relationship)
+	// but tolerated by Hibernate 5.x; switching to roleGroupRef makes the mapping spec-correct.
+	@OneToMany(mappedBy = "roleGroupRef", fetch = FetchType.EAGER)
 	private List<RoleRoleGroupMapping> roleRoleGroupMappings;
 
 	// //bi-directional many-to-one association to UserRoleGroupMapping

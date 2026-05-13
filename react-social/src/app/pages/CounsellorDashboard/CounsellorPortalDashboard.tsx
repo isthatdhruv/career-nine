@@ -5,6 +5,7 @@ import PortalLayout, { MenuItem } from '../portal/PortalLayout'
 import AppointmentCalendar from './components/AppointmentCalendar'
 import SessionNotes from './components/SessionNotes'
 import { getCounsellorByUserId } from '../Counselling/API/CounsellorAPI'
+import { useAuth } from '../../modules/auth'
 import './CounsellorPortal.css'
 
 const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
@@ -40,52 +41,34 @@ const COUNSELLOR_MENU_ITEMS: MenuItem[] = [
   },
 ]
 
-const COUNSELLOR_STORAGE_KEYS = ['counsellorPortalToken', 'counsellorPortalUser', 'counsellorPortalLoggedIn']
-
 const CounsellorPortalDashboard: React.FC = () => {
   const navigate = useNavigate()
+  const { currentUser } = useAuth()
   const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
   const [counsellorId, setCounsellorId] = useState<number | null>(null)
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null)
 
+  // Phase 19: replaced the legacy localStorage JSON-blob reads with useAuth().
+  // CounsellorRoutes' guard already enforces COUNSELLOR-role + currentUser presence;
+  // if we reach here without currentUser, the guard navigated us away. The fallback
+  // navigate below is a defensive belt-and-braces for the race between mount and
+  // guard re-evaluation.
+  // TODO(phase-19-followup): /auth/me does not yet expose `counsellorId`.
+  // Until it does, we resolve counsellorId via the existing
+  // getCounsellorByUserId(currentUser.id) lookup — same as the legacy fallback path.
   useEffect(() => {
-    const isLoggedIn = localStorage.getItem('counsellorPortalLoggedIn')
-    if (!isLoggedIn) {
-      navigate('/counsellor/login')
+    if (!currentUser) {
+      navigate('/counsellor/login', { replace: true })
       return
     }
-
-    try {
-      const userStr = localStorage.getItem('counsellorPortalUser')
-      if (userStr) {
-        const parsedUser = JSON.parse(userStr)
-        setUser(parsedUser)
-
-        // New login flow stores counsellorId directly
-        const cId = parsedUser.counsellorId || null
-        if (cId) {
-          setCounsellorId(cId)
-          import('../Counselling/API/CounsellorAPI').then(({ getCounsellorById }) => {
-            getCounsellorById(cId)
-              .then((res) => setProfileImageUrl(res.data?.profileImageUrl || null))
-              .catch(() => {})
-          })
-        } else if (parsedUser.id) {
-          getCounsellorByUserId(parsedUser.id)
-            .then((res) => {
-              setCounsellorId(res.data?.id || null)
-              setProfileImageUrl(res.data?.profileImageUrl || null)
-            })
-            .catch(() => setCounsellorId(null))
-        }
-      }
-    } catch {
-      navigate('/counsellor/login')
-    } finally {
-      setLoading(false)
-    }
-  }, [navigate])
+    getCounsellorByUserId(currentUser.id)
+      .then((res) => {
+        setCounsellorId(res.data?.id || null)
+        setProfileImageUrl(res.data?.profileImageUrl || null)
+      })
+      .catch(() => setCounsellorId(null))
+      .finally(() => setLoading(false))
+  }, [currentUser, navigate])
 
 
   if (loading) {
@@ -101,7 +84,7 @@ const CounsellorPortalDashboard: React.FC = () => {
     <PortalLayout
       title='Counsellor Dashboard'
       menuItems={COUNSELLOR_MENU_ITEMS}
-      storageKeys={COUNSELLOR_STORAGE_KEYS}
+      storageKeys={[]}
       loginPath='/counsellor/login'
     >
       {/* Welcome Header */}
@@ -117,16 +100,16 @@ const CounsellorPortalDashboard: React.FC = () => {
                 <img src={profileImageUrl} alt='' style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
                 <span style={{ fontSize: 20, fontWeight: 700, color: '#0C6B5A' }}>
-                  {user?.name?.charAt(0)?.toUpperCase() || '?'}
+                  {currentUser?.name?.charAt(0)?.toUpperCase() || '?'}
                 </span>
               )}
             </div>
             <div>
               <h2 className='cp-welcome-title'>
-                Welcome, {user?.name || 'Counsellor'}
+                Welcome, {currentUser?.name || 'Counsellor'}
               </h2>
               <p className='cp-welcome-sub'>
-                {user?.organisation || 'Career-9'} &middot; Counsellor Dashboard
+                Career-9 &middot; Counsellor Dashboard
               </p>
             </div>
           </div>

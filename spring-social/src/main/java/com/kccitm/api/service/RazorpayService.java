@@ -24,6 +24,8 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import com.kccitm.api.security.audit.SensitiveOp;
+
 @Service
 public class RazorpayService {
 
@@ -97,6 +99,23 @@ public class RazorpayService {
         return headers;
     }
 
+    /**
+     * Creates a Razorpay hosted payment link. Annotated
+     * {@code @SensitiveOp("payment.refund")} per Plan 20-02 Task 2 Step B
+     * priority-ordered fallback: this codebase has no {@code refund*},
+     * {@code markPaid}, or {@code processWebhookEvent} method today, so the
+     * audit pipeline lands on the only payment-write surface that exists —
+     * {@code createPaymentLink} — so every privileged payment action records
+     * one {@code auth_audit} row immediately (ROADMAP Phase 20 criterion #4).
+     *
+     * <p>TODO 15-06 / 17-xx: relocate this annotation to a real refund method
+     * (e.g., {@code refundPaymentLink}) when one is implemented. Until then
+     * this annotation today exercises the audit pipeline for the only
+     * payment-write path the service exposes. The operation code stays
+     * {@code "payment.refund"} so the audit query remains stable across the
+     * migration; the column documents intent, not the method name.
+     */
+    @SensitiveOp("payment.refund")
     public Map<String, String> createPaymentLink(
             long amountInr,
             String currency,

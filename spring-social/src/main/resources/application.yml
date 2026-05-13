@@ -5,6 +5,11 @@ spring:
     multipart:
       max-file-size: 1GB
       max-request-size: 1GB
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
 
 server:
   port: 8080
@@ -31,6 +36,16 @@ server:
 app:
   openai:
     api-key: ${OPENAI_API_KEY:}
+
+# Phase 15 RBAC + ABAC authorization runtime mode.
+# `log-only` (the safe default for Phase 15 — Phase 17 flips to `enforce`):
+#   AuthorizationService computes the policy decision, records DENYs to
+#   auth_audit (once 15-06 wires the auditor), and always returns true.
+# `enforce`:
+#   Same decision logic, but DENY actually returns false → @PreAuthorize
+#   triggers a 403. Set AUTH_ENFORCE_MODE=enforce to flip per environment.
+auth:
+  enforce-mode: log-only
 
 ---
 spring:
@@ -152,6 +167,13 @@ app:
   auth:
     tokenSecret: ${APP_AUTH_TOKEN_SECRET}
     tokenExpirationMsec: 864000000
+    accessTokenExpirationMsec: 3600000      # 60 min (Phase 18 short-lived access JWT)
+    refreshTokenExpirationMsec: 604800000   # 7 days (Phase 18 opaque refresh token)
+    assessmentTokenExpirationMsec: 14400000 # 4h — Phase 19 assessment-scoped JWT TTL (cn_at_asmnt)
+  cookie:
+    secure: false
+    same-site: Strict
+    access-max-age-seconds: 864000
   cors:
     allowedOrigins: http://localhost:5173,http://35.227.40.232:3000,http://localhost:3001,http://192.168.1.11:3000,http://35.196.122.199:3000,http://192.168.0.204:3000,http://192.168.0.204:3000,http://localhost:3000,https://localhost:3000,https://localhost:8080,https://192.168.0.204:8080,https://localhost,https://localhost:80,https://staging.student.kccitm.in,https://student.kccitm.in,https://erp.aktu.ac.in,https://leetcode.com,http://192.168.0.204:8443,http://localhost:8080
   oauth2:
@@ -199,6 +221,19 @@ app:
   b2c:
     frontendBaseUrl: http://localhost:3000
     assessmentBaseUrl: http://localhost:5173
+  # Phase 20-01: in-process rate limit (Bucket4j). Dev profile runs against
+  # localhost with no upstream proxy — getRemoteAddr() is authoritative.
+  # XFF would be client-controlled / spoofable, so trust-xff is fail-safe false.
+  rate-limit:
+    enabled: true
+    ip-per-minute: 10
+    user-per-minute: 50
+    window-seconds: 60
+    trust-xff: false   # dev has no upstream proxy — getRemoteAddr() is authoritative
+
+# Phase 15 RBAC + ABAC enforcement mode (see root document for semantics).
+auth:
+  enforce-mode: log-only
 
 ---
 spring:
@@ -219,7 +254,7 @@ spring:
     show-sql: false
     hibernate:
       naming-strategy: org.hibernate.cfg.EJB3NamingStrategy
-      ddl-auto: update
+      ddl-auto: validate
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5InnoDBDialect
@@ -331,8 +366,15 @@ app:
   auth:
     tokenSecret: ${APP_AUTH_TOKEN_SECRET}
     tokenExpirationMsec: 864000000
+    accessTokenExpirationMsec: 3600000      # 60 min (Phase 18 short-lived access JWT)
+    refreshTokenExpirationMsec: 604800000   # 7 days (Phase 18 opaque refresh token)
+    assessmentTokenExpirationMsec: 14400000 # 4h — Phase 19 assessment-scoped JWT TTL (cn_at_asmnt)
+  cookie:
+    secure: true
+    same-site: Strict
+    access-max-age-seconds: 864000
   cors:
-    allowedOrigins: https://career-9.com,https://www.career-9.com,https://dashboard.career-9.com,https://walrus-app-e2a6a.ondigitalocean.app,https://assessment.career-9.com,https://*.career-9.com
+    allowedOrigins: https://career-9.com,https://www.career-9.com,https://dashboard.career-9.com,https://assessment.career-9.com,https://*.career-9.com
   oauth2:
     # After successfully authenticating with the OAuth2 Provider,
     # we'll be generating an auth token for the user and sending the token to the
@@ -368,6 +410,33 @@ app:
   b2c:
     frontendBaseUrl: https://dashboard.career-9.com
     assessmentBaseUrl: https://assessment.career-9.com
+  # Phase 20-01: in-process rate limit (Bucket4j). Production runs behind
+  # DigitalOcean's reverse proxy which sets X-Forwarded-For and strips any
+  # incoming XFF from untrusted clients — safe to trust here.
+  rate-limit:
+    enabled: true
+    ip-per-minute: 10
+    user-per-minute: 50
+    window-seconds: 60
+    trust-xff: true   # behind DigitalOcean reverse proxy
+
+# Phase 15 RBAC + ABAC enforcement mode (see root document for semantics).
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# REQUIRES USER ACTION BEFORE PRODUCTION ENFORCE (Phase 17-04, 2026-05-12)
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# Production INTENTIONALLY remains `log-only` per user-directed safety hold.
+# Sandbox + staging are flipped to `enforce` to soak the new enforce semantics.
+# Operator must:
+#   1. Review `auth_audit` DENY rows from staging + production for 1-2 days.
+#   2. Confirm ZERO false-positive DENYs against legitimate admin users.
+#   3. Manually edit the line below: `log-only` -> `enforce`.
+#   4. Redeploy production with the change.
+# Until that manual step, production behaves as Phase 15 log-only:
+# DENYs are recorded but allows() returns true (no 403). See 17-04-SUMMARY.md.
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+auth:
+  enforce-mode: log-only
+
 ---
 spring:
   config:
@@ -489,6 +558,13 @@ app:
   auth:
     tokenSecret: ${APP_AUTH_TOKEN_SECRET}
     tokenExpirationMsec: 864000000
+    accessTokenExpirationMsec: 3600000      # 60 min (Phase 18 short-lived access JWT)
+    refreshTokenExpirationMsec: 604800000   # 7 days (Phase 18 opaque refresh token)
+    assessmentTokenExpirationMsec: 14400000 # 4h — Phase 19 assessment-scoped JWT TTL (cn_at_asmnt)
+  cookie:
+    secure: true
+    same-site: Strict
+    access-max-age-seconds: 864000
   cors:
     allowedOrigins: https://career-9.com,https://www.career-9.com,https://dashboard.career-9.com,https://assessment.career-9.com,https://*.career-9.com,http://localhost:5173,http://localhost:3000
   oauth2:
@@ -528,6 +604,21 @@ app:
   b2c:
     frontendBaseUrl: https://staging-dashboard.career-9.com
     assessmentBaseUrl: https://staging-assessment.career-9.com
+  # Phase 20-01: in-process rate limit (Bucket4j). Sandbox is a pre-prod soak
+  # environment; per Phase 20 plan the upstream-proxy assumption is NOT yet
+  # confirmed for this profile, so XFF stays fail-safe false. Flip to true
+  # once the deployment is verified to be behind a trusted reverse proxy.
+  rate-limit:
+    enabled: true
+    ip-per-minute: 10
+    user-per-minute: 50
+    window-seconds: 60
+    trust-xff: false
+
+# Phase 15 RBAC + ABAC enforcement mode (see root document for semantics).
+# Phase 17-04 (2026-05-12): sandbox flipped to `enforce` for pre-prod soak.
+auth:
+  enforce-mode: enforce
 
 ---
 spring:
@@ -550,7 +641,7 @@ spring:
     show-sql: false
     hibernate:
       naming-strategy: org.hibernate.cfg.EJB3NamingStrategy
-      ddl-auto: update
+      ddl-auto: validate
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL5InnoDBDialect
@@ -647,6 +738,13 @@ app:
   auth:
     tokenSecret: ${APP_AUTH_TOKEN_SECRET}
     tokenExpirationMsec: 864000000
+    accessTokenExpirationMsec: 3600000      # 60 min (Phase 18 short-lived access JWT)
+    refreshTokenExpirationMsec: 604800000   # 7 days (Phase 18 opaque refresh token)
+    assessmentTokenExpirationMsec: 14400000 # 4h — Phase 19 assessment-scoped JWT TTL (cn_at_asmnt)
+  cookie:
+    secure: true
+    same-site: Strict
+    access-max-age-seconds: 864000
   cors:
     allowedOrigins: https://career-9.com,https://www.career-9.com,https://*.career-9.com,https://dashboard.career-9.com,https://assessment.career-9.com,http://localhost:3000,http://localhost:3001,http://localhost:8080,http://localhost,http://localhost:80,https://staging.student.kccitm.in,https://student.kccitm.in
   oauth2:
@@ -682,5 +780,21 @@ app:
       endpoint: https://sgp1.digitaloceanspaces.com
   razorpay:
     webhook-secret: ${RAZORPAY_WEBHOOK_SECRET}
+  # Phase 20-01: in-process rate limit (Bucket4j). Staging runs behind
+  # DigitalOcean's reverse proxy which sets X-Forwarded-For and strips any
+  # incoming XFF from untrusted clients — safe to trust here.
+  rate-limit:
+    enabled: true
+    ip-per-minute: 10
+    user-per-minute: 50
+    window-seconds: 60
+    trust-xff: true   # behind DigitalOcean reverse proxy
+
+# Phase 15 RBAC + ABAC enforcement mode (see root document for semantics).
+# Phase 17-04 (2026-05-12): staging flipped to `enforce` for pre-prod soak.
+# After 1-2 days of clean auth_audit DENY review, operator may flip production
+# (currently still `log-only` per user-directed safety hold).
+auth:
+  enforce-mode: enforce
 
 ---

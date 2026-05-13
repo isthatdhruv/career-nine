@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,6 +26,7 @@ public class ClassTeacherDashboardController {
      * Get class overview statistics
      * GET /api/teacher/dashboard/class-overview/{teacherId}
      */
+    @PreAuthorize("@auth.allows('dashboard.teacher.read')")
     @GetMapping("/class-overview/{teacherId}")
     public ResponseEntity<?> getClassOverview(@PathVariable Long teacherId) {
         Map<String, Object> overview = dashboardService.getClassOverview(teacherId);
@@ -35,6 +37,7 @@ public class ClassTeacherDashboardController {
      * Get student performance summary
      * GET /api/teacher/dashboard/student-performance/{teacherId}
      */
+    @PreAuthorize("@auth.allows('dashboard.teacher.read')")
     @GetMapping("/student-performance/{teacherId}")
     public ResponseEntity<?> getStudentPerformance(
             @PathVariable Long teacherId,
@@ -47,6 +50,7 @@ public class ClassTeacherDashboardController {
      * Get assessment completion rates
      * GET /api/teacher/dashboard/assessment-completion/{teacherId}
      */
+    @PreAuthorize("@auth.allows('dashboard.teacher.read')")
     @GetMapping("/assessment-completion/{teacherId}")
     public ResponseEntity<?> getAssessmentCompletion(@PathVariable Long teacherId) {
         Map<String, Object> completion = dashboardService.getAssessmentCompletion(teacherId);
@@ -57,6 +61,7 @@ public class ClassTeacherDashboardController {
      * Get class cognitive development trends
      * GET /api/teacher/dashboard/cognitive-trends/{teacherId}
      */
+    @PreAuthorize("@auth.allows('dashboard.teacher.read')")
     @GetMapping("/cognitive-trends/{teacherId}")
     public ResponseEntity<?> getCognitiveTrends(@PathVariable Long teacherId) {
         Map<String, Object> trends = dashboardService.getCognitiveTrends(teacherId);
@@ -67,6 +72,7 @@ public class ClassTeacherDashboardController {
      * Get complete class teacher dashboard data
      * GET /api/teacher/dashboard/complete/{teacherId}
      */
+    @PreAuthorize("@auth.allows('dashboard.teacher.read')")
     @GetMapping("/complete/{teacherId}")
     public ResponseEntity<?> getCompleteDashboard(
             @PathVariable Long teacherId,
@@ -84,6 +90,7 @@ public class ClassTeacherDashboardController {
      * Get all assessments list
      * GET /api/teacher/dashboard/assessments
      */
+    @PreAuthorize("@auth.allows('dashboard.teacher.read')")
     @GetMapping("/assessments")
     public ResponseEntity<?> getAllAssessments() {
         List<Map<String, Object>> assessments = dashboardService.getAllAssessments();

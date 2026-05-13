@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,12 +32,14 @@ public class RoleRoleGroupMappingController {
 	@Autowired
 	private RoleRepository roleRepository;
 
+	@PreAuthorize("@auth.allows('role_role_group_mapping.read.all')")
 	@GetMapping(value = "rolerolegroupmapping/get", headers = "Accept=application/json")
 	public List<RoleRoleGroupMapping> getAllRoles() {
 		List<RoleRoleGroupMapping> allRoleroleGroupMapping = roleRoleGroupMappingRepository.findByDisplay(true);
 		return allRoleroleGroupMapping;
 	}
 
+	@PreAuthorize("@auth.allows('role_role_group_mapping.update')")
 	@PostMapping(value = "rolerolegroupmapping/update", headers = "Accept=application/json")
 	public RoleGroup updateRoleRoleGroup(@RequestBody Map<String, RoleGroup> currentRoleGroupMapping) {
 		RoleGroup r = currentRoleGroupMapping.get("values");
@@ -68,6 +71,7 @@ public class RoleRoleGroupMappingController {
 		return roleGroupRepository.findByName(rSaved.getName()).get(0);
 	}
 
+	@PreAuthorize("@auth.allows('role_role_group_mapping.update')")
 	@PostMapping(value = "rolerolegroupmapping/update/{id}", headers = "Accept=application/json")
 	public RoleGroup updateRoleRoleGroup(@RequestBody Map<String, RoleGroup> currentRoleGroupMapping,
 			@PathVariable int id) {
@@ -94,6 +98,7 @@ public class RoleRoleGroupMappingController {
 		return roleGroupRepository.findByName(rSaved.getName()).get(0);
 	}
 
+	@PreAuthorize("@auth.allows('role_role_group_mapping.delete')")
 	@GetMapping(value = "rolerolegroupmapping/delete/{id}", headers = "Accept=application/json")
 	public RoleRoleGroupMapping deleteRoleRoleGroup(@PathVariable("id") int roleGroupId) {
 		RoleRoleGroupMapping roleGroup = roleRoleGroupMappingRepository.getOne(roleGroupId);
