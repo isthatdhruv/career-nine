@@ -60,6 +60,13 @@ const CounsellorAuthGuard: FC = () => {
   if (!currentUser) {
     return <Navigate to='/counsellor/login' replace />
   }
+  // Super-admin is a full bypass — matches the predicate in
+  // modules/auth/core/permissions.ts and the backend AuthorizationService.
+  // Without this, a bootstrap super-admin (no role groups assigned yet) would
+  // be unable to enter the counsellor portal to inspect / debug.
+  if (currentUser.superAdmin) {
+    return <Outlet />
+  }
   const roles = (currentUser as any).roles
   const role = (currentUser as any).role
   const isCounsellor =

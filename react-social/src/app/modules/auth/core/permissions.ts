@@ -3,24 +3,24 @@ import { Scope } from "./_models";
 /**
  * Frontend mirror of the backend `AuthorizationService.allows()` predicate.
  *
- * Backend reference (docs/AUTH_REDESIGN_PLAN.md §3.4):
+ * Backend reference ([AuthorizationService.java:82-110]):
  *
- *   boolean allowed(user, permission, instituteId, sessionId, courseCode, sectionId) {
- *     if (!user.hasPermission(permission)) return false;     // RBAC gate
- *     if (user.isSuperAdmin())             return true;      // bypass scope check
- *     return user.scopes.anyMatch(s ->
- *          matches(s.instituteId, instituteId)
- *       && matches(s.sessionId,   sessionId)
- *       && matches(s.courseCode,  courseCode)
- *       && matches(s.sectionId,   sectionId));
+ *   boolean decide(permission, i, s, c, x) {
+ *     if (principal == null)        return false;   // ANONYMOUS
+ *     if (principal.isSuperAdmin()) return true;    // full bypass
+ *     if (!hasPermission(perm))     return false;   // PERM_MISSING
+ *     if (i == s == c == x == null) return true;    // no scope args
+ *     return scopes.anyMatch(...);                  // SCOPE_MISMATCH otherwise
  *   }
- *   matches(null, x) = true     // wildcard
- *   matches(a, b)    = a === b  // exact match
  *
- * This file MUST stay in lock-step with the Java implementation.
- * Any change here without a corresponding change there (or vice-versa) is
- * a security bug. The unit tests in permissions.test.ts cover the same
- * cases the Java test suite covers — keep them aligned.
+ * IMPORTANT: super-admin is a FULL bypass — it skips both the permission and
+ * scope checks. The previous version of this function checked permissions
+ * before super-admin, which contradicted the backend and locked out a freshly-
+ * bootstrapped super-admin (no role groups assigned yet → empty perms array →
+ * can't even reach the role-management screen to grant themselves permissions).
+ *
+ * This file MUST stay in lock-step with the Java implementation. Any change
+ * here without a corresponding change there is a security bug.
  */
 export function allows(
   permissions: string[] | undefined,
@@ -35,11 +35,14 @@ export function allows(
   const scopeRows = scopes ?? [];
   const sa = superAdmin === true;
 
-  // RBAC gate — must hold the verb regardless of super-admin.
-  if (!perms.includes(perm)) return false;
-
-  // Super-admin bypasses the SCOPE check (but not the perm check above).
+  // Super-admin is a full bypass — matches backend AuthorizationService.decide().
+  // MUST come before the perm check so a freshly-bootstrapped super-admin (who
+  // has no role groups yet) can still access the role-management UI to grant
+  // themselves and others permissions.
   if (sa) return true;
+
+  // RBAC gate — must hold the verb.
+  if (!perms.includes(perm)) return false;
 
   // No scope argument requested → permission alone is enough (matches
   // backend `allowed(user, perm, null, null, null, null)`).

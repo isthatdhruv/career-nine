@@ -3,6 +3,7 @@ import axios from "axios";
 import { showErrorToast } from "../../../utils/toast";
 import type { RoleItem } from "../RolesAndPermissionsPage";
 import { ActionIcon } from "../../../components/ActionIcon";
+import RolePermissionsModal from "./RolePermissionsModal";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -19,6 +20,7 @@ const RolesPanel = ({ roles, loading, onRefresh }: Props) => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [editUrl, setEditUrl] = useState("");
+  const [permsRole, setPermsRole] = useState<RoleItem | null>(null);
 
   const handleCreate = async () => {
     if (!newName.trim() || !newUrl.trim()) return;
@@ -92,7 +94,7 @@ const RolesPanel = ({ roles, loading, onRefresh }: Props) => {
             <div className="d-flex gap-2 mb-2 px-2" style={{ fontSize: "0.72rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.5px" }}>
               <div style={{ flex: 1 }}>Role Name</div>
               <div style={{ flex: 1 }}>URL Path</div>
-              <div style={{ width: "80px", textAlign: "center" }}>Actions</div>
+              <div style={{ width: "130px", textAlign: "center" }}>Actions</div>
             </div>
 
             {/* Existing roles */}
@@ -117,7 +119,7 @@ const RolesPanel = ({ roles, loading, onRefresh }: Props) => {
                         onChange={(e) => setEditUrl(e.target.value)}
                         style={{ flex: 1, borderRadius: "6px", fontSize: "0.85rem", border: "1px solid #d1d5db" }}
                       />
-                      <div className="d-flex gap-1" style={{ width: "80px", justifyContent: "center" }}>
+                      <div className="d-flex gap-1" style={{ width: "130px", justifyContent: "center" }}>
                         <button className="btn btn-sm" onClick={() => handleUpdate(role)} style={actionBtn("#059669")}>
                           <ActionIcon type="approve" size="sm" />
                         </button>
@@ -130,15 +132,24 @@ const RolesPanel = ({ roles, loading, onRefresh }: Props) => {
                     <>
                       <span style={{ flex: 1, fontSize: "0.85rem", fontWeight: 600, color: "#111827" }}>{role.name}</span>
                       <span style={{ flex: 1, fontSize: "0.82rem", color: "#4b5563", fontFamily: "monospace", background: "#f3f4f6", padding: "2px 8px", borderRadius: "4px", display: "inline-block" }}>{role.url}</span>
-                      <div className="d-flex gap-1" style={{ width: "80px", justifyContent: "center" }}>
+                      <div className="d-flex gap-1" style={{ width: "130px", justifyContent: "center" }}>
                         <button
                           className="btn btn-sm"
+                          title="Manage permissions"
+                          onClick={() => setPermsRole(role)}
+                          style={actionBtn("#7c3aed")}
+                        >
+                          <i className="bi bi-key-fill" style={{ fontSize: "0.85rem" }}></i>
+                        </button>
+                        <button
+                          className="btn btn-sm"
+                          title="Edit role"
                           onClick={() => { setEditingId(role.id!); setEditName(role.name); setEditUrl(role.url); }}
                           style={actionBtn("#2563eb")}
                         >
                           <ActionIcon type="edit" size="sm" />
                         </button>
-                        <button className="btn btn-sm" onClick={() => handleDelete(role.id!)} style={actionBtn("#dc2626")}>
+                        <button className="btn btn-sm" title="Delete role" onClick={() => handleDelete(role.id!)} style={actionBtn("#dc2626")}>
                           <ActionIcon type="delete" size="sm" />
                         </button>
                       </div>
@@ -180,6 +191,12 @@ const RolesPanel = ({ roles, loading, onRefresh }: Props) => {
           </>
         )}
       </div>
+
+      <RolePermissionsModal
+        show={!!permsRole}
+        onHide={() => setPermsRole(null)}
+        role={permsRole ? { id: permsRole.id!, name: permsRole.name } : null}
+      />
     </div>
   );
 };

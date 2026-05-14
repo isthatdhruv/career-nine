@@ -190,6 +190,12 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 "Authorization",
                 "Content-Type",
                 "Accept",
+                // Phase 16-01: frontend CSRF interceptor (AuthHelpers.setupAxios)
+                // mirrors the cn_csrf cookie into this header on every state-
+                // changing request (POST/PUT/PATCH/DELETE). Must be in the CORS
+                // allow-list or the browser preflight refuses cross-origin calls
+                // from the React dev server (http://localhost:3000 → :8080/:8091).
+                "X-CSRF-Token",
                 "X-Assessment-Session",
                 "X-Assessment-Student-Id",
                 "X-Assessment-Id",

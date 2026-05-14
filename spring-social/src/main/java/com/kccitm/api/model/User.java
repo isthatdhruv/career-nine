@@ -52,6 +52,9 @@ public class User implements Serializable {
     @Column(name="isActive", nullable = true, columnDefinition = "boolean default false")
     private Boolean isActive = false;
 
+    @Column(name = "is_super_admin", nullable = false, columnDefinition = "boolean default false")
+    private Boolean isSuperAdmin = false;
+
     @OneToOne
     @JoinColumn(name = "student_info_id", referencedColumnName = "id", nullable = true)
     private StudentInfo studentInfo;
@@ -155,7 +158,15 @@ public class User implements Serializable {
     public void setIsActive(Boolean isActive) {
         this.isActive = isActive;
     }
-    
+
+    public Boolean getIsSuperAdmin() {
+        return isSuperAdmin;
+    }
+
+    public void setIsSuperAdmin(Boolean isSuperAdmin) {
+        this.isSuperAdmin = isSuperAdmin;
+    }
+
     public Boolean getDisplay() {
         return display;
     }

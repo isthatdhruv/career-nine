@@ -1,5 +1,7 @@
 package com.kccitm.api.security;
 
+import java.nio.charset.StandardCharsets;
+import java.security.Key;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -10,6 +12,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import javax.annotation.PostConstruct;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +30,7 @@ import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.SignatureException;
 import io.jsonwebtoken.UnsupportedJwtException;
+import io.jsonwebtoken.security.Keys;
 
 /**
  * JWT mint + parse for the Phase 15 hybrid RBAC + ABAC claim shape.
@@ -53,8 +58,38 @@ public class TokenProvider {
 
     private AppProperties appProperties;
 
+    /**
+     * HS512 signing/verification key, built once from the raw bytes of
+     * {@code app.auth.tokenSecret}. The previous {@code signWith(alg, String)}
+     * overload base64-decoded the secret string and threw
+     * {@code DecodingException} on any non-base64 character (e.g. {@code _}).
+     * Using {@link Keys#hmacShaKeyFor(byte[])} treats the secret as raw bytes,
+     * so any sufficiently long (≥ 64 bytes / 512 bits for HS512) string works.
+     *
+     * <p>Generate a production secret with: {@code openssl rand -base64 64}
+     * (treat the output as an opaque string; the bytes-as-UTF-8 path here does
+     * not care whether it is base64 or not).
+     */
+    private Key signingKey;
+
     public TokenProvider(AppProperties appProperties) {
         this.appProperties = appProperties;
+    }
+
+    @PostConstruct
+    void initSigningKey() {
+        String secret = appProperties.getAuth().getTokenSecret();
+        if (secret == null || secret.isEmpty()) {
+            throw new IllegalStateException(
+                    "app.auth.tokenSecret is missing — set APP_AUTH_TOKEN_SECRET to a 64+ byte random string");
+        }
+        byte[] bytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (bytes.length < 64) {
+            throw new IllegalStateException(
+                    "app.auth.tokenSecret must be at least 64 bytes for HS512; current length is "
+                            + bytes.length + ". Generate one with: openssl rand -base64 64");
+        }
+        this.signingKey = Keys.hmacShaKeyFor(bytes);
     }
 
     /**
@@ -147,13 +182,13 @@ public class TokenProvider {
                 .claim("perms", perms)
                 .claim("scopes", scopes)
                 .claim("sa", userPrincipal.isSuperAdmin())
-                .signWith(SignatureAlgorithm.HS512, appProperties.getAuth().getTokenSecret())
+                .signWith(signingKey, SignatureAlgorithm.HS512)
                 .compact();
     }
 
     public Long getUserIdFromToken(String token) {
         Claims claims = Jwts.parser()
-                .setSigningKey(appProperties.getAuth().getTokenSecret())
+                .setSigningKey(signingKey)
                 .parseClaimsJws(token)
                 .getBody();
 
@@ -192,7 +227,7 @@ public class TokenProvider {
                 .setId(UUID.randomUUID().toString())
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
-                .signWith(SignatureAlgorithm.HS512, appProperties.getAuth().getTokenSecret())
+                .signWith(signingKey, SignatureAlgorithm.HS512)
                 .compact();
     }
 
@@ -206,7 +241,7 @@ public class TokenProvider {
     public String getScopeFromToken(String token) {
         try {
             Claims claims = Jwts.parser()
-                    .setSigningKey(appProperties.getAuth().getTokenSecret())
+                    .setSigningKey(signingKey)
                     .parseClaimsJws(token)
                     .getBody();
             Object scope = claims.get("scope");
@@ -225,7 +260,7 @@ public class TokenProvider {
     public Long getAssessmentIdFromToken(String token) {
         try {
             Claims claims = Jwts.parser()
-                    .setSigningKey(appProperties.getAuth().getTokenSecret())
+                    .setSigningKey(signingKey)
                     .parseClaimsJws(token)
                     .getBody();
             Object aid = claims.get("aid");
@@ -258,7 +293,7 @@ public class TokenProvider {
     public String getJtiFromToken(String token) {
         try {
             return Jwts.parser()
-                    .setSigningKey(appProperties.getAuth().getTokenSecret())
+                    .setSigningKey(signingKey)
                     .parseClaimsJws(token)
                     .getBody()
                     .getId();
@@ -269,7 +304,7 @@ public class TokenProvider {
 
     public boolean validateToken(String authToken) {
         try {
-            Jwts.parser().setSigningKey(appProperties.getAuth().getTokenSecret()).parseClaimsJws(authToken);
+            Jwts.parser().setSigningKey(signingKey).parseClaimsJws(authToken);
             return true;
         } catch (SignatureException ex) {
             logger.error("Invalid JWT signature");
@@ -312,7 +347,7 @@ public class TokenProvider {
     @SuppressWarnings("unchecked")
     public TokenClaims parseClaims(String token) {
         Claims c = Jwts.parser()
-                .setSigningKey(appProperties.getAuth().getTokenSecret())
+                .setSigningKey(signingKey)
                 .parseClaimsJws(token)
                 .getBody();
 

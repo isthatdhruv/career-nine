@@ -25,12 +25,16 @@ describe("allows() — frontend predicate mirrors backend AuthorizationService.a
   });
 
   // ── Super-admin bypass ───────────────────────────────────────────────
-  it("super-admin bypasses scope check (but still needs the permission)", () => {
+  // Matches backend AuthorizationService.decide(): isSuperAdmin returns true
+  // BEFORE the permission check, so a super-admin with empty perms still
+  // passes every gate. Required for cold-start (bootstrap admin has no role
+  // groups yet but must be able to assign them).
+  it("super-admin bypasses both the permission AND the scope check", () => {
     expect(allows(["student.read"], [], true, "student.read", { i: 999 })).toBe(true);
   });
 
-  it("super-admin WITHOUT the permission is still denied (sa does not bypass RBAC gate)", () => {
-    expect(allows([], [], true, "student.write", { i: 5 })).toBe(false);
+  it("super-admin WITHOUT the permission is still allowed (full bypass)", () => {
+    expect(allows([], [], true, "student.write", { i: 5 })).toBe(true);
   });
 
   // ── Wildcard rule: null on user's grant ≡ matches every value ────────

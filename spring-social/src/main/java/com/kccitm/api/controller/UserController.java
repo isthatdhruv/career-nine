@@ -12,6 +12,7 @@ import org.apache.http.HttpStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,6 +36,7 @@ import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.security.CurrentUser;
 import com.kccitm.api.security.UserPrincipal;
+import com.kccitm.api.service.OdooEmailService;
 import com.kccitm.api.service.SmtpEmailService;
 import com.kccitm.api.service.dashboard.StudentDashboardDataService;
 import com.kccitm.api.model.userDefinedModel.StudentDashboardResponse;
@@ -45,6 +47,12 @@ public class UserController {
 
     @Autowired
     private SmtpEmailService smtpEmailService;
+
+    @Autowired
+    private OdooEmailService odooEmailService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @Autowired
     private UserRepository userRepository;
@@ -382,6 +390,86 @@ public class UserController {
             result.add(row);
         }
         return result;
+    }
+
+    /**
+     * Admin-driven password reset. Lets a privileged admin set a target user's
+     * password without going through the user's email-reset flow. Useful for
+     * onboarding new users or recovering locked accounts.
+     *
+     * <p>Body: {@code { "password": "<plaintext>", "sendEmail": true|false }}.
+     * On success the user's password is BCrypt-hashed and stored. If
+     * {@code sendEmail} is true and the user has an email on file, an email is
+     * sent containing the new plaintext password and a prompt to change it on
+     * first login. The email is best-effort — failures are logged but do not
+     * fail the request (the password is already saved).
+     *
+     * <p>Security note: emailing plaintext passwords is a deliberate UX choice
+     * for this admin-onboarding flow. Plaintext passwords sitting in inboxes /
+     * mail logs is an accepted trade-off here. The {@code user.update}
+     * permission gate keeps this off the public surface; super-admins always
+     * bypass via {@code AuthorizationService}.
+     */
+    @PreAuthorize("@auth.allows('user.update')")
+    @PostMapping(value = "user/{id}/admin-reset-password")
+    public ResponseEntity<?> adminResetPassword(@PathVariable("id") Long userId,
+            @RequestBody Map<String, Object> body) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+
+        Object rawPassword = body.get("password");
+        if (!(rawPassword instanceof String) || ((String) rawPassword).trim().isEmpty()) {
+            return ResponseEntity.status(HttpStatus.SC_BAD_REQUEST)
+                    .body(new ApiResponse(false, "password is required"));
+        }
+        String newPassword = ((String) rawPassword).trim();
+        if (newPassword.length() < 6) {
+            return ResponseEntity.status(HttpStatus.SC_BAD_REQUEST)
+                    .body(new ApiResponse(false, "password must be at least 6 characters"));
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        boolean sendEmail = Boolean.TRUE.equals(body.get("sendEmail"));
+        boolean emailQueued = false;
+        String emailError = null;
+        if (sendEmail) {
+            if (user.getEmail() == null || user.getEmail().isEmpty()) {
+                emailError = "User has no email on file";
+            } else {
+                try {
+                    String subject = "Your Career-9 password has been reset";
+                    String text =
+                            "Hello " + (user.getName() != null ? user.getName() : "") + ",\n\n" +
+                            "An administrator has reset your Career-9 password.\n\n" +
+                            "Your new password is: " + newPassword + "\n\n" +
+                            "Please log in at https://dashboard.career-9.com using your registered email " +
+                            "and the password above, and change it immediately from your profile.\n\n" +
+                            "If you did not request this change, contact your administrator.\n\n" +
+                            "— Career-9 Team";
+                    // Odoo path is @Async fire-and-forget — returns immediately and the
+                    // actual send happens on a worker thread. We only know the request
+                    // was queued; OdooEmailService logs the eventual success/failure.
+                    odooEmailService.sendSimpleEmail(user.getEmail(), subject, text);
+                    emailQueued = true;
+                } catch (Exception e) {
+                    emailError = e.getMessage();
+                }
+            }
+        }
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("success", true);
+        resp.put("message", "Password reset successfully" +
+                (sendEmail ? (emailQueued ? " — email is being sent to the user" : " (email failed)") : ""));
+        resp.put("emailRequested", sendEmail);
+        // The FE consumes both keys for back-compat; semantically "queued" is more
+        // accurate when the underlying transport is async (Odoo here).
+        resp.put("emailSent", emailQueued);
+        resp.put("emailQueued", emailQueued);
+        if (emailError != null) resp.put("emailError", emailError);
+        return ResponseEntity.ok(resp);
     }
 
     @PreAuthorize("@auth.allows('user.toggle_active')")

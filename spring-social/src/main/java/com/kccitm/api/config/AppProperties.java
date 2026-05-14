@@ -10,6 +10,7 @@ public class AppProperties {
     private final Auth auth = new Auth();
     private final OAuth2 oauth2 = new OAuth2();
     private Cookie cookie = new Cookie();
+    private final Bootstrap bootstrap = new Bootstrap();
 
     public static class Auth {
         private String tokenSecret;
@@ -156,5 +157,49 @@ public class AppProperties {
 
     public void setCookie(Cookie cookie) {
         this.cookie = cookie;
+    }
+
+    public Bootstrap getBootstrap() {
+        return bootstrap;
+    }
+
+    /**
+     * Bootstrap admin seeding. Read by SuperAdminBootstrapper on every application
+     * boot. If {@code superAdminEmail} resolves to an existing user, that user is
+     * promoted to super-admin (idempotent); otherwise a new user is created with
+     * the configured password (BCrypt-hashed) and is_super_admin=true.
+     *
+     * <p>If {@code superAdminEmail} is blank/null, bootstrap is skipped — useful
+     * once the production admin is established and you no longer want every
+     * restart to mutate user rows.
+     */
+    public static class Bootstrap {
+        private String superAdminEmail;
+        private String superAdminPassword;
+        private String superAdminName;
+
+        public String getSuperAdminEmail() {
+            return superAdminEmail;
+        }
+
+        public void setSuperAdminEmail(String superAdminEmail) {
+            this.superAdminEmail = superAdminEmail;
+        }
+
+        public String getSuperAdminPassword() {
+            return superAdminPassword;
+        }
+
+        public void setSuperAdminPassword(String superAdminPassword) {
+            this.superAdminPassword = superAdminPassword;
+        }
+
+        public String getSuperAdminName() {
+            return superAdminName;
+        }
+
+        public void setSuperAdminName(String superAdminName) {
+            this.superAdminName = superAdminName;
+        }
     }
 }

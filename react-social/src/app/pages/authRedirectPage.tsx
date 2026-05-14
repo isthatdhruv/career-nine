@@ -5,7 +5,7 @@ import { LayoutSplashScreen } from "../../_metronic/layout/core";
 import { useAuth } from "../modules/auth";
 import {
   exchangeOAuthToken,
-  getUserByToken,
+  getCurrentUser,
 } from "../modules/auth/core/_requests";
 
 export const ACCESS_TOKEN = "accessToken";
@@ -68,7 +68,7 @@ const AuthRedirectPage: React.FC = () => {
         }
 
         // 4. Bootstrap user (cn_at cookie auto-attached via withCredentials).
-        const { data: user } = await getUserByToken();
+        const { data: user } = await getCurrentUser();
         if (user) {
           setCurrentUser(user);
         }
@@ -76,7 +76,7 @@ const AuthRedirectPage: React.FC = () => {
         setDestination("/dashboard");
       } catch (err) {
         // Any failure — missing token, 401 from /auth/oauth-exchange, 401 from
-        // /user/me — bounces the user to the login page. The axios response
+        // /auth/me — bounces the user to the login page. The axios response
         // interceptor already surfaces the toast on 401.
         setDestination("/auth");
       } finally {

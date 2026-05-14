@@ -9,28 +9,20 @@ import {
   SetStateAction,
 } from "react";
 import { LayoutSplashScreen } from "../../../../_metronic/layout/core";
-import { AuthModel, User, Scope } from "./_models";
+import { User, Scope } from "./_models";
 import { allows } from "./permissions";
-// Phase 16: authHelper.{getAuth,setAuth,removeAuth} are now no-op stubs;
-// kept imported so any leftover references compile while Plan 16-04 finishes
-// migrating authRedirectPage.tsx. Safe to drop the import in the follow-up.
-import * as authHelper from "./AuthHelpers";
 import * as authRequests from "./_requests";
-import { getUserByToken } from "./_requests";
+import { getCurrentUser } from "./_requests";
 import { WithChildren } from "../../../../_metronic/helpers";
 
 type AuthContextProps = {
-  auth: AuthModel | undefined;
-  saveAuth: (auth: AuthModel | undefined) => void;
   currentUser: User | undefined;
   setCurrentUser: Dispatch<SetStateAction<User | undefined>>;
   logout: () => void;
   can: (perm: string, scope?: Scope) => boolean;
 };
 
-const initAuthContextPropsState = {
-  auth: undefined,
-  saveAuth: () => {},
+const initAuthContextPropsState: AuthContextProps = {
   currentUser: undefined,
   setCurrentUser: () => {},
   logout: () => {},
@@ -44,17 +36,7 @@ const useAuth = () => {
 };
 
 const AuthProvider: FC<WithChildren> = ({ children }) => {
-  const [auth, setAuth] = useState<AuthModel | undefined>(undefined);
   const [currentUser, setCurrentUser] = useState<User | undefined>();
-
-  const saveAuth = (auth: AuthModel | undefined) => {
-    setAuth(auth);
-    // No localStorage write (Phase 16 — cookie-based session).
-    // authHelper.setAuth/removeAuth are no-op stubs; we intentionally do
-    // not call them here. The reference is preserved at module scope so
-    // the import is not orphaned while Plan 16-04 finishes the migration.
-    void authHelper;
-  };
 
   const logout = async () => {
     // Phase 18: best-effort POST `/auth/logout` — server revokes the access-jti
@@ -67,14 +49,10 @@ const AuthProvider: FC<WithChildren> = ({ children }) => {
     } catch (e) {
       // ignore — we still want to clear local state even if the server call fails
     }
-    saveAuth(undefined);
     setCurrentUser(undefined);
   };
 
-  // Mirrors backend AuthorizationService.allows() — see permissions.ts docblock.
-  // Defaults guard against legacy /auth/me responses that lack the new shape
-  // (treat as "logged in but no perms" — degrades gracefully per Phase 17
-  // backwards-compat strategy).
+  // Mirrors backend AuthorizationService.allows() — see permissions.ts.
   const can = (perm: string, scope?: Scope): boolean => {
     if (!currentUser) return false;
     return allows(
@@ -88,7 +66,7 @@ const AuthProvider: FC<WithChildren> = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ auth, saveAuth, currentUser, setCurrentUser, logout, can }}
+      value={{ currentUser, setCurrentUser, logout, can }}
     >
       {children}
     </AuthContext.Provider>
@@ -106,7 +84,7 @@ const AuthInit: FC<WithChildren> = ({ children }) => {
       didRequest.current = true;
       try {
         // Cookie (cn_at) is auto-attached via axios withCredentials.
-        const { data } = await getUserByToken();
+        const { data } = await getCurrentUser();
         if (data) {
           setCurrentUser(data);
         }

@@ -1,19 +1,3 @@
-import { AuthModel } from "./_models";
-
-const AUTH_LOCAL_STORAGE_KEY = "kt-auth-react-v";
-
-// Phase 16: localStorage JWT is DEAD. cn_at is an HttpOnly cookie. The
-// functions below are kept as no-op stubs so any legacy callers do not
-// crash; remove them entirely in a Phase-16 follow-up cleanup once
-// authRedirectPage.tsx (Plan 16-04) no longer references them.
-const getAuth = (): AuthModel | undefined => undefined;
-const setAuth = (_auth: AuthModel): void => {
-  // intentionally a no-op
-};
-const removeAuth = (): void => {
-  // intentionally a no-op
-};
-
 // Read a cookie value by name from document.cookie. Returns null if absent.
 function readCookie(name: string): string | null {
   if (typeof document === "undefined") return null;
@@ -134,22 +118,41 @@ export function setupAxios(axios: any) {
       const url: string | undefined = originalConfig?.url;
 
       if (status === 401) {
+        // 0) Opt-out: callers (AuthInit's "am I logged in?" probe) can mark a
+        // request with __skipAuthRedirect to handle the 401 themselves without
+        // triggering a toast or a redirect. Required because AuthInit fires on
+        // every page load — including the public /auth page — and a redirect
+        // to /auth would loop forever.
+        if (originalConfig.__skipAuthRedirect) {
+          return Promise.reject(error);
+        }
+
         // 1) Never silently refresh for auth-flow endpoints OR the refresh call itself.
         if (isAuthFlowUrl(url) || originalConfig.__isRefreshCall) {
-          const { showErrorToast } = require("../../../utils/toast");
-          showErrorToast("Session expired, please log in again");
-          removeAuth();
-          window.location.href = "/auth";
+          // Defense-in-depth: if we're already on /auth, don't redirect to /auth
+          // (and don't spam the toast). The page is already where it needs to be.
+          const onAuthPage =
+            typeof window !== "undefined" &&
+            window.location.pathname.startsWith("/auth");
+          if (!onAuthPage) {
+            const { showErrorToast } = require("../../../utils/toast");
+            showErrorToast("Session expired, please log in again");
+            window.location.href = "/auth";
+          }
           return Promise.reject(error);
         }
 
         // 2) Never retry twice. If we've already attempted a silent refresh for THIS
         //    request, give up.
         if (originalConfig.__hasRetriedAfterRefresh) {
-          const { showErrorToast } = require("../../../utils/toast");
-          showErrorToast("Session expired, please log in again");
-          removeAuth();
-          window.location.href = "/auth";
+          const onAuthPage =
+            typeof window !== "undefined" &&
+            window.location.pathname.startsWith("/auth");
+          if (!onAuthPage) {
+            const { showErrorToast } = require("../../../utils/toast");
+            showErrorToast("Session expired, please log in again");
+            window.location.href = "/auth";
+          }
           return Promise.reject(error);
         }
 
@@ -158,10 +161,14 @@ export function setupAxios(axios: any) {
           await performRefresh(axios);
         } catch (refreshError) {
           // Refresh itself failed → log out, no retry.
-          const { showErrorToast } = require("../../../utils/toast");
-          showErrorToast("Session expired, please log in again");
-          removeAuth();
-          window.location.href = "/auth";
+          const onAuthPage =
+            typeof window !== "undefined" &&
+            window.location.pathname.startsWith("/auth");
+          if (!onAuthPage) {
+            const { showErrorToast } = require("../../../utils/toast");
+            showErrorToast("Session expired, please log in again");
+            window.location.href = "/auth";
+          }
           return Promise.reject(refreshError);
         }
 
@@ -220,4 +227,3 @@ export function setupAxios(axios: any) {
   );
 }
 
-export { getAuth, setAuth, removeAuth, AUTH_LOCAL_STORAGE_KEY };

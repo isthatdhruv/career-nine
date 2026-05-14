@@ -58,6 +58,13 @@ const StudentAuthGuard: FC = () => {
   if (!currentUser) {
     return <Navigate to='/student/login' replace />
   }
+  // Super-admin is a full bypass — matches the predicate in
+  // modules/auth/core/permissions.ts and the backend AuthorizationService.
+  // Without this, a bootstrap super-admin (no role groups assigned yet) would
+  // be unable to enter the student portal to inspect / debug.
+  if (currentUser.superAdmin) {
+    return <Outlet />
+  }
   // Either STUDENT or B2C_STUDENT role is acceptable for the student portal.
   // currentUser.roles is the canonical field per modules/auth/core/_models.ts (string[]).
   // We also tolerate ROLE_-prefixed variants in case the backend serialises Spring authorities directly.

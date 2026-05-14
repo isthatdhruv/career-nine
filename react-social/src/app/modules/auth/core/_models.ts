@@ -1,96 +1,16 @@
-export interface AuthModel {
-  api_token: string;
-  refreshToken?: string;
-}
-
-export interface UserAddressModel {
-  addressLine: string;
-  city: string;
-  state: string;
-  postCode: string;
-}
-
-export interface UserCommunicationModel {
-  email: boolean;
-  sms: boolean;
-  phone: boolean;
-}
-
-export interface UserEmailSettingsModel {
-  emailNotification?: boolean;
-  sendCopyToPersonalEmail?: boolean;
-  activityRelatesEmail?: {
-    youHaveNewNotifications?: boolean;
-    youAreSentADirectMessage?: boolean;
-    someoneAddsYouAsAsAConnection?: boolean;
-    uponNewOrder?: boolean;
-    newMembershipApproval?: boolean;
-    memberRegistration?: boolean;
-  };
-  updatesFromKeenthemes?: {
-    newsAboutKeenthemesProductsAndFeatureUpdates?: boolean;
-    tipsOnGettingMoreOutOfKeen?: boolean;
-    thingsYouMissedSindeYouLastLoggedIntoKeen?: boolean;
-    newsAboutStartOnPartnerProductsAndOtherServices?: boolean;
-    tipsOnStartBusinessProducts?: boolean;
-  };
-}
-
-export interface UserSocialNetworksModel {
-  linkedIn: string;
-  facebook: string;
-  twitter: string;
-  instagram: string;
-}
-
-export interface UserModel {
-  id: number;
-  username: string;
-  password: string | undefined;
-  email: string;
-  first_name: string;
-  last_name: string;
-  fullname?: string;
-  occupation?: string;
-  companyName?: string;
-  phone?: string;
-  roles?: Array<number>;
-  pic?: string;
-  language?: "en" | "de" | "es" | "fr" | "ja" | "zh" | "ru";
-  timeZone?: string;
-  website?: "https://keenthemes.com";
-  emailSettings?: UserEmailSettingsModel;
-  auth?: AuthModel;
-  communication?: UserCommunicationModel;
-  address?: UserAddressModel;
-  socialNetworks?: UserSocialNetworksModel;
-}
-
+// Mirrors the backend MeResponse (GET /auth/me).
+// The shape matches what TokenAuthenticationFilter hydrates from the JWT claims:
+// id, displayName, email, roles[], permissions[], scopes[{i,s,c,x}], superAdmin.
 export interface User {
   id: number;
   name: string;
   email: string;
   roles: string[];
   permissions: string[];
-  scopes: Array<{ i?: number; s?: number; c?: number; x?: number }>;
+  scopes: Array<Scope>;
   superAdmin: boolean;
-  provider?: any;
-  providerId?: string;
-  first_name?: string;
-  last_name?: string;
-  fullname?: string;
-  occupation?: string;
-  companyName?: string;
-  phone?: string;
-  imageUrl?: string;
-  language?: "en" | "de" | "es" | "fr" | "ja" | "zh" | "ru";
-  timeZone?: string;
-  website?: "https://support.kccitm.edu.in";
-  emailSettings?: UserEmailSettingsModel;
-  auth?: AuthModel;
-  communication?: UserCommunicationModel;
-  address?: UserAddressModel;
-  socialNetworks?: UserSocialNetworksModel;
 }
 
+// ABAC scope row (institute / session / course / section).
+// Short keys mirror the JWT claim shape so the same parser can be reused.
 export type Scope = { i?: number; s?: number; c?: number; x?: number };

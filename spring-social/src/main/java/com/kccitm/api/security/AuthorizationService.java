@@ -68,6 +68,26 @@ public class AuthorizationService {
     }
 
     /**
+     * Institute-scoped endpoint convenience overload. Equivalent to
+     * {@code allows(perm, instituteId, null, null, null)}. Exists because
+     * Spring SpEL resolves overloads by exact arity, so writing
+     * {@code @auth.allows('x', #instituteId)} requires a (String, Integer)
+     * method to bind to. ~26 controller annotations rely on this shape.
+     */
+    public boolean allows(String permission, Integer instituteId) {
+        return decide(permission, instituteId, null, null, null);
+    }
+
+    /**
+     * Institute + session scoped convenience overload — same SpEL arity
+     * rationale as {@link #allows(String, Integer)}. ~10 controller
+     * annotations use this shape.
+     */
+    public boolean allows(String permission, Integer instituteId, Integer sessionId) {
+        return decide(permission, instituteId, sessionId, null, null);
+    }
+
+    /**
      * 4-dim ABAC endpoint. Any of {@code instituteId}, {@code sessionId},
      * {@code courseCode}, {@code sectionId} may be {@code null}; a null target
      * dim means "the request did not bind this dim" and authorization succeeds

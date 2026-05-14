@@ -68,8 +68,13 @@ spring:
     password: Career-qCsfeuECc3MW
     # password: MyStrongPass@123
     hikari:
-      maximum-pool-size: 50
-      minimum-idle: 20
+      # Dev sizing: a single dev machine with one running JVM rarely needs >10
+      # concurrent JDBC connections, and a high minimum-idle quickly exhausts
+      # MySQL's default max_connections=151 when stale JVMs are left around or
+      # when multiple clients (Workbench, DBeaver) connect alongside. Production
+      # pools live in the staging/prod profiles below.
+      maximum-pool-size: 10
+      minimum-idle: 2
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
@@ -174,11 +179,20 @@ app:
   googleAPIJSON: classpath:google.json
   fileTempFolder: classpath:temp
   auth:
-    tokenSecret: ${APP_AUTH_TOKEN_SECRET}
+    tokenSecret: "${APP_AUTH_TOKEN_SECRET:1PG4GePk3fxNKAAgI45mGa+YzrgVidfeau5o+Y5T+IUzyr/Ab3+O2C/QaG7s+XujsJdPlBgqsBc4tEKLenVI1A==}"
     tokenExpirationMsec: 864000000
     accessTokenExpirationMsec: 3600000      # 60 min (Phase 18 short-lived access JWT)
     refreshTokenExpirationMsec: 604800000   # 7 days (Phase 18 opaque refresh token)
     assessmentTokenExpirationMsec: 14400000 # 4h — Phase 19 assessment-scoped JWT TTL (cn_at_asmnt)
+  # SuperAdminBootstrapper reads these on every boot.
+  #   - If superAdminEmail resolves to an existing user → ensure is_super_admin=true.
+  #   - If not → create a local-provider user with the password BCrypt-hashed.
+  # Leave superAdminEmail blank/null to disable bootstrap once production admins
+  # are established. CHANGE THESE BEFORE PRODUCTION.
+  bootstrap:
+    superAdminEmail: admin@career-9.local
+    superAdminPassword: ChangeMeOnFirstLogin!2026
+    superAdminName: System Administrator
   cookie:
     secure: false
     same-site: Strict
@@ -373,11 +387,20 @@ app:
   googleAPIJSON: classpath:google.json
   fileTempFolder: classpath:temp
   auth:
-    tokenSecret: ${APP_AUTH_TOKEN_SECRET}
+    tokenSecret: "${APP_AUTH_TOKEN_SECRET:1PG4GePk3fxNKAAgI45mGa+YzrgVidfeau5o+Y5T+IUzyr/Ab3+O2C/QaG7s+XujsJdPlBgqsBc4tEKLenVI1A==}"
     tokenExpirationMsec: 864000000
     accessTokenExpirationMsec: 3600000      # 60 min (Phase 18 short-lived access JWT)
     refreshTokenExpirationMsec: 604800000   # 7 days (Phase 18 opaque refresh token)
     assessmentTokenExpirationMsec: 14400000 # 4h — Phase 19 assessment-scoped JWT TTL (cn_at_asmnt)
+  # SuperAdminBootstrapper reads these on every boot.
+  #   - If superAdminEmail resolves to an existing user → ensure is_super_admin=true.
+  #   - If not → create a local-provider user with the password BCrypt-hashed.
+  # Leave superAdminEmail blank/null to disable bootstrap once production admins
+  # are established. CHANGE THESE BEFORE PRODUCTION.
+  bootstrap:
+    superAdminEmail: admin@career-9.local
+    superAdminPassword: ChangeMeOnFirstLogin!2026
+    superAdminName: System Administrator
   cookie:
     secure: true
     same-site: Strict
@@ -565,11 +588,20 @@ app:
   googleAPIJSON: classpath:google.json
   fileTempFolder: classpath:temp
   auth:
-    tokenSecret: ${APP_AUTH_TOKEN_SECRET}
+    tokenSecret: "${APP_AUTH_TOKEN_SECRET:1PG4GePk3fxNKAAgI45mGa+YzrgVidfeau5o+Y5T+IUzyr/Ab3+O2C/QaG7s+XujsJdPlBgqsBc4tEKLenVI1A==}"
     tokenExpirationMsec: 864000000
     accessTokenExpirationMsec: 3600000      # 60 min (Phase 18 short-lived access JWT)
     refreshTokenExpirationMsec: 604800000   # 7 days (Phase 18 opaque refresh token)
     assessmentTokenExpirationMsec: 14400000 # 4h — Phase 19 assessment-scoped JWT TTL (cn_at_asmnt)
+  # SuperAdminBootstrapper reads these on every boot.
+  #   - If superAdminEmail resolves to an existing user → ensure is_super_admin=true.
+  #   - If not → create a local-provider user with the password BCrypt-hashed.
+  # Leave superAdminEmail blank/null to disable bootstrap once production admins
+  # are established. CHANGE THESE BEFORE PRODUCTION.
+  bootstrap:
+    superAdminEmail: admin@career-9.local
+    superAdminPassword: ChangeMeOnFirstLogin!2026
+    superAdminName: System Administrator
   cookie:
     secure: true
     same-site: Strict
@@ -745,11 +777,20 @@ app:
   googleAPIJSON: classpath:google.json
   fileTempFolder: classpath:temp
   auth:
-    tokenSecret: ${APP_AUTH_TOKEN_SECRET}
+    tokenSecret: "${APP_AUTH_TOKEN_SECRET:1PG4GePk3fxNKAAgI45mGa+YzrgVidfeau5o+Y5T+IUzyr/Ab3+O2C/QaG7s+XujsJdPlBgqsBc4tEKLenVI1A==}"
     tokenExpirationMsec: 864000000
     accessTokenExpirationMsec: 3600000      # 60 min (Phase 18 short-lived access JWT)
     refreshTokenExpirationMsec: 604800000   # 7 days (Phase 18 opaque refresh token)
     assessmentTokenExpirationMsec: 14400000 # 4h — Phase 19 assessment-scoped JWT TTL (cn_at_asmnt)
+  # SuperAdminBootstrapper reads these on every boot.
+  #   - If superAdminEmail resolves to an existing user → ensure is_super_admin=true.
+  #   - If not → create a local-provider user with the password BCrypt-hashed.
+  # Leave superAdminEmail blank/null to disable bootstrap once production admins
+  # are established. CHANGE THESE BEFORE PRODUCTION.
+  bootstrap:
+    superAdminEmail: admin@career-9.local
+    superAdminPassword: ChangeMeOnFirstLogin!2026
+    superAdminName: System Administrator
   cookie:
     secure: true
     same-site: Strict

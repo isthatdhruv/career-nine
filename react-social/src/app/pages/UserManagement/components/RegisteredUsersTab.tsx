@@ -4,6 +4,7 @@ import { Dropdown } from "react-bootstrap";
 import UsersRegistrationEditModal from "../../Users/components/UsersRegistrationEditModal";
 import UserCollegeMappingModal from "../../Users/components/UserCollegeMappingModal";
 import UserRoleGroupModal from "./UserRoleGroupModal";
+import UserPasswordResetModal from "./UserPasswordResetModal";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -18,6 +19,7 @@ interface UserRow {
   provider: string;
   dob?: string;
   roleGroups?: string[];
+  userRoleGroupMappings?: { id: number; roleGroup: { id: number; name: string } }[];
 }
 
 const RegisteredUsersTab: FC = () => {
@@ -31,6 +33,8 @@ const RegisteredUsersTab: FC = () => {
   const [selectedMappingUser, setSelectedMappingUser] = useState<UserRow | null>(null);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [selectedRoleUser, setSelectedRoleUser] = useState<UserRow | null>(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [selectedPasswordUser, setSelectedPasswordUser] = useState<UserRow | null>(null);
   const [searchText, setSearchText] = useState("");
 
   const fetchUsers = async () => {
@@ -176,6 +180,9 @@ const RegisteredUsersTab: FC = () => {
                                 <Dropdown.Item as="button" onClick={() => { setSelectedMappingUser(user); setShowMappingModal(true); }} className="d-flex align-items-center px-3 py-2" style={{ fontSize: "0.85rem", borderRadius: "6px" }}>
                                   <i className="bi bi-building-fill me-2" style={{ color: "#0891b2", fontSize: "1rem" }}></i>Map to College
                                 </Dropdown.Item>
+                                <Dropdown.Item as="button" onClick={() => { setSelectedPasswordUser(user); setShowPasswordModal(true); }} className="d-flex align-items-center px-3 py-2" style={{ fontSize: "0.85rem", borderRadius: "6px" }}>
+                                  <i className="bi bi-key-fill me-2" style={{ color: "#d97706", fontSize: "1rem" }}></i>Reset Password
+                                </Dropdown.Item>
                               </Dropdown.Menu>
                             </Dropdown>
                           </td>
@@ -205,6 +212,11 @@ const RegisteredUsersTab: FC = () => {
         show={showRoleModal}
         onHide={() => { setShowRoleModal(false); setSelectedRoleUser(null); }}
         user={selectedRoleUser}
+      />
+      <UserPasswordResetModal
+        show={showPasswordModal}
+        onHide={() => { setShowPasswordModal(false); setSelectedPasswordUser(null); }}
+        user={selectedPasswordUser}
       />
     </>
   );

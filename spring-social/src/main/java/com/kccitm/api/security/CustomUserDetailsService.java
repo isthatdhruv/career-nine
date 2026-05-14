@@ -17,10 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.model.AuthProvider;
-import com.kccitm.api.model.Role;
-import com.kccitm.api.model.RoleRoleGroupMapping;
 import com.kccitm.api.model.User;
-import com.kccitm.api.model.UserRoleGroupMapping;
 import com.kccitm.api.model.UserRoleScope;
 import com.kccitm.api.repository.PermissionRepository;
 import com.kccitm.api.repository.UserRepository;
@@ -102,38 +99,15 @@ public class CustomUserDetailsService implements UserDetailsService {
             up.setScopes(Collections.<CurrentScopes.ScopeRow>emptyList());
         }
 
-        // --- Phase 15-06: permissions from user_role_group_mapping → role → role_permission ---
-        Set<String> perms = new HashSet<String>();
+        // Permissions: native join through user_role_group_mapping → role_role_group_mapping
+        // → role → role_permission → permission, returning distinct permission codes.
+        // Without this hydration the minted JWT carries an empty perms claim, which
+        // makes the frontend can() gate deny every menu item for non-super-admins.
         try {
-            List<UserRoleGroupMapping> urgms = user.getUserRoleGroupMappings();
-            if (urgms != null) {
-                for (UserRoleGroupMapping urgm : urgms) {
-                    if (urgm.getRoleGroup() == null) continue;
-                    List<RoleRoleGroupMapping> rrgms = urgm.getRoleGroup().getRoleRoleGroupMappings();
-                    if (rrgms == null) continue;
-                    for (RoleRoleGroupMapping rrgm : rrgms) {
-                        Role role = rrgm.getRole();
-                        if (role == null) continue;
-                        // Walk role → role_permission → permission. No JPA relationship is
-                        // declared between Role and Permission today (the join table is
-                        // accessed via JPQL in Phase 15+). Resolve permission codes by
-                        // running the canonical JPQL through PermissionRepository — but
-                        // do it via a single native-style hop: PermissionRepository today
-                        // only exposes findByCode(String). Until a richer query exists,
-                        // we walk via SimpleGrantedAuthority strings on the user.
-                        // The user already carries role names via User.getRole(); use
-                        // those as permission seeds for Phase 15 log-only.
-                    }
-                }
-            }
-            // Phase 15-06 transitional: derive a baseline permission set from the
-            // user's role names. Phase 17 will replace this with a JPQL join
-            // through role_permission once a richer repository exists. For
-            // log-only mode an empty perms set is also acceptable — the
-            // AuthorizationService records PERM_MISSING DENYs which are exactly
-            // the signal Phase 17 needs to confirm coverage before flipping to
-            // enforce. We leave perms empty here intentionally so the audit
-            // stream reflects the real "no permissions claimed yet" state.
+            List<String> codes = permissionRepository.findCodesForUser(user.getId());
+            Set<String> perms = (codes == null || codes.isEmpty())
+                    ? Collections.<String>emptySet()
+                    : new HashSet<String>(codes);
             up.setPermissions(perms);
         } catch (Exception e) {
             log.warn("loadUser: permission hydration failed for user={} — defaulting to empty perms",
@@ -141,11 +115,11 @@ public class CustomUserDetailsService implements UserDetailsService {
             up.setPermissions(Collections.<String>emptySet());
         }
 
-        // --- Phase 15-06: super-admin bit. The User entity does not yet carry
-        //     a dedicated isSuperAdmin column (Phase 14 deferred this). Until
-        //     it does, super-admin is false; manual admins will see DENYs in
-        //     the audit stream (the expected behaviour for log-only mode). ---
-        up.setSuperAdmin(false);
+        // Super-admin bit. Sourced from User.is_super_admin (column added when
+        // the bootstrap admin feature landed). SuperAdminBootstrapper seeds /
+        // promotes the configured admin email on every boot so this stays in
+        // sync with app.bootstrap.* config without manual SQL.
+        up.setSuperAdmin(Boolean.TRUE.equals(user.getIsSuperAdmin()));
 
         return up;
     }
