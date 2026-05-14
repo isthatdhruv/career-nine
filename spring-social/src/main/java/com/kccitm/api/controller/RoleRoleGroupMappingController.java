@@ -45,7 +45,7 @@ public class RoleRoleGroupMappingController {
 		RoleGroup r = currentRoleGroupMapping.get("values");
 		RoleGroup rSaved = roleGroupRepository.save(r);
 		List<RoleGroup> t = roleGroupRepository.findByName(rSaved.getName());
-		int roleGroupID = t.get(t.size() - 1).getId();
+		Long roleGroupID = t.get(t.size() - 1).getId();
 		List<RoleRoleGroupMapping> rrList = new ArrayList<>();
 		Iterator<RoleRoleGroupMapping> rrIterators = r.getRoleRoleGroupMappings().iterator();
 		while (rrIterators.hasNext()) {
@@ -55,7 +55,7 @@ public class RoleRoleGroupMappingController {
 			rol.forEach(p -> {
 				if (p.getId() == y) {
 					rr.setRole(p);
-					rr.setRoleGroup((long) roleGroupID);
+					rr.setRoleGroup(roleGroupID);
 					rr.setDisplay(true);
 					rrList.add(rr);
 				}
@@ -74,10 +74,10 @@ public class RoleRoleGroupMappingController {
 	@PreAuthorize("@auth.allows('role_role_group_mapping.update')")
 	@PostMapping(value = "rolerolegroupmapping/update/{id}", headers = "Accept=application/json")
 	public RoleGroup updateRoleRoleGroup(@RequestBody Map<String, RoleGroup> currentRoleGroupMapping,
-			@PathVariable int id) {
+			@PathVariable Long id) {
 		RoleGroup r = currentRoleGroupMapping.get("values");
 		if (roleGroupRepository.findById(id) != null) {
-			roleRoleGroupMappingRepository.deleteAll(roleRoleGroupMappingRepository.findByRoleGroup((long) id));
+			roleRoleGroupMappingRepository.deleteAll(roleRoleGroupMappingRepository.findByRoleGroup(id));
 			roleGroupRepository.deleteById(id);
 		}
 
@@ -89,7 +89,7 @@ public class RoleRoleGroupMappingController {
 
 		for (RoleRoleGroupMapping d : rrRoleMapping) {
 			d.setId(dumID++);
-			d.setRoleGroup((long) rSaved.getId());
+			d.setRoleGroup(rSaved.getId());
 
 		}
 		;

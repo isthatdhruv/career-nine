@@ -39,7 +39,7 @@ public class RoleGroupController {
 
 	@PreAuthorize("@auth.allows('role_group.read')")
 	@GetMapping(value = "rolegroup/getbyid/{id}", headers = "Accept=application/json")
-	public Optional<RoleGroup> getRoleById(@PathVariable("id") int roleId) {
+	public Optional<RoleGroup> getRoleById(@PathVariable("id") Long roleId) {
 		Optional<RoleGroup> roleGroup = roleGroupRepository.findById(roleId);
 		return roleGroup;
 	}
@@ -49,9 +49,9 @@ public class RoleGroupController {
 	public RoleGroup updaterRoleGroup(@RequestBody Map<String, RoleGroup> inputData) {
 		RoleGroup r = inputData.get("values");
 		RoleGroup rt = roleGroupRepository.save(r);
-		roleRoleGroupMappingRepository.deleteByRoleGroup((long) rt.getId());
+		roleRoleGroupMappingRepository.deleteByRoleGroup(rt.getId());
 		for (RoleRoleGroupMapping rty : r.getRoleRoleGroupMappings()) {
-			rty.setRoleGroup((long) rt.getId());
+			rty.setRoleGroup(rt.getId());
 		}
 		roleRoleGroupMappingRepository.saveAll(r.getRoleRoleGroupMappings());
 		return roleGroupRepository.findById(rt.getId()).get();
@@ -59,7 +59,7 @@ public class RoleGroupController {
 
 	@PreAuthorize("@auth.allows('role_group.delete')")
 	@GetMapping(value = "rolegroup/delete/{id}", headers = "Accept=application/json")
-	public RoleGroup deleteUser(@PathVariable("id") int roleGroupId) {
+	public RoleGroup deleteUser(@PathVariable("id") Long roleGroupId) {
 		RoleGroup roleGroup = roleGroupRepository.getOne(roleGroupId);
 		roleGroup.setDisplay(false);
 		RoleGroup r = roleGroupRepository.save(roleGroup);

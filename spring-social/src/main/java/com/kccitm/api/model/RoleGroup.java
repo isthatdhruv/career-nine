@@ -23,7 +23,7 @@ public class RoleGroup implements Serializable {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private int id;
+	private Long id;
 
 	private Boolean display;
 
@@ -44,11 +44,11 @@ public class RoleGroup implements Serializable {
 	public RoleGroup() {
 	}
 
-	public int getId() {
+	public Long getId() {
 		return this.id;
 	}
 
-	public void setId(int id) {
+	public void setId(Long id) {
 		this.id = id;
 	}
 

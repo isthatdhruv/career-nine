@@ -536,7 +536,7 @@ public class StudentController {
         usre.setEmail(stu.getOfficialEmailAddress());
         usre.setEmailVerified(true);
         usre = userRepository.save(usre);
-        UserRoleGroupMapping urgm = new UserRoleGroupMapping(false, usre.getId(), roleGroupRepository.getById(3));
+        UserRoleGroupMapping urgm = new UserRoleGroupMapping(false, usre.getId(), roleGroupRepository.getById(3L));
         userRoleGroupMappingRepository.save(urgm);
         return "Done";
       } catch (Exception e2) {
@@ -567,7 +567,7 @@ public class StudentController {
     usre.setEmail(stu.getOfficialEmailAddress());
     usre.setEmailVerified(true);
     usre = userRepository.save(usre);
-    UserRoleGroupMapping urgm = new UserRoleGroupMapping(false, usre.getId(), roleGroupRepository.getById(3));
+    UserRoleGroupMapping urgm = new UserRoleGroupMapping(false, usre.getId(), roleGroupRepository.getById(3L));
     userRoleGroupMappingRepository.save(urgm);
     return "Done";
   }
@@ -644,7 +644,7 @@ public class StudentController {
     usre.setProviderId(stu.getCollegeEnrollmentNumber() + "");
     usre.setEmail(stu.getOfficialEmailAddress());
     usre = userRepository.save(usre);
-    UserRoleGroupMapping urgm = new UserRoleGroupMapping(false, usre.getId(), roleGroupRepository.getById(3));
+    UserRoleGroupMapping urgm = new UserRoleGroupMapping(false, usre.getId(), roleGroupRepository.getById(3L));
     userRoleGroupMappingRepository.save(urgm);
     return "Done";
   }

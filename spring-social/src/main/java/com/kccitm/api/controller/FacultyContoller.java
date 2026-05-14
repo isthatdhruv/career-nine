@@ -230,7 +230,7 @@ public class FacultyContoller {
     user.setEmail(ftu.getOfficialEmailAddress());
     user.setEmailVerified(true);
     user = userRepository.save(user);
-    UserRoleGroupMapping urgm = new UserRoleGroupMapping(false, user.getId(), roleGroupRepository.getById(4));
+    UserRoleGroupMapping urgm = new UserRoleGroupMapping(false, user.getId(), roleGroupRepository.getById(4L));
     userRoleGroupMappingRepository.save(urgm);
     return "Done";
   }

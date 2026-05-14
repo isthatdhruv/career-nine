@@ -70,7 +70,7 @@ public class UserRoleGroupMappingController {
 		userRoleGroupMappingRepository.deleteAllByUser(r.getUser());
 		for (int i = 0; i < r.getRoleGroupTemp().size(); i++) {
 			Integer t = (Integer) r.getRoleGroupTemp().get(i);
-			Optional<RoleGroup> t1 = roleGroupRepository.findById((int) t);
+			Optional<RoleGroup> t1 = roleGroupRepository.findById(t.longValue());
 			if (t1.isPresent()) {
 				RoleGroup rg = t1.get();
 				UserRoleGroupMapping urt = new UserRoleGroupMapping(true, r.getUser(), rg);
@@ -150,7 +150,7 @@ public class UserRoleGroupMappingController {
 			UserRoleGroupMapping mapping = new UserRoleGroupMapping();
 			mapping.setDisplay(true);
 			mapping.setUser(usre.getId());
-			mapping.setRoleGroup(roleGroupRepository.getById(value));
+			mapping.setRoleGroup(roleGroupRepository.getById(value.longValue()));
 			urgm.add(mapping);
 		}
 		userRoleGroupMappingRepository.saveAll(urgm);
