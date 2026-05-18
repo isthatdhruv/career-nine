@@ -98,6 +98,9 @@ const FacultyReFillFormPage = lazy(
 const ClassRoomPage = lazy(
   () => import("../pages/ClassRoom/ClassRoom")
 );
+const PermissionDeniedPage = lazy(
+  () => import("../components/PermissionDeniedPage")
+);
 
 /**
  * Base URL of the website.
@@ -118,6 +121,23 @@ const AppRoutes: FC = () => {
         <Route path="/student-details" element={<StudentDetailPage />} />
         <Route path="/oauth2/redirect" element={<AuthRedirectPage />} />
         <Route path="error/*" element={<ErrorsPage />} />
+        {/*
+          Phase 19 (Plan 19-05): canonical admin/staff permission-denied page.
+          Mounted BEFORE the auth-conditional catch-all so both authenticated
+          and unauthenticated users can reach it (an unauthenticated 403 from
+          a deeplink should land here, not bounce to /auth).
+          Student / counsellor variants live inside their own route trees
+          (/student/permission-denied, /counsellor/permission-denied) so the
+          persona layout stays consistent.
+        */}
+        <Route
+          path="/permission-denied"
+          element={
+            <SuspensedView>
+              <PermissionDeniedPage />
+            </SuspensedView>
+          }
+        />
         
         {/* <Route path="compiler/compiler-edit" element={<CompilerPageEdit />} /> */}
         <Route

@@ -3,6 +3,7 @@ package com.kccitm.api.controller.career9;
 import com.kccitm.api.service.FirebaseService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,6 +21,7 @@ public class GameResultsController {
     private FirebaseService firebaseService;
 
     @GetMapping("/getAll")
+    @PreAuthorize("@auth.allows('game_results.read')") // SCOPE: filtered by Hibernate scopeFilter (Plan 15-06) — no read.all variant in enum
     public ResponseEntity<?> getAllGameResults() {
         try {
             List<Map<String, Object>> results = firebaseService.getAllDocuments(COLLECTION_NAME);
@@ -32,6 +34,7 @@ public class GameResultsController {
     }
 
     @GetMapping("/get/{id}")
+    @PreAuthorize("@auth.allows('game_results.read')")
     public ResponseEntity<?> getGameResultById(@PathVariable String id) {
         try {
             Map<String, Object> result = firebaseService.getDocument(COLLECTION_NAME, id);
@@ -45,6 +48,7 @@ public class GameResultsController {
     }
 
     @GetMapping("/query")
+    @PreAuthorize("@auth.allows('game_results.read')")
     public ResponseEntity<?> queryGameResults(
             @RequestParam String field,
             @RequestParam String operator,

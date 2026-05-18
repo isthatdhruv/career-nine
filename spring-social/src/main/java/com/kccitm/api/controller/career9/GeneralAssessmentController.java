@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import com.kccitm.api.model.career9.GeneralAssessmentResult;
@@ -46,6 +47,7 @@ public class GeneralAssessmentController {
      * Runs the full pipeline and stores the result.
      */
     @PostMapping("/process/{userStudentId}/{assessmentId}")
+    @PreAuthorize("@auth.allows('general_assessment.update', #userStudentId, #assessmentId)")
     public ResponseEntity<?> processStudent(
             @PathVariable Long userStudentId,
             @PathVariable Long assessmentId) {
@@ -57,6 +59,7 @@ public class GeneralAssessmentController {
      * Process all students in a given assessment (batch).
      */
     @PostMapping("/process-batch/{assessmentId}")
+    @PreAuthorize("@auth.allows('general_assessment.update', #assessmentId)")
     public ResponseEntity<?> processBatch(@PathVariable Long assessmentId) {
         List<StudentAssessmentMapping> mappings = mappingRepository.findAllByAssessmentId(assessmentId);
         List<Map<String, Object>> results = new ArrayList<>();
@@ -97,6 +100,7 @@ public class GeneralAssessmentController {
      * Simple DB read — no computation.
      */
     @GetMapping("/dashboard/{userStudentId}/{assessmentId}")
+    @PreAuthorize("@auth.allows('general_assessment.read', #userStudentId, #assessmentId)")
     public ResponseEntity<?> getDashboard(
             @PathVariable Long userStudentId,
             @PathVariable Long assessmentId) {
@@ -115,6 +119,7 @@ public class GeneralAssessmentController {
      * Check if a processed result exists for a student-assessment.
      */
     @GetMapping("/status/{userStudentId}/{assessmentId}")
+    @PreAuthorize("@auth.allows('general_assessment.read', #userStudentId, #assessmentId)")
     public ResponseEntity<?> getStatus(
             @PathVariable Long userStudentId,
             @PathVariable Long assessmentId) {
@@ -134,6 +139,7 @@ public class GeneralAssessmentController {
      * Get all processed results for an assessment.
      */
     @GetMapping("/results/{assessmentId}")
+    @PreAuthorize("@auth.allows('general_assessment.read', #assessmentId)")
     public ResponseEntity<?> getResultsByAssessment(@PathVariable Long assessmentId) {
         List<GeneralAssessmentResult> results = resultRepository.findByAssessmentId(assessmentId);
         return ResponseEntity.ok(results);
@@ -144,6 +150,7 @@ public class GeneralAssessmentController {
      * in the old 167-column OMR format (Sec_A_1 through Sec_F_24).
      */
     @GetMapping("/export-excel/{assessmentId}")
+    @PreAuthorize("@auth.allows('report.export', #assessmentId)")
     public ResponseEntity<?> exportExcel(@PathVariable Long assessmentId) throws Exception {
         byte[] excelBytes = exportService.exportToOldFormat(assessmentId);
 
@@ -161,6 +168,7 @@ public class GeneralAssessmentController {
      * Export a single student's answers in the old OMR format.
      */
     @GetMapping("/export-excel/{assessmentId}/student/{userStudentId}")
+    @PreAuthorize("@auth.allows('report.export', #assessmentId, #userStudentId)")
     public ResponseEntity<?> exportExcelForStudent(
             @PathVariable Long assessmentId,
             @PathVariable Long userStudentId) throws Exception {

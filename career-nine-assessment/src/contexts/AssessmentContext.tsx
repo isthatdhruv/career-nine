@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import http from '../api/http';
+import http, { COOKIE_AUTH_FLAG, setCookieAuthRuntimeActive } from '../api/http';
 import { getActiveCacheName } from '../components/ResourcePreloader';
 
 type AssessmentContextType = {
@@ -11,6 +11,21 @@ type AssessmentContextType = {
   prefetchAssessmentData: (userStudentId: string) => void;
   preloadAssessmentData: (assessmentId: string) => void;
   prefetchedAssessments: any[] | null;
+  /**
+   * Phase 19 — mints the assessment-scoped cookie (cn_at_asmnt) by POSTing to
+   * /auth/assessment-session once the (userStudentId, assessmentId) pair is
+   * known. Returns true if the cookie path is now active, false if the SPA
+   * fell back to the v2.0 header path (build flag off, 404 from per-institute
+   * disabled, 403 enrolment mismatch, or transient network/5xx).
+   *
+   * Idempotent per `(userStudentId, assessmentId)` pair for the lifetime of
+   * the SPA tab — repeat invocations for the same pair are no-ops. This
+   * matches the plan's "pre-flight POST /auth/assessment-session once per
+   * (userStudentId, assessmentId) pair" contract.
+   */
+  mintAssessmentSessionCookie: (userStudentId: number, assessmentId: number) => Promise<boolean>;
+  /** True iff /auth/assessment-session returned 200 for the active pair. */
+  cookieAuthActive: boolean;
 };
 
 /**
@@ -128,6 +143,24 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const preloadPromiseRef = useRef<Promise<void> | null>(null);
   const cachedAssessmentIdRef = useRef<string | null>(null);
 
+  /**
+   * Phase 19 cookie-auth state.
+   *
+   * `cookieAuthActive` mirrors the http-instance runtime flag — it tracks
+   * whether the most recent POST /auth/assessment-session for the active
+   * pair returned 200. Components MAY branch UI on this (currently no
+   * downstream consumer needs to; the SPA shows identical screens either
+   * way) but the http-instance interceptor is the source of truth for
+   * header-vs-cookie injection.
+   *
+   * `mintedPairRef` is the idempotency guard: we keep a string
+   * `${userStudentId}:${assessmentId}` of the last successful mint so we
+   * don't re-POST on every navigation. Cleared on logout / new pair.
+   */
+  const [cookieAuthActive, setCookieAuthActive] = useState<boolean>(false);
+  const mintedPairRef = useRef<string | null>(null);
+  const mintInFlightRef = useRef<Promise<boolean> | null>(null);
+
   /** Store fetched assessment data in context + sessionStorage */
   const applyAssessmentResult = (assessmentId: string, data: any, config: any) => {
     cachedAssessmentIdRef.current = assessmentId;
@@ -189,6 +222,84 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     preloadPromiseRef.current = promise;
   };
 
+  /**
+   * Phase 19 — mint cn_at_asmnt by POSTing to /auth/assessment-session.
+   *
+   * Decision matrix:
+   *   - build flag off (COOKIE_AUTH_FLAG=false) → no-op, return false. The
+   *     http-instance interceptor keeps injecting the v2.0 X-Assessment-*
+   *     headers; behaviour is identical to pre-Phase-19.
+   *   - 200 OK → set the http-instance runtime flag to active; cookie is
+   *     the source of truth from now on.
+   *   - 404 (per-institute flag off for this student's institute, per
+   *     Plan 19-01's InstituteDetail.assessmentCookieAuthEnabled) →
+   *     transparently fall back to header path for this student only.
+   *   - 403 (enrolment mismatch — student does not own this assessment) →
+   *     surface as cookie-auth-inactive; subsequent calls will hit the
+   *     header path and the backend will reject them with the same 403,
+   *     which the SPA already maps to "Your assessment session has expired."
+   *   - Network error or 5xx → fall back to header path so the student is
+   *     not blocked; warn to console for ops visibility.
+   *
+   * Idempotent per (userStudentId, assessmentId) pair; concurrent callers
+   * coalesce via mintInFlightRef.
+   */
+  const mintAssessmentSessionCookie = async (
+    userStudentId: number,
+    assessmentId: number,
+  ): Promise<boolean> => {
+    if (!COOKIE_AUTH_FLAG) {
+      setCookieAuthRuntimeActive(false);
+      setCookieAuthActive(false);
+      return false;
+    }
+
+    const pairKey = `${userStudentId}:${assessmentId}`;
+    if (mintedPairRef.current === pairKey) {
+      // Already minted for this exact pair in this tab — http-instance flag
+      // is already set; nothing to do.
+      return cookieAuthActive;
+    }
+    if (mintInFlightRef.current) {
+      // Coalesce concurrent callers (e.g. AllottedAssessmentPage + an effect)
+      return mintInFlightRef.current;
+    }
+
+    const mintPromise = (async () => {
+      try {
+        await http.post('/auth/assessment-session', { userStudentId, assessmentId });
+        mintedPairRef.current = pairKey;
+        setCookieAuthRuntimeActive(true);
+        setCookieAuthActive(true);
+        return true;
+      } catch (err: any) {
+        const status = err?.response?.status;
+        if (status === 404) {
+          // Per-institute flag OFF — fall back transparently.
+          setCookieAuthRuntimeActive(false);
+          setCookieAuthActive(false);
+          return false;
+        }
+        if (status === 403) {
+          // Enrolment mismatch — fall back; downstream 403 will re-tokenize.
+          setCookieAuthRuntimeActive(false);
+          setCookieAuthActive(false);
+          return false;
+        }
+        // Network or 5xx — fall back so the student is not blocked.
+        // eslint-disable-next-line no-console
+        console.warn('mintAssessmentSessionCookie failed; falling back to header path', err);
+        setCookieAuthRuntimeActive(false);
+        setCookieAuthActive(false);
+        return false;
+      } finally {
+        mintInFlightRef.current = null;
+      }
+    })();
+    mintInFlightRef.current = mintPromise;
+    return mintPromise;
+  };
+
   const fetchAssessmentData = async (assessmentId: string): Promise<void> => {
     // Wait for any in-flight prefetch or preload to complete first
     if (prefetchPromiseRef.current) {
@@ -248,7 +359,8 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   return (
     <AssessmentContext.Provider value={{
       assessmentData, assessmentConfig, loading, error,
-      fetchAssessmentData, prefetchAssessmentData, preloadAssessmentData, prefetchedAssessments
+      fetchAssessmentData, prefetchAssessmentData, preloadAssessmentData, prefetchedAssessments,
+      mintAssessmentSessionCookie, cookieAuthActive,
     }}>
       {children}
     </AssessmentContext.Provider>

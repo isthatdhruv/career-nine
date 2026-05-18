@@ -3,6 +3,7 @@ package com.kccitm.api.controller.career9;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,16 +23,19 @@ public class LanguageOptionsController {
     private LanguageOptionRepository languageoption;
 
     @GetMapping("/getAll")
+    @PreAuthorize("@auth.allows('language_option.read')")
     public List<LanguageOption> getAllOptions(){
        return languageoption.findAll();
     }
 
     @GetMapping("/get/{id}")
+    @PreAuthorize("@auth.allows('language_option.read')")
     public LanguageOption getOptionsById(@PathVariable Long id){
        return languageoption.findById(id)
            .orElseThrow(() -> new ResourceNotFoundException("LanguageOption", "id", id));
     }
     @PostMapping("/create")
+    @PreAuthorize("@auth.allows('language_option.create')")
     public LanguageOption createLanguageOption(@RequestBody LanguageOption langoption){
         return languageoption.save(langoption);
     }

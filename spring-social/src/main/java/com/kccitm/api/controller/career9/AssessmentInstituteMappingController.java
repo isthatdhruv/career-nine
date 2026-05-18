@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -108,6 +109,7 @@ public class AssessmentInstituteMappingController {
     // ============ ADMIN ENDPOINTS ============
 
     @PostMapping("/create")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.create')")
     public ResponseEntity<?> createMapping(@RequestBody AssessmentInstituteMapping mapping) {
         // Validate assessment exists
         if (!assessmentTableRepository.existsById(mapping.getAssessmentId())) {
@@ -122,21 +124,25 @@ public class AssessmentInstituteMappingController {
     }
 
     @GetMapping("/getAll")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.read')") // SCOPE: filtered by Hibernate scopeFilter (Plan 15-06)
     public List<AssessmentInstituteMapping> getAll() {
         return mappingRepository.findAll();
     }
 
     @GetMapping("/getByInstitute/{instituteCode}")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.read')")
     public List<AssessmentInstituteMapping> getByInstitute(@PathVariable Integer instituteCode) {
         return mappingRepository.findByInstituteCode(instituteCode);
     }
 
     @GetMapping("/getByInstitute/{instituteCode}/assessments")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.read')")
     public List<AssessmentTableRepository.AssessmentSummary> getAssessmentsByInstitute(@PathVariable Integer instituteCode) {
         return assessmentTableRepository.findAssessmentSummariesByInstitute(instituteCode);
     }
 
     @GetMapping("/get/{id}")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.read')")
     public ResponseEntity<?> getById(@PathVariable Long id) {
         return mappingRepository.findById(id)
                 .map(m -> ResponseEntity.ok((Object) m))
@@ -144,6 +150,7 @@ public class AssessmentInstituteMappingController {
     }
 
     @PutMapping("/update/{id}")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.update')")
     public ResponseEntity<?> updateMapping(@PathVariable Long id,
             @RequestBody AssessmentInstituteMapping updated) {
         Optional<AssessmentInstituteMapping> existingOpt = mappingRepository.findById(id);
@@ -163,6 +170,7 @@ public class AssessmentInstituteMappingController {
     }
 
     @DeleteMapping("/delete/{id}")
+    @PreAuthorize("@auth.allows('assessment_institute_mapping.delete')")
     public ResponseEntity<?> deleteMapping(@PathVariable Long id) {
         if (!mappingRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
@@ -174,6 +182,7 @@ public class AssessmentInstituteMappingController {
     // ============ PUBLIC ENDPOINTS ============
 
     @GetMapping("/public/info/{token}")
+    @PreAuthorize("@auth.allows('assessment.prefetch')") // PUBLIC?: flagged for 15-06 EXCLUSIONS review (token-gated public endpoint)
     public ResponseEntity<?> getMappingInfoByToken(@PathVariable String token) {
         Optional<AssessmentInstituteMapping> mappingOpt = mappingRepository.findByTokenAndIsActive(token, true);
         if (!mappingOpt.isPresent()) {
@@ -239,6 +248,7 @@ public class AssessmentInstituteMappingController {
 
     @PostMapping("/public/register/{token}")
     @Transactional
+    @PreAuthorize("@auth.allows('assessment.prefetch')") // PUBLIC?: flagged for 15-06 EXCLUSIONS review (B2C self-registration endpoint)
     public ResponseEntity<?> registerStudentByToken(@PathVariable String token,
             @RequestBody Map<String, Object> studentData) {
         // 1. Find mapping by token

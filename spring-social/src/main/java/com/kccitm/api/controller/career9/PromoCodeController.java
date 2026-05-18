@@ -9,6 +9,7 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,6 +32,7 @@ public class PromoCodeController {
     @Autowired
     private com.kccitm.api.repository.Career9.b2c.PromoCodeCampaignRepository promoCodeCampaignRepository;
 
+    @PreAuthorize("@auth.allows('promo_code.create')")
     @PostMapping("/create")
     public ResponseEntity<?> createPromoCode(@RequestBody Map<String, Object> request) {
         String code = (String) request.get("code");
@@ -69,11 +71,13 @@ public class PromoCodeController {
         return ResponseEntity.ok(saved);
     }
 
+    @PreAuthorize("@auth.allows('promo_code.read.all')")
     @GetMapping("/getAll")
     public ResponseEntity<List<PromoCode>> getAllPromoCodes() {
         return ResponseEntity.ok(promoCodeRepository.findAllByOrderByCreatedAtDesc());
     }
 
+    @PreAuthorize("@auth.allows('promo_code.read')")
     @GetMapping("/get/{id}")
     public ResponseEntity<?> getPromoCodeById(@PathVariable Long id) {
         Optional<PromoCode> promo = promoCodeRepository.findById(id);
@@ -83,6 +87,7 @@ public class PromoCodeController {
         return ResponseEntity.ok(promo.get());
     }
 
+    @PreAuthorize("@auth.allows('promo_code.update')")
     @PutMapping("/update/{id}")
     public ResponseEntity<?> updatePromoCode(@PathVariable Long id, @RequestBody Map<String, Object> request) {
         Optional<PromoCode> optPromo = promoCodeRepository.findById(id);
@@ -133,6 +138,7 @@ public class PromoCodeController {
         return ResponseEntity.ok(saved);
     }
 
+    @PreAuthorize("@auth.allows('promo_code.delete')")
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<?> deletePromoCode(@PathVariable Long id) {
         if (!promoCodeRepository.existsById(id)) {
@@ -142,6 +148,7 @@ public class PromoCodeController {
         return ResponseEntity.ok("Promo code deleted");
     }
 
+    @PreAuthorize("@auth.allows('promo_code.read')")
     @PostMapping("/public/validate")
     public ResponseEntity<?> validatePromoCode(@RequestBody Map<String, Object> request) {
         Object codeObj = request.get("code");
@@ -193,6 +200,7 @@ public class PromoCodeController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("@auth.allows('promo_code.update')")
     @PutMapping("/{id}/campaigns")
     public ResponseEntity<?> setCampaigns(@PathVariable Long id, @RequestBody Map<String, Object> req) {
         if (!promoCodeRepository.findById(id).isPresent()) {
@@ -223,6 +231,7 @@ public class PromoCodeController {
         return ResponseEntity.ok(java.util.Map.of("status", "ok", "count", campaignIds.size()));
     }
 
+    @PreAuthorize("@auth.allows('promo_code.read')")
     @GetMapping("/{id}/campaigns")
     public ResponseEntity<?> getCampaigns(@PathVariable Long id) {
         List<Long> ids = promoCodeCampaignRepository.findByPromoCodeId(id).stream()

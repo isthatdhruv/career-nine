@@ -5,7 +5,7 @@ import { useFormik } from "formik";
 import { Link } from "react-router-dom";
 import * as Yup from "yup";
 import { useAuth } from "../core/Auth";
-import { login, getUserByToken } from "../core/_requests";
+import { login, getCurrentUser } from "../core/_requests";
 
 const API_URL = process.env.REACT_APP_API_URL;
 const URL = process.env.REACT_APP_URL;
@@ -18,7 +18,7 @@ const Redirect_URL =
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
-  const { saveAuth, setCurrentUser } = useAuth();
+  const { setCurrentUser } = useAuth();
 
   const formik = useFormik({
     initialValues: {
@@ -33,14 +33,13 @@ const Login = () => {
       setLoading(true);
       setStatus(undefined);
       try {
-        const { data } = await login(values.email, values.password);
-        // Backend returns { accessToken, tokenType } — map to AuthModel's api_token
-        const auth = { api_token: data.accessToken };
-        saveAuth(auth);
-        const { data: user } = await getUserByToken(auth.api_token);
+        // Phase 16: cookies are set by the server on /auth/login.
+        // Body still includes accessToken (backwards compat) but we ignore it.
+        await login(values.email, values.password);
+        const { data: user } = await getCurrentUser();
         setCurrentUser(user);
       } catch (error: any) {
-        saveAuth(undefined);
+        // No local auth state to clear — cookie auth lives on the server.
         const msg =
           error?.response?.data?.message ||
           error?.response?.data?.error ||

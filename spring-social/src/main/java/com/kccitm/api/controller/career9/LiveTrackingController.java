@@ -7,6 +7,7 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -46,6 +47,8 @@ public class LiveTrackingController {
      * Lightweight endpoint: returns only student id, name, email, status.
      * Single JPQL query — no Redis, no answer counts, no N+1.
      */
+    // no scope arg: identifies by assessmentId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('live_tracking.read')")
     @GetMapping("/{assessmentId}/live-tracking-lite")
     public ResponseEntity<?> getLiveTrackingLite(@PathVariable Long assessmentId) {
         AssessmentTable assessment = assessmentTableRepository.findById(assessmentId).orElse(null);
@@ -100,6 +103,8 @@ public class LiveTrackingController {
      * Returns assessment info, total questions, all student statuses, and answer counts
      * in one response — optimized for low-bandwidth polling.
      */
+    // no scope arg: identifies by assessmentId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('live_tracking.read')")
     @GetMapping("/{assessmentId}/live-tracking")
     public ResponseEntity<?> getLiveTracking(@PathVariable Long assessmentId) {
         // 1. Get the assessment

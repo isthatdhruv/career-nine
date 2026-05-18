@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,6 +29,7 @@ public class InstituteBranchBatchMappingController {
     @Autowired
     private InstituteBatchRepository instituteBatchRepository;
 
+    @PreAuthorize("@auth.allows('institute_branch_batch_mapping.read.all')")
     @GetMapping(value = "instituteBranchBatchMapping/get", headers = "Accept=application/json")
     public List<InstituteBranchBatchMapping> getAllBranchBatchMappings() {
         List<InstituteBranchBatchMapping> allInstituteBranchBatchMapping = instituteBranchBatchMappingRepository
@@ -44,6 +46,7 @@ public class InstituteBranchBatchMappingController {
     // return instituteBranchBatchMapping;
     // }
 
+    @PreAuthorize("@auth.allows('institute_branch_batch_mapping.update')")
     @PostMapping(value = "instituteBranchBatchMapping/update", headers = "Accept=application/json")
     public List<InstituteBranchBatchMapping> updateInstituteDetail(@RequestBody Map<String, InstituteBatch> inputData) {
         InstituteBatch r = inputData.get("values");
@@ -73,6 +76,7 @@ public class InstituteBranchBatchMappingController {
         return inbbm;
     }
 
+    @PreAuthorize("@auth.allows('institute_branch_batch_mapping.delete')")
     @GetMapping(value = "instituteBranchBatchMapping/delete/{id}", headers = "Accept=application/json")
     public InstituteBranchBatchMapping deleteBatchBatch(@PathVariable("id") int branchId) {
         InstituteBranchBatchMapping branch = instituteBranchBatchMappingRepository.getOne(branchId);

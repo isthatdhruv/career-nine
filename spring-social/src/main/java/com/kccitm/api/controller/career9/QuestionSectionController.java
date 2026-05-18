@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,26 +27,31 @@ public class QuestionSectionController {
     private QuestionSectionRepository questionSectionRepository;
 
     @GetMapping("/getAll")
+    @PreAuthorize("@auth.allows('question_section.read')")
     public List<QuestionSection> getAllQuestionSections() {
         return questionSectionRepository.findByIsDeletedFalseOrIsDeletedIsNull();
     }
 
     @GetMapping("/getAllList")
+    @PreAuthorize("@auth.allows('question_section.read')")
     public List<QuestionSection> getAllQuestionSectionsList() {
         return questionSectionRepository.findAllSectionsProjection();
     }
 
     @GetMapping("/get/{id}")
+    @PreAuthorize("@auth.allows('question_section.read')")
     public QuestionSection getQuestionSectionById(@PathVariable Long id) {
         return questionSectionRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("QuestionSection", "id", id));
     }
 
     @PostMapping("/create")
+    @PreAuthorize("@auth.allows('question_section.create')")
     public QuestionSection createQuestionSection(@RequestBody QuestionSection questionSection) {
         return questionSectionRepository.save(questionSection);
     }
     @PutMapping("/update/{id}")
+    @PreAuthorize("@auth.allows('question_section.update')")
     public ResponseEntity<QuestionSection> updateQuestionSection(@PathVariable Long id, @RequestBody QuestionSection questionSection) {
         QuestionSection existingSection = questionSectionRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("QuestionSection", "id", id));
@@ -57,6 +63,7 @@ public class QuestionSectionController {
         return ResponseEntity.ok(updatedSection);
     }
     @DeleteMapping("/delete/{id}")
+    @PreAuthorize("@auth.allows('question_section.delete')")
     public ResponseEntity<String> deleteQuestionSection(@PathVariable Long id) {
         QuestionSection questionSection = questionSectionRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("QuestionSection", "id", id));
@@ -72,11 +79,13 @@ public class QuestionSectionController {
     }
     
     @GetMapping("/deleted")
+    @PreAuthorize("@auth.allows('question_section.read')")
     public List<QuestionSection> getDeletedQuestionSections() {
         return questionSectionRepository.findByIsDeletedTrue();
     }
 
     @PutMapping("/restore/{id}")
+    @PreAuthorize("@auth.allows('question_section.update')")
     public ResponseEntity<String> restoreQuestionSection(@PathVariable Long id) {
         QuestionSection qs = questionSectionRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("QuestionSection", "id", id));
@@ -86,6 +95,7 @@ public class QuestionSectionController {
     }
 
     @DeleteMapping("/permanent-delete/{id}")
+    @PreAuthorize("@auth.allows('question_section.delete')")
     public ResponseEntity<String> permanentDeleteQuestionSection(@PathVariable Long id) {
         questionSectionRepository.deleteById(id);
         return ResponseEntity.ok("Permanently deleted.");
@@ -93,6 +103,7 @@ public class QuestionSectionController {
 
     // Additional endpoints
     @GetMapping("/{id}/questions")
+    @PreAuthorize("@auth.allows('question_section.read')")
     public ResponseEntity<List<com.kccitm.api.model.career9.AssessmentQuestions>> getSectionQuestions(@PathVariable Long id) {
         QuestionSection section = questionSectionRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("QuestionSection", "id", id));

@@ -7,6 +7,7 @@ import java.util.List;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -37,6 +38,8 @@ public class UniversityMarkController {
 	// return p;
 	// }
 
+	// no scope arg: cross-institute marks list; scope-filter narrows result set
+	@PreAuthorize("@auth.allows('university_mark.read')")
 	@GetMapping(value = "/getmarks")
 	public List<ResultClass> getAllMarks() {
 		List<UniversityMark> tasks = universityMarkRepository.findAll();
@@ -81,6 +84,8 @@ public class UniversityMarkController {
 		return list;
 	}
 
+	// no scope arg: identifies by rollno; scope-filter narrows access
+	@PreAuthorize("@auth.allows('university_mark.read')")
 	@GetMapping(value = "/getmarks/{id}", headers = "Accept=application/json")
 	public ResultClass getRoleById(@PathVariable("id") Long rollno) {
 		List<UniversityMark> list = universityMarkRepository.findAll();
@@ -143,6 +148,8 @@ public class UniversityMarkController {
 		return p;
 	}
 
+	// no scope arg: body is List<Long> of rollNos; scope-filter narrows access
+	@PreAuthorize("@auth.allows('university_mark.read')")
 	@PostMapping(value = "/getmarksArray", headers = "Accept=application/json")
 	public List<ResultClass> getStudentMarksRollArray(@RequestBody List<Long> rollNos) {
 		List<UniversityMark> marks = universityMarkRepository.findAll();
@@ -166,6 +173,8 @@ public class UniversityMarkController {
 		return results;
 	}
 
+	// no scope arg: body is UniMarksScrapping DTO without scope dims; scope-filter narrows access
+	@PreAuthorize("@auth.allows('university_mark.create')")
 	@PostMapping(value = "/student/putmarks")
 	public UniversityMark putUniMarks(@RequestBody UniMarksScrapping uni) {
 		System.out.println("Working!!!");

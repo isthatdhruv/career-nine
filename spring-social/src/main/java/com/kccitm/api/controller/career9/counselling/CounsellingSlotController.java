@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,6 +36,7 @@ public class CounsellingSlotController {
     @Autowired
     private BookingService bookingService;
 
+    @PreAuthorize("@auth.allows('counselling.slot.read', #instituteCode, null, null, null)")
     @GetMapping("/available")
     public ResponseEntity<List<CounsellingSlot>> getAvailable(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate week,
@@ -52,6 +54,8 @@ public class CounsellingSlotController {
         return ResponseEntity.ok(slots);
     }
 
+    // no scope arg: body is CounsellingSlot; admin manual slot creation
+    @PreAuthorize("@auth.allows('counselling.slot.create')")
     @PostMapping("/create-manual")
     public ResponseEntity<CounsellingSlot> createManual(@RequestBody CounsellingSlot slot) {
         logger.info("Creating manual counselling slot");
@@ -62,6 +66,8 @@ public class CounsellingSlotController {
         return ResponseEntity.ok(saved);
     }
 
+    // no scope arg: body is CounsellingSlot; admin block-date action
+    @PreAuthorize("@auth.allows('counselling.slot.update')")
     @PostMapping("/block-date")
     public ResponseEntity<CounsellingSlot> blockDate(@RequestBody CounsellingSlot slot) {
         logger.info("Blocking date for counselling slot");
@@ -72,6 +78,8 @@ public class CounsellingSlotController {
         return ResponseEntity.ok(saved);
     }
 
+    // no scope arg: delete by id; admin-only
+    @PreAuthorize("@auth.allows('counselling.slot.delete')")
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<?> delete(@PathVariable Long id) {
         CounsellingSlot slot = slotRepository.findById(id)
@@ -87,6 +95,8 @@ public class CounsellingSlotController {
         return ResponseEntity.ok().build();
     }
 
+    // no scope arg: identifies by counsellorId
+    @PreAuthorize("@auth.allows('counselling.slot.read')")
     @GetMapping("/by-counsellor/{counsellorId}")
     public ResponseEntity<List<CounsellingSlot>> getByCounsellor(
             @PathVariable Long counsellorId,

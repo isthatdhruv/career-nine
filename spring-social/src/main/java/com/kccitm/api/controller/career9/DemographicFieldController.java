@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,16 +27,22 @@ public class DemographicFieldController {
     @Autowired
     private DemographicFieldDefinitionRepository fieldDefinitionRepository;
 
+    // no scope arg: catalog list — admin-shape
+    @PreAuthorize("@auth.allows('demographic_field.read')")
     @GetMapping("/getAll")
     public List<DemographicFieldDefinition> getAll() {
         return fieldDefinitionRepository.findAll();
     }
 
+    // no scope arg: catalog list — admin-shape
+    @PreAuthorize("@auth.allows('demographic_field.read')")
     @GetMapping("/getActive")
     public List<DemographicFieldDefinition> getActive() {
         return fieldDefinitionRepository.findByIsActiveTrue();
     }
 
+    // no scope arg: fetch by id; admin-shape
+    @PreAuthorize("@auth.allows('demographic_field.read')")
     @GetMapping("/get/{id}")
     public ResponseEntity<DemographicFieldDefinition> getById(@PathVariable Long id) {
         DemographicFieldDefinition field = fieldDefinitionRepository.findById(id)
@@ -43,6 +50,8 @@ public class DemographicFieldController {
         return ResponseEntity.ok(field);
     }
 
+    // no scope arg: catalog-shape create; admin-only
+    @PreAuthorize("@auth.allows('demographic_field.create')")
     @PostMapping("/create")
     public ResponseEntity<DemographicFieldDefinition> create(@RequestBody DemographicFieldDefinition field) {
         // Set bidirectional references for options
@@ -56,6 +65,8 @@ public class DemographicFieldController {
         return new ResponseEntity<>(saved, HttpStatus.CREATED);
     }
 
+    // no scope arg: catalog-shape update; admin-only
+    @PreAuthorize("@auth.allows('demographic_field.update')")
     @PutMapping("/update/{id}")
     public ResponseEntity<DemographicFieldDefinition> update(@PathVariable Long id,
             @RequestBody DemographicFieldDefinition fieldUpdate) {
@@ -89,6 +100,8 @@ public class DemographicFieldController {
         return ResponseEntity.ok(fieldDefinitionRepository.save(existing));
     }
 
+    // no scope arg: catalog-shape soft-delete; admin-only
+    @PreAuthorize("@auth.allows('demographic_field.delete')")
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<String> delete(@PathVariable Long id) {
         DemographicFieldDefinition existing = fieldDefinitionRepository.findById(id)

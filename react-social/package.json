@@ -107,6 +107,9 @@
     "webpack-cli": "4.10.0"
   },
   "scripts": {
+    "gen:perms": "node scripts/extract-perm-routes.js",
+    "prestart": "npm run gen:perms",
+    "prebuild": "npm run gen:perms",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",

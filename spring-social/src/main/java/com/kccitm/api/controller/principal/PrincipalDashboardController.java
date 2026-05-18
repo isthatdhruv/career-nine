@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,6 +25,7 @@ public class PrincipalDashboardController {
     /**
      * Get complete dashboard data for principal
      */
+    @PreAuthorize("@auth.allows('dashboard.principal.read')")
     @GetMapping("/data/{principalId}")
     public ResponseEntity<Map<String, Object>> getDashboardData(
             @PathVariable Long principalId,
@@ -43,6 +45,7 @@ public class PrincipalDashboardController {
     /**
      * Get institute overview only
      */
+    @PreAuthorize("@auth.allows('dashboard.principal.read')")
     @GetMapping("/overview/{principalId}")
     public ResponseEntity<Map<String, Object>> getOverview(@PathVariable Long principalId) {
         return ResponseEntity.ok(principalDashboardService.getInstituteOverview());
@@ -51,6 +54,7 @@ public class PrincipalDashboardController {
     /**
      * Get assessment performance
      */
+    @PreAuthorize("@auth.allows('dashboard.principal.read')")
     @GetMapping("/assessment-performance/{principalId}")
     public ResponseEntity<Map<String, Object>> getAssessmentPerformance(
             @PathVariable Long principalId,
@@ -61,6 +65,7 @@ public class PrincipalDashboardController {
     /**
      * Get classwise performance
      */
+    @PreAuthorize("@auth.allows('dashboard.principal.read')")
     @GetMapping("/classwise-performance/{principalId}")
     public ResponseEntity<Map<String, Object>> getClasswisePerformance(@PathVariable Long principalId) {
         return ResponseEntity.ok(principalDashboardService.getClasswisePerformance());
@@ -69,6 +74,7 @@ public class PrincipalDashboardController {
     /**
      * Get teacher activity
      */
+    @PreAuthorize("@auth.allows('dashboard.principal.read')")
     @GetMapping("/teacher-activity/{principalId}")
     public ResponseEntity<Map<String, Object>> getTeacherActivity(@PathVariable Long principalId) {
         return ResponseEntity.ok(principalDashboardService.getTeacherActivity());
@@ -77,6 +83,7 @@ public class PrincipalDashboardController {
     /**
      * Get enrollment trends
      */
+    @PreAuthorize("@auth.allows('dashboard.principal.read')")
     @GetMapping("/enrollment-trends/{principalId}")
     public ResponseEntity<Map<String, Object>> getEnrollmentTrends(@PathVariable Long principalId) {
         return ResponseEntity.ok(principalDashboardService.getEnrollmentTrends());
@@ -85,6 +92,7 @@ public class PrincipalDashboardController {
     /**
      * Get all assessments for dropdown
      */
+    @PreAuthorize("@auth.allows('dashboard.principal.read')")
     @GetMapping("/assessments")
     public ResponseEntity<List<Map<String, Object>>> getAllAssessments() {
         return ResponseEntity.ok(principalDashboardService.getAllAssessments());

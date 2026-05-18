@@ -21,6 +21,7 @@ import javax.persistence.PersistenceContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -150,21 +151,28 @@ public class FirebaseDataMappingController {
     @Autowired
     private com.kccitm.api.service.AssessmentCompletionService completionService;
 
+    // no scope arg: admin-only firebase mapping list
+    @PreAuthorize("@auth.allows('firebase_data_mapping.read')")
     @GetMapping("/getAll")
     public List<FirebaseDataMapping> getAll() {
         return firebaseDataMappingRepository.findAll();
     }
 
+    // no scope arg: admin-only firebase mapping query by type
+    @PreAuthorize("@auth.allows('firebase_data_mapping.read')")
     @GetMapping("/getByType/{type}")
     public List<FirebaseDataMapping> getByType(@PathVariable("type") String type) {
         return firebaseDataMappingRepository.findByFirebaseType(type.toUpperCase());
     }
 
+    // no scope arg: admin-only firebase mapping query by parent
+    @PreAuthorize("@auth.allows('firebase_data_mapping.read')")
     @GetMapping("/getByParent/{parentId}")
     public List<FirebaseDataMapping> getByParent(@PathVariable("parentId") Long parentId) {
         return firebaseDataMappingRepository.findByParentMappingId(parentId);
     }
 
+    @PreAuthorize("@auth.allows('firebase_data_mapping.read', #instituteCode, null, null, null)")
     @GetMapping("/students-by-institute/{instituteCode}")
     public ResponseEntity<?> getStudentsByInstitute(@PathVariable("instituteCode") Integer instituteCode) {
         List<UserStudent> students = userStudentRepository.findByInstituteInstituteCode(instituteCode);
@@ -204,6 +212,8 @@ public class FirebaseDataMappingController {
         return ResponseEntity.ok(result);
     }
 
+    // no scope arg: body is raw Map; admin-only firebase data import
+    @PreAuthorize("@auth.allows('firebase_data_mapping.create')")
     @Transactional
     @PostMapping("/import-mapped-answers")
     public ResponseEntity<?> importMappedAnswers(@RequestBody Map<String, Object> payload) {
@@ -396,6 +406,8 @@ public class FirebaseDataMappingController {
     }
 
     @Transactional
+    // no scope arg: body is raw List<Map>; admin-only status bulk update
+    @PreAuthorize("@auth.allows('firebase_data_mapping.update')")
     @PostMapping("/force-complete-status")
     public ResponseEntity<?> forceCompleteStatus(@RequestBody List<Map<String, Object>> payload) {
         int updated = 0;
@@ -416,6 +428,8 @@ public class FirebaseDataMappingController {
         return ResponseEntity.ok(Map.of("updated", updated));
     }
 
+    // no scope arg: delete by id; admin-only
+    @PreAuthorize("@auth.allows('firebase_data_mapping.delete')")
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<?> deleteMapping(@PathVariable("id") Long id) {
         Optional<FirebaseDataMapping> opt = firebaseDataMappingRepository.findById(id);
@@ -438,6 +452,8 @@ public class FirebaseDataMappingController {
         return ResponseEntity.ok().build();
     }
 
+    // no scope arg: delete by query params; admin-only
+    @PreAuthorize("@auth.allows('firebase_data_mapping.delete')")
     @DeleteMapping("/deleteByFirebaseNameAndType")
     public ResponseEntity<?> deleteByFirebaseNameAndType(
             @RequestParam("firebaseName") String firebaseName,
@@ -469,6 +485,8 @@ public class FirebaseDataMappingController {
         return ResponseEntity.ok().body(matching.size() + " mapping(s) deleted");
     }
 
+    // no scope arg: body is FirebaseDataMapping entity; admin-only create
+    @PreAuthorize("@auth.allows('firebase_data_mapping.create')")
     @PostMapping("/save")
     public ResponseEntity<FirebaseDataMapping> save(@RequestBody FirebaseDataMapping mapping) {
         // Normalize firebaseType to uppercase
@@ -479,6 +497,8 @@ public class FirebaseDataMappingController {
         return ResponseEntity.ok(saved);
     }
 
+    // no scope arg: body is List<FirebaseDataMapping>; admin-only bulk create
+    @PreAuthorize("@auth.allows('firebase_data_mapping.create')")
     @PostMapping("/save-batch")
     public ResponseEntity<List<FirebaseDataMapping>> saveBatch(@RequestBody List<FirebaseDataMapping> mappings) {
         for (FirebaseDataMapping m : mappings) {
@@ -490,6 +510,8 @@ public class FirebaseDataMappingController {
         return ResponseEntity.ok(saved);
     }
 
+    // no scope arg: existence check by ids; admin-only
+    @PreAuthorize("@auth.allows('firebase_data_mapping.read')")
     @GetMapping("/check/{firebaseId}/{type}")
     public ResponseEntity<FirebaseDataMapping> checkMapping(
             @PathVariable("firebaseId") String firebaseId,
@@ -536,12 +558,16 @@ public class FirebaseDataMappingController {
      * Refresh button in the mapping wizard when the admin knows Firebase has
      * new data and does not want to wait for the 10-minute TTL.
      */
+    // no scope arg: cache-invalidation utility; admin-only
+    @PreAuthorize("@auth.allows('firebase_data_mapping.update')")
     @PostMapping("/invalidate-cache")
     public ResponseEntity<?> invalidateFirebaseCache() {
         firebaseDataCacheService.invalidate();
         return ResponseEntity.ok(Map.of("status", "ok", "message", "Firebase cache cleared"));
     }
 
+    // no scope arg: firebase fetch; admin-only
+    @PreAuthorize("@auth.allows('firebase_data_mapping.read')")
     @GetMapping("/fetch-school-data")
     public ResponseEntity<?> fetchSchoolData(@RequestParam(value = "tenant", required = false) String tenant) {
         try {
@@ -676,6 +702,7 @@ public class FirebaseDataMappingController {
      * Deletes all students imported from Firebase for a given institute.
      * Cleans up all related data: answers, scores, mappings, reports, etc.
      */
+    @PreAuthorize("@auth.allows('firebase_data_mapping.delete', #instituteCode, null, null, null)")
     @DeleteMapping("/delete-firebase-students/{instituteCode}")
     @Transactional
     public ResponseEntity<?> deleteFirebaseStudents(
@@ -803,6 +830,8 @@ public class FirebaseDataMappingController {
      * Fetches ALL user documents from Firestore with full data (personal, educational,
      * assessment responses, scores, etc.) for the student import wizard.
      */
+    // no scope arg: firebase user-data fetch; admin-only
+    @PreAuthorize("@auth.allows('firebase_data_mapping.read')")
     @GetMapping("/fetch-user-data")
     public ResponseEntity<?> fetchUserData(@RequestParam(value = "tenant", required = false) String tenant) {
         try {
@@ -876,6 +905,8 @@ public class FirebaseDataMappingController {
      * Extracts unique questions from Firebase user responses across all users.
      * Groups them by assessment type (ability, MI, personality).
      */
+    // no scope arg: firebase unique-questions fetch; admin-only
+    @PreAuthorize("@auth.allows('firebase_data_mapping.read')")
     @GetMapping("/fetch-unique-questions")
     public ResponseEntity<?> fetchUniqueQuestions(@RequestParam(value = "tenant", required = false) String tenant) {
         try {
@@ -954,6 +985,8 @@ public class FirebaseDataMappingController {
      * mappings for the given assessment. Returns questions that exist in Firebase
      * user data but have no mapping in this assessment.
      */
+    // no scope arg: identifies by assessmentId; admin-only
+    @PreAuthorize("@auth.allows('firebase_data_mapping.read')")
     @GetMapping("/detect-unmapped-questions/{assessmentId}")
     public ResponseEntity<?> detectUnmappedQuestions(
             @PathVariable Long assessmentId,
@@ -1139,6 +1172,8 @@ public class FirebaseDataMappingController {
      *   "phone", "instituteCode", "schoolSectionId", "studentClass" } ] }
      */
     @Transactional // Issue 2: entire import is atomic — partial imports can't leave orphan data
+    // no scope arg: body is raw Map; admin-only firebase student import
+    @PreAuthorize("@auth.allows('firebase_data_mapping.create')")
     @PostMapping("/import-students")
     public ResponseEntity<?> importStudents(@RequestBody Map<String, Object> payload) {
         try {
@@ -1365,6 +1400,8 @@ public class FirebaseDataMappingController {
      *   ]
      * }
      */
+    // no scope arg: body is raw Map; admin-only firebase score import
+    @PreAuthorize("@auth.allows('firebase_data_mapping.create')")
     @PostMapping("/import-scores")
     public ResponseEntity<?> importScores(@RequestBody Map<String, Object> payload) {
         try {
@@ -1459,6 +1496,8 @@ public class FirebaseDataMappingController {
      *   ]
      * }
      */
+    // no scope arg: body is raw Map; admin-only firebase extra-data import
+    @PreAuthorize("@auth.allows('firebase_data_mapping.create')")
     @PostMapping("/import-extra-data")
     public ResponseEntity<?> importExtraData(@RequestBody Map<String, Object> payload) {
         try {
@@ -1561,12 +1600,16 @@ public class FirebaseDataMappingController {
 
     // ========================== Question Mapping Persistence ==========================
 
+    // no scope arg: identifies by assessmentId; admin-only
+    @PreAuthorize("@auth.allows('firebase_data_mapping.read')")
     @GetMapping("/question-mappings/{assessmentId}")
     public ResponseEntity<?> getQuestionMappings(@PathVariable("assessmentId") Long assessmentId) {
         List<FirebaseQuestionMapping> mappings = firebaseQuestionMappingRepository.findByAssessmentId(assessmentId);
         return ResponseEntity.ok(mappings);
     }
 
+    // no scope arg: body is raw Map; admin-only firebase question-mapping save
+    @PreAuthorize("@auth.allows('firebase_data_mapping.update')")
     @PostMapping("/save-question-mappings")
     @Transactional
     public ResponseEntity<?> saveQuestionMappings(@RequestBody Map<String, Object> payload) {
@@ -1612,6 +1655,8 @@ public class FirebaseDataMappingController {
         }
     }
 
+    // no scope arg: delete by assessmentId; admin-only
+    @PreAuthorize("@auth.allows('firebase_data_mapping.delete')")
     @DeleteMapping("/question-mappings/{assessmentId}")
     @Transactional
     public ResponseEntity<?> deleteQuestionMappings(@PathVariable("assessmentId") Long assessmentId) {
@@ -1619,6 +1664,8 @@ public class FirebaseDataMappingController {
         return ResponseEntity.ok(Map.of("deleted", true, "assessmentId", assessmentId));
     }
 
+    // no scope arg: cross-assessment list; admin-only
+    @PreAuthorize("@auth.allows('firebase_data_mapping.read')")
     @GetMapping("/question-mappings/all-assessments")
     public ResponseEntity<?> getAllMappedAssessments() {
         List<FirebaseQuestionMapping> all = firebaseQuestionMappingRepository.findAll();
@@ -1654,6 +1701,8 @@ public class FirebaseDataMappingController {
      * Looks up the Firebase docId for the given userStudentId from the mapping table,
      * then fetches that document from Firestore and returns its scores.
      */
+    // no scope arg: identifies by userStudentId; admin-only
+    @PreAuthorize("@auth.allows('firebase_data_mapping.read')")
     @GetMapping("/firebase-scores/{userStudentId}")
     public ResponseEntity<?> getFirebaseScores(@PathVariable Long userStudentId) {
         try {
@@ -1699,6 +1748,8 @@ public class FirebaseDataMappingController {
      * Looks up option -> AssessmentQuestions -> QuestionnaireQuestion and patches the row.
      * Run this once after the FirebaseDataMappingController import fix was deployed.
      */
+    // no scope arg: body is raw Map; admin-only repair operation
+    @PreAuthorize("@auth.allows('firebase_data_mapping.update')")
     @PostMapping("/repair-questionnaire-questions")
     @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<?> repairQuestionnaireQuestions(@RequestBody Map<String, Object> request) {

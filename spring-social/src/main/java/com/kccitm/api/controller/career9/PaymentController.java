@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -82,6 +83,7 @@ public class PaymentController {
         return base + "/payment-register/" + txn.getTransactionId();
     }
 
+    @PreAuthorize("@auth.allows('payment.create')")
     @PostMapping("/generate-link")
     public ResponseEntity<?> generatePaymentLink(@RequestBody Map<String, Object> request) {
         try {
@@ -151,6 +153,7 @@ public class PaymentController {
      *         studentName, studentEmail, studentPhone, promoCode? }
      * Response: { transactionId, paymentLinkUrl, shortUrl, amount }
      */
+    @PreAuthorize("@auth.allows('payment.create')")
     @PostMapping("/generate-campaign-link")
     public ResponseEntity<?> generateCampaignPaymentLink(@RequestBody Map<String, Object> request) {
         if (entitlementService == null || campaignRepository == null
@@ -261,6 +264,7 @@ public class PaymentController {
         return Long.parseLong(o.toString());
     }
 
+    @PreAuthorize("@auth.allows('payment.read.all')")
     @GetMapping("/transactions")
     public ResponseEntity<List<PaymentTransaction>> getTransactions(
             @RequestParam(required = false) String status,
@@ -284,12 +288,14 @@ public class PaymentController {
         return ResponseEntity.ok(transactions);
     }
 
+    @PreAuthorize("@auth.allows('payment.read')")
     @GetMapping("/transactions/by-mapping/{mappingId}")
     public ResponseEntity<List<PaymentTransaction>> getByMapping(@PathVariable Long mappingId) {
         return ResponseEntity.ok(
                 paymentTransactionRepository.findByMappingIdOrderByCreatedAtDesc(mappingId));
     }
 
+    @PreAuthorize("@auth.allows('payment.update')")
     @PostMapping("/{transactionId}/send-nudge")
     public ResponseEntity<?> sendNudgeEmail(@PathVariable Long transactionId) {
         Optional<PaymentTransaction> txnOpt = paymentTransactionRepository.findById(transactionId);
@@ -313,6 +319,7 @@ public class PaymentController {
         return ResponseEntity.ok(Map.of("message", "Nudge email sent successfully"));
     }
 
+    @PreAuthorize("@auth.allows('payment.update')")
     @PostMapping("/{transactionId}/resend-welcome")
     public ResponseEntity<?> resendWelcomeEmail(@PathVariable Long transactionId) {
         Optional<PaymentTransaction> txnOpt = paymentTransactionRepository.findById(transactionId);
@@ -339,6 +346,7 @@ public class PaymentController {
         return ResponseEntity.ok(Map.of("message", "Welcome email resent successfully"));
     }
 
+    @PreAuthorize("@auth.allows('payment.update')")
     @PostMapping("/{transactionId}/send-email")
     public ResponseEntity<?> sendPaymentLinkEmail(
             @PathVariable Long transactionId,
@@ -389,6 +397,7 @@ public class PaymentController {
         }
     }
 
+    @PreAuthorize("@auth.allows('payment.update')")
     @PostMapping("/{transactionId}/send-whatsapp")
     public ResponseEntity<?> sendPaymentLinkWhatsApp(
             @PathVariable Long transactionId,
@@ -448,6 +457,7 @@ public class PaymentController {
         ));
     }
 
+    @PreAuthorize("@auth.allows('payment.read')")
     @GetMapping("/{transactionId}/notifications")
     public ResponseEntity<List<PaymentNotificationLog>> getNotificationLogs(@PathVariable Long transactionId) {
         return ResponseEntity.ok(

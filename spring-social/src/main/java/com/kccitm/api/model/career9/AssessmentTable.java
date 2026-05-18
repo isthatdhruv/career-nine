@@ -9,6 +9,8 @@ import javax.persistence.JoinColumn;
 import javax.persistence.OneToOne;
 import javax.persistence.Table;
 
+import org.hibernate.annotations.Filter;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.kccitm.api.model.career9.Questionaire.Questionnaire;
 
@@ -16,6 +18,20 @@ import com.kccitm.api.model.career9.Questionaire.Questionnaire;
 
 // import net.bytebuddy.implementation.bind.annotation.Default;
 
+/**
+ * Phase 15-06 — ABAC row-level filter (scopeFilter).
+ *
+ * <p>{@code assessment_table} has NO direct institute/session/course/section FK
+ * columns (verified Task 0). The scope filter is wired to a {@code 1=1}
+ * (always-true) condition: the filter mechanism is engaged at the Hibernate
+ * Session level, but does not narrow the result set for assessments. Access
+ * control for assessments is enforced exclusively by {@code @PreAuthorize}
+ * (RBAC verb checks) — there is no row-level filter target.
+ *
+ * <p>If a future schema change adds an {@code institute_code} column to
+ * assessment_table, update this condition accordingly.
+ */
+@Filter(name = "scopeFilter", condition = "1=1")
 @Entity
 @Table(name = "assessment_table")
 public class AssessmentTable implements java.io.Serializable {

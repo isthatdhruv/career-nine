@@ -5,7 +5,9 @@ import { ApexOptions } from "apexcharts";
 import { PageTitle } from "../../../_metronic/layout/core";
 import { useThemeMode } from "../../../_metronic/partials/layout/theme-mode/ThemeModeProvider";
 import { useAuth } from "../../modules/auth/core/Auth";
+import { Scope } from "../../modules/auth";
 import {
+  AdminDashboardSnapshot,
   fetchAdminDashboardSnapshot,
   fetchLogins,
   refreshAdminDashboardSnapshot,
@@ -101,6 +103,104 @@ const initials = (s: string) =>
     .map((w) => w[0]?.toUpperCase() ?? "")
     .join("") || "?";
 
+// ABAC scope filter for the admin dashboard payload. The backend already
+// runs the scoped JPQL query (see DashboardDataService#fillScoped), but we
+// re-apply the same predicate client-side as defense-in-depth so legacy/
+// unscoped responses, stale caches, or future controller changes can't leak
+// institutes/sessions/classes/sections the user isn't mapped to. Mirrors the
+// dim-by-dim match used in ReportsHubPage.
+const matchesScope = (
+  rules: Scope[],
+  dims: { i?: number | null; s?: number | null; c?: number | null; x?: number | null }
+): boolean => {
+  if (!rules.length) return true; // no rules = unscoped session, don't restrict
+  return rules.some((r) => {
+    if (r.i != null && dims.i != null && r.i !== dims.i) return false;
+    if (r.s != null && dims.s != null && r.s !== dims.s) return false;
+    if (r.c != null && dims.c != null && r.c !== dims.c) return false;
+    if (r.x != null && dims.x != null && r.x !== dims.x) return false;
+    return true;
+  });
+};
+
+const toNum = (v: any): number | null => {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isNaN(n) ? null : n;
+};
+
+const applyScopeToSnapshot = (
+  snap: AdminDashboardSnapshot,
+  rules: Scope[],
+  isSuperAdmin: boolean
+): AdminDashboardSnapshot => {
+  if (isSuperAdmin || !rules.length) return snap;
+
+  const studentDims = (s: any) => ({
+    i: toNum(pick(s, ["instituteId", "institute_id"])),
+    s: toNum(pick(s, ["sessionId", "session_id"])),
+    c: toNum(pick(s, ["courseCode", "course_code", "classId", "class_id"])),
+    x: toNum(pick(s, ["schoolSectionId", "school_section_id", "sectionId"])),
+  });
+
+  const students = snap.students.filter((s) => matchesScope(rules, studentDims(s)));
+  const studentMappings = snap.studentMappings.filter((s) => matchesScope(rules, studentDims(s)));
+
+  // Institutes: match scope.i against the institute's code (the scope's
+  // institute dimension stores `instituteCode`, not the DB row id).
+  const institutes = snap.institutes.filter((inst) => {
+    const code = toNum(pick(inst, ["instituteCode", "code", "id"]));
+    return matchesScope(rules, { i: code });
+  });
+
+  // Reports/appointments don't carry institute/session/class/section on the
+  // top-level object — we map them through their userStudent reference.
+  const studentDimsById = new Map<string, ReturnType<typeof studentDims>>();
+  studentMappings.forEach((s) => {
+    const sid = String(pick(s, ["userStudentId", "user_student_id", "id"]) ?? "");
+    if (sid) studentDimsById.set(sid, studentDims(s));
+  });
+  students.forEach((s) => {
+    const sid = String(pick(s, ["userStudentId", "user_student_id", "id"]) ?? "");
+    if (sid && !studentDimsById.has(sid)) studentDimsById.set(sid, studentDims(s));
+  });
+
+  const reportSid = (r: any) =>
+    String(
+      (r?.userStudent && (r.userStudent.userStudentId ?? r.userStudent.id ?? r.userStudent.studentId)) ??
+        pick(r, ["userStudentId", "user_student_id", "studentId", "student_id"]) ??
+        ""
+    );
+  const reports = snap.reports.filter((r) => {
+    const sid = reportSid(r);
+    if (sid && studentDimsById.has(sid)) return true;
+    // Reports without a resolvable student are dropped under a scoped session
+    // — we can't prove they belong to the user.
+    return false;
+  });
+
+  const apptSid = (a: any) =>
+    String(
+      (a?.student && (a.student.userStudentId ?? a.student.id)) ??
+        pick(a, ["userStudentId", "studentId"]) ??
+        ""
+    );
+  const appointments = snap.appointments.filter((a) => {
+    const sid = apptSid(a);
+    if (sid && studentDimsById.has(sid)) return true;
+    return false;
+  });
+
+  return {
+    ...snap,
+    students,
+    studentMappings,
+    institutes,
+    reports,
+    appointments,
+  };
+};
+
 const relativeTime = (iso: string | undefined): string => {
   if (!iso) return "";
   const then = new Date(iso).getTime();
@@ -126,6 +226,13 @@ const DashboardAdminContent: FC = () => {
   const t: Theme = mode === "dark" ? darkTheme : lightTheme;
   const [now, setNow] = useState(new Date());
 
+  // ABAC scope context — used to filter the snapshot client-side so the
+  // dashboard only ever shows the institutes/sessions/classes/sections the
+  // current user is mapped to. Backend already filters via
+  // DashboardDataService; this is defense-in-depth.
+  const userScopes: Scope[] = useMemo(() => currentUser?.scopes ?? [], [currentUser]);
+  const isSuperAdmin = currentUser?.superAdmin === true;
+
   // raw data
   const [students, setStudents] = useState<any[]>([]);
   const [institutes, setInstitutes] = useState<any[]>([]);
@@ -140,6 +247,11 @@ const DashboardAdminContent: FC = () => {
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [refreshNonce, setRefreshNonce] = useState(0);
+  // Cache freshness — backend stamps the original compute time onto every
+  // payload (cached or fresh), so we can show "updated X ago" regardless of
+  // whether this load came from Redis or from a live DB compute.
+  const [computedAt, setComputedAt] = useState<string | undefined>(undefined);
+  const [cacheHit, setCacheHit] = useState<boolean | undefined>(undefined);
 
   const mappingsLoading = false;
   const refreshing = loading || loginsLoading;
@@ -196,10 +308,11 @@ const DashboardAdminContent: FC = () => {
     setLoading(true);
     (async () => {
       try {
-        const snap = manualRefresh
+        const raw = manualRefresh
           ? await refreshAdminDashboardSnapshot()
           : await fetchAdminDashboardSnapshot();
         if (cancelled) return;
+        const snap = applyScopeToSnapshot(raw, userScopes, isSuperAdmin);
         setStudents(snap.students);
         setInstitutes(snap.institutes);
         setCounsellors(snap.counsellors);
@@ -208,6 +321,8 @@ const DashboardAdminContent: FC = () => {
         setAssessments(snap.assessments);
         setReports(snap.reports);
         setStudentMappings(snap.studentMappings);
+        setComputedAt(snap.computedAt);
+        setCacheHit(snap.cacheHit);
         setErrors((prev) => {
           const { snapshot: _omit, ...rest } = prev;
           return rest;
@@ -226,7 +341,7 @@ const DashboardAdminContent: FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [refreshNonce]);
+  }, [refreshNonce, userScopes, isSuperAdmin]);
 
   // Logins: re-fetch whenever the date range changes
   useEffect(() => {
@@ -737,6 +852,8 @@ const DashboardAdminContent: FC = () => {
           onRefresh={handleRefresh}
           refreshing={refreshing}
           loading={loading}
+          computedAt={computedAt}
+          cacheHit={cacheHit}
           error={
             Object.keys(errors).length > 0
               ? `${Object.keys(errors).length} source(s) failed`
@@ -1020,8 +1137,12 @@ const Hero: FC<{
   refreshing: boolean;
   loading: boolean;
   error: string | null;
+  /** ISO timestamp of when the backend payload was originally computed. */
+  computedAt?: string;
+  /** True if this payload was served from Redis (vs. a fresh DB compute). */
+  cacheHit?: boolean;
   quickStats: { label: string; value: string }[];
-}> = ({ greeting, name, date, onLogout, onRefresh, refreshing, loading, error, quickStats }) => (
+}> = ({ greeting, name, date, onLogout, onRefresh, refreshing, loading, error, computedAt, cacheHit, quickStats }) => (
   <div className="ds-hero">
     <div className="ds-hero-grid" />
     <div className="ds-hero-glow ds-hero-glow-1" />
@@ -1099,6 +1220,42 @@ const Hero: FC<{
             <IconLogout /> Logout
           </button>
         </div>
+
+        {computedAt && (
+          <div
+            title={
+              cacheHit
+                ? `Served from cache · original compute: ${new Date(computedAt).toLocaleString()}`
+                : `Fresh compute: ${new Date(computedAt).toLocaleString()}`
+            }
+            style={{
+              marginTop: 12,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "3px 10px",
+              borderRadius: 999,
+              background: cacheHit
+                ? "rgba(251, 191, 36, 0.18)"
+                : "rgba(52, 211, 153, 0.18)",
+              color: cacheHit ? "#fcd34d" : "#a7f3d0",
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "0.02em",
+            }}
+          >
+            <span
+              className="ds-pulse"
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: cacheHit ? "#fbbf24" : "#34d399",
+              }}
+            />
+            {cacheHit ? "cached" : "fresh"} · updated {relativeTime(computedAt)}
+          </div>
+        )}
       </div>
 
       <div className="ds-hero-stats">

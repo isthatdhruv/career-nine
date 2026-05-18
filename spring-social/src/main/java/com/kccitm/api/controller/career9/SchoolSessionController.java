@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -42,11 +43,13 @@ public class SchoolSessionController {
     @Autowired
     private SchoolSectionsRepository schoolSectionsRepository;
 
+    @PreAuthorize("@auth.allows('school_session.read.all')")
     @GetMapping("/getAll")
     public List<SchoolSession> getAll() {
         return schoolSessionRepository.findAll();
     }
 
+    @PreAuthorize("@auth.allows('school_session.create')")
     @PostMapping("/create")
     public List<SchoolSession> createSchoolSession(@RequestBody ArrayList<SchoolSession> payload) {
         // Wire up all relationships before saving
@@ -79,6 +82,7 @@ public class SchoolSessionController {
 
     // ============ RESOLVE OR CREATE ============
 
+    @PreAuthorize("@auth.allows('school_session.create')")
     @PostMapping("/resolve-or-create")
     @Transactional
     public ResponseEntity<SchoolSections> resolveOrCreateSection(@RequestBody Map<String, Object> payload) {
@@ -123,6 +127,7 @@ public class SchoolSessionController {
 
     // ============ SESSION CRUD ENDPOINTS ============
 
+    @PreAuthorize("@auth.allows('school_session.read', #instituteCode)")
     @GetMapping("/getByInstituteCode/{instituteCode}")
     @Transactional(readOnly = true)
     public ResponseEntity<List<SchoolSession>> getByInstituteCode(@PathVariable Integer instituteCode) {
@@ -143,6 +148,7 @@ public class SchoolSessionController {
         return ResponseEntity.ok(sessions);
     }
 
+    @PreAuthorize("@auth.allows('school_session.update')")
     @PutMapping("/update/{id}")
     public ResponseEntity<SchoolSession> updateSession(@PathVariable Integer id, @RequestBody SchoolSession sessionUpdate) {
         SchoolSession existing = schoolSessionRepository.findById(id)
@@ -152,6 +158,7 @@ public class SchoolSessionController {
         return ResponseEntity.ok(updated);
     }
 
+    @PreAuthorize("@auth.allows('school_session.delete')")
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<String> deleteSession(@PathVariable Integer id) {
         if (!schoolSessionRepository.existsById(id)) {
@@ -163,6 +170,7 @@ public class SchoolSessionController {
 
     // ============ CLASS CRUD ENDPOINTS ============
 
+    @PreAuthorize("@auth.allows('class.write')")
     @PostMapping("/class/create")
     public ResponseEntity<SchoolClasses> createClass(@RequestBody Map<String, Object> payload) {
         SchoolClasses schoolClass = new SchoolClasses();
@@ -183,6 +191,7 @@ public class SchoolSessionController {
         return ResponseEntity.ok(saved);
     }
 
+    @PreAuthorize("@auth.allows('class.write')")
     @PutMapping("/class/update/{id}")
     public ResponseEntity<SchoolClasses> updateClass(@PathVariable Integer id, @RequestBody SchoolClasses classUpdate) {
         SchoolClasses existing = schoolClassesRepository.findById(id)
@@ -192,6 +201,7 @@ public class SchoolSessionController {
         return ResponseEntity.ok(updated);
     }
 
+    @PreAuthorize("@auth.allows('class.write')")
     @DeleteMapping("/class/delete/{id}")
     public ResponseEntity<String> deleteClass(@PathVariable Integer id) {
         if (!schoolClassesRepository.existsById(id)) {
@@ -203,6 +213,7 @@ public class SchoolSessionController {
 
     // ============ SECTION CRUD ENDPOINTS ============
 
+    @PreAuthorize("@auth.allows('section.write')")
     @PostMapping("/section/create")
     public ResponseEntity<SchoolSections> createSection(@RequestBody Map<String, Object> payload) {
         SchoolSections section = new SchoolSections();
@@ -223,6 +234,7 @@ public class SchoolSessionController {
         return ResponseEntity.ok(saved);
     }
 
+    @PreAuthorize("@auth.allows('section.write')")
     @PutMapping("/section/update/{id}")
     public ResponseEntity<SchoolSections> updateSection(@PathVariable Integer id, @RequestBody SchoolSections sectionUpdate) {
         SchoolSections existing = schoolSectionsRepository.findById(id)
@@ -232,6 +244,7 @@ public class SchoolSessionController {
         return ResponseEntity.ok(updated);
     }
 
+    @PreAuthorize("@auth.allows('section.write')")
     @DeleteMapping("/section/delete/{id}")
     public ResponseEntity<String> deleteSection(@PathVariable Integer id) {
         if (!schoolSectionsRepository.existsById(id)) {

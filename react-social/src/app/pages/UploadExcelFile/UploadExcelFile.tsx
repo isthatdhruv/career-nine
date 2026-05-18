@@ -8,6 +8,8 @@ import { addStudentInfo, StudentInfo, getAllAssessments, Assessment } from "../S
 import { ReadCollegeData, GetSessionsByInstituteCode, ResolveOrCreateSection } from "../College/API/College_APIs";
 import PageHeader from "../../components/PageHeader";
 import { ActionIcon } from "../../components/ActionIcon";
+import { useAssessmentsForInstitute } from "../../hooks/useScopedAssessments";
+import CreateStudentModal from "../StudentInformation/CreateStudentModal";
 
 /* ================= MASTER SCHEMA ================= */
 
@@ -53,6 +55,7 @@ export default function UploadExcelFile() {
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [uploadResult, setUploadResult] = useState<{ success: number; skipped: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showSingleStudentModal, setShowSingleStudentModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [tableData, setTableData] = useState<{
@@ -62,7 +65,10 @@ export default function UploadExcelFile() {
 
   const [institutes, setInstitutes] = useState<any[]>([]);
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  // `allAssessments` is the unfiltered catalog; the hook below narrows it to whatever
+  // is mapped to `selectedInstitute` (or returns all when no institute is picked).
+  const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
+  const { assessments } = useAssessmentsForInstitute(selectedInstitute, allAssessments);
   const [selectedAssessment, setSelectedAssessment] = useState<number | "">("");
 
   // Session/Grade/Section hierarchy
@@ -82,10 +88,16 @@ export default function UploadExcelFile() {
     getAllAssessments()
       .then((res) => {
         const activeOnly = (res.data || []).filter((a: any) => a.isActive !== false);
-        setAssessments(activeOnly);
+        setAllAssessments(activeOnly);
       })
       .catch((err) => console.error("Failed to fetch assessments", err));
   }, []);
+
+  // If the user changes the institute after picking an assessment, clear the
+  // assessment to avoid leaving a stale ID selected that isn't in the new mapped list.
+  useEffect(() => {
+    setSelectedAssessment("");
+  }, [selectedInstitute]);
 
   // Fetch hierarchy when institute changes
   useEffect(() => {
@@ -359,7 +371,7 @@ export default function UploadExcelFile() {
     <div className="ph-page">
       <PageHeader
         icon={<i className="bi bi-file-earmark-spreadsheet" />}
-        title="Bulk Upload"
+        title="Upload Students"
         subtitle={
           <>
             Upload and map Excel files to import student information
@@ -370,6 +382,15 @@ export default function UploadExcelFile() {
             )}
           </>
         }
+        actions={[
+          {
+            label: "Add Single Student",
+            onClick: () => setShowSingleStudentModal(true),
+            actionType: "add",
+            variant: "primary",
+            disabled: !selectedInstitute,
+          },
+        ]}
       />
 
       {/* Institute + Assessment selectors */}
@@ -770,6 +791,14 @@ export default function UploadExcelFile() {
           </div>
         </div>
       )}
+
+      {/* Single Student Add Modal */}
+      <CreateStudentModal
+        show={showSingleStudentModal}
+        onHide={() => setShowSingleStudentModal(false)}
+        onSave={() => setShowSingleStudentModal(false)}
+        instituteId={selectedInstitute || undefined}
+      />
 
       {/* Empty State */}
       {!fileName && excelColumns.length === 0 && (

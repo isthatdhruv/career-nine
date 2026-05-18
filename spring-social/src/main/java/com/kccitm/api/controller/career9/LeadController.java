@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -45,6 +46,8 @@ public class LeadController {
     /**
      * PUBLIC endpoint — accepts lead form submissions from external landing pages.
      */
+    // PUBLIC?: flagged for 15-06 exclusions review — public lead capture from landing pages (anonymous by design)
+    @PreAuthorize("@auth.allows('lead.create')")
     // @CrossOrigin(origins = "*", maxAge = 3600)
     @PostMapping("/capture")
     public ResponseEntity<?> captureLead(@RequestBody Map<String, Object> payload) throws Exception {
@@ -122,6 +125,8 @@ public class LeadController {
         ));
     }
 
+    // no scope arg: cross-institute admin list; scope-filter narrows result set
+    @PreAuthorize("@auth.allows('lead.read')")
     @GetMapping("/getAll")
     public List<Lead> getAllLeads() {
         return leadRepository.findAll();
@@ -131,6 +136,8 @@ public class LeadController {
      * Email leads export as attachment using Gmail API.
      * Accepts multipart: to (comma-separated emails), subject, body, file (Excel).
      */
+    // no scope arg: lead export via email; admin operation
+    @PreAuthorize("@auth.allows('lead.read')")
     @PostMapping("/email-export")
     public ResponseEntity<?> emailExport(
             @RequestParam("to") String to,

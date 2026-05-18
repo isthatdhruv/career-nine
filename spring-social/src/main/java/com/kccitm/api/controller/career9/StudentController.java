@@ -12,6 +12,7 @@ import java.util.Optional;
 import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -113,6 +114,8 @@ public class StudentController {
   // @Autowired
   // private SubCategoryRepository subCategoryRepository;
 
+  // no scope arg: bulk CSV save; scope-filter narrows access (admin-only)
+  @PreAuthorize("@auth.allows('student.import')")
   @PostMapping(value = "/student/save-csv", headers = "Accept=application/json")
   public Boolean saveBulk(
       @RequestBody ArrayList<Student> saveAllStudentsCSV) {
@@ -132,6 +135,8 @@ public class StudentController {
     return true;
   }
 
+  // no scope arg: cross-institute admin diagnostic; scope-filter narrows result set
+  @PreAuthorize("@auth.allows('student.read.all')")
   @GetMapping(value = "student/get-check", headers = "Accept=application/json")
   public List<Student> getAllStudentsGoogleAdmin(@CurrentUser UserPrincipal userPrincipal) {
     List<Student> allStudents = studentRepository.findAll();
@@ -152,12 +157,16 @@ public class StudentController {
     return allStudents;
   }
 
+  // no scope arg: cross-institute list; scope-filter narrows result set
+  @PreAuthorize("@auth.allows('student.read.all')")
   @GetMapping(value = "student/get", headers = "Accept=application/json")
   public List<Student> getAllStudents(@CurrentUser UserPrincipal userPrincipal) {
     List<Student> allStudents = studentRepository.findAll();
     return allStudents;
   }
 
+  // no scope arg: body is Map<String,Student>; SpEL cannot address nested map values
+  @PreAuthorize("@auth.allows('student.update')")
   @PostMapping(value = "student/update", headers = "Accept=application/json")
   public List<Student> updateStudent(
       @RequestBody Map<String, Student> studentDetail,
@@ -185,6 +194,9 @@ public class StudentController {
         r.getPersonalEmailAddress());
   }
 
+  // no scope arg: test mail endpoint; scope-less utility
+  // PUBLIC?: flagged for 15-06 exclusions review (dev test endpoint, may need exclusion)
+  @PreAuthorize("@auth.allows('email.send')")
   @GetMapping("/mail")
   public String mail()
       throws RequestFailedException, MandrillApiError, IOException {
@@ -199,6 +211,8 @@ public class StudentController {
     return "Hello";
   }
 
+  // no scope arg: email-existence check; admin-only utility
+  @PreAuthorize("@auth.allows('student.read')")
   @PostMapping(value = "student/emailChecker", headers = "Accept=application/json")
   public Boolean emailChecker(@RequestBody Map<String, String> email) {
     String r = email.get("values");
@@ -212,6 +226,8 @@ public class StudentController {
     }
   }
 
+  // no scope arg: fetch by id; scope-filter narrows access
+  @PreAuthorize("@auth.allows('student.read')")
   @GetMapping(value = "student/getbyid/{id}", headers = "Accept=application/json")
   public Student getStudentById(@PathVariable("id") int studentId) {
     Student student = studentRepository.findById(studentId);
@@ -234,12 +250,16 @@ public class StudentController {
     return student;
   }
 
+  // no scope arg: catalog list (gender enum-shaped); admin-level access
+  @PreAuthorize("@auth.allows('list.read')")
   @GetMapping(value = "gender/get", headers = "Accept=application/json")
   public List<Gender> getAllGender() {
     List<Gender> allGender = genderRepository.findAll();
     return allGender;
   }
 
+  // no scope arg: body is Map<String,Gender>; catalog-update admin
+  @PreAuthorize("@auth.allows('util.execute')")
   @PostMapping(value = "gender/update", headers = "Accept=application/json")
   public List<Gender> updateGender(
       @RequestBody Map<String, Gender> currentGender) {
@@ -248,18 +268,24 @@ public class StudentController {
     return genderRepository.findBytype(r.getType());
   }
 
+  // no scope arg: catalog fetch by id
+  @PreAuthorize("@auth.allows('list.read')")
   @GetMapping(value = "gender/getbyid/{id}", headers = "Accept=application/json")
   public Optional<Gender> getGenderById(@PathVariable("id") int genderId) {
     Optional<Gender> gender = genderRepository.findById(genderId);
     return gender;
   }
 
+  // no scope arg: catalog list
+  @PreAuthorize("@auth.allows('list.read')")
   @GetMapping(value = "category/get", headers = "Accept=application/json")
   public List<Category> getAllCategory() {
     List<Category> allCategory = categoryRepository.findAll();
     return allCategory;
   }
 
+  // no scope arg: body is Map<String,Category>; catalog-update admin
+  @PreAuthorize("@auth.allows('util.execute')")
   @PostMapping(value = "category/update", headers = "Accept=application/json")
   public List<Category> updateCategory(
       @RequestBody Map<String, Category> currentCategory) {
@@ -268,6 +294,8 @@ public class StudentController {
     return categoryRepository.findByName(r.getName());
   }
 
+  // no scope arg: catalog fetch by id
+  @PreAuthorize("@auth.allows('list.read')")
   @GetMapping(value = "category/getbyid/{id}", headers = "Accept=application/json")
   public Optional<Category> getCategoryById(
       @PathVariable("id") int categoryId) {
@@ -275,6 +303,8 @@ public class StudentController {
     return category;
   }
 
+  // no scope arg: catalog soft-delete by id
+  @PreAuthorize("@auth.allows('util.execute')")
   @GetMapping(value = "category/delete/{id}", headers = "Accept=application/json")
   public Category deleteCategory(@PathVariable("id") int categoryId) {
     Category category = categoryRepository.getOne(categoryId);
@@ -289,12 +319,16 @@ public class StudentController {
   // return allSubCategory;
   // }
 
+  // no scope arg: catalog list (legacy Branch entity, not institute_branch)
+  @PreAuthorize("@auth.allows('list.read')")
   @GetMapping(value = "branch/get", headers = "Accept=application/json")
   public List<Branch> getAllBranch() {
     List<Branch> allBranch = branchRepository.findAll();
     return allBranch;
   }
 
+  // no scope arg: body is Map<String,Branch>; catalog-update admin (legacy Branch)
+  @PreAuthorize("@auth.allows('util.execute')")
   @PostMapping(value = "branch/update", headers = "Accept=application/json")
   public List<Branch> updateBranch(
       @RequestBody Map<String, Branch> currentBranch) {
@@ -303,12 +337,16 @@ public class StudentController {
     return branchRepository.findByName(r.getName());
   }
 
+  // no scope arg: catalog fetch by id (legacy Branch)
+  @PreAuthorize("@auth.allows('list.read')")
   @GetMapping(value = "branch/getbyid/{id}", headers = "Accept=application/json")
   public Optional<Branch> getBranchById(@PathVariable("id") int branchId) {
     Optional<Branch> branch = branchRepository.findById(branchId);
     return branch;
   }
 
+  // no scope arg: catalog soft-delete by id (legacy Branch)
+  @PreAuthorize("@auth.allows('util.execute')")
   @GetMapping(value = "branch/delete/{id}", headers = "Accept=application/json")
   public Branch deleteBranch(@PathVariable("id") int branchId) {
     Branch branch = branchRepository.getOne(branchId);
@@ -317,12 +355,16 @@ public class StudentController {
     return r;
   }
 
+  // no scope arg: catalog list
+  @PreAuthorize("@auth.allows('list.read')")
   @GetMapping(value = "board/get", headers = "Accept=application/json")
   public List<BoardName> getAllBoard() {
     List<BoardName> allBoard = boardNameRepository.findAll();
     return allBoard;
   }
 
+  // no scope arg: body is Map<String,BoardName>; catalog-update admin
+  @PreAuthorize("@auth.allows('util.execute')")
   @PostMapping(value = "board/update", headers = "Accept=application/json")
   public BoardName updateBoard(
       @RequestBody Map<String, BoardName> currentBoardName) {
@@ -331,6 +373,8 @@ public class StudentController {
     return boardNameRepository.findByName(r.getName());
   }
 
+  // no scope arg: catalog soft-delete by id
+  @PreAuthorize("@auth.allows('util.execute')")
   @GetMapping(value = "board/delete/{id}", headers = "Accept=application/json")
   public BoardName deleteBoard(@PathVariable("id") int boardNameId) {
     BoardName boardName = boardNameRepository.getOne(boardNameId);
@@ -340,12 +384,16 @@ public class StudentController {
     return r;
   }
 
+  // no scope arg: catalog list (legacy Batch entity)
+  @PreAuthorize("@auth.allows('list.read')")
   @GetMapping(value = "batch/get", headers = "Accept=application/json")
   public List<Batch> getAllBatch() {
     List<Batch> allBatch = batchRepository.findAll();
     return allBatch;
   }
 
+  // no scope arg: body is Map<String,Batch>; catalog-update admin
+  @PreAuthorize("@auth.allows('util.execute')")
   @PostMapping(value = "batch/update", headers = "Accept=application/json")
   public List<Batch> updateBatch(@RequestBody Map<String, Batch> currentBatch) {
     Batch r = currentBatch.get("values");
@@ -353,6 +401,8 @@ public class StudentController {
     return batchRepository.findByBatch(r.getBatch());
   }
 
+  // no scope arg: body is Map<String,Student>; registrar update
+  @PreAuthorize("@auth.allows('student.update')")
   @PostMapping(value = "studnet-confirmation/update", headers = "Accept=application/json")
   public boolean updateStudnetByRegistrar(
       @RequestBody Map<String, Student> studnetDetails) {
@@ -374,6 +424,8 @@ public class StudentController {
     return true;
   }
 
+  // no scope arg: body is Map<String,Student>; updates student email + creates Google account
+  @PreAuthorize("@auth.allows('student.update')")
   @PostMapping(value = "student-email/update", headers = "Accept=application/json")
   // public String updateEmail(@RequestBody Map<String, Student> currentStudent) {
   // Student r = currentStudent.get("values");
@@ -408,6 +460,8 @@ public class StudentController {
     }
   }
 
+  // no scope arg: body is Map<String,ArrayList<Student>>; bulk save
+  @PreAuthorize("@auth.allows('student.import')")
   @PostMapping(value = "student/getSavetoDatabase", headers = "Accept=application/json")
   public Boolean saveAllStudentsCSV(
       @RequestBody Map<String, ArrayList<Student>> saveAllStudentsCSV) {
@@ -421,6 +475,8 @@ public class StudentController {
     return true;
   }
 
+  // no scope arg: identifies student by id query param; generates ID card PDF
+  @PreAuthorize("@auth.allows('student.export')")
   @GetMapping(value = "/generate_pdf")
   @ResponseBody
   public String generatePdf(@RequestParam(name = "id") String st, @CurrentUser UserPrincipal userPrincipal,
@@ -480,7 +536,7 @@ public class StudentController {
         usre.setEmail(stu.getOfficialEmailAddress());
         usre.setEmailVerified(true);
         usre = userRepository.save(usre);
-        UserRoleGroupMapping urgm = new UserRoleGroupMapping(false, usre.getId(), roleGroupRepository.getById(3));
+        UserRoleGroupMapping urgm = new UserRoleGroupMapping(false, usre.getId(), roleGroupRepository.getById(3L));
         userRoleGroupMappingRepository.save(urgm);
         return "Done";
       } catch (Exception e2) {
@@ -511,11 +567,13 @@ public class StudentController {
     usre.setEmail(stu.getOfficialEmailAddress());
     usre.setEmailVerified(true);
     usre = userRepository.save(usre);
-    UserRoleGroupMapping urgm = new UserRoleGroupMapping(false, usre.getId(), roleGroupRepository.getById(3));
+    UserRoleGroupMapping urgm = new UserRoleGroupMapping(false, usre.getId(), roleGroupRepository.getById(3L));
     userRoleGroupMappingRepository.save(urgm);
     return "Done";
   }
 
+  // PUBLIC?: flagged for 15-06 exclusions review — pre-auth OTP-flow endpoint for signup
+  @PreAuthorize("@auth.allows('email.validate')")
   @GetMapping(value = "/email-validation-official")
   @ResponseBody
   public boolean emailValidationOfficial(@RequestParam(name = "email") String email,
@@ -530,6 +588,8 @@ public class StudentController {
 
   }
 
+  // PUBLIC?: flagged for 15-06 exclusions review — pre-auth OTP-verification endpoint
+  @PreAuthorize("@auth.allows('email.validate')")
   @GetMapping(value = "/email-validation-official-confermation")
   @ResponseBody
   public boolean emailValidationOfficialConfermation(@RequestParam(name = "email") String email,
@@ -543,6 +603,8 @@ public class StudentController {
     return false;
   }
 
+  // no scope arg: identifies student by id query param; generates ID card + email
+  @PreAuthorize("@auth.allows('student.export')")
   @GetMapping(value = "/generate_id_card")
   @ResponseBody
   public String generateIdCard(@RequestParam(name = "id") String st, @CurrentUser UserPrincipal userPrincipal,
@@ -582,7 +644,7 @@ public class StudentController {
     usre.setProviderId(stu.getCollegeEnrollmentNumber() + "");
     usre.setEmail(stu.getOfficialEmailAddress());
     usre = userRepository.save(usre);
-    UserRoleGroupMapping urgm = new UserRoleGroupMapping(false, usre.getId(), roleGroupRepository.getById(3));
+    UserRoleGroupMapping urgm = new UserRoleGroupMapping(false, usre.getId(), roleGroupRepository.getById(3L));
     userRoleGroupMappingRepository.save(urgm);
     return "Done";
   }

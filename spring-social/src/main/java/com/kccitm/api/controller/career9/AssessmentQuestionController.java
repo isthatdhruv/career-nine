@@ -29,6 +29,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -83,6 +84,7 @@ public class AssessmentQuestionController {
     // and return.
     @Cacheable("assessmentQuestions")
     @GetMapping("/getAll")
+    @PreAuthorize("@auth.allows('assessment_question.read.all')")
     public List<AssessmentQuestions> getAllAssessmentQuestions() {
        
         List<AssessmentQuestions> fromDb = fetchAndTransformFromDb();
@@ -91,6 +93,7 @@ public class AssessmentQuestionController {
     }
 
     @GetMapping("/mqt-counts")
+    @PreAuthorize("@auth.allows('assessment_question.read')")
     public java.util.Map<Long, Long> getMqtCountsPerQuestion() {
         java.util.Map<Long, Long> counts = new java.util.HashMap<>();
         for (Object[] row : assessmentQuestionRepository.findMqtCountsPerQuestion()) {
@@ -102,10 +105,12 @@ public class AssessmentQuestionController {
     }
 
     @GetMapping("/get/{id}")
+    @PreAuthorize("@auth.allows('assessment_question.read')")
     public AssessmentQuestions getAssessmentQuestionById(@PathVariable Long id) {
         return assessmentQuestionRepository.findById(id).orElse(null);
     }
     @GetMapping("/getAllList")
+    @PreAuthorize("@auth.allows('assessment_question.read.all')")
     public List<AssessmentQuestions> findAllQuestionsProjection() {
        
         List<AssessmentQuestions> fromDb = assessmentQuestionRepository.findAllQuestionsProjection();
@@ -117,6 +122,7 @@ public class AssessmentQuestionController {
 
     @CacheEvict(value = "assessmentQuestions", allEntries = true)
     @PostMapping(value = "/create", consumes = "application/json")
+    @PreAuthorize("@auth.allows('assessment_question.create')")
     public AssessmentQuestions createAssessmentQuestion(@RequestBody AssessmentQuestions assessmentQuestions)
             throws Exception {
         // Wire up relationships before saving
@@ -183,6 +189,7 @@ public class AssessmentQuestionController {
      */
     @CacheEvict(value = "assessmentQuestions", allEntries = true)
     @PutMapping("/update/{id}")
+    @PreAuthorize("@auth.allows('assessment_question.update')")
     public AssessmentQuestions updateAssessmentQuestion(@PathVariable Long id,
             @RequestBody AssessmentQuestions assessmentQuestions) {
 
@@ -255,6 +262,7 @@ public class AssessmentQuestionController {
 
     @CacheEvict(value = "assessmentQuestions", allEntries = true)
     @DeleteMapping("/delete/{id}")
+    @PreAuthorize("@auth.allows('assessment_question.delete')")
     public ResponseEntity<String> deleteAssessmentQuestion(@PathVariable Long id) {
         // Soft delete: set isDeleted flag instead of removing from database
         AssessmentQuestions question = assessmentQuestionRepository.findById(id)
@@ -269,12 +277,14 @@ public class AssessmentQuestionController {
     }
 
     @GetMapping("/deleted")
+    @PreAuthorize("@auth.allows('assessment_question.read.all')")
     public List<AssessmentQuestions> getDeletedQuestions() {
         return assessmentQuestionRepository.findByIsDeletedTrue();
     }
 
     @CacheEvict(value = "assessmentQuestions", allEntries = true)
     @PutMapping("/restore/{id}")
+    @PreAuthorize("@auth.allows('assessment_question.update')")
     public ResponseEntity<String> restoreAssessmentQuestion(@PathVariable Long id) {
         AssessmentQuestions question = assessmentQuestionRepository.findById(id)
                 .orElse(null);
@@ -289,6 +299,7 @@ public class AssessmentQuestionController {
 
     @CacheEvict(value = "assessmentQuestions", allEntries = true)
     @DeleteMapping("/permanent-delete/{id}")
+    @PreAuthorize("@auth.allows('assessment_question.delete')")
     public ResponseEntity<String> permanentlyDeleteAssessmentQuestion(@PathVariable Long id) {
         assessmentQuestionRepository.deleteById(id);
 
@@ -313,6 +324,7 @@ public class AssessmentQuestionController {
      * @throws Exception if Excel generation fails
      */
     @GetMapping("/export-excel")
+    @PreAuthorize("@auth.allows('assessment_question.export')")
     public ResponseEntity<byte[]> exportQuestionsToExcel() throws Exception {
         logger.info("Starting Excel export for assessment questions");
 
@@ -478,6 +490,7 @@ public class AssessmentQuestionController {
      */
     @CacheEvict(value = "assessmentQuestions", allEntries = true)
     @PostMapping("/import-excel")
+    @PreAuthorize("@auth.allows('assessment_question.import')")
     public ResponseEntity<Map<String, Object>> importQuestionsFromExcel(
             @RequestParam("file") MultipartFile file) throws Exception {
 

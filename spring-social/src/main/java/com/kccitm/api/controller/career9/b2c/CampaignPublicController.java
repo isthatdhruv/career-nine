@@ -78,17 +78,23 @@ public class CampaignPublicController {
     @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:}")
     private String callbackBaseUrl;
 
+    // @PreAuthorize-Exempt: public b2c registration funnel — anonymous-by-design (entire controller)
+    // See ControllerPreAuthorizeCoverageTest.EXCLUSIONS (15-02 / 15-06)
     @GetMapping("/info/{slug}")
     public ResponseEntity<?> infoBySlug(@PathVariable String slug) {
         return buildInfo(slug, null, null);
     }
 
+    // @PreAuthorize-Exempt: public b2c registration funnel — anonymous-by-design (entire controller)
+    // See ControllerPreAuthorizeCoverageTest.EXCLUSIONS (15-02 / 15-06)
     @GetMapping("/info/{slug}/{assessmentId}")
     public ResponseEntity<?> infoByAssessment(@PathVariable String slug,
                                               @PathVariable Long assessmentId) {
         return buildInfo(slug, assessmentId, null);
     }
 
+    // @PreAuthorize-Exempt: public b2c registration funnel — anonymous-by-design (entire controller)
+    // See ControllerPreAuthorizeCoverageTest.EXCLUSIONS (15-02 / 15-06)
     @GetMapping("/info/{slug}/{assessmentId}/{tierMappingId}")
     public ResponseEntity<?> infoByTier(@PathVariable String slug,
                                         @PathVariable Long assessmentId,
@@ -195,6 +201,8 @@ public class CampaignPublicController {
         return ResponseEntity.ok(response);
     }
 
+    // @PreAuthorize-Exempt: public b2c registration funnel — anonymous-by-design (entire controller)
+    // See ControllerPreAuthorizeCoverageTest.EXCLUSIONS (15-02 / 15-06)
     @PostMapping("/register/{slug}/{assessmentId}/{tierMappingId}")
     @Transactional
     public ResponseEntity<?> register(@PathVariable String slug,
@@ -308,6 +316,8 @@ public class CampaignPublicController {
      * lets the student start the assessment immediately. They pay for the report
      * later via /pay-for-report.
      */
+    // @PreAuthorize-Exempt: public b2c registration funnel — anonymous-by-design (entire controller)
+    // See ControllerPreAuthorizeCoverageTest.EXCLUSIONS (15-02 / 15-06)
     @PostMapping("/register-trial/{slug}/{assessmentId}")
     @Transactional
     public ResponseEntity<?> registerTrial(@PathVariable String slug,
@@ -433,6 +443,8 @@ public class CampaignPublicController {
      * entitlement. Used by the thank-you page to decide what to render and by the
      * pay-for-report page to render its form.
      */
+    // @PreAuthorize-Exempt: public b2c registration funnel — anonymous-by-design (entire controller)
+    // See ControllerPreAuthorizeCoverageTest.EXCLUSIONS (15-02 / 15-06)
     @GetMapping("/upgrade-info/{entitlementId}")
     public ResponseEntity<?> upgradeInfo(@PathVariable Long entitlementId) {
         Optional<StudentEntitlement> eOpt = studentEntitlementRepository.findById(entitlementId);
@@ -523,6 +535,8 @@ public class CampaignPublicController {
      * assessment. Creates a PaymentTransaction + Razorpay link. The webhook chain
      * (activateOnPayment) finds the existing pending entitlement and upgrades it.
      */
+    // @PreAuthorize-Exempt: public b2c registration funnel — anonymous-by-design (entire controller)
+    // See ControllerPreAuthorizeCoverageTest.EXCLUSIONS (15-02 / 15-06)
     @PostMapping("/pay-for-report")
     @Transactional
     public ResponseEntity<?> payForReport(@RequestBody Map<String, Object> body) {

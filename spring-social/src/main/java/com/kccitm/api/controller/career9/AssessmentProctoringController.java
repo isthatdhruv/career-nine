@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -68,6 +69,7 @@ public class AssessmentProctoringController {
 
     @SuppressWarnings("unchecked")
     @PostMapping(value = "/save", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_proctoring.create')")
     public ResponseEntity<?> saveProctoringData(@RequestBody Map<String, Object> payload) {
         Long userStudentId = ((Number) payload.get("userStudentId")).longValue();
         Long assessmentId = ((Number) payload.get("assessmentId")).longValue();
@@ -87,6 +89,7 @@ public class AssessmentProctoringController {
     }
 
     @GetMapping(value = "/getByStudent/{studentId}", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_proctoring.read', #studentId)")
     public ResponseEntity<?> getByStudent(@PathVariable Long studentId) {
         List<AssessmentProctoringQuestionLog> logs = questionLogRepository
                 .findByUserStudentUserStudentId(studentId);
@@ -94,6 +97,7 @@ public class AssessmentProctoringController {
     }
 
     @GetMapping(value = "/getByAssessment/{assessmentId}", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_proctoring.read', #assessmentId)")
     public ResponseEntity<?> getByAssessment(@PathVariable Long assessmentId) {
         List<AssessmentProctoringQuestionLog> logs = questionLogRepository
                 .findByAssessmentId(assessmentId);
@@ -101,6 +105,7 @@ public class AssessmentProctoringController {
     }
 
     @GetMapping(value = "/get/{studentId}/{assessmentId}", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_proctoring.read', #studentId, #assessmentId)")
     public ResponseEntity<?> getByStudentAndAssessment(
             @PathVariable Long studentId, @PathVariable Long assessmentId) {
         List<AssessmentProctoringQuestionLog> logs = questionLogRepository
@@ -109,6 +114,7 @@ public class AssessmentProctoringController {
     }
 
     @PostMapping(value = "/getBulkProctoringData", headers = "Accept=application/json")
+    @PreAuthorize("@auth.allows('assessment_proctoring.read')")
     public ResponseEntity<?> getBulkProctoringData(
             @RequestBody List<Map<String, Long>> pairs) {
         List<Map<String, Object>> result = new ArrayList<>();
@@ -164,6 +170,7 @@ public class AssessmentProctoringController {
      * instead of raw JSON — no cell ever exceeds Excel's 32767 char limit.
      */
     @PostMapping(value = "/export-excel")
+    @PreAuthorize("@auth.allows('report.export')")
     public void exportExcel(@RequestBody List<Map<String, Long>> pairs,
                             HttpServletResponse response) {
         SXSSFWorkbook workbook = new SXSSFWorkbook(100);

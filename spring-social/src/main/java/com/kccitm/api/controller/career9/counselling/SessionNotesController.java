@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,6 +34,8 @@ public class SessionNotesController {
     @Autowired
     private UserRepository userRepository;
 
+    // no scope arg: counsellor writes notes; scope-filter narrows access
+    @PreAuthorize("@auth.allows('counselling.session_notes.create')")
     @PostMapping("/create")
     public ResponseEntity<?> create(@RequestBody SessionNotes notes, @RequestParam Long userId) {
         User user = userRepository.findById(userId)
@@ -42,6 +45,8 @@ public class SessionNotesController {
         return ResponseEntity.ok(created);
     }
 
+    // no scope arg: fetch by appointmentId
+    @PreAuthorize("@auth.allows('counselling.session_notes.read')")
     @GetMapping("/get/{appointmentId}")
     public ResponseEntity<SessionNotes> getByAppointment(
             @PathVariable Long appointmentId,
@@ -56,6 +61,8 @@ public class SessionNotesController {
                 .orElseThrow(() -> new ResourceNotFoundException("SessionNotes", "appointmentId", appointmentId)));
     }
 
+    // no scope arg: update by id
+    @PreAuthorize("@auth.allows('counselling.session_notes.update')")
     @PutMapping("/update/{id}")
     public ResponseEntity<SessionNotes> update(@PathVariable Long id, @RequestBody SessionNotes notes) {
         logger.info("Updating session notes with id: {}", id);

@@ -7,6 +7,7 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,16 +28,19 @@ public class PricingTierController {
     @Autowired private PricingTierRepository pricingTierRepository;
     @Autowired private CampaignAssessmentTierRepository campaignAssessmentTierRepository;
 
+    @PreAuthorize("@auth.allows('pricing_tier.read.all')")
     @GetMapping("/getAll")
     public ResponseEntity<List<PricingTier>> getAll() {
         return ResponseEntity.ok(pricingTierRepository.findByIsDeletedFalseOrderBySortOrderAscTierIdAsc());
     }
 
+    @PreAuthorize("@auth.allows('pricing_tier.read.all')")
     @GetMapping("/getActive")
     public ResponseEntity<List<PricingTier>> getActive() {
         return ResponseEntity.ok(pricingTierRepository.findByIsDeletedFalseAndIsActiveTrueOrderBySortOrderAscTierIdAsc());
     }
 
+    @PreAuthorize("@auth.allows('pricing_tier.read')")
     @GetMapping("/get/{id}")
     public ResponseEntity<?> getById(@PathVariable Long id) {
         Optional<PricingTier> tier = pricingTierRepository.findById(id);
@@ -46,6 +50,7 @@ public class PricingTierController {
         return ResponseEntity.ok(tier.get());
     }
 
+    @PreAuthorize("@auth.allows('pricing_tier.create')")
     @PostMapping("/create")
     public ResponseEntity<?> create(@RequestBody PricingTier body) {
         if (body.getName() == null || body.getName().trim().isEmpty()) {
@@ -59,6 +64,7 @@ public class PricingTierController {
         return ResponseEntity.ok(saved);
     }
 
+    @PreAuthorize("@auth.allows('pricing_tier.update')")
     @PutMapping("/update/{id}")
     public ResponseEntity<?> update(@PathVariable Long id, @RequestBody Map<String, Object> req) {
         Optional<PricingTier> opt = pricingTierRepository.findById(id);
@@ -82,6 +88,7 @@ public class PricingTierController {
         return ResponseEntity.ok(pricingTierRepository.save(t));
     }
 
+    @PreAuthorize("@auth.allows('pricing_tier.delete')")
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<?> softDelete(@PathVariable Long id) {
         Optional<PricingTier> opt = pricingTierRepository.findById(id);

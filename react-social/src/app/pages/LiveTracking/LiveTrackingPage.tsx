@@ -21,6 +21,8 @@ import {
 import { showErrorToast } from '../../utils/toast';
 import PageHeader from "../../components/PageHeader";
 import { ActionIcon } from "../../components/ActionIcon";
+import { useAssessmentsForCurrentUser } from "../../hooks/useScopedAssessments";
+import { ReadCollegeList } from "../College/API/College_APIs";
 
 /* ─── Types ─── */
 
@@ -195,7 +197,20 @@ const SummaryCards = ({ summary }: { summary: Summary }) => {
 
 /* ─── Main component ─── */
 const LiveTrackingPage = () => {
-  const [assessments, setAssessments] = useState<AssessmentOption[]>([]);
+  // `allAssessments` is the full catalog from /assessments/get/list-summary.
+  // `assessments` (below) is the user-scoped narrowing — what the dropdown renders.
+  const [allAssessments, setAllAssessments] = useState<AssessmentOption[]>([]);
+  // Cast through Assessment[] — the hook only reads .id so shape overlap is enough.
+  const { assessments: scopedAssessments, allowedInstituteCodes } =
+    useAssessmentsForCurrentUser(allAssessments as any);
+  const assessments = scopedAssessments as unknown as AssessmentOption[];
+
+  // Allowed institute *names*, derived from /instituteDetail/get/list (which the
+  // backend already scopes for the current user). Used to drop student rows from
+  // assessments that span multiple schools — a KVS-only user shouldn't see
+  // names from other institutes inside an assessment that's shared with them.
+  const [allowedInstituteNames, setAllowedInstituteNames] = useState<Set<string> | null>(null);
+
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [data, setData] = useState<TrackingData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -247,13 +262,39 @@ const LiveTrackingPage = () => {
     getAssessmentList()
       .then((res) => {
         const list: AssessmentOption[] = res.data || [];
-        setAssessments(list);
-        // Auto-select first active assessment
-        const active = list.find((a) => a.isActive);
-        if (active) setSelectedId(active.id);
+        setAllAssessments(list);
       })
       .catch(() => setError("Failed to load assessments"));
   }, []);
+
+  // Auto-select first active assessment from the *scoped* list — picking from
+  // the raw catalog would auto-load an assessment the user isn't allotted to.
+  useEffect(() => {
+    if (selectedId != null) return; // user (or prior auto-select) already chose one
+    if (assessments.length === 0) return;
+    const active = assessments.find((a) => a.isActive);
+    if (active) setSelectedId(active.id);
+  }, [assessments, selectedId]);
+
+  // Pull allowed institute names from the scoped /instituteDetail/get/list. This
+  // mirrors the BE deny set — the same source we use elsewhere — so the row
+  // filter agrees with the rest of the app. null = no restriction (super-admin
+  // or user has wildcard institute scope).
+  useEffect(() => {
+    if (allowedInstituteCodes === null) {
+      setAllowedInstituteNames(null);
+      return;
+    }
+    ReadCollegeList()
+      .then((res) => {
+        const names = new Set<string>();
+        for (const inst of res.data || []) {
+          if (inst?.instituteName) names.add(inst.instituteName);
+        }
+        setAllowedInstituteNames(names);
+      })
+      .catch(() => setAllowedInstituteNames(new Set()));
+  }, [allowedInstituteCodes]);
 
   // Track whether we've already loaded lite data for the current assessment
   const liteLoadedRef = useRef<number | null>(null);
@@ -363,7 +404,11 @@ const LiveTrackingPage = () => {
     }
   }, [selectedId]);
 
-  // Adaptive polling interval
+  // Adaptive polling interval. Uses the full `data.summary.ongoing` (not the
+  // scope-narrowed count) because (a) `scopedSummary` is declared further down
+  // and pulling it up would create churny diff noise, and (b) fast-vs-slow
+  // polling is 8s vs 25s — the cost of polling slightly faster than strictly
+  // needed for a single-school user is negligible.
   const getInterval = useCallback((): number => {
     if (!data) return POLL_FAST;
     const { ongoing } = data.summary;
@@ -692,19 +737,47 @@ const LiveTrackingPage = () => {
     return `${h}h ${m}m`;
   };
 
+  // Students the current user is allowed to see — applied BEFORE the existing
+  // status/institute/search filters so the UI options (status counts, institute
+  // dropdown, exported CSV) only ever reflect rows the user can act on. Mirrors
+  // the BE deny set; if the BE later starts scoping /live-tracking server-side
+  // this becomes a redundant client-side belt over the suspenders.
+  const visibleStudents = useMemo(() => {
+    if (!data) return [];
+    if (allowedInstituteNames == null) return data.students; // super-admin / wildcard
+    return data.students.filter((s) => {
+      // Empty instituteName means the row isn't tagged — fail-open so we don't
+      // hide students whose institute hasn't been resolved yet (lite-data path).
+      if (!s.instituteName) return true;
+      return allowedInstituteNames.has(s.instituteName);
+    });
+  }, [data, allowedInstituteNames]);
+
+  // Summary that reflects ONLY the rows the user can see. When scope filtering is
+  // a no-op (super-admin) this equals `data.summary` so the cards/progress bar
+  // are unchanged for admins.
+  const scopedSummary = useMemo<Summary>(() => {
+    if (!data) return { total: 0, notStarted: 0, ongoing: 0, completed: 0 };
+    if (allowedInstituteNames == null) return data.summary;
+    let notStarted = 0, ongoing = 0, completed = 0;
+    for (const s of visibleStudents) {
+      if (s.status === "completed") completed++;
+      else if (s.status === "ongoing") ongoing++;
+      else notStarted++;
+    }
+    return { total: visibleStudents.length, notStarted, ongoing, completed };
+  }, [data, visibleStudents, allowedInstituteNames]);
+
   // Unique institute names for filter dropdown
   const instituteOptions = useMemo(() => {
-    if (!data) return [];
-    const names = new Set(
-      data.students.map((s) => s.instituteName).filter(Boolean)
-    );
+    const names = new Set(visibleStudents.map((s) => s.instituteName).filter(Boolean));
     return Array.from(names).sort();
-  }, [data]);
+  }, [visibleStudents]);
 
   // Filtered & searched students (memoized to avoid re-computation)
   const filteredStudents = useMemo(() => {
     if (!data) return [];
-    let list = data.students;
+    let list = visibleStudents;
 
     if (filterStatus !== "all") {
       list = list.filter((s) => s.status === filterStatus);
@@ -788,7 +861,7 @@ const LiveTrackingPage = () => {
         title="Live Tracking"
         subtitle={
           data ? (
-            <><strong>{data.summary.total}</strong> students · <strong>{data.summary.completed}</strong> completed · <strong>{data.summary.ongoing}</strong> in progress · {isPolling ? "Live" : "Paused"}</>
+            <><strong>{scopedSummary.total}</strong> students · <strong>{scopedSummary.completed}</strong> completed · <strong>{scopedSummary.ongoing}</strong> in progress · {isPolling ? "Live" : "Paused"}</>
           ) : (
             <>Select an assessment to start tracking</>
           )
@@ -901,22 +974,22 @@ const LiveTrackingPage = () => {
         {activeTab === "live" && data && (
           <>
             {/* Summary cards */}
-            <SummaryCards summary={data.summary} />
+            <SummaryCards summary={scopedSummary} />
 
             {/* Completion progress */}
             <div className="mb-4">
               <div className="d-flex justify-content-between mb-1">
                 <small className="fw-semibold">Overall Completion</small>
                 <small className="text-muted">
-                  {data.summary.completed} / {data.summary.total} students
+                  {scopedSummary.completed} / {scopedSummary.total} students
                 </small>
               </div>
               <div className="progress" style={{ height: 12 }}>
                 <div
                   className="progress-bar bg-success"
                   style={{
-                    width: `${data.summary.total > 0
-                      ? (data.summary.completed / data.summary.total) * 100
+                    width: `${scopedSummary.total > 0
+                      ? (scopedSummary.completed / scopedSummary.total) * 100
                       : 0}%`,
                     transition: "width 0.5s ease",
                   }}
@@ -924,8 +997,8 @@ const LiveTrackingPage = () => {
                 <div
                   className="progress-bar bg-warning"
                   style={{
-                    width: `${data.summary.total > 0
-                      ? (data.summary.ongoing / data.summary.total) * 100
+                    width: `${scopedSummary.total > 0
+                      ? (scopedSummary.ongoing / scopedSummary.total) * 100
                       : 0}%`,
                     transition: "width 0.5s ease",
                   }}

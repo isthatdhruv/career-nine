@@ -15,6 +15,7 @@ import java.util.zip.ZipOutputStream;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -89,12 +90,16 @@ public class ContactPersonController {
 
     // ============ EXISTING ENDPOINTS ============
 
+    // no scope arg: cross-institute list — scope-filter narrows result set
+    @PreAuthorize("@auth.allows('contact_person.read')")
     @GetMapping("/getAll")
     public ResponseEntity<List<ContactPerson>> getAllContactPersons() {
         List<ContactPerson> list = contactPersonRepository.findAll();
         return ResponseEntity.ok(list);
     }
 
+    // no scope arg: fetch by id; scope-filter narrows access
+    @PreAuthorize("@auth.allows('contact_person.read')")
     @GetMapping("/get/{id}")
     public ResponseEntity<ContactPerson> getContactPersonById(@PathVariable("id") Long contactPersonId) {
         ContactPerson contactPerson = contactPersonRepository.findById(contactPersonId)
@@ -102,6 +107,8 @@ public class ContactPersonController {
         return ResponseEntity.ok(contactPerson);
     }
 
+    // no scope arg: delete by id; scope-filter narrows access
+    @PreAuthorize("@auth.allows('contact_person.delete')")
     @DeleteMapping("/delete/{id}")
     public ResponseEntity<Void> deleteContactPerson(@PathVariable("id") Long id) {
         if (!contactPersonRepository.existsById(id)) {
@@ -111,6 +118,7 @@ public class ContactPersonController {
         return ResponseEntity.noContent().build();
     }
 
+    @PreAuthorize("@auth.allows('contact_person.create', #instituteCode, null, null, null)")
     @PostMapping("/create")
     public ResponseEntity<?> createContactPerson(
             @RequestBody ContactPerson contactPerson,
@@ -126,6 +134,8 @@ public class ContactPersonController {
         return ResponseEntity.ok(saved);
     }
 
+    // no scope arg: update by id; scope-filter narrows access
+    @PreAuthorize("@auth.allows('contact_person.update')")
     @PutMapping("/update/{id}")
     public ResponseEntity<?> updateContactPerson(@PathVariable Long id, @RequestBody ContactPerson body) {
         Optional<ContactPerson> opt = contactPersonRepository.findById(id);
@@ -151,6 +161,8 @@ public class ContactPersonController {
      * Map a registered user as a contact person for an institute.
      * Auto-populates name, email, phone, designation from the User entity.
      */
+    // no scope arg: body is raw Map<String,Object>; admin-only, scope-filter narrows access
+    @PreAuthorize("@auth.allows('contact_person.create')")
     @PostMapping("/map-to-college")
     public ResponseEntity<?> mapUserToCollege(@RequestBody Map<String, Object> payload) {
         Long userId = payload.get("userId") != null ? ((Number) payload.get("userId")).longValue() : null;
@@ -202,6 +214,8 @@ public class ContactPersonController {
     /**
      * Get all college mappings for a user (with access levels for each).
      */
+    // no scope arg: identifies by userId (caller's mappings); scope-filter narrows access
+    @PreAuthorize("@auth.allows('contact_person.read')")
     @GetMapping("/by-user/{userId}")
     public ResponseEntity<?> getUserCollegeMappings(@PathVariable Long userId) {
         List<ContactPerson> contacts = contactPersonRepository.findByUserId(userId);
@@ -220,6 +234,8 @@ public class ContactPersonController {
     /**
      * Unmap a user from a college. Deletes the ContactPerson and all its access levels.
      */
+    // no scope arg: delete by contactPersonId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('contact_person.delete')")
     @DeleteMapping("/unmap/{contactPersonId}")
     public ResponseEntity<?> unmapUserFromCollege(@PathVariable Long contactPersonId) {
         if (!contactPersonRepository.existsById(contactPersonId)) {
@@ -239,6 +255,8 @@ public class ContactPersonController {
     /**
      * Create an access level entry for a contact person.
      */
+    // no scope arg: body links to contact_person; scope-filter narrows access
+    @PreAuthorize("@auth.allows('contact_person.update')")
     @PostMapping("/access-level/create")
     public ResponseEntity<?> createAccessLevel(@RequestBody ContactPersonAccessLevel accessLevel) {
         if (accessLevel.getContactPersonId() == null) {
@@ -256,6 +274,8 @@ public class ContactPersonController {
     /**
      * Get all access levels for a contact person.
      */
+    // no scope arg: read by contactPersonId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('contact_person.read')")
     @GetMapping("/access-level/by-contact/{contactPersonId}")
     public ResponseEntity<List<ContactPersonAccessLevel>> getAccessLevelsByContact(
             @PathVariable Long contactPersonId) {
@@ -266,6 +286,8 @@ public class ContactPersonController {
     /**
      * Delete a single access level entry.
      */
+    // no scope arg: delete by id; scope-filter narrows access
+    @PreAuthorize("@auth.allows('contact_person.update')")
     @DeleteMapping("/access-level/delete/{id}")
     public ResponseEntity<Void> deleteAccessLevel(@PathVariable Long id) {
         if (!accessLevelRepository.existsById(id)) {
@@ -280,6 +302,7 @@ public class ContactPersonController {
     /**
      * Get all contact persons for a given institute.
      */
+    @PreAuthorize("@auth.allows('contact_person.read', #instituteCode, null, null, null)")
     @GetMapping("/by-institute/{instituteCode}")
     public ResponseEntity<List<Map<String, Object>>> getByInstitute(
             @PathVariable int instituteCode) {
@@ -297,6 +320,8 @@ public class ContactPersonController {
      * Assign a list of students to a contact person and notify them via email.
      * Body: { contactPersonId, userStudentIds: [Long...], instituteId }
      */
+    // no scope arg: body is raw Map; scope-filter narrows access
+    @PreAuthorize("@auth.allows('contact_person.update')")
     @PostMapping("/assign-students")
     public ResponseEntity<?> assignStudents(@RequestBody Map<String, Object> payload) {
         Long contactPersonId = payload.get("contactPersonId") != null
@@ -372,6 +397,8 @@ public class ContactPersonController {
      * Get all students assigned to a contact person.
      * Returns basic student info for each assignment.
      */
+    // no scope arg: identifies by contactPersonId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('contact_person.read')")
     @GetMapping("/{contactPersonId}/assigned-students")
     public ResponseEntity<?> getAssignedStudents(@PathVariable Long contactPersonId) {
         if (!contactPersonRepository.existsById(contactPersonId)) {
@@ -428,6 +455,8 @@ public class ContactPersonController {
      * 2. Contact persons directly assigned to this student
      * 3. All contact persons of the student's institute
      */
+    // no scope arg: identifies by userStudentId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('contact_person.read')")
     @Transactional(readOnly = true)
     @GetMapping("/email-recipients/{userStudentId}")
     public ResponseEntity<?> getEmailRecipients(@PathVariable Long userStudentId) {
@@ -513,6 +542,8 @@ public class ContactPersonController {
      * Send a report email to selected recipients.
      * Body: { emails: [String...], subject: String, htmlContent: String, fromName: String (optional) }
      */
+    // no scope arg: body is raw Map; email send action
+    @PreAuthorize("@auth.allows('email.send')")
     @PostMapping("/send-report-email")
     public ResponseEntity<?> sendReportEmail(@RequestBody Map<String, Object> payload) {
         @SuppressWarnings("unchecked")
@@ -570,6 +601,8 @@ public class ContactPersonController {
      * and email the ZIP as an attachment to the contact person.
      * Body: { contactPersonId, assessmentId, reportType: "navigator" | "bet" }
      */
+    // no scope arg: body is raw Map; report-export + email-send action
+    @PreAuthorize("@auth.allows('report.export')")
     @PostMapping("/send-reports")
     public ResponseEntity<?> sendReportsToContactPerson(@RequestBody Map<String, Object> payload) {
         Long contactPersonId = payload.get("contactPersonId") != null
@@ -741,6 +774,8 @@ public class ContactPersonController {
      * Get report availability for students assigned to a contact person.
      * Returns which students have generated reports for a given assessment.
      */
+    // no scope arg: identifies by contactPersonId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('report.read')")
     @GetMapping("/{contactPersonId}/report-status/{assessmentId}")
     public ResponseEntity<?> getReportStatus(
             @PathVariable Long contactPersonId,
@@ -797,6 +832,7 @@ public class ContactPersonController {
     /**
      * Get report status for all students in an institute for a given assessment.
      */
+    @PreAuthorize("@auth.allows('report.read', #instituteCode, null, null, null)")
     @GetMapping("/report-status-by-institute/{instituteCode}/{assessmentId}")
     @Transactional(readOnly = true)
     public ResponseEntity<?> getReportStatusByInstitute(
@@ -865,6 +901,8 @@ public class ContactPersonController {
      * to a contact person via email as a ZIP file.
      * Body: { contactPersonId, instituteCode, assessmentId, reportType }
      */
+    // no scope arg: body is raw Map; report-export action
+    @PreAuthorize("@auth.allows('report.export')")
     @PostMapping("/send-reports-by-institute")
     public ResponseEntity<?> sendReportsByInstitute(@RequestBody Map<String, Object> payload) {
         Long contactPersonId = payload.get("contactPersonId") != null
@@ -1192,6 +1230,8 @@ public class ContactPersonController {
      * Send a WhatsApp message via AiSensy API.
      * Body: { phoneNumber: String, templateName: String, templateParams: [String...] }
      */
+    // no scope arg: body is raw Map; messaging action via communication_log
+    @PreAuthorize("@auth.allows('communication_log.create')")
     @PostMapping("/send-whatsapp")
     public ResponseEntity<?> sendWhatsApp(@RequestBody Map<String, Object> payload) {
         String phoneNumber = (String) payload.get("phoneNumber");
@@ -1276,6 +1316,8 @@ public class ContactPersonController {
      * Send bulk WhatsApp messages via AiSensy API.
      * Body: { recipients: [{ phoneNumber, templateParams }], templateName: String }
      */
+    // no scope arg: body is raw Map; bulk messaging action via communication_log
+    @PreAuthorize("@auth.allows('communication_log.create')")
     @PostMapping("/send-whatsapp-bulk")
     public ResponseEntity<?> sendWhatsAppBulk(@RequestBody Map<String, Object> payload) {
         String templateName = (String) payload.get("templateName");

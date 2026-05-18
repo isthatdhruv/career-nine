@@ -211,6 +211,32 @@ Refresh token (7 days, opaque, server-side `refresh_token` table, rotated on use
 
 ---
 
+## 3.6 ⚡ Post-Phase-14 design update (2026-05-11)
+
+After Phase 14 shipped, a clarification landed: **scope attributes attach to each role-assignment, not to the user globally.** The data model and §3.3 wording above describe a single `user_scope` table keyed on `user_id`. That was superseded by `user_role_scope` keyed on `user_role_group_mapping_id` (the FK to the role assignment).
+
+**Why:** a single user can hold multiple roles with different scopes per role — a director who is both "Teacher of Section 10-A at School 5" and "Counsellor of Class 12 at School 7" gets two `user_role_scope` rows, each FK'd to a different `user_role_group_mapping` row. The previous `user_scope` design forced all of a user's roles to share one scope, which doesn't match how schools actually assign staff.
+
+**What changed (read these substitutions into §3.3, §3.4, §3.5, §4 below):**
+
+| Old (Phase 14 as-shipped) | New (post-Phase-14) |
+|---|---|
+| `user_scope` table | `user_role_scope` table |
+| `user_id BIGINT NOT NULL` column | `user_role_group_mapping_id INT NOT NULL` column (FK to `user_role_group_mapping.id`, ON DELETE CASCADE) |
+| `UserScope.java` JPA entity | `UserRoleScope.java` (links `@ManyToOne` to `UserRoleGroupMapping`, not `User`) |
+| `UserScopeRepository.findByUser_Id(userId)` | `UserRoleScopeRepository.findAllByUserId(userId)` (JPQL walks through `user_role_group_mapping`) |
+| `is_active` column on `user_scope` | Removed — admin deletes the row OR removes the underlying role assignment (cascades) |
+
+**Migrations shipped 2026-05-11:**
+- `V20260511006__supersede_user_scope_undo_seeds.sql` — drops `user_scope`, truncates `role_permission` (auto-seed only matched 1 of 8 roles) and `student_info_backfill_report` (auto-backfill resolved 0 of 1588 rows). Admin UI in Phase 15+ owns these assignments going forward.
+- `V20260511007__create_user_role_scope.sql` — creates `user_role_scope` with FK to `user_role_group_mapping`, composite index `(institute_id, session_id, course_code, section_id)`, and containment CHECK.
+
+**Wildcard semantics, containment rule, super-admin bypass, ABAC dimension types — all UNCHANGED.** Only the keying-column moves.
+
+A multi-institute admin still gets multiple rows; now they live across multiple role assignments rather than multiple `user_scope` rows for one user.
+
+---
+
 ## 4. Data model changes
 
 New tables:
@@ -508,21 +534,20 @@ End-to-end, a Cypress run per role (super-admin, institute-admin, principal, tea
 
 ---
 
-## 12. Open questions to confirm before Phase 1
+## 12. Decisions & open questions
 
 Resolved by user direction:
 - ~~Class vs section terminology~~ — class = `InstituteCourse.course_code`, section = `Section.id`. One class has many sections; teachers can be assigned at class level (wildcard section) or per-section.
 - ~~Multi-institute admins~~ — yes, `INSTITUTE_ADMIN` can span multiple institutes via multiple `user_scope` rows.
 - ~~OAuth changes~~ — out of scope for this redesign.
+- ~~Session backfill strategy~~ — **map each student to their institute's currently-active `InstituteSession`** at backfill time. Unresolved rows (no active session / no institute) remain NULL and fail closed under ABAC. (Decision 2026-05-08.)
+- ~~Default scope for new staff users~~ — **no scope at creation; admin must explicitly grant**. Fail closed, principle of least privilege. (Decision 2026-05-08.)
+- ~~Teacher rostering data model~~ — **`user_scope` is the single source of truth**; the scope grant *is* the assignment. No separate `teacher_assignment` table for now. Per-assignment metadata (subject, class-teacher flag) can be added as columns on `user_scope` later if product needs it. (Decision 2026-05-08.)
+- ~~Workflow~~ — **GSD plugin** (`/gsd:plan-phase` → `/gsd:execute-phase` per phase, atomic commits, checkpoints, resumable). (Decision 2026-05-08.)
 
 Still open:
-1. **Session inference for backfill.** When backfilling `student_info.session_id`, do we map a student to "the active session of their institute at the time of their creation", or to "the current session"? Affects the migration script.
-2. **Default scope for new users.** When an admin creates a new staff user, what's the default scope until they're assigned one? Recommend: no scope = no access (fail closed), admin must explicitly grant.
-3. **Per-section-teacher vs per-class-teacher data model.** Today there's no `teacher_assignment` table linking a teacher User to specific sections. The `user_scope` table proposed here implicitly *is* that link for authorization purposes — confirm we're OK with that, vs. a separate `teacher_assignment` table that drives both rostering and auth.
-4. **Sub-institute hierarchy.** Above institute we have `InstituteBranch` (a branch of an institute). Does the multi-institute director also need branch-level scope, or is "institute" enough granularity above session? Currently the plan stops at institute.
-5. **Refresh token rotation on every use** vs **sliding refresh**. Recommend rotation-on-use (default) for stricter revocation.
-
-Answers feed into the Phase 1 migration and the seed `role_permission` mapping.
+1. **Sub-institute hierarchy.** Above institute we have `InstituteBranch`. Does the multi-institute director also need branch-level scope, or is "institute" enough granularity? Currently the plan stops at institute. Revisit if/when a director user reports they need to limit access to one branch.
+2. **Refresh token rotation on every use** vs **sliding refresh**. Recommend rotation-on-use (default) — stricter revocation. Defer final call to Phase 3 planning.
 
 ---
 

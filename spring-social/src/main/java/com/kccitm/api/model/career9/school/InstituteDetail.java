@@ -69,6 +69,22 @@ public class InstituteDetail implements Serializable {
     @Column(name = "display")
     private Boolean display; // wrapper, can be null
 
+    /**
+     * Phase 19 Plan 01 per-institute feature flag for the cookie-based assessment
+     * authentication. NULL or FALSE → {@code POST /auth/assessment-session} returns
+     * 404 for students under this institute, so the assessment SPA transparently
+     * falls back to the legacy {@code X-Assessment-Session} header path (handled
+     * by {@code AssessmentSessionInterceptor}). TRUE → the endpoint mints a
+     * {@code cn_at_asmnt} cookie carrying a 4h assessment-scoped JWT.
+     *
+     * <p>Default {@code NULL} so existing institutes are not auto-flipped onto the
+     * new auth at upgrade time; operations team enables per institute via a manual
+     * SQL update once 19-04 (assessment SPA cookie path) has been validated for
+     * each tenant.
+     */
+    @Column(name = "assessment_cookie_auth_enabled")
+    private Boolean assessmentCookieAuthEnabled;
+
     @Transient
     private String transientField;
 
@@ -155,6 +171,15 @@ public class InstituteDetail implements Serializable {
 
     public void setDisplay(Boolean display) {
         this.display = display;
+    }
+
+    /** Phase 19 Plan 01 cookie-auth feature flag. NULL/FALSE → endpoint returns 404. */
+    public Boolean getAssessmentCookieAuthEnabled() {
+        return assessmentCookieAuthEnabled;
+    }
+
+    public void setAssessmentCookieAuthEnabled(Boolean assessmentCookieAuthEnabled) {
+        this.assessmentCookieAuthEnabled = assessmentCookieAuthEnabled;
     }
 
     public String getTransientField() {

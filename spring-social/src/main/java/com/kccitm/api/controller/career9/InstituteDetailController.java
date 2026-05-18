@@ -8,8 +8,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.kccitm.api.security.UserPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,10 +41,14 @@ import com.kccitm.api.repository.InstituteBranchBatchMappingRepository;
 import com.kccitm.api.repository.InstituteBranchRepository;
 import com.kccitm.api.repository.InstituteCourseRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
+import com.kccitm.api.security.access.AccessScope;
+import com.kccitm.api.security.access.AccessScopeService;
 
 @RestController
 @RequestMapping("/instituteDetail")
 public class InstituteDetailController {
+
+	private static final Logger log = LoggerFactory.getLogger(InstituteDetailController.class);
 
 	@Autowired
 	private InstituteDetailRepository instituteDetailRepository;
@@ -61,24 +71,70 @@ public class InstituteDetailController {
 	@Autowired
 	private BoardNameRepository boardNameRepository;
 
-	@GetMapping("/get/list")
-	public List<Map<String, Object>> getInstituteList() {
-		return instituteDetailRepository.findAllIdAndName();
+	@Autowired
+	private AccessScopeService accessScopeService;
+
+	/**
+	 * Narrow an institute list down to the caller's allowed institute codes.
+	 * Super-admins (Optional.empty()) pass through unchanged. Anyone else only
+	 * sees institutes they're mapped to via ContactPerson — same source-of-truth
+	 * the @PreAuthorize scope check on per-institute endpoints uses, so the
+	 * dropdown and the deep-link endpoints agree on visibility.
+	 */
+	private Optional<Set<Integer>> scopeCodesForCurrentUser() {
+		Optional<AccessScope> scope = accessScopeService.forCurrentUser();
+		if (!scope.isPresent()) return Optional.empty(); // super-admin → no filter
+		return Optional.of(scope.get().getAllowedInstituteCodes());
 	}
 
+	@PreAuthorize("@auth.allows('institute_detail.read.all')")
+	@GetMapping("/get/list")
+	public List<Map<String, Object>> getInstituteList() {
+		List<Map<String, Object>> all = instituteDetailRepository.findAllIdAndName();
+		Optional<Set<Integer>> allowed = scopeCodesForCurrentUser();
+		// DIAG-INSTITUTE-FILTER: temporary diagnostic. Removed once dhruv-mapping is verified.
+		Authentication a = SecurityContextHolder.getContext().getAuthentication();
+		String who = (a != null && a.getPrincipal() instanceof UserPrincipal)
+				? (((UserPrincipal) a.getPrincipal()).getEmail() + " sa=" + ((UserPrincipal) a.getPrincipal()).isSuperAdmin())
+				: "anon";
+		if (!allowed.isPresent()) {
+			log.warn("DIAG-INSTITUTE-FILTER user={} → super-admin bypass, returning ALL {} institutes",
+					who, all.size());
+			return all;
+		}
+		Set<Integer> allowedCodes = allowed.get();
+		log.warn("DIAG-INSTITUTE-FILTER user={} allowedCodes={} totalBeforeFilter={}",
+				who, allowedCodes, all.size());
+		List<Map<String, Object>> filtered = new ArrayList<Map<String, Object>>();
+		for (Map<String, Object> row : all) {
+			Object codeObj = row.get("instituteCode");
+			if (codeObj instanceof Number && allowedCodes.contains(((Number) codeObj).intValue())) {
+				filtered.add(row);
+			}
+		}
+		log.warn("DIAG-INSTITUTE-FILTER user={} returning {} of {} institutes", who, filtered.size(), all.size());
+		return filtered;
+	}
+
+	@PreAuthorize("@auth.allows('institute_detail.read.all')")
 	@GetMapping(value = "/get", headers = "Accept=application/json")
 	public List<InstituteDetail> getallInstituteDetail() {
 		List<InstituteDetail> allInstituteDetails = instituteDetailRepository.findAll();
+		Optional<Set<Integer>> allowed = scopeCodesForCurrentUser();
 		List<InstituteDetail> allInstituteDetailsNew = new ArrayList<InstituteDetail>();
 		for (InstituteDetail IdNew : allInstituteDetails) {
-			if (IdNew.getDisplay() != null && IdNew.getDisplay() == true) {
-				// if (IdNew.getDisplay() == null) {
-				allInstituteDetailsNew.add(IdNew);
+			if (IdNew.getDisplay() == null || !IdNew.getDisplay()) continue;
+			if (allowed.isPresent()
+					&& (IdNew.getInstituteCode() == null
+							|| !allowed.get().contains(IdNew.getInstituteCode()))) {
+				continue;
 			}
+			allInstituteDetailsNew.add(IdNew);
 		}
 		return allInstituteDetailsNew;
 	}
 
+	@PreAuthorize("@auth.allows('institute_detail.read', #instituteDetailId)")
 	@GetMapping(value = "/getbyid/{id}", headers = "Accept=application/json")
 	public InstituteDetail getInstituteDetailById(@PathVariable("id") int instituteDetailId) {
 		InstituteDetail instituteDetail = instituteDetailRepository.findById(instituteDetailId);
@@ -127,6 +183,7 @@ public class InstituteDetailController {
 	// InstituteDetail r = instituteDetailRepository.save(instituteDetail);
 	// return r;
 	// }
+	@PreAuthorize("@auth.allows('institute_detail.delete', #id)")
 	@GetMapping("/delete/{id}")
 	public InstituteDetail deleteUser(@PathVariable("id") Integer id) {
 		InstituteDetail institute = instituteDetailRepository.findById(id.intValue());
@@ -137,11 +194,13 @@ public class InstituteDetailController {
 		return null;
 	}
 
+	@PreAuthorize("@auth.allows('institute_detail.read.all')")
 	@GetMapping("/deleted")
 	public List<InstituteDetail> getDeletedInstitutes() {
 		return instituteDetailRepository.findByDisplay(false);
 	}
 
+	@PreAuthorize("@auth.allows('institute_detail.update', #id)")
 	@GetMapping("/restore/{id}")
 	public InstituteDetail restoreInstitute(@PathVariable("id") Integer id) {
 		InstituteDetail institute = instituteDetailRepository.findById(id.intValue());
@@ -152,6 +211,7 @@ public class InstituteDetailController {
 		return null;
 	}
 
+	@PreAuthorize("@auth.allows('institute_detail.update')")
 	@PostMapping(value = "/update", consumes = "application/json", produces = "application/json")
 	public InstituteDetail updateInstituteDetail(@RequestBody Map<String, InstituteDetail> payload) {
 		if (payload == null || payload.isEmpty()) {
@@ -168,6 +228,7 @@ public class InstituteDetailController {
 	}
 
 	@SuppressWarnings("unchecked")
+	@PreAuthorize("@auth.allows('institute_detail.update')")
 	@PostMapping(value = "/map-contacts-boards")
 	public ResponseEntity<?> mapContactsAndBoards(@RequestBody Map<String, Object> payload) {
 		Integer instituteCode = (Integer) payload.get("instituteCode");
@@ -219,6 +280,7 @@ public class InstituteDetailController {
 		return ResponseEntity.ok(new ApiResponse(true, "Contacts and boards mapped successfully"));
 	}
 
+	@PreAuthorize("@auth.allows('institute_detail.read', #instituteCode)")
 	@GetMapping(value = "/get-mappings/{id}")
 	public ResponseEntity<?> getMappings(@PathVariable("id") int instituteCode) {
 		InstituteDetail institute = instituteDetailRepository.findById(instituteCode);
@@ -240,6 +302,7 @@ public class InstituteDetailController {
 	// Per-institute limits (max assessments allowed before allotment is blocked)
 	// ============================================================
 
+	@PreAuthorize("@auth.allows('institute_detail.read', #instituteCode)")
 	@GetMapping("/{id}/limits")
 	public ResponseEntity<?> getInstituteLimits(@PathVariable("id") int instituteCode) {
 		InstituteDetail institute = instituteDetailRepository.findById(instituteCode);
@@ -253,6 +316,7 @@ public class InstituteDetailController {
 		return ResponseEntity.ok(body);
 	}
 
+	@PreAuthorize("@auth.allows('institute_detail.update', #instituteCode)")
 	@PutMapping("/{id}/limits")
 	public ResponseEntity<?> updateInstituteLimits(
 			@PathVariable("id") int instituteCode,

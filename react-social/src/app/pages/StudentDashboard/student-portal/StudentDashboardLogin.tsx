@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { toAbsoluteUrl } from '../../../../_metronic/helpers'
+import { useAuth } from '../../../modules/auth/core/Auth'
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8091'
 
@@ -19,6 +20,7 @@ const years = Array.from({ length: 40 }, (_, i) => String(2024 - i))
 
 const StudentDashboardLogin: React.FC = () => {
   const navigate = useNavigate()
+  const { setCurrentUser } = useAuth()
   const [username, setUsername] = useState('')
   const [dobDay, setDobDay] = useState('')
   const [dobMonth, setDobMonth] = useState('')
@@ -52,7 +54,10 @@ const StudentDashboardLogin: React.FC = () => {
       const { data } = await axios.post(
         `${API_BASE_URL}/user/student-auth`,
         { username: username.trim(), dobDate },
-        { headers: { Accept: 'application/json', 'Content-Type': 'application/json' } }
+        {
+          withCredentials: true,
+          headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        }
       )
 
       if (!data || !data.profile) {
@@ -60,9 +65,33 @@ const StudentDashboardLogin: React.FC = () => {
         return
       }
 
-      localStorage.setItem('studentPortalProfile', JSON.stringify(data.profile))
+      // Phase 19 (19-02): no localStorage writes for studentPortalLoggedIn / studentPortalProfile.
+      // The unified cookie session (cn_at) is the auth source of truth. AuthInit picks
+      // up currentUser from /auth/me on next render via the HttpOnly cookie.
+      //
+      // GAP / Phase 16 carry-over: today's /user/student-auth endpoint returns the
+      // profile in the response body but does NOT yet set cn_at. Until the backend
+      // is updated, we pre-seed currentUser from data.profile so the dashboard renders
+      // immediately. If cn_at is not set server-side, the StudentAuthGuard will bounce
+      // the user back to login on the next full page load — that is correct
+      // fail-closed behaviour pending Phase 16's student-login cookie wiring.
+      //
+      // Legacy localStorage keys studentPortalDashboard is OUT OF SCOPE for 19-02
+      // (it's dashboard data cache, not auth). Phase 19+ should migrate it to a
+      // proper server fetch — tracked in SUMMARY.
       localStorage.setItem('studentPortalDashboard', JSON.stringify(data.dashboardData))
-      localStorage.setItem('studentPortalLoggedIn', 'true')
+
+      const p = data.profile as any
+      setCurrentUser({
+        id: p.userId ?? p.userStudentId ?? 0,
+        name: p.name ?? '',
+        email: p.email ?? '',
+        roles: ['STUDENT'],
+        permissions: [],
+        scopes: [],
+        superAdmin: false,
+        ...p,
+      } as any)
 
       navigate('/student/dashboard')
     } catch (err: any) {

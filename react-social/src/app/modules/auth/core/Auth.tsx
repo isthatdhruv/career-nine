@@ -9,25 +9,24 @@ import {
   SetStateAction,
 } from "react";
 import { LayoutSplashScreen } from "../../../../_metronic/layout/core";
-import { AuthModel, User } from "./_models";
-import * as authHelper from "./AuthHelpers";
-import { getUserByToken } from "./_requests";
+import { User, Scope } from "./_models";
+import { allows } from "./permissions";
+import * as authRequests from "./_requests";
+import { getCurrentUser } from "./_requests";
 import { WithChildren } from "../../../../_metronic/helpers";
 
 type AuthContextProps = {
-  auth: AuthModel | undefined;
-  saveAuth: (auth: AuthModel | undefined) => void;
   currentUser: User | undefined;
   setCurrentUser: Dispatch<SetStateAction<User | undefined>>;
   logout: () => void;
+  can: (perm: string, scope?: Scope) => boolean;
 };
 
-const initAuthContextPropsState = {
-  auth: authHelper.getAuth(),
-  saveAuth: () => {},
+const initAuthContextPropsState: AuthContextProps = {
   currentUser: undefined,
   setCurrentUser: () => {},
   logout: () => {},
+  can: (_perm: string, _scope?: Scope) => false,
 };
 
 const AuthContext = createContext<AuthContextProps>(initAuthContextPropsState);
@@ -37,26 +36,37 @@ const useAuth = () => {
 };
 
 const AuthProvider: FC<WithChildren> = ({ children }) => {
-  const [auth, setAuth] = useState<AuthModel | undefined>(authHelper.getAuth());
   const [currentUser, setCurrentUser] = useState<User | undefined>();
 
-  const saveAuth = (auth: AuthModel | undefined) => {
-    setAuth(auth);
-    if (auth) {
-      authHelper.setAuth(auth);
-    } else {
-      authHelper.removeAuth();
+  const logout = async () => {
+    // Phase 18: best-effort POST `/auth/logout` — server revokes the access-jti
+    // (deny list), revokes the refresh-token row, and clears cn_at + cn_csrf
+    // + cn_rt cookies. NEVER block local-state clear on this network call:
+    // if it fails (offline, server down, cookie already invalid) we still
+    // want the user to be logged out client-side.
+    try {
+      await authRequests.logout();
+    } catch (e) {
+      // ignore — we still want to clear local state even if the server call fails
     }
+    setCurrentUser(undefined);
   };
 
-  const logout = () => {
-    saveAuth(undefined);
-    setCurrentUser(undefined);
+  // Mirrors backend AuthorizationService.allows() — see permissions.ts.
+  const can = (perm: string, scope?: Scope): boolean => {
+    if (!currentUser) return false;
+    return allows(
+      currentUser.permissions,
+      currentUser.scopes,
+      currentUser.superAdmin,
+      perm,
+      scope
+    );
   };
 
   return (
     <AuthContext.Provider
-      value={{ auth, saveAuth, currentUser, setCurrentUser, logout }}
+      value={{ currentUser, setCurrentUser, logout, can }}
     >
       {children}
     </AuthContext.Provider>
@@ -64,38 +74,30 @@ const AuthProvider: FC<WithChildren> = ({ children }) => {
 };
 
 const AuthInit: FC<WithChildren> = ({ children }) => {
-  const { auth, logout, setCurrentUser } = useAuth();
+  const { setCurrentUser } = useAuth();
   const didRequest = useRef(false);
   const [showSplashScreen, setShowSplashScreen] = useState(true);
-  // We should request user by authToken (IN OUR EXAMPLE IT'S API_TOKEN) before rendering the application
+
   useEffect(() => {
-    const requestUser = async (apiToken: string) => {
+    const bootstrap = async () => {
+      if (didRequest.current) return;
+      didRequest.current = true;
       try {
-        if (!didRequest.current) {
-          const { data } = await getUserByToken(apiToken);
-          if (data) {
-            setCurrentUser(data);
-          }
+        // Cookie (cn_at) is auto-attached via axios withCredentials.
+        const { data } = await getCurrentUser();
+        if (data) {
+          setCurrentUser(data);
         }
       } catch (error) {
-        console.error(error);
-        if (!didRequest.current) {
-          logout();
-        }
+        // 401 (no cookie / expired) is the normal "not logged in" path.
+        // Don't toast — the response interceptor already redirected.
+        // Silently fall through to splash-off; PrivateRoutes will gate.
       } finally {
         setShowSplashScreen(false);
       }
-
-      return () => (didRequest.current = true);
     };
-
-    if (auth && auth.api_token) {
-      requestUser(auth.api_token);
-    } else {
-      logout();
-      setShowSplashScreen(false);
-    }
-    // eslint-disable-next-line
+    bootstrap();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return showSplashScreen ? <LayoutSplashScreen /> : <>{children}</>;

@@ -1,5 +1,6 @@
 import { FC, lazy, Suspense, useEffect } from 'react'
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
+import { useAuth } from '../modules/auth/core/Auth'
 
 const CounsellorAuthPage = lazy(
   () => import('../pages/CounsellorDashboard/CounsellorAuthPage')
@@ -18,6 +19,9 @@ const CounsellorAvailabilityPage = lazy(
 )
 const CounsellorProfilePage = lazy(
   () => import('../pages/CounsellorDashboard/CounsellorProfilePage')
+)
+const PermissionDeniedPage = lazy(
+  () => import('../components/PermissionDeniedPage')
 )
 
 const CounsellorFallback: FC = () => (
@@ -39,44 +43,38 @@ const CounsellorFallback: FC = () => (
 
 /**
  * Route guard for authenticated counsellor routes.
- * Checks login status and validates counsellor role from stored user data.
+ *
+ * Phase 19 (persona unification): replaced the legacy localStorage
+ * counsellor-portal flag + JSON-blob gate with the unified cookie-session
+ * auth context. AuthInit (in modules/auth/core/Auth.tsx) bootstraps
+ * currentUser from /auth/me via the HttpOnly cn_at cookie; this guard
+ * simply checks that currentUser is present AND has the COUNSELLOR role.
+ *
+ * Counsellors are normal users with role COUNSELLOR — there is no
+ * separate session, no separate token, no separate stored object.
+ * Setting localStorage flags in DevTools no longer grants access
+ * (Phase 19 success criterion #2).
  */
 const CounsellorAuthGuard: FC = () => {
-  const isLoggedIn = localStorage.getItem('counsellorPortalLoggedIn')
-
-  if (!isLoggedIn) {
+  const { currentUser } = useAuth()
+  if (!currentUser) {
     return <Navigate to='/counsellor/login' replace />
   }
-
-  try {
-    const userStr = localStorage.getItem('counsellorPortalUser')
-    if (!userStr) {
-      return <Navigate to='/counsellor/login' replace />
-    }
-
-    const user = JSON.parse(userStr)
-
-    // New counsellor login flow stores counsellorId directly
-    if (user.counsellorId) {
-      return <Outlet />
-    }
-
-    // Legacy flow: check authorityUrls from JWT-based login
-    const urls: string[] = user.authorityUrls || []
-    const hasAccess = urls.some((url: string) => {
-      const lower = url.toLowerCase()
-      return lower.includes('counsellor') || lower.includes('counselor') || lower === '*' || lower === '/*'
-    })
-    if (!hasAccess) {
-      localStorage.removeItem('counsellorPortalLoggedIn')
-      localStorage.removeItem('counsellorPortalToken')
-      localStorage.removeItem('counsellorPortalUser')
-      return <Navigate to='/counsellor/login' replace />
-    }
-  } catch {
+  // Super-admin is a full bypass — matches the predicate in
+  // modules/auth/core/permissions.ts and the backend AuthorizationService.
+  // Without this, a bootstrap super-admin (no role groups assigned yet) would
+  // be unable to enter the counsellor portal to inspect / debug.
+  if (currentUser.superAdmin) {
+    return <Outlet />
+  }
+  const roles = (currentUser as any).roles
+  const role = (currentUser as any).role
+  const isCounsellor =
+    role === 'COUNSELLOR' ||
+    (Array.isArray(roles) && roles.includes('COUNSELLOR'))
+  if (!isCounsellor) {
     return <Navigate to='/counsellor/login' replace />
   }
-
   return <Outlet />
 }
 
@@ -89,11 +87,10 @@ const CounsellorAuthGuard: FC = () => {
  *
  * Protected:
  *   /counsellor/dashboard   — Main counsellor dashboard
- *   /counsellor/students    — Student list (placeholder)
- *   /counsellor/appointments — Appointments (placeholder)
- *   /counsellor/notes       — Session notes (placeholder)
- *   /counsellor/messages    — Messages (placeholder)
- *   /counsellor/reports     — Reports (placeholder)
+ *   /counsellor/appointments — Appointments
+ *   /counsellor/notes       — Session notes
+ *   /counsellor/availability — Availability templates + slots
+ *   /counsellor/profile     — Counsellor profile editor
  */
 const CounsellorRoutes: FC = () => {
   useEffect(() => {
@@ -111,6 +108,14 @@ const CounsellorRoutes: FC = () => {
         {/* Public */}
         <Route path='login' element={<CounsellorAuthPage />} />
         <Route path='register' element={<CounsellorAuthPage />} />
+
+        {/*
+          Phase 19 (Plan 19-05): counsellor-portal permission-denied page.
+          Reachable WITHOUT the auth guard so 403 redirects land cleanly even
+          if the cookie has been revoked. The page reads useAuth() and picks
+          the counsellor CTA when currentUser has the COUNSELLOR role.
+        */}
+        <Route path='permission-denied' element={<PermissionDeniedPage />} />
 
         {/* Protected */}
         <Route element={<CounsellorAuthGuard />}>

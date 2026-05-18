@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -38,6 +39,7 @@ public class StudentManagementController {
     private GeneratedReportRepository generatedReportRepository;
 
     /** Get all students for an institute with their flags */
+    @PreAuthorize("@auth.allows('counselling.student_management.read', #instituteCode, null, null, null)")
     @GetMapping("/by-institute/{instituteCode}")
     public ResponseEntity<List<Map<String, Object>>> getByInstitute(@PathVariable Integer instituteCode) {
         List<UserStudent> students = userStudentRepository.findByInstituteInstituteCode(instituteCode);
@@ -67,6 +69,8 @@ public class StudentManagementController {
     }
 
     /** Toggle the counsellingAllowed flag for a student */
+    // no scope arg: identifies by userStudentId; admin flag update
+    @PreAuthorize("@auth.allows('counselling.student_management.update')")
     @PutMapping("/counselling-allowed/{userStudentId}")
     public ResponseEntity<?> setCounsellingAllowed(
             @PathVariable Long userStudentId,
@@ -84,6 +88,8 @@ public class StudentManagementController {
      * Toggle report visibility for a student by flipping GeneratedReport.visibleToStudent
      * on every generated report that belongs to them — identical to the /reports-hub toggle.
      */
+    // no scope arg: identifies by userStudentId; admin report visibility update
+    @PreAuthorize("@auth.allows('counselling.student_management.update')")
     @PutMapping("/reports-visible/{userStudentId}")
     public ResponseEntity<?> setReportsVisible(
             @PathVariable Long userStudentId,

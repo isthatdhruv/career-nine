@@ -7,6 +7,7 @@ import {
   GetReportStatus,
   SendReportsToContactPerson,
 } from "../ContactPerson/API/Contact_Person_APIs";
+import { useAssessmentsForInstitute } from "../../hooks/useScopedAssessments";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8080";
 
@@ -53,8 +54,12 @@ const AssignedStudentsPage: React.FC = () => {
   const [studentsError, setStudentsError] = useState<string>("");
 
   // Send Reports state
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
-  const [assessmentsLoading, setAssessmentsLoading] = useState(false);
+  const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
+  // Narrow to assessments mapped to this institute (route is per-institute).
+  const { assessments, loading: assessmentsLoading } = useAssessmentsForInstitute(
+    instituteId ? Number(instituteId) : "",
+    allAssessments,
+  );
   const [selectedAssessment, setSelectedAssessment] = useState<number | "">("");
   const [reportType, setReportType] = useState<"navigator" | "bet">("navigator");
   const [reportStatuses, setReportStatuses] = useState<ReportStatusEntry[]>([]);
@@ -78,13 +83,11 @@ const AssignedStudentsPage: React.FC = () => {
       .finally(() => setCpLoading(false));
   }, [instituteId]);
 
-  // Load assessments
+  // Load assessments — hook narrows to this institute's mapped assessments.
   useEffect(() => {
-    setAssessmentsLoading(true);
     getAllAssessments()
-      .then((res) => setAssessments(res.data || []))
-      .catch(() => setAssessments([]))
-      .finally(() => setAssessmentsLoading(false));
+      .then((res) => setAllAssessments(res.data || []))
+      .catch(() => setAllAssessments([]));
   }, []);
 
   // Load assigned students when a contact person is selected

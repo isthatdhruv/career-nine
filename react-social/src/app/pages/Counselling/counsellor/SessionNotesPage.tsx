@@ -21,16 +21,9 @@ const SessionNotesPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const userId: number | undefined =
-    currentUser?.id ??
-    (() => {
-      try {
-        const stored = localStorage.getItem('counsellorPortalUser')
-        if (stored) return JSON.parse(stored)?.id
-      } catch {
-        return undefined
-      }
-    })()
+  // Phase 19: userId resolves from useAuth().currentUser only — the legacy
+  // localStorage JSON-blob fallback is gone.
+  const userId: number | undefined = currentUser?.id
 
   useEffect(() => {
     if (!id || !userId) {

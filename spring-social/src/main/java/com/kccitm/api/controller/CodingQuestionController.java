@@ -3,6 +3,7 @@ package com.kccitm.api.controller;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,6 +29,8 @@ public class CodingQuestionController {
     @Autowired
     private DifficultyRepository difficultyRepository;
 
+    // no scope arg: body is CodingQuestion entity without scope dims; scope-filter narrows access
+    @PreAuthorize("@auth.allows('coding_question.update')")
     @CrossOrigin(origins = "https://codeforces.com")
     @PostMapping("/update")
     public CodingQuestion CodingQuestionUpdate(@RequestBody CodingQuestion cd) {
@@ -46,6 +49,8 @@ public class CodingQuestionController {
         return codingQuestionRepository.save(cd);
     }
 
+    // no scope arg: fetch by id; scope-filter narrows access
+    @PreAuthorize("@auth.allows('coding_question.read')")
     @GetMapping("/get")
     public CodingQuestion CodingQuestionGet(@RequestParam int id) {
 

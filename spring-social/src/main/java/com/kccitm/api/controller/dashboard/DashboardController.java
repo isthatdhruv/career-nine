@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,6 +25,7 @@ public class DashboardController {
      * Get student basic information
      * GET /api/student/getbyid/{studentId}
      */
+    @PreAuthorize("@auth.allows('dashboard.admin.read')")
     @GetMapping("/student/getbyid/{studentId}")
     public ResponseEntity<?> getStudentBasicInfo(@PathVariable Long studentId) {
         Map<String, Object> studentInfo = dashboardService.getStudentBasicInfo(studentId);
@@ -34,6 +36,7 @@ public class DashboardController {
      * Get cognitive game results (Attention, Working Memory, Cognitive Flexibility)
      * GET /api/game-results/{studentId}?assessmentId={assessmentId}
      */
+    @PreAuthorize("@auth.allows('dashboard.admin.read')")
     @GetMapping("/game-results/{studentId}")
     public ResponseEntity<?> getGameResults(
             @PathVariable Long studentId,
@@ -46,6 +49,7 @@ public class DashboardController {
      * Get assessment scores (Social Insight, Values, Environmental Awareness)
      * GET /api/assessment-scores/{studentId}?assessmentId={assessmentId}
      */
+    @PreAuthorize("@auth.allows('dashboard.admin.read')")
     @GetMapping("/assessment-scores/{studentId}")
     public ResponseEntity<?> getAssessmentScores(
             @PathVariable Long studentId,
@@ -58,6 +62,7 @@ public class DashboardController {
      * Get self-management data (Self-Efficacy, Emotional Regulation, Self-Regulation)
      * GET /api/self-management/{studentId}?assessmentId={assessmentId}
      */
+    @PreAuthorize("@auth.allows('dashboard.admin.read')")
     @GetMapping("/self-management/{studentId}")
     public ResponseEntity<?> getSelfManagement(
             @PathVariable Long studentId,
@@ -70,6 +75,7 @@ public class DashboardController {
      * Get complete dashboard data (all sections combined)
      * GET /api/dashboard/{studentId}
      */
+    @PreAuthorize("@auth.allows('dashboard.admin.read')")
     @GetMapping("/dashboard/{studentId}")
     public ResponseEntity<?> getCompleteDashboard(@PathVariable Long studentId,@RequestParam Long assessmentId) {
         Map<String, Object> dashboard = new HashMap<>();

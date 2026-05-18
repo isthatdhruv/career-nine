@@ -1,0 +1,862 @@
+spring:
+  # Load env vars from a .env file at repo root (Spring Boot 2.4+).
+  # File is OPTIONAL — Docker / CI / shell-exported envs work the same way.
+  # Looks for ./.env (repo root) first, then ./spring-social/.env as a fallback.
+  # Both files MUST be gitignored — they hold real secrets.
+  config:
+    import:
+      - optional:file:./.env[.properties]
+      - optional:file:./spring-social/.env[.properties]
+      - optional:file:../.env[.properties]
+  profiles:
+    active: dev
+  servlet:
+    multipart:
+      max-file-size: 1GB
+      max-request-size: 1GB
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
+
+server:
+  port: 8080
+  # Tomcat's response-header buffer. Default is 8 KB which trips
+  # HeadersTooLargeException once the cn_at JWT cookie + the cn_csrf + cn_rt
+  # cookies + CSP/CORS headers stack up — the JWT alone can run 4-6 KB for
+  # super-admins with a full roles/perms/scopes claim shape. 64 KB gives
+  # comfortable headroom (Spring Boot 2.5 maps this to maxHttpHeaderSize).
+  max-http-header-size: 65536
+  compression:
+    enabled: true
+    min-response-size: 1024
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain,application/javascript,text/css
+  tomcat:
+    max-http-form-content-size: 500MB
+    max-swallow-size: 500MB
+    threads:
+      max: 300
+      min-spare: 50
+    accept-count: 100
+    connection-timeout: 60000
+
+  # ssl:
+  #   enabled: true
+  #   key-store: classpath:keystore.p12
+  #   key-store-password: 123456
+  #   key-store-type: PKCS12
+  #   key-alias: mysslcert
+
+app:
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+
+# Phase 15 RBAC + ABAC authorization runtime mode.
+# `log-only` (the safe default for Phase 15 — Phase 17 flips to `enforce`):
+#   AuthorizationService computes the policy decision, records DENYs to
+#   auth_audit (once 15-06 wires the auditor), and always returns true.
+# `enforce`:
+#   Same decision logic, but DENY actually returns false → @PreAuthorize
+#   triggers a 403. Set AUTH_ENFORCE_MODE=enforce to flip per environment.
+auth:
+  enforce-mode: log-only
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:mysql://localhost:3306/career-9-staging?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    # url: jdbc:mysql://192.168.10.73:3306/kiraya-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    username: root
+    password: Career-qCsfeuECc3MW
+    # password: MyStrongPass@123
+    hikari:
+      # Dev sizing: a single dev machine with one running JVM rarely needs >10
+      # concurrent JDBC connections, and a high minimum-idle quickly exhausts
+      # MySQL's default max_connections=151 when stale JVMs are left around or
+      # when multiple clients (Workbench, DBeaver) connect alongside. Production
+      # pools live in the staging/prod profiles below.
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  jpa:
+    show-sql: true
+    hibernate:
+      naming-strategy: org.hibernate.cfg.EJB3NamingStrategy
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+        default_batch_fetch_size: 30
+        jdbc:
+          batch_size: 30
+        order_inserts: true
+        order_updates: true
+  cache:
+    type: redis
+    cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
+    redis:
+      time-to-live: 86400000
+      key-prefix: "career9:"
+      use-key-prefix: true
+  redis:
+    host: localhost
+    port: 6379
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 2
+        max-wait: 5000ms
+      shutdown-timeout: 200ms
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${SMTP_USERNAME:notifications@career-9.net}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            clientId: 101961828065-ak601ssij07ugrffovuns8v2adrqvtqd.apps.googleusercontent.com
+            clientSecret: ${GOOGLE_CLIENT_SECRET:placeholder-dev-only}
+            # redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+            redirectUri: "http://192.168.0.204:8443/oauth2/callback/{registrationId}"
+
+            scope:
+              - email
+              - profile
+              - https://www.googleapis.com/auth/admin.directory.user
+              - https://www.googleapis.com/auth/admin.directory.group
+              - https://www.googleapis.com/auth/admin.directory.orgunit
+          facebook:
+            clientId: 121189305185277
+            clientSecret: ${FACEBOOK_CLIENT_SECRET:placeholder-dev-only}
+            redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+            scope:
+              - email
+              - public_profile
+          github:
+            clientId: d3e47fc2ddd966fa4352
+            clientSecret: ${GITHUB_CLIENT_SECRET:placeholder-dev-only}
+            redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+            scope:
+              - user:email
+              - read:user
+        provider:
+          facebook:
+            authorizationUri: https://www.facebook.com/v3.0/dialog/oauth
+            tokenUri: https://graph.facebook.com/v3.0/oauth/access_token
+            userInfoUri: https://graph.facebook.com/v3.0/me?fields=id,first_name,middle_name,last_name,name,email,verified,is_verified,picture.width(250).height(250)
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,caches
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  health:
+    redis:
+      enabled: true
+
+app:
+  protocol: http
+  name: localhost:3000
+  googleAPIJSON: classpath:google.json
+  fileTempFolder: classpath:temp
+  auth:
+    tokenSecret: "${APP_AUTH_TOKEN_SECRET:1PG4GePk3fxNKAAgI45mGa+YzrgVidfeau5o+Y5T+IUzyr/Ab3+O2C/QaG7s+XujsJdPlBgqsBc4tEKLenVI1A==}"
+    tokenExpirationMsec: 864000000
+    accessTokenExpirationMsec: 3600000      # 60 min (Phase 18 short-lived access JWT)
+    refreshTokenExpirationMsec: 604800000   # 7 days (Phase 18 opaque refresh token)
+    assessmentTokenExpirationMsec: 14400000 # 4h — Phase 19 assessment-scoped JWT TTL (cn_at_asmnt)
+  # SuperAdminBootstrapper reads these on every boot.
+  #   - If superAdminEmail resolves to an existing user → ensure is_super_admin=true.
+  #   - If not → create a local-provider user with the password BCrypt-hashed.
+  # Leave superAdminEmail blank/null to disable bootstrap once production admins
+  # are established. CHANGE THESE BEFORE PRODUCTION.
+  bootstrap:
+    superAdminEmail: admin@career-9.local
+    superAdminPassword: ChangeMeOnFirstLogin!2026
+    superAdminName: System Administrator
+  cookie:
+    secure: false
+    same-site: Strict
+    access-max-age-seconds: 864000
+  cors:
+    allowedOrigins: http://localhost:5173,http://35.227.40.232:3000,http://localhost:3001,http://192.168.1.11:3000,http://35.196.122.199:3000,http://192.168.0.204:3000,http://192.168.0.204:3000,http://localhost:3000,https://localhost:3000,https://localhost:8080,https://192.168.0.204:8080,https://localhost,https://localhost:80,https://staging.student.kccitm.in,https://student.kccitm.in,https://erp.aktu.ac.in,https://leetcode.com,http://192.168.0.204:8443,http://localhost:8080
+  oauth2:
+    # After successfully authenticating with the OAuth2 Provider,
+    # we'll be generating an auth token for the user and sending the token to the
+    # redirectUri mentioned by the client in the /oauth2/authorize request.
+    # We're not using cookies because they won't work well in mobile clients.
+    authorizedRedirectUris:
+      - https://student.kccitm.in/oauth2/redirect
+      - https://staging.student.kccitm.in/oauth2/redirect
+      - https://student.kccitm.in/oauth2/redirect
+      - http://192.168.0.204:3000/oauth2/redirect
+      - myandroidapp://oauth2/redirect
+      - http://localhost/oauth2/redirect
+      - http://localhost:80/oauth2/redirect
+      - myiosapp://oauth2/redirect
+      - http://192.168.0.204:3000
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+  mandrill: ${APP_MANDRILL:}
+  odoo:
+    url: ${ODOO_URL:}
+    database: ${ODOO_DATABASE:}
+    username: ${ODOO_USERNAME:}
+    api-key: ${ODOO_API_KEY:}
+
+  gmail:
+    sender-email: ${GMAIL_SENDER:notifications@career-9.net}
+  firebase:
+    project-id: career-9-assessment
+    service-account-file: firebase-service-account.json
+  digitalocean:
+    spaces:
+      bucket: storage-c9
+      region: sgp1
+      cdn-url: https://storage-c9.sgp1.digitaloceanspaces.com
+      # access-key: ${DO_SPACES_ACCESS_KEY:}
+      # secret-key: ${DO_SPACES_SECRET_KEY:}
+      endpoint: https://sgp1.digitaloceanspaces.com
+  razorpay:
+    # key-id: ${RAZORPAY_KEY_ID:}
+    # key-secret: ${RAZORPAY_KEY_SECRET:}
+    # webhook-secret: ${RAZORPAY_WEBHOOK_SECRET}
+    callback-base-url: http://localhost:5173
+  b2c:
+    frontendBaseUrl: http://localhost:3000
+    assessmentBaseUrl: http://localhost:5173
+  # Phase 20-01: in-process rate limit (Bucket4j). Dev profile runs against
+  # localhost with no upstream proxy — getRemoteAddr() is authoritative.
+  # XFF would be client-controlled / spoofable, so trust-xff is fail-safe false.
+  rate-limit:
+    enabled: true
+    ip-per-minute: 10
+    user-per-minute: 50
+    window-seconds: 60
+    trust-xff: false   # dev has no upstream proxy — getRemoteAddr() is authoritative
+
+# Phase 15 RBAC + ABAC enforcement mode (see root document for semantics).
+auth:
+  enforce-mode: log-only
+
+---
+spring:
+  config:
+    activate:
+      on-profile: production
+  datasource:
+    url: jdbc:mysql://mysql_db_api:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    username: root
+    password: ${SPRING_DATASOURCE_PASSWORD} # password: Google.com1
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 20
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  jpa:
+    show-sql: false
+    hibernate:
+      naming-strategy: org.hibernate.cfg.EJB3NamingStrategy
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+        default_batch_fetch_size: 30
+        jdbc:
+          batch_size: 30
+        order_inserts: true
+        order_updates: true
+  cache:
+    type: redis
+    cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
+    redis:
+      time-to-live: 86400000
+      key-prefix: "career9:"
+      use-key-prefix: true
+  redis:
+    host: redis_cache
+    port: 6379
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 50
+        max-idle: 20
+        min-idle: 5
+        max-wait: 5000ms
+      shutdown-timeout: 200ms
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${SMTP_USERNAME:notifications@career-9.net}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
+  digitalocean:
+    spaces:
+      bucket: storage-c9
+      region: sgp1
+      cdn-url: https://storage-c9.sgp1.digitaloceanspaces.com
+      access-key: ${DO_SPACES_ACCESS_KEY:}
+      secret-key: ${DO_SPACES_SECRET_KEY:}
+      endpoint: https://sgp1.digitaloceanspaces.com
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            clientId: 101961828065-ak601ssij07ugrffovuns8v2adrqvtqd.apps.googleusercontent.com
+            clientSecret: ${GOOGLE_CLIENT_SECRET}
+            # redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+            redirectUri: "https://api.career-9.com/oauth2/callback/{registrationId}"
+
+            scope:
+              - email
+              - profile
+              - https://www.googleapis.com/auth/admin.directory.user
+              - https://www.googleapis.com/auth/admin.directory.group
+              - https://www.googleapis.com/auth/admin.directory.orgunit
+          facebook:
+            clientId: 121189305185277
+            clientSecret: ${FACEBOOK_CLIENT_SECRET}
+            redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+            scope:
+              - email
+              - public_profile
+          github:
+            clientId: d3e47fc2ddd966fa4352
+            clientSecret: ${GITHUB_CLIENT_SECRET}
+            redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+            scope:
+              - user:email
+              - read:user
+        provider:
+          facebook:
+            authorizationUri: https://www.facebook.com/v3.0/dialog/oauth
+            tokenUri: https://graph.facebook.com/v3.0/oauth/access_token
+            userInfoUri: https://graph.facebook.com/v3.0/me?fields=id,first_name,middle_name,last_name,name,email,verified,is_verified,picture.width(250).height(250)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,caches
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  health:
+    redis:
+      enabled: true
+server:
+  # See dev profile note (line 23) — 64 KB header buffer to absorb stacked
+  # auth cookies + CSP/CORS on production-sized JWTs.
+  max-http-header-size: 65536
+  tomcat:
+    threads:
+      max: 300
+      min-spare: 50
+    accept-count: 100
+    connection-timeout: 60000
+app:
+  protocol: https
+  name: api.career-9.com
+  googleAPIJSON: classpath:google.json
+  fileTempFolder: classpath:temp
+  auth:
+    tokenSecret: "${APP_AUTH_TOKEN_SECRET:1PG4GePk3fxNKAAgI45mGa+YzrgVidfeau5o+Y5T+IUzyr/Ab3+O2C/QaG7s+XujsJdPlBgqsBc4tEKLenVI1A==}"
+    tokenExpirationMsec: 864000000
+    accessTokenExpirationMsec: 3600000      # 60 min (Phase 18 short-lived access JWT)
+    refreshTokenExpirationMsec: 604800000   # 7 days (Phase 18 opaque refresh token)
+    assessmentTokenExpirationMsec: 14400000 # 4h — Phase 19 assessment-scoped JWT TTL (cn_at_asmnt)
+  # SuperAdminBootstrapper reads these on every boot.
+  #   - If superAdminEmail resolves to an existing user → ensure is_super_admin=true.
+  #   - If not → create a local-provider user with the password BCrypt-hashed.
+  # Leave superAdminEmail blank/null to disable bootstrap once production admins
+  # are established. CHANGE THESE BEFORE PRODUCTION.
+  bootstrap:
+    superAdminEmail: admin@career-9.local
+    superAdminPassword: ChangeMeOnFirstLogin!2026
+    superAdminName: System Administrator
+  cookie:
+    secure: true
+    same-site: Strict
+    access-max-age-seconds: 864000
+  cors:
+    allowedOrigins: https://career-9.com,https://www.career-9.com,https://dashboard.career-9.com,https://assessment.career-9.com,https://*.career-9.com
+  oauth2:
+    # After successfully authenticating with the OAuth2 Provider,
+    # we'll be generating an auth token for the user and sending the token to the
+    # redirectUri mentioned by the client in the /oauth2/authorize request.
+    # We're not using cookies because they won't work well in mobile clients.
+    authorizedRedirectUris:
+      - https://dashboard.career-9.com/oauth2/redirect
+      - https://career-9.com/oauth2/redirect
+      - https://www.career-9.com/oauth2/redirect
+      - https://assessment.career-9.com/oauth2/redirect
+      - https://student.kccitm.in/oauth2/redirect
+      - https://staging.student.kccitm.in/oauth2/redirect
+      - http://localhost:3000/oauth2/redirect
+      - myandroidapp://oauth2/redirect
+      - http://localhost/oauth2/redirect
+      - http://localhost:80/oauth2/redirect
+      - myiosapp://oauth2/redirect
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+  mandrill: ${APP_MANDRILL:}
+  odoo:
+    url: ${ODOO_URL:}
+    database: ${ODOO_DATABASE:}
+    username: ${ODOO_USERNAME:}
+    api-key: ${ODOO_API_KEY:}
+  gmail:
+    sender-email: ${GMAIL_SENDER:notifications@career-9.net}
+  razorpay:
+    key-id: ${RAZORPAY_KEY_ID:}
+    key-secret: ${RAZORPAY_KEY_SECRET:}
+    webhook-secret: ${RAZORPAY_WEBHOOK_SECRET}
+    callback-base-url: https://assessment.career-9.com
+  b2c:
+    frontendBaseUrl: https://dashboard.career-9.com
+    assessmentBaseUrl: https://assessment.career-9.com
+  # Phase 20-01: in-process rate limit (Bucket4j). Production runs behind
+  # DigitalOcean's reverse proxy which sets X-Forwarded-For and strips any
+  # incoming XFF from untrusted clients — safe to trust here.
+  rate-limit:
+    enabled: true
+    ip-per-minute: 10
+    user-per-minute: 50
+    window-seconds: 60
+    trust-xff: true   # behind DigitalOcean reverse proxy
+
+# Phase 15 RBAC + ABAC enforcement mode (see root document for semantics).
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# REQUIRES USER ACTION BEFORE PRODUCTION ENFORCE (Phase 17-04, 2026-05-12)
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# Production INTENTIONALLY remains `log-only` per user-directed safety hold.
+# Sandbox + staging are flipped to `enforce` to soak the new enforce semantics.
+# Operator must:
+#   1. Review `auth_audit` DENY rows from staging + production for 1-2 days.
+#   2. Confirm ZERO false-positive DENYs against legitimate admin users.
+#   3. Manually edit the line below: `log-only` -> `enforce`.
+#   4. Redeploy production with the change.
+# Until that manual step, production behaves as Phase 15 log-only:
+# DENYs are recorded but allows() returns true (no 403). See 17-04-SUMMARY.md.
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+auth:
+  enforce-mode: log-only
+
+---
+spring:
+  config:
+    activate:
+      on-profile: sandbox
+  datasource:
+    url: jdbc:mysql://mysql_db_staging:3306/career-9-staging?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    username: root
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  jpa:
+    show-sql: false
+    hibernate:
+      naming-strategy: org.hibernate.cfg.EJB3NamingStrategy
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+        default_batch_fetch_size: 30
+        jdbc:
+          batch_size: 30
+        order_inserts: true
+        order_updates: true
+  cache:
+    type: redis
+    cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
+    redis:
+      time-to-live: 86400000
+      key-prefix: "career9-staging:"
+      use-key-prefix: true
+  redis:
+    host: redis_staging
+    port: 6379
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 30
+        max-idle: 10
+        min-idle: 2
+        max-wait: 5000ms
+      shutdown-timeout: 200ms
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${SMTP_USERNAME:notifications@career-9.net}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            clientId: 101961828065-ak601ssij07ugrffovuns8v2adrqvtqd.apps.googleusercontent.com
+            clientSecret: ${GOOGLE_CLIENT_SECRET}
+            redirectUri: "https://api-staging.career-9.com/oauth2/callback/{registrationId}"
+            scope:
+              - email
+              - profile
+              - https://www.googleapis.com/auth/admin.directory.user
+              - https://www.googleapis.com/auth/admin.directory.group
+              - https://www.googleapis.com/auth/admin.directory.orgunit
+          facebook:
+            clientId: 121189305185277
+            clientSecret: ${FACEBOOK_CLIENT_SECRET}
+            redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+            scope:
+              - email
+              - public_profile
+          github:
+            clientId: d3e47fc2ddd966fa4352
+            clientSecret: ${GITHUB_CLIENT_SECRET}
+            redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+            scope:
+              - user:email
+              - read:user
+        provider:
+          facebook:
+            authorizationUri: https://www.facebook.com/v3.0/dialog/oauth
+            tokenUri: https://graph.facebook.com/v3.0/oauth/access_token
+            userInfoUri: https://graph.facebook.com/v3.0/me?fields=id,first_name,middle_name,last_name,name,email,verified,is_verified,picture.width(250).height(250)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,caches
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  health:
+    redis:
+      enabled: true
+server:
+  # See dev profile note (line 23) — 64 KB header buffer to absorb stacked
+  # auth cookies + CSP/CORS on production-sized JWTs.
+  max-http-header-size: 65536
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 30
+    accept-count: 100
+    connection-timeout: 60000
+app:
+  protocol: https
+  name: api-staging.career-9.com
+  googleAPIJSON: classpath:google.json
+  fileTempFolder: classpath:temp
+  auth:
+    tokenSecret: "${APP_AUTH_TOKEN_SECRET:1PG4GePk3fxNKAAgI45mGa+YzrgVidfeau5o+Y5T+IUzyr/Ab3+O2C/QaG7s+XujsJdPlBgqsBc4tEKLenVI1A==}"
+    tokenExpirationMsec: 864000000
+    accessTokenExpirationMsec: 3600000      # 60 min (Phase 18 short-lived access JWT)
+    refreshTokenExpirationMsec: 604800000   # 7 days (Phase 18 opaque refresh token)
+    assessmentTokenExpirationMsec: 14400000 # 4h — Phase 19 assessment-scoped JWT TTL (cn_at_asmnt)
+  # SuperAdminBootstrapper reads these on every boot.
+  #   - If superAdminEmail resolves to an existing user → ensure is_super_admin=true.
+  #   - If not → create a local-provider user with the password BCrypt-hashed.
+  # Leave superAdminEmail blank/null to disable bootstrap once production admins
+  # are established. CHANGE THESE BEFORE PRODUCTION.
+  bootstrap:
+    superAdminEmail: admin@career-9.local
+    superAdminPassword: ChangeMeOnFirstLogin!2026
+    superAdminName: System Administrator
+  cookie:
+    secure: true
+    same-site: Strict
+    access-max-age-seconds: 864000
+  cors:
+    allowedOrigins: https://career-9.com,https://www.career-9.com,https://dashboard.career-9.com,https://assessment.career-9.com,https://*.career-9.com,http://localhost:5173,http://localhost:3000
+  oauth2:
+    authorizedRedirectUris:
+      - https://dashboard.career-9.com/oauth2/redirect
+      - https://career-9.com/oauth2/redirect
+      - https://www.career-9.com/oauth2/redirect
+      - https://assessment.career-9.com/oauth2/redirect
+      - https://student.kccitm.in/oauth2/redirect
+      - https://staging.student.kccitm.in/oauth2/redirect
+      - http://localhost:3000/oauth2/redirect
+      - myandroidapp://oauth2/redirect
+      - myiosapp://oauth2/redirect
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+  mandrill: ${APP_MANDRILL:}
+  odoo:
+    url: ${ODOO_URL:}
+    database: ${ODOO_DATABASE:}
+    username: ${ODOO_USERNAME:}
+    api-key: ${ODOO_API_KEY:}
+  gmail:
+    sender-email: ${GMAIL_SENDER:notifications@career-9.net}
+  digitalocean:
+    spaces:
+      bucket: storage-c9
+      region: sgp1
+      cdn-url: https://storage-c9.sgp1.digitaloceanspaces.com
+      access-key: ${DO_SPACES_ACCESS_KEY:}
+      secret-key: ${DO_SPACES_SECRET_KEY:}
+      endpoint: https://sgp1.digitaloceanspaces.com
+  razorpay:
+    key-id: ${RAZORPAY_KEY_ID:}
+    key-secret: ${RAZORPAY_KEY_SECRET:}
+    webhook-secret: ${RAZORPAY_WEBHOOK_SECRET}
+    callback-base-url: https://staging-assessment.career-9.com
+  b2c:
+    frontendBaseUrl: https://staging-dashboard.career-9.com
+    assessmentBaseUrl: https://staging-assessment.career-9.com
+  # Phase 20-01: in-process rate limit (Bucket4j). Sandbox is a pre-prod soak
+  # environment; per Phase 20 plan the upstream-proxy assumption is NOT yet
+  # confirmed for this profile, so XFF stays fail-safe false. Flip to true
+  # once the deployment is verified to be behind a trusted reverse proxy.
+  rate-limit:
+    enabled: true
+    ip-per-minute: 10
+    user-per-minute: 50
+    window-seconds: 60
+    trust-xff: false
+
+# Phase 15 RBAC + ABAC enforcement mode (see root document for semantics).
+# Phase 17-04 (2026-05-12): sandbox flipped to `enforce` for pre-prod soak.
+auth:
+  enforce-mode: enforce
+
+---
+spring:
+
+  config:
+    activate:
+      on-profile: staging
+  datasource:
+    url: jdbc:mysql://easylearning.guru:3310/kcc_student?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&&allowPublicKeyRetrieval=true
+    username: root
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    # password: Google.com1
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 20
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  jpa:
+    show-sql: false
+    hibernate:
+      naming-strategy: org.hibernate.cfg.EJB3NamingStrategy
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL5InnoDBDialect
+        default_batch_fetch_size: 30
+        jdbc:
+          batch_size: 30
+        order_inserts: true
+        order_updates: true
+  cache:
+    type: redis
+    cache-names: assessmentQuestions,assessmentDetails,measuredQualityTypes,questionnaireQuestions
+    redis:
+      time-to-live: 86400000
+      key-prefix: "career9:"
+      use-key-prefix: true
+  redis:
+    host: redis_cache
+    port: 6379
+    timeout: 2000ms
+    lettuce:
+      pool:
+        max-active: 50
+        max-idle: 20
+        min-idle: 5
+        max-wait: 5000ms
+      shutdown-timeout: 200ms
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${SMTP_USERNAME}
+    password: ${SMTP_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            clientId: 701038408648-gnmlifdksik4mqu2as5vpgpe64l8m55b.apps.googleusercontent.com
+            clientSecret: ${GOOGLE_CLIENT_SECRET}
+            # redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+            redirectUri: "https://api.kccitm.in/oauth2/callback/{registrationId}"
+
+            scope:
+              - email
+              - profile
+              - https://www.googleapis.com/auth/admin.directory.user
+              - https://www.googleapis.com/auth/admin.directory.group
+              - https://www.googleapis.com/auth/admin.directory.orgunit
+          facebook:
+            clientId: 121189305185277
+            clientSecret: ${FACEBOOK_CLIENT_SECRET}
+            redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+            scope:
+              - email
+              - public_profile
+          github:
+            clientId: d3e47fc2ddd966fa4352
+            clientSecret: ${GITHUB_CLIENT_SECRET}
+            redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+            scope:
+              - user:email
+              - read:user
+        provider:
+          facebook:
+            authorizationUri: https://www.facebook.com/v3.0/dialog/oauth
+            tokenUri: https://graph.facebook.com/v3.0/oauth/access_token
+            userInfoUri: https://graph.facebook.com/v3.0/me?fields=id,first_name,middle_name,last_name,name,email,verified,is_verified,picture.width(250).height(250)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,caches
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+  health:
+    redis:
+      enabled: true
+app:
+  protocol: http
+  name: student.kccitm.in
+  googleAPIJSON: classpath:google.json
+  fileTempFolder: classpath:temp
+  auth:
+    tokenSecret: "${APP_AUTH_TOKEN_SECRET:1PG4GePk3fxNKAAgI45mGa+YzrgVidfeau5o+Y5T+IUzyr/Ab3+O2C/QaG7s+XujsJdPlBgqsBc4tEKLenVI1A==}"
+    tokenExpirationMsec: 864000000
+    accessTokenExpirationMsec: 3600000      # 60 min (Phase 18 short-lived access JWT)
+    refreshTokenExpirationMsec: 604800000   # 7 days (Phase 18 opaque refresh token)
+    assessmentTokenExpirationMsec: 14400000 # 4h — Phase 19 assessment-scoped JWT TTL (cn_at_asmnt)
+  # SuperAdminBootstrapper reads these on every boot.
+  #   - If superAdminEmail resolves to an existing user → ensure is_super_admin=true.
+  #   - If not → create a local-provider user with the password BCrypt-hashed.
+  # Leave superAdminEmail blank/null to disable bootstrap once production admins
+  # are established. CHANGE THESE BEFORE PRODUCTION.
+  bootstrap:
+    superAdminEmail: admin@career-9.local
+    superAdminPassword: ChangeMeOnFirstLogin!2026
+    superAdminName: System Administrator
+  cookie:
+    secure: true
+    same-site: Strict
+    access-max-age-seconds: 864000
+  cors:
+    allowedOrigins: https://career-9.com,https://www.career-9.com,https://*.career-9.com,https://dashboard.career-9.com,https://assessment.career-9.com,http://localhost:3000,http://localhost:3001,http://localhost:8080,http://localhost,http://localhost:80,https://staging.student.kccitm.in,https://student.kccitm.in
+  oauth2:
+    # After successfully authenticating with the OAuth2 Provider,
+    # we'll be generating an auth token for the user and sending the token to the
+    # redirectUri mentioned by the client in the /oauth2/authorize request.
+    # We're not using cookies because they won't work well in mobile clients.
+    authorizedRedirectUris:
+      - https://student.kccitm.in/oauth2/redirect
+      - https://staging.student.kccitm.in/oauth2/redirect
+      - https://student.kccitm.in/oauth2/redirect
+      - http://localhost:3000/oauth2/redirect
+      - myandroidapp://oauth2/redirect
+      - http://localhost/oauth2/redirect
+      - http://localhost:80/oauth2/redirect
+      - myiosapp://oauth2/redirect
+  mandrill: ${APP_MANDRILL:}
+  odoo:
+    url: ${ODOO_URL:}
+    database: ${ODOO_DATABASE:}
+    username: ${ODOO_USERNAME:}
+    api-key: ${ODOO_API_KEY:}
+
+  gmail:
+    sender-email: ${GMAIL_SENDER:notifications@career-9.net}
+  digitalocean:
+    spaces:
+      bucket: storage-c9
+      region: sgp1
+      cdn-url: https://storage-c9.sgp1.digitaloceanspaces.com
+      access-key: ${DO_SPACES_ACCESS_KEY:}
+      secret-key: ${DO_SPACES_SECRET_KEY:}
+      endpoint: https://sgp1.digitaloceanspaces.com
+  razorpay:
+    webhook-secret: ${RAZORPAY_WEBHOOK_SECRET}
+  # Phase 20-01: in-process rate limit (Bucket4j). Staging runs behind
+  # DigitalOcean's reverse proxy which sets X-Forwarded-For and strips any
+  # incoming XFF from untrusted clients — safe to trust here.
+  rate-limit:
+    enabled: true
+    ip-per-minute: 10
+    user-per-minute: 50
+    window-seconds: 60
+    trust-xff: true   # behind DigitalOcean reverse proxy
+
+# Phase 15 RBAC + ABAC enforcement mode (see root document for semantics).
+# Phase 17-04 (2026-05-12): staging flipped to `enforce` for pre-prod soak.
+# After 1-2 days of clean auth_audit DENY review, operator may flip production
+# (currently still `log-only` per user-directed safety hold).
+auth:
+  enforce-mode: enforce
+
+---

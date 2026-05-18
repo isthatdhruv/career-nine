@@ -71,7 +71,14 @@ export interface AdminDashboardSnapshot {
   assessments: any[];
   reports: any[];
   studentMappings: any[];
+  /** ISO timestamp of when the payload was originally computed. Drives the
+   *  "updated X ago" pill in the dashboard header. When the payload comes
+   *  from Redis, this is the time of the original DB compute (not the cache
+   *  read), so the staleness label is accurate. */
   computedAt?: string;
+  /** True when the backend served this payload from Redis; false when it
+   *  was just computed fresh. Useful for the staleness pill and for debug. */
+  cacheHit?: boolean;
 }
 
 const emptySnapshot = (): AdminDashboardSnapshot => ({
@@ -92,6 +99,7 @@ const normalizeSnapshot = (data: any): AdminDashboardSnapshot => {
     reports: safeList(data.reports),
     studentMappings: safeList(data.studentMappings),
     computedAt: typeof data.computedAt === "string" ? data.computedAt : undefined,
+    cacheHit: typeof data.cacheHit === "boolean" ? data.cacheHit : undefined,
   };
 };
 

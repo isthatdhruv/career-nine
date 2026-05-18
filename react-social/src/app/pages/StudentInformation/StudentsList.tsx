@@ -7,6 +7,7 @@ import ResetAssessmentModal from "./ResetAssessmentModal";
 import CreateStudentModal from "./CreateStudentModal";
 import StudentInstitutesModal from "./StudentInstitutesModal";
 import { ActionIcon } from "../../components/ActionIcon";
+import { useAssessmentsForInstitute } from "../../hooks/useScopedAssessments";
 
 export type Student = {
   id: number;
@@ -20,7 +21,14 @@ export type Student = {
 
 export default function StudentsList() {
   const [students, setStudents] = useState<Student[]>([]);
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
+  // The page is scoped to a single institute via localStorage; narrow the
+  // assessment list to those mapped to that institute.
+  const lsInstituteId = (() => {
+    const v = localStorage.getItem("instituteId");
+    return v ? Number(v) : ("" as const);
+  })();
+  const { assessments } = useAssessmentsForInstitute(lsInstituteId, allAssessments);
   const [studentsLoading, setStudentsLoading] = useState(true);
   const [assessmentsLoading, setAssessmentsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -81,7 +89,7 @@ export default function StudentsList() {
     getAllAssessments()
       .then(response => {
         const activeOnly = (response.data || []).filter((a: any) => a.isActive !== false);
-        setAssessments(activeOnly);
+        setAllAssessments(activeOnly);
       })
       .catch(error => {
         console.error("Error fetching assessments:", error);

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toAbsoluteUrl } from '../../../../_metronic/helpers'
+import { useAuth } from '../../../modules/auth/core/Auth'
 import PendingRatingPrompt from '../../Counselling/student/components/PendingRatingPrompt'
 import { fetchNavigator360Scores } from '../../ReportsHub/navigator360/Navigator360API'
 import { computeNavigator360 } from '../../ReportsHub/navigator360/Navigator360Engine'
@@ -22,6 +23,7 @@ const LIBRARY_URL = 'https://library.career-9.com/'
 
 const StudentPortalDashboard: React.FC = () => {
   const navigate = useNavigate()
+  const { currentUser } = useAuth()
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<any>(null)
   const [report, setReport] = useState<Navigator360Result | null>(null)
@@ -30,22 +32,25 @@ const StudentPortalDashboard: React.FC = () => {
   const [hasCompletedAssessment, setHasCompletedAssessment] = useState<boolean>(false)
 
   useEffect(() => {
-    const isLoggedIn = localStorage.getItem('studentPortalLoggedIn')
-    if (!isLoggedIn) {
+    // Phase 19 (19-02): auth gating moved to StudentRoutes' StudentAuthGuard which
+    // reads useAuth().currentUser. If we got here, the guard already verified an
+    // authenticated student session.
+    if (!currentUser) {
       navigate('/student/login')
       return
     }
 
     try {
-      const profileStr = localStorage.getItem('studentPortalProfile')
+      // studentPortalDashboard is dashboard-data cache (NOT auth state) — out of
+      // scope for 19-02; tracked in SUMMARY for a future server-fetch migration.
       const dashStr = localStorage.getItem('studentPortalDashboard')
 
-      if (!profileStr || !dashStr) {
+      if (!dashStr) {
         navigate('/student/login')
         return
       }
 
-      const profileData = JSON.parse(profileStr)
+      const profileData = currentUser as any
       const rawData: DashboardApiResponse = JSON.parse(dashStr)
       setProfile(profileData)
 
@@ -80,7 +85,7 @@ const StudentPortalDashboard: React.FC = () => {
     } catch {
       navigate('/student/login')
     }
-  }, [navigate])
+  }, [navigate, currentUser])
 
   if (loading) {
     return (

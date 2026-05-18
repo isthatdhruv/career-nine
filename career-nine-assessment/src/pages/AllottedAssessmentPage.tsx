@@ -20,7 +20,7 @@ export default function AllottedAssessmentPage() {
   const [showOngoingModal, setShowOngoingModal] = useState(false);
   const [showMobileWarning, setShowMobileWarning] = useState(false);
   const navigate = useNavigate();
-  const { fetchAssessmentData } = useAssessment();
+  const { fetchAssessmentData, mintAssessmentSessionCookie } = useAssessment();
   usePreventReload();
 
   useEffect(() => {
@@ -54,6 +54,16 @@ export default function AllottedAssessmentPage() {
 
     try {
       localStorage.setItem('assessmentId', String(assessment.assessmentId));
+
+      // Phase 19 — mint the cn_at_asmnt HttpOnly cookie now that both
+      // (userStudentId, assessmentId) are known. No-op when the build flag
+      // VITE_ASSESSMENT_COOKIE_AUTH is off (production default). On 404
+      // (per-institute flag off), the SPA transparently falls back to the
+      // v2.0 X-Assessment-Session header path for this student.
+      await mintAssessmentSessionCookie(
+        Number(userStudentId),
+        Number(assessment.assessmentId),
+      );
 
       // Load assessment config (uses static cache → API, same call that would happen anyway)
       await fetchAssessmentData(String(assessment.assessmentId));

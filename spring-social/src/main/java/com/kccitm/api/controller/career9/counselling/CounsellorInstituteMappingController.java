@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -41,6 +42,8 @@ public class CounsellorInstituteMappingController {
      * POST /api/counsellor-institute/allocate
      * Body: { counsellorId, instituteCode, assignedBy, notes? }
      */
+    // no scope arg: body is raw Map; admin counsellor-to-institute allocation
+    @PreAuthorize("@auth.allows('counsellor_institute_mapping.create')")
     @PostMapping("/allocate")
     public ResponseEntity<?> allocate(@RequestBody Map<String, Object> body) {
         Long counsellorId = ((Number) body.get("counsellorId")).longValue();
@@ -59,6 +62,8 @@ public class CounsellorInstituteMappingController {
     /**
      * DELETE /api/counsellor-institute/deallocate/{id}
      */
+    // no scope arg: deallocate by id; admin-only
+    @PreAuthorize("@auth.allows('counsellor_institute_mapping.delete')")
     @DeleteMapping("/deallocate/{id}")
     public ResponseEntity<?> deallocate(@PathVariable Long id) {
         try {
@@ -72,6 +77,8 @@ public class CounsellorInstituteMappingController {
     /**
      * GET /api/counsellor-institute/getAll
      */
+    // no scope arg: admin cross-institute list
+    @PreAuthorize("@auth.allows('counsellor_institute_mapping.read')")
     @GetMapping("/getAll")
     public ResponseEntity<List<CounsellorInstituteMapping>> getAll() {
         return ResponseEntity.ok(mappingService.getAll());
@@ -80,6 +87,7 @@ public class CounsellorInstituteMappingController {
     /**
      * GET /api/counsellor-institute/by-institute/{instituteCode}
      */
+    @PreAuthorize("@auth.allows('counsellor_institute_mapping.read', #instituteCode, null, null, null)")
     @GetMapping("/by-institute/{instituteCode}")
     public ResponseEntity<List<CounsellorInstituteMapping>> getByInstitute(@PathVariable Integer instituteCode) {
         return ResponseEntity.ok(mappingService.getCounsellorsForInstitute(instituteCode));
@@ -88,6 +96,8 @@ public class CounsellorInstituteMappingController {
     /**
      * GET /api/counsellor-institute/by-counsellor/{counsellorId}
      */
+    // no scope arg: identifies by counsellorId
+    @PreAuthorize("@auth.allows('counsellor_institute_mapping.read')")
     @GetMapping("/by-counsellor/{counsellorId}")
     public ResponseEntity<List<CounsellorInstituteMapping>> getByCounsellor(@PathVariable Long counsellorId) {
         return ResponseEntity.ok(mappingService.getInstitutesForCounsellor(counsellorId));

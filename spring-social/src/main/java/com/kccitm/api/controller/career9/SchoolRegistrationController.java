@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -79,6 +80,8 @@ public class SchoolRegistrationController {
 
     // ============ ADMIN ENDPOINTS ============
 
+    // no scope arg: body is raw Map; admin-only config
+    @PreAuthorize("@auth.allows('school_registration.create')")
     @PostMapping("/config/create")
     public ResponseEntity<?> createConfig(@RequestBody Map<String, Object> data) {
         Integer instituteCode = (Integer) data.get("instituteCode");
@@ -110,6 +113,8 @@ public class SchoolRegistrationController {
         return ResponseEntity.ok(config);
     }
 
+    // no scope arg: body is raw Map; bulk admin-only config
+    @PreAuthorize("@auth.allows('school_registration.create')")
     @PostMapping("/config/batch-save")
     public ResponseEntity<?> batchSaveConfigs(@RequestBody Map<String, Object> data) {
         Integer instituteCode = (Integer) data.get("instituteCode");
@@ -145,11 +150,14 @@ public class SchoolRegistrationController {
         return ResponseEntity.ok(saved);
     }
 
+    @PreAuthorize("@auth.allows('school_registration.read', #instituteCode, #sessionId, null, null)")
     @GetMapping("/config/by-institute/{instituteCode}/{sessionId}")
     public ResponseEntity<?> getConfigs(@PathVariable Integer instituteCode, @PathVariable Integer sessionId) {
         return ResponseEntity.ok(configRepository.findByInstituteCodeAndSessionIdOrderByClassIdAsc(instituteCode, sessionId));
     }
 
+    // no scope arg: update by configId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('school_registration.update')")
     @PutMapping("/config/update/{configId}")
     public ResponseEntity<?> updateConfig(@PathVariable Long configId, @RequestBody Map<String, Object> data) {
         Optional<SchoolAssessmentConfig> opt = configRepository.findById(configId);
@@ -164,6 +172,8 @@ public class SchoolRegistrationController {
         return ResponseEntity.ok(config);
     }
 
+    // no scope arg: delete by configId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('school_registration.delete')")
     @DeleteMapping("/config/delete/{configId}")
     public ResponseEntity<?> deleteConfig(@PathVariable Long configId) {
         if (!configRepository.existsById(configId)) return ResponseEntity.notFound().build();
@@ -171,6 +181,8 @@ public class SchoolRegistrationController {
         return ResponseEntity.ok("Deleted");
     }
 
+    // no scope arg: body is raw Map; admin-only link generation
+    @PreAuthorize("@auth.allows('school_registration.create')")
     @PostMapping("/link/generate")
     public ResponseEntity<?> generateLink(@RequestBody Map<String, Object> data) {
         Integer instituteCode = (Integer) data.get("instituteCode");
@@ -195,12 +207,15 @@ public class SchoolRegistrationController {
         return ResponseEntity.ok(link);
     }
 
+    @PreAuthorize("@auth.allows('school_registration.read', #instituteCode, #sessionId, null, null)")
     @GetMapping("/link/by-institute/{instituteCode}/{sessionId}")
     public ResponseEntity<?> getLink(@PathVariable Integer instituteCode, @PathVariable Integer sessionId) {
         Optional<SchoolRegistrationLink> link = linkRepository.findByInstituteCodeAndSessionId(instituteCode, sessionId);
         return link.map(ResponseEntity::ok).orElse(ResponseEntity.ok().build());
     }
 
+    // no scope arg: update by linkId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('school_registration.update')")
     @PutMapping("/link/toggle/{linkId}")
     public ResponseEntity<?> toggleLink(@PathVariable Long linkId) {
         Optional<SchoolRegistrationLink> opt = linkRepository.findById(linkId);
@@ -212,6 +227,8 @@ public class SchoolRegistrationController {
         return ResponseEntity.ok(link);
     }
 
+    // no scope arg: update by linkId; scope-filter narrows access
+    @PreAuthorize("@auth.allows('school_registration.update')")
     @PutMapping("/link/{linkId}/max-registrations")
     public ResponseEntity<?> updateMaxRegistrations(@PathVariable Long linkId, @RequestBody Map<String, Object> data) {
         Optional<SchoolRegistrationLink> opt = linkRepository.findById(linkId);
@@ -232,6 +249,8 @@ public class SchoolRegistrationController {
 
     // ============ PUBLIC ENDPOINTS ============
 
+    // PUBLIC?: flagged for 15-06 exclusions review — pre-auth public registration info by token
+    @PreAuthorize("@auth.allows('school_registration.read')")
     @GetMapping("/public/info/{token}")
     public ResponseEntity<?> getSchoolInfo(@PathVariable String token) {
         Optional<SchoolRegistrationLink> linkOpt = linkRepository.findByTokenAndIsActive(token, true);
@@ -299,6 +318,8 @@ public class SchoolRegistrationController {
         return ResponseEntity.ok(info);
     }
 
+    // PUBLIC?: flagged for 15-06 exclusions review — pre-auth public verify-details by token
+    @PreAuthorize("@auth.allows('school_registration.read')")
     @PostMapping("/public/verify-details/{token}")
     public ResponseEntity<?> verifyDetails(@PathVariable String token,
             @RequestBody Map<String, Object> body) {
@@ -397,6 +418,8 @@ public class SchoolRegistrationController {
         response.put("dob", dobStr);
     }
 
+    // PUBLIC?: flagged for 15-06 exclusions review — pre-auth public student registration by token
+    @PreAuthorize("@auth.allows('school_registration.create')")
     @PostMapping("/public/register/{token}")
     @Transactional
     public ResponseEntity<?> registerStudent(@PathVariable String token,
