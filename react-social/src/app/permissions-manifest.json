@@ -9,7 +9,7 @@
     "/question-sections",
     "/tools"
   ],
-  "assessment.write": [
+  "assessment.create": [
     "/admin-assessment-edit/:assessmentId/:studentId",
     "/assessment-mapping",
     "/assessment-questions/create",
@@ -41,15 +41,15 @@
     "/tools/create",
     "/tools/edit/:id"
   ],
-  "audit.read": [
+  "permission.grant": [
     "/activity-log",
     "/communication-logs"
   ],
-  "b2c.read": [
+  "campaign.read": [
     "/b2c/campaigns",
     "/b2c/tracker"
   ],
-  "b2c.write": [
+  "campaign.write": [
     "/b2c/campaigns/create",
     "/b2c/campaigns/edit/:id",
     "/b2c/pricing-tiers"
@@ -64,7 +64,7 @@
   "counselling.read": [
     "/counsellor/dashboard"
   ],
-  "counselling.write": [
+  "user.write": [
     "/admin/counselling-notifications",
     "/admin/counselling-slots",
     "/admin/counselling-students",
@@ -94,13 +94,13 @@
     "/college/create",
     "/contact-person/create"
   ],
-  "lead.read": [
+  "user.read": [
     "/leads"
   ],
-  "payment.read": [
+  "payment.refund": [
     "/payment-tracking"
   ],
-  "payment.write": [
+  "payment.refund": [
     "/promo-codes"
   ],
   "report.export": [
@@ -113,12 +113,13 @@
     "/roles/role",
     "/unified-report-management"
   ],
-  "role.write": [
+  "role.assign": [
     "/user-management/roles/manage"
   ],
   "student.read": [
     "/live-tracking",
     "/login/reset-password/enter-email",
+    "/student-list",
     "/student/login",
     "/student/registration-details",
     "/student/university/result",

@@ -64,6 +64,7 @@ import com.kccitm.api.model.career9.AssessmentAdminAction;
 import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.exception.ServiceException;
 import com.kccitm.api.repository.UserRepository;
+import com.kccitm.api.service.LoginCredentialsEmailService;
 
 @RestController
 @RequestMapping("/student-info")
@@ -102,6 +103,8 @@ public class StudentInfoController {
     private com.kccitm.api.repository.Career9.DemographicFieldDefinitionRepository demographicFieldDefinitionRepository;
     @Autowired
     private com.kccitm.api.repository.Career9.StudentDemographicResponseRepository studentDemographicResponseRepository;
+    @Autowired
+    private LoginCredentialsEmailService loginCredentialsEmailService;
 
     // no scope arg: cross-institute list — scope-filter (Plan 15-06) narrows result set
     @PreAuthorize("@auth.allows('student_info.read.all')")
@@ -1321,6 +1324,119 @@ public class StudentInfoController {
         response.put("columns", columns);
         response.put("rows", rows);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Send login credentials (username = User.username, password = student DOB
+     * formatted dd-MM-yyyy) by email to one or more students.
+     *
+     * <p>Request body: {@code { "userStudentIds": [1, 2, 3] }}.
+     *
+     * <p>Returns a per-row outcome list plus aggregate counts so the frontend
+     * can show which students succeeded and which failed (missing email, no
+     * dob, no username, send error).
+     *
+     * <p>Authorization: {@code student_info.update} — sending credentials is a
+     * mutation of the student's outbox/state, not a read. Scope filter narrows
+     * access (Plan 15-06) so KVS-scoped users can only send for KVS students.
+     */
+    @PreAuthorize("@auth.allows('student_info.update')")
+    @PostMapping("/send-login-credentials")
+    public ResponseEntity<?> sendLoginCredentials(@RequestBody Map<String, Object> payload) {
+        @SuppressWarnings("unchecked")
+        List<Object> rawIds = (List<Object>) payload.get("userStudentIds");
+        if (rawIds == null || rawIds.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "userStudentIds is required"));
+        }
+
+        List<Long> userStudentIds = new ArrayList<>();
+        for (Object o : rawIds) {
+            if (o instanceof Number) userStudentIds.add(((Number) o).longValue());
+        }
+
+        List<Map<String, Object>> results = new ArrayList<>();
+        int sent = 0;
+        int failed = 0;
+
+        for (Long usid : userStudentIds) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("userStudentId", usid);
+
+            Optional<UserStudent> usOpt = userStudentRepository.findById(usid);
+            if (!usOpt.isPresent()) {
+                row.put("status", "failed");
+                row.put("reason", "UserStudent not found");
+                results.add(row); failed++;
+                continue;
+            }
+            UserStudent us = usOpt.get();
+            StudentInfo info = us.getStudentInfo();
+            if (info == null) {
+                row.put("status", "failed");
+                row.put("reason", "StudentInfo missing");
+                results.add(row); failed++;
+                continue;
+            }
+
+            String email = info.getEmail();
+            if (email == null || email.trim().isEmpty()) {
+                row.put("status", "failed");
+                row.put("reason", "No email on file");
+                results.add(row); failed++;
+                continue;
+            }
+
+            // Username lives on User (not StudentInfo). Walk via userId; tolerate
+            // students whose User row was never linked (legacy / B2C-only flows).
+            String username = null;
+            if (us.getUserId() != null) {
+                Optional<User> userOpt = userRepository.findById(us.getUserId());
+                if (userOpt.isPresent()) username = userOpt.get().getUsername();
+            }
+            if (username == null || username.trim().isEmpty()) {
+                row.put("status", "failed");
+                row.put("reason", "No username assigned");
+                results.add(row); failed++;
+                continue;
+            }
+
+            if (info.getStudentDob() == null) {
+                row.put("status", "failed");
+                row.put("reason", "No DOB on file (used as password)");
+                results.add(row); failed++;
+                continue;
+            }
+            String dob = new SimpleDateFormat("dd-MM-yyyy").format(info.getStudentDob());
+
+            // Hand off to the Odoo-backed templated email service. Note that
+            // OdooEmailService is @Async fire-and-forget — the actual SMTP
+            // dispatch happens later; eventual send success/failure shows up
+            // only in OdooEmailService logs. So per-row status here is
+            // "queued" once validation passes, not "sent". Anything thrown
+            // synchronously (validation guard or pre-queue error) is reported
+            // as "failed" with the reason.
+            try {
+                loginCredentialsEmailService.send(info.getName(), email, username, dob);
+                row.put("status", "queued");
+                row.put("email", email);
+                sent++;
+            } catch (Exception e) {
+                row.put("status", "failed");
+                row.put("reason", "Email queue failed: " + e.getMessage());
+                failed++;
+            }
+            results.add(row);
+        }
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("requested", userStudentIds.size());
+        // `sent` here means "queued for Odoo dispatch" — the FE label reads
+        // "Sent to N students" which matches user expectation even though the
+        // actual SMTP handshake happens asynchronously.
+        resp.put("sent", sent);
+        resp.put("failed", failed);
+        resp.put("results", results);
+        return ResponseEntity.ok(resp);
     }
 
     // no scope arg: body is raw id-pair list; scope-filter narrows access

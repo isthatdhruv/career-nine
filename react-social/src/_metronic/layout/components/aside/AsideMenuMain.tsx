@@ -34,57 +34,57 @@ export function AsideMenuMain() {
     can("institute.read") ||      // /college, /contact-person, /board
     can("student.read") ||         // /group-student, /school/group-student, /school/assigned-students
     can("student.write") ||        // /upload-excel
-    can("assessment.write") ||     // /assessment-mapping
+    can("assessment.create") ||     // /assessment-mapping
     can("institute.write");        // /contact-person/create (covered by parent in route, but kept here for completeness)
 
   // Questionnaire submenu — children: /questionare/create, /questionaire/List, /tools, /game-list.
   const showQuestionnaire =
     can("assessment.read") ||      // /questionaire/List, /tools, /game-list
-    can("assessment.write");       // /questionare/create
+    can("assessment.create");       // /questionare/create
 
   // Qualities submenu — children: /measured-qualities, /measured-quality-types.
   const showQualities =
     can("assessment.read") ||      // /measured-qualities, /measured-quality-types
-    can("assessment.write");
+    can("assessment.create");
 
   // Assessment Section submenu — children: /assessments, /assessment-questions,
   //   /question-sections, /demographic-fields, /text-response-mapping.
   const showAssessment =
     can("assessment.read") ||
-    can("assessment.write");
+    can("assessment.create");
 
   const showAssessmentManagement = showQuestionnaire || showQualities || showAssessment;
 
   // Data Upload & Tracking — children: /offline-assessment-upload, /omr-data-upload,
   //   /live-tracking, /communication-logs, /payment-tracking, /promo-codes.
   const showDataUpload =
-    can("assessment.write") ||     // /offline-assessment-upload, /omr-data-upload
+    can("assessment.create") ||     // /offline-assessment-upload, /omr-data-upload
     can("student.read") ||          // /live-tracking
-    can("audit.read") ||            // /communication-logs
-    can("payment.read") ||          // /payment-tracking
-    can("payment.write");           // /promo-codes
+    can("permission.grant") ||            // /communication-logs
+    can("payment.refund") ||          // /payment-tracking
+    can("payment.refund");           // /promo-codes
 
   // Reports section — children: /reports-hub.
   const showReports = can("report.read");
 
-  // Roles & Users — children: /user-management/roles/manage (role.write),
+  // Roles & Users — children: /user-management/roles/manage (role.assign),
   //   /user-management/users/manage (user.write).
   const showRoles =
-    can("role.write") ||
+    can("role.assign") ||
     can("user.write") ||
     can("user.read");
 
   // Standalone items.
-  const showActivityLog = can("audit.read");
-  const showLeads = can("lead.read");
+  const showActivityLog = can("permission.grant");
+  const showLeads = can("user.read");
   // TODO(product): confirm permission for /old-data-mapping (Firebase Data Mapping)
-  const showOldDataMapping = can("assessment.write");
+  const showOldDataMapping = can("assessment.create");
   // TODO(product): confirm permission for /score-debug (Score Debug tool)
-  const showScoreDebug = can("assessment.write");
+  const showScoreDebug = can("assessment.create");
 
   // Counselling submenu — children: /admin/counsellors, /admin/counselling-students,
   //   /admin/counselling-slots, /admin/counselling-notifications.
-  const showCounselling = can("counselling.write");
+  const showCounselling = can("user.write");
 
   // Student Portal section — only show for users who actually hold a student
   // role (matches the StudentRoutes guard at routing/StudentRoutes.tsx). An
@@ -97,7 +97,7 @@ export function AsideMenuMain() {
   );
 
   // B2C Portal — children: /b2c/campaigns, /b2c/pricing-tiers, /b2c/tracker.
-  const showB2C = can("b2c.read") || can("b2c.write");
+  const showB2C = can("campaign.read") || can("campaign.write");
 
   return (
     <>
@@ -148,6 +148,14 @@ export function AsideMenuMain() {
                 fontIcon="bi-app-indicator"
               />
             </Can>
+            <Can perm="student.read">
+              <AsideMenuItem
+                to="/student-list"
+                icon="/media/icons/duotune/general/gen044.svg"
+                title="Student List"
+                fontIcon="bi-app-indicator"
+              />
+            </Can>
             {showSchoolGroupStudent && (
               <Can perm="student.read">
                 <AsideMenuItem
@@ -184,7 +192,7 @@ export function AsideMenuMain() {
                 fontIcon="bi-app-indicator"
               />
             </Can>
-            <Can perm="assessment.write">
+            <Can perm="assessment.create">
               <AsideMenuItem
                 to="/assessment-mapping"
                 icon="/media/icons/duotune/general/gen001.svg"
@@ -214,7 +222,7 @@ export function AsideMenuMain() {
               fontIcon="bi-app-indicator"
               icon="/media/icons/duotune/communication/com006.svg"
             >
-              <Can perm="assessment.write">
+              <Can perm="assessment.create">
                 <AsideMenuItem
                   to="/questionare/create"
                   icon="/media/icons/duotune/general/gen044.svg"
@@ -316,7 +324,7 @@ export function AsideMenuMain() {
                   fontIcon="bi-app-indicator"
                 />
               </Can>
-              <Can perm="assessment.write">
+              <Can perm="assessment.create">
                 <AsideMenuItem
                   to="/text-response-mapping"
                   icon="/media/icons/duotune/general/gen005.svg"
@@ -345,7 +353,7 @@ export function AsideMenuMain() {
             fontIcon="bi-cloud-upload"
             icon="/media/icons/duotune/files/fil003.svg"
           >
-            <Can perm="assessment.write">
+            <Can perm="assessment.create">
               <AsideMenuItem
                 to="/offline-assessment-upload"
                 icon="/media/icons/duotune/general/gen044.svg"
@@ -353,7 +361,7 @@ export function AsideMenuMain() {
                 fontIcon="bi-cloud-upload"
               />
             </Can>
-            <Can perm="assessment.write">
+            <Can perm="assessment.create">
               <AsideMenuItem
                 to="/omr-data-upload"
                 icon="/media/icons/duotune/general/gen044.svg"
@@ -369,7 +377,7 @@ export function AsideMenuMain() {
                 fontIcon="bi-broadcast"
               />
             </Can>
-            <Can perm="audit.read">
+            <Can perm="permission.grant">
               <AsideMenuItem
                 to="/communication-logs"
                 icon="/media/icons/duotune/communication/com007.svg"
@@ -377,7 +385,7 @@ export function AsideMenuMain() {
                 fontIcon="bi-envelope-paper"
               />
             </Can>
-            <Can perm="payment.read">
+            <Can perm="payment.refund">
               <AsideMenuItem
                 to="/payment-tracking"
                 icon="/media/icons/duotune/finance/fin002.svg"
@@ -385,7 +393,7 @@ export function AsideMenuMain() {
                 fontIcon="bi-credit-card"
               />
             </Can>
-            <Can perm="payment.write">
+            <Can perm="payment.refund">
               <AsideMenuItem
                 to="/promo-codes"
                 icon="/media/icons/duotune/ecommerce/ecm001.svg"
@@ -412,7 +420,7 @@ export function AsideMenuMain() {
             fontIcon="bi-shop"
             icon="/media/icons/duotune/ecommerce/ecm001.svg"
           >
-            <Can perm="b2c.read">
+            <Can perm="campaign.read">
               <AsideMenuItem
                 to="/b2c/campaigns"
                 icon="/media/icons/duotune/ecommerce/ecm005.svg"
@@ -420,7 +428,7 @@ export function AsideMenuMain() {
                 fontIcon="bi-megaphone"
               />
             </Can>
-            <Can perm="b2c.write">
+            <Can perm="campaign.write">
               <AsideMenuItem
                 to="/b2c/pricing-tiers"
                 icon="/media/icons/duotune/finance/fin010.svg"
@@ -428,7 +436,7 @@ export function AsideMenuMain() {
                 fontIcon="bi-tag-fill"
               />
             </Can>
-            <Can perm="b2c.read">
+            <Can perm="campaign.read">
               <AsideMenuItem
                 to="/b2c/tracker"
                 icon="/media/icons/duotune/graphs/gra007.svg"
@@ -566,7 +574,7 @@ export function AsideMenuMain() {
             fontIcon="bi-shield-lock"
             icon="/media/icons/duotune/general/gen019.svg"
           >
-            <Can perm="role.write">
+            <Can perm="role.assign">
               <AsideMenuItem
                 to="/user-management/roles/manage"
                 title="Roles & Permissions"
@@ -594,7 +602,7 @@ export function AsideMenuMain() {
               </span>
             </div>
           </div>
-          <Can perm="audit.read">
+          <Can perm="permission.grant">
             <AsideMenuItem
               to="/activity-log"
               icon="/media/icons/duotune/general/gen019.svg"
@@ -605,7 +613,7 @@ export function AsideMenuMain() {
         </>
       )}
       {showLeads && (
-        <Can perm="lead.read">
+        <Can perm="user.read">
           <AsideMenuItem
             to="/leads"
             icon="/media/icons/duotune/communication/com005.svg"
@@ -624,8 +632,8 @@ export function AsideMenuMain() {
               </span>
             </div>
           </div>
-          {/* TODO(product): confirm permission for /old-data-mapping (Firebase Data Mapping) — defaulted to assessment.write. */}
-          <Can perm="assessment.write">
+          {/* TODO(product): confirm permission for /old-data-mapping (Firebase Data Mapping) — defaulted to assessment.create. */}
+          <Can perm="assessment.create">
             <AsideMenuItem
               to="/old-data-mapping"
               icon="/media/icons/duotune/general/gen022.svg"
@@ -645,8 +653,8 @@ export function AsideMenuMain() {
               </span>
             </div>
           </div>
-          {/* TODO(product): confirm permission for /score-debug — defaulted to assessment.write. */}
-          <Can perm="assessment.write">
+          {/* TODO(product): confirm permission for /score-debug — defaulted to assessment.create. */}
+          <Can perm="assessment.create">
             <AsideMenuItem
               to="/score-debug"
               icon="/media/icons/duotune/general/gen031.svg"
@@ -672,16 +680,16 @@ export function AsideMenuMain() {
             fontIcon="bi-app-indicator"
             icon="/media/icons/duotune/general/gen049.svg"
           >
-            <Can perm="counselling.write">
+            <Can perm="user.write">
               <AsideMenuItem to="/admin/counsellors" title="Manage Counsellors" hasBullet={true} />
             </Can>
-            <Can perm="counselling.write">
+            <Can perm="user.write">
               <AsideMenuItem to="/admin/counselling-students" title="Manage Students" hasBullet={true} />
             </Can>
-            <Can perm="counselling.write">
+            <Can perm="user.write">
               <AsideMenuItem to="/admin/counselling-slots" title="Create Slots" hasBullet={true} />
             </Can>
-            <Can perm="counselling.write">
+            <Can perm="user.write">
               <AsideMenuItem to="/admin/counselling-notifications" title="Notifications" hasBullet={true} />
             </Can>
           </AsideMenuItemWithSub>
