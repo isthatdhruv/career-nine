@@ -40,6 +40,7 @@ import com.kccitm.api.payload.LoginRequest;
 import com.kccitm.api.payload.MeResponse;
 import com.kccitm.api.payload.OAuthExchangeRequest;
 import com.kccitm.api.payload.SignUpRequest;
+import com.kccitm.api.repository.RoleUrlRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.security.AuthCookieService;
 import com.kccitm.api.security.CurrentScopes;
@@ -80,6 +81,9 @@ public class AuthController {
 
     @Autowired
     private JtiDenyListService jtiDenyListService;
+
+    @Autowired
+    private RoleUrlRepository roleUrlRepository;
 
     // @PreAuthorize-Exempt: login/signup are anonymous-by-design — auth entrypoint establishes auth context, cannot consume it
     // See ControllerPreAuthorizeCoverageTest.EXCLUSIONS (15-02 / 15-06)
@@ -276,6 +280,20 @@ public class AuthController {
         // UserPrincipal with a cached displayName at filter time.)
         String displayName = resolveDisplayName(principal);
 
+        // Per-user URL allow-list — distinct paths whitelisted by any of the
+        // user's roles via their role groups. Used by the FE RequirePermission
+        // guard for an intersection check against the permission gate.
+        // Super-admins get an empty list returned but bypass the URL check
+        // entirely on the FE (same convention as the permission bypass).
+        List<String> urls;
+        try {
+            urls = roleUrlRepository.findPathsForUser(principal.getId());
+        } catch (Exception e) {
+            // Defensive — if the role_url table is missing on a partial-deploy
+            // boot, fall back to empty rather than 500-ing the auth bootstrap.
+            urls = Collections.<String>emptyList();
+        }
+
         return ResponseEntity.ok(new MeResponse(
                 principal.getId(),
                 displayName,
@@ -283,6 +301,7 @@ public class AuthController {
                 roles,
                 permissions,
                 scopes,
+                urls,
                 principal.isSuperAdmin()
         ));
     }

@@ -1,7 +1,7 @@
 /* eslint-disable react/jsx-no-target-blank */
 import { useIntl } from "react-intl";
 import { useLocation } from "react-router-dom";
-import { useCan, Can } from "../../../../app/modules/auth";
+import { useCan, Can, useAuth } from "../../../../app/modules/auth";
 import { AsideMenuItem } from "./AsideMenuItem";
 import { AsideMenuItemWithSub } from "./AsideMenuItemWithSub";
 
@@ -9,6 +9,7 @@ export function AsideMenuMain() {
   const intl = useIntl();
   const { pathname, search } = useLocation();
   const can = useCan();
+  const { currentUser } = useAuth();
   // Path-context flags (routing state, not authorization — preserved from
   // the pre-permission-aware menu so the institute-dashboard nested links
   // still work):
@@ -85,11 +86,15 @@ export function AsideMenuMain() {
   //   /admin/counselling-slots, /admin/counselling-notifications.
   const showCounselling = can("counselling.write");
 
-  // Student Portal section — preserved as "every authenticated user can see"
-  // per the Phase-19 persona-deferral note in Plan 17-02. No can() gate.
-  // We keep the section visible to any authenticated user; individual links
-  // inside don't get <Can> wrappers either.
-  const showStudentPortal = true;
+  // Student Portal section — only show for users who actually hold a student
+  // role (matches the StudentRoutes guard at routing/StudentRoutes.tsx). An
+  // admin like dhruv.kccsw@gmail.com (mapped to KVS) shouldn't see student-
+  // facing menu entries on their console. Kept in source so re-enabling for a
+  // student user is just a role assignment, not a code restore.
+  const userRoles = currentUser?.roles ?? [];
+  const showStudentPortal = userRoles.some(
+    (r) => r === "STUDENT" || r === "B2C_STUDENT" || r === "ROLE_STUDENT" || r === "ROLE_B2C_STUDENT"
+  );
 
   // B2C Portal — children: /b2c/campaigns, /b2c/pricing-tiers, /b2c/tracker.
   const showB2C = can("b2c.read") || can("b2c.write");
@@ -175,7 +180,7 @@ export function AsideMenuMain() {
               <AsideMenuItem
                 to="/upload-excel"
                 icon="/media/icons/duotune/general/gen044.svg"
-                title="Add Students in Bulk"
+                title="Upload Students"
                 fontIcon="bi-app-indicator"
               />
             </Can>

@@ -16,6 +16,7 @@ import com.kccitm.api.exception.OAuth2AuthenticationProcessingException;
 import com.kccitm.api.model.AuthProvider;
 import com.kccitm.api.model.User;
 import com.kccitm.api.repository.UserRepository;
+import com.kccitm.api.security.CustomUserDetailsService;
 import com.kccitm.api.security.UserPrincipal;
 import com.kccitm.api.security.oauth2.user.OAuth2UserInfo;
 import com.kccitm.api.security.oauth2.user.OAuth2UserInfoFactory;
@@ -25,6 +26,9 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private CustomUserDetailsService customUserDetailsService;
 
     @Override
     public OAuth2User loadUser(OAuth2UserRequest oAuth2UserRequest) throws OAuth2AuthenticationException {
@@ -61,7 +65,13 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             user = updateExistingUser(user, oAuth2UserInfo, oAuth2UserRequest);
         }
 
-        return UserPrincipal.create(user, oAuth2User.getAttributes());
+        // Hydrate through the same path as email/password login so the OAuth-minted
+        // JWT carries permissions/scopes/superAdmin. Without this, Google/GitHub/Facebook
+        // logins yield a principal with empty perms and the user hits Permission Denied
+        // even after being assigned to role groups.
+        UserPrincipal hydrated = customUserDetailsService.hydrate(user);
+        hydrated.setAttributes(oAuth2User.getAttributes());
+        return hydrated;
     }
 
     private User registerNewUser(OAuth2UserRequest oAuth2UserRequest, OAuth2UserInfo oAuth2UserInfo) {

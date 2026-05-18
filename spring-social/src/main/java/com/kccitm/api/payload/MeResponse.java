@@ -26,19 +26,30 @@ public class MeResponse {
     private List<String> roles;
     private List<String> permissions;
     private List<Map<String, Object>> scopes;
+    /**
+     * React route paths whitelisted for this user, accumulated across every
+     * role they hold via any of their role groups. Used by the FE
+     * {@code RequirePermission} guard for an intersection check: a route is
+     * accessible iff its path matches at least one entry here AND the
+     * existing permission gate passes. Empty list = no routes whitelisted
+     * (deny-by-default for non-super-admin users until URLs are configured).
+     */
+    private List<String> urls;
     private boolean superAdmin;
 
     public MeResponse() {}
 
     public MeResponse(Long id, String name, String email,
                       List<String> roles, List<String> permissions,
-                      List<Map<String, Object>> scopes, boolean superAdmin) {
+                      List<Map<String, Object>> scopes,
+                      List<String> urls, boolean superAdmin) {
         this.id = id;
         this.name = name;
         this.email = email;
         this.roles = roles != null ? roles : Collections.<String>emptyList();
         this.permissions = permissions != null ? permissions : Collections.<String>emptyList();
         this.scopes = scopes != null ? scopes : Collections.<Map<String, Object>>emptyList();
+        this.urls = urls != null ? urls : Collections.<String>emptyList();
         this.superAdmin = superAdmin;
     }
 
@@ -54,6 +65,8 @@ public class MeResponse {
     public void setPermissions(List<String> permissions) { this.permissions = permissions; }
     public List<Map<String, Object>> getScopes() { return scopes; }
     public void setScopes(List<Map<String, Object>> scopes) { this.scopes = scopes; }
+    public List<String> getUrls() { return urls; }
+    public void setUrls(List<String> urls) { this.urls = urls; }
     public boolean isSuperAdmin() { return superAdmin; }
     public void setSuperAdmin(boolean superAdmin) { this.superAdmin = superAdmin; }
 }

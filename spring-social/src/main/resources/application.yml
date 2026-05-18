@@ -22,6 +22,12 @@ spring:
 
 server:
   port: 8080
+  # Tomcat's response-header buffer. Default is 8 KB which trips
+  # HeadersTooLargeException once the cn_at JWT cookie + the cn_csrf + cn_rt
+  # cookies + CSP/CORS headers stack up — the JWT alone can run 4-6 KB for
+  # super-admins with a full roles/perms/scopes claim shape. 64 KB gives
+  # comfortable headroom (Spring Boot 2.5 maps this to maxHttpHeaderSize).
+  max-http-header-size: 65536
   compression:
     enabled: true
     min-response-size: 1024
@@ -375,6 +381,9 @@ management:
     redis:
       enabled: true
 server:
+  # See dev profile note (line 23) — 64 KB header buffer to absorb stacked
+  # auth cookies + CSP/CORS on production-sized JWTs.
+  max-http-header-size: 65536
   tomcat:
     threads:
       max: 300
@@ -576,6 +585,9 @@ management:
     redis:
       enabled: true
 server:
+  # See dev profile note (line 23) — 64 KB header buffer to absorb stacked
+  # auth cookies + CSP/CORS on production-sized JWTs.
+  max-http-header-size: 65536
   tomcat:
     threads:
       max: 200

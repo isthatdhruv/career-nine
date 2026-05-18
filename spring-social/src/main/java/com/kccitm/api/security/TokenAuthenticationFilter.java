@@ -147,20 +147,20 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                 // @auth.allows(...) doesn't have to round-trip to the DB per request.
                 if (userDetails instanceof UserPrincipal) {
                     UserPrincipal up = (UserPrincipal) userDetails;
+                    // Permissions are NOT carried in the JWT (would blow the 4 KB cookie
+                    // limit for admin users with 400+ codes). loadUserById above already
+                    // hydrated up.permissions from the DB via the role_permission walk,
+                    // so we deliberately leave that value alone. Scopes / sa / jti still
+                    // come from the JWT claim since those are small and the existing
+                    // filter design treats them as authoritative.
                     if (claims.isLegacyShape) {
-                        // Token was minted before Phase 15 — JWT does not carry perms / scopes.
-                        // Plan 15-06 will own the DB-derive fallback path. Until then: empty
-                        // perms is safe because the runtime is in log-only mode (every DENY
-                        // is recorded but not enforced) and the 10-day TTL ensures legacy
-                        // tokens age out by the time Phase 17 flips to enforce.
-                        logger.warn("LEGACY_TOKEN: deriving perms/scopes from DB for userId={} — empty perms (15-06 owns real derive)",
+                        // Pre-Phase-15 token: scopes claim absent too. Keep DB-loaded
+                        // scopes/sa (already populated by hydrate()); just clear jti so
+                        // the deny-list lookup doesn't match a stale UUID.
+                        logger.warn("LEGACY_TOKEN: keeping DB-loaded perms/scopes/sa for userId={}",
                                 claims.userId);
-                        up.setPermissions(Collections.<String>emptySet());
-                        up.setScopes(Collections.<CurrentScopes.ScopeRow>emptyList());
-                        up.setSuperAdmin(false);
                         up.setJti(null);
                     } else {
-                        up.setPermissions(claims.perms);
                         up.setScopes(claims.scopes);
                         up.setSuperAdmin(claims.superAdmin);
                         up.setJti(claims.jti);

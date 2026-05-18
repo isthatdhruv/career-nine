@@ -73,8 +73,14 @@ public class CustomUserDetailsService implements UserDetailsService {
      * Builds a fully-populated {@link UserPrincipal} from the given user:
      * basic identity (via {@code UserPrincipal.create}), plus the Phase 15-06
      * additions: {@code permissions}, {@code scopes}, {@code superAdmin}.
+     *
+     * <p>Public so the OAuth2 login path ({@code CustomOAuth2UserService}) can
+     * reuse the same hydration. Both paths MUST produce a principal carrying
+     * permissions/scopes/superAdmin — otherwise the token minted by the
+     * success handler will have an empty {@code perms} claim and the user
+     * sees Permission Denied despite valid role-group assignments.
      */
-    private UserPrincipal hydrate(User user) {
+    public UserPrincipal hydrate(User user) {
         UserPrincipal up = UserPrincipal.create(user);
 
         // --- Phase 15-06: scopes from user_role_scope rows (post-Phase-14 design) ---

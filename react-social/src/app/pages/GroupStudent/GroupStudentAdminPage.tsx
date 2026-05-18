@@ -20,6 +20,7 @@ import {
 } from "../StudentInformation/StudentInfo_APIs";
 import * as XLSX from "xlsx";
 import { ActionIcon } from "../../components/ActionIcon";
+import { useAssessmentsForInstitute } from "../../hooks/useScopedAssessments";
 
 type Student = {
   id: number;
@@ -48,7 +49,9 @@ export default function GroupStudentAdminPage() {
   const [institutes, setInstitutes] = useState<any[]>([]);
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
   const [students, setStudents] = useState<Student[]>([]);
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
+  // Narrow assessments to those mapped to the selected institute.
+  const { assessments } = useAssessmentsForInstitute(selectedInstitute, allAssessments);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedStudents, setSelectedStudents] = useState<Set<number>>(
@@ -517,11 +520,11 @@ export default function GroupStudentAdminPage() {
       })
       .catch((err: any) => console.error("Failed to fetch institutes", err));
 
-    // Fetch assessments (only active ones)
+    // Fetch assessments (only active ones) — hook narrows per institute.
     getAllAssessments()
       .then((response) => {
         const activeOnly = (response.data || []).filter((a: any) => a.isActive !== false);
-        setAssessments(activeOnly);
+        setAllAssessments(activeOnly);
       })
       .catch((error) => {
         console.error("Error fetching assessments:", error);

@@ -9,9 +9,17 @@ interface CreateStudentModalProps {
   show: boolean;
   onHide: () => void;
   onSave?: (data: any) => void;
+  /**
+   * Optional institute override. When omitted the modal falls back to the
+   * `instituteId` stored in localStorage (legacy StudentsList behaviour).
+   * Passed from contexts where the user picks an institute in-page (e.g.,
+   * the bulk-upload page) so the modal scopes its session/class/section
+   * cascade to the right school.
+   */
+  instituteId?: number | string;
 }
 
-const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, onSave }) => {
+const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, onSave, instituteId }) => {
   const [formData, setFormData] = useState({
     name: "",
     schoolRollNumber: "",
@@ -33,17 +41,21 @@ const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, o
   const [selectedClassId, setSelectedClassId] = useState("");
   const [selectedSectionId, setSelectedSectionId] = useState("");
 
+  const effectiveInstituteId = useMemo(
+    () => (instituteId != null && instituteId !== "" ? String(instituteId) : localStorage.getItem('instituteId')),
+    [instituteId]
+  );
+
   useEffect(() => {
     if (show) {
       setLoading(true);
-      const instituteId = localStorage.getItem('instituteId');
 
       const promises: Promise<any>[] = [
         getAssessmentIdNameMap(),
       ];
 
-      if (instituteId) {
-        promises.push(GetSessionsByInstituteCode(instituteId));
+      if (effectiveInstituteId) {
+        promises.push(GetSessionsByInstituteCode(effectiveInstituteId));
       }
 
       Promise.all(promises)
@@ -61,7 +73,7 @@ const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, o
         .catch((err) => console.error("Failed to load data", err))
         .finally(() => setLoading(false));
     }
-  }, [show]);
+  }, [show, effectiveInstituteId]);
 
   const classes = useMemo(() => {
     if (!selectedSessionId) return [];
@@ -100,8 +112,6 @@ const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, o
 
     setSubmitting(true);
     try {
-        const instituteId = localStorage.getItem('instituteId');
-
         const payload: StudentInfo = {
             name: formData.name,
             schoolRollNumber: formData.schoolRollNumber || "",
@@ -110,7 +120,7 @@ const CreateStudentModal: React.FC<CreateStudentModalProps> = ({ show, onHide, o
             email: "",
             address: "",
             studentDob: formatDateForBackend(formData.dob),
-            instituteId: instituteId ? Number(instituteId) : undefined,
+            instituteId: effectiveInstituteId ? Number(effectiveInstituteId) : undefined,
             assesment_id: formData.selectedAssessmentId,
             schoolSectionId: Number(selectedSectionId),
             careerNineRollNumber: autoGenerateRoll ? "" : formData.careerNineRollNumber,

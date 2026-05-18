@@ -467,7 +467,13 @@ public class StudentInfoController {
         }
     }
 
-    private List<java.util.Map<String, Object>> assembleStudentsWithMapping(List<StudentInfo> students) {
+    /**
+     * Build the {@code studentMappings} JSON shape from a (possibly already
+     * filtered) list of StudentInfo rows. Visibility widened from private to
+     * public so {@code DashboardDataService} can call it with a scope-narrowed
+     * list instead of pulling everything through {@code findAll()}.
+     */
+    public List<java.util.Map<String, Object>> assembleStudentsWithMapping(List<StudentInfo> students) {
         try {
             if (students.isEmpty()) return new java.util.ArrayList<>();
 

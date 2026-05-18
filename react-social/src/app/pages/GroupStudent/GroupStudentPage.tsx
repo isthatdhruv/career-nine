@@ -22,6 +22,7 @@ import {
   updateStudentBasicInfo,
 } from "../StudentInformation/StudentInfo_APIs";
 import { getEmailRecipientsForStudent, sendReportEmail, EmailRecipient } from "../ReportGeneration/API/BetReportData_APIs";
+import { useAssessmentsForInstitute } from "../../hooks/useScopedAssessments";
 import * as XLSX from "xlsx";
 
 // Convert DOB from API (ISO timestamp or dd-MM-yyyy) to dd-MM-yyyy
@@ -69,7 +70,10 @@ export default function GroupStudentPage() {
   const [institutes, setInstitutes] = useState<any[]>([]);
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
   const [students, setStudents] = useState<Student[]>([]);
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
+  // Narrow to assessments mapped to the selected institute (falls back to all when
+  // nothing is picked or the institute has no mappings).
+  const { assessments } = useAssessmentsForInstitute(selectedInstitute, allAssessments);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedStudents, setSelectedStudents] = useState<Set<number>>(
@@ -601,11 +605,11 @@ export default function GroupStudentPage() {
       })
       .catch((err: any) => console.error("Failed to fetch institutes", err));
 
-    // Fetch assessments (only active ones)
+    // Fetch assessments (only active ones) — the hook narrows this down per institute.
     getAllAssessments()
       .then((response) => {
         const activeOnly = (response.data || []).filter((a: any) => a.isActive !== false);
-        setAssessments(activeOnly);
+        setAllAssessments(activeOnly);
       })
       .catch((error) => {
         console.error("Error fetching assessments:", error);

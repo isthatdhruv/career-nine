@@ -168,10 +168,15 @@ public class TokenProvider {
                         .map(GrantedAuthority::getAuthority)
                         .collect(Collectors.toList());
 
-        List<String> perms = new ArrayList<>(
-                userPrincipal.getPermissions() != null
-                        ? userPrincipal.getPermissions()
-                        : Collections.<String>emptySet());
+        // NOTE: perms[] is intentionally OMITTED from the JWT. A user assigned to
+        // multiple admin role groups can hold 400+ permission codes (~80 bytes each
+        // serialised), pushing the JWT past the ~4 KB per-cookie browser limit —
+        // the browser silently drops cn_at and every subsequent request comes back
+        // as "Full authentication required". Permissions are hydrated server-side
+        // on each request from the DB via CustomUserDetailsService.loadUserById in
+        // TokenAuthenticationFilter, so the principal still carries the full set
+        // when @auth.allows() runs. Roles / scopes / sa stay in the JWT because
+        // they are small and the existing filter treats them as authoritative.
 
         return Jwts.builder()
                 .setSubject(Long.toString(userPrincipal.getId()))
@@ -179,7 +184,6 @@ public class TokenProvider {
                 .setExpiration(expiryDate)
                 .setId(UUID.randomUUID().toString())   // jti
                 .claim("roles", roles)
-                .claim("perms", perms)
                 .claim("scopes", scopes)
                 .claim("sa", userPrincipal.isSuperAdmin())
                 .signWith(signingKey, SignatureAlgorithm.HS512)

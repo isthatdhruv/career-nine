@@ -42,6 +42,7 @@ import { Navigator360Preview } from "./navigator360/Navigator360Report";
 import { FourPagerPreview } from "./fourPager/FourPagerReport";
 import { buildFourPagerHtml } from "./fourPager/FourPagerAPI";
 import PageHeader from "../../components/PageHeader";
+import { useAuth, Scope } from "../../modules/auth";
 
 // ═══════════════════════ TYPES ═══════════════════════
 
@@ -59,7 +60,13 @@ type StudentRow = {
   assignedAssessmentIds?: number[];
 };
 
-type SectionInfo = { className: string; sectionName: string };
+type SectionInfo = {
+  className: string;
+  sectionName: string;
+  sessionId?: number;
+  classId?: number;
+  sectionId?: number;
+};
 
 type ReportData = {
   userStudent?: { userStudentId: number };
@@ -72,6 +79,25 @@ type ReportData = {
 // ═══════════════════════ COMPONENT ═══════════════════════
 
 const ReportsHubPage: React.FC = () => {
+  // ── Current user (for ABAC scope-based filtering) ──
+  // dhruv.kccsw@gmail.com mapped to KVS means scopes carry an `i` for that
+  // institute; we filter the dropdown and the student list to honour it so the
+  // user can only see what they're allotted to.
+  const { currentUser } = useAuth();
+  // Pull a stable reference to the scope array so downstream useMemos don't
+  // re-fire every render (currentUser is a new object on each provider update,
+  // but currentUser.scopes is referentially stable across renders).
+  const userScopes: Scope[] = useMemo(() => currentUser?.scopes ?? [], [currentUser]);
+  const isSuperAdmin = currentUser?.superAdmin === true;
+
+  // null = no restriction (super-admin OR at least one scope row is institute-wildcard).
+  const allowedInstituteIds = useMemo<Set<number> | null>(() => {
+    if (isSuperAdmin) return null;
+    if (!userScopes.length) return null; // no scope rows = legacy/unscoped session, don't restrict
+    if (userScopes.some((s) => s.i == null)) return null;
+    return new Set(userScopes.map((s) => s.i!).filter((v) => v != null));
+  }, [isSuperAdmin, userScopes]);
+
   // ── Institute ──
   const [institutes, setInstitutes] = useState<any[]>([]);
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
@@ -159,13 +185,25 @@ const ReportsHubPage: React.FC = () => {
   useEffect(() => {
     setInstitutesLoading(true);
     ReadCollegeList()
-      .then((res) => setInstitutes(res.data || []))
+      .then((res) => {
+        const all = res.data || [];
+        // Scope down to institutes this user is allotted to. null = no restriction.
+        const filtered = allowedInstituteIds == null
+          ? all
+          : all.filter((inst: any) => allowedInstituteIds.has(Number(inst.instituteCode)));
+        setInstitutes(filtered);
+        // If user is scoped to exactly one institute, auto-select it so they
+        // don't have to pick from a single-item dropdown.
+        if (filtered.length === 1) {
+          setSelectedInstitute(Number(filtered[0].instituteCode));
+        }
+      })
       .catch(() => setInstitutes([]))
       .finally(() => setInstitutesLoading(false));
     getAllAssessments()
       .then((res) => setAllAssessments(res.data || []))
       .catch(() => setAllAssessments([]));
-  }, []);
+  }, [allowedInstituteIds]);
 
   // Load assessment mappings for selected institute
   // null = no institute selected, empty Set = institute selected but no assessments linked
@@ -207,7 +245,13 @@ const ReportsHubPage: React.FC = () => {
         for (const session of sessionsRes.data || []) {
           for (const cls of session.schoolClasses || []) {
             for (const sec of cls.schoolSections || []) {
-              if (!lookup.has(sec.id)) lookup.set(sec.id, { className: cls.className, sectionName: sec.sectionName });
+              if (!lookup.has(sec.id)) lookup.set(sec.id, {
+                className: cls.className,
+                sectionName: sec.sectionName,
+                sessionId: session.id,
+                classId: cls.id,
+                sectionId: sec.id,
+              });
             }
           }
         }
@@ -289,26 +333,52 @@ const ReportsHubPage: React.FC = () => {
     return students.filter((s) => (s.assignedAssessmentIds || []).includes(selectedAssessmentObj.id));
   }, [students, selectedAssessmentObj]);
 
+  // Apply the user's ABAC scopes (session/class/section) within the chosen
+  // institute. Mirrors the backend predicate in AccessScopeJpqlBuilder: a
+  // student is visible iff at least one of the user's scope rows matches every
+  // non-null dimension. Super-admin / no scopes / institute-only-wildcard
+  // scopes fall through and show all rows for the institute.
+  const scopedStudents = useMemo(() => {
+    if (isSuperAdmin) return assessmentStudents;
+    if (!userScopes.length) return assessmentStudents;
+    const instCode = selectedInstitute === "" ? null : Number(selectedInstitute);
+    const matches = (scope: Scope, info: SectionInfo | undefined) => {
+      if (scope.i != null && instCode != null && scope.i !== instCode) return false;
+      if (scope.s != null && info?.sessionId !== scope.s) return false;
+      if (scope.c != null && info?.classId !== scope.c) return false;
+      if (scope.x != null && info?.sectionId !== scope.x) return false;
+      return true;
+    };
+    // If every scope row constrains only the institute dimension, no further
+    // filtering is needed inside this institute.
+    const anyNarrower = userScopes.some((s) => s.s != null || s.c != null || s.x != null);
+    if (!anyNarrower) return assessmentStudents;
+    return assessmentStudents.filter((s) => {
+      const info = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
+      return userScopes.some((scope) => matches(scope, info));
+    });
+  }, [assessmentStudents, isSuperAdmin, userScopes, selectedInstitute, sectionLookup]);
+
   const uniqueGrades = useMemo(() => {
     const g = new Set<string>();
-    for (const s of assessmentStudents) {
+    for (const s of scopedStudents) {
       const info = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
       if (info?.className) g.add(info.className);
     }
     return Array.from(g).sort();
-  }, [assessmentStudents, sectionLookup]);
+  }, [scopedStudents, sectionLookup]);
 
   const uniqueSections = useMemo(() => {
     const sec = new Set<string>();
-    for (const s of assessmentStudents) {
+    for (const s of scopedStudents) {
       const info = s.schoolSectionId ? sectionLookup.get(s.schoolSectionId) : undefined;
       if (info?.sectionName) sec.add(info.sectionName);
     }
     return Array.from(sec).sort();
-  }, [assessmentStudents, sectionLookup]);
+  }, [scopedStudents, sectionLookup]);
 
   const displayedStudents = useMemo(() => {
-    let result = assessmentStudents;
+    let result = scopedStudents;
     if (nameQuery.trim()) {
       const q = nameQuery.toLowerCase();
       result = result.filter((s) =>
@@ -337,7 +407,7 @@ const ReportsHubPage: React.FC = () => {
       });
     }
     return result;
-  }, [assessmentStudents, nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, selectedAssessmentObj, sectionLookup]);
+  }, [scopedStudents, nameQuery, usernameQuery, usernamePresence, selectedGrade, selectedSection, selectedStatus, selectedAssessmentObj, sectionLookup]);
 
   const totalPages = Math.max(1, Math.ceil(displayedStudents.length / pageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);

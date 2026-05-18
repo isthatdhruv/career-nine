@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { showErrorToast } from '../../utils/toast';
+import { useAssessmentsForInstitute } from "../../hooks/useScopedAssessments";
 
 const API_URL = process.env.REACT_APP_API_URL;
 
@@ -66,8 +67,10 @@ interface Assessment {
 const ScoreDebugPage: React.FC = () => {
   const [institutes, setInstitutes] = useState<Institute[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [allAssessments, setAllAssessments] = useState<Assessment[]>([]);
   const [selectedInstitute, setSelectedInstitute] = useState<number | "">("");
+  // Narrow assessments to those mapped to the selected institute (or all when none picked).
+  const { assessments } = useAssessmentsForInstitute(selectedInstitute, allAssessments as any);
   const [selectedStudent, setSelectedStudent] = useState<number | "">("");
   const [selectedAssessment, setSelectedAssessment] = useState<number | "">("");
   const [debugData, setDebugData] = useState<DebugData | null>(null);
@@ -90,9 +93,15 @@ const ScoreDebugPage: React.FC = () => {
       );
     });
     axios.get(`${API_URL}/assessments/get/list`).then((res) => {
-      setAssessments(res.data);
+      setAllAssessments(res.data);
     });
   }, []);
+
+  // Reset the assessment selection when the institute changes — the new
+  // narrowed list may not contain the previously-selected ID.
+  useEffect(() => {
+    setSelectedAssessment("");
+  }, [selectedInstitute]);
 
   useEffect(() => {
     if (!selectedInstitute) {

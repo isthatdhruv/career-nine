@@ -77,3 +77,47 @@ function dimMatches(rowDim: number | undefined, requiredDim: number | undefined)
   if (requiredDim === undefined || requiredDim === null) return true;
   return rowDim === requiredDim;
 }
+
+// ── URL access predicate ─────────────────────────────────────────────────────
+// The role.url table on the backend stores per-role whitelisted route paths.
+// /auth/me accumulates them as `user.urls[]`. RequirePermission then runs an
+// intersection check: a route is accessible iff (a) `allows(...)` passes the
+// permission gate AND (b) the current `location.pathname` matches at least
+// one of the user's whitelisted patterns (or the user is super-admin).
+//
+// Patterns supported:
+//   - Literal:     /students/list           ⇒ matches /students/list only
+//   - Parametric:  /students/getbyid/:id    ⇒ matches /students/getbyid/<anything-not-/>
+//   - Wildcard:    /students/*              ⇒ matches /students and everything below
+//
+// Implemented as on-the-fly regex compilation — the user's url list is small
+// (single-digit to low-hundreds entries) so compile-per-call is fine.
+
+/**
+ * True iff {@code path} matches at least one of the supplied url patterns.
+ * Empty / undefined list → returns false (deny-by-default).
+ */
+export function urlAllowed(urls: string[] | undefined, path: string): boolean {
+  if (!urls || urls.length === 0) return false;
+  for (const pattern of urls) {
+    if (matchesPattern(pattern, path)) return true;
+  }
+  return false;
+}
+
+function matchesPattern(pattern: string, path: string): boolean {
+  if (!pattern) return false;
+  // Fast path: literal equality (no `:`, no `*`).
+  if (pattern.indexOf(":") < 0 && pattern.indexOf("*") < 0) {
+    return pattern === path;
+  }
+  // Translate the pattern to a regex. Escape regex metacharacters except for
+  // the placeholders we replace below.
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+  // `*` → match anything (greedy). Used as suffix wildcard: `/x/*` matches `/x/`, `/x/y`, `/x/y/z`.
+  // `:name` → match one path segment (no slashes).
+  const re = escaped
+    .replace(/\*/g, ".*")
+    .replace(/:[A-Za-z0-9_]+/g, "[^/]+");
+  return new RegExp("^" + re + "$").test(path);
+}

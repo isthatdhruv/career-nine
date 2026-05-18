@@ -490,7 +490,26 @@ public enum PermissionCode {
     COUNSELLING_STUDENT_MANAGEMENT_READ   ("counselling.student_management.read",   "View counselling student management"),
     COUNSELLING_STUDENT_MANAGEMENT_CREATE ("counselling.student_management.create", "Create counselling student-management records"),
     COUNSELLING_STUDENT_MANAGEMENT_UPDATE ("counselling.student_management.update", "Update counselling student-management records"),
-    COUNSELLING_STUDENT_MANAGEMENT_DELETE ("counselling.student_management.delete", "Delete counselling student-management records");
+    COUNSELLING_STUDENT_MANAGEMENT_DELETE ("counselling.student_management.delete", "Delete counselling student-management records"),
+
+    /**
+     * Permission gating the "Refresh Permissions" admin action that scans
+     * controllers for new {@code @auth.allows(...)} literals and seeds the
+     * catalog from {@link PermissionCode} into the permission DB table.
+     *
+     * <p>Required for: {@code POST /permission/refresh}.
+     * <br>FE: button on RolesAndPermissionsPage toolbar ("Refresh Permissions").
+     */
+    PERMISSION_REFRESH ("permission.refresh", "Run the permission catalog refresh"),
+
+    /**
+     * Permission gating the "URL Access" admin action for editing the
+     * per-role list of allowed React route paths.
+     *
+     * <p>Required for: {@code PUT /role/{id}/urls}.
+     * <br>FE: 🌐 icon on each Role row in RolesPanel ("Manage URL access").
+     */
+    ROLE_URL_UPDATE ("role.url.update", "Manage which React URLs a role grants access to");
 
     private final String code;
     private final String description;
