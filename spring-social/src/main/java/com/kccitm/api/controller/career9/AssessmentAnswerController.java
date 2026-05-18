@@ -122,9 +122,6 @@ public class AssessmentAnswerController {
     @Autowired
     private AssessmentAdminActionRepository adminActionRepository;
 
-    @Autowired(required = false)
-    private com.kccitm.api.service.b2c.EntitlementService entitlementService;
-
     @GetMapping(value = "/getByStudent/{studentId}", headers = "Accept=application/json")
     public List<AssessmentAnswer> getAssessmentAnswersByStudent(@PathVariable("studentId") Long studentId) {
         UserStudent userStudent = userStudentRepository.findById(studentId).orElse(null);
@@ -309,14 +306,35 @@ public class AssessmentAnswerController {
                         .orElseThrow(() -> new ServiceException("Failed to create/find assessment mapping"));
             }
 
-            // 5. SERVER-SIDE status contract (ignore anything client sent):
-            //   - status = "completed"     → student has finished (Redis holds the submission)
-            //   - persistenceState = "pending" → answers not in MySQL yet
-            // The async processor flips persistenceState to "persisted" /
-            // "persisted_with_warnings" / "failed" once it runs. Resetting the
-            // mapping's persistenceState here ensures a retry after a prior
+            // 5. Idempotency on completed submissions. If a prior submission
+            // already landed in MySQL, do NOT re-process — return the cached
+            // result (or a short-circuit response). Prevents duplicate-click
+            // and SPA-replay from re-deleting + re-inserting answers and
+            // recomputing scores.
+            String currentStatus = mapping.getStatus();
+            String currentPState = mapping.getPersistenceState();
+            if ("completed".equals(currentStatus)
+                    && ("persisted".equals(currentPState)
+                        || "persisted_with_warnings".equals(currentPState))) {
+                assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
+                Object cachedResult = assessmentSessionService.getSubmissionResult(userStudentId, assessmentId);
+                if (cachedResult != null) {
+                    return ResponseEntity.ok(cachedResult);
+                }
+                return ResponseEntity.ok(Map.of(
+                        "status", "already_submitted",
+                        "message", "This assessment has already been submitted and persisted"
+                ));
+            }
+
+            // 6. SERVER-SIDE status contract (ignore anything client sent):
+            //   - status: untouched here — the async processor flips
+            //     "ongoing" → "completed" atomically with the DB write
+            //     (or "failed" after 3-strike non-transient failures).
+            //   - persistenceState = "pending" → answers not in MySQL yet.
+            //
+            // Resetting persistenceState here ensures a retry after a prior
             // "failed" starts cleanly.
-            mapping.setStatus("completed");
             mapping.setPersistenceState("pending");
             studentAssessmentMappingRepository.save(mapping);
 
@@ -329,20 +347,10 @@ public class AssessmentAnswerController {
             logger.info("Submission accepted: student={} assessment={} answers={}",
                     userStudentId, assessmentId, answers.size());
 
-            // B2C entitlement: if this submission belongs to an active entitlement, fire the
-            // post-completion notification (1-pager / final report email). Best-effort.
-            try {
-                if (entitlementService != null) {
-                    String studentEmail = null;
-                    UserStudent us = userStudentRepository.findById(userStudentId).orElse(null);
-                    if (us != null && us.getStudentInfo() != null) {
-                        studentEmail = us.getStudentInfo().getEmail();
-                    }
-                    entitlementService.onAssessmentCompleted(userStudentId, assessmentId, studentEmail);
-                }
-            } catch (Exception entitlementEx) {
-                logger.warn("B2C entitlement post-completion hook failed (non-fatal)", entitlementEx);
-            }
+            // NOTE: B2C entitlement hook (onAssessmentCompleted) moved to the
+            // async processor's success path. Firing here would have notified
+            // students whose answers ultimately failed to persist; now the hook
+            // only fires after MySQL confirms the write.
 
             return ResponseEntity.ok(Map.of(
                     "status", "accepted",
@@ -450,37 +458,24 @@ public class AssessmentAnswerController {
     }
 
     /**
-     * Save a draft of student's current answer state to Redis.
-     * Called periodically (every 30s) by the frontend to back up localStorage.
-     * Accepts a JSON blob with userStudentId, assessmentId, and answer state.
+     * Restore the most recent partial-answer snapshot for a student+assessment.
+     * Reads career9:partial:{sid}:{aid} (written by /save-partial on each
+     * section transition). Returns the full payload including answers and
+     * savedAt timestamp, or 404 if no snapshot exists (assessment never
+     * started, no section transition happened yet, or TTL expired).
+     *
+     * Used by SectionQuestionPage on mount to hydrate React state when the
+     * student relogs in, refreshes the page, or resumes from a different
+     * device — without consulting localStorage / sessionStorage.
      */
-    @PostMapping(value = "/draft-save", headers = "Accept=application/json")
-    public ResponseEntity<?> saveDraft(@RequestBody Map<String, Object> draftData) {
-        Long studentId = ((Number) draftData.get("userStudentId")).longValue();
-        Long assessmentId = ((Number) draftData.get("assessmentId")).longValue();
-
-        assessmentSessionService.saveDraft(studentId, assessmentId, draftData);
-
-        Map<String, String> response = new HashMap<>();
-        response.put("status", "saved");
-        return ResponseEntity.ok(response);
-    }
-
-    /**
-     * Restore a saved draft for a student+assessment pair.
-     * Called by the frontend on page load to recover answers after browser crash.
-     * Returns 404 if no draft exists.
-     */
-    @GetMapping(value = "/draft-restore/{studentId}/{assessmentId}", headers = "Accept=application/json")
-    public ResponseEntity<?> restoreDraft(@PathVariable Long studentId, @PathVariable Long assessmentId) {
-        Object draft = assessmentSessionService.getDraft(studentId, assessmentId);
-
-        if (draft == null) {
-            Map<String, String> response = new HashMap<>();
-            response.put("status", "no_draft");
-            return ResponseEntity.status(404).body(response);
+    @GetMapping(value = "/partial-restore/{studentId}/{assessmentId}", headers = "Accept=application/json")
+    public ResponseEntity<?> restorePartialAnswers(
+            @PathVariable Long studentId, @PathVariable Long assessmentId) {
+        Map<String, Object> partial = assessmentSessionService.getPartialAnswers(studentId, assessmentId);
+        if (partial == null) {
+            return ResponseEntity.status(404).body(Map.of("status", "no_partial"));
         }
-        return ResponseEntity.ok(draft);
+        return ResponseEntity.ok(partial);
     }
 
     // ============ OFFLINE ASSESSMENT UPLOAD ENDPOINTS ============
