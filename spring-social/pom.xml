@@ -286,21 +286,7 @@
 		<resources>
 			<resource>
 				<directory>src/main/resources</directory>
-				<filtering>true</filtering>
-				<excludes>
-					<exclude>**/*.p12</exclude>
-					<exclude>**/*.jks</exclude>
-					<exclude>**/*.json</exclude>
-				</excludes>
-			</resource>
-			<resource>
-				<directory>src/main/resources</directory>
 				<filtering>false</filtering>
-				<includes>
-					<include>**/*.p12</include>
-					<include>**/*.jks</include>
-					<include>**/*.json</include>
-				</includes>
 			</resource>
 		</resources>
 		<plugins>

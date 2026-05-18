@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAssessment } from '../contexts/AssessmentContext';
 import { usePreventReload } from '../hooks/usePreventReload';
 import http from '../api/http';
+import { isDevAutoFillEnabled } from '../utils/devMode';
+import { generateRandomAnswers } from '../utils/devAutoFill';
 
 type Assessment = {
   assessmentId: number;
@@ -90,6 +92,51 @@ export default function AllottedAssessmentPage() {
     } catch (error) {
       console.error('Error starting assessment:', error);
       alert('Failed to start assessment. Please try again.');
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
+  const handleDevAutoFill = async (assessment: Assessment) => {
+    const userStudentId = localStorage.getItem('userStudentId');
+    if (!userStudentId) {
+      alert('Session expired. Please login again.');
+      navigate('/student-login');
+      return;
+    }
+    if (assessment.studentStatus === 'completed' || !assessment.isActive) return;
+
+    setLoadingId(assessment.assessmentId);
+    try {
+      localStorage.setItem('assessmentId', String(assessment.assessmentId));
+      await fetchAssessmentData(String(assessment.assessmentId));
+      await http.post('/assessments/startAssessment', {
+        userStudentId: Number(userStudentId),
+        assessmentId: Number(assessment.assessmentId),
+      });
+
+      const raw = sessionStorage.getItem('assessmentData');
+      if (!raw) throw new Error('Assessment data not loaded');
+      const parsed = JSON.parse(raw);
+      const questionnaire = Array.isArray(parsed) ? parsed[0] : parsed;
+      if (!questionnaire?.sections?.length) {
+        throw new Error('Questionnaire has no sections');
+      }
+
+      const { answers, rankingAnswers, textAnswers } = generateRandomAnswers(questionnaire);
+
+      localStorage.setItem('assessmentAnswers', JSON.stringify(answers));
+      localStorage.setItem('assessmentRankingAnswers', JSON.stringify(rankingAnswers));
+      localStorage.setItem('assessmentTextAnswers', JSON.stringify(textAnswers));
+      localStorage.setItem('assessmentSavedForLater', JSON.stringify({}));
+      localStorage.setItem('assessmentSkipped', JSON.stringify({}));
+      localStorage.setItem('assessmentElapsedTime', '0');
+
+      const firstSectionId = questionnaire.sections[0].section.sectionId;
+      navigate(`/studentAssessment/sections/${firstSectionId}/questions/0`);
+    } catch (err) {
+      console.error('Dev auto-fill failed:', err);
+      alert('Auto-fill failed. Check the console for details.');
     } finally {
       setLoadingId(null);
     }
@@ -363,6 +410,28 @@ export default function AllottedAssessmentPage() {
                         </>
                       )}
                     </button>
+
+                    {isDevAutoFillEnabled() &&
+                      assessment.isActive &&
+                      assessment.studentStatus !== 'completed' && (
+                        <button
+                          onClick={() => handleDevAutoFill(assessment)}
+                          disabled={loadingId === assessment.assessmentId}
+                          className="btn w-100 mt-2"
+                          style={{
+                            padding: '0.5rem',
+                            border: '2px dashed #f97316',
+                            background: 'rgba(249, 115, 22, 0.06)',
+                            color: '#c2410c',
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            borderRadius: '10px',
+                            cursor: loadingId === assessment.assessmentId ? 'wait' : 'pointer',
+                          }}
+                        >
+                          ⚡ Dev: Auto-fill & Start
+                        </button>
+                      )}
                   </div>
                 </div>
               );

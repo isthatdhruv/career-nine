@@ -348,10 +348,8 @@ public class AssessmentInstituteMappingController {
             // the registered-student path can return a session token.
             Date existingDob = existing.getStudentDob();
             if (existingDob == null || !sameDay(existingDob, dob)) {
-                return ResponseEntity.badRequest().body(Map.of(
-                        "status", "error",
-                        "message", "This email is already registered with a different date of birth. " +
-                                "If this is your account, please use your registered date of birth."));
+                return ResponseEntity.badRequest().body(
+                        com.kccitm.api.util.DuplicateEmailResponse.build(existing, instituteDetailRepository));
             }
 
             if (paymentRequired && finalAmount > 0) {

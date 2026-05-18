@@ -98,8 +98,9 @@ const AllotmentsTab = ({
 
   return (
     <>
-      <Table responsive striped hover size="sm" className="align-middle" style={{ minWidth: 1200 }}>
-        <thead>
+      <div className="table-responsive" style={{ maxHeight: "65vh", minHeight: 200 }}>
+      <Table striped hover size="sm" className="align-middle mb-0" style={{ minWidth: 1200 }}>
+        <thead className="position-sticky top-0 bg-white" style={{ zIndex: 2, boxShadow: "inset 0 -1px 0 #dee2e6" }}>
           <tr>
             <th style={{ whiteSpace: "nowrap" }}>Granted</th>
             <th style={{ minWidth: 180 }}>Student</th>
@@ -206,8 +207,9 @@ const AllotmentsTab = ({
           })}
         </tbody>
       </Table>
+      </div>
 
-      <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
         <small className="text-muted">{total} total · page {page + 1} of {totalPages}</small>
         <Pagination size="sm" className="mb-0 flex-wrap">
           <Pagination.First disabled={page === 0} onClick={() => onPageChange(0)} />
