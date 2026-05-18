@@ -195,6 +195,26 @@ public class AssessmentSubmissionProcessorService {
                 .orElseThrow(() -> new EntityNotFoundException("Assessment " + assessmentId));
         StudentAssessmentMapping mapping = loadMapping(studentId, assessmentId);
 
+        // Idempotency guard: if a prior processor pass already persisted this
+        // submission, do NOT re-run dedupe/scoring/delete-and-reinsert. Without
+        // this, a transient Redis failure in steps 7-8 below would propagate to
+        // the catch handler → recordFailure → retry scheduler, which would then
+        // re-fire the completion email and B2C entitlement hook from steps 9-10.
+        // Best-effort Redis cleanup + return; the side-effect hooks fired on the
+        // first pass and must not fire again.
+        if ("completed".equals(mapping.getStatus())
+                && ("persisted".equals(mapping.getPersistenceState())
+                    || "persisted_with_warnings".equals(mapping.getPersistenceState()))) {
+            logger.info("Submission already persisted on a prior pass; skipping re-processing. student={} assessment={}",
+                    studentId, assessmentId);
+            try { assessmentSessionService.deletePartialAnswers(studentId, assessmentId); } catch (Exception ignored) {}
+            try {
+                assessmentSessionService.markSubmittedArchived(studentId, assessmentId,
+                        mapping.getPersistenceState(), 0, 0);
+            } catch (Exception ignored) {}
+            return;
+        }
+
         // 1. Defensive dedupe — on composite key, not questionId alone.
         //
         // Multi-select / ranking / text questions legitimately have multiple
