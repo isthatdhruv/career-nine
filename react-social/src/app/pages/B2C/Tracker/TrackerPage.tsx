@@ -260,6 +260,12 @@ const TrackerPage = () => {
       />
 
       <style>{`
+        .b2c-tracker-page,
+        .b2c-tracker-page .card-body,
+        .b2c-tracker-page .tab-content,
+        .b2c-tracker-page .tab-pane {
+          min-width: 0;
+        }
         .b2c-tracker-page .b2c-tracker-tabs {
           overflow-x: auto;
           overflow-y: hidden;
@@ -268,8 +274,30 @@ const TrackerPage = () => {
         .b2c-tracker-page .b2c-tracker-tabs .nav-link {
           white-space: nowrap;
         }
+        /* Force horizontal scroll on tables even when an ancestor (.card,
+           .card-body, .tab-content) sets overflow:hidden or constrains width.
+           Without this, the inline minWidth on the table is honoured but the
+           overflow gets clipped instead of scrolled. */
+        .b2c-tracker-page .card-body,
+        .b2c-tracker-page .tab-content,
+        .b2c-tracker-page .tab-pane {
+          overflow: visible;
+          min-width: 0;
+        }
         .b2c-tracker-page .table-responsive {
+          display: block;
+          width: 100%;
+          max-width: 100%;
+          overflow-x: auto !important;
+          overflow-y: visible;
           -webkit-overflow-scrolling: touch;
+        }
+        .b2c-tracker-page .table-responsive > .table > thead th {
+          position: sticky;
+          top: 0;
+          background: #fff;
+          z-index: 2;
+          box-shadow: inset 0 -1px 0 #dee2e6;
         }
         @media (max-width: 575.98px) {
           .b2c-tracker-page .card-header { padding-left: 1rem; padding-right: 1rem; }

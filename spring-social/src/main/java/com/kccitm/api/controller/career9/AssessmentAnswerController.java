@@ -123,14 +123,101 @@ public class AssessmentAnswerController {
     @Autowired
     private AssessmentAdminActionRepository adminActionRepository;
 
-    @Autowired(required = false)
-    private com.kccitm.api.service.b2c.EntitlementService entitlementService;
-
     @GetMapping(value = "/getByStudent/{studentId}", headers = "Accept=application/json")
     @PreAuthorize("@auth.allows('assessment_answer.read', #studentId)")
     public List<AssessmentAnswer> getAssessmentAnswersByStudent(@PathVariable("studentId") Long studentId) {
         UserStudent userStudent = userStudentRepository.findById(studentId).orElse(null);
         return assessmentAnswerRepository.findByUserStudent(userStudent);
+    }
+
+    /**
+     * Admin/debug endpoint: returns every answer recorded for a student on a
+     * single assessment, grouped by question, with question + option text
+     * already resolved. Also surfaces:
+     *   - the StudentAssessmentMapping status (so we can tell ongoing vs completed)
+     *   - the Redis partial-answer count when an attempt is still in-flight
+     *
+     * Used by the B2C Tracker drawer's "View answers" button — works for both
+     * ongoing and completed attempts (whatever is in the DB is what shows).
+     */
+    @GetMapping(value = "/admin-view/{userStudentId}/{assessmentId}", headers = "Accept=application/json")
+    public ResponseEntity<?> adminViewAnswers(@PathVariable Long userStudentId,
+                                              @PathVariable Long assessmentId) {
+        UserStudent student = userStudentRepository.findById(userStudentId).orElse(null);
+        if (student == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Student not found"));
+        }
+        AssessmentTable assessment = assessmentTableRepository.findById(assessmentId).orElse(null);
+        if (assessment == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "Assessment not found"));
+        }
+
+        List<AssessmentAnswer> rows = assessmentAnswerRepository
+                .findByAssessmentIdAndStudentIdForExport(assessmentId, userStudentId);
+
+        // Group by question so the UI can render one card per question with
+        // the chosen options underneath (multi-select / ranking produces
+        // multiple rows for the same questionnaireQuestionId).
+        Map<Long, Map<String, Object>> byQuestion = new LinkedHashMap<>();
+        for (AssessmentAnswer a : rows) {
+            QuestionnaireQuestion qq = a.getQuestionnaireQuestion();
+            Long qqId = qq != null ? qq.getQuestionnaireQuestionId() : null;
+            Map<String, Object> group = byQuestion.computeIfAbsent(qqId, k -> {
+                Map<String, Object> g = new LinkedHashMap<>();
+                g.put("questionnaireQuestionId", qqId);
+                AssessmentQuestions question = qq != null ? qq.getQuestion() : null;
+                g.put("questionText", question != null ? question.getQuestionText() : null);
+                g.put("questionType", question != null ? question.getQuestionType() : null);
+                QuestionnaireSection section = qq != null ? qq.getSection() : null;
+                QuestionSection inner = section != null ? section.getSection() : null;
+                g.put("sectionName", inner != null ? inner.getSectionName() : null);
+                g.put("orderIndex", qq != null ? qq.getOrder() : null);
+                g.put("selections", new ArrayList<Map<String, Object>>());
+                return g;
+            });
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> selections = (List<Map<String, Object>>) group.get("selections");
+            Map<String, Object> sel = new LinkedHashMap<>();
+            AssessmentQuestionOptions opt = a.getOption();
+            sel.put("optionId", opt != null ? opt.getOptionId() : null);
+            sel.put("optionText", opt != null ? opt.getOptionText() : null);
+            sel.put("rankOrder", a.getRankOrder());
+            sel.put("textResponse", a.getTextResponse());
+            AssessmentQuestionOptions mapped = a.getMappedOption();
+            if (mapped != null) {
+                sel.put("mappedOptionId", mapped.getOptionId());
+                sel.put("mappedOptionText", mapped.getOptionText());
+            }
+            selections.add(sel);
+        }
+
+        StudentAssessmentMapping mapping = studentAssessmentMappingRepository
+                .findFirstByUserStudentUserStudentIdAndAssessmentId(userStudentId, assessmentId)
+                .orElse(null);
+
+        Map<String, Object> partial = assessmentSessionService
+                .getPartialAnswers(userStudentId, assessmentId);
+        Integer partialAnswerCount = null;
+        if (partial != null && partial.get("answers") instanceof List) {
+            partialAnswerCount = ((List<?>) partial.get("answers")).size();
+        }
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("userStudentId", userStudentId);
+        body.put("assessmentId", assessmentId);
+        body.put("assessmentName", assessment.getAssessmentName());
+        body.put("studentName", student.getStudentInfo() != null
+                ? student.getStudentInfo().getName() : null);
+        body.put("status", mapping != null ? mapping.getStatus() : "not_started");
+        body.put("persistenceState", mapping != null ? mapping.getPersistenceState() : null);
+        body.put("totalQuestions", completionService.getTotalQuestions(assessmentId));
+        body.put("answeredQuestions", byQuestion.size());
+        body.put("hasRedisDraft", partial != null);
+        body.put("redisAnswerCount", partialAnswerCount);
+        body.put("questions", new ArrayList<>(byQuestion.values()));
+        return ResponseEntity.ok(body);
     }
 
     @GetMapping(value = "/getAll", headers = "Accept=application/json")
@@ -223,14 +310,35 @@ public class AssessmentAnswerController {
                         .orElseThrow(() -> new ServiceException("Failed to create/find assessment mapping"));
             }
 
-            // 5. SERVER-SIDE status contract (ignore anything client sent):
-            //   - status = "completed"     → student has finished (Redis holds the submission)
-            //   - persistenceState = "pending" → answers not in MySQL yet
-            // The async processor flips persistenceState to "persisted" /
-            // "persisted_with_warnings" / "failed" once it runs. Resetting the
-            // mapping's persistenceState here ensures a retry after a prior
+            // 5. Idempotency on completed submissions. If a prior submission
+            // already landed in MySQL, do NOT re-process — return the cached
+            // result (or a short-circuit response). Prevents duplicate-click
+            // and SPA-replay from re-deleting + re-inserting answers and
+            // recomputing scores.
+            String currentStatus = mapping.getStatus();
+            String currentPState = mapping.getPersistenceState();
+            if ("completed".equals(currentStatus)
+                    && ("persisted".equals(currentPState)
+                        || "persisted_with_warnings".equals(currentPState))) {
+                assessmentSessionService.clearSubmissionLock(userStudentId, assessmentId);
+                Object cachedResult = assessmentSessionService.getSubmissionResult(userStudentId, assessmentId);
+                if (cachedResult != null) {
+                    return ResponseEntity.ok(cachedResult);
+                }
+                return ResponseEntity.ok(Map.of(
+                        "status", "already_submitted",
+                        "message", "This assessment has already been submitted and persisted"
+                ));
+            }
+
+            // 6. SERVER-SIDE status contract (ignore anything client sent):
+            //   - status: untouched here — the async processor flips
+            //     "ongoing" → "completed" atomically with the DB write
+            //     (or "failed" after 3-strike non-transient failures).
+            //   - persistenceState = "pending" → answers not in MySQL yet.
+            //
+            // Resetting persistenceState here ensures a retry after a prior
             // "failed" starts cleanly.
-            mapping.setStatus("completed");
             mapping.setPersistenceState("pending");
             studentAssessmentMappingRepository.save(mapping);
 
@@ -243,20 +351,10 @@ public class AssessmentAnswerController {
             logger.info("Submission accepted: student={} assessment={} answers={}",
                     userStudentId, assessmentId, answers.size());
 
-            // B2C entitlement: if this submission belongs to an active entitlement, fire the
-            // post-completion notification (1-pager / final report email). Best-effort.
-            try {
-                if (entitlementService != null) {
-                    String studentEmail = null;
-                    UserStudent us = userStudentRepository.findById(userStudentId).orElse(null);
-                    if (us != null && us.getStudentInfo() != null) {
-                        studentEmail = us.getStudentInfo().getEmail();
-                    }
-                    entitlementService.onAssessmentCompleted(userStudentId, assessmentId, studentEmail);
-                }
-            } catch (Exception entitlementEx) {
-                logger.warn("B2C entitlement post-completion hook failed (non-fatal)", entitlementEx);
-            }
+            // NOTE: B2C entitlement hook (onAssessmentCompleted) moved to the
+            // async processor's success path. Firing here would have notified
+            // students whose answers ultimately failed to persist; now the hook
+            // only fires after MySQL confirms the write.
 
             return ResponseEntity.ok(Map.of(
                     "status", "accepted",
@@ -366,39 +464,25 @@ public class AssessmentAnswerController {
     }
 
     /**
-     * Save a draft of student's current answer state to Redis.
-     * Called periodically (every 30s) by the frontend to back up localStorage.
-     * Accepts a JSON blob with userStudentId, assessmentId, and answer state.
+     * Restore the most recent partial-answer snapshot for a student+assessment.
+     * Reads career9:partial:{sid}:{aid} (written by /save-partial on each
+     * section transition). Returns the full payload including answers and
+     * savedAt timestamp, or 404 if no snapshot exists (assessment never
+     * started, no section transition happened yet, or TTL expired).
+     *
+     * Used by SectionQuestionPage on mount to hydrate React state when the
+     * student relogs in, refreshes the page, or resumes from a different
+     * device — without consulting localStorage / sessionStorage.
      */
-    @PostMapping(value = "/draft-save", headers = "Accept=application/json")
-    @PreAuthorize("@auth.allows('assessment_answer.update')") // PUBLIC?: assessment app draft save — flagged for 15-06 EXCLUSIONS review
-    public ResponseEntity<?> saveDraft(@RequestBody Map<String, Object> draftData) {
-        Long studentId = ((Number) draftData.get("userStudentId")).longValue();
-        Long assessmentId = ((Number) draftData.get("assessmentId")).longValue();
-
-        assessmentSessionService.saveDraft(studentId, assessmentId, draftData);
-
-        Map<String, String> response = new HashMap<>();
-        response.put("status", "saved");
-        return ResponseEntity.ok(response);
-    }
-
-    /**
-     * Restore a saved draft for a student+assessment pair.
-     * Called by the frontend on page load to recover answers after browser crash.
-     * Returns 404 if no draft exists.
-     */
-    @GetMapping(value = "/draft-restore/{studentId}/{assessmentId}", headers = "Accept=application/json")
+    @GetMapping(value = "/partial-restore/{studentId}/{assessmentId}", headers = "Accept=application/json")
     @PreAuthorize("@auth.allows('assessment_answer.read', #studentId)")
-    public ResponseEntity<?> restoreDraft(@PathVariable Long studentId, @PathVariable Long assessmentId) {
-        Object draft = assessmentSessionService.getDraft(studentId, assessmentId);
-
-        if (draft == null) {
-            Map<String, String> response = new HashMap<>();
-            response.put("status", "no_draft");
-            return ResponseEntity.status(404).body(response);
+    public ResponseEntity<?> restorePartialAnswers(
+            @PathVariable Long studentId, @PathVariable Long assessmentId) {
+        Map<String, Object> partial = assessmentSessionService.getPartialAnswers(studentId, assessmentId);
+        if (partial == null) {
+            return ResponseEntity.status(404).body(Map.of("status", "no_partial"));
         }
-        return ResponseEntity.ok(draft);
+        return ResponseEntity.ok(partial);
     }
 
     // ============ OFFLINE ASSESSMENT UPLOAD ENDPOINTS ============

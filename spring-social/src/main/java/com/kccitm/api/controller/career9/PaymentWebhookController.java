@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.User;
@@ -130,10 +131,20 @@ public class PaymentWebhookController {
      *
      * Returns the actual DB status (set by webhook), not the query param from Razorpay redirect.
      * Frontend polls until status != "created" (i.e., webhook has arrived and updated it).
+     *
+     * When called with {@code ?reconcile=1}, and the DB still shows "created"
+     * (i.e. webhook hasn't landed yet), we synchronously ask Razorpay for the
+     * authoritative state of the payment link and run the same mark-paid +
+     * provision pipeline the webhook would have. This is the safety net for
+     * the redirect-after-payment hop on environments where the webhook is
+     * misconfigured or delayed — the student lands on /payment-status, the
+     * page calls this with reconcile=1, and gets a real "paid" answer back
+     * within the same request instead of timing out the poll.
      */
     @PreAuthorize("@auth.allows('payment_webhook.read')")
     @GetMapping("/status/{razorpayLinkId}")
-    public ResponseEntity<?> getPaymentStatus(@PathVariable String razorpayLinkId) {
+    public ResponseEntity<?> getPaymentStatus(@PathVariable String razorpayLinkId,
+                                              @RequestParam(value = "reconcile", required = false) String reconcile) {
         Optional<PaymentTransaction> txnOpt = paymentTransactionRepository
                 .findByRazorpayLinkId(razorpayLinkId);
 
@@ -142,6 +153,31 @@ public class PaymentWebhookController {
         }
 
         PaymentTransaction txn = txnOpt.get();
+
+        // Reconcile against Razorpay if the caller asked and the DB still
+        // hasn't been flipped by the webhook. Cheap to skip when txn is
+        // already in a terminal state so we don't hammer Razorpay on every
+        // poll.
+        if ("1".equals(reconcile) && "created".equals(txn.getStatus())) {
+            try {
+                org.json.JSONObject link = razorpayService.fetchPaymentLink(razorpayLinkId);
+                String razorpayStatus = link.optString("status", null);
+                if ("paid".equals(razorpayStatus)) {
+                    org.json.JSONObject paymentEntity = pickPaidPaymentFromLink(link);
+                    markPaidAndProvision(txn, paymentEntity, link.optJSONObject("notes"));
+                    txn = paymentTransactionRepository.findById(txn.getTransactionId()).orElse(txn);
+                } else if ("expired".equals(razorpayStatus) || "cancelled".equals(razorpayStatus)) {
+                    txn.setStatus(razorpayStatus);
+                    paymentTransactionRepository.save(txn);
+                }
+            } catch (Exception e) {
+                // Reconciliation is best-effort; on Razorpay errors we fall
+                // through and return the DB state so the frontend keeps
+                // polling (webhook may still land).
+                logger.warn("Reconcile against Razorpay failed for link {}: {}", razorpayLinkId, e.getMessage());
+            }
+        }
+
         Map<String, Object> response = new HashMap<>();
         response.put("status", txn.getStatus());
         response.put("amount", txn.getAmount());
@@ -156,15 +192,35 @@ public class PaymentWebhookController {
             response.put("failureReason", txn.getFailureReason());
         }
 
-        // Auto-login: when status flipped to paid AND student has been created
-        // (provisioning may lag the status update by a few hundred ms), include
-        // the session payload so the frontend can write localStorage and redirect.
-        // If userStudentId is null at this moment, the frontend keeps polling.
-        if ("paid".equals(txn.getStatus()) && txn.getUserStudentId() != null) {
+        // Include the session payload whenever the txn already knows which
+        // student it belongs to. For Path B upgrade txns, userStudentId is
+        // stamped on the row before the Razorpay redirect, so this lets the
+        // /payment-status page build a self-contained redirect URL
+        // ("/studentAssessment/completed?e=…&userStudentId=…&assessmentId=…")
+        // from the very first poll — without waiting for the webhook to flip
+        // status to "paid". The auto-login branch on the frontend still gates
+        // on status==="paid", so this widening is safe.
+        if (txn.getUserStudentId() != null) {
             response.putAll(studentSessionService.buildSessionPayload(txn.getUserStudentId()));
         }
 
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Picks the first captured/authorized payment from a payment-link entity.
+     * Mirrors the helper used by the admin Tracker's check-status flow.
+     */
+    private org.json.JSONObject pickPaidPaymentFromLink(org.json.JSONObject link) {
+        org.json.JSONArray payments = link.optJSONArray("payments");
+        if (payments == null) return null;
+        for (int i = 0; i < payments.length(); i++) {
+            org.json.JSONObject p = payments.optJSONObject(i);
+            if (p == null) continue;
+            String s = p.optString("status", "");
+            if ("captured".equals(s) || "authorized".equals(s)) return p;
+        }
+        return payments.length() > 0 ? payments.optJSONObject(0) : null;
     }
 
     /**
@@ -265,46 +321,66 @@ public class PaymentWebhookController {
         }
 
         PaymentTransaction txn = txnOpt.get();
-
-        // Idempotency: skip if already processed
-        if ("paid".equals(txn.getStatus())) {
-            logger.info("Duplicate payment_link.paid webhook for linkId: {}, skipping", linkId);
-            return;
-        }
-
         JSONObject payment = payloadObj.getJSONObject("payment").getJSONObject("entity");
-        txn.setRazorpayPaymentId(payment.getString("id"));
-        if (payment.has("order_id") && !payment.isNull("order_id")) {
-            txn.setRazorpayOrderId(payment.getString("order_id"));
-        }
-        txn.setStatus("paid");
+        markPaidAndProvision(txn, payment, paymentLink.optJSONObject("notes"));
+    }
 
-        // Only fill from Razorpay payload if registration didn't already capture these
-        if ((txn.getStudentEmail() == null || txn.getStudentEmail().isEmpty())
-                && payment.has("email") && !payment.isNull("email")) {
-            txn.setStudentEmail(payment.getString("email"));
-        }
-        if ((txn.getStudentPhone() == null || txn.getStudentPhone().isEmpty())
-                && payment.has("contact") && !payment.isNull("contact")) {
-            txn.setStudentPhone(payment.getString("contact"));
+    /**
+     * Shared "mark-paid + provision student + activate entitlement" path.
+     * Used by:
+     *   - the {@code payment_link.paid} webhook (real-time, primary)
+     *   - the admin "Check status" action on the B2C Tracker, which fetches
+     *     Razorpay's view of a stuck transaction and reconciles when the
+     *     webhook was missed/delayed
+     *
+     * Idempotent: returns immediately when the txn is already marked paid.
+     * Inputs may be partial — paymentEntity / notes are optional. When
+     * Razorpay reports a paid link without a matching payment object (rare,
+     * old links), we still mark the txn paid and provision so the student
+     * isn't stuck.
+     */
+    @Transactional
+    public boolean markPaidAndProvision(PaymentTransaction txn,
+                                        JSONObject paymentEntity,
+                                        JSONObject linkNotes) {
+        if ("paid".equals(txn.getStatus())) {
+            logger.info("markPaidAndProvision: txn {} already paid, skipping", txn.getTransactionId());
+            return false;
         }
 
-        JSONObject notes = paymentLink.optJSONObject("notes");
-        if (notes != null) {
-            if ((txn.getStudentName() == null || txn.getStudentName().isEmpty())
-                    && notes.has("customerName")) {
-                txn.setStudentName(notes.getString("customerName"));
+        if (paymentEntity != null) {
+            if (paymentEntity.has("id") && !paymentEntity.isNull("id")) {
+                txn.setRazorpayPaymentId(paymentEntity.getString("id"));
             }
-            if (txn.getStudentDob() == null && notes.has("customerDob")) {
+            if (paymentEntity.has("order_id") && !paymentEntity.isNull("order_id")) {
+                txn.setRazorpayOrderId(paymentEntity.getString("order_id"));
+            }
+            if ((txn.getStudentEmail() == null || txn.getStudentEmail().isEmpty())
+                    && paymentEntity.has("email") && !paymentEntity.isNull("email")) {
+                txn.setStudentEmail(paymentEntity.getString("email"));
+            }
+            if ((txn.getStudentPhone() == null || txn.getStudentPhone().isEmpty())
+                    && paymentEntity.has("contact") && !paymentEntity.isNull("contact")) {
+                txn.setStudentPhone(paymentEntity.getString("contact"));
+            }
+        }
+
+        if (linkNotes != null) {
+            if ((txn.getStudentName() == null || txn.getStudentName().isEmpty())
+                    && linkNotes.has("customerName")) {
+                txn.setStudentName(linkNotes.getString("customerName"));
+            }
+            if (txn.getStudentDob() == null && linkNotes.has("customerDob")) {
                 try {
                     SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
-                    txn.setStudentDob(sdf.parse(notes.getString("customerDob")));
+                    txn.setStudentDob(sdf.parse(linkNotes.getString("customerDob")));
                 } catch (Exception e) {
                     logger.warn("Could not parse customer DOB from notes");
                 }
             }
         }
 
+        txn.setStatus("paid");
         paymentTransactionRepository.save(txn);
 
         // Branch: B2C (campaign-linked) vs legacy school payment.
@@ -313,6 +389,7 @@ public class PaymentWebhookController {
         } else {
             createStudentAndAllotAssessment(txn);
         }
+        return true;
     }
 
     private void provisionB2CStudentAndEntitlement(PaymentTransaction txn) {

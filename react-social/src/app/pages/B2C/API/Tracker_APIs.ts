@@ -160,6 +160,22 @@ export const resendPaymentLink = (transactionId: number) =>
 export const resetPayment = (transactionId: number, reason?: string, resetBy?: string) =>
   axios.post(`${API_URL}/admin/tracker/payments/${transactionId}/reset`, { reason, resetBy });
 
+export type CheckPaymentStatusResponse = {
+  transactionId: number;
+  previousStatus?: string;
+  status: string;
+  razorpayStatus?: string | null;
+  changed: boolean;
+  message: string;
+  entitlementId?: number | null;
+  entitlementStatus?: string | null;
+};
+
+export const checkPaymentStatus = (transactionId: number) =>
+  axios.post<CheckPaymentStatusResponse>(
+    `${API_URL}/admin/tracker/payments/${transactionId}/check-status`,
+  );
+
 export const sendPaymentLinkEmail = (
   transactionId: number,
   email: string,
@@ -189,3 +205,40 @@ export const retryReportGeneration = (logId: number, resolvedBy?: string) =>
 
 export const dismissReportError = (logId: number, note?: string, resolvedBy?: string) =>
   axios.post(`${API_URL}/admin/tracker/report-errors/${logId}/dismiss`, { note, resolvedBy });
+
+export type AnswerSelection = {
+  optionId?: number | null;
+  optionText?: string | null;
+  rankOrder?: number | null;
+  textResponse?: string | null;
+  mappedOptionId?: number | null;
+  mappedOptionText?: string | null;
+};
+
+export type AnsweredQuestion = {
+  questionnaireQuestionId: number;
+  questionText?: string | null;
+  questionType?: string | null;
+  sectionName?: string | null;
+  orderIndex?: string | null;
+  selections: AnswerSelection[];
+};
+
+export type AdminAnswersResponse = {
+  userStudentId: number;
+  assessmentId: number;
+  assessmentName?: string | null;
+  studentName?: string | null;
+  status: string;
+  persistenceState?: string | null;
+  totalQuestions: number;
+  answeredQuestions: number;
+  hasRedisDraft: boolean;
+  redisAnswerCount?: number | null;
+  questions: AnsweredQuestion[];
+};
+
+export const getStudentAssessmentAnswers = (userStudentId: number, assessmentId: number) =>
+  axios.get<AdminAnswersResponse>(
+    `${API_URL}/assessment-answer/admin-view/${userStudentId}/${assessmentId}`,
+  );

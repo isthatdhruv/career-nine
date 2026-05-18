@@ -116,6 +116,15 @@ public class AssessmentSubmissionProcessorService {
     private AssessmentSubmissionFailureRepository failureRepository;
 
     /**
+     * B2C entitlement hook — fires post-completion notifications (1-pager /
+     * final report email) when a paid-attempt submission successfully
+     * persists. Optional bean: not present in environments without B2C
+     * features wired up.
+     */
+    @Autowired(required = false)
+    private com.kccitm.api.service.b2c.EntitlementService entitlementService;
+
+    /**
      * Self-reference for @Async proxy invocation (so scheduled retries actually
      * run off the scheduler thread).
      */
@@ -185,6 +194,26 @@ public class AssessmentSubmissionProcessorService {
         AssessmentTable assessment = assessmentTableRepository.findById(assessmentId)
                 .orElseThrow(() -> new EntityNotFoundException("Assessment " + assessmentId));
         StudentAssessmentMapping mapping = loadMapping(studentId, assessmentId);
+
+        // Idempotency guard: if a prior processor pass already persisted this
+        // submission, do NOT re-run dedupe/scoring/delete-and-reinsert. Without
+        // this, a transient Redis failure in steps 7-8 below would propagate to
+        // the catch handler → recordFailure → retry scheduler, which would then
+        // re-fire the completion email and B2C entitlement hook from steps 9-10.
+        // Best-effort Redis cleanup + return; the side-effect hooks fired on the
+        // first pass and must not fire again.
+        if ("completed".equals(mapping.getStatus())
+                && ("persisted".equals(mapping.getPersistenceState())
+                    || "persisted_with_warnings".equals(mapping.getPersistenceState()))) {
+            logger.info("Submission already persisted on a prior pass; skipping re-processing. student={} assessment={}",
+                    studentId, assessmentId);
+            try { assessmentSessionService.deletePartialAnswers(studentId, assessmentId); } catch (Exception ignored) {}
+            try {
+                assessmentSessionService.markSubmittedArchived(studentId, assessmentId,
+                        mapping.getPersistenceState(), 0, 0);
+            } catch (Exception ignored) {}
+            return;
+        }
 
         // 1. Defensive dedupe — on composite key, not questionId alone.
         //
@@ -379,21 +408,18 @@ public class AssessmentSubmissionProcessorService {
             rawScoresToSave.add(ars);
         }
 
-        // 5. Persist to MySQL (transactional, delete-before-save).
+        // 5. Persist to MySQL (transactional: delete-before-save + atomic mapping flip).
         // Call via `self` so Spring's proxy wraps the call with @Transactional —
         // direct this-invocation would bypass AOP and lose rollback semantics.
-        self.persistToMySQL(studentId, assessmentId, mapping, answersToSave, rawScoresToSave);
-
-        // 6. Flip persistenceState based on whether we saw warnings
+        //
+        // status flips ongoing → completed ONLY here, inside the same transaction
+        // as the answer/score writes. Crash after answer-save but before mapping
+        // commit ⇒ the whole transaction rolls back, and the next retry sees
+        // status="ongoing" + persistence_state="pending" as before. No zombie
+        // "pending" mappings with answers already in the DB.
         boolean hadWarnings = (duplicateCount > 0) || (skippedUnknownCount > 0);
-        mapping.setPersistenceState(hadWarnings ? "persisted_with_warnings" : "persisted");
-        // Also make completion status idempotent: if the mapping was still
-        // "ongoing" (e.g. admin dispatched a stuck submission), the presence of
-        // the full answer set in MySQL makes "completed" the correct state.
-        if (!"completed".equals(mapping.getStatus())) {
-            mapping.setStatus("completed");
-        }
-        studentAssessmentMappingRepository.save(mapping);
+        self.persistToMySQL(studentId, assessmentId, mapping,
+                answersToSave, rawScoresToSave, hadWarnings);
 
         // 7. Clean up partial: key (no longer needed — student submitted).
         // CRITICAL: we do NOT delete the submitted: key on success. It stays as
@@ -422,6 +448,22 @@ public class AssessmentSubmissionProcessorService {
         } catch (Exception emailErr) {
             logger.warn("Completion email failed for student={} assessment={} (non-fatal)",
                     studentId, assessmentId, emailErr);
+        }
+
+        // 10. B2C entitlement post-completion hook (non-critical).
+        // Fires only after MySQL confirms the write — previously was wired
+        // into the /submit endpoint, which meant it would fire even for
+        // submissions that later 3-strike failed. Now: success-only.
+        try {
+            if (entitlementService != null) {
+                String studentEmail = userStudent.getStudentInfo() != null
+                        ? userStudent.getStudentInfo().getEmail()
+                        : null;
+                entitlementService.onAssessmentCompleted(studentId, assessmentId, studentEmail);
+            }
+        } catch (Exception entitlementErr) {
+            logger.warn("B2C entitlement post-completion hook failed for student={} assessment={} (non-fatal)",
+                    studentId, assessmentId, entitlementErr);
         }
 
         logger.info("Processing succeeded: student={} assessment={} answers={} scores={} warnings={}/{}",
@@ -457,22 +499,24 @@ public class AssessmentSubmissionProcessorService {
     }
 
     /**
-     * Transactional MySQL write: delete-before-save pattern.
-     * Under the same @Transactional, stale rows are removed first; if the save
-     * fails the whole thing rolls back and the old rows remain intact. This
-     * avoids the previous brief-window of both old + new rows co-existing.
+     * Transactional MySQL write: delete-before-save + atomic mapping flip.
      *
-     * markCompletedIfFullyAnswered is called here only as a double-check — the
-     * submit endpoint has already set status=completed. If the student somehow
-     * landed fewer answers than expected, this logs the mismatch but does not
-     * revert status (that policy is enforced at the submit endpoint via the
-     * excess-payload guard, and by future answer-count validation).
+     * Single transaction wraps:
+     *   (a) delete stale answers + scores
+     *   (b) save new answers + scores
+     *   (c) flip mapping.status="completed" + persistence_state
+     *
+     * Crash anywhere inside ⇒ the whole transaction rolls back; the mapping
+     * keeps its prior status="ongoing" + persistence_state="pending" and the
+     * retry scheduler can pick it up cleanly. There is no window where answers
+     * exist in the DB but the mapping reports otherwise.
      */
     @Transactional
     public void persistToMySQL(Long studentId, Long assessmentId,
                                StudentAssessmentMapping mapping,
                                List<AssessmentAnswer> answersToSave,
-                               List<AssessmentRawScore> rawScoresToSave) {
+                               List<AssessmentRawScore> rawScoresToSave,
+                               boolean hadWarnings) {
 
         // Delete existing answers for this (student, assessment)
         List<Long> existingAnswerIds = assessmentAnswerRepository
@@ -503,8 +547,14 @@ public class AssessmentSubmissionProcessorService {
         assessmentAnswerRepository.saveAll(answersToSave);
         assessmentRawScoreRepository.saveAll(rawScoresToSave);
 
+        // Atomic mapping flip — only commits if the answer/score saves above
+        // succeed. status moves to "completed" ONLY here, inside the DB
+        // transaction. /submit no longer pre-flips status.
+        mapping.setStatus("completed");
+        mapping.setPersistenceState(hadWarnings ? "persisted_with_warnings" : "persisted");
+        studentAssessmentMappingRepository.save(mapping);
+
         // Double-check completion against actual answer count (informational only).
-        // The submit endpoint has already set status=completed synchronously.
         int total = completionService.getTotalQuestions(assessmentId);
         int answered = completionService.getAnsweredCount(studentId, assessmentId);
         if (total > 0 && answered < total) {
@@ -524,8 +574,11 @@ public class AssessmentSubmissionProcessorService {
      *   (timeouts, deadlocks, connection drops)
      * - Spring's NonTransientDataAccessException hierarchy → non-transient
      *   (integrity violations, bad SQL)
-     * - EntityNotFoundException, IllegalArgumentException, NPE → non-transient
+     * - EntityNotFoundException, IllegalArgumentException → non-transient
      *   (data/code problem — retrying won't help)
+     * - NullPointerException → transient (often LazyInit, race conditions,
+     *   incidental missing-state bugs that resolve on the next attempt;
+     *   3 consecutive NPEs still trips the non-transient cap defensively).
      * - Anything else → transient by default (generous; gives flaky infra
      *   room to heal; poison pills still die after 3 consecutive such hits).
      */
@@ -537,7 +590,6 @@ public class AssessmentSubmissionProcessorService {
             if (cur instanceof DataIntegrityViolationException) return false;
             if (cur instanceof EntityNotFoundException) return false;
             if (cur instanceof IllegalArgumentException) return false;
-            if (cur instanceof NullPointerException) return false;
             cur = cur.getCause();
         }
         return true;
@@ -582,6 +634,11 @@ public class AssessmentSubmissionProcessorService {
                 row.setNextRetryAt(null);
                 try {
                     StudentAssessmentMapping mapping = loadMapping(studentId, assessmentId);
+                    // Flip BOTH columns: status="failed" excludes this row from
+                    // teacher dashboards / report generators / exports that key
+                    // off status; persistence_state="failed" tells admin tools
+                    // the technical reason.
+                    mapping.setStatus("failed");
                     mapping.setPersistenceState("failed");
                     studentAssessmentMappingRepository.save(mapping);
                 } catch (Exception flagErr) {

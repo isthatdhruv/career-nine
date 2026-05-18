@@ -549,6 +549,40 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {/* Status row — prominent on/off toggle so admins can immediately
+                      fix the public "Link Unavailable" screen by flipping it back on. */}
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+                    padding: "12px 16px", borderRadius: 10,
+                    background: link.isActive ? "#ecfdf5" : "#fef2f2",
+                    border: `1.5px solid ${link.isActive ? "#a7f3d0" : "#fecaca"}`,
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+                      <span style={{
+                        width: 10, height: 10, borderRadius: "50%",
+                        background: link.isActive ? "#10b981" : "#ef4444",
+                        boxShadow: link.isActive
+                          ? "0 0 0 4px rgba(16, 185, 129, 0.15)"
+                          : "0 0 0 4px rgba(239, 68, 68, 0.15)",
+                      }} />
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: "0.88rem", color: link.isActive ? "#065f46" : "#991b1b" }}>
+                          {link.isActive ? "Link enabled" : "Link disabled"}
+                        </div>
+                        <div style={{ fontSize: "0.74rem", color: link.isActive ? "#047857" : "#b91c1c", marginTop: 2 }}>
+                          {link.isActive
+                            ? "Students can open this URL and register."
+                            : "Students see “Link Unavailable”. Turn on to re-enable."}
+                        </div>
+                      </div>
+                    </div>
+                    <ToggleSwitch
+                      checked={!!link.isActive}
+                      onChange={handleToggleLink}
+                      ariaLabel="Toggle school registration link"
+                    />
+                  </div>
+
                   <div style={{
                     display: "flex", alignItems: "flex-end", gap: 12, flexWrap: "wrap",
                     padding: "12px 14px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10,
@@ -585,11 +619,14 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
-                      fontSize: "0.82rem", color: "#2563eb", wordBreak: "break-all",
-                      lineHeight: 1.5, textDecoration: "none",
+                      fontSize: "0.82rem",
+                      color: link.isActive ? "#2563eb" : "#94a3b8",
+                      wordBreak: "break-all",
+                      lineHeight: 1.5,
+                      textDecoration: link.isActive ? "none" : "line-through",
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
-                    onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+                    onMouseEnter={(e) => { if (link.isActive) e.currentTarget.style.textDecoration = "underline"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.textDecoration = link.isActive ? "none" : "line-through"; }}
                   >
                     {getRegistrationUrl()}
                   </a>
@@ -619,18 +656,6 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
                     >
                       <MdQrCode size={14} />
                       {showQr ? "Hide QR" : "Show QR"}
-                    </button>
-                    <button
-                      onClick={handleToggleLink}
-                      style={{
-                        display: "inline-flex", alignItems: "center",
-                        padding: "6px 14px", borderRadius: 8,
-                        border: "1.5px solid #e2e8f0", background: "#fff",
-                        color: link.isActive ? "#059669" : "#94a3b8",
-                        fontWeight: 600, fontSize: "0.78rem", cursor: "pointer",
-                      }}
-                    >
-                      {link.isActive ? "Active" : "Inactive"}
                     </button>
                   </div>
 
@@ -675,5 +700,47 @@ const SchoolAssessmentMappingPanel = ({ instituteCode, instituteName, active = t
     </div>
   );
 };
+
+interface ToggleSwitchProps {
+  checked: boolean;
+  onChange: () => void;
+  ariaLabel?: string;
+}
+
+const ToggleSwitch = ({ checked, onChange, ariaLabel }: ToggleSwitchProps) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    aria-label={ariaLabel}
+    onClick={onChange}
+    style={{
+      position: "relative",
+      width: 48,
+      height: 26,
+      borderRadius: 999,
+      border: "none",
+      padding: 0,
+      cursor: "pointer",
+      background: checked ? "#10b981" : "#cbd5e1",
+      transition: "background 0.2s ease",
+      flexShrink: 0,
+    }}
+  >
+    <span
+      style={{
+        position: "absolute",
+        top: 3,
+        left: checked ? 25 : 3,
+        width: 20,
+        height: 20,
+        borderRadius: "50%",
+        background: "#fff",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+        transition: "left 0.2s ease",
+      }}
+    />
+  </button>
+);
 
 export default SchoolAssessmentMappingPanel;

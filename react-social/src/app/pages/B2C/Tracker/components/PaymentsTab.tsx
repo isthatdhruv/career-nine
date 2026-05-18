@@ -5,6 +5,7 @@ import {
   InstituteOption,
   PaymentRow,
   assignStudentInstitute,
+  checkPaymentStatus,
   resendEntitlementService,
   resetPayment,
   sendPaymentLinkEmail,
@@ -113,6 +114,26 @@ const PaymentsTab = ({
     }
   };
 
+  const handleCheckStatus = async (r: PaymentRow) => {
+    setBusy({ id: r.transactionId, type: "check_status" });
+    try {
+      const res = await checkPaymentStatus(r.transactionId);
+      const { status, previousStatus, razorpayStatus, changed, message } = res.data;
+      if (changed && status === "paid") {
+        showSuccessToast(`Txn #${r.transactionId}: ${previousStatus ?? "?"} → paid (synced from Razorpay)`);
+      } else if (changed) {
+        showSuccessToast(`Txn #${r.transactionId}: ${previousStatus ?? "?"} → ${status}`);
+      } else {
+        showSuccessToast(`Razorpay: ${razorpayStatus ?? "—"} · ${message}`);
+      }
+      onInstituteChanged?.();
+    } catch (e: any) {
+      showErrorToast(e?.response?.data?.message ?? e?.response?.data ?? "Failed to check status");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const handleResetPayment = async (r: PaymentRow) => {
     const wording = r.status === "paid"
       ? `Reset transaction #${r.transactionId}?\n\nThis will:\n• Flip the payment to "not received" (status: created)\n• Revert the linked entitlement to pending (clears tier + dashboard/counselling/LMS/report flags)\n• Keep Razorpay IDs as audit evidence\n\nUse for test cleanup or to undo a mistakenly-marked-paid row. Continue?`
@@ -160,8 +181,9 @@ const PaymentsTab = ({
 
   return (
     <>
-      <Table responsive striped hover size="sm" className="align-middle" style={{ minWidth: 1100 }}>
-        <thead>
+      <div className="table-responsive" style={{ maxHeight: "65vh", minHeight: 200 }}>
+      <Table striped hover size="sm" className="align-middle mb-0" style={{ minWidth: 1100 }}>
+        <thead className="position-sticky top-0 bg-white" style={{ zIndex: 2, boxShadow: "inset 0 -1px 0 #dee2e6" }}>
           <tr>
             <th style={{ whiteSpace: "nowrap" }}>Txn</th>
             <th style={{ whiteSpace: "nowrap" }}>Created</th>
@@ -275,6 +297,19 @@ const PaymentsTab = ({
                       ? <Button size="sm" variant="outline-primary" onClick={() => onOpenEntitlement(r.entitlementId!)}>Manage</Button>
                       : (r.shortUrl && <a href={r.shortUrl} target="_blank" rel="noreferrer" className="btn btn-sm btn-outline-secondary">Open link</a>)
                     }
+                    {r.status !== "paid" && r.status !== "refunded" && (
+                      <Button
+                        size="sm"
+                        variant="outline-primary"
+                        title="Ask Razorpay for the live status of this payment link. If Razorpay reports paid, the txn will flip to paid and the entitlement will be provisioned."
+                        disabled={busy?.id === r.transactionId && busy.type === "check_status"}
+                        onClick={() => handleCheckStatus(r)}
+                      >
+                        {busy?.id === r.transactionId && busy.type === "check_status"
+                          ? <Spinner animation="border" size="sm" />
+                          : "Check status"}
+                      </Button>
+                    )}
                     {r.status && r.status !== "created" && (
                       <Button
                         size="sm"
@@ -295,8 +330,9 @@ const PaymentsTab = ({
           })}
         </tbody>
       </Table>
+      </div>
 
-      <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
         <small className="text-muted">{total} total · page {page + 1} of {totalPages}</small>
         <Pagination size="sm" className="mb-0 flex-wrap">
           <Pagination.First disabled={page === 0} onClick={() => onPageChange(0)} />

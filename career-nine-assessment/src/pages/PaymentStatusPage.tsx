@@ -76,30 +76,100 @@ const PaymentStatusPage = () => {
   const [details, setDetails] = useState<any>(null)
   const pollCount = useRef(0)
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Cached on every successful poll so the fallback redirect can still build
+  // a self-contained /studentAssessment/completed?... URL even when polling
+  // exhausts (Razorpay unreachable and webhook hasn't landed).
+  const lastSeenAssessmentId = useRef<number | null>(null)
+  const lastSeenUserStudentId = useRef<number | null>(null)
 
   useEffect(() => {
     const linkId = searchParams.get("razorpay_payment_link_id")
     const isUpgrade = searchParams.get("upgrade") === "1"
     const eid = searchParams.get("eid")
+    const urlSaysPaid = searchParams.get("razorpay_payment_link_status") === "paid"
 
     if (!linkId) {
       setStatus("error")
       return
     }
 
+    // Builds /studentAssessment/completed?e=…&userStudentId=…&assessmentId=…
+    // from whatever we have. ThankYouPage reads all three keys and seeds
+    // localStorage on mount, so passing them in the URL keeps the flow
+    // resilient to fresh tabs, incognito, or any localStorage gap.
+    const buildCompletedUrl = (
+      userStudentId?: number | string | null,
+      assessmentId?: number | string | null,
+    ) => {
+      const params = new URLSearchParams({ e: String(eid) })
+      if (userStudentId != null) params.set("userStudentId", String(userStudentId))
+      if (assessmentId != null) params.set("assessmentId", String(assessmentId))
+      return `/studentAssessment/completed?${params.toString()}`
+    }
+
+    // Upgrade-path safety net: if polling exhausts without ever seeing "paid"
+    // from the DB but Razorpay's redirect URL claims paid, still send the
+    // student to the completed page. The reconcile=1 call below normally
+    // makes this unnecessary, but it's the last-ditch escape hatch when
+    // Razorpay's API itself is unreachable from the backend.
+    const navigateToCompletedIfUpgrade = () => {
+      if (isUpgrade && eid && urlSaysPaid) {
+        localStorage.setItem("entitlementId", eid)
+        if (lastSeenUserStudentId.current != null) {
+          localStorage.setItem("userStudentId", String(lastSeenUserStudentId.current))
+        }
+        if (lastSeenAssessmentId.current != null) {
+          localStorage.setItem("assessmentId", String(lastSeenAssessmentId.current))
+        }
+        setStatus("paid")
+        setTimeout(
+          () => navigate(
+            buildCompletedUrl(lastSeenUserStudentId.current, lastSeenAssessmentId.current),
+            { replace: true },
+          ),
+          1200,
+        )
+        return true
+      }
+      return false
+    }
+
     const pollStatus = () => {
+      // On the very first request, ask the backend to reconcile against
+      // Razorpay if the DB is still "created" — this short-circuits the
+      // 30-second poll loop when the webhook is delayed or misconfigured.
+      const url = pollCount.current === 0 && urlSaysPaid
+        ? `/payment/webhook/status/${linkId}?reconcile=1`
+        : `/payment/webhook/status/${linkId}`
+
       http
-        .get(`/payment/webhook/status/${linkId}`)
+        .get(url)
         .then((res) => {
           const data = res.data
           setDetails(data)
+          // Cache the latest known ids so the fallback path can use them.
+          if (data?.assessmentId != null) lastSeenAssessmentId.current = data.assessmentId
+          if (data?.userStudentId != null) lastSeenUserStudentId.current = data.userStudentId
 
           if (data.status === "paid" && isUpgrade && eid) {
-            // Try-First upgrade: student already logged in. Keep their session,
-            // just refresh the entitlement pointer and bounce back to thank-you.
+            // Try-First upgrade: student already logged in. Stamp all three
+            // ids into both the redirect URL and localStorage so ThankYouPage
+            // picks them up regardless of whether it reads URL or storage first.
             localStorage.setItem("entitlementId", eid)
+            if (data.userStudentId != null) {
+              localStorage.setItem("userStudentId", String(data.userStudentId))
+            }
+            if (data.assessmentId != null) {
+              localStorage.setItem("assessmentId", String(data.assessmentId))
+            }
             setStatus("paid")
-            setTimeout(() => navigate("/studentAssessment/completed", { replace: true }), 1500)
+            setTimeout(
+              () => navigate(
+                buildCompletedUrl(data.userStudentId, data.assessmentId),
+                { replace: true },
+              ),
+              1500,
+            )
             return
           }
 
@@ -138,9 +208,8 @@ const PaymentStatusPage = () => {
           if (pollCount.current < 15) {
             pollTimer.current = setTimeout(pollStatus, 2000)
             setStatus("created")
-          } else {
-            const linkStatus = searchParams.get("razorpay_payment_link_status")
-            setStatus((linkStatus as PaymentStatus) || "created")
+          } else if (!navigateToCompletedIfUpgrade()) {
+            setStatus(urlSaysPaid ? "paid" : "created")
           }
         })
         .catch(() => {
@@ -149,14 +218,8 @@ const PaymentStatusPage = () => {
           if (pollCount.current < 15) {
             setStatus("created")
             pollTimer.current = setTimeout(pollStatus, 2000)
-          } else {
-            // All retries exhausted — check Razorpay query param as fallback
-            const linkStatus = searchParams.get("razorpay_payment_link_status")
-            if (linkStatus === "paid") {
-              setStatus("paid")
-            } else {
-              setStatus("error")
-            }
+          } else if (!navigateToCompletedIfUpgrade()) {
+            setStatus(urlSaysPaid ? "paid" : "error")
           }
         })
     }

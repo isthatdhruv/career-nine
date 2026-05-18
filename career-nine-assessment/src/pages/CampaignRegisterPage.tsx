@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { showErrorToast } from "../utils/toast"
 import {
@@ -9,6 +9,7 @@ import {
   registerTrial,
 } from "../api-clients/campaignAPI"
 import { validatePromoCode } from "../api-clients/promoCodeAPI"
+import DuplicateEmailDialog, { DuplicateEmailPayload } from "../components/DuplicateEmailDialog"
 
 type Tier = {
   campaignAssessmentTierId: number
@@ -76,6 +77,10 @@ const CampaignRegisterPage = () => {
   const [dob, setDob] = useState("")
   const [phone, setPhone] = useState("")
   const [gender, setGender] = useState("")
+
+  const [duplicateInfo, setDuplicateInfo] = useState<DuplicateEmailPayload | null>(null)
+  const emailRef = useRef<HTMLInputElement | null>(null)
+  const dobRef = useRef<HTMLInputElement | null>(null)
 
   const [promoCode, setPromoCode] = useState("")
   const [promoApplied, setPromoApplied] = useState<{ code: string; discountPercent: number } | null>(null)
@@ -232,7 +237,13 @@ const CampaignRegisterPage = () => {
 
       showErrorToast("Unexpected response from server. Please try again.")
     } catch (err: any) {
-      const raw = err.response?.data?.message || err.response?.data || "Registration failed. Please try again."
+      const payload = err.response?.data
+      if (payload && typeof payload === "object" && payload.status === "duplicate_email") {
+        setDuplicateInfo(payload as DuplicateEmailPayload)
+        setFormError("")
+        return
+      }
+      const raw = payload?.message || payload || "Registration failed. Please try again."
       const msg = typeof raw === "string" ? raw : "Registration failed."
       // 400-class server validation errors render as an inline banner above
       // the form; everything else falls through to the toast.
@@ -438,6 +449,7 @@ const CampaignRegisterPage = () => {
                       Email <span style={{ color: "#f43f5e" }}>*</span>
                     </label>
                     <input
+                      ref={emailRef}
                       type="email"
                       placeholder="you@example.com"
                       value={email}
@@ -453,6 +465,7 @@ const CampaignRegisterPage = () => {
                       Date of Birth <span style={{ color: "#f43f5e" }}>*</span>
                     </label>
                     <input
+                      ref={dobRef}
                       type="text"
                       placeholder="dd-mm-yyyy"
                       value={dob}
@@ -619,6 +632,23 @@ const CampaignRegisterPage = () => {
       }}>
         CAREER-9
       </div>
+
+      <DuplicateEmailDialog
+        open={!!duplicateInfo}
+        payload={duplicateInfo}
+        onUseRegisteredDob={() => {
+          setDuplicateInfo(null)
+          setDob("")
+          setTimeout(() => dobRef.current?.focus(), 50)
+        }}
+        onChangeIdentity={() => {
+          setDuplicateInfo(null)
+          setEmail("")
+          setPhone("")
+          setTimeout(() => emailRef.current?.focus(), 50)
+        }}
+        onClose={() => setDuplicateInfo(null)}
+      />
     </div>
   )
 }
