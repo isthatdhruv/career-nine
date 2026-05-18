@@ -1,8 +1,7 @@
 package com.kccitm.api.controller.career9;
 
-import java.util.Map;
-
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,17 +17,17 @@ public class DashboardSnapshotController {
     @Autowired
     private DashboardSnapshotService dashboardSnapshotService;
 
-    @GetMapping("/admin/snapshot")
-    public ResponseEntity<Map<String, Object>> getAdminSnapshot() {
-        Map<String, Object> payload = dashboardSnapshotService.getOrCompute(
+    @GetMapping(value = "/admin/snapshot", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<byte[]> getAdminSnapshot() {
+        byte[] bytes = dashboardSnapshotService.getOrComputeJsonBytes(
                 DashboardSnapshotService.ADMIN_DASHBOARD_KEY, false);
-        return ResponseEntity.ok(payload);
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(bytes);
     }
 
-    @PostMapping("/admin/snapshot/refresh")
-    public ResponseEntity<Map<String, Object>> refreshAdminSnapshot() {
-        Map<String, Object> payload = dashboardSnapshotService.getOrCompute(
+    @PostMapping(value = "/admin/snapshot/refresh", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<byte[]> refreshAdminSnapshot() {
+        byte[] bytes = dashboardSnapshotService.getOrComputeJsonBytes(
                 DashboardSnapshotService.ADMIN_DASHBOARD_KEY, true);
-        return ResponseEntity.ok(payload);
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(bytes);
     }
 }
