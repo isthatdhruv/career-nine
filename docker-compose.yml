@@ -59,7 +59,7 @@ services:
       dockerfile: dockerfile
     ports:
       - 8080:8080
-    command: ["java", "-Xms1g", "-Xmx2g", "-jar", "/usr/local/lib/demo.jar"]
+    command: ["java", "-Xms1g", "-Xmx2g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=production"]
     restart: always
     volumes:
       - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
