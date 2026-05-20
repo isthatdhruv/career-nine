@@ -47,7 +47,7 @@ import StudentsList from "../pages/StudentInformation/StudentsList";
 import GroupCreatePage from "../pages/dashboard/widgets/CreateNewGroup";
 import StudentCreatePage from "../pages/dashboard/widgets/CreateNewStudent";
 import GroupStudentPage from "../pages/GroupStudent/GroupStudentPage";
-import StudentManagementPage from "../pages/GroupStudent/StudentManagementPage";
+// import StudentManagementPage from "../pages/GroupStudent/StudentManagementPage";
 import StudentListPage from "../pages/GroupStudent/StudentListPage";
 // GroupStudentAdminPage removed — consolidated into Data Download (/group-student)
 import GroupStudentSchoolPage from "../pages/GroupStudent/GroupStudentSchoolPage";
@@ -74,6 +74,7 @@ import ReportsHubPage from "../pages/ReportsHub/ReportsHubPage";
 import AdminAssessmentEditPage from "../pages/ReportsHub/AdminAssessmentEdit/AdminAssessmentEditPage";
 import StudentDashboard from "../pages/StudentDashboard/StudentDashboard";
 import ClassTeacherDashboard from "../pages/ClassTeacherDashboard/ClassTeacherDashboard";
+import StudentManagementPage from "../pages/GroupStudent/StudentManagementPage";
 
 // Paths that every logged-in user can access without a per-route permission check.
 // Preserved verbatim per Phase 17 locked decision — Phase 17 does NOT add or remove entries.
@@ -391,7 +392,7 @@ const PrivateRoutes = () => {
         <Route path="/student-list" element={
           <RequirePermission perm="student.read">
             <SuspensedView>
-              <StudentListPage />
+              <StudentManagementPage/>
             </SuspensedView>
           </RequirePermission>
         } />

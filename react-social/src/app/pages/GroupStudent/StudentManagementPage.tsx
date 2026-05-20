@@ -18,6 +18,10 @@ import {
   getAllGameResults,
   getDemographicFieldsForStudent,
   updateStudentBasicInfo,
+  sendLoginCredentials,
+  generateBetReportOneClick,
+  generatePagerReportOneClick,
+  getGeneratedReportsForStudent,
 } from "../StudentInformation/StudentInfo_APIs";
 import { useAssessmentsForInstitute } from "../../hooks/useScopedAssessments";
 // XLSX retained ONLY for the Student List export (admin convenience for the
@@ -108,6 +112,87 @@ export default function StudentManagementPage() {
 
   // Reset state
   const [resetting, setResetting] = useState(false);
+
+  // Credentials-email send-in-flight tracking. Set of userStudentIds currently
+  // being processed. Lets us disable the button + show a spinner per-row.
+  const [sendingCredentialsFor, setSendingCredentialsFor] = useState<Set<number>>(new Set());
+  // Separate flag for the bulk-send button so a bulk run doesn't have to
+  // populate the per-row set (and visa-versa).
+  const [bulkSendingCredentials, setBulkSendingCredentials] = useState(false);
+
+  // ── Report state (Generate / Download / Regenerate per assessment) ──
+  // key = "userStudentId-assessmentId", value = DO Spaces report URL.
+  // Hydrated on modal open from /generated-reports/by-student; populated
+  // inline as Generate/Regenerate calls return.
+  const [generatedReportUrls, setGeneratedReportUrls] = useState<Map<string, string>>(new Map());
+  // "userStudentId-assessmentId" of the row currently in-flight, so we can
+  // disable + spin the right Generate / Regenerate button per assessment.
+  const [reportGeneratingFor, setReportGeneratingFor] = useState<string | null>(null);
+
+  /** Build the Map key used by generatedReportUrls / reportGeneratingFor. */
+  const reportKey = (userStudentId: number, assessmentId: number) =>
+    `${userStudentId}-${assessmentId}`;
+
+  /**
+   * Picks the right one-click generator based on the assessment's type. BET
+   * assessments (questionnaire.type === true) get the BET pipeline; everything
+   * else (Navigator-type) gets the new pager 4-pager pipeline. Legacy
+   * 18-pager Navigator is intentionally NOT reachable from here — kept in
+   * ReportsHub only (per product decision).
+   */
+  const generateReportForAssessment = async (
+    assessmentId: number,
+    userStudentId: number,
+    force: boolean,
+  ): Promise<string | null> => {
+    const fullAssessment = (assessments as any[]).find((a: any) => a.id === assessmentId);
+    const isBet = fullAssessment?.questionnaire?.type === true;
+    if (isBet) {
+      const res = await generateBetReportOneClick(assessmentId, userStudentId, force);
+      return (res.data as any)?.reportUrl || null;
+    }
+    const res = await generatePagerReportOneClick(assessmentId, userStudentId, force);
+    return res.data?.reportUrl || null;
+  };
+
+  /**
+   * Single entrypoint for the View modal + per-row chip + Regenerate buttons.
+   * Writes the resolved URL into state on success; shows a toast on failure
+   * or "not ready" (e.g. async persist hasn't landed yet).
+   */
+  const handleGenerateReport = async (
+    assessmentId: number,
+    userStudentId: number,
+    force: boolean,
+  ) => {
+    const key = reportKey(userStudentId, assessmentId);
+    if (reportGeneratingFor === key) return;
+    setReportGeneratingFor(key);
+    try {
+      const url = await generateReportForAssessment(assessmentId, userStudentId, force);
+      if (url) {
+        setGeneratedReportUrls((prev) => {
+          const next = new Map(prev);
+          next.set(key, url);
+          return next;
+        });
+        showSuccessToast(force ? "Report regenerated." : "Report ready.");
+      } else {
+        showErrorToast("Report generation returned no URL.");
+      }
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const body = err?.response?.data;
+      if (status === 503 || body?.status === "not_ready") {
+        showErrorToast(body?.error || "Scores aren't ready yet. Try again in a moment.");
+      } else {
+        const msg = body?.error || body?.message || err?.message || "Report generation failed";
+        showErrorToast(msg);
+      }
+    } finally {
+      setReportGeneratingFor(null);
+    }
+  };
 
   // ── Convenience aliases for backward compatibility ──
   const showAssessmentModal = modal.type === "assessment";
@@ -708,6 +793,89 @@ export default function StudentManagementPage() {
     }
   };
 
+  /**
+   * Re-queue the styled "here are your login credentials" Odoo email for one
+   * student. Backend looks up the username + DOB (as the initial password)
+   * and validates that an email is on file; surfaced failures here are
+   * "queued failed" (no email / no DOB / no username) — actual SMTP success
+   * shows up only in backend logs.
+   */
+  const handleSendCredentials = async (student: Student) => {
+    if (sendingCredentialsFor.has(student.userStudentId)) return;
+    setSendingCredentialsFor((prev) => {
+      const next = new Set(prev);
+      next.add(student.userStudentId);
+      return next;
+    });
+    try {
+      const res = await sendLoginCredentials([student.userStudentId]);
+      const row = (res.data?.results || [])[0];
+      if (res.data?.sent > 0 && row?.status === "queued") {
+        showSuccessToast(`Credentials email queued for ${student.name} (${row.email || "email on file"}).`);
+      } else {
+        const reason = row?.reason || "Unknown error";
+        showErrorToast(`Could not send credentials to ${student.name}: ${reason}`);
+      }
+    } catch (err: any) {
+      console.error("send-login-credentials failed:", err);
+      const msg = err?.response?.data?.message || err?.message || "Request failed";
+      showErrorToast(`Could not send credentials to ${student.name}: ${msg}`);
+    } finally {
+      setSendingCredentialsFor((prev) => {
+        const next = new Set(prev);
+        next.delete(student.userStudentId);
+        return next;
+      });
+    }
+  };
+
+  /**
+   * Bulk variant of {@link handleSendCredentials}. Targets the checkbox-
+   * selected rows when any are selected; otherwise targets every row matching
+   * the current filter (the same set the "Student List" Excel download uses).
+   * Confirms before firing because the resulting Odoo dispatches are
+   * irreversible from the admin's side.
+   */
+  const handleBulkSendCredentials = async () => {
+    if (bulkSendingCredentials) return;
+    const targetStudents = selectedStudents.size > 0
+      ? filteredStudents.filter((s) => selectedStudents.has(s.userStudentId))
+      : filteredStudents;
+    if (targetStudents.length === 0) {
+      showErrorToast("No students to send credentials to.");
+      return;
+    }
+    const scopeLabel = selectedStudents.size > 0 ? "selected" : "filtered";
+    const confirmed = window.confirm(
+      `Send login credentials emails to ${targetStudents.length} ${scopeLabel} student${targetStudents.length === 1 ? "" : "s"}?\n\n`
+      + "Each student must have an email on file, a username, and a date of birth — others will be skipped and reported as failures."
+    );
+    if (!confirmed) return;
+
+    setBulkSendingCredentials(true);
+    try {
+      const ids = targetStudents.map((s) => s.userStudentId);
+      const res = await sendLoginCredentials(ids);
+      const sent = res.data?.sent ?? 0;
+      const failed = res.data?.failed ?? 0;
+      if (sent > 0 && failed === 0) {
+        showSuccessToast(`Credentials emails queued for all ${sent} student${sent === 1 ? "" : "s"}.`);
+      } else if (sent > 0 && failed > 0) {
+        showSuccessToast(`Queued ${sent}, failed ${failed}. Check console for per-student reasons.`);
+        console.warn("Bulk send-credentials partial failures:", res.data?.results);
+      } else {
+        showErrorToast(`Could not queue any credentials emails. ${failed} failed.`);
+        console.warn("Bulk send-credentials all failed:", res.data?.results);
+      }
+    } catch (err: any) {
+      console.error("bulk send-login-credentials failed:", err);
+      const msg = err?.response?.data?.message || err?.message || "Request failed";
+      showErrorToast(`Bulk send failed: ${msg}`);
+    } finally {
+      setBulkSendingCredentials(false);
+    }
+  };
+
   const handleEditStudent = (student: Student) => {
     setEditForm({
       name: student.name || "",
@@ -766,6 +934,26 @@ export default function StudentManagementPage() {
       return true;
     });
     setStudentAssessments(deduplicated);
+
+    // Hydrate the report-URL map for this student so Generate / Download /
+    // Regenerate buttons start in the right state. Best-effort — on failure
+    // we just default-to-Generate (the per-button flows still work).
+    getGeneratedReportsForStudent(student.userStudentId)
+      .then((res) => {
+        const rows = res.data || [];
+        setGeneratedReportUrls((prev) => {
+          const next = new Map(prev);
+          for (const r of rows) {
+            if (r.reportStatus === "generated" && r.reportUrl) {
+              next.set(reportKey(student.userStudentId, r.assessmentId), r.reportUrl);
+            }
+          }
+          return next;
+        });
+      })
+      .catch((err) => {
+        console.warn("getGeneratedReportsForStudent failed (non-fatal):", err);
+      });
   };
 
   const handleViewDemographics = async (student: Student, assessmentId: number, assessmentName: string) => {
@@ -812,7 +1000,7 @@ export default function StudentManagementPage() {
     <div className="ph-page">
       <PageHeader
         icon={<i className="bi bi-people" />}
-        title="Group Students"
+        title="Student Management"
         subtitle={
           selectedInstitute ? (
             <>
@@ -1589,6 +1777,49 @@ export default function StudentManagementPage() {
                     <ActionIcon type="download" size="sm" />
                     Student List
                   </button>
+                  {/* Bulk send-credentials. Operates on selected rows when any
+                      are selected, else on every filtered row. Disabled while
+                      the request is in flight to prevent duplicate queueing. */}
+                  {(() => {
+                    const bulkCount = selectedStudents.size > 0
+                      ? filteredStudents.filter((s) => selectedStudents.has(s.userStudentId)).length
+                      : filteredStudents.length;
+                    const bulkLabel = selectedStudents.size > 0 ? "Selected" : "All";
+                    const bulkDisabled = bulkCount === 0 || bulkSendingCredentials;
+                    return (
+                      <button
+                        className="btn btn-sm d-flex align-items-center gap-1"
+                        onClick={handleBulkSendCredentials}
+                        disabled={bulkDisabled}
+                        title="Email login credentials to every student in scope"
+                        style={{
+                          background: bulkDisabled
+                            ? "#e0e0e0"
+                            : "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                          border: "none",
+                          borderRadius: "8px",
+                          padding: "0.45rem 0.8rem",
+                          fontWeight: 600,
+                          fontSize: "0.82rem",
+                          color: bulkDisabled ? "#9e9e9e" : "#fff",
+                          cursor: bulkDisabled ? "not-allowed" : "pointer",
+                          transition: "all 0.3s ease",
+                        }}
+                      >
+                        {bulkSendingCredentials ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
+                            Sending…
+                          </>
+                        ) : (
+                          <>
+                            <i className="bi bi-envelope-paper"></i>
+                            Send Credentials ({bulkLabel}: {bulkCount})
+                          </>
+                        )}
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -1795,10 +2026,10 @@ export default function StudentManagementPage() {
                               className="btn btn-sm d-flex align-items-center gap-1"
                               onClick={() => handleViewAssessments(student)}
                               style={{
-                                background: "rgba(67, 97, 238, 0.1)",
+                                background: "rgba(67, 97, 238, 0.08)",
                                 color: "#4361ee",
-                                border: "1px solid rgba(67, 97, 238, 0.3)",
-                                padding: "4px 8px",
+                                border: "1px solid rgba(67, 97, 238, 0.18)",
+                                padding: "4px 10px",
                                 borderRadius: "6px",
                                 fontWeight: 500,
                                 fontSize: "0.78rem",
@@ -1927,12 +2158,12 @@ export default function StudentManagementPage() {
                                 className="btn btn-sm d-flex align-items-center gap-1"
                                 onClick={() => handleEditStudent(student)}
                                 style={{
-                                  background: "rgba(67, 97, 238, 0.1)",
-                                  color: "#4361ee",
-                                  border: "1px solid rgba(67, 97, 238, 0.3)",
+                                  background: "#f8fafc",
+                                  color: "#64748b",
+                                  border: "1px solid #e2e8f0",
                                   padding: "5px 10px",
                                   borderRadius: "6px",
-                                  fontWeight: 600,
+                                  fontWeight: 400,
                                   fontSize: "0.78rem",
                                   transition: "all 0.2s",
                                   whiteSpace: "nowrap",
@@ -1941,24 +2172,48 @@ export default function StudentManagementPage() {
                                 <ActionIcon type="edit" size="sm" />
                                 Edit
                               </button>
+                              {/* Resend login credentials via the styled Odoo
+                                  email service. Disabled + spinner while a send
+                                  for this student is in flight. */}
                               <button
                                 className="btn btn-sm d-flex align-items-center gap-1"
-                                onClick={() => navigate(`/student-dashboard/${student.userStudentId}`)}
+                                onClick={() => handleSendCredentials(student)}
+                                disabled={sendingCredentialsFor.has(student.userStudentId)}
+                                title="Email login credentials to this student"
                                 style={{
-                                  background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                                  color: "#fff",
-                                  border: "none",
+                                  background: sendingCredentialsFor.has(student.userStudentId)
+                                    ? "#f1f5f9"
+                                    : "#f8fafc",
+                                  color: sendingCredentialsFor.has(student.userStudentId)
+                                    ? "#94a3b8"
+                                    : "#64748b",
+                                  border: `1px solid ${
+                                    sendingCredentialsFor.has(student.userStudentId)
+                                      ? "#e2e8f0"
+                                      : "#e2e8f0"
+                                  }`,
                                   padding: "5px 10px",
                                   borderRadius: "6px",
-                                  fontWeight: 600,
+                                  fontWeight: 400,
                                   fontSize: "0.78rem",
                                   transition: "all 0.2s",
-                                  boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
+                                  cursor: sendingCredentialsFor.has(student.userStudentId)
+                                    ? "not-allowed"
+                                    : "pointer",
                                   whiteSpace: "nowrap",
                                 }}
                               >
-                                <i className="bi bi-speedometer2"></i>
-                                Dashboard
+                                {sendingCredentialsFor.has(student.userStudentId) ? (
+                                  <>
+                                    <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
+                                    Sending…
+                                  </>
+                                ) : (
+                                  <>
+                                    <i className="bi bi-envelope-paper"></i>
+                                    Send Credentials
+                                  </>
+                                )}
                               </button>
                             </div>
                           </td>
@@ -2313,10 +2568,100 @@ export default function StudentManagementPage() {
                           Reset
                         </button>
 
-                        {/* Report generation / view / email actions intentionally
-                            removed on this page. The Data Download page retains
-                            them. */}
-                        {isCompleted ? null : null}
+                        {/* Report group — only for completed assessments. The
+                            generator (BET vs pager) is auto-picked by
+                            generateReportForAssessment based on the assessment's
+                            questionnaire type; admin doesn't choose the report
+                            family. Legacy 18-pager Navigator is intentionally
+                            absent here — it lives in ReportsHub only. */}
+                        {isCompleted && (() => {
+                          const key = reportKey(modalStudent!.userStudentId, assessment.assessmentId);
+                          const url = generatedReportUrls.get(key);
+                          const isGenerating = reportGeneratingFor === key;
+                          return (
+                            <>
+                              <div style={{ width: "100%", height: 0 }}></div>
+                              <span style={{ fontSize: "0.7rem", color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px", marginRight: "2px" }}>Report</span>
+
+                              {url ? (
+                                <button
+                                  className="btn btn-sm d-flex align-items-center gap-1"
+                                  onClick={() => window.open(url, "_blank")}
+                                  style={{
+                                    borderRadius: "6px",
+                                    padding: "5px 10px",
+                                    fontWeight: 600,
+                                    fontSize: "0.78rem",
+                                    background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                                    color: "#fff",
+                                    border: "none",
+                                  }}
+                                >
+                                  <ActionIcon type="download" size="sm" />
+                                  Download Report
+                                </button>
+                              ) : (
+                                <button
+                                  className="btn btn-sm d-flex align-items-center gap-1"
+                                  disabled={isGenerating}
+                                  onClick={() =>
+                                    handleGenerateReport(
+                                      assessment.assessmentId,
+                                      modalStudent!.userStudentId,
+                                      false,
+                                    )
+                                  }
+                                  style={{
+                                    borderRadius: "6px",
+                                    padding: "5px 10px",
+                                    fontWeight: 500,
+                                    fontSize: "0.78rem",
+                                    background: isGenerating ? "#f1f5f9" : "rgba(16, 185, 129, 0.1)",
+                                    color: isGenerating ? "#94a3b8" : "#059669",
+                                    border: `1px solid ${isGenerating ? "#e2e8f0" : "rgba(16, 185, 129, 0.2)"}`,
+                                  }}
+                                >
+                                  {isGenerating ? (
+                                    <>
+                                      <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                      Generating…
+                                    </>
+                                  ) : (
+                                    <>
+                                      <i className="bi bi-file-earmark-bar-graph"></i>
+                                      Generate Report
+                                    </>
+                                  )}
+                                </button>
+                              )}
+
+                              <button
+                                className="btn btn-sm d-flex align-items-center gap-1"
+                                disabled={isGenerating}
+                                title="Force regenerate (overwrites the existing report at the same DO Spaces key)"
+                                onClick={() =>
+                                  handleGenerateReport(
+                                    assessment.assessmentId,
+                                    modalStudent!.userStudentId,
+                                    true,
+                                  )
+                                }
+                                style={{
+                                  borderRadius: "6px",
+                                  padding: "5px 10px",
+                                  fontWeight: 500,
+                                  fontSize: "0.78rem",
+                                  background: isGenerating ? "#f1f5f9" : "rgba(245, 158, 11, 0.1)",
+                                  color: isGenerating ? "#94a3b8" : "#d97706",
+                                  border: `1px solid ${isGenerating ? "#e2e8f0" : "rgba(245, 158, 11, 0.2)"}`,
+                                }}
+                              >
+                                <ActionIcon type="refresh" size="sm" />
+                                Regenerate
+                              </button>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                     );

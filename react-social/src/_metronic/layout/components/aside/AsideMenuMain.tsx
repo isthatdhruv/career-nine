@@ -161,7 +161,7 @@ export function AsideMenuMain() {
               <AsideMenuItem
                 to="/student-list"
                 icon="/media/icons/duotune/general/gen044.svg"
-                title="Student List"
+                title="Student Management"
                 fontIcon="bi-app-indicator"
               />
             </Can>
