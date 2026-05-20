@@ -1145,7 +1145,7 @@ const PrivateRoutes = () => {
         <Route
           path="/user-management/roles/manage"
           element={
-            <RequirePermission perm="role.write">
+            <RequirePermission perm="role.update">
               <SuspensedView>
                 <RolesAndPermissionsPage />
               </SuspensedView>

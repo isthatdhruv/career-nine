@@ -113,7 +113,7 @@
     "/roles/role",
     "/unified-report-management"
   ],
-  "role.write": [
+  "role.update": [
     "/user-management/roles/manage"
   ],
   "student.read": [
