@@ -1,5 +1,6 @@
 package com.kccitm.api.controller.career9;
 
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
@@ -93,16 +94,20 @@ public class PaymentWebhookController {
     @PostMapping("/razorpay")
     @Transactional
     public ResponseEntity<?> handleRazorpayWebhook(
-            @RequestBody String payload,
+            @RequestBody byte[] payloadBytes,
             @RequestHeader(value = "X-Razorpay-Signature", required = false) String signature) {
 
         logger.info("Razorpay webhook received");
 
-        // Reject if signature is missing or invalid
-        if (signature == null || !razorpayService.verifyWebhookSignature(payload, signature)) {
+        // Sign the exact bytes Razorpay sent — reading as @RequestBody String
+        // round-trips through StringHttpMessageConverter which can re-encode
+        // with the wrong charset and break HMAC equality.
+        if (signature == null || !razorpayService.verifyWebhookSignature(payloadBytes, signature)) {
             logger.warn("Invalid or missing Razorpay webhook signature");
             return ResponseEntity.status(401).body("Invalid or missing signature");
         }
+
+        String payload = new String(payloadBytes, StandardCharsets.UTF_8);
 
         try {
             JSONObject event = new JSONObject(payload);

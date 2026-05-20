@@ -1,6 +1,7 @@
 package com.kccitm.api.service;
 
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
@@ -192,18 +193,26 @@ public class RazorpayService {
         return new JSONObject(response.getBody());
     }
 
-    public boolean verifyWebhookSignature(String payload, String signature) {
+    public boolean verifyWebhookSignature(byte[] payloadBytes, String signature) {
         try {
             if (webhookSecret == null || webhookSecret.isEmpty()) {
                 logger.error("Razorpay webhook secret is not configured");
                 return false;
             }
+            if (payloadBytes == null || signature == null || signature.isEmpty()) {
+                return false;
+            }
             Mac sha256_HMAC = Mac.getInstance("HmacSHA256");
-            SecretKeySpec secretKey = new SecretKeySpec(webhookSecret.getBytes(), "HmacSHA256");
+            SecretKeySpec secretKey = new SecretKeySpec(
+                    webhookSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
             sha256_HMAC.init(secretKey);
-            byte[] hash = sha256_HMAC.doFinal(payload.getBytes());
+            byte[] hash = sha256_HMAC.doFinal(payloadBytes);
             String computedSignature = bytesToHex(hash);
-            return computedSignature.equals(signature);
+            // Constant-time compare so the response time can't be used to leak
+            // signature bytes via a timing side-channel.
+            return MessageDigest.isEqual(
+                    computedSignature.getBytes(StandardCharsets.US_ASCII),
+                    signature.getBytes(StandardCharsets.US_ASCII));
         } catch (Exception e) {
             logger.error("Webhook signature verification failed", e);
             return false;
