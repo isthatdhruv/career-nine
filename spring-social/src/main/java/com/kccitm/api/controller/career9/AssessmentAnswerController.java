@@ -59,11 +59,16 @@ import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.service.AssessmentSessionService;
+import com.kccitm.api.security.AuthCookieService;
+import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.exception.BadRequestException;
 import com.kccitm.api.exception.ServiceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/assessment-answer")
@@ -116,6 +121,9 @@ public class AssessmentAnswerController {
 
     @Autowired
     private com.kccitm.api.service.AssessmentCompletionService completionService;
+
+    @Autowired
+    private TokenProvider tokenProvider;
 
     @Autowired
     private AssessmentSubmissionFailureRepository submissionFailureRepository;
@@ -228,13 +236,50 @@ public class AssessmentAnswerController {
 
     @PostMapping(value = "/submit", headers = "Accept=application/json")
     @PreAuthorize("@auth.allows('assessment_answer.submit')") // PUBLIC?: assessment app may call without admin JWT — flagged for 15-06 EXCLUSIONS review
-    public ResponseEntity<?> submitAssessmentAnswers(@RequestBody Map<String, Object> submissionData) {
+    public ResponseEntity<?> submitAssessmentAnswers(@RequestBody Map<String, Object> submissionData,
+                                                      HttpServletRequest httpRequest) {
         // 1. Basic Extraction & Validation
         if (submissionData.get("userStudentId") == null || submissionData.get("assessmentId") == null) {
             return ResponseEntity.badRequest().body("userStudentId and assessmentId are required");
         }
         Long userStudentId = ((Number) submissionData.get("userStudentId")).longValue();
         Long assessmentId = ((Number) submissionData.get("assessmentId")).longValue();
+
+        // 1a. Server-side auth check: if the assessment-scoped session cookie
+        // (cn_at_asmnt) is attached, REQUIRE that its (sub, aid) claims match
+        // the body's (userStudentId, assessmentId). Closes the prior trust
+        // hole where the SPA could submit on behalf of any student so long as
+        // it knew their ids.
+        //
+        // When the cookie is absent we fall through to the existing
+        // PreAuthorize gate — the legacy header-based assessment-session path
+        // and admin/test invocations remain supported until the rollout
+        // completes.
+        String assessmentJwt = readAssessmentCookie(httpRequest);
+        if (assessmentJwt != null) {
+            Long tokenStudentId;
+            Long tokenAssessmentId;
+            try {
+                tokenStudentId = tokenProvider.getStudentIdFromToken(assessmentJwt);
+                tokenAssessmentId = tokenProvider.getAssessmentIdFromToken(assessmentJwt);
+            } catch (Exception ex) {
+                logger.warn("cn_at_asmnt parse failed on submit: {}", ex.getMessage());
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "Invalid assessment session"));
+            }
+            if (tokenStudentId == null || !tokenStudentId.equals(userStudentId)) {
+                logger.warn("submit cookie mismatch: token sub={} body userStudentId={}",
+                        tokenStudentId, userStudentId);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Assessment session does not match request"));
+            }
+            if (tokenAssessmentId == null || !tokenAssessmentId.equals(assessmentId)) {
+                logger.warn("submit cookie mismatch: token aid={} body assessmentId={}",
+                        tokenAssessmentId, assessmentId);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Assessment session does not match request"));
+            }
+        }
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> answers = (List<Map<String, Object>>) submissionData.get("answers");
@@ -428,7 +473,11 @@ public class AssessmentAnswerController {
         cleaned.remove("adminUserId");
         cleaned.remove("reason");
 
-        return submitAssessmentAnswers(cleaned);
+        // Admin-submit bypasses the cn_at_asmnt cookie check: the admin caller
+        // is authorised via the admin JWT (different cookie/header), and the
+        // student's own assessment cookie is not present in this request.
+        // Passing null is safely handled by readAssessmentCookie.
+        return submitAssessmentAnswers(cleaned, null);
     }
 
     @PutMapping(value = "/feedback-rating", headers = "Accept=application/json")
@@ -2617,5 +2666,21 @@ public class AssessmentAnswerController {
             logger.warn("Audit write failed for action={} student={} assessment={}",
                     actionType, userStudentId, assessmentId, e);
         }
+    }
+
+    /**
+     * Reads the {@code cn_at_asmnt} HttpOnly cookie from the request, if
+     * present. Returns null when no cookie is attached — caller treats that
+     * as "fall back to legacy auth" rather than blocking the request.
+     */
+    private static String readAssessmentCookie(HttpServletRequest request) {
+        if (request == null || request.getCookies() == null) return null;
+        for (Cookie c : request.getCookies()) {
+            if (AuthCookieService.ASSESSMENT_SESSION_COOKIE.equals(c.getName())) {
+                String v = c.getValue();
+                return (v == null || v.isEmpty()) ? null : v;
+            }
+        }
+        return null;
     }
 }

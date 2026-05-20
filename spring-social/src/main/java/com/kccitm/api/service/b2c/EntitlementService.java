@@ -12,8 +12,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.text.SimpleDateFormat;
+
+import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.AssessmentTable;
 import com.kccitm.api.model.career9.PaymentTransaction;
+import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.b2c.Campaign;
 import com.kccitm.api.model.career9.b2c.CampaignAssessmentMapping;
 import com.kccitm.api.model.career9.b2c.CampaignAssessmentTier;
@@ -21,6 +25,7 @@ import com.kccitm.api.model.career9.b2c.PricingTier;
 import com.kccitm.api.model.career9.b2c.StudentEntitlement;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
 import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
+import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.b2c.CampaignAssessmentMappingRepository;
 import com.kccitm.api.repository.Career9.b2c.CampaignAssessmentTierRepository;
 import com.kccitm.api.repository.Career9.b2c.CampaignRepository;
@@ -45,6 +50,7 @@ public class EntitlementService {
     @Autowired private PricingTierRepository pricingTierRepository;
     @Autowired private PaymentTransactionRepository paymentTransactionRepository;
     @Autowired private AssessmentTableRepository assessmentTableRepository;
+    @Autowired private UserStudentRepository userStudentRepository;
     @Autowired private NotificationDispatcher notificationDispatcher;
     @Autowired private LinkBuilder linkBuilder;
 
@@ -359,17 +365,142 @@ public class EntitlementService {
     private void sendWelcomeAssessmentLink(StudentEntitlement entitlement, PaymentTransaction txn) {
         String to = txn.getStudentEmail();
         if (to == null || to.isEmpty()) return;
-        String link = linkBuilder.assessmentStart(entitlement.getAccessToken(), entitlement.getEntitlementId());
+
+        // Resolve credentials for the manual-login fallback: username from User,
+        // DOB stringified as dd-MM-yyyy (the same format the student typed at
+        // registration and that StudentLoginPage expects).
+        String username = null;
+        String dobStr = null;
+        String displayName = txn.getStudentName() != null ? txn.getStudentName() : "there";
+        if (entitlement.getUserStudentId() != null) {
+            UserStudent us = userStudentRepository.findById(entitlement.getUserStudentId()).orElse(null);
+            if (us != null && us.getStudentInfo() != null) {
+                User u = us.getStudentInfo().getUser();
+                if (u != null) username = u.getUsername();
+            }
+        }
+        if (txn.getStudentDob() != null) {
+            dobStr = new SimpleDateFormat("dd-MM-yyyy").format(txn.getStudentDob());
+        }
+
+        String magicLink = linkBuilder.assessmentStart(entitlement.getAccessToken(), entitlement.getEntitlementId());
+        String manualLoginUrl = linkBuilder.manualLogin();
         String subject = "Welcome to Career-9 — start your assessment";
-        String body = simpleHtml(
-                "Welcome to Career-9! Your purchase is confirmed.",
-                "Click below to start your assessment:",
-                link,
-                "Start assessment"
-        );
-        notificationDispatcher.sendEmail(entitlement, to, "assessment_invite", subject, body, link);
+        String body = welcomeEmailHtml(displayName, username, dobStr, magicLink, manualLoginUrl);
+        notificationDispatcher.sendEmail(entitlement, to, "assessment_invite", subject, body, magicLink);
     }
 
+    /**
+     * Glassmorphic amber→green welcome email. Two entry options (magic link,
+     * manual sign-in with credentials). Inline styles only — backdrop-filter is
+     * unsupported in mail clients, so the "glass" look is approximated with
+     * pastel gradients + soft borders.
+     */
+    private static String welcomeEmailHtml(String displayName, String username, String dobStr,
+                                           String magicLink, String manualLoginUrl) {
+        String credentialsBlock;
+        if (username != null && dobStr != null) {
+            credentialsBlock =
+                "<div style='background:#ffffff;border:1px solid #fde68a;border-radius:10px;padding:14px 18px;"
+                +     "font-family:\"Courier New\",Consolas,monospace;'>"
+                + "  <div style='margin-bottom:6px;'>"
+                + "    <span style='display:inline-block;width:80px;color:#94a3b8;font-size:0.74rem;"
+                +         "text-transform:uppercase;letter-spacing:0.05em;font-weight:600;'>User ID</span>"
+                + "    <span style='font-weight:700;color:#0f172a;font-size:0.95rem;'>" + username + "</span>"
+                + "  </div>"
+                + "  <div>"
+                + "    <span style='display:inline-block;width:80px;color:#94a3b8;font-size:0.74rem;"
+                +         "text-transform:uppercase;letter-spacing:0.05em;font-weight:600;'>Password</span>"
+                + "    <span style='font-weight:700;color:#0f172a;font-size:0.95rem;'>" + dobStr
+                +     "</span><span style='color:#64748b;font-size:0.82rem;margin-left:6px;'>(your date of birth)</span>"
+                + "  </div>"
+                + "</div>";
+        } else {
+            credentialsBlock =
+                "<p style='margin:0;font-size:0.88rem;color:#92400e;'>"
+                + "Use the user ID and date of birth you provided at registration to sign in."
+                + "</p>";
+        }
+
+        return ""
+            + "<div style='background:linear-gradient(135deg,#fef3c7 0%,#d1fae5 100%);padding:48px 16px;"
+            +     "font-family:\"Inter\",\"Segoe UI\",Arial,sans-serif;'>"
+            + "  <div style='max-width:560px;margin:0 auto;background:#ffffff;border-radius:24px;"
+            +       "overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.08);'>"
+
+            // Header — amber → green gradient
+            + "    <div style='background:linear-gradient(135deg,#f59e0b 0%,#10b981 100%);"
+            +         "padding:32px 32px 28px;color:#ffffff;'>"
+            + "      <div style='font-size:0.72rem;font-weight:700;text-transform:uppercase;"
+            +           "letter-spacing:0.1em;opacity:0.9;margin-bottom:10px;'>CAREER-9 · WELCOME</div>"
+            + "      <h1 style='margin:0;font-size:1.55rem;font-weight:800;line-height:1.25;'>"
+            +           "Welcome aboard, " + escape(displayName) + "!</h1>"
+            + "      <p style='margin:10px 0 0;font-size:0.95rem;line-height:1.5;opacity:0.95;'>"
+            +           "Your purchase is confirmed. Let's get you started on your assessment.</p>"
+            + "    </div>"
+
+            // Body
+            + "    <div style='padding:32px;color:#1e293b;'>"
+            + "      <p style='margin:0 0 22px;font-size:0.95rem;line-height:1.55;color:#475569;'>"
+            +           "You have two ways to start — pick whichever works for you.</p>"
+
+            // Option 1: Magic link (green tint)
+            + "      <div style='background:linear-gradient(135deg,#ecfdf5 0%,#f0fdf4 100%);"
+            +           "border:1.5px solid #6ee7b7;border-radius:14px;padding:20px 22px;margin-bottom:18px;'>"
+            + "        <div style='font-size:0.72rem;font-weight:700;color:#059669;text-transform:uppercase;"
+            +             "letter-spacing:0.06em;margin-bottom:8px;'>Option 1 · One-click start</div>"
+            + "        <p style='margin:0 0 16px;font-size:0.92rem;line-height:1.55;color:#374151;'>"
+            +             "Click below — we'll sign you in and take you straight to your assessment.</p>"
+            + "        <div style='text-align:center;'>"
+            + "          <a href='" + magicLink + "' style='display:inline-block;padding:14px 32px;"
+            +               "background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#ffffff;"
+            +               "text-decoration:none;border-radius:12px;font-weight:700;font-size:0.95rem;"
+            +               "box-shadow:0 4px 16px rgba(16,185,129,0.35);letter-spacing:0.01em;'>"
+            +               "Start Assessment &rarr;</a>"
+            + "        </div>"
+            + "      </div>"
+
+            // Option 2: Manual login (amber tint) with credentials
+            + "      <div style='background:linear-gradient(135deg,#fffbeb 0%,#fef3c7 100%);"
+            +           "border:1.5px solid #fbbf24;border-radius:14px;padding:20px 22px;'>"
+            + "        <div style='font-size:0.72rem;font-weight:700;color:#b45309;text-transform:uppercase;"
+            +             "letter-spacing:0.06em;margin-bottom:8px;'>Option 2 · Sign in manually</div>"
+            + "        <p style='margin:0 0 14px;font-size:0.92rem;line-height:1.55;color:#374151;'>"
+            +             "Visit <a href='" + manualLoginUrl + "' style='color:#059669;text-decoration:none;"
+            +                 "font-weight:700;'>" + manualLoginUrl + "</a> and sign in with these credentials:"
+            + "        </p>"
+            +          credentialsBlock
+            + "        <p style='margin:14px 0 0;font-size:0.8rem;line-height:1.5;color:#92400e;'>"
+            +             "Keep these safe &mdash; you'll need them to resume your assessment or access your report later.</p>"
+            + "      </div>"
+
+            // Fallback raw link
+            + "      <p style='margin:24px 0 0;font-size:0.76rem;color:#94a3b8;text-align:center;line-height:1.5;'>"
+            +           "If the button doesn't work, paste this link into your browser:<br/>"
+            + "        <span style='word-break:break-all;color:#64748b;'>" + magicLink + "</span></p>"
+            + "    </div>"
+
+            // Footer
+            + "    <div style='background:#f8fafc;padding:18px 32px;text-align:center;border-top:1px solid #e2e8f0;'>"
+            + "      <p style='margin:0;font-size:0.72rem;color:#94a3b8;font-weight:600;letter-spacing:0.08em;'>"
+            +           "CAREER<span style='color:#10b981;'>-9</span></p>"
+            + "    </div>"
+            + "  </div>"
+            + "</div>";
+    }
+
+    /** Minimal HTML escape for values interpolated into the email body. */
+    private static String escape(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                .replace("\"", "&quot;").replace("'", "&#39;");
+    }
+
+    /**
+     * Compact template used by post-completion notifications (1-pager, final
+     * report, resend flows). The welcome email uses {@link #welcomeEmailHtml}
+     * because it surfaces credentials and a manual-login fallback.
+     */
     private static String simpleHtml(String greeting, String preLink, String link, String cta) {
         return "<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;'>"
                 + "<div style='background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);padding:24px;border-radius:12px 12px 0 0;color:white;'>"

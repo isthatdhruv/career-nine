@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUpgradeInfo, prepareReport } from '../api-clients/campaignAPI';
 import { TierCard, Tier } from '../components/TierCard';
+import { downloadHtmlAsPdf } from '../utils/htmlToPdf';
 
 type UpgradeInfo = {
     entitlementId: number;
@@ -33,6 +34,22 @@ const ThankYouPage: React.FC = () => {
     const [upgradeInfoLoaded, setUpgradeInfoLoaded] = useState<boolean>(false);
     const [reportState, setReportState] = useState<ReportState>('idle');
     const [longWait, setLongWait] = useState<boolean>(false);
+    // Captured from prepareReport response — the DO Spaces HTML URL + the
+    // resolved report type (bet/pager). For "pager" we fetch HTML from this URL
+    // and convert client-side. For "bet" we still hand off to the existing
+    // server-side PDF endpoint (upgradeInfo.finalReportUrl).
+    const [preparedReportUrl, setPreparedReportUrl] = useState<string | null>(null);
+    const [preparedReportType, setPreparedReportType] = useState<string | null>(null);
+    const [isDownloading, setIsDownloading] = useState<boolean>(false);
+    // Brief initial state that surfaces "Recording your responses…" for the
+    // first ~3s after the student lands here, covering the async-persist race
+    // window before the report-prepare spinner takes over. Pure UX — does not
+    // gate any backend call (the backend already retries via PagerScoreSource).
+    const [isRecordingPhase, setIsRecordingPhase] = useState<boolean>(true);
+    useEffect(() => {
+        const t = window.setTimeout(() => setIsRecordingPhase(false), 3000);
+        return () => window.clearTimeout(t);
+    }, []);
 
     // Allow the B2C admin tracker (or a direct test link) to bootstrap the
     // page without a real assessment session by passing the IDs via query
@@ -90,7 +107,12 @@ const ThankYouPage: React.FC = () => {
             upgradeInfo.accessToken,
             upgradeInfo.assessment.assessmentId,
         )
-            .then(() => setReportState('ready'))
+            .then((res) => {
+                const data: any = res?.data;
+                if (data?.reportUrl) setPreparedReportUrl(data.reportUrl);
+                if (data?.reportType) setPreparedReportType(data.reportType);
+                setReportState('ready');
+            })
             .catch(() => setReportState('failed'))
             .finally(() => window.clearTimeout(longWaitTimer));
 
@@ -106,7 +128,28 @@ const ThankYouPage: React.FC = () => {
         if (upgradeInfo?.dashboardUrl) window.open(upgradeInfo.dashboardUrl, '_blank');
     };
 
-    const handleDownloadReport = () => {
+    const handleDownloadReport = async () => {
+        // "pager" reports live as HTML on DO Spaces — we fetch + convert in the
+        // browser so the user gets a single PDF download without round-tripping
+        // through Flying Saucer. "bet" reports keep the existing server-side
+        // PDF endpoint (preparedReportType==='bet' OR no captured type).
+        if (preparedReportType === 'pager' && preparedReportUrl) {
+            try {
+                setIsDownloading(true);
+                const safeName = (upgradeInfo?.student.name || 'career9')
+                    .replace(/[^a-zA-Z0-9]/g, '_')
+                    .toLowerCase();
+                await downloadHtmlAsPdf(preparedReportUrl, `${safeName}_career9_report.pdf`);
+            } catch (err) {
+                console.error('Client-side PDF conversion failed', err);
+                // Last-resort fallback: open the HTML in a new tab so the user
+                // can use the browser's "Save as PDF" feature.
+                window.open(preparedReportUrl, '_blank');
+            } finally {
+                setIsDownloading(false);
+            }
+            return;
+        }
         if (upgradeInfo?.finalReportUrl) window.open(upgradeInfo.finalReportUrl, '_blank');
     };
 
@@ -351,14 +394,18 @@ const ThankYouPage: React.FC = () => {
                                             <span className="visually-hidden">Loading...</span>
                                         </div>
                                         <h3 style={ts.preparingTitle}>
-                                            {expectsReport
-                                                ? "Hold on — we're preparing your detailed report"
-                                                : 'Loading your results…'}
+                                            {isRecordingPhase
+                                                ? 'Recording your responses…'
+                                                : expectsReport
+                                                    ? "Hold on — we're preparing your detailed report"
+                                                    : 'Loading your results…'}
                                         </h3>
                                         <p style={ts.preparingSub}>
-                                            {longWait
-                                                ? 'Almost done… this usually takes 10–20 seconds.'
-                                                : 'This usually takes a few seconds.'}
+                                            {isRecordingPhase
+                                                ? "Your submission is being saved. We'll have your report ready in a moment."
+                                                : longWait
+                                                    ? 'Almost done… this usually takes 10–20 seconds.'
+                                                    : 'This usually takes a few seconds.'}
                                         </p>
                                     </div>
                                 )}

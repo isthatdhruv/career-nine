@@ -252,7 +252,17 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                         // to validate against. Enrolment + feature-flag DB checks are the gate.
                         "/auth/assessment-session",
                         "/oauth2/**",
-                        "/payment/webhook/**")
+                        "/payment/webhook/**",
+                        // Anonymous-by-design B2C funnels — POSTs are issued by students
+                        // who never sign in, so they have no prior cn_csrf cookie to
+                        // echo back. Endpoint authorization is permitAll() below and
+                        // the bodies are protected by signature / token / promo-lookup
+                        // gates inside the controller, not by CSRF.
+                        "/campaign/public/**",
+                        "/entitlement/redeem-token",
+                        "/promo-code/validate",
+                        "/bet-report-data/public/**",
+                        "/navigator-report-data/public/**")
                 .and()
                 .formLogin()
                 .disable()

@@ -31,6 +31,15 @@ public class LinkBuilder {
         return assessmentBaseUrl + "/assessment/start?t=" + accessToken + "&e=" + entitlementId;
     }
 
+    /**
+     * The manual sign-in URL we surface in the welcome email as the fallback to
+     * the one-click magic link. Students log in here with username + DOB if the
+     * magic link is unavailable.
+     */
+    public String manualLogin() {
+        return assessmentBaseUrl + "/student-login";
+    }
+
     public String onePager(String accessToken, Long entitlementId) {
         return frontendBaseUrl + "/report/one-pager?t=" + accessToken + "&e=" + entitlementId;
     }

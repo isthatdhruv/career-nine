@@ -11,6 +11,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,9 +46,13 @@ import com.kccitm.api.repository.Career9.SchoolAssessmentConfigRepository;
 import com.kccitm.api.repository.Career9.SchoolRegistrationLinkRepository;
 import com.kccitm.api.service.b2c.StudentInstituteMembershipService;
 import com.kccitm.api.repository.Career9.School.SchoolClassesRepository;
+import com.kccitm.api.security.AuthCookieService;
+import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.service.CareerNineRollNumberService;
 import com.kccitm.api.service.PaymentEmailService;
 import com.kccitm.api.service.RazorpayService;
+
+import javax.servlet.http.HttpServletResponse;
 
 @RestController
 @RequestMapping("/payment/webhook")
@@ -76,6 +81,12 @@ public class PaymentWebhookController {
 
     @Autowired
     private com.kccitm.api.service.StudentSessionService studentSessionService;
+
+    @Autowired private AuthCookieService authCookieService;
+    @Autowired private TokenProvider tokenProvider;
+
+    @org.springframework.beans.factory.annotation.Value("${app.auth.assessmentTokenExpirationMsec:14400000}")
+    private long assessmentTokenExpirationMsec;
 
     // @PreAuthorize-Exempt: Razorpay HMAC signature auth, not user JWT — anonymous-by-design
     // See ControllerPreAuthorizeCoverageTest.EXCLUSIONS (15-02 / 15-06)
@@ -120,8 +131,13 @@ public class PaymentWebhookController {
             return ResponseEntity.ok(Map.of("status", "ok"));
 
         } catch (Exception e) {
-            logger.error("Error processing Razorpay webhook", e);
-            return ResponseEntity.ok(Map.of("status", "error_logged"));
+            // Return 500 so Razorpay retries the webhook on transient failures.
+            // Idempotency is enforced by the pessimistic row-lock +
+            // status="paid" early-exit in markPaidAndProvision — a retry on a
+            // payment we already provisioned is safe and observable in logs.
+            logger.error("Error processing Razorpay webhook — returning 500 to request retry", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("status", "error_retry_requested"));
         }
     }
 
@@ -144,7 +160,8 @@ public class PaymentWebhookController {
     @PreAuthorize("@auth.allows('payment_webhook.read')")
     @GetMapping("/status/{razorpayLinkId}")
     public ResponseEntity<?> getPaymentStatus(@PathVariable String razorpayLinkId,
-                                              @RequestParam(value = "reconcile", required = false) String reconcile) {
+                                              @RequestParam(value = "reconcile", required = false) String reconcile,
+                                              HttpServletResponse httpResponse) {
         Optional<PaymentTransaction> txnOpt = paymentTransactionRepository
                 .findByRazorpayLinkId(razorpayLinkId);
 
@@ -202,6 +219,20 @@ public class PaymentWebhookController {
         // on status==="paid", so this widening is safe.
         if (txn.getUserStudentId() != null) {
             response.putAll(studentSessionService.buildSessionPayload(txn.getUserStudentId()));
+
+            // Mint and write the cn_at_asmnt cookie ONLY once the txn is in a
+            // terminal "paid" state. Until then the caller might still be
+            // polling on a created txn (and we don't want to issue a session
+            // cookie for an unconfirmed payment). The assessment SPA reads the
+            // response body to decide when to navigate; the cookie attaches in
+            // the same response so /allotted-assessment can authenticate on
+            // its very first request.
+            if ("paid".equals(txn.getStatus()) && txn.getAssessmentId() != null) {
+                String sessionJwt = tokenProvider.createAssessmentSessionToken(
+                        txn.getUserStudentId(), txn.getAssessmentId());
+                authCookieService.issueAssessmentSessionCookie(httpResponse, sessionJwt,
+                        (int) (assessmentTokenExpirationMsec / 1000));
+            }
         }
 
         return ResponseEntity.ok(response);
@@ -314,7 +345,11 @@ public class PaymentWebhookController {
         JSONObject paymentLink = payloadObj.getJSONObject("payment_link").getJSONObject("entity");
         String linkId = paymentLink.getString("id");
 
-        Optional<PaymentTransaction> txnOpt = paymentTransactionRepository.findByRazorpayLinkId(linkId);
+        // Use the pessimistic-write finder so two concurrent webhook
+        // deliveries for the same link serialise here. The status-based
+        // early-return inside markPaidAndProvision then ensures only the
+        // first delivery actually provisions the student.
+        Optional<PaymentTransaction> txnOpt = paymentTransactionRepository.findByRazorpayLinkIdForUpdate(linkId);
         if (!txnOpt.isPresent()) {
             logger.warn("Payment link not found in DB: {}", linkId);
             return;

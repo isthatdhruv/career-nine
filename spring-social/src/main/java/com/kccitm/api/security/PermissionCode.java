@@ -97,6 +97,13 @@ public enum PermissionCode {
     STUDENT_IMPORT   ("student.import",   "Import students (single-row CSV/Excel)"),
     STUDENT_EXPORT   ("student.export",   "Export student lists (CSV/Excel/PDF)"),
 
+    // ── Student Management (clone of Data Download without any export paths) ──
+    // Gates the /student-management SPA page: roster view, allot, reset, edit
+    // basic info, demographics view. Separate from STUDENT_READ so admins can
+    // grant management without granting answer/proctoring/report downloads.
+    STUDENT_MANAGEMENT_READ   ("student_management.read",   "View Student Management page (no data downloads)"),
+    STUDENT_MANAGEMENT_UPDATE ("student_management.update", "Allot / reset / edit students from Student Management"),
+
     // ── User (additional verbs) ─────────────────────────────────────────
     USER_ME       ("user.me",       "View own user profile"),
     USER_READ_ALL ("user.read.all", "View user accounts across all scopes"),

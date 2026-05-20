@@ -136,6 +136,37 @@ export function bulkRemoveAssessment(removals: BulkAssessmentAssignment[]) {
     return axios.post(`${STUDENT_INFO_BASE}/bulkRemoveAssessment`, removals);
 }
 
+// Result row returned per-student by /send-login-credentials.
+// `status === "queued"` means the email was handed off to Odoo (fire-and-forget;
+// the actual SMTP send may complete a few seconds later — check Odoo logs for
+// the definitive outcome). `status === "failed"` means validation failed
+// before dispatch (no email / no username / no DOB on file, etc).
+export interface SendCredentialsResult {
+    userStudentId: number;
+    status: "queued" | "failed";
+    email?: string;
+    reason?: string;
+}
+
+export interface SendCredentialsResponse {
+    requested: number;
+    // Count of rows successfully queued for dispatch via Odoo.
+    sent: number;
+    failed: number;
+    results: SendCredentialsResult[];
+}
+
+// Sends username (from User.username) + password (= student's DOB formatted
+// dd-MM-yyyy) by email to every supplied userStudentId. Backend dispatches via
+// OdooEmailService asynchronously; rows missing email/username/dob are
+// reported as `failed` synchronously rather than aborting the batch.
+export function sendLoginCredentials(userStudentIds: number[]) {
+    return axios.post<SendCredentialsResponse>(
+        `${STUDENT_INFO_BASE}/send-login-credentials`,
+        { userStudentIds },
+    );
+}
+
 // New API to get student answers with question and option details
 export function getStudentAnswersWithDetails(userStudentId: number, assessmentId: number) {
     return axios.get<StudentAnswerDetail[]>(`${STUDENT_INFO_BASE}/getStudentAnswersWithDetails`, {
