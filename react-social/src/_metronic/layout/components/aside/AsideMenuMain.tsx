@@ -149,14 +149,14 @@ export function AsideMenuMain() {
                 fontIcon="bi-app-indicator"
               />
             </Can>
-            <Can perm="student_management.read">
+            {/* <Can perm="student_management.read">
               <AsideMenuItem
                 to="/student-management"
                 icon="/media/icons/duotune/general/gen049.svg"
                 title="Student Management"
                 fontIcon="bi-app-indicator"
-              />
-            </Can>
+              /> */}
+            {/* </Can> */}
             <Can perm="student.read">
               <AsideMenuItem
                 to="/student-list"
