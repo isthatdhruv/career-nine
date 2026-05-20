@@ -147,12 +147,16 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                 // @auth.allows(...) doesn't have to round-trip to the DB per request.
                 if (userDetails instanceof UserPrincipal) {
                     UserPrincipal up = (UserPrincipal) userDetails;
-                    // Permissions are NOT carried in the JWT (would blow the 4 KB cookie
-                    // limit for admin users with 400+ codes). loadUserById above already
-                    // hydrated up.permissions from the DB via the role_permission walk,
-                    // so we deliberately leave that value alone. Scopes / sa / jti still
-                    // come from the JWT claim since those are small and the existing
-                    // filter design treats them as authoritative.
+                    // Permissions and the super-admin flag are NOT trusted from the JWT.
+                    // - Permissions don't fit in the JWT (4 KB cookie limit vs 400+ codes
+                    //   for admin users), so loadUserById walks role_permission live.
+                    // - The `sa` claim DOES fit but it goes stale: SuperAdminBootstrapper
+                    //   promoting a user mid-session previously left them locked out until
+                    //   their access token expired and re-issued. Treating it the same as
+                    //   permissions (DB-of-truth, ignore JWT) makes promotions and
+                    //   revocations take effect on the next request.
+                    // Scopes and jti stay sourced from the JWT — small, and the design
+                    //   already treats them as authoritative there.
                     if (claims.isLegacyShape) {
                         // Pre-Phase-15 token: scopes claim absent too. Keep DB-loaded
                         // scopes/sa (already populated by hydrate()); just clear jti so
@@ -162,7 +166,9 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                         up.setJti(null);
                     } else {
                         up.setScopes(claims.scopes);
-                        up.setSuperAdmin(claims.superAdmin);
+                        // up.setSuperAdmin intentionally NOT called — keep DB-loaded value
+                        // from CustomUserDetailsService.loadUserById to avoid stale-JWT
+                        // privilege drift in either direction.
                         up.setJti(claims.jti);
                     }
                 }
