@@ -1,5 +1,9 @@
 [mysqld]
 max_connections = 200
+# Dashboard snapshot payloads (LONGTEXT) can run into hundreds of MB.
+# MySQL 8 defaults this to 64 MB, which force-closes the connection
+# mid-batch when a larger row is written. 512 MB gives headroom.
+max_allowed_packet = 512M
 innodb_buffer_pool_size = 1G
 innodb_flush_log_at_trx_commit = 2
 innodb_flush_method = O_DIRECT

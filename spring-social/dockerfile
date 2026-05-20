@@ -4,7 +4,13 @@
 FROM maven:3.8.1-jdk-11-slim AS build
 COPY src /home/app/src
 COPY pom.xml /home/app
-RUN mvn -f /home/app/pom.xml clean package
+# Skip tests during image build:
+#   - integration tests (e.g. AssessmentLoadTest) need a running API + DB + Redis,
+#     none of which exist inside the build container
+#   - assertion tests (e.g. ControllerPreAuthorizeCoverageTest) belong in CI,
+#     where failures should block merges — not block image builds
+# Tests still compile (catches compile errors); only execution is skipped.
+RUN mvn -f /home/app/pom.xml clean package -DskipTests
 
 #
 # Package stage
