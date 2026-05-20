@@ -67,10 +67,10 @@ export function AsideMenuMain() {
   // Reports section — children: /reports-hub.
   const showReports = can("report.read");
 
-  // Roles & Users — children: /user-management/roles/manage (role.write),
+  // Roles & Users — children: /user-management/roles/manage (role.update),
   //   /user-management/users/manage (user.write).
   const showRoles =
-    can("role.write") ||
+    can("role.update") ||
     can("user.write") ||
     can("user.read");
 
@@ -566,7 +566,7 @@ export function AsideMenuMain() {
             fontIcon="bi-shield-lock"
             icon="/media/icons/duotune/general/gen019.svg"
           >
-            <Can perm="role.write">
+            <Can perm="role.update">
               <AsideMenuItem
                 to="/user-management/roles/manage"
                 title="Roles & Permissions"

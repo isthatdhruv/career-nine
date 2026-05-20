@@ -16,6 +16,7 @@ interface UserRow {
   organisation: string;
   designation: string;
   isActive: boolean | null;
+  isSuperAdmin?: boolean;
   provider: string;
   dob?: string;
   roleGroups?: string[];
@@ -27,6 +28,7 @@ const RegisteredUsersTab: FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [togglingSuperAdminId, setTogglingSuperAdminId] = useState<number | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
   const [showMappingModal, setShowMappingModal] = useState(false);
@@ -61,6 +63,32 @@ const RegisteredUsersTab: FC = () => {
       console.error("Failed to toggle user status", err);
     } finally {
       setTogglingId(null);
+    }
+  };
+
+  const toggleSuperAdmin = async (user: UserRow) => {
+    const isSuper = user.isSuperAdmin === true;
+    const verb = isSuper ? "revoke super-admin from" : "grant super-admin to";
+    const warning = isSuper
+      ? ""
+      : "\n\nSuper-admins bypass all permission and URL checks across the system.";
+    if (!window.confirm(`Are you sure you want to ${verb} ${user.name || user.email}?${warning}\n\nThe user must re-login for the change to fully take effect.`)) {
+      return;
+    }
+    setTogglingSuperAdminId(user.id);
+    try {
+      const { data } = await axios.post(`${API_URL}/user/toggle-super-admin/${user.id}`);
+      const newStatus = typeof data?.isSuperAdmin === "boolean" ? data.isSuperAdmin : !isSuper;
+      setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, isSuperAdmin: newStatus } : u));
+      if (data?.message) {
+        // Best-effort surface — keep it simple, no toast lib coupling.
+        window.alert(data.message);
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || "Failed to toggle super-admin status";
+      window.alert(msg);
+    } finally {
+      setTogglingSuperAdminId(null);
     }
   };
 
@@ -146,6 +174,23 @@ const RegisteredUsersTab: FC = () => {
                                 {user.name?.charAt(0).toUpperCase() || "U"}
                               </div>
                               <span style={{ fontWeight: 600, color: "#111827" }}>{user.name || "-"}</span>
+                              {user.isSuperAdmin && (
+                                <span
+                                  title="This user is a super admin — bypasses all permission and URL checks"
+                                  style={{
+                                    fontSize: "0.65rem",
+                                    fontWeight: 700,
+                                    padding: "2px 6px",
+                                    borderRadius: "3px",
+                                    background: "#7c3aed",
+                                    color: "#fff",
+                                    letterSpacing: "0.3px",
+                                    textTransform: "uppercase",
+                                  }}
+                                >
+                                  <i className="bi bi-shield-fill-check me-1"></i>Super
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td style={{ padding: "8px 12px", color: "#4b5563" }}>{user.email || "-"}</td>
@@ -176,6 +221,12 @@ const RegisteredUsersTab: FC = () => {
                                 </Dropdown.Item>
                                 <Dropdown.Item as="button" onClick={() => { setSelectedRoleUser(user); setShowRoleModal(true); }} className="d-flex align-items-center px-3 py-2" style={{ fontSize: "0.85rem", borderRadius: "6px" }}>
                                   <i className="bi bi-shield-check me-2" style={{ color: "#d97706", fontSize: "1rem" }}></i>Assign Role Groups
+                                </Dropdown.Item>
+                                <Dropdown.Item as="button" disabled={togglingSuperAdminId === user.id} onClick={() => toggleSuperAdmin(user)} className="d-flex align-items-center px-3 py-2" style={{ fontSize: "0.85rem", borderRadius: "6px" }}>
+                                  {togglingSuperAdminId === user.id
+                                    ? <span className="spinner-border spinner-border-sm me-2" />
+                                    : <i className={`bi bi-shield-${user.isSuperAdmin ? "slash-fill" : "fill-plus"} me-2`} style={{ color: user.isSuperAdmin ? "#dc2626" : "#7c3aed", fontSize: "1rem" }}></i>}
+                                  {user.isSuperAdmin ? "Revoke Super Admin" : "Make Super Admin"}
                                 </Dropdown.Item>
                                 <Dropdown.Item as="button" onClick={() => { setSelectedMappingUser(user); setShowMappingModal(true); }} className="d-flex align-items-center px-3 py-2" style={{ fontSize: "0.85rem", borderRadius: "6px" }}>
                                   <i className="bi bi-building-fill me-2" style={{ color: "#0891b2", fontSize: "1rem" }}></i>Map to College

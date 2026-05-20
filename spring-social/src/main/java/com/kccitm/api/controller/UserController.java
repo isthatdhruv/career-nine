@@ -364,6 +364,7 @@ public class UserController {
             row.put("organisation", u.getOrganisation());
             row.put("designation", u.getDesignation());
             row.put("isActive", u.getIsActive());
+            row.put("isSuperAdmin", Boolean.TRUE.equals(u.getIsSuperAdmin()));
             row.put("provider", u.getProvider() != null ? u.getProvider().name() : null);
             if (u.getDobDate() != null) {
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
@@ -490,6 +491,62 @@ public class UserController {
         } catch (Exception e) {
         }
         return ResponseEntity.ok(new ApiResponse(true, newStatus ? "User activated" : "User deactivated"));
+    }
+
+    /**
+     * Grant or revoke the super-admin flag on a user. Super-admin is a hard
+     * bypass over both the RBAC permission check and the URL whitelist (see
+     * {@code AuthorizationService.decide()} and the FE {@code RequirePermission}
+     * guard), so this endpoint is the privilege-escalation surface and is gated
+     * on {@code permission.grant}.
+     *
+     * <p>Two safety rails:
+     * <ul>
+     *   <li>You cannot demote yourself — prevents accidentally locking the only
+     *       admin out of the system in a single click.</li>
+     *   <li>You cannot demote the last remaining super-admin in the database —
+     *       same reason, just defended at a different layer.</li>
+     * </ul>
+     *
+     * <p>Note: the target user's existing access token keeps its old {@code sa}
+     * claim until it expires or they re-login (we don't have a JWT-revocation
+     * hook from here). The response includes a hint so the FE can surface that.
+     */
+    @PreAuthorize("@auth.allows('permission.grant')")
+    @PostMapping(value = "user/toggle-super-admin/{id}")
+    public ResponseEntity<?> toggleSuperAdmin(@PathVariable("id") Long userId,
+                                              @CurrentUser UserPrincipal currentUser) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+
+        boolean current = Boolean.TRUE.equals(user.getIsSuperAdmin());
+        boolean newStatus = !current;
+
+        if (!newStatus && currentUser != null && currentUser.getId() != null
+                && currentUser.getId().equals(userId)) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse(false, "You cannot revoke your own super-admin status"));
+        }
+
+        if (!newStatus) {
+            long remaining = userRepository.countByIsSuperAdminTrue();
+            if (remaining <= 1) {
+                return ResponseEntity.status(org.springframework.http.HttpStatus.BAD_REQUEST)
+                        .body(new ApiResponse(false,
+                                "Cannot revoke — this is the last remaining super-admin"));
+            }
+        }
+
+        user.setIsSuperAdmin(newStatus);
+        userRepository.save(user);
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("success", true);
+        resp.put("isSuperAdmin", newStatus);
+        resp.put("message", newStatus
+                ? "User promoted to super-admin — they must re-login for the change to take effect"
+                : "Super-admin revoked — existing sessions remain super-admin until token expiry or re-login");
+        return ResponseEntity.ok(resp);
     }
 
     @PreAuthorize("@auth.allows('user.update')")
