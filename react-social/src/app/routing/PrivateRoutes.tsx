@@ -47,6 +47,7 @@ import StudentsList from "../pages/StudentInformation/StudentsList";
 import GroupCreatePage from "../pages/dashboard/widgets/CreateNewGroup";
 import StudentCreatePage from "../pages/dashboard/widgets/CreateNewStudent";
 import GroupStudentPage from "../pages/GroupStudent/GroupStudentPage";
+import StudentManagementPage from "../pages/GroupStudent/StudentManagementPage";
 import StudentListPage from "../pages/GroupStudent/StudentListPage";
 // GroupStudentAdminPage removed — consolidated into Data Download (/group-student)
 import GroupStudentSchoolPage from "../pages/GroupStudent/GroupStudentSchoolPage";
@@ -368,6 +369,19 @@ const PrivateRoutes = () => {
           <RequirePermission perm="student.read">
             <SuspensedView>
               <GroupStudentPage />
+            </SuspensedView>
+          </RequirePermission>
+        } />
+
+        {/* /student-management: clone of /group-student with every data-export
+            path stripped (single answer + bulk answers + proctoring + report
+            generation + report email). Keeps Student List xlsx, allot, reset,
+            edit basic info, demographics view. Gated by its own permission
+            so admins can hand out management without granting downloads. */}
+        <Route path="/student-management" element={
+          <RequirePermission perm="student_management.read">
+            <SuspensedView>
+              <StudentManagementPage />
             </SuspensedView>
           </RequirePermission>
         } />

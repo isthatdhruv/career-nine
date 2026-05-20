@@ -14,6 +14,7 @@ import AssessmentRegisterPage from './pages/AssessmentRegisterPage'
 import PaymentStatusPage from './pages/PaymentStatusPage'
 import CampaignRegisterPage from './pages/CampaignRegisterPage'
 import PayForReportPage from './pages/PayForReportPage'
+import AssessmentStartPage from './pages/AssessmentStartPage'
 import PermissionDeniedPage from './components/PermissionDeniedPage'
 
 const SelectSectionPage = lazy(() => import('./pages/SelectSectionPage'))
@@ -46,6 +47,7 @@ export default function App() {
               <Route path="/studentAssessment/sections/:sectionId/questions/:questionIndex" element={<SectionQuestionPage />} />
               <Route path="/studentAssessment/completed" element={<ThankYouPage />} />
               <Route path="/assessment-register/:token" element={<AssessmentRegisterPage />} />
+              <Route path="/assessment/start" element={<AssessmentStartPage />} />
               <Route path="/payment-status" element={<PaymentStatusPage />} />
               <Route path="/c/:slug" element={<CampaignRegisterPage />} />
               <Route path="/c/:slug/:assessmentId" element={<CampaignRegisterPage />} />

@@ -52,6 +52,16 @@ export function getUpgradeInfo(entitlementId: number | string) {
   return http.get(`/campaign/public/upgrade-info/${entitlementId}`)
 }
 
+/**
+ * Magic-link redemption for the welcome-email flow. Validates the access
+ * token, issues the cn_at_asmnt cookie via Set-Cookie, and returns the
+ * session payload (userStudentId, assessments, campaign slug) so the SPA can
+ * skip straight to /allotted-assessment.
+ */
+export function redeemAssessmentStartToken(token: string, entitlementId: string | number) {
+  return http.post('/entitlement/redeem-token', { token, entitlementId })
+}
+
 export function payForReport(body: {
   entitlementId: number | string
   campaignAssessmentTierId: number

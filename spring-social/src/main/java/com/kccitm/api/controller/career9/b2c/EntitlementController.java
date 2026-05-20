@@ -35,7 +35,12 @@ import com.kccitm.api.repository.Career9.b2c.ServiceDeliveryLogRepository;
 import com.kccitm.api.repository.Career9.b2c.StudentEntitlementRepository;
 import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
+import com.kccitm.api.security.AuthCookieService;
+import com.kccitm.api.security.TokenProvider;
+import com.kccitm.api.service.StudentSessionService;
 import com.kccitm.api.service.b2c.EntitlementService;
+
+import javax.servlet.http.HttpServletResponse;
 
 @RestController
 @RequestMapping("/entitlement")
@@ -51,6 +56,12 @@ public class EntitlementController {
     @Autowired private UserStudentRepository userStudentRepository;
     @Autowired private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
     @Autowired private com.kccitm.api.service.b2c.StudentInstituteMembershipService membershipService;
+    @Autowired private AuthCookieService authCookieService;
+    @Autowired private TokenProvider tokenProvider;
+    @Autowired private StudentSessionService studentSessionService;
+
+    @org.springframework.beans.factory.annotation.Value("${app.auth.assessmentTokenExpirationMsec:14400000}")
+    private long assessmentTokenExpirationMsec;
 
     /**
      * PUBLIC: Path B step 1 — student takes the free assessment from a campaign landing page.
@@ -161,12 +172,25 @@ public class EntitlementController {
      */
     @PreAuthorize("@auth.allows('entitlement.read')")
     @PostMapping("/redeem-token")
-    public ResponseEntity<?> redeemToken(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<?> redeemToken(@RequestBody Map<String, Object> body,
+                                          HttpServletResponse httpResponse) {
         String token = body.get("token") != null ? body.get("token").toString() : null;
         Long entitlementId = body.get("entitlementId") != null
                 ? Long.valueOf(body.get("entitlementId").toString()) : null;
         StudentEntitlement e = entitlementService.redeemAccessToken(token, entitlementId);
         if (e == null) return ResponseEntity.status(404).body("Invalid or expired token");
+
+        // Issue the cn_at_asmnt cookie so the SPA can hit assessment-scoped
+        // endpoints (allotted-assessment, demographics, sections, submit) with
+        // server-side auth — not just localStorage trust. Same TTL as paid /
+        // free-registration flows for consistency.
+        if (e.getUserStudentId() != null && e.getAssessmentId() != null) {
+            String sessionJwt = tokenProvider.createAssessmentSessionToken(
+                    e.getUserStudentId(), e.getAssessmentId());
+            authCookieService.issueAssessmentSessionCookie(httpResponse, sessionJwt,
+                    (int) (assessmentTokenExpirationMsec / 1000));
+        }
+
         Map<String, Object> response = new HashMap<>();
         response.put("entitlementId", e.getEntitlementId());
         response.put("userStudentId", e.getUserStudentId());
@@ -180,6 +204,17 @@ public class EntitlementController {
         response.put("lmsActive", e.getLmsActive());
         response.put("finalReportActive", e.getFinalReportActive());
         response.put("expiresAt", e.getExpiresAt());
+
+        // Include the allotted-assessments list + campaign slug so the SPA can
+        // navigate straight to /allotted-assessment in one round-trip.
+        if (e.getUserStudentId() != null) {
+            response.putAll(studentSessionService.buildSessionPayload(e.getUserStudentId()));
+        }
+        if (e.getCampaignId() != null) {
+            campaignRepository.findById(e.getCampaignId())
+                    .ifPresent(c -> response.put("campaignSlug", c.getSlug()));
+        }
+
         return ResponseEntity.ok(response);
     }
 

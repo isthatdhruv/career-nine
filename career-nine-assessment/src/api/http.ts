@@ -87,6 +87,31 @@ http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 })
 
 /**
+ * Endpoints that are anonymous-by-design and MUST NOT trigger the
+ * Phase 19-05 permission-denied redirect when they 401/403. These are public
+ * B2C funnels (registration, promo lookup, payment status, magic-link
+ * redemption) — failures here should bubble to the calling component as a
+ * normal error so it can render an in-page toast / banner.
+ *
+ * Without this carve-out a stale `cn_at_asmnt` cookie from a previous testing
+ * session (4h TTL expired) attached to a POST `/campaign/public/register/...`
+ * tips a fresh student onto the permission-denied page mid-registration.
+ */
+const PUBLIC_ENDPOINT_PATTERNS: RegExp[] = [
+  /\/campaign\/public\//,
+  /\/promo-code\//,
+  /\/entitlement\/redeem-token/,
+  /\/payment\/webhook\/(status|info)\//,
+  /\/auth\/(login|logout|refresh|assessment-session)/,
+  /\/public\//,   // catches /bet-report-data/public/, /navigator-report-data/public/, etc.
+]
+
+function isPublicEndpoint(url: string | undefined): boolean {
+  if (!url) return false
+  return PUBLIC_ENDPOINT_PATTERNS.some((re) => re.test(url))
+}
+
+/**
  * Response interceptor — two responsibilities:
  *
  *   1. Retry on network errors and 5xx with exponential backoff (mirrors the
@@ -98,7 +123,10 @@ http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
  *      auth is the active mechanism, an expired/invalid cn_at_asmnt
  *      surfaces as 401 (header path emits 403 instead) — so we also
  *      redirect on 401-while-cookie-auth-active. The redirect is skipped
- *      when already on the denied page to avoid an infinite loop.
+ *      when already on the denied page to avoid an infinite loop, AND when
+ *      the failing request was a public endpoint (registration funnel,
+ *      payment polling, magic-link redemption) — those need to surface the
+ *      error in-page rather than throw the student onto a session-expiry UI.
  *
  *      The retry logic runs FIRST: a transient 5xx still gets retried;
  *      only after retries are exhausted (or for a non-retryable 403/401)
@@ -123,13 +151,16 @@ http.interceptors.response.use(
 
     // 2) Phase 19 (Plan 19-05): redirect to /permission-denied on 403, and on
     //    401 when cookie auth is active. Guard against window being absent
-    //    (tests / SSR) and skip the redirect when already on the denied page.
+    //    (tests / SSR) and skip the redirect when already on the denied page
+    //    OR when the failing request was a public B2C endpoint.
     const status = error.response?.status
     if (typeof window !== 'undefined') {
       const path = window.location.pathname
       const isDeniedPage = path.endsWith('/permission-denied')
+      const publicCall = isPublicEndpoint(config?.url)
       const shouldRedirect =
         !isDeniedPage &&
+        !publicCall &&
         (status === 403 || (status === 401 && cookieAuthRuntimeActive))
       if (shouldRedirect) {
         const from = encodeURIComponent(path + window.location.search)

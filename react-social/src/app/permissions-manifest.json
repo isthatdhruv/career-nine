@@ -1,14 +1,4 @@
 {
-  "assessment.read": [
-    "/assessment-questions",
-    "/assessments",
-    "/demographic-fields",
-    "/list",
-    "/measured-qualities",
-    "/measured-quality-types",
-    "/question-sections",
-    "/tools"
-  ],
   "assessment.create": [
     "/admin-assessment-edit/:assessmentId/:studentId",
     "/assessment-mapping",
@@ -41,9 +31,15 @@
     "/tools/create",
     "/tools/edit/:id"
   ],
-  "permission.grant": [
-    "/activity-log",
-    "/communication-logs"
+  "assessment.read": [
+    "/assessment-questions",
+    "/assessments",
+    "/demographic-fields",
+    "/list",
+    "/measured-qualities",
+    "/measured-quality-types",
+    "/question-sections",
+    "/tools"
   ],
   "campaign.read": [
     "/b2c/campaigns",
@@ -55,7 +51,8 @@
     "/b2c/pricing-tiers"
   ],
   "career.read": [
-    "/career"
+    "/career",
+    "/career-suggestion"
   ],
   "career.write": [
     "/career/create",
@@ -63,14 +60,6 @@
   ],
   "counselling.read": [
     "/counsellor/dashboard"
-  ],
-  "user.write": [
-    "/admin/counselling-notifications",
-    "/admin/counselling-slots",
-    "/admin/counselling-students",
-    "/admin/counsellors",
-    "/counsellor/availability",
-    "/counsellor/session-notes/:id"
   ],
   "group.read": [
     "/forgotpassword",
@@ -94,14 +83,13 @@
     "/college/create",
     "/contact-person/create"
   ],
-  "user.read": [
-    "/leads"
-  ],
   "payment.refund": [
-    "/payment-tracking"
-  ],
-  "payment.refund": [
+    "/payment-tracking",
     "/promo-codes"
+  ],
+  "permission.grant": [
+    "/activity-log",
+    "/communication-logs"
   ],
   "report.export": [
     "/send-reports"
@@ -109,6 +97,7 @@
   "report.read": [
     "/bet-report-generation",
     "/navigator-report-generation",
+    "/report-generation",
     "/reports-hub",
     "/roles/role",
     "/unified-report-management"
@@ -119,7 +108,9 @@
   "student.read": [
     "/live-tracking",
     "/login/reset-password/enter-email",
-    "/student-list",
+    "/school/assigned-students",
+    "/school/group-student",
+    "/student-dashboard/:studentId",
     "/student/login",
     "/student/registration-details",
     "/student/university/result",
@@ -134,9 +125,16 @@
   ],
   "user.read": [
     "/faculty/registration-details",
+    "/leads",
     "/old-student-email"
   ],
   "user.write": [
+    "/admin/counselling-notifications",
+    "/admin/counselling-slots",
+    "/admin/counselling-students",
+    "/admin/counsellors",
+    "/counsellor/availability",
+    "/counsellor/session-notes/:id",
     "/faculty/registration-form",
     "/registrar/verification/faculty",
     "/user-management/users/manage"

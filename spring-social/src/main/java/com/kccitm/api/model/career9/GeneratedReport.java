@@ -51,7 +51,9 @@ public class GeneratedReport implements Serializable {
     @Column(name = "assessment_id", nullable = false)
     private Long assessmentId;
 
-    // "bet" or "navigator"
+    // "bet"      = legacy class-wise report (grades 3-5)
+    // "navigator" = legacy 18-page Navigator report (deprecated, kept for historical rows)
+    // "pager"    = new 4-pager Navigator report (grades 6+, three template variants: insight / subject / career)
     @Column(name = "type_of_report", nullable = false, length = 50)
     private String typeOfReport;
 
