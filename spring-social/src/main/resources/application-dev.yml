@@ -1,0 +1,85 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:mysql://localhost:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true
+    username: root
+    password: Career-qCsfeuECc3MW
+    hikari:
+      # Dev sizing: a single dev machine with one running JVM rarely needs >10
+      # concurrent JDBC connections, and a high minimum-idle quickly exhausts
+      # MySQL's default max_connections=151 when stale JVMs are left around or
+      # when multiple clients (Workbench, DBeaver) connect alongside.
+      maximum-pool-size: 10
+      minimum-idle: 2
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: update
+  cache:
+    redis:
+      key-prefix: "career9:"
+  redis:
+    host: localhost
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 2
+  mail:
+    properties:
+      mail:
+        smtp:
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            clientId: 101961828065-ak601ssij07ugrffovuns8v2adrqvtqd.apps.googleusercontent.com
+            clientSecret: ${GOOGLE_CLIENT_SECRET:placeholder-dev-only}
+            redirectUri: "http://192.168.0.204:8443/oauth2/callback/{registrationId}"
+          facebook:
+            clientId: 121189305185277
+            clientSecret: ${FACEBOOK_CLIENT_SECRET:placeholder-dev-only}
+            redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+          github:
+            clientId: d3e47fc2ddd966fa4352
+            clientSecret: ${GITHUB_CLIENT_SECRET:placeholder-dev-only}
+            redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+
+app:
+  protocol: http
+  name: localhost:3000
+  cookie:
+    secure: false
+  cors:
+    allowedOrigins: http://localhost:5173,http://35.227.40.232:3000,http://localhost:3001,http://192.168.1.11:3000,http://35.196.122.199:3000,http://192.168.0.204:3000,http://192.168.0.204:3000,http://localhost:3000,https://localhost:3000,https://localhost:8080,https://192.168.0.204:8080,https://localhost,https://localhost:80,https://staging.student.kccitm.in,https://student.kccitm.in,https://erp.aktu.ac.in,https://leetcode.com,http://192.168.0.204:8443,http://localhost:8080
+  oauth2:
+    authorizedRedirectUris:
+      - https://student.kccitm.in/oauth2/redirect
+      - https://staging.student.kccitm.in/oauth2/redirect
+      - https://student.kccitm.in/oauth2/redirect
+      - http://192.168.0.204:3000/oauth2/redirect
+      - myandroidapp://oauth2/redirect
+      - http://localhost/oauth2/redirect
+      - http://localhost:80/oauth2/redirect
+      - myiosapp://oauth2/redirect
+      - http://192.168.0.204:3000
+  razorpay:
+    callback-base-url: http://localhost:5173
+  b2c:
+    frontendBaseUrl: http://localhost:3000
+    assessmentBaseUrl: http://localhost:5173
+  # Phase 20-01: in-process rate limit (Bucket4j). Dev profile runs against
+  # localhost with no upstream proxy — getRemoteAddr() is authoritative.
+  # XFF would be client-controlled / spoofable, so trust-xff is fail-safe false.
+  rate-limit:
+    trust-xff: false
+
+# Phase 15 RBAC + ABAC enforcement mode (see root document for semantics).
+auth:
+  enforce-mode: log-only

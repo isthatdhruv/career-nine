@@ -1,0 +1,103 @@
+spring:
+  config:
+    activate:
+      on-profile: production
+  datasource:
+    url: jdbc:mysql://mysql_db_api:3306/career-9?useSSL=false&serverTimezone=UTC&useLegacyDatetimeCode=false&allowPublicKeyRetrieval=true
+    username: root
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 20
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: validate
+  cache:
+    redis:
+      key-prefix: "career9:"
+  redis:
+    host: redis_cache
+    lettuce:
+      pool:
+        max-active: 50
+        max-idle: 20
+        min-idle: 5
+  mail:
+    properties:
+      mail:
+        smtp:
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            clientId: 101961828065-ak601ssij07ugrffovuns8v2adrqvtqd.apps.googleusercontent.com
+            clientSecret: ${GOOGLE_CLIENT_SECRET}
+            redirectUri: "https://api.career-9.com/oauth2/callback/{registrationId}"
+          facebook:
+            clientId: 121189305185277
+            clientSecret: ${FACEBOOK_CLIENT_SECRET}
+            redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+          github:
+            clientId: d3e47fc2ddd966fa4352
+            clientSecret: ${GITHUB_CLIENT_SECRET}
+            redirectUri: "{baseUrl}/oauth2/callback/{registrationId}"
+
+app:
+  protocol: https
+  name: api.career-9.com
+  cookie:
+    secure: true
+  cors:
+    allowedOrigins: https://career-9.com,https://www.career-9.com,https://dashboard.career-9.com,https://assessment.career-9.com,https://*.career-9.com
+  oauth2:
+    authorizedRedirectUris:
+      - https://dashboard.career-9.com/oauth2/redirect
+      - https://career-9.com/oauth2/redirect
+      - https://www.career-9.com/oauth2/redirect
+      - https://assessment.career-9.com/oauth2/redirect
+      - https://student.kccitm.in/oauth2/redirect
+      - https://staging.student.kccitm.in/oauth2/redirect
+      - http://localhost:3000/oauth2/redirect
+      - myandroidapp://oauth2/redirect
+      - http://localhost/oauth2/redirect
+      - http://localhost:80/oauth2/redirect
+      - myiosapp://oauth2/redirect
+  razorpay:
+    key-id: ${RAZORPAY_KEY_ID:}
+    key-secret: ${RAZORPAY_KEY_SECRET:}
+    webhook-secret: ${RAZORPAY_WEBHOOK_SECRET}
+    callback-base-url: https://assessment.career-9.com
+  digitalocean:
+    spaces:
+      access-key: ${DO_SPACES_ACCESS_KEY:}
+      secret-key: ${DO_SPACES_SECRET_KEY:}
+  b2c:
+    frontendBaseUrl: https://dashboard.career-9.com
+    assessmentBaseUrl: https://assessment.career-9.com
+  # Phase 20-01: in-process rate limit (Bucket4j). Production runs behind
+  # DigitalOcean's reverse proxy which sets X-Forwarded-For and strips any
+  # incoming XFF from untrusted clients — safe to trust here.
+  rate-limit:
+    trust-xff: true   # behind DigitalOcean reverse proxy
+
+# Phase 15 RBAC + ABAC enforcement mode (see root document for semantics).
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# REQUIRES USER ACTION BEFORE PRODUCTION ENFORCE (Phase 17-04, 2026-05-12)
+# >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# Production INTENTIONALLY remains `log-only` per user-directed safety hold.
+# Sandbox is flipped to `enforce` to soak the new enforce semantics.
+# Operator must:
+#   1. Review `auth_audit` DENY rows from sandbox + production for 1-2 days.
+#   2. Confirm ZERO false-positive DENYs against legitimate admin users.
+#   3. Manually edit the line below: `log-only` -> `enforce`.
+#   4. Redeploy production with the change.
+# Until that manual step, production behaves as Phase 15 log-only:
+# DENYs are recorded but allows() returns true (no 403). See 17-04-SUMMARY.md.
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+auth:
+  enforce-mode: log-only

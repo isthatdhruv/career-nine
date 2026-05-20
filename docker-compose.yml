@@ -59,7 +59,7 @@ services:
       dockerfile: dockerfile
     ports:
       - 8080:8080
-    command: ["java", "-Xms1g", "-Xmx2g", "-jar", "/usr/local/lib/demo.jar"]
+    command: ["java", "-Xms1g", "-Xmx2g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=production"]
     restart: always
     volumes:
       - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
@@ -115,7 +115,7 @@ services:
       dockerfile: dockerfile
     ports:
       - 8081:8080
-    command: ["java", "-Xms512m", "-Xmx1g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=sandbox"]
+    command: ["java", "-Xms1g", "-Xmx2g", "-jar", "/usr/local/lib/demo.jar", "--spring.profiles.active=sandbox"]
     restart: always
     volumes:
       - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
@@ -127,7 +127,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1.5g
+          memory: 3g
     depends_on:
       mysql_db_staging:
         condition: service_healthy
