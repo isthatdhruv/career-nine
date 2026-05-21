@@ -21,11 +21,27 @@ import javax.persistence.Table;
 import javax.persistence.Transient;
 import javax.validation.constraints.NotNull;
 
+import org.hibernate.annotations.Filter;
+
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.kccitm.api.model.BoardName;
 import com.kccitm.api.model.ContactPerson;
 import com.kccitm.api.model.InstituteCourse;
 
+/**
+ * Phase 3 (Task 3.2 / audit "school sees only its data"): apply the shared {@code scopeFilter}
+ * (declared on {@link com.kccitm.api.model.career9.StudentInfo}) so institute LIST/query reads
+ * narrow to the caller's institute scope. The PK {@code institute_code} is never null, so the
+ * {@code OR ... IS NULL} carve-out is a no-op here: a non-super-admin with no matching institute
+ * scope sees zero institutes in list endpoints (fail-closed, consistent with StudentInfo).
+ *
+ * <p>Hibernate filters are NOT applied to primary-key loads ({@code EntityManager.find} /
+ * {@code findById}), so institute-name lookups by code keep working for everyone — only
+ * {@code findAll} / JPQL list/projection queries are scoped. Super-admins and full-wildcard
+ * callers skip the filter entirely (see {@code ScopeFilterInterceptor}).
+ */
+@Filter(name = "scopeFilter", condition =
+        "(institute_code IN (:instituteIds) OR institute_code IS NULL)")
 @Entity
 @Table(name = "institute_detail_new")
 public class InstituteDetail implements Serializable {

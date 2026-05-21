@@ -148,6 +148,10 @@ public class AssessmentAnswerController {
      * Used by the B2C Tracker drawer's "View answers" button — works for both
      * ongoing and completed attempts (whatever is in the DB is what shows).
      */
+    // Phase 0 (Task 0.2): admin "View answers" drawer — was unannotated. Gated like the sibling
+    // cross-scope admin read above (assessment_answer.read.all; rows narrowed by the Hibernate
+    // scopeFilter for scoped admins). Advisory until enforce-mode flips (Phase 6).
+    @PreAuthorize("@auth.allows('assessment_answer.read.all')")
     @GetMapping(value = "/admin-view/{userStudentId}/{assessmentId}", headers = "Accept=application/json")
     public ResponseEntity<?> adminViewAnswers(@PathVariable Long userStudentId,
                                               @PathVariable Long assessmentId) {

@@ -64,9 +64,8 @@ services:
     volumes:
       - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
     env_file:
-      - .env
+      - .env.production
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
       - SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE=1GB
       - SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE=1GB
@@ -120,9 +119,8 @@ services:
     volumes:
       - ./spring-social/src/main/resources/firebase-service-account.json:/config/firebase-service-account.json:ro
     env_file:
-      - .env
+      - .env.staging
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - APP_FIREBASE_SERVICE_ACCOUNT_FILE=/config/firebase-service-account.json
     deploy:
       resources:

@@ -148,7 +148,9 @@ public class PromoCodeController {
         return ResponseEntity.ok("Promo code deleted");
     }
 
-    @PreAuthorize("@auth.allows('promo_code.read')")
+    // Phase 2 (Task 2.1 / HIGH-B): genuinely anonymous landing-page promo check. @PreAuthorize
+    // removed so the enforce flip won't 403 anonymous callers (permitAll + CSRF-exempt via
+    // PUBLIC_PATHS); the in-body promo-code lookup is the gate. Excluded in the coverage test.
     @PostMapping("/public/validate")
     public ResponseEntity<?> validatePromoCode(@RequestBody Map<String, Object> request) {
         Object codeObj = request.get("code");

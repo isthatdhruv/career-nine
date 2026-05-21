@@ -107,8 +107,10 @@ public class BetReportDataController {
      * as a downloadable PDF. No frontend page is needed — the browser
      * downloads the PDF directly from the email link.
      */
+    // Phase 2 (Task 2.1 / HIGH-B): anonymous token-gated public report download. @PreAuthorize
+    // removed so the enforce flip won't 403 the public viewer; permitAll + CSRF-exempt via
+    // PUBLIC_PATHS (/bet-report-data/public/**). The access token is the gate. Coverage-excluded.
     @GetMapping("/public/final")
-    @PreAuthorize("@auth.allows('bet_report_data.read')") // PUBLIC?: token-gated public report download — flagged for 15-06 EXCLUSIONS review
     public ResponseEntity<?> publicFinalReportPdf(
             @org.springframework.web.bind.annotation.RequestParam("t") String token,
             @org.springframework.web.bind.annotation.RequestParam("e") Long entitlementId) {

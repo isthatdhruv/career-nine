@@ -53,6 +53,7 @@ import com.kccitm.api.model.career9.Questionaire.QuestionnaireQuestion;
 import com.kccitm.api.repository.AssessmentRawScoreRepository;
 import com.kccitm.api.repository.Career9.AssessmentAnswerRepository;
 import com.kccitm.api.repository.Career9.StudentInfoRepository;
+import com.kccitm.api.security.AuthorizationService;
 import javax.transaction.Transactional;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
 import com.kccitm.api.repository.Career9.Questionaire.QuestionnaireQuestionRepository;
@@ -73,6 +74,9 @@ public class StudentInfoController {
     private UserRepository userRepository;
     @Autowired
     private StudentInfoRepository studentInfoRepository;
+    // Phase 1 (Task 1.6): used to re-authorize /update against the PERSISTED institute.
+    @Autowired
+    private AuthorizationService authorizationService;
     @Autowired
     private UserStudentRepository userStudentRepository;
     @Autowired
@@ -660,10 +664,35 @@ public class StudentInfoController {
         }
     }
 
-    @PreAuthorize("@auth.allows('student_info.update', #studentInfo.instituteId, null, null, null)")
+    // Phase 1 (Task 1.6 / audit HIGH-D): previously `return studentInfoRepository.save(studentInfo)`
+    // — a blind upsert of the full client-supplied entity. The caller controlled the primary `id`
+    // (overwrite or create any row) AND `instituteId` (which was also the ABAC scope arg), so an
+    // attacker could pick the institute their own request was scope-checked against and rewrite an
+    // arbitrary student in any tenant. Now: require an existing id, load the persisted row,
+    // re-authorize against the PERSISTED institute, and pin `id` + `instituteId` from the persisted
+    // row so this endpoint can neither move a student across tenants nor mint a new row. The
+    // annotation drops the body-supplied scope arg (it was attacker-controlled and meaningless);
+    // the real scope check happens in-method below.
+    @PreAuthorize("@auth.allows('student_info.update')")
     @PostMapping("/update")
-    public StudentInfo updateStudentInfo(@RequestBody StudentInfo studentInfo) {
-        return studentInfoRepository.save(studentInfo);
+    public ResponseEntity<?> updateStudentInfo(@RequestBody StudentInfo studentInfo) {
+        if (studentInfo.getId() == null) {
+            return ResponseEntity.badRequest().body("id is required to update a student");
+        }
+        StudentInfo existing = studentInfoRepository.findById(studentInfo.getId().longValue())
+                .orElse(null);
+        if (existing == null) {
+            return ResponseEntity.notFound().build();
+        }
+        // Authorize against the institute on the PERSISTED row, not the client-supplied one.
+        if (!authorizationService.allows("student_info.update", existing.getInstituteId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Not permitted to update a student in this institute");
+        }
+        // Pin tenant + identity from the persisted row regardless of what the client sent.
+        studentInfo.setId(existing.getId());
+        studentInfo.setInstituteId(existing.getInstituteId());
+        return ResponseEntity.ok(studentInfoRepository.save(studentInfo));
     }
 
     // no scope arg: delete by id alone; scope-filter narrows access

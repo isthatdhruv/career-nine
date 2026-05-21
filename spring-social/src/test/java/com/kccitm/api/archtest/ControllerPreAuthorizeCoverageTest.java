@@ -84,6 +84,10 @@ public class ControllerPreAuthorizeCoverageTest {
             "com.kccitm.api.controller.AuthController#logout",
             // oauth-exchange — establishes the cookie session from a body-bound JWT (Phase 16-04).
             "com.kccitm.api.controller.AuthController#exchangeOAuthToken",
+            // assessment-session minting — anonymous-by-design (permitAll + in PUBLIC_PATHS); the
+            // gate is body params + enrolment + feature-flag DB checks, not Spring auth. (Auth
+            // remediation Phase 1/HIGH-1 hardens it with identity proof but it stays anonymous.)
+            "com.kccitm.api.controller.AssessmentSessionController#issueAssessmentSession",
             // refresh — consumes the opaque cn_rt cookie; MUST work with an EXPIRED access token (Phase 18-02).
             "com.kccitm.api.controller.AuthController#refresh",
             // me — anonymous-friendly: returns 401 when no principal is bound rather than 403 via PreAuthorize.
@@ -120,7 +124,16 @@ public class ControllerPreAuthorizeCoverageTest {
             "com.kccitm.api.controller.career9.b2c.CampaignPublicController#register",
             "com.kccitm.api.controller.career9.b2c.CampaignPublicController#registerTrial",
             "com.kccitm.api.controller.career9.b2c.CampaignPublicController#upgradeInfo",
-            "com.kccitm.api.controller.career9.b2c.CampaignPublicController#payForReport"
+            "com.kccitm.api.controller.career9.b2c.CampaignPublicController#payForReport",
+
+            // --- Phase 2 (Task 2.1 / HIGH-B): genuinely anonymous funnel endpoints whose
+            // @PreAuthorize was removed (they are permitAll + CSRF-exempt via PUBLIC_PATHS and
+            // gated by an in-controller token / promo / signature check, not by Spring auth).
+            "com.kccitm.api.controller.career9.PromoCodeController#validatePromoCode",
+            "com.kccitm.api.controller.career9.b2c.ReportPreparationController#prepareReport",
+            "com.kccitm.api.controller.career9.b2c.EntitlementController#redeemToken",
+            "com.kccitm.api.controller.career9.AssessmentInstituteMappingController#getMappingInfoByToken",
+            "com.kccitm.api.controller.career9.AssessmentInstituteMappingController#registerStudentByToken"
 
             // Plan 15-04 DEFERRED block removed by Plan 15-04 FINAL COMPLETION (2026-05-11).
             // All 17 assessment / questionnaire / scoring / report-generation controllers

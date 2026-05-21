@@ -60,7 +60,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
         Set<String> s = new HashSet<>(Arrays.asList(
                 "/auth/login",
                 "/auth/refresh",
-                "/auth/signup"));
+                "/auth/signup",
+                // Phase 1 (Task 1.7 / audit MED-3 + MED-E): anonymous token-minting / lookup
+                // endpoints that take attacker-controlled identifiers. Throttling them per-IP
+                // blunts the enumeration that powers the assessment-session IDOR (HIGH-1) and
+                // the lead-spam / Odoo-hammer vector (MED-E). All are exact paths.
+                "/auth/assessment-session",
+                "/auth/oauth-exchange",
+                "/entitlement/redeem-token",
+                "/leads/capture"));
         PER_IP_PATHS = Collections.unmodifiableSet(s);
     }
 
