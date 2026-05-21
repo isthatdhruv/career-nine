@@ -199,6 +199,9 @@ public enum PermissionCode {
     SCHOOL_SESSION_DELETE       ("school_session.delete",       "Delete school sessions"),
     DASHBOARD_ADMIN             ("dashboard.admin",             "Access admin dashboard"),
     DASHBOARD_ADMIN_READ        ("dashboard.admin.read",        "Read admin dashboard data"),
+    // Phase 0 (Task 0.3): write/recompute permission for POST /dashboard/admin/snapshot/refresh,
+    // separated from the read so the heavier on-demand recompute can be granted independently.
+    DASHBOARD_ADMIN_REFRESH     ("dashboard.admin.refresh",     "Force-recompute the admin dashboard snapshot"),
     DASHBOARD_PRINCIPAL         ("dashboard.principal",         "Access principal dashboard"),
     DASHBOARD_PRINCIPAL_READ    ("dashboard.principal.read",    "Read principal dashboard data"),
     DASHBOARD_TEACHER           ("dashboard.teacher",           "Access teacher dashboard"),

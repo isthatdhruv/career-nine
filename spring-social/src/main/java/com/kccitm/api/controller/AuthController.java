@@ -22,6 +22,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -67,6 +68,26 @@ public class AuthController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    /**
+     * Phase 7 (Task 7.9): a dummy bcrypt hash (computed once, at the encoder's configured cost) so
+     * the unknown-email login path spends the same time as a real password check — removing the
+     * timing oracle that would otherwise reveal which emails are registered.
+     */
+    private volatile String dummyBcryptHash;
+
+    private String dummyHash() {
+        String h = dummyBcryptHash;
+        if (h == null) {
+            synchronized (this) {
+                if (dummyBcryptHash == null) {
+                    dummyBcryptHash = passwordEncoder.encode("timing-equalizer-not-a-real-password");
+                }
+                h = dummyBcryptHash;
+            }
+        }
+        return h;
+    }
+
     @Autowired
     private TokenProvider tokenProvider;
 
@@ -92,6 +113,11 @@ public class AuthController {
             HttpServletRequest request, HttpServletResponse response) {
         User user = userRepository.findByEmailAndProvider(loginRequest.getEmail(), AuthProvider.local);
         if (user == null) {
+            // Phase 7 (Task 7.9): burn equivalent bcrypt time on the unknown-email path so it is
+            // not distinguishable by timing from a known-email/wrong-password failure, and return
+            // the SAME generic message as a credential failure (no user enumeration).
+            passwordEncoder.matches(
+                    loginRequest.getPassword() == null ? "" : loginRequest.getPassword(), dummyHash());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ApiResponse(false, "Invalid email or password."));
         }
@@ -100,10 +126,18 @@ public class AuthController {
                 .body(new ApiResponse(false, "Your registration is under Process"));
         }
 
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        loginRequest.getEmail(),
-                        loginRequest.getPassword()));
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            loginRequest.getEmail(),
+                            loginRequest.getPassword()));
+        } catch (BadCredentialsException ex) {
+            // Phase 7 (Task 7.9): identical generic message as the unknown-email path above, so a
+            // wrong password on a real account is indistinguishable from an unknown email.
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiResponse(false, "Invalid email or password."));
+        }
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
 

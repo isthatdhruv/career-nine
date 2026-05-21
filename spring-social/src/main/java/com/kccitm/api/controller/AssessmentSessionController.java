@@ -1,6 +1,10 @@
 package com.kccitm.api.controller;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Optional;
 
 import javax.servlet.http.HttpServletResponse;
@@ -20,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
+import com.kccitm.api.model.career9.StudentInfo;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.model.career9.school.InstituteDetail;
 import com.kccitm.api.repository.InstituteDetailRepository;
@@ -79,6 +84,14 @@ public class AssessmentSessionController {
         public Long userStudentId;
         @NotNull
         public Long assessmentId;
+        /**
+         * Phase 1 (Task 1.4 / audit HIGH-1): identity proof. Date of birth in {@code dd-MM-yyyy},
+         * matched against the student's record before a session is minted so that
+         * {@code (userStudentId, assessmentId)} enumeration alone can no longer obtain another
+         * student's assessment session. Required; callers (the assessment SPA entry) must supply it.
+         */
+        @NotNull
+        public String dob;
     }
 
     /**
@@ -146,6 +159,27 @@ public class AssessmentSessionController {
                     .body("Student not enrolled in this assessment");
         }
 
+        // 2b. Identity proof (Phase 1 / HIGH-1): the supplied DOB must match the student's record.
+        // Mirrors the duplicate-email DOB gate in CampaignPublicController: when a DOB is on file we
+        // require an exact day match; when none is on file we mint anyway (so legacy students with no
+        // recorded DOB are not locked out) but log it. This closes the pure-id enumeration path.
+        Date suppliedDob = parseDob(req.dob);
+        if (suppliedDob == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Invalid date of birth; expected format dd-MM-yyyy");
+        }
+        StudentInfo info = student.getStudentInfo();
+        Date storedDob = info != null ? info.getStudentDob() : null;
+        if (storedDob != null) {
+            if (!sameDay(storedDob, suppliedDob)) {
+                logger.warn("Assessment-session: DOB mismatch userStudentId={}", req.userStudentId);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Identity verification failed");
+            }
+        } else {
+            logger.warn("Assessment-session: no DOB on record for userStudentId={} — minting without DOB proof",
+                    req.userStudentId);
+        }
+
         // 3. Mint the assessment-scoped JWT.
         String token = tokenProvider.createAssessmentSessionToken(req.userStudentId, req.assessmentId);
 
@@ -159,5 +193,32 @@ public class AssessmentSessionController {
         logger.info("Assessment-session issued userStudentId={} assessmentId={}",
                 req.userStudentId, req.assessmentId);
         return ResponseEntity.ok(Collections.singletonMap("ok", true));
+    }
+
+    /** Parse a {@code dd-MM-yyyy} date string; returns null on null/blank/malformed input. */
+    private static Date parseDob(String s) {
+        if (s == null || s.trim().isEmpty()) {
+            return null;
+        }
+        SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
+        sdf.setLenient(false);
+        try {
+            return sdf.parse(s.trim());
+        } catch (ParseException e) {
+            return null;
+        }
+    }
+
+    /** True iff both dates fall on the same calendar day. */
+    private static boolean sameDay(Date a, Date b) {
+        if (a == null || b == null) {
+            return false;
+        }
+        Calendar ca = Calendar.getInstance();
+        ca.setTime(a);
+        Calendar cb = Calendar.getInstance();
+        cb.setTime(b);
+        return ca.get(Calendar.YEAR) == cb.get(Calendar.YEAR)
+                && ca.get(Calendar.DAY_OF_YEAR) == cb.get(Calendar.DAY_OF_YEAR);
     }
 }

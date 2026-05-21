@@ -25,6 +25,7 @@ import com.kccitm.api.config.AppProperties;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -191,12 +192,28 @@ public class TokenProvider {
     }
 
     public Long getUserIdFromToken(String token) {
-        Claims claims = Jwts.parser()
-                .setSigningKey(signingKey)
-                .parseClaimsJws(token)
-                .getBody();
-
+        Claims claims = parseSigned(token).getBody();
         return Long.parseLong(claims.getSubject());
+    }
+
+    /**
+     * Phase 7 (Task 7.1 / audit HIGH-3): the single signed-JWT parse path. Uses the non-deprecated
+     * {@code parserBuilder()} and EXPLICITLY pins the signing algorithm to HS512. jjwt 0.11 already
+     * rejects {@code alg:none} and HMAC/RSA confusion because {@link #signingKey} is a
+     * {@code SecretKey}, but asserting the header algorithm here makes that protection explicit
+     * (not silently dependent on key-type behaviour) and future-proof. Every parse call site routes
+     * through this method.
+     */
+    private Jws<Claims> parseSigned(String token) {
+        Jws<Claims> jws = Jwts.parserBuilder()
+                .setSigningKey(signingKey)
+                .build()
+                .parseClaimsJws(token);
+        String alg = jws.getHeader().getAlgorithm();
+        if (!SignatureAlgorithm.HS512.getValue().equals(alg)) {
+            throw new UnsupportedJwtException("Unexpected JWT signing algorithm: " + alg);
+        }
+        return jws;
     }
 
     // ── Phase 19 Plan 01: assessment-scoped JWT minting + scope helpers ────────────────
@@ -244,10 +261,7 @@ public class TokenProvider {
      */
     public String getScopeFromToken(String token) {
         try {
-            Claims claims = Jwts.parser()
-                    .setSigningKey(signingKey)
-                    .parseClaimsJws(token)
-                    .getBody();
+            Claims claims = parseSigned(token).getBody();
             Object scope = claims.get("scope");
             return scope == null ? "session" : scope.toString();
         } catch (Exception ex) {
@@ -263,10 +277,7 @@ public class TokenProvider {
      */
     public Long getAssessmentIdFromToken(String token) {
         try {
-            Claims claims = Jwts.parser()
-                    .setSigningKey(signingKey)
-                    .parseClaimsJws(token)
-                    .getBody();
+            Claims claims = parseSigned(token).getBody();
             Object aid = claims.get("aid");
             return aid == null ? null : Long.valueOf(aid.toString());
         } catch (Exception ex) {
@@ -296,11 +307,7 @@ public class TokenProvider {
      */
     public String getJtiFromToken(String token) {
         try {
-            return Jwts.parser()
-                    .setSigningKey(signingKey)
-                    .parseClaimsJws(token)
-                    .getBody()
-                    .getId();
+            return parseSigned(token).getBody().getId();
         } catch (Exception ex) {
             return null;
         }
@@ -308,7 +315,7 @@ public class TokenProvider {
 
     public boolean validateToken(String authToken) {
         try {
-            Jwts.parser().setSigningKey(signingKey).parseClaimsJws(authToken);
+            parseSigned(authToken);
             return true;
         } catch (SignatureException ex) {
             logger.error("Invalid JWT signature");
@@ -350,10 +357,7 @@ public class TokenProvider {
      */
     @SuppressWarnings("unchecked")
     public TokenClaims parseClaims(String token) {
-        Claims c = Jwts.parser()
-                .setSigningKey(signingKey)
-                .parseClaimsJws(token)
-                .getBody();
+        Claims c = parseSigned(token).getBody();
 
         TokenClaims out = new TokenClaims();
         out.userId = Long.parseLong(c.getSubject());

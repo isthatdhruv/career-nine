@@ -527,6 +527,10 @@ public class TrackerController {
      * provision pipeline the webhook would have, so the operator sees the
      * txn flip plus the linked student/entitlement get created in one click.
      */
+    // Phase 0 (Task 0.2): operator action that re-checks Razorpay and runs the mark-paid +
+    // provision pipeline — was unannotated. Gated as a tracker mutation, consistent with the
+    // other state-changing tracker endpoints. Advisory until enforce-mode flips (Phase 6).
+    @PreAuthorize("@auth.allows('tracker.update')")
     @PostMapping("/payments/{transactionId}/check-status")
     public ResponseEntity<?> checkPaymentStatus(@PathVariable Long transactionId) {
         Optional<PaymentTransaction> opt = paymentTransactionRepository.findById(transactionId);

@@ -10,6 +10,7 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import com.kccitm.api.security.AssessmentScopeOwnershipInterceptor;
 import com.kccitm.api.security.ScopeFilterInterceptor;
 
 import javax.servlet.MultipartConfigElement;
@@ -26,6 +27,14 @@ public class WebMvcConfig implements WebMvcConfigurer {
     private AssessmentSessionInterceptor sessionInterceptor;
 
     /**
+     * Phase 1 (Task 1.2) — assessment-scoped token IDOR guard. Cross-checks any
+     * student/assessment id in the request against the token's own pair so an assessment
+     * session cannot read/write another student's data (audit CRIT-C / MED-H).
+     */
+    @Autowired
+    private AssessmentScopeOwnershipInterceptor assessmentScopeOwnershipInterceptor;
+
+    /**
      * Phase 15-06 — Hibernate ABAC row-level scope filter enable/disable.
      * Runs on every request EXCEPT auth-establishment, public marketing, and
      * health/webhook paths where {@link org.springframework.security.core.context.SecurityContextHolder}
@@ -36,6 +45,17 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        // Phase 1 (Task 1.2): assessment-token ownership guard over every assessment-scope path
+        // (mirrors ASSESSMENT_SCOPE_PATHS in TokenAuthenticationFilter). No-ops for admin/staff
+        // sessions (they carry no assessment attributes); only assessment-scoped tokens are checked.
+        registry.addInterceptor(assessmentScopeOwnershipInterceptor)
+                .addPathPatterns(
+                        "/assessments/**",
+                        "/assessment-answer/**",
+                        "/student-demographics/**",
+                        "/assessment-proctoring/**",
+                        "/student-info/**");
+
         registry.addInterceptor(sessionInterceptor)
                 .addPathPatterns("/assessment-answer/**", "/assessments/**")
                 .excludePathPatterns(

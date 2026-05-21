@@ -181,8 +181,10 @@ public class AssessmentInstituteMappingController {
 
     // ============ PUBLIC ENDPOINTS ============
 
+    // Phase 2 (Task 2.1 / HIGH-B): anonymous token-gated public mapping lookup. @PreAuthorize
+    // removed so the enforce flip won't 403 the public caller; permitAll + CSRF-exempt via
+    // PUBLIC_PATHS (/assessment-mapping/public/**). The path token is the gate. Coverage-excluded.
     @GetMapping("/public/info/{token}")
-    @PreAuthorize("@auth.allows('assessment.prefetch')") // PUBLIC?: flagged for 15-06 EXCLUSIONS review (token-gated public endpoint)
     public ResponseEntity<?> getMappingInfoByToken(@PathVariable String token) {
         Optional<AssessmentInstituteMapping> mappingOpt = mappingRepository.findByTokenAndIsActive(token, true);
         if (!mappingOpt.isPresent()) {
@@ -246,9 +248,11 @@ public class AssessmentInstituteMappingController {
         return ResponseEntity.ok(info);
     }
 
+    // Phase 2 (Task 2.1 / HIGH-B): anonymous token-gated B2C self-registration. @PreAuthorize
+    // removed so the enforce flip won't 403 the public caller; permitAll + CSRF-exempt via
+    // PUBLIC_PATHS (/assessment-mapping/public/**). The path token is the gate. Coverage-excluded.
     @PostMapping("/public/register/{token}")
     @Transactional
-    @PreAuthorize("@auth.allows('assessment.prefetch')") // PUBLIC?: flagged for 15-06 EXCLUSIONS review (B2C self-registration endpoint)
     public ResponseEntity<?> registerStudentByToken(@PathVariable String token,
             @RequestBody Map<String, Object> studentData) {
         // 1. Find mapping by token

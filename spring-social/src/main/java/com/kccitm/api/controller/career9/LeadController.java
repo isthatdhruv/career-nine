@@ -46,8 +46,9 @@ public class LeadController {
     /**
      * PUBLIC endpoint — accepts lead form submissions from external landing pages.
      */
-    // PUBLIC?: flagged for 15-06 exclusions review — public lead capture from landing pages (anonymous by design)
-    @PreAuthorize("@auth.allows('lead.create')")
+    // Phase 2 (Task 2.1 / HIGH-B): public lead capture from external landing pages (anonymous by
+    // design). @PreAuthorize removed so the enforce flip won't 403 anonymous callers; permitAll +
+    // CSRF-exempt via PUBLIC_PATHS (/leads/capture) and rate-limited per-IP (Task 1.7). Coverage-excluded.
     // @CrossOrigin(origins = "*", maxAge = 3600)
     @PostMapping("/capture")
     public ResponseEntity<?> captureLead(@RequestBody Map<String, Object> payload) throws Exception {

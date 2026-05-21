@@ -79,6 +79,73 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     // private HttpCookieOAuth2AuthorizationRequestRepository
     // httpCookieOAuth2AuthorizationRequestRepository;
 
+    /**
+     * Phase 0 (Task 0.1) — single source of truth for anonymous-by-design request paths.
+     *
+     * <p>Fed to BOTH the CSRF {@code ignoringAntMatchers(...)} list and the
+     * {@code authorizeRequests().permitAll()} list in {@link #configure(HttpSecurity)}, so the
+     * two can never drift. The prior split definition (two hand-maintained lists) was the root
+     * cause of the audit's HIGH-B / MED-C findings: several B2C funnel endpoints were
+     * CSRF-exempt but NOT permitAll (so anonymous callers got 401), and others were permitAll
+     * but NOT CSRF-exempt.
+     *
+     * <p>Every entry is either auth-bootstrap (no prior {@code cn_csrf} cookie exists yet) or an
+     * anonymous B2C / registration funnel gated by an in-controller signature / token /
+     * promo-lookup check rather than by Spring auth.
+     *
+     * <p>NOTE (Phase 2 / HIGH-B follow-up): {@code /promo-code/validate} is the legacy
+     * (mis-typed) path; the live endpoint is {@code /promo-codes/public/validate}. Phase 2
+     * corrects this and removes the now-redundant {@code @PreAuthorize} on these genuinely
+     * anonymous handlers. {@code /util/file-get/**} is deliberately NOT in this set: Phase 1
+     * (CRIT-B) removes its public access entirely, so it stays a separate, clearly-flagged
+     * permitAll entry below rather than being baked into the shared constant.
+     */
+    private static final String[] PUBLIC_PATHS = {
+            // --- auth bootstrap / token lifecycle ---
+            "/auth/login",
+            "/auth/signup",
+            "/auth/logout",
+            "/auth/oauth-exchange",
+            "/auth/refresh",
+            // Phase 19: assessment-session minting is the SPA's first call; no prior cn_csrf.
+            "/auth/assessment-session",
+            "/oauth2/**",
+            // --- payment + anonymous B2C / registration funnels ---
+            // POSTs issued by students/landing pages that never sign in (no cn_csrf to echo);
+            // each body is protected by a signature / token / promo-lookup gate in-controller.
+            "/payment/webhook/**",
+            "/campaign/public/**",
+            "/entitlement/redeem-token",
+            // Phase 2 (Task 2.1 / HIGH-B): corrected from the dead "/promo-code/validate" typo to
+            // the real endpoint path; was CSRF-exempt-but-not-permitAll, so anonymous validation 401'd.
+            "/promo-codes/public/validate",
+            "/bet-report-data/public/**",
+            "/navigator-report-data/public/**",
+            "/assessment-mapping/public/**",
+            "/school-registration/public/**",
+            // Phase 2 (Task 2.1 / HIGH-B): landing-page lead capture — was not permitAll (401 for
+            // external pages). The handler validates/sanitises the body itself.
+            "/leads/capture",
+            // Phase 2 (Task 2.2 / HIGH-A): counsellor self-registration + login are pre-auth flows
+            // for users who have no session yet. Now reachable anonymously; their @PreAuthorize is removed.
+            "/api/counsellor/self-register",
+            "/api/counsellor/login"
+    };
+
+    /** Static assets + root/error/favicon — always anonymous (Phase 0 Task 0.1 extraction). */
+    private static final String[] STATIC_ASSET_PATHS = {
+            "/",
+            "/error",
+            "/favicon.ico",
+            "/**/*.png",
+            "/**/*.gif",
+            "/**/*.svg",
+            "/**/*.jpg",
+            "/**/*.html",
+            "/**/*.css",
+            "/**/*.js"
+    };
+
     @Bean
     public TokenAuthenticationFilter tokenAuthenticationFilter() {
         return new TokenAuthenticationFilter();
@@ -241,28 +308,10 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 // webhooks are exempt — none have a prior cn_csrf cookie to validate against.
                 .csrf()
                 .csrfTokenRepository(csrfTokenRepository())
-                .ignoringAntMatchers(
-                        "/auth/login",
-                        "/auth/signup",
-                        "/auth/logout",
-                        "/auth/oauth-exchange",
-                        "/auth/refresh",
-                        // Phase 19 Plan 01: assessment-session minting is the first call
-                        // the assessment SPA makes; the caller has no prior cn_csrf cookie
-                        // to validate against. Enrolment + feature-flag DB checks are the gate.
-                        "/auth/assessment-session",
-                        "/oauth2/**",
-                        "/payment/webhook/**",
-                        // Anonymous-by-design B2C funnels — POSTs are issued by students
-                        // who never sign in, so they have no prior cn_csrf cookie to
-                        // echo back. Endpoint authorization is permitAll() below and
-                        // the bodies are protected by signature / token / promo-lookup
-                        // gates inside the controller, not by CSRF.
-                        "/campaign/public/**",
-                        "/entitlement/redeem-token",
-                        "/promo-code/validate",
-                        "/bet-report-data/public/**",
-                        "/navigator-report-data/public/**")
+                // Phase 0 (Task 0.1): exempt the shared PUBLIC_PATHS set. Sourced from the
+                // SAME constant fed to permitAll() below so the CSRF-exempt and
+                // authentication-exempt sets can never drift (audit MED-C / HIGH-B root cause).
+                .ignoringAntMatchers(PUBLIC_PATHS)
                 .and()
                 .formLogin()
                 .disable()
@@ -279,38 +328,20 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .authorizeRequests()
                 // CORS preflight — must stay open for every path
                 .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                // Root, error page, favicon, static assets
-                .antMatchers(
-                        "/",
-                        "/error",
-                        "/favicon.ico",
-                        "/**/*.png",
-                        "/**/*.gif",
-                        "/**/*.svg",
-                        "/**/*.jpg",
-                        "/**/*.html",
-                        "/**/*.css",
-                        "/**/*.js")
+                // Root, error page, favicon, static assets (Phase 0 Task 0.1: extracted constant).
+                .antMatchers(STATIC_ASSET_PATHS)
                 .permitAll()
-                // Public application endpoints — must match ROADMAP success criterion #3 EXACTLY (11 patterns)
-                // Phase 16-01 adds /auth/logout so it always succeeds even with an expired/missing cookie.
-                // Phase 16-04 adds /auth/oauth-exchange — the URL-token → cookie bridge for the OAuth flow.
-                .antMatchers(
-                        "/auth/login",
-                        "/auth/signup",
-                        "/auth/logout",
-                        "/auth/oauth-exchange",
-                        "/auth/refresh",
-                        // Phase 19 Plan 01: assessment-session minting. Endpoint is the SPA's
-                        // entry call before any session cookie exists; gate is body params +
-                        // enrolment + feature-flag DB checks, not Spring auth.
-                        "/auth/assessment-session",
-                        "/oauth2/**",
-                        "/payment/webhook/**",
-                        "/campaign/public/**",
-                        "/assessment-mapping/public/**",
-                        "/school-registration/public/**",
-                        "/util/file-get/**")
+                // Public application endpoints — Phase 0 (Task 0.1): the SAME PUBLIC_PATHS
+                // constant fed to ignoringAntMatchers() above, so anonymous-reachable and
+                // CSRF-exempt sets stay in lockstep.
+                .antMatchers(PUBLIC_PATHS)
+                .permitAll()
+                // CRIT-B (audit) — /util/file-get/** is an UNAUTHENTICATED arbitrary GCS object
+                // read. It is intentionally kept OUT of PUBLIC_PATHS and isolated here because
+                // Phase 1 (Task 1.1) REMOVES this permitAll entry entirely and replaces it with
+                // an authenticated + scope-checked (or signed-URL) handler. DO NOT fold this into
+                // PUBLIC_PATHS. (It is a GET, so CSRF exemption is not needed.)
+                .antMatchers("/util/file-get/**")
                 .permitAll()
                 // Phase 20-04: Spring Boot Actuator lockdown.
                 // Order matters — Spring Security's antMatcher chain is first-match-wins,

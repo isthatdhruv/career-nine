@@ -170,7 +170,10 @@ public class EntitlementController {
      * existing JWT pipeline. The SPA can use the entitlement reference to short-circuit the
      * assessment-start flow with the resolved userStudentId.
      */
-    @PreAuthorize("@auth.allows('entitlement.read')")
+    // Phase 2 (Task 2.1 / HIGH-B): anonymous SPA token redemption, gated by the unguessable
+    // 30-byte SecureRandom access token validated in EntitlementService.redeemAccessToken.
+    // @PreAuthorize removed so the enforce flip won't 403 the anonymous redeem; permitAll +
+    // CSRF-exempt via PUBLIC_PATHS (/entitlement/redeem-token). Coverage-excluded.
     @PostMapping("/redeem-token")
     public ResponseEntity<?> redeemToken(@RequestBody Map<String, Object> body,
                                           HttpServletResponse httpResponse) {

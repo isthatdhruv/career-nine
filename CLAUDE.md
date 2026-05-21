@@ -83,7 +83,9 @@ mvn clean package -DskipTests
 ```
 
 **Configuration:**
-- Dev profile: `application-dev.yml` (default — root `application.yml` sets `spring.profiles.active: dev`)
+- Single `application.yml` holds all profiles as separate YAML documents; `spring.profiles.active: dev` is the default. There are no more `application-{dev,sandbox,production}.yml` files.
+- Each profile auto-loads its own root `.env` file via profile-scoped `spring.config.import`: `dev`→`.env.dev`, `sandbox`→`.env.staging`, `production`→`.env.production`. Copy the matching `.env.*.example` template to create one.
+- Dev has **no secret fallbacks**: `mvn spring-boot:run` fails unless `.env.dev` (or matching shell/Docker env) supplies `SPRING_DATASOURCE_PASSWORD` and the three OAuth client secrets.
 - Database: `career-9` on localhost:3306 (docker `mysql_db_api` container exposed on the host)
 - Server port: 8080
 - Default credentials: root/Career-qCsfeuECc3MW
@@ -158,11 +160,11 @@ docker-compose up -d --build
 - Production (docker): `jdbc:mysql://mysql_db_api:3306/career-9`
 - Sandbox (docker): `jdbc:mysql://mysql_db_staging:3306/career-9-staging`
 - User: `root`
-- Password: dev uses `Career-qCsfeuECc3MW` in the profile file; production/sandbox read `${SPRING_DATASOURCE_PASSWORD}` from root `.env`
+- Password: all profiles read `${SPRING_DATASOURCE_PASSWORD}` from their per-profile `.env` file (`.env.dev` / `.env.staging` / `.env.production`)
 
 **Hibernate DDL:** `update` for dev/sandbox; `validate` for production
 
-**Profile config layout:** `application.yml` holds shared structure; per-profile overrides live in `application-{dev,sandbox,production}.yml`. The single canonical `.env` lives at the repo root and is loaded via `spring.config.import`.
+**Profile config layout:** a single `application.yml` holds shared structure (document 1) plus one `spring.config.activate.on-profile` document per profile (`dev`, `sandbox`, `production`). Each profile document declares its own `spring.config.import` for the matching root `.env` file — `dev`→`.env.dev`, `sandbox`→`.env.staging`, `production`→`.env.production` — covering both CWDs (`./` repo root and `../` from `spring-social/`). The imports are `optional:` so the non-matching CWD path is skipped; fail-fast comes from unresolved `${...}` placeholders, not a missing file. In Docker the same secrets arrive via `env_file:` on each service. Each `.env.*` is gitignored; commit only the `.env.*.example` templates.
 
 ## API Patterns
 
@@ -600,7 +602,7 @@ export function getEntityById(id: number) {
 
 ## Important Notes
 
-- **Never commit `application.yml` (or per-profile yml files) with real credentials** — secrets belong in the root `.env` (gitignored) and resolve via `${VAR}` placeholders
+- **Never commit real credentials** — `application.yml` uses `${VAR}` placeholders only; secrets live in the gitignored per-profile `.env.dev` / `.env.staging` / `.env.production` at the repo root (commit only the `.env.*.example` templates)
 - **Database names:** `career-9` for dev/production; `career-9-staging` for sandbox
 - **Server port:** 8080 everywhere (dev, production docker, sandbox docker)
 - **Google credentials required:** Backend won't fully start without `google.json` and Firebase config
