@@ -543,9 +543,13 @@ public class UserController {
         Map<String, Object> resp = new HashMap<>();
         resp.put("success", true);
         resp.put("isSuperAdmin", newStatus);
+        // The is_super_admin flag is re-read from the DB on every request (it is NOT trusted from
+        // the JWT — see TokenAuthenticationFilter / CustomUserDetailsService), so the change applies
+        // on the user's very next backend request. The frontend caches /auth/me at load, so the user
+        // only needs to REFRESH their browser (no re-login) to see menus/actions update.
         resp.put("message", newStatus
-                ? "User promoted to super-admin — they must re-login for the change to take effect"
-                : "Super-admin revoked — existing sessions remain super-admin until token expiry or re-login");
+                ? "User promoted to super-admin — they should refresh their browser to see it take effect (applies on their next request)."
+                : "Super-admin revoked — applies on the user's next request; they should refresh their browser.");
         return ResponseEntity.ok(resp);
     }
 

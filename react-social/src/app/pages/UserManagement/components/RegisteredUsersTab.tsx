@@ -72,7 +72,7 @@ const RegisteredUsersTab: FC = () => {
     const warning = isSuper
       ? ""
       : "\n\nSuper-admins bypass all permission and URL checks across the system.";
-    if (!window.confirm(`Are you sure you want to ${verb} ${user.name || user.email}?${warning}\n\nThe user must re-login for the change to fully take effect.`)) {
+    if (!window.confirm(`Are you sure you want to ${verb} ${user.name || user.email}?${warning}\n\nThe user should refresh their browser for the change to take effect (no re-login needed).`)) {
       return;
     }
     setTogglingSuperAdminId(user.id);
