@@ -71,6 +71,7 @@ export function AsideMenuMain() {
   //   /user-management/users/manage (user.write).
   const showRoles =
     can("role.assign") ||
+    can("role.update") ||
     can("user.write") ||
     can("user.read");
 
@@ -86,15 +87,18 @@ export function AsideMenuMain() {
   //   /admin/counselling-slots, /admin/counselling-notifications.
   const showCounselling = can("user.write");
 
-  // Student Portal section — only show for users who actually hold a student
-  // role (matches the StudentRoutes guard at routing/StudentRoutes.tsx). An
-  // admin like dhruv.kccsw@gmail.com (mapped to KVS) shouldn't see student-
-  // facing menu entries on their console. Kept in source so re-enabling for a
-  // student user is just a role assignment, not a code restore.
+  // Student Portal section — show for users who actually hold a student
+  // role (matches the StudentRoutes guard at routing/StudentRoutes.tsx) OR
+  // for super admins, who need visibility into both student- and school-facing
+  // surfaces. A regular school admin like dhruv.kccsw@gmail.com (mapped to KVS)
+  // still shouldn't see student-facing menu entries on their console.
   const userRoles = currentUser?.roles ?? [];
-  const showStudentPortal = userRoles.some(
-    (r) => r === "STUDENT" || r === "B2C_STUDENT" || r === "ROLE_STUDENT" || r === "ROLE_B2C_STUDENT"
-  );
+  const isSuperAdmin = currentUser?.superAdmin === true;
+  const showStudentPortal =
+    isSuperAdmin ||
+    userRoles.some(
+      (r) => r === "STUDENT" || r === "B2C_STUDENT" || r === "ROLE_STUDENT" || r === "ROLE_B2C_STUDENT"
+    );
 
   // B2C Portal — children: /b2c/campaigns, /b2c/pricing-tiers, /b2c/tracker.
   const showB2C = can("campaign.read") || can("campaign.write");
@@ -583,6 +587,7 @@ export function AsideMenuMain() {
             icon="/media/icons/duotune/general/gen019.svg"
           >
             <Can perm="role.assign">
+            
               <AsideMenuItem
                 to="/user-management/roles/manage"
                 title="Roles & Permissions"

@@ -103,6 +103,9 @@ export function updateStudentBasicInfo(data: {
     return axios.post(`${STUDENT_INFO_BASE}/updateDemographics`, data);
 }
 
+// (sendLoginCredentials is declared below alongside its typed response
+// interfaces — single canonical definition.)
+
 // Assessment APIs
 // Uses the lightweight cached /get/list-summary projection (id, name, isActive,
 // questionnaireType) instead of /getAll, which deep-loaded each AssessmentTable
@@ -313,4 +316,46 @@ export function generateNavigatorReportOneClick(assessmentId: number, userStuden
         userStudentId,
         force,
     }, { timeout: 120000 }); // 2 min timeout for report generation + AI
+}
+
+/**
+ * One-click pager (Navigator 4-pager) report generator for the Student
+ * Management page. Response payload uses different keys than the legacy BET /
+ * Navigator endpoints because the pager pipeline tells the caller whether the
+ * row already existed (for Generate vs Regenerate label semantics).
+ */
+export interface PagerOneClickReportResponse {
+    status: string;          // "ready" | "not_ready" | "failed"
+    reportType: "pager";
+    reportUrl: string;
+    alreadyExisted: boolean;
+    generatedAt?: string;
+}
+
+export function generatePagerReportOneClick(assessmentId: number, userStudentId: number, force = false) {
+    return axios.post<PagerOneClickReportResponse>(`${API_URL}/pager-report-data/one-click-report`, {
+        assessmentId,
+        userStudentId,
+        force,
+    }, { timeout: 120000 });
+}
+
+/**
+ * Bulk fetch every {@code generated_report} row for one student. Powers the
+ * Student Management view-modal hydration so each assessment's Generate /
+ * Download / Regenerate button starts with the right state instead of
+ * forgetting prior generations on every modal open. Backend endpoint at
+ * {@code GET /generated-reports/by-student/:userStudentId}.
+ */
+export interface GeneratedReportRow {
+    assessmentId: number;
+    typeOfReport: string;   // "bet" | "navigator" | "pager"
+    reportStatus: string;   // "notGenerated" | "generated" | "failed"
+    reportUrl: string | null;
+    visibleToStudent?: boolean;
+    updatedAt?: string;
+}
+
+export function getGeneratedReportsForStudent(userStudentId: number) {
+    return axios.get<GeneratedReportRow[]>(`${API_URL}/generated-reports/by-student/${userStudentId}`);
 }

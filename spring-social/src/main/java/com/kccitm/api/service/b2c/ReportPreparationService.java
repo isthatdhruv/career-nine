@@ -116,28 +116,35 @@ public class ReportPreparationService {
     }
 
     /**
-     * Default routing rule:
+     * Default routing rule (assessment-type-based — student grade only picks
+     * the variant inside the pager path, not the report family):
      *   • Admin explicit override (assessment.reportType column) — wins.
-     *   • Grades 3-5  → "bet" (legacy class-wise report).
-     *   • Grade 6+ (or unknown) → "pager" (Navigator 4-pager).
+     *   • Assessment is BET ({@code questionnaire.type === true}) → "bet"
+     *     (3 class-wise templates for grades 3-5).
+     *   • Else (Navigator-type assessment) → "pager"
+     *     (4-pager Navigator with three class-wise variants picked by
+     *     {@link com.kccitm.api.service.b2c.pager.FourPagerEngineService#resolveVariant}).
      *
      * The legacy {@code "navigator"} (18-page) value is preserved for historical
-     * generated_report rows but is no longer selected by this resolver.
+     * generated_report rows and the ReportsHub admin tooling but is no longer
+     * selected automatically by this resolver. {@code studentClass} is retained
+     * on the signature only because callers already compute it for the
+     * log row.
      */
     private String resolveReportType(Long assessmentId, Integer studentClass) {
-        if (assessmentId != null) {
-            Optional<AssessmentTable> opt = assessmentTableRepository.findById(assessmentId);
-            if (opt.isPresent()) {
-                String explicit = opt.get().getReportType();
-                if (explicit != null && !explicit.trim().isEmpty()) {
-                    return explicit.trim().toLowerCase();
-                }
-            }
+        if (assessmentId == null) return "pager";
+        Optional<AssessmentTable> opt = assessmentTableRepository.findById(assessmentId);
+        if (!opt.isPresent()) return "pager";
+        AssessmentTable assessment = opt.get();
+
+        String explicit = assessment.getReportType();
+        if (explicit != null && !explicit.trim().isEmpty()) {
+            return explicit.trim().toLowerCase();
         }
-        if (studentClass != null && studentClass >= 3 && studentClass <= 5) {
-            return "bet";
-        }
-        return "pager";
+        return assessment.getQuestionnaire() != null
+                && Boolean.TRUE.equals(assessment.getQuestionnaire().getType())
+                ? "bet"
+                : "pager";
     }
 
     private Integer lookupStudentClass(Long userStudentId) {

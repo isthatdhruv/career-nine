@@ -47,6 +47,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByCareerNineRollNumber(String careerNineRollNumber);
 
+    long countByIsSuperAdminTrue();
+
     @Query(value = "SELECT u.career_nine_rollnumber FROM student_user u " +
            "JOIN student_info si ON si.user_id = u.id " +
            "WHERE si.institute_id = :instituteId AND si.student_class = :studentClass " +

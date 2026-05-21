@@ -107,10 +107,10 @@
   ],
   "student.read": [
     "/live-tracking",
-    "/login/reset-password/enter-email",
     "/school/assigned-students",
     "/school/group-student",
     "/student-dashboard/:studentId",
+    "/student-list",
     "/student/login",
     "/student/registration-details",
     "/student/university/result",
@@ -122,6 +122,9 @@
     "/registrar/verification",
     "/student/registrar/page",
     "/upload-excel"
+  ],
+  "student_management.read": [
+    "/login/reset-password/enter-email"
   ],
   "user.read": [
     "/faculty/registration-details",

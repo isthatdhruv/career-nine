@@ -3,13 +3,21 @@ package com.kccitm.api.controller.career9;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Controller;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.career9.GeneratedReport;
 import com.kccitm.api.model.career9.StudentInfo;
@@ -49,7 +57,8 @@ import com.kccitm.api.service.b2c.pager.PagerScoreSource;
  *   <li>Return the public CDN URL.</li>
  * </ol>
  */
-@Controller
+@RestController
+@RequestMapping("/pager-report-data")
 public class PagerReportDataController {
 
     private static final Logger logger = LoggerFactory.getLogger(PagerReportDataController.class);
@@ -72,13 +81,24 @@ public class PagerReportDataController {
      * can map exceptions to log rows + 500s, identical to the BET path.
      */
     public String prepareAndUploadForEntitlement(Long userStudentId, Long assessmentId) {
-        // 1. Short-circuit: if already generated, return the cached URL. The unique
-        //    constraint on (user_student_id, assessment_id, type_of_report) gives
-        //    us this idempotency by lookup.
+        return prepareAndUpload(userStudentId, assessmentId, false);
+    }
+
+    /**
+     * Force-aware variant. {@code force=false} short-circuits to the cached URL
+     * if a "generated" {@code generated_report} row exists; {@code force=true}
+     * skips the short-circuit and re-fills + re-uploads to the SAME DO Spaces
+     * object key (overwrites the previous report — no versioning, per product).
+     */
+    public String prepareAndUpload(Long userStudentId, Long assessmentId, boolean force) {
+        // 1. Short-circuit: if already generated AND not forcing, return the cached URL.
+        //    The unique constraint on (user_student_id, assessment_id, type_of_report)
+        //    gives us this idempotency by lookup.
         Optional<GeneratedReport> existing = generatedReportRepository
                 .findByUserStudentUserStudentIdAndAssessmentIdAndTypeOfReport(
                         userStudentId, assessmentId, "pager");
-        if (existing.isPresent()
+        if (!force
+                && existing.isPresent()
                 && "generated".equals(existing.get().getReportStatus())
                 && existing.get().getReportUrl() != null) {
             return existing.get().getReportUrl();
@@ -191,4 +211,74 @@ public class PagerReportDataController {
     /** Reference held for future Redis-fallback wiring; not currently invoked directly. */
     @SuppressWarnings("unused")
     private NavigatorReportGenerationService getRawScorer() { return navigatorReportGenerationService; }
+
+    /**
+     * POST /pager-report-data/one-click-report
+     * Body: { "userStudentId": 874, "assessmentId": 5, "force": false }
+     *
+     * <p>Admin / Student Management one-click "Generate Report" button. Mirrors
+     * {@code BetReportDataController.oneClickReport} so the SPA can dispatch
+     * uniformly across the BET / pager generators. Returns:
+     * <pre>{
+     *   "status": "ready",
+     *   "reportType": "pager",
+     *   "reportUrl": "https://storage-c9.sgp1...",
+     *   "alreadyExisted": true,
+     *   "generatedAt": "2026-05-20T08:00:00Z"
+     * }</pre>
+     *
+     * <p>{@code force=true} bypasses the cached short-circuit and re-uploads to
+     * the same DO Spaces object key, overwriting the previous report (no
+     * versioning — per product decision).
+     */
+    @PostMapping("/one-click-report")
+    @PreAuthorize("@auth.allows('navigator_report_data.create')")
+    public ResponseEntity<?> oneClickReport(@RequestBody Map<String, Object> request) {
+        if (request.get("userStudentId") == null || request.get("assessmentId") == null) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "userStudentId and assessmentId are required"));
+        }
+        Long userStudentId = ((Number) request.get("userStudentId")).longValue();
+        Long assessmentId = ((Number) request.get("assessmentId")).longValue();
+        boolean force = Boolean.TRUE.equals(request.get("force"));
+
+        // Detect "already existed" BEFORE running so we can report it back to the
+        // SPA, useful for the admin "Generate" label vs "Regenerate" semantics.
+        Optional<GeneratedReport> existingBefore = generatedReportRepository
+                .findByUserStudentUserStudentIdAndAssessmentIdAndTypeOfReport(
+                        userStudentId, assessmentId, "pager");
+        boolean alreadyExisted = existingBefore.isPresent()
+                && "generated".equals(existingBefore.get().getReportStatus())
+                && existingBefore.get().getReportUrl() != null;
+
+        try {
+            String url = prepareAndUpload(userStudentId, assessmentId, force);
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("status", "ready");
+            response.put("reportType", "pager");
+            response.put("reportUrl", url);
+            response.put("alreadyExisted", alreadyExisted);
+            // Reflect the updated_at on the unified row so the SPA can show "Generated 2m ago".
+            generatedReportRepository
+                    .findByUserStudentUserStudentIdAndAssessmentIdAndTypeOfReport(
+                            userStudentId, assessmentId, "pager")
+                    .map(GeneratedReport::getUpdatedAt)
+                    .ifPresent(d -> response.put("generatedAt", d));
+            return ResponseEntity.ok(response);
+        } catch (IllegalStateException stateErr) {
+            // Most likely: scores aren't ready (async persist hasn't landed yet).
+            // 503 lets the SPA retry; 404 would be misleading.
+            logger.warn("Pager one-click not-ready for student={} assessment={}: {}",
+                    userStudentId, assessmentId, stateErr.getMessage());
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("status", "not_ready", "error", stateErr.getMessage()));
+        } catch (Exception ex) {
+            logger.error("Pager one-click failed for student={} assessment={}",
+                    userStudentId, assessmentId, ex);
+            Map<String, Object> err = new HashMap<>();
+            err.put("status", "failed");
+            err.put("error", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
+        }
+    }
 }
