@@ -17,7 +17,9 @@ yarn.lock
 
 # Project Documentation
 CLAUDE.md
-
+.env.dev
+.env.production
+.env.staging
 # Environment variables
 .env
 .env.local
