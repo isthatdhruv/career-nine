@@ -79,6 +79,9 @@ export function AsideMenuMain() {
   const showOldDataMapping = allowed("/old-data-mapping");
   const showScoreDebug = allowed("/score-debug");
 
+  const showTeacherDashboards =
+    allowed("/teacher/class-dashboard") || allowed("/principal/dashboard");
+
   const showCounselling =
     allowed("/admin/counsellors") ||
     allowed("/admin/counselling-slots") || allowed("/admin/counselling-students") || allowed("/admin/counselling-notifications");
@@ -625,6 +628,39 @@ export function AsideMenuMain() {
             title="Score Debug"
             fontIcon="bi-bug"
           />
+        </>
+      )}
+
+      {showTeacherDashboards && (
+        <>
+          <div className="menu-item">
+            <div className="menu-content pt-8 pb-2">
+              <span className="menu-section text-muted text-uppercase fs-8 ls-1">
+                Teacher
+              </span>
+            </div>
+          </div>
+          <AsideMenuItemWithSub
+            to=""
+            title="Dashboards"
+            fontIcon="bi-speedometer2"
+            icon="/media/icons/duotune/general/gen019.svg"
+          >
+            {allowed("/teacher/class-dashboard") && (
+              <AsideMenuItem
+                to="/teacher/class-dashboard"
+                title="Class Teacher Dashboard"
+                hasBullet={true}
+              />
+            )}
+            {allowed("/principal/dashboard") && (
+              <AsideMenuItem
+                to="/principal/dashboard"
+                title="Principal Dashboard"
+                hasBullet={true}
+              />
+            )}
+          </AsideMenuItemWithSub>
         </>
       )}
 
