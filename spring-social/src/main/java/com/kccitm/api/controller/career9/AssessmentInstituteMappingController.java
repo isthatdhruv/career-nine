@@ -465,7 +465,7 @@ public class AssessmentInstituteMappingController {
                         mapping.getMappingId(), finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
                         name, email, dob, phone, activeTierId);
             }
-            return handleExistingStudent(existing, assessmentId, instituteCode);
+            return handleExistingStudent(existing, assessmentId, instituteCode, activeTierId);
         }
 
         // 7. Duplicate check by DOB + institute + class + name
@@ -478,7 +478,7 @@ public class AssessmentInstituteMappingController {
                             mapping.getMappingId(), finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
                             name, email, dob, phone, activeTierId);
                 }
-                return handleExistingStudent(byDob.get(0), assessmentId, instituteCode);
+                return handleExistingStudent(byDob.get(0), assessmentId, instituteCode, activeTierId);
             }
         }
 
@@ -665,7 +665,7 @@ public class AssessmentInstituteMappingController {
      * Handle assigning assessment to an existing student.
      */
     private ResponseEntity<?> handleExistingStudent(StudentInfo existingStudentInfo, Long assessmentId,
-            Integer instituteCode) {
+            Integer instituteCode, Long mappingTierId) {
         // Find UserStudent for this student
         List<UserStudent> userStudents = userStudentRepository.findByStudentInfoId(existingStudentInfo.getId());
         if (userStudents.isEmpty()) {
@@ -711,6 +711,21 @@ public class AssessmentInstituteMappingController {
             StudentAssessmentMapping sam = new StudentAssessmentMapping(
                     userStudent.getUserStudentId(), assessmentId);
             studentAssessmentMappingRepository.save(sam);
+            // Free tiered completion by an existing student: consume a tier slot and
+            // record a zero-amount paid transaction so recount has a single source.
+            if (mappingTierId != null) {
+                tierRepository.tryIncrementCount(mappingTierId);
+                PaymentTransaction freeTxn = new PaymentTransaction();
+                freeTxn.setMappingTierId(mappingTierId);
+                freeTxn.setAmount(0L);
+                freeTxn.setStatus("paid");
+                freeTxn.setAssessmentId(assessmentId);
+                freeTxn.setInstituteCode(instituteCode);
+                freeTxn.setStudentName(existingStudentInfo.getName());
+                freeTxn.setStudentEmail(existingStudentInfo.getEmail());
+                freeTxn.setStudentDob(existingStudentInfo.getStudentDob());
+                paymentTransactionRepository.save(freeTxn);
+            }
             response.put("status", "success");
             response.put("message", "Assessment assigned successfully. Please use your existing credentials to log in.");
         }
