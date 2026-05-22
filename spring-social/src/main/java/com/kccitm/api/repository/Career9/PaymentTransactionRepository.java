@@ -28,4 +28,6 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
     List<PaymentTransaction> findByStudentEmailAndAssessmentId(String studentEmail, Long assessmentId);
 
     List<PaymentTransaction> findByAssessmentIdOrderByCreatedAtDesc(Long assessmentId);
+
+    long countByMappingTierIdAndStatus(Long mappingTierId, String status);
 }
