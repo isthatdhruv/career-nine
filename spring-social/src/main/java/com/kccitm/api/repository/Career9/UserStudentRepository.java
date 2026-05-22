@@ -21,4 +21,14 @@ public interface UserStudentRepository extends JpaRepository<UserStudent, Long> 
     @Query("SELECT aa.studentInfo.name FROM UserStudent aa " +
            "WHERE aa.userStudentId = :userStudentId " )
     String getNameByUserID(@Param("userStudentId") Long userStudentId);
+
+    /**
+     * Students whose user holds no mapping to the given role group — i.e. not yet
+     * provisioned. Used by the one-time backfill runner; self-limiting (returns
+     * empty once every student has been provisioned).
+     */
+    @Query("SELECT us FROM UserStudent us WHERE us.userId NOT IN ("
+         + "SELECT urgm.user FROM UserRoleGroupMapping urgm "
+         + "WHERE urgm.roleGroup.name = :groupName)")
+    List<UserStudent> findMissingRoleGroup(@Param("groupName") String groupName);
 }

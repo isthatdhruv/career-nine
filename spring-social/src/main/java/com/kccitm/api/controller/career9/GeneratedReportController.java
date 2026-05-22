@@ -81,13 +81,13 @@ public class GeneratedReportController {
     // ═══════════════════════ QUERIES ═══════════════════════
 
     @GetMapping("/by-student/{userStudentId}")
-    @PreAuthorize("@auth.allows('generated_report.read', #userStudentId)")
+    @PreAuthorize("@auth.allows('generated_report.read', @auth.instituteOfStudent(#userStudentId))")
     public ResponseEntity<List<GeneratedReport>> getByStudent(@PathVariable Long userStudentId) {
         return ResponseEntity.ok(generatedReportRepository.findByUserStudentUserStudentId(userStudentId));
     }
 
     @GetMapping("/by-student/{userStudentId}/type/{typeOfReport}")
-    @PreAuthorize("@auth.allows('generated_report.read', #userStudentId)")
+    @PreAuthorize("@auth.allows('generated_report.read', @auth.instituteOfStudent(#userStudentId))")
     public ResponseEntity<List<GeneratedReport>> getByStudentAndType(
             @PathVariable Long userStudentId, @PathVariable String typeOfReport) {
         return ResponseEntity.ok(
@@ -109,7 +109,7 @@ public class GeneratedReportController {
     }
 
     @GetMapping("/by-student/{userStudentId}/assessment/{assessmentId}/type/{typeOfReport}")
-    @PreAuthorize("@auth.allows('generated_report.read', #userStudentId, #assessmentId)")
+    @PreAuthorize("@auth.allows('generated_report.read', @auth.instituteOfStudent(#userStudentId))")
     public ResponseEntity<GeneratedReport> getByStudentAssessmentType(
             @PathVariable Long userStudentId,
             @PathVariable Long assessmentId,
@@ -123,7 +123,7 @@ public class GeneratedReportController {
     // ═══════════════════════ STUDENT-FACING (visibility-filtered) ═══════════════════════
 
     @GetMapping("/student/{userStudentId}")
-    @PreAuthorize("@auth.allows('generated_report.read', #userStudentId)")
+    @PreAuthorize("@auth.allows('generated_report.read', @auth.instituteOfStudent(#userStudentId))")
     public ResponseEntity<List<GeneratedReport>> getVisibleReportsForStudent(@PathVariable Long userStudentId) {
         return ResponseEntity.ok(
                 generatedReportRepository.findByUserStudentUserStudentIdAndVisibleToStudent(userStudentId, true));

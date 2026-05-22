@@ -18,6 +18,17 @@ export function login(email: string, password: string) {
   return axios.post<{ accessToken: string }>(LOGIN_URL, { email, password });
 }
 
+// Student-mode login on the same unified endpoint: identifier is a username OR
+// email, the secret is date of birth (dd-MM-yyyy). The server verifies the user
+// is a student (has a UserStudent record) and sets the same cn_at session cookie.
+export function studentLogin(identifier: string, dob: string) {
+  return axios.post<{ accessToken: string; userStudentId: number }>(LOGIN_URL, {
+    mode: "student",
+    email: identifier,
+    dob,
+  });
+}
+
 // Returns the authenticated user. The cn_at cookie is auto-attached by axios
 // (withCredentials defaults in AuthHelpers.setupAxios). 401 if no valid cookie.
 //

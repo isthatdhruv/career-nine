@@ -38,6 +38,7 @@ import com.kccitm.api.security.CurrentUser;
 import com.kccitm.api.security.UserPrincipal;
 import com.kccitm.api.service.OdooEmailService;
 import com.kccitm.api.service.SmtpEmailService;
+import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.service.dashboard.StudentDashboardDataService;
 import com.kccitm.api.model.userDefinedModel.StudentDashboardResponse;
 import com.kccitm.api.model.userDefinedModel.StudentPortalComputedData;
@@ -65,6 +66,9 @@ public class UserController {
 
     @Autowired
     private StudentDashboardDataService studentDashboardDataService;
+
+    @Autowired
+    private StudentProvisioningService studentProvisioningService;
 
     @PreAuthorize("@auth.allows('user.me')")
     @GetMapping("/user/me")
@@ -254,6 +258,7 @@ public class UserController {
 
         userRepository.save(user);
         userStudentRepository.save(userStudent);
+        studentProvisioningService.provision(userStudent);
 
         // Return updated profile
         Map<String, Object> profile = new HashMap<>();

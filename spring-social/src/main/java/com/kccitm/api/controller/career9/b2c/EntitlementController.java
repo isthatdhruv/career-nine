@@ -37,6 +37,7 @@ import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.security.AuthCookieService;
 import com.kccitm.api.security.TokenProvider;
+import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.service.StudentSessionService;
 import com.kccitm.api.service.b2c.EntitlementService;
 
@@ -59,6 +60,7 @@ public class EntitlementController {
     @Autowired private AuthCookieService authCookieService;
     @Autowired private TokenProvider tokenProvider;
     @Autowired private StudentSessionService studentSessionService;
+    @Autowired private StudentProvisioningService studentProvisioningService;
 
     @org.springframework.beans.factory.annotation.Value("${app.auth.assessmentTokenExpirationMsec:14400000}")
     private long assessmentTokenExpirationMsec;
@@ -130,6 +132,7 @@ public class EntitlementController {
 
             userStudent = new UserStudent(user, info, null);
             userStudent = userStudentRepository.save(userStudent);
+            studentProvisioningService.provision(userStudent);
         }
 
         membershipService.assignFromCampaign(userStudent, campaignOpt.get(), "entitlement-create");

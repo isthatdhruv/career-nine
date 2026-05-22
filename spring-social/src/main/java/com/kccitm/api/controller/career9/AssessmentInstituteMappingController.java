@@ -48,6 +48,7 @@ import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.service.RazorpayService;
 import com.kccitm.api.service.SmtpEmailService;
+import com.kccitm.api.service.StudentProvisioningService;
 
 @RestController
 @RequestMapping("/assessment-mapping")
@@ -87,6 +88,9 @@ public class AssessmentInstituteMappingController {
 
     @Autowired
     private SmtpEmailService gmailApiEmailService;
+
+    @Autowired
+    private StudentProvisioningService studentProvisioningService;
 
     @Autowired
     private com.kccitm.api.service.CareerNineRollNumberService rollNumberService;
@@ -435,6 +439,7 @@ public class AssessmentInstituteMappingController {
         InstituteDetail institute = instituteDetailRepository.findById(instituteCode.intValue());
         UserStudent userStudent = new UserStudent(user, studentInfo, institute);
         userStudent = userStudentRepository.save(userStudent);
+        studentProvisioningService.provision(userStudent);
 
         // Create StudentAssessmentMapping
         StudentAssessmentMapping sam = new StudentAssessmentMapping(
@@ -580,6 +585,7 @@ public class AssessmentInstituteMappingController {
             }
             UserStudent newUs = new UserStudent(existingUser, existingStudentInfo, institute);
             newUs = userStudentRepository.save(newUs);
+            studentProvisioningService.provision(newUs);
             userStudents = List.of(newUs);
         }
 

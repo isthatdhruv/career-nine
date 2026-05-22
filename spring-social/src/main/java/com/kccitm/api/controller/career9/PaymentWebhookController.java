@@ -52,6 +52,7 @@ import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.service.CareerNineRollNumberService;
 import com.kccitm.api.service.PaymentEmailService;
 import com.kccitm.api.service.RazorpayService;
+import com.kccitm.api.service.StudentProvisioningService;
 
 import javax.servlet.http.HttpServletResponse;
 
@@ -76,6 +77,7 @@ public class PaymentWebhookController {
     @Autowired private SchoolAssessmentConfigRepository schoolAssessmentConfigRepository;
     @Autowired private SchoolRegistrationLinkRepository schoolRegistrationLinkRepository;
     @Autowired private StudentInstituteMembershipService membershipService;
+    @Autowired private StudentProvisioningService studentProvisioningService;
 
     @Autowired(required = false)
     private com.kccitm.api.service.b2c.EntitlementService entitlementService;
@@ -473,6 +475,7 @@ public class PaymentWebhookController {
 
                 userStudent = new UserStudent(user, studentInfo, null);
                 userStudent = userStudentRepository.save(userStudent);
+                studentProvisioningService.provision(userStudent);
             }
 
             // Ensure StudentAssessmentMapping exists so they can take the assessment.
@@ -652,6 +655,7 @@ public class PaymentWebhookController {
 
             UserStudent userStudent = new UserStudent(user, studentInfo, null);
             userStudent = userStudentRepository.save(userStudent);
+            studentProvisioningService.provision(userStudent);
 
             membershipService.setPrimaryInstitute(userStudent, instituteCode, null, "payment-provision");
 
@@ -698,6 +702,7 @@ public class PaymentWebhookController {
             }
             UserStudent newUs = new UserStudent(existingUser, existingStudent, institute);
             newUs = userStudentRepository.save(newUs);
+            studentProvisioningService.provision(newUs);
             tryIncrementSchoolLink(txn);
             userStudents = List.of(newUs);
         }

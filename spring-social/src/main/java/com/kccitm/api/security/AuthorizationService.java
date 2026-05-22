@@ -62,6 +62,28 @@ public class AuthorizationService {
     @Autowired(required = false)
     private AuthAuditService authAuditService;
 
+    @Autowired(required = false)
+    private com.kccitm.api.repository.Career9.UserStudentRepository userStudentRepository;
+
+    /**
+     * Resolve the institute_code of a student (by {@code userStudentId}) so student-facing
+     * endpoints can ABAC-scope on the <em>resource's</em> institute rather than misusing the
+     * student id as an institute id. Used from {@code @PreAuthorize} as
+     * {@code @auth.allows('perm', @auth.instituteOfStudent(#userStudentId))}.
+     *
+     * <p>Returns {@code null} when the student is unknown or has no institute (B2C campaign
+     * students) — null means "no institute dim bound", i.e. permission alone decides, which is
+     * correct since B2C students are wildcard-scoped.
+     */
+    public Integer instituteOfStudent(Long userStudentId) {
+        if (userStudentId == null || userStudentRepository == null) {
+            return null;
+        }
+        return userStudentRepository.findById(userStudentId)
+                .map(us -> us.getInstitute() == null ? null : us.getInstitute().getInstituteCode())
+                .orElse(null);
+    }
+
     /** No-scope endpoints (e.g., {@code GET /user/me}, {@code POST /auth/logout}). */
     public boolean allows(String permission) {
         return decide(permission, null, null, null, null);

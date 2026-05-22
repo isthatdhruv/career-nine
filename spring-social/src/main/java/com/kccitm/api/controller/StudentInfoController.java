@@ -66,6 +66,7 @@ import com.kccitm.api.exception.ResourceNotFoundException;
 import com.kccitm.api.exception.ServiceException;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.service.LoginCredentialsEmailService;
+import com.kccitm.api.service.StudentProvisioningService;
 
 @RestController
 @RequestMapping("/student-info")
@@ -97,6 +98,8 @@ public class StudentInfoController {
     private QuestionnaireQuestionRepository questionnaireQuestionRepository;
     @Autowired
     private com.kccitm.api.service.AssessmentSessionService assessmentSessionService;
+    @Autowired
+    private StudentProvisioningService studentProvisioningService;
     @Autowired
     private com.kccitm.api.repository.Career9.School.SchoolSectionsRepository schoolSectionsRepository;
     @Autowired
@@ -327,6 +330,7 @@ public class StudentInfoController {
             UserStudent userStudent = new UserStudent(user, studentInfoRepository.save(studentInfo),
                     instituteDetailRepository.getById(instituteId));
             UserStudent userStudentSAVED = userStudentRepository.save(userStudent);
+            studentProvisioningService.provision(userStudentSAVED);
 
             var assessmentId = Long.parseLong(studentInfo.getAssesment_id());
 

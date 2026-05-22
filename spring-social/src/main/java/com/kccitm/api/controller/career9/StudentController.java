@@ -54,6 +54,7 @@ import com.kccitm.api.service.GoogleAPIAdmin;
 import com.kccitm.api.service.GoogleCloudAPI;
 import com.kccitm.api.service.PdfService;
 import com.kccitm.api.service.StudentService;
+import com.kccitm.api.service.StudentProvisioningService;
 import com.microtripit.mandrillapp.lutung.model.MandrillApiError;
 
 @RestController
@@ -90,6 +91,9 @@ public class StudentController {
 
   @Autowired
   private StudentService studentService;
+
+  @Autowired
+  private StudentProvisioningService studentProvisioningService;
 
   @Autowired
   private EmailService emailService;
@@ -536,8 +540,7 @@ public class StudentController {
         usre.setEmail(stu.getOfficialEmailAddress());
         usre.setEmailVerified(true);
         usre = userRepository.save(usre);
-        UserRoleGroupMapping urgm = new UserRoleGroupMapping(false, usre.getId(), roleGroupRepository.getById(3L));
-        userRoleGroupMappingRepository.save(urgm);
+        studentProvisioningService.provision(usre.getId(), null);
         return "Done";
       } catch (Exception e2) {
         System.out.println(e2);
@@ -567,8 +570,7 @@ public class StudentController {
     usre.setEmail(stu.getOfficialEmailAddress());
     usre.setEmailVerified(true);
     usre = userRepository.save(usre);
-    UserRoleGroupMapping urgm = new UserRoleGroupMapping(false, usre.getId(), roleGroupRepository.getById(3L));
-    userRoleGroupMappingRepository.save(urgm);
+    studentProvisioningService.provision(usre.getId(), null);
     return "Done";
   }
 
@@ -644,8 +646,7 @@ public class StudentController {
     usre.setProviderId(stu.getCollegeEnrollmentNumber() + "");
     usre.setEmail(stu.getOfficialEmailAddress());
     usre = userRepository.save(usre);
-    UserRoleGroupMapping urgm = new UserRoleGroupMapping(false, usre.getId(), roleGroupRepository.getById(3L));
-    userRoleGroupMappingRepository.save(urgm);
+    studentProvisioningService.provision(usre.getId(), null);
     return "Done";
   }
 

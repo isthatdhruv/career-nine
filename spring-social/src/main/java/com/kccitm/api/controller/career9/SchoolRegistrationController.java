@@ -52,6 +52,7 @@ import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.service.CareerNineRollNumberService;
 import com.kccitm.api.service.RazorpayService;
 import com.kccitm.api.service.SmtpEmailService;
+import com.kccitm.api.service.StudentProvisioningService;
 
 @RestController
 @RequestMapping("/school-registration")
@@ -74,6 +75,7 @@ public class SchoolRegistrationController {
     @Autowired private RazorpayService razorpayService;
     @Autowired private SmtpEmailService emailService;
     @Autowired private CareerNineRollNumberService rollNumberService;
+    @Autowired private StudentProvisioningService studentProvisioningService;
 
     @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:https://dashboard.career-9.com}")
     private String callbackBaseUrl;
@@ -577,6 +579,7 @@ public class SchoolRegistrationController {
         InstituteDetail institute = instituteDetailRepository.findById(instituteCode.intValue());
         UserStudent userStudent = new UserStudent(user, studentInfo, institute);
         userStudent = userStudentRepository.save(userStudent);
+        studentProvisioningService.provision(userStudent);
 
         incrementLinkCountAndDeactivateIfFull(link.getLinkId());
 
@@ -721,6 +724,7 @@ public class SchoolRegistrationController {
             }
             UserStudent newUs = new UserStudent(existingUser, existingStudentInfo, institute);
             newUs = userStudentRepository.save(newUs);
+            studentProvisioningService.provision(newUs);
             incrementLinkCountAndDeactivateIfFull(linkId);
             userStudents = List.of(newUs);
         }

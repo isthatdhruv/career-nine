@@ -59,6 +59,7 @@ import com.kccitm.api.repository.Career9.StudentInfoRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.repository.InstituteDetailRepository;
 import com.kccitm.api.service.AssessmentSessionService;
+import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.security.AuthCookieService;
 import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.exception.ResourceNotFoundException;
@@ -114,6 +115,9 @@ public class AssessmentAnswerController {
     private AssessmentSessionService assessmentSessionService;
 
     @Autowired
+    private StudentProvisioningService studentProvisioningService;
+
+    @Autowired
     private com.kccitm.api.service.PartialAnswerFlushService partialAnswerFlushService;
 
     @Autowired
@@ -132,7 +136,7 @@ public class AssessmentAnswerController {
     private AssessmentAdminActionRepository adminActionRepository;
 
     @GetMapping(value = "/getByStudent/{studentId}", headers = "Accept=application/json")
-    @PreAuthorize("@auth.allows('assessment_answer.read', #studentId)")
+    @PreAuthorize("@auth.allows('assessment_answer.read', @auth.instituteOfStudent(#studentId))")
     public List<AssessmentAnswer> getAssessmentAnswersByStudent(@PathVariable("studentId") Long studentId) {
         UserStudent userStudent = userStudentRepository.findById(studentId).orElse(null);
         return assessmentAnswerRepository.findByUserStudent(userStudent);
@@ -528,7 +532,7 @@ public class AssessmentAnswerController {
      * device — without consulting localStorage / sessionStorage.
      */
     @GetMapping(value = "/partial-restore/{studentId}/{assessmentId}", headers = "Accept=application/json")
-    @PreAuthorize("@auth.allows('assessment_answer.read', #studentId)")
+    @PreAuthorize("@auth.allows('assessment_answer.read', @auth.instituteOfStudent(#studentId))")
     public ResponseEntity<?> restorePartialAnswers(
             @PathVariable Long studentId, @PathVariable Long assessmentId) {
         Map<String, Object> partial = assessmentSessionService.getPartialAnswers(studentId, assessmentId);
@@ -815,8 +819,10 @@ public class AssessmentAnswerController {
             if (candidates.size() == 1) {
                 Optional<UserStudent> us = userStudentRepository.findByStudentInfo(candidates.get(0));
                 if (us.isPresent()) return new ResolveResult(us.get(), false);
-                return new ResolveResult(userStudentRepository.save(
-                        new UserStudent(candidates.get(0).getUser(), candidates.get(0), institute)), false);
+                UserStudent saved = userStudentRepository.save(
+                        new UserStudent(candidates.get(0).getUser(), candidates.get(0), institute));
+                studentProvisioningService.provision(saved);
+                return new ResolveResult(saved, false);
             }
         }
 
@@ -827,8 +833,10 @@ public class AssessmentAnswerController {
             if (candidates.size() == 1) {
                 Optional<UserStudent> us = userStudentRepository.findByStudentInfo(candidates.get(0));
                 if (us.isPresent()) return new ResolveResult(us.get(), false);
-                return new ResolveResult(userStudentRepository.save(
-                        new UserStudent(candidates.get(0).getUser(), candidates.get(0), institute)), false);
+                UserStudent saved = userStudentRepository.save(
+                        new UserStudent(candidates.get(0).getUser(), candidates.get(0), institute));
+                studentProvisioningService.provision(saved);
+                return new ResolveResult(saved, false);
             }
         }
 
@@ -838,8 +846,10 @@ public class AssessmentAnswerController {
         if (candidates.size() == 1) {
             Optional<UserStudent> us = userStudentRepository.findByStudentInfo(candidates.get(0));
             if (us.isPresent()) return new ResolveResult(us.get(), false);
-            return new ResolveResult(userStudentRepository.save(
-                    new UserStudent(candidates.get(0).getUser(), candidates.get(0), institute)), false);
+            UserStudent saved = userStudentRepository.save(
+                    new UserStudent(candidates.get(0).getUser(), candidates.get(0), institute));
+            studentProvisioningService.provision(saved);
+            return new ResolveResult(saved, false);
         }
         if (candidates.size() > 1) {
             throw new BadRequestException("Multiple students matched by name at this institute. Provide DOB or phone to disambiguate.");
@@ -865,7 +875,9 @@ public class AssessmentAnswerController {
         si.setUser(user);
         si = studentInfoRepository.save(si);
 
-        return new ResolveResult(userStudentRepository.save(new UserStudent(user, si, institute)), true);
+        UserStudent saved = userStudentRepository.save(new UserStudent(user, si, institute));
+        studentProvisioningService.provision(saved);
+        return new ResolveResult(saved, true);
     }
 
     /**
@@ -1102,6 +1114,7 @@ public class AssessmentAnswerController {
                         userStudent = userStudentOpt.get();
                     } else {
                         userStudent = userStudentRepository.save(new UserStudent(user, studentInfo, institute));
+                        studentProvisioningService.provision(userStudent);
                     }
 
                     matchedCount++;

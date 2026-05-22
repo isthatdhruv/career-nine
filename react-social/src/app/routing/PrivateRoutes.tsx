@@ -152,9 +152,11 @@ const PrivateRoutes = () => {
     () => import("../pages/StudentInformation/StudentProfile")
   );
 
-  const StudentDashboardLogin = lazy(
-    () => import("../pages/StudentDashboard/student-portal/StudentDashboardLogin")
-  );
+  // R2: separate student login dissolved — students sign in via the unified /auth
+  // login page (student/DOB mode). Kept commented per the no-deletion policy.
+  // const StudentDashboardLogin = lazy(
+  //   () => import("../pages/StudentDashboard/student-portal/StudentDashboardLogin")
+  // );
   const StudentPortalDashboard = lazy(
     () => import("../pages/StudentDashboard/student-portal/StudentPortalDashboard")
   );
@@ -437,36 +439,45 @@ const PrivateRoutes = () => {
           </RequirePermission>
         } />
 
-        {/* Student portal — ALWAYS-allowed in Phase 17. Persona-aware auth lands in Phase 19. */}
+        {/* Student portal — now inside MasterLayout (aside-menu shell), permission-gated.
+            R2: /student/login dissolved — students use the unified /auth login (student/DOB mode).
         <Route path="/student/login" element={
           <SuspensedView>
             <StudentDashboardLogin />
           </SuspensedView>
-        } />
+        } /> */}
         <Route path="/student/student-info" element={
           <SuspensedView>
             <StudentInfoForm />
           </SuspensedView>
         } />
         <Route path="/student/dashboard" element={
-          <SuspensedView>
-            <StudentPortalDashboard />
-          </SuspensedView>
+          <RequirePermission perm="assessment.read">
+            <SuspensedView>
+              <StudentPortalDashboard />
+            </SuspensedView>
+          </RequirePermission>
         } />
         <Route path="/student/navigator-360" element={
-          <SuspensedView>
-            <StudentPortalNavigator360 />
-          </SuspensedView>
+          <RequirePermission perm="generated_report.read">
+            <SuspensedView>
+              <StudentPortalNavigator360 />
+            </SuspensedView>
+          </RequirePermission>
         } />
         <Route path="/student/assessments" element={
-          <SuspensedView>
-            <StudentPortalAssessments />
-          </SuspensedView>
+          <RequirePermission perm="assessment.read">
+            <SuspensedView>
+              <StudentPortalAssessments />
+            </SuspensedView>
+          </RequirePermission>
         } />
         <Route path="/student/reports" element={
-          <SuspensedView>
-            <StudentPortalReports />
-          </SuspensedView>
+          <RequirePermission perm="generated_report.read">
+            <SuspensedView>
+              <StudentPortalReports />
+            </SuspensedView>
+          </RequirePermission>
         } />
         <Route path="/student/counselling" element={
           <SuspensedView>

@@ -37,6 +37,9 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
     @Autowired(required = false)
     private UserActivityLogService userActivityLogService;
 
+    @Autowired(required = false)
+    private com.kccitm.api.repository.Career9.UserStudentRepository userStudentRepository;
+
     private static final Logger logger = LoggerFactory.getLogger(TokenAuthenticationFilter.class);
 
     // URL patterns to skip logging (static assets, activity-log endpoints to avoid recursion)
@@ -124,15 +127,35 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
                     request.setAttribute("assessmentUserStudentId", aUserStudentId);
                     request.setAttribute("assessmentAssessmentId", aAssessmentId);
 
-                    // Minimal authenticated token: principal is the userStudentId string,
-                    // authorities empty. Sufficient for .authenticated() to pass on the
-                    // assessment routes; controllers needing the student id read the
-                    // request attribute (typed Long, no string-parse round-trip).
-                    UsernamePasswordAuthenticationToken assessmentAuth =
-                            new UsernamePasswordAuthenticationToken(
-                                    String.valueOf(aUserStudentId),
-                                    null,
-                                    Collections.<org.springframework.security.core.GrantedAuthority>emptyList());
+                    // R6: hydrate the student's User principal (role-group perms + scopes) so the
+                    // @PreAuthorize("@auth.allows(...)") gates on the assessment endpoints resolve
+                    // against the granted `student` role group when enforce-mode is on. The
+                    // (userStudentId, assessmentId) request attributes above remain the contract for
+                    // controllers that read the student id. Falls back to a minimal authority-less
+                    // principal if the user can't be resolved, so .authenticated() still passes and
+                    // the legacy service-layer (StudentAssessmentMapping) ABAC continues to apply.
+                    UsernamePasswordAuthenticationToken assessmentAuth = null;
+                    try {
+                        Long resolvedUserId = (userStudentRepository == null || aUserStudentId == null)
+                                ? null
+                                : userStudentRepository.findById(aUserStudentId)
+                                        .map(com.kccitm.api.model.career9.UserStudent::getUserId)
+                                        .orElse(null);
+                        if (resolvedUserId != null) {
+                            UserDetails studentDetails = customUserDetailsService.loadUserById(resolvedUserId);
+                            assessmentAuth = new UsernamePasswordAuthenticationToken(
+                                    studentDetails, null, studentDetails.getAuthorities());
+                        }
+                    } catch (Exception e) {
+                        logger.warn("Assessment-scope: failed to hydrate student perms for userStudentId={} — "
+                                + "falling back to minimal principal", aUserStudentId, e);
+                    }
+                    if (assessmentAuth == null) {
+                        assessmentAuth = new UsernamePasswordAuthenticationToken(
+                                String.valueOf(aUserStudentId),
+                                null,
+                                Collections.<org.springframework.security.core.GrantedAuthority>emptyList());
+                    }
                     assessmentAuth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(assessmentAuth);
                     filterChain.doFilter(request, response);

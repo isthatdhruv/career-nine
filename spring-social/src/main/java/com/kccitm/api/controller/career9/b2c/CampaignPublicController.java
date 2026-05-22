@@ -47,6 +47,7 @@ import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.security.AuthCookieService;
 import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.service.RazorpayService;
+import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.service.StudentSessionService;
 
 import javax.servlet.http.HttpServletResponse;
@@ -73,6 +74,7 @@ public class CampaignPublicController {
     @Autowired private StudentAssessmentMappingRepository studentAssessmentMappingRepository;
     @Autowired private RazorpayService razorpayService;
     @Autowired private StudentSessionService studentSessionService;
+    @Autowired private StudentProvisioningService studentProvisioningService;
     @Autowired private com.kccitm.api.service.b2c.StudentInstituteMembershipService membershipService;
     @Autowired(required = false) private com.kccitm.api.service.b2c.EntitlementService entitlementService;
     @Autowired(required = false) private com.kccitm.api.repository.Career9.b2c.StudentEntitlementRepository studentEntitlementRepository;
@@ -412,6 +414,7 @@ public class CampaignPublicController {
             userStudent = us.isEmpty()
                     ? userStudentRepository.save(new UserStudent(user, existing, null))
                     : us.get(0);
+            if (userStudent != null) studentProvisioningService.provision(userStudent);
         } else {
             user = new User((int) (Math.random() * 100000), dob);
             user.setName(name);
@@ -429,6 +432,7 @@ public class CampaignPublicController {
             info = studentInfoRepository.save(info);
 
             userStudent = userStudentRepository.save(new UserStudent(user, info, null));
+            studentProvisioningService.provision(userStudent);
         }
 
         // Set the campaign's institute as primary + record membership.
@@ -765,6 +769,7 @@ public class CampaignPublicController {
             if (us.isEmpty()) {
                 UserStudent newUs = new UserStudent(user, existing, null);
                 userStudent = userStudentRepository.save(newUs);
+                studentProvisioningService.provision(userStudent);
             } else {
                 userStudent = us.get(0);
             }
@@ -786,6 +791,7 @@ public class CampaignPublicController {
 
             userStudent = new UserStudent(user, studentInfo, null);
             userStudent = userStudentRepository.save(userStudent);
+            studentProvisioningService.provision(userStudent);
         }
 
         membershipService.assignFromCampaign(userStudent, campaign, "campaign-register");

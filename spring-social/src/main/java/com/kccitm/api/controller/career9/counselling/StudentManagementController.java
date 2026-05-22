@@ -21,6 +21,7 @@ import com.kccitm.api.model.career9.GeneratedReport;
 import com.kccitm.api.model.career9.UserStudent;
 import com.kccitm.api.repository.Career9.GeneratedReportRepository;
 import com.kccitm.api.repository.Career9.UserStudentRepository;
+import com.kccitm.api.service.StudentProvisioningService;
 
 /**
  * Admin endpoints for the "Manage Students" page — list students by institute
@@ -37,6 +38,9 @@ public class StudentManagementController {
 
     @Autowired
     private GeneratedReportRepository generatedReportRepository;
+
+    @Autowired
+    private StudentProvisioningService studentProvisioningService;
 
     /** Get all students for an institute with their flags */
     @PreAuthorize("@auth.allows('counselling.student_management.read', #instituteCode, null, null, null)")
@@ -80,6 +84,7 @@ public class StudentManagementController {
         boolean value = Boolean.TRUE.equals(body.get("value"));
         student.setCounsellingAllowed(value);
         userStudentRepository.save(student);
+        studentProvisioningService.provision(student);
         logger.info("Set counsellingAllowed={} for student {}", value, userStudentId);
         return ResponseEntity.ok(Map.of("userStudentId", userStudentId, "counsellingAllowed", value));
     }

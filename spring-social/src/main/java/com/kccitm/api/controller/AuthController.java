@@ -48,10 +48,19 @@ import com.kccitm.api.security.CurrentScopes;
 import com.kccitm.api.security.JtiDenyListService;
 import com.kccitm.api.security.RefreshTokenService;
 import com.kccitm.api.security.RefreshTokenService.RefreshTokenReuseException;
+import com.kccitm.api.security.CustomUserDetailsService;
 import com.kccitm.api.security.TokenProvider;
 import com.kccitm.api.security.UserPrincipal;
 import com.kccitm.api.service.SmtpEmailService;
+import com.kccitm.api.service.StudentProvisioningService;
 import com.kccitm.api.service.UserActivityLogService;
+import com.kccitm.api.model.career9.UserStudent;
+import com.kccitm.api.repository.Career9.UserStudentRepository;
+
+import org.springframework.security.core.userdetails.UserDetails;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
 @RestController
 @RequestMapping("/auth")
 
@@ -106,11 +115,26 @@ public class AuthController {
     @Autowired
     private RoleUrlRepository roleUrlRepository;
 
+    @Autowired
+    private UserStudentRepository userStudentRepository;
+
+    @Autowired
+    private StudentProvisioningService studentProvisioningService;
+
+    @Autowired
+    private CustomUserDetailsService customUserDetailsService;
+
     // @PreAuthorize-Exempt: login/signup are anonymous-by-design — auth entrypoint establishes auth context, cannot consume it
     // See ControllerPreAuthorizeCoverageTest.EXCLUSIONS (15-02 / 15-06)
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest,
             HttpServletRequest request, HttpServletResponse response) {
+        // Student mode (R3): username/email + date-of-birth, no password. Issues the SAME
+        // cn_at session as staff. Dissolves the separate /student/login portal.
+        if (loginRequest.isStudentMode()) {
+            return authenticateStudent(loginRequest, request, response);
+        }
+
         User user = userRepository.findByEmailAndProvider(loginRequest.getEmail(), AuthProvider.local);
         if (user == null) {
             // Phase 7 (Task 7.9): burn equivalent bcrypt time on the unknown-email path so it is
@@ -171,6 +195,83 @@ public class AuthController {
         authCookieService.setRefreshToken(response, refreshJti);
 
         return ResponseEntity.ok(new AuthResponse(accessJwt));
+    }
+
+    /**
+     * Student-mode login (R3): authenticate by username-or-email + date of birth, verify the
+     * user is actually a student (has a UserStudent record), lazy-provision the student role
+     * group/scope if missing, then issue the same cn_at/cn_rt session as staff. Anonymous-reachable
+     * because /auth/login is in SecurityConfig.PUBLIC_PATHS.
+     */
+    private ResponseEntity<?> authenticateStudent(LoginRequest loginRequest,
+            HttpServletRequest request, HttpServletResponse response) {
+        User user = findStudentUser(loginRequest.getEmail(), loginRequest.getDob());
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiResponse(false, "Invalid username/email or date of birth."));
+        }
+
+        Optional<UserStudent> userStudentOpt = userStudentRepository.getByUserId(user.getId());
+        if (!userStudentOpt.isPresent()) {
+            // "Is a student" gate: only users with a UserStudent record may use student mode.
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiResponse(false, "Invalid username/email or date of birth."));
+        }
+        UserStudent userStudent = userStudentOpt.get();
+
+        // Lazy safety net (R5): self-heal a student that predates / missed provisioning.
+        try {
+            studentProvisioningService.provision(userStudent);
+        } catch (Exception e) {
+            // Provisioning failure must not block login; permissions resolve from whatever exists.
+        }
+
+        // Build a fully-hydrated principal (roles/perms/scopes/sa) without a password check.
+        UserDetails principal = customUserDetailsService.loadUserById(user.getId());
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                principal, null, principal.getAuthorities());
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        String accessJwt = tokenProvider.createAccessToken(authentication);
+        String loginUserAgent = request.getHeader("User-Agent");
+        String loginIp = UserActivityLogService.getClientIp(request);
+        String refreshJti = refreshTokenService.issue(user.getId(), loginUserAgent, loginIp);
+
+        authCookieService.issueAuthCookies(response, accessJwt);
+        authCookieService.setRefreshToken(response, refreshJti);
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("accessToken", accessJwt);
+        body.put("tokenType", "Bearer");
+        body.put("userStudentId", userStudent.getUserStudentId());
+        return ResponseEntity.ok(body);
+    }
+
+    /** Resolve a student User by username+DOB, falling back to email+DOB (same calendar day). */
+    private User findStudentUser(String identifier, Date dob) {
+        if (identifier == null || identifier.trim().isEmpty() || dob == null) {
+            return null;
+        }
+        identifier = identifier.trim();
+
+        Optional<User> byUsername = userRepository.findByUsernameAndDobDate(identifier, dob);
+        if (byUsername.isPresent()) {
+            return byUsername.get();
+        }
+
+        User byEmail = userRepository.findByEmail(identifier);
+        if (byEmail != null && sameDay(byEmail.getDobDate(), dob)) {
+            return byEmail;
+        }
+        return null;
+    }
+
+    private boolean sameDay(Date a, Date b) {
+        if (a == null || b == null) {
+            return false;
+        }
+        SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy");
+        return sdf.format(a).equals(sdf.format(b));
     }
 
     /**

@@ -68,6 +68,7 @@ import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.service.FirebaseDataCacheService;
 import com.kccitm.api.service.FirebaseService;
 import com.kccitm.api.service.FirebaseStudentDeletionService;
+import com.kccitm.api.service.StudentProvisioningService;
 
 @RestController
 @RequestMapping("/firebase-mapping")
@@ -96,6 +97,9 @@ public class FirebaseDataMappingController {
 
     @Autowired
     private UserStudentRepository userStudentRepository;
+
+    @Autowired
+    private StudentProvisioningService studentProvisioningService;
 
     @Autowired
     private InstituteDetailRepository instituteDetailRepository;
@@ -1245,6 +1249,7 @@ public class FirebaseDataMappingController {
                                             us.getInstitute().getInstituteCode() != instituteCode)) {
                                         us.setInstitute(newInstOpt.get());
                                         userStudentRepository.save(us);
+                                        studentProvisioningService.provision(us);
                                     }
                                 }
 
@@ -1340,6 +1345,7 @@ public class FirebaseDataMappingController {
                 // 3. Create UserStudent
                 UserStudent userStudent = new UserStudent(user, studentInfo, instituteOpt.get());
                 userStudent = userStudentRepository.save(userStudent);
+                studentProvisioningService.provision(userStudent);
 
                 // Issue 5: Use the managed UserStudent entity directly
                 Long assessmentId = getLong(student, "assessmentId");
