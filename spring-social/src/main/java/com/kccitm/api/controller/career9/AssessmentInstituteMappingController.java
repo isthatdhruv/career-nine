@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.AssessmentInstituteMapping;
+import com.kccitm.api.model.career9.AssessmentMappingTier;
 import com.kccitm.api.model.career9.PaymentTransaction;
 import com.kccitm.api.model.career9.PromoCode;
 import com.kccitm.api.model.career9.StudentAssessmentMapping;
@@ -35,6 +37,7 @@ import com.kccitm.api.model.career9.school.SchoolClasses;
 import com.kccitm.api.model.career9.school.SchoolSections;
 import com.kccitm.api.repository.Career9.AssessmentInstituteMappingRepository;
 import com.kccitm.api.repository.Career9.AssessmentTableRepository;
+import com.kccitm.api.repository.Career9.AssessmentMappingTierRepository;
 import com.kccitm.api.repository.Career9.PaymentTransactionRepository;
 import com.kccitm.api.repository.Career9.PromoCodeRepository;
 import com.kccitm.api.repository.Career9.StudentInfoRepository;
@@ -47,6 +50,7 @@ import com.kccitm.api.repository.StudentAssessmentMappingRepository;
 import com.kccitm.api.repository.UserRepository;
 import com.kccitm.api.service.RazorpayService;
 import com.kccitm.api.service.SmtpEmailService;
+import com.kccitm.api.service.career9.AssessmentMappingTierService;
 
 @RestController
 @RequestMapping("/assessment-mapping")
@@ -101,6 +105,12 @@ public class AssessmentInstituteMappingController {
 
     @Autowired
     private PromoCodeRepository promoCodeRepository;
+
+    @Autowired
+    private AssessmentMappingTierRepository tierRepository;
+
+    @Autowired
+    private AssessmentMappingTierService tierService;
 
     @org.springframework.beans.factory.annotation.Value("${app.razorpay.callback-base-url:https://dashboard.career-9.com}")
     private String callbackBaseUrl;
@@ -169,6 +179,82 @@ public class AssessmentInstituteMappingController {
         }
         mappingRepository.deleteById(id);
         return ResponseEntity.ok("Mapping deleted successfully");
+    }
+
+    // ----- Pricing tiers (unprotected, matching sibling mapping admin endpoints) -----
+
+    @GetMapping("/{mappingId}/tiers")
+    public ResponseEntity<?> listTiers(@PathVariable Long mappingId) {
+        if (!mappingRepository.existsById(mappingId)) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(tierRepository.findByMappingIdOrderBySortOrderAsc(mappingId));
+    }
+
+    @PostMapping("/{mappingId}/tiers")
+    public ResponseEntity<?> createTier(@PathVariable Long mappingId,
+            @RequestBody AssessmentMappingTier tier) {
+        if (!mappingRepository.existsById(mappingId)) {
+            return ResponseEntity.notFound().build();
+        }
+        if (tier.getName() == null || tier.getName().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Tier name is required");
+        }
+        if (tier.getSortOrder() == null) {
+            return ResponseEntity.badRequest().body("Sort order is required");
+        }
+        tier.setMappingId(mappingId);
+        tier.setCurrentCount(0);
+        return ResponseEntity.ok(tierRepository.save(tier));
+    }
+
+    @PutMapping("/tiers/{tierId}")
+    public ResponseEntity<?> updateTier(@PathVariable Long tierId,
+            @RequestBody AssessmentMappingTier updated) {
+        Optional<AssessmentMappingTier> existingOpt = tierRepository.findById(tierId);
+        if (!existingOpt.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+        AssessmentMappingTier existing = existingOpt.get();
+        if (updated.getName() != null) existing.setName(updated.getName());
+        if (updated.getAmount() != null) existing.setAmount(updated.getAmount());
+        if (updated.getSortOrder() != null) existing.setSortOrder(updated.getSortOrder());
+        // maxRegistrations is nullable-meaningful: always copy it through
+        existing.setMaxRegistrations(updated.getMaxRegistrations());
+        if (updated.getIsActive() != null) existing.setIsActive(updated.getIsActive());
+        return ResponseEntity.ok(tierRepository.save(existing));
+    }
+
+    @PatchMapping("/tiers/{tierId}/toggle")
+    public ResponseEntity<?> toggleTier(@PathVariable Long tierId) {
+        Optional<AssessmentMappingTier> existingOpt = tierRepository.findById(tierId);
+        if (!existingOpt.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+        AssessmentMappingTier existing = existingOpt.get();
+        existing.setIsActive(!Boolean.TRUE.equals(existing.getIsActive()));
+        return ResponseEntity.ok(tierRepository.save(existing));
+    }
+
+    @DeleteMapping("/tiers/{tierId}")
+    public ResponseEntity<?> deleteTier(@PathVariable Long tierId) {
+        if (!tierRepository.existsById(tierId)) {
+            return ResponseEntity.notFound().build();
+        }
+        tierRepository.deleteById(tierId);
+        return ResponseEntity.ok("Tier deleted successfully");
+    }
+
+    @PostMapping("/tiers/{tierId}/recount")
+    public ResponseEntity<?> recountTier(@PathVariable Long tierId) {
+        if (!tierRepository.existsById(tierId)) {
+            return ResponseEntity.notFound().build();
+        }
+        int newCount = tierService.recountTier(tierId);
+        Map<String, Object> response = new HashMap<>();
+        response.put("tierId", tierId);
+        response.put("currentCount", newCount);
+        return ResponseEntity.ok(response);
     }
 
     // ============ PUBLIC ENDPOINTS ============
