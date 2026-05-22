@@ -271,7 +271,25 @@ public class AssessmentInstituteMappingController {
         Map<String, Object> info = new HashMap<>();
         info.put("mappingLevel", mapping.getMappingLevel());
         info.put("assessmentId", mapping.getAssessmentId());
-        info.put("amount", mapping.getAmount() != null ? mapping.getAmount() : 0);
+
+        // Tier-aware pricing: resolve the live tier; fall back to mapping.amount
+        // when no tiers are configured (backward compatible).
+        List<AssessmentMappingTier> tiers =
+                tierRepository.findByMappingIdOrderBySortOrderAsc(mapping.getMappingId());
+        if (tiers.isEmpty()) {
+            info.put("amount", mapping.getAmount() != null ? mapping.getAmount() : 0);
+            info.put("registrationClosed", false);
+        } else {
+            AssessmentMappingTier active = tierService.resolveActiveTier(tiers);
+            if (active == null) {
+                info.put("amount", 0);
+                info.put("registrationClosed", true);
+            } else {
+                info.put("amount", active.getAmount() != null ? active.getAmount() : 0);
+                info.put("activeTierName", active.getName());
+                info.put("registrationClosed", false);
+            }
+        }
 
         // Get assessment name
         assessmentTableRepository.findById(mapping.getAssessmentId()).ifPresent(assessment -> {
