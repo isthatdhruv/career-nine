@@ -402,8 +402,22 @@ public class AssessmentInstituteMappingController {
             }
         }
 
-        // 4. Check if payment is required
-        Long mappingAmount = mapping.getAmount(); // amount in rupees
+        // 4. Resolve the active pricing tier (falls back to mapping.amount when
+        //    no tiers configured). amount in rupees.
+        List<AssessmentMappingTier> tiers =
+                tierRepository.findByMappingIdOrderBySortOrderAsc(mapping.getMappingId());
+        Long mappingAmount;
+        Long activeTierId = null;
+        if (tiers.isEmpty()) {
+            mappingAmount = mapping.getAmount();
+        } else {
+            AssessmentMappingTier active = tierService.resolveActiveTier(tiers);
+            if (active == null) {
+                return ResponseEntity.badRequest().body("Registrations are closed for this link");
+            }
+            mappingAmount = active.getAmount();
+            activeTierId = active.getTierId();
+        }
         boolean paymentRequired = mappingAmount != null && mappingAmount > 0;
 
         // 5. Handle promo code if provided
@@ -449,7 +463,7 @@ public class AssessmentInstituteMappingController {
             if (paymentRequired && finalAmount > 0) {
                 return handleExistingStudentWithPayment(existing, assessmentId, instituteCode,
                         mapping.getMappingId(), finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
-                        name, email, dob, phone);
+                        name, email, dob, phone, activeTierId);
             }
             return handleExistingStudent(existing, assessmentId, instituteCode);
         }
@@ -462,7 +476,7 @@ public class AssessmentInstituteMappingController {
                 if (paymentRequired && finalAmount > 0) {
                     return handleExistingStudentWithPayment(byDob.get(0), assessmentId, instituteCode,
                             mapping.getMappingId(), finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
-                            name, email, dob, phone);
+                            name, email, dob, phone, activeTierId);
                 }
                 return handleExistingStudent(byDob.get(0), assessmentId, instituteCode);
             }
@@ -472,18 +486,25 @@ public class AssessmentInstituteMappingController {
         if (paymentRequired && finalAmount > 0) {
             return createPaymentAndRedirect(mapping.getMappingId(), assessmentId, instituteCode,
                     finalAmount, originalAmount, promoCodeStr, promoDiscountPercent,
-                    name, email, dob, dobStr, phone, gender);
+                    name, email, dob, dobStr, phone, gender, activeTierId);
         }
 
-        // 9. Free registration (no amount, or 100% promo discount) — create student directly
-        // If 100% promo was used, record a zero-amount transaction
-        if (paymentRequired && finalAmount != null && finalAmount == 0 && promoCodeStr != null) {
+        // 9. Free registration (no amount, or 100% promo discount) — create student directly.
+        // Record a zero-amount paid transaction stamped with the tier so recount has a
+        // single source, and increment the tier tally (no-op when no tier).
+        if (activeTierId != null) {
+            tierRepository.tryIncrementCount(activeTierId);
+        }
+        if (!tiers.isEmpty() || (paymentRequired && finalAmount != null && finalAmount == 0 && promoCodeStr != null)) {
             PaymentTransaction txn = new PaymentTransaction();
             txn.setMappingId(mapping.getMappingId());
+            txn.setMappingTierId(activeTierId);
             txn.setAmount(0L);
             txn.setOriginalAmount(originalAmount);
-            txn.setPromoCode(promoCodeStr.trim().toUpperCase());
-            txn.setPromoDiscountPercent(promoDiscountPercent);
+            if (promoCodeStr != null && !promoCodeStr.trim().isEmpty()) {
+                txn.setPromoCode(promoCodeStr.trim().toUpperCase());
+                txn.setPromoDiscountPercent(promoDiscountPercent);
+            }
             txn.setStatus("paid");
             txn.setAssessmentId(assessmentId);
             txn.setInstituteCode(instituteCode);
@@ -552,7 +573,7 @@ public class AssessmentInstituteMappingController {
      */
     private ResponseEntity<?> createPaymentAndRedirect(Long mappingId, Long assessmentId, Integer instituteCode,
             Long finalAmountInr, Long originalAmountInr, String promoCodeStr, Integer promoDiscountPercent,
-            String name, String email, Date dob, String dobStr, String phone, String gender) {
+            String name, String email, Date dob, String dobStr, String phone, String gender, Long mappingTierId) {
         try {
             String assessmentName = assessmentTableRepository.findById(assessmentId)
                     .map(a -> a.getAssessmentName()).orElse("Assessment");
@@ -586,6 +607,7 @@ public class AssessmentInstituteMappingController {
             txn.setPaymentLinkUrl((String) rzpResponse.get("shortUrl"));
             txn.setShortUrl((String) rzpResponse.get("shortUrl"));
             txn.setStatus("created");
+            txn.setMappingTierId(mappingTierId);
 
             if (promoCodeStr != null && !promoCodeStr.trim().isEmpty()) {
                 txn.setPromoCode(promoCodeStr.trim().toUpperCase());
@@ -614,7 +636,7 @@ public class AssessmentInstituteMappingController {
     private ResponseEntity<?> handleExistingStudentWithPayment(StudentInfo existingStudentInfo, Long assessmentId,
             Integer instituteCode, Long mappingId, Long finalAmountInr, Long originalAmountInr,
             String promoCodeStr, Integer promoDiscountPercent,
-            String name, String email, Date dob, String phone) {
+            String name, String email, Date dob, String phone, Long mappingTierId) {
         // Check if already assigned
         List<UserStudent> userStudents = userStudentRepository.findByStudentInfoId(existingStudentInfo.getId());
         if (!userStudents.isEmpty()) {
@@ -636,7 +658,7 @@ public class AssessmentInstituteMappingController {
         String dobStr = sdf.format(dob);
         return createPaymentAndRedirect(mappingId, assessmentId, instituteCode,
                 finalAmountInr, originalAmountInr, promoCodeStr, promoDiscountPercent,
-                name, email, dob, dobStr, phone, null);
+                name, email, dob, dobStr, phone, null, mappingTierId);
     }
 
     /**
