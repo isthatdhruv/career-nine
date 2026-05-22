@@ -186,32 +186,9 @@ export function setupAxios(axios: any) {
       if (status === 403) {
         const { showErrorToast } = require("../../../utils/toast");
         showErrorToast(message || "You don't have permission for this action");
-        // Phase 19 (Plan 19-05): on 403, redirect the user to the persona-
-        // appropriate /permission-denied page (in addition to the toast,
-        // which gives instant feedback while the redirect happens).
-        //
-        // Persona is inferred from the current URL prefix:
-        //   /student/*   → /student/permission-denied
-        //   /counsellor/* → /counsellor/permission-denied
-        //   anything else → /permission-denied (admin variant)
-        //
-        // ?from=<encoded original path> lets the page surface what the user
-        // tried to open. The redirect uses window.location.href because the
-        // axios interceptor runs outside React's router context.
-        try {
-          const path = window.location.pathname;
-          const search = window.location.search;
-          // Avoid infinite loop if already on a permission-denied page.
-          if (!path.endsWith("/permission-denied")) {
-            const from = encodeURIComponent(path + search);
-            let dest = "/permission-denied";
-            if (path.startsWith("/student/")) dest = "/student/permission-denied";
-            else if (path.startsWith("/counsellor/")) dest = "/counsellor/permission-denied";
-            window.location.href = `${dest}?from=${from}`;
-          }
-        } catch {
-          // window may be unavailable in tests / SSR — fall through to reject.
-        }
+        // Toast only — no redirect. The error propagates to the calling
+        // component's catch block so the user stays on the current page and
+        // can inspect the failed request in DevTools.
         return Promise.reject(error);
       }
 
