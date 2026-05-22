@@ -20,7 +20,8 @@ the next batch — with no manual intervention.
 - **In scope:** pricing tiers on `AssessmentInstituteMapping` (the token-based,
   externally-redirected mapping that already supports INSTITUTE / SESSION / CLASS /
   SECTION levels); admin CRUD for tiers; tier-aware public info + registration; tally
-  upkeep; data migration; authorization on admin endpoints.
+  upkeep; data migration. New tier endpoints stay unprotected to match sibling mapping
+  admin endpoints; real authorization is deferred to the RBAC remediation (Key decision 5).
 - **Out of scope (separate efforts):**
   - Unifying the two B2B admin panels / retiring `SchoolAssessmentConfig` (tracked in
     `project_assessment_mapping_unification`). Tiers are built on
@@ -43,9 +44,14 @@ the next batch — with no manual intervention.
 4. **Active-tier resolution:** **stored per-tier tally** (`currentCount`), matching the
    existing school shared-link `currentCount` / `maxRegistrations` pattern. Drift is
    mitigated by decrement-on-delete/refund and an admin "recount" backstop.
-5. **Authorization:** add `@PreAuthorize(@auth.allows(...))` to the admin mapping + tier
-   endpoints (currently unprotected by convention). Public token-gated endpoints stay
-   anonymous.
+5. **Authorization:** the new tier admin endpoints stay **unprotected, matching the
+   existing sibling mapping admin endpoints** (`/create`, `/update`, `/delete`,
+   `/getAll`), which carry no `@PreAuthorize`. (Discovery during planning: `@auth.allows()`
+   does not exist on this branch — only 3 controllers use `@PreAuthorize`, all with the
+   plain `hasAuthority('...')` form, and this controller's public endpoint had
+   `@PreAuthorize` intentionally removed.) Real authorization is deferred to the
+   platform-wide RBAC remediation (`project_auth_remediation_plan`) so it can be applied
+   uniformly. Public token-gated endpoints remain anonymous.
 
 ## Data model
 
@@ -104,7 +110,7 @@ tier. Migration backfills a default tier for existing priced mappings (see Migra
 
 ## Backend API
 
-### Admin tier endpoints (protected via `@auth.allows()`)
+### Admin tier endpoints (unprotected, matching sibling mapping admin endpoints)
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -118,10 +124,11 @@ tier. Migration backfills a default tier for existing priced mappings (see Migra
 `POST /assessment-mapping/create` gains an optional `tiers[]` array so the create form can
 persist a mapping and its tiers in one call. Subsequent edits use the tier endpoints.
 
-### Existing admin endpoints — authorization added
+### Existing admin endpoints — authorization unchanged
 
-`create`, `getAll`, `getByInstitute`, `get/{id}`, `update/{id}`, `delete/{id}` gain
-`@PreAuthorize(@auth.allows(...))` consistent with the codebase convention.
+`create`, `getAll`, `getByInstitute`, `get/{id}`, `update/{id}`, `delete/{id}` remain
+as-is (unprotected). Authorization for all mapping + tier admin endpoints is handled
+uniformly by the separate RBAC remediation effort.
 
 ### Public endpoints (anonymous, token-gated — unchanged auth)
 
@@ -175,5 +182,3 @@ tier's price); new fields are additive. The external assessment app may later di
   `registrationClosed`.
 - **Migration:** existing priced mapping yields one unlimited "Standard" tier; pricing
   unchanged before/after.
-- **Auth:** admin tier/mapping endpoints reject unauthorized callers; public token
-  endpoints remain anonymous.
