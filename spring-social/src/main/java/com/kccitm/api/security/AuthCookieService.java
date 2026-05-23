@@ -71,10 +71,11 @@ public class AuthCookieService {
         int maxAge = appProperties.getCookie().getAccessMaxAgeSeconds();
         boolean secure = appProperties.getCookie().isSecure();
         String sameSite = appProperties.getCookie().getSameSite();
+        String domain = appProperties.getCookie().getDomain();
 
         // cn_at — HttpOnly access token.
         response.addHeader("Set-Cookie",
-                buildSetCookie(ACCESS_COOKIE, jwt, maxAge, /* httpOnly= */ true, secure, sameSite, "/"));
+                buildSetCookie(ACCESS_COOKIE, jwt, maxAge, /* httpOnly= */ true, secure, sameSite, "/", domain));
 
         // cn_csrf — non-HttpOnly so JS can read it for the double-submit pattern.
         // Seed it with a random value so the frontend has something to echo back
@@ -82,7 +83,7 @@ public class AuthCookieService {
         // will overwrite this on the next state-changing response.
         String csrfValue = generateCsrfToken();
         response.addHeader("Set-Cookie",
-                buildSetCookie(CSRF_COOKIE, csrfValue, maxAge, /* httpOnly= */ false, secure, sameSite, "/"));
+                buildSetCookie(CSRF_COOKIE, csrfValue, maxAge, /* httpOnly= */ false, secure, sameSite, "/", domain));
     }
 
     /**
@@ -92,11 +93,12 @@ public class AuthCookieService {
     public void clearAuthCookies(HttpServletResponse response) {
         boolean secure = appProperties.getCookie().isSecure();
         String sameSite = appProperties.getCookie().getSameSite();
+        String domain = appProperties.getCookie().getDomain();
 
         response.addHeader("Set-Cookie",
-                buildSetCookie(ACCESS_COOKIE, "", 0, /* httpOnly= */ true, secure, sameSite, "/"));
+                buildSetCookie(ACCESS_COOKIE, "", 0, /* httpOnly= */ true, secure, sameSite, "/", domain));
         response.addHeader("Set-Cookie",
-                buildSetCookie(CSRF_COOKIE, "", 0, /* httpOnly= */ false, secure, sameSite, "/"));
+                buildSetCookie(CSRF_COOKIE, "", 0, /* httpOnly= */ false, secure, sameSite, "/", domain));
     }
 
     // ── Phase 18 Plan 02: split-token API (cn_at + cn_rt) ──────────────────
@@ -111,8 +113,9 @@ public class AuthCookieService {
         int maxAge = appProperties.getCookie().getAccessMaxAgeSeconds();
         boolean secure = appProperties.getCookie().isSecure();
         String sameSite = appProperties.getCookie().getSameSite();
+        String domain = appProperties.getCookie().getDomain();
         response.addHeader("Set-Cookie",
-                buildSetCookie(ACCESS_COOKIE, accessJwt, maxAge, /* httpOnly= */ true, secure, sameSite, "/"));
+                buildSetCookie(ACCESS_COOKIE, accessJwt, maxAge, /* httpOnly= */ true, secure, sameSite, "/", domain));
     }
 
     /**
@@ -124,9 +127,10 @@ public class AuthCookieService {
         int maxAge = appProperties.getCookie().getRefreshMaxAgeSeconds();
         boolean secure = appProperties.getCookie().isSecure();
         String sameSite = appProperties.getCookie().getSameSite();
+        String domain = appProperties.getCookie().getDomain();
         response.addHeader("Set-Cookie",
                 buildSetCookie(REFRESH_COOKIE, refreshJti, maxAge, /* httpOnly= */ true, secure, sameSite,
-                        REFRESH_COOKIE_PATH));
+                        REFRESH_COOKIE_PATH, domain));
     }
 
     /**
@@ -167,9 +171,10 @@ public class AuthCookieService {
     public void issueAssessmentSessionCookie(HttpServletResponse response, String jwt, int maxAgeSeconds) {
         boolean secure = appProperties.getCookie().isSecure();
         String sameSite = appProperties.getCookie().getSameSite();
+        String domain = appProperties.getCookie().getDomain();
         response.addHeader("Set-Cookie",
                 buildSetCookie(ASSESSMENT_SESSION_COOKIE, jwt, maxAgeSeconds,
-                        /* httpOnly= */ true, secure, sameSite, "/"));
+                        /* httpOnly= */ true, secure, sameSite, "/", domain));
     }
 
     /**
@@ -180,9 +185,10 @@ public class AuthCookieService {
     public void clearAssessmentSessionCookie(HttpServletResponse response) {
         boolean secure = appProperties.getCookie().isSecure();
         String sameSite = appProperties.getCookie().getSameSite();
+        String domain = appProperties.getCookie().getDomain();
         response.addHeader("Set-Cookie",
                 buildSetCookie(ASSESSMENT_SESSION_COOKIE, "", 0,
-                        /* httpOnly= */ true, secure, sameSite, "/"));
+                        /* httpOnly= */ true, secure, sameSite, "/", domain));
     }
 
     /**
@@ -193,24 +199,29 @@ public class AuthCookieService {
     public void clearAll(HttpServletResponse response) {
         boolean secure = appProperties.getCookie().isSecure();
         String sameSite = appProperties.getCookie().getSameSite();
+        String domain = appProperties.getCookie().getDomain();
 
         response.addHeader("Set-Cookie",
-                buildSetCookie(ACCESS_COOKIE, "", 0, /* httpOnly= */ true, secure, sameSite, "/"));
+                buildSetCookie(ACCESS_COOKIE, "", 0, /* httpOnly= */ true, secure, sameSite, "/", domain));
         response.addHeader("Set-Cookie",
-                buildSetCookie(CSRF_COOKIE, "", 0, /* httpOnly= */ false, secure, sameSite, "/"));
+                buildSetCookie(CSRF_COOKIE, "", 0, /* httpOnly= */ false, secure, sameSite, "/", domain));
         response.addHeader("Set-Cookie",
                 buildSetCookie(REFRESH_COOKIE, "", 0, /* httpOnly= */ true, secure, sameSite,
-                        REFRESH_COOKIE_PATH));
+                        REFRESH_COOKIE_PATH, domain));
     }
 
     private static String buildSetCookie(String name, String value, int maxAge,
                                          boolean httpOnly, boolean secure,
-                                         String sameSite, String path) {
+                                         String sameSite, String path,
+                                         String domain) {
         StringBuilder sb = new StringBuilder();
         sb.append(name).append('=').append(value == null ? "" : value);
         sb.append("; Path=").append(path);
         sb.append("; Max-Age=").append(maxAge);
         sb.append("; SameSite=").append(sameSite);
+        if (domain != null && !domain.isEmpty()) {
+            sb.append("; Domain=").append(domain);
+        }
         if (httpOnly) {
             sb.append("; HttpOnly");
         }

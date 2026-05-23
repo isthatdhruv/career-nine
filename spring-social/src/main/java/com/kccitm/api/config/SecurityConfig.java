@@ -56,6 +56,9 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     @Value("${spring.profiles.active:dev}")
     private String activeProfile;
 
+    @Value("${app.cookie.domain:}")
+    private String cookieDomain;
+
     @Autowired
     private CustomUserDetailsService customUserDetailsService;
 
@@ -201,6 +204,13 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         repo.setCookieName("cn_csrf");
         repo.setHeaderName("X-CSRF-Token");
         repo.setCookiePath("/");
+        // When frontend and API live on different subdomains (e.g.
+        // staging-dashboard.career-9.com → api-staging.career-9.com), the
+        // cn_csrf cookie must carry Domain=.career-9.com so frontend JS can
+        // read it for the double-submit CSRF pattern.
+        if (cookieDomain != null && !cookieDomain.isEmpty()) {
+            repo.setCookieDomain(cookieDomain);
+        }
         return repo;
     }
 

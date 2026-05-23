@@ -109,6 +109,15 @@ public class AppProperties {
         private int accessMaxAgeSeconds = 864000;
         // Phase 18 Plan 02: cn_rt cookie Max-Age. Defaults to 7 days (refresh-token TTL).
         private int refreshMaxAgeSeconds = 604800;
+        /**
+         * Optional cookie Domain attribute. When the frontend SPA and API live on
+         * different subdomains (e.g. dashboard.career-9.com → api.career-9.com),
+         * set this to the parent domain (e.g. ".career-9.com") so the non-HttpOnly
+         * cn_csrf cookie is readable by frontend JS for the double-submit CSRF
+         * pattern. Null/empty = omit the attribute (browser defaults to the exact
+         * request host — fine when frontend and API share one origin).
+         */
+        private String domain;
 
         public boolean isSecure() {
             return secure;
@@ -140,6 +149,14 @@ public class AppProperties {
 
         public void setRefreshMaxAgeSeconds(int refreshMaxAgeSeconds) {
             this.refreshMaxAgeSeconds = refreshMaxAgeSeconds;
+        }
+
+        public String getDomain() {
+            return domain;
+        }
+
+        public void setDomain(String domain) {
+            this.domain = domain;
         }
     }
 

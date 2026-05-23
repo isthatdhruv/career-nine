@@ -186,9 +186,9 @@ export function setupAxios(axios: any) {
       if (status === 403) {
         const { showErrorToast } = require("../../../utils/toast");
         showErrorToast(message || "You don't have permission for this action");
-        // Toast only — no redirect. The error propagates to the calling
-        // component's catch block so the user stays on the current page and
-        // can inspect the failed request in DevTools.
+        // Let the error propagate to the component's catch block (e.g.
+        // handleSave shows its own toast). No hard redirect — the user stays
+        // on the current page so they can see what failed and retry.
         return Promise.reject(error);
       }
 
