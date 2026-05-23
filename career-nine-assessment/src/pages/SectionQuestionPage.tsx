@@ -1077,15 +1077,20 @@ const SectionQuestionPage: React.FC = () => {
       const maxRetries = 3;
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
+          const csrfMatch = document.cookie.match(/(?:^|;\s*)cn_csrf=([^;]*)/)
+          const csrfToken = csrfMatch ? decodeURIComponent(csrfMatch[1]) : undefined
+          const submitHeaders: Record<string, string> = {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          }
+          if (csrfToken) submitHeaders["X-CSRF-Token"] = csrfToken
+
           const response = await fetch(
             `${import.meta.env.VITE_API_URL}/assessment-answer/submit`,
             {
               method: "POST",
-              credentials: "include", // Phase 19: send cn_at_asmnt cookie on assessment submit
-              headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-              },
+              credentials: "include",
+              headers: submitHeaders,
               body: JSON.stringify(submissionJSON),
               signal: AbortSignal.timeout(10000), // 10s timeout (async processing)
             },
