@@ -11,13 +11,18 @@
  * either path during the backwards-compat window (per Plan 19-01).
  */
 export function savePartialAnswers(payload: Record<string, any>): void {
+  const csrfMatch = document.cookie.match(/(?:^|;\s*)cn_csrf=([^;]*)/)
+  const csrfToken = csrfMatch ? decodeURIComponent(csrfMatch[1]) : undefined
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  }
+  if (csrfToken) headers["X-CSRF-Token"] = csrfToken
+
   fetch(`${import.meta.env.VITE_API_URL}/assessment-answer/save-partial`, {
     method: "POST",
     credentials: "include", // Phase 19: send cn_at_asmnt cookie on the partial-save call
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
+    headers,
     body: JSON.stringify(payload),
   }).catch(() => {}); // fire-and-forget
 }

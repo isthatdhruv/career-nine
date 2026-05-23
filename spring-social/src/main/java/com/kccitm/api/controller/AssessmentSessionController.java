@@ -190,6 +190,12 @@ public class AssessmentSessionController {
         authCookieService.issueAssessmentSessionCookie(response, token,
                 (int) (assessmentTokenExpirationMsec / 1000));
 
+        // Issue a cn_csrf cookie so the assessment SPA can perform the CSRF
+        // double-submit pattern on subsequent POST/PUT requests. Without this
+        // the student has no CSRF token and every state-changing request 403s.
+        authCookieService.issueCsrfCookie(response,
+                (int) (assessmentTokenExpirationMsec / 1000));
+
         logger.info("Assessment-session issued userStudentId={} assessmentId={}",
                 req.userStudentId, req.assessmentId);
         return ResponseEntity.ok(Collections.singletonMap("ok", true));

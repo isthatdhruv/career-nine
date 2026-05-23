@@ -74,6 +74,16 @@ const http = axios.create({
  * the v2.0 backwards-compat path for the one-release window.
  */
 http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  // CSRF double-submit: copy the cn_csrf cookie into the X-CSRF-Token header
+  // on state-changing requests so Spring Security's CsrfFilter passes.
+  const method = (config.method || 'get').toUpperCase()
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    const match = document.cookie.match(/(?:^|;\s*)cn_csrf=([^;]*)/)
+    if (match) {
+      ;(config.headers as any)['X-CSRF-Token'] = decodeURIComponent(match[1])
+    }
+  }
+
   if (cookieAuthRuntimeActive) {
     return config
   }

@@ -87,6 +87,20 @@ public class AuthCookieService {
     }
 
     /**
+     * Issues only the cn_csrf cookie (non-HttpOnly, JS-readable). Used by
+     * assessment-session minting where no cn_at is issued but the SPA still
+     * needs a CSRF token for subsequent POST requests.
+     */
+    public void issueCsrfCookie(HttpServletResponse response, int maxAgeSeconds) {
+        boolean secure = appProperties.getCookie().isSecure();
+        String sameSite = appProperties.getCookie().getSameSite();
+        String domain = appProperties.getCookie().getDomain();
+        String csrfValue = generateCsrfToken();
+        response.addHeader("Set-Cookie",
+                buildSetCookie(CSRF_COOKIE, csrfValue, maxAgeSeconds, /* httpOnly= */ false, secure, sameSite, "/", domain));
+    }
+
+    /**
      * Writes both cookies with {@code Max-Age=0} to clear them. Called from
      * {@code AuthController.logout}.
      */
