@@ -109,6 +109,13 @@ export default function AllottedAssessmentPage() {
     setLoadingId(assessment.assessmentId);
     try {
       localStorage.setItem('assessmentId', String(assessment.assessmentId));
+
+      // Mint the assessment session cookie before any authenticated API call
+      await mintAssessmentSessionCookie(
+        Number(userStudentId),
+        Number(assessment.assessmentId),
+      );
+
       await fetchAssessmentData(String(assessment.assessmentId));
       await http.post('/assessments/startAssessment', {
         userStudentId: Number(userStudentId),
