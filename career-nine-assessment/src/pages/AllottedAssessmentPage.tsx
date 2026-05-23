@@ -97,56 +97,31 @@ export default function AllottedAssessmentPage() {
     }
   };
 
-  const handleDevAutoFill = async (assessment: Assessment) => {
-    const userStudentId = localStorage.getItem('userStudentId');
-    if (!userStudentId) {
-      alert('Session expired. Please login again.');
-      navigate('/student-login');
-      return;
-    }
+  const handleDevAutoFill = (assessment: Assessment) => {
     if (assessment.studentStatus === 'completed' || !assessment.isActive) return;
 
-    setLoadingId(assessment.assessmentId);
-    try {
-      localStorage.setItem('assessmentId', String(assessment.assessmentId));
-
-      // Mint the assessment session cookie before any authenticated API call
-      await mintAssessmentSessionCookie(
-        Number(userStudentId),
-        Number(assessment.assessmentId),
-      );
-
-      await fetchAssessmentData(String(assessment.assessmentId));
-      await http.post('/assessments/startAssessment', {
-        userStudentId: Number(userStudentId),
-        assessmentId: Number(assessment.assessmentId),
-      });
-
-      const raw = sessionStorage.getItem('assessmentData');
-      if (!raw) throw new Error('Assessment data not loaded');
-      const parsed = JSON.parse(raw);
-      const questionnaire = Array.isArray(parsed) ? parsed[0] : parsed;
-      if (!questionnaire?.sections?.length) {
-        throw new Error('Questionnaire has no sections');
-      }
-
-      const { answers, rankingAnswers, textAnswers } = generateRandomAnswers(questionnaire);
-
-      localStorage.setItem('assessmentAnswers', JSON.stringify(answers));
-      localStorage.setItem('assessmentRankingAnswers', JSON.stringify(rankingAnswers));
-      localStorage.setItem('assessmentTextAnswers', JSON.stringify(textAnswers));
-      localStorage.setItem('assessmentSavedForLater', JSON.stringify({}));
-      localStorage.setItem('assessmentSkipped', JSON.stringify({}));
-      localStorage.setItem('assessmentElapsedTime', '0');
-
-      const firstSectionId = questionnaire.sections[0].section.sectionId;
-      navigate(`/studentAssessment/sections/${firstSectionId}/questions/0`);
-    } catch (err) {
-      console.error('Dev auto-fill failed:', err);
-      alert('Auto-fill failed. Check the console for details.');
-    } finally {
-      setLoadingId(null);
+    const raw = sessionStorage.getItem('assessmentData');
+    if (!raw) {
+      alert('Start the assessment first, then use this button to fill dummy answers.');
+      return;
     }
+    const parsed = JSON.parse(raw);
+    const questionnaire = Array.isArray(parsed) ? parsed[0] : parsed;
+    if (!questionnaire?.sections?.length) {
+      alert('No sections found in assessment data.');
+      return;
+    }
+
+    const { answers, rankingAnswers, textAnswers } = generateRandomAnswers(questionnaire);
+
+    localStorage.setItem('assessmentAnswers', JSON.stringify(answers));
+    localStorage.setItem('assessmentRankingAnswers', JSON.stringify(rankingAnswers));
+    localStorage.setItem('assessmentTextAnswers', JSON.stringify(textAnswers));
+    localStorage.setItem('assessmentSavedForLater', JSON.stringify({}));
+    localStorage.setItem('assessmentSkipped', JSON.stringify({}));
+
+    const firstSectionId = questionnaire.sections[0].section.sectionId;
+    navigate(`/studentAssessment/sections/${firstSectionId}/questions/0`);
   };
 
   const getStatusColor = (status: string | null, isActive: boolean) => {
