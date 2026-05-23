@@ -391,55 +391,55 @@ export default function StudentManagementPage() {
     }
 
     setSaving(true);
-    bulkAlotAssessment(assignments);
-    // try {
-    // await bulkAlotAssessment(assignments);
-    // showSuccessToast(`${assignments.length} assessment(s) saved successfully!`);
-    // setHasChanges(false);
+    // bulkAlotAssessment(assignments);
+    try {
+      await bulkAlotAssessment(assignments);
+      showSuccessToast(`${assignments.length} assessment(s) saved successfully!`);
+      setHasChanges(false);
 
-    // Refresh data
-    //   if (selectedInstitute) {
-    //     const response = await getStudentsWithMappingByInstituteId(
-    //       Number(selectedInstitute)
-    //     );
-    //     const studentData = response.data.map((student: any) => {
-    //       const assessmentId = student.assessmentId
-    //         ? String(student.assessmentId)
-    //         : "";
-    //       const assessment = assessments.find(
-    //         (a) => a.id === Number(assessmentId)
-    //       );
-    //       const assignedIds = Array.isArray(student.assignedAssessmentIds)
-    //         ? student.assignedAssessmentIds
-    //         : [];
+      // Refresh data
+      if (selectedInstitute) {
+        const response = await getStudentsWithMappingByInstituteId(
+          Number(selectedInstitute)
+        );
+        const studentData = response.data.map((student: any) => {
+          const assessmentId = student.assessmentId
+            ? String(student.assessmentId)
+            : "";
+          const assessment = assessments.find(
+            (a) => a.id === Number(assessmentId)
+          );
+          const assignedIds = Array.isArray(student.assignedAssessmentIds)
+            ? student.assignedAssessmentIds
+            : [];
 
-    //       return {
-    //         id: student.id,
-    //         name: student.name || "",
-    //         phoneNumber: student.phoneNumber || "",
-    //         studentDob: formatDobFromApi(student.studentDob),
-    //         loginDob: formatDobFromApi(student.loginDob),
-    //         schoolRollNumber: student.schoolRollNumber || "",
-    //         controlNumber: student.controlNumber ?? undefined,
-    //         selectedAssessment: "",
-    //         userStudentId: student.userStudentId,
-    //         assessmentName: assessment?.assessmentName || "",
-    //         username: student.username || "",
-    //         email: student.email || "",
-    //         schoolSectionId: student.schoolSectionId ?? undefined,
-    //         gender: student.gender || "",
-    //         assessments: student.assessments || [],
-    //         assignedAssessmentIds: assignedIds,
-    //       };
-    //     });
-    //     setStudents(studentData);
-    //   }
-    // } catch (error) {
-    //   console.error("Error saving assessments:", error);
-    //   showErrorToast("Failed to save assessments. Please try again.");
-    // } finally {
-    //   setSaving(false);
-    // }
+          return {
+            id: student.id,
+            name: student.name || "",
+            phoneNumber: student.phoneNumber || "",
+            studentDob: formatDobFromApi(student.studentDob),
+            loginDob: formatDobFromApi(student.loginDob),
+            schoolRollNumber: student.schoolRollNumber || "",
+            controlNumber: student.controlNumber ?? undefined,
+            selectedAssessment: "",
+            userStudentId: student.userStudentId,
+            assessmentName: assessment?.assessmentName || "",
+            username: student.username || "",
+            email: student.email || "",
+            schoolSectionId: student.schoolSectionId ?? undefined,
+            gender: student.gender || "",
+            assessments: student.assessments || [],
+            assignedAssessmentIds: assignedIds,
+          };
+        });
+        setStudents(studentData);
+      }
+    } catch (error) {
+      console.error("Error saving assessments:", error);
+      showErrorToast("Failed to save assessments. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleResetClick = (student: Student, assessmentId: number, assessmentName: string) => {
