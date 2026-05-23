@@ -45,6 +45,7 @@ export async function restorePartialAnswers(
       `${import.meta.env.VITE_API_URL}/assessment-answer/partial-restore/${studentId}/${assessmentId}`,
       {
         method: "GET",
+        credentials: "include",
         headers: { Accept: "application/json" },
       },
     );
