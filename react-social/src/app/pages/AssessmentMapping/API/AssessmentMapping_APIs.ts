@@ -66,3 +66,50 @@ export function registerStudentByToken(
     studentData
   );
 }
+
+// ============ PRICING TIERS ============
+
+export interface AssessmentMappingTier {
+  tierId?: number;
+  mappingId?: number;
+  name: string;
+  amount: number | null;
+  sortOrder: number;
+  maxRegistrations: number | null;
+  currentCount?: number;
+  isActive?: boolean;
+}
+
+export function getTiers(mappingId: number) {
+  return axios.get<AssessmentMappingTier[]>(
+    `${API_URL}/assessment-mapping/${mappingId}/tiers`
+  );
+}
+
+export function createTier(mappingId: number, tier: AssessmentMappingTier) {
+  return axios.post<AssessmentMappingTier>(
+    `${API_URL}/assessment-mapping/${mappingId}/tiers`,
+    tier
+  );
+}
+
+export function updateTier(tierId: number, tier: Partial<AssessmentMappingTier>) {
+  return axios.put<AssessmentMappingTier>(
+    `${API_URL}/assessment-mapping/tiers/${tierId}`,
+    tier
+  );
+}
+
+export function toggleTier(tierId: number) {
+  return axios.patch<AssessmentMappingTier>(
+    `${API_URL}/assessment-mapping/tiers/${tierId}/toggle`
+  );
+}
+
+export function deleteTier(tierId: number) {
+  return axios.delete(`${API_URL}/assessment-mapping/tiers/${tierId}`);
+}
+
+export function recountTier(tierId: number) {
+  return axios.post(`${API_URL}/assessment-mapping/tiers/${tierId}/recount`);
+}

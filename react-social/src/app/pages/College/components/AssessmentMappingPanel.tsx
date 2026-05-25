@@ -12,6 +12,7 @@ import {
   updateAssessmentMapping,
 } from "../../AssessmentMapping/API/AssessmentMapping_APIs";
 import { showErrorToast } from "../../../utils/toast";
+import TierManagementModal from "./TierManagementModal";
 
 interface Props {
   instituteCode: number;
@@ -31,10 +32,10 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
   const [selectedSection, setSelectedSection] = useState<string>("");
 
   const [loading, setLoading] = useState(false);
-  const [amount, setAmount] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [copySuccess, setCopySuccess] = useState<string>("");
   const [qrVisible, setQrVisible] = useState<{ token: string; type: "free" | "paid" } | null>(null);
+  const [tierModalMappingId, setTierModalMappingId] = useState<number | null>(null);
 
   const selectedSessionObj = sessions.find((s: any) => String(s.id) === selectedSession);
   const classes: any[] = selectedSessionObj?.schoolClasses || [];
@@ -102,20 +103,17 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
       data.sectionId = Number(selectedSection);
     }
 
-    if (amount && Number(amount) > 0) {
-      data.amount = Math.round(Number(amount));
-    }
-
     setSubmitting(true);
     try {
-      await createAssessmentMapping(data);
+      const createRes = await createAssessmentMapping(data);
       const res = await getAssessmentMappingsByInstitute(instituteCode);
       setMappings(res.data || []);
       setSelectedAssessment("");
       setSelectedSession("");
       setSelectedClass("");
       setSelectedSection("");
-      setAmount("");
+      const newMappingId = createRes?.data?.mappingId;
+      if (newMappingId) setTierModalMappingId(newMappingId);
     } catch (error: any) {
       console.error("Failed to create mapping:", error);
       showErrorToast("Failed to create mapping: " + (error.response?.data || error.message));
@@ -213,7 +211,7 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
               </h6>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20, marginBottom: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
               <div>
                 <Form.Label style={{ fontWeight: 600, fontSize: "0.8rem", color: "#475569", marginBottom: 8 }}>
                   Assessment
@@ -248,19 +246,6 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
                   <option value="CLASS">Class</option>
                   <option value="SECTION">Section</option>
                 </Form.Select>
-              </div>
-              <div>
-                <Form.Label style={{ fontWeight: 600, fontSize: "0.8rem", color: "#475569", marginBottom: 8 }}>
-                  Amount (INR) <span style={{ color: "#94a3b8", fontWeight: 400 }}>-- optional</span>
-                </Form.Label>
-                <Form.Control
-                  type="number"
-                  placeholder="0 = Free"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  min="0"
-                  style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #e2e8f0", fontSize: "0.9rem" }}
-                />
               </div>
             </div>
 
@@ -386,7 +371,7 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ background: "#f8fafc" }}>
-                      {["Assessment", "Level", "Details", "Amount", "Status", "Free Link (Assessment)", "Paid Link (Dashboard)", "Actions"].map((h) => (
+                      {["Assessment", "Level", "Details", "Pricing", "Status", "Free Link (Assessment)", "Paid Link (Dashboard)", "Actions"].map((h) => (
                         <th key={h} style={{
                           padding: "14px 18px", fontWeight: 700, fontSize: "0.78rem",
                           color: "#64748b", textTransform: "uppercase" as const, letterSpacing: "0.05em",
@@ -426,16 +411,16 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
                           {getLevelLabel(mapping)}
                         </td>
                         <td style={{ padding: "14px 18px", borderBottom: "1px solid #f1f5f9" }}>
-                          <span style={{
-                            background: mapping.amount && mapping.amount > 0 ? "#fef3c7" : "#f0fdf4",
-                            color: mapping.amount && mapping.amount > 0 ? "#92400e" : "#166534",
-                            padding: "4px 12px", borderRadius: 8,
-                            fontWeight: 600, fontSize: "0.78rem",
-                          }}>
-                            {mapping.amount && mapping.amount > 0
-                              ? `INR ${mapping.amount}`
-                              : "Free"}
-                          </span>
+                          <button
+                            onClick={() => setTierModalMappingId(mapping.mappingId)}
+                            style={{
+                              padding: "5px 14px", borderRadius: 8,
+                              border: "1.5px solid #e2e8f0", background: "#f8fafc",
+                              color: "#4361ee", fontWeight: 600, fontSize: "0.78rem", cursor: "pointer",
+                            }}
+                          >
+                            Manage Tiers
+                          </button>
                         </td>
                         <td style={{ padding: "14px 18px", borderBottom: "1px solid #f1f5f9" }}>
                           <span
@@ -643,6 +628,13 @@ const AssessmentMappingPanel = ({ instituteCode, active = true }: Props) => {
           </Button>
         </Modal.Footer>
       </Modal>
+      {tierModalMappingId !== null && (
+        <TierManagementModal
+          mappingId={tierModalMappingId}
+          show={tierModalMappingId !== null}
+          onHide={() => setTierModalMappingId(null)}
+        />
+      )}
     </div>
   );
 };

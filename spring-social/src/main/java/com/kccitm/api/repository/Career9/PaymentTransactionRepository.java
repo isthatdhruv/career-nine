@@ -52,4 +52,6 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
     // a given student has triggered (paid, failed, abandoned) into one
     // chronologically ordered list.
     List<PaymentTransaction> findByUserStudentIdOrderByCreatedAtDesc(Long userStudentId);
+
+    long countByMappingTierIdAndStatus(Long mappingTierId, String status);
 }

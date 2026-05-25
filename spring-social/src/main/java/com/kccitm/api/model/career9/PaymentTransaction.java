@@ -90,6 +90,9 @@ public class PaymentTransaction implements Serializable {
     @Column(name = "campaign_assessment_tier_id")
     private Long campaignAssessmentTierId;
 
+    @Column(name = "mapping_tier_id")
+    private Long mappingTierId;
+
     @Column(name = "purchase_path", length = 1)
     private String purchasePath;
 
@@ -193,6 +196,9 @@ public class PaymentTransaction implements Serializable {
 
     public Long getCampaignAssessmentTierId() { return campaignAssessmentTierId; }
     public void setCampaignAssessmentTierId(Long v) { this.campaignAssessmentTierId = v; }
+
+    public Long getMappingTierId() { return mappingTierId; }
+    public void setMappingTierId(Long mappingTierId) { this.mappingTierId = mappingTierId; }
 
     public String getPurchasePath() { return purchasePath; }
     public void setPurchasePath(String purchasePath) { this.purchasePath = purchasePath; }
