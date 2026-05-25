@@ -20,6 +20,11 @@ import {
   generateBetReportOneClick,
   generateNavigatorReportOneClick,
   updateStudentBasicInfo,
+  getStudentRoleGroups,
+  updateStudentRoleGroups,
+  getRoleGroupCatalog,
+  StudentRoleGroupRef,
+  StudentRoleGroupDetail,
 } from "../StudentInformation/StudentInfo_APIs";
 import { getEmailRecipientsForStudent, sendReportEmail, EmailRecipient } from "../ReportGeneration/API/BetReportData_APIs";
 import { useAssessmentsForInstitute } from "../../hooks/useScopedAssessments";
@@ -57,6 +62,7 @@ type Student = {
   gender?: string;
   assessments?: StudentAssessmentInfo[];
   assignedAssessmentIds: number[];
+  roleGroups?: StudentRoleGroupRef[];
 };
 
 type StudentAssessmentInfo = {
@@ -84,7 +90,7 @@ export default function GroupStudentPage() {
 
   // ── Modal manager (consolidates 5 modals into one state object) ──
   type ModalState = {
-    type: "none" | "assessment" | "download" | "bulkDownload" | "reset" | "demographics" | "edit";
+    type: "none" | "assessment" | "download" | "bulkDownload" | "reset" | "demographics" | "edit" | "roleGroup";
     student: Student | null;
     assessmentId: number | null;
     assessmentName: string;
@@ -96,6 +102,15 @@ export default function GroupStudentPage() {
   // Edit student modal data
   const [editForm, setEditForm] = useState({ name: "", email: "", phoneNumber: "", studentDob: "" });
   const [editSaving, setEditSaving] = useState(false);
+
+  // Role-group modal data
+  const [roleGroupCatalog, setRoleGroupCatalog] = useState<StudentRoleGroupRef[]>([]);
+  const [roleGroupDetails, setRoleGroupDetails] = useState<StudentRoleGroupDetail[]>([]);
+  const [roleGroupEffective, setRoleGroupEffective] = useState<string[]>([]);
+  const [roleGroupSelectedIds, setRoleGroupSelectedIds] = useState<Set<number>>(new Set());
+  const [roleGroupLoading, setRoleGroupLoading] = useState(false);
+  const [roleGroupSaving, setRoleGroupSaving] = useState(false);
+  const [roleGroupError, setRoleGroupError] = useState<string>("");
 
   // Assessment modal data
   const [studentAssessments, setStudentAssessments] = useState<StudentAssessmentInfo[]>([]);
@@ -445,6 +460,7 @@ export default function GroupStudentPage() {
             gender: student.gender || "",
             assessments: student.assessments || [],
             assignedAssessmentIds: assignedIds,
+            roleGroups: Array.isArray(student.roleGroups) ? student.roleGroups : [],
           };
         });
         setStudents(studentData);
@@ -572,6 +588,7 @@ export default function GroupStudentPage() {
             gender: student.gender || "",
             assessments: student.assessments || [],
             assignedAssessmentIds: assignedIds,
+            roleGroups: Array.isArray(student.roleGroups) ? student.roleGroups : [],
           };
         });
         setStudents(studentData);
@@ -658,6 +675,7 @@ export default function GroupStudentPage() {
               gender: student.gender || "",
               assessments: student.assessments || [],
               assignedAssessmentIds: assignedIds,
+              roleGroups: Array.isArray(student.roleGroups) ? student.roleGroups : [],
             };
           });
           setStudents(studentData);
@@ -1271,6 +1289,87 @@ export default function GroupStudentPage() {
       showErrorToast(err?.response?.data?.message || "Failed to update student info");
     } finally {
       setEditSaving(false);
+    }
+  };
+
+  const handleViewRoleGroups = async (student: Student) => {
+    setModal({ type: "roleGroup", student, assessmentId: null, assessmentName: "", showConfirm: false });
+    setRoleGroupLoading(true);
+    setRoleGroupError("");
+    setRoleGroupDetails([]);
+    setRoleGroupEffective([]);
+    setRoleGroupSelectedIds(new Set());
+    try {
+      const [detailRes, catalogRes] = await Promise.all([
+        getStudentRoleGroups(student.userStudentId),
+        // Catalog is small and unlikely to change mid-session — cache after first load.
+        roleGroupCatalog.length === 0
+          ? getRoleGroupCatalog().then((r) => {
+              setRoleGroupCatalog(r.data || []);
+              return r;
+            })
+          : Promise.resolve({ data: roleGroupCatalog }),
+      ]);
+      const payload = detailRes.data;
+      setRoleGroupDetails(payload?.roleGroups || []);
+      setRoleGroupEffective(payload?.effectivePermissions || []);
+      setRoleGroupSelectedIds(
+        new Set((payload?.roleGroups || []).map((rg) => rg.id))
+      );
+    } catch (err: any) {
+      console.error("Failed to load role groups", err);
+      setRoleGroupError(
+        err?.response?.data || "Failed to load role groups for this student."
+      );
+    } finally {
+      setRoleGroupLoading(false);
+    }
+  };
+
+  const toggleRoleGroupSelection = (id: number) => {
+    setRoleGroupSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSaveRoleGroups = async () => {
+    if (!modal.student) return;
+    const studentId = modal.student.userStudentId;
+    setRoleGroupSaving(true);
+    setRoleGroupError("");
+    try {
+      const res = await updateStudentRoleGroups(
+        studentId,
+        Array.from(roleGroupSelectedIds)
+      );
+      const payload = res.data;
+      setRoleGroupDetails(payload?.roleGroups || []);
+      setRoleGroupEffective(payload?.effectivePermissions || []);
+      // Reflect in the table row so the chip updates without a full refetch.
+      setStudents((prev) =>
+        prev.map((s) =>
+          s.userStudentId === studentId
+            ? {
+                ...s,
+                roleGroups: (payload?.roleGroups || []).map((rg) => ({
+                  id: rg.id,
+                  name: rg.name,
+                })),
+              }
+            : s
+        )
+      );
+      showSuccessToast("Role groups updated");
+    } catch (err: any) {
+      const msg =
+        err?.response?.data || err?.message || "Failed to update role groups";
+      setRoleGroupError(typeof msg === "string" ? msg : "Failed to update role groups");
+      showErrorToast(typeof msg === "string" ? msg : "Failed to update role groups");
+    } finally {
+      setRoleGroupSaving(false);
     }
   };
 
@@ -2284,6 +2383,17 @@ export default function GroupStudentPage() {
                             whiteSpace: "nowrap",
                           }}
                         >
+                          Role Group
+                        </th>
+                        <th
+                          style={{
+                            padding: "10px 12px",
+                            fontWeight: 600,
+                            color: "#1a1a2e",
+                            borderBottom: "2px solid #e0e0e0",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
                           Assessments
                         </th>
                         <th
@@ -2434,6 +2544,43 @@ export default function GroupStudentPage() {
                                 Not Available
                               </span>
                             )}
+                          </td>
+                          <td
+                            style={{
+                              padding: "10px 12px",
+                              borderBottom: "1px solid #f0f0f0",
+                              fontSize: "0.85rem",
+                            }}
+                          >
+                            <button
+                              type="button"
+                              className="btn btn-sm d-flex align-items-center gap-1 flex-wrap"
+                              onClick={() => handleViewRoleGroups(student)}
+                              title="View / edit role groups and permissions"
+                              style={{
+                                background: (student.roleGroups || []).length > 0
+                                  ? "rgba(76, 175, 80, 0.1)"
+                                  : "rgba(158, 158, 158, 0.12)",
+                                color: (student.roleGroups || []).length > 0 ? "#2e7d32" : "#666",
+                                border: (student.roleGroups || []).length > 0
+                                  ? "1px solid rgba(76, 175, 80, 0.3)"
+                                  : "1px dashed #bdbdbd",
+                                padding: "4px 8px",
+                                borderRadius: "6px",
+                                fontWeight: 500,
+                                fontSize: "0.78rem",
+                                maxWidth: "220px",
+                                textAlign: "left",
+                                whiteSpace: "normal",
+                              }}
+                            >
+                              <i className="bi bi-shield-lock"></i>
+                              {(student.roleGroups || []).length > 0
+                                ? (student.roleGroups || [])
+                                    .map((rg) => rg.name)
+                                    .join(", ")
+                                : "None — assign"}
+                            </button>
                           </td>
                           <td
                             style={{
@@ -4483,6 +4630,263 @@ export default function GroupStudentPage() {
       )}
 
       {/* Edit Student Modal */}
+      {modal.type === "roleGroup" && modal.student && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10060,
+          }}
+          onClick={closeModal}
+        >
+          <div
+            style={{
+              backgroundColor: "white",
+              borderRadius: "20px",
+              maxWidth: "720px",
+              width: "92%",
+              maxHeight: "88vh",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 25px 50px rgba(0, 0, 0, 0.15)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                background: "linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%)",
+                padding: "1rem 1.25rem",
+                borderRadius: "20px 20px 0 0",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <h5 className="mb-0 text-white fw-bold" style={{ fontSize: "1.1rem" }}>
+                <i className="bi bi-shield-lock me-2"></i>
+                Role Groups &amp; Permissions
+              </h5>
+              <button
+                type="button"
+                className="btn-close btn-close-white"
+                onClick={closeModal}
+              ></button>
+            </div>
+
+            <div style={{ padding: "1.25rem", overflowY: "auto" }}>
+              <p className="text-muted mb-3" style={{ fontSize: "0.85rem" }}>
+                Student:&nbsp;
+                <strong>#{modal.student.userStudentId}</strong>
+                &nbsp;&mdash;&nbsp;
+                {modal.student.name || modal.student.username || "Unnamed"}
+              </p>
+
+              {roleGroupError && (
+                <div className="alert alert-danger" style={{ fontSize: "0.85rem" }}>
+                  {roleGroupError}
+                </div>
+              )}
+
+              {roleGroupLoading ? (
+                <div className="text-center py-4">
+                  <span className="spinner-border spinner-border-sm me-2" />
+                  Loading role groups…
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4">
+                    <h6 className="fw-bold mb-2" style={{ fontSize: "0.9rem" }}>
+                      <i className="bi bi-list-check me-1"></i>
+                      Assign role groups
+                    </h6>
+                    {roleGroupCatalog.length === 0 ? (
+                      <p className="text-muted mb-0" style={{ fontSize: "0.85rem" }}>
+                        No role groups available in this system.
+                      </p>
+                    ) : (
+                      <div
+                        style={{
+                          maxHeight: "200px",
+                          overflowY: "auto",
+                          border: "1px solid #e0e0e0",
+                          borderRadius: "10px",
+                          padding: "0.5rem 0.75rem",
+                          background: "#fafbfc",
+                        }}
+                      >
+                        {roleGroupCatalog.map((rg) => {
+                          const checked = roleGroupSelectedIds.has(rg.id);
+                          return (
+                            <label
+                              key={rg.id}
+                              className="d-flex align-items-center gap-2 py-1"
+                              style={{ cursor: "pointer", fontSize: "0.88rem" }}
+                            >
+                              <input
+                                type="checkbox"
+                                className="form-check-input m-0"
+                                checked={checked}
+                                onChange={() => toggleRoleGroupSelection(rg.id)}
+                              />
+                              <span style={{ fontWeight: checked ? 600 : 400 }}>
+                                {rg.name}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mb-4">
+                    <h6 className="fw-bold mb-2" style={{ fontSize: "0.9rem" }}>
+                      <i className="bi bi-collection me-1"></i>
+                      Currently assigned ({roleGroupDetails.length})
+                    </h6>
+                    {roleGroupDetails.length === 0 ? (
+                      <p className="text-muted mb-0" style={{ fontSize: "0.85rem" }}>
+                        This student has no role groups assigned.
+                      </p>
+                    ) : (
+                      <div className="d-flex flex-column gap-2">
+                        {roleGroupDetails.map((rg) => (
+                          <div
+                            key={rg.id}
+                            style={{
+                              border: "1px solid #e0e0e0",
+                              borderRadius: "10px",
+                              padding: "0.6rem 0.75rem",
+                              background: "#fff",
+                            }}
+                          >
+                            <div className="d-flex align-items-center justify-content-between mb-1">
+                              <span className="fw-bold" style={{ fontSize: "0.88rem", color: "#1a1a2e" }}>
+                                {rg.name}
+                              </span>
+                              <span
+                                className="badge"
+                                style={{
+                                  background: "rgba(76, 175, 80, 0.12)",
+                                  color: "#2e7d32",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                {rg.permissionCodes.length} perms
+                              </span>
+                            </div>
+                            {rg.permissionCodes.length > 0 ? (
+                              <div className="d-flex flex-wrap gap-1">
+                                {rg.permissionCodes.map((code) => (
+                                  <span
+                                    key={code}
+                                    className="badge"
+                                    style={{
+                                      background: "rgba(67, 97, 238, 0.08)",
+                                      color: "#3a0ca3",
+                                      fontWeight: 500,
+                                      fontSize: "0.72rem",
+                                    }}
+                                  >
+                                    {code}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-muted" style={{ fontSize: "0.78rem" }}>
+                                No permissions on this role group.
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <h6 className="fw-bold mb-2" style={{ fontSize: "0.9rem" }}>
+                      <i className="bi bi-key me-1"></i>
+                      Effective permissions ({roleGroupEffective.length})
+                    </h6>
+                    {roleGroupEffective.length === 0 ? (
+                      <p className="text-muted mb-0" style={{ fontSize: "0.85rem" }}>
+                        No permissions granted through the current role groups.
+                      </p>
+                    ) : (
+                      <div className="d-flex flex-wrap gap-1">
+                        {roleGroupEffective.map((code) => (
+                          <span
+                            key={code}
+                            className="badge"
+                            style={{
+                              background: "rgba(67, 97, 238, 0.1)",
+                              color: "#4361ee",
+                              fontWeight: 500,
+                              fontSize: "0.75rem",
+                            }}
+                          >
+                            {code}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div
+              style={{
+                padding: "0.75rem 1.25rem",
+                borderTop: "1px solid #e2e8f0",
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "8px",
+              }}
+            >
+              <button
+                className="btn btn-secondary"
+                onClick={closeModal}
+                style={{ borderRadius: "10px" }}
+                disabled={roleGroupSaving}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn"
+                onClick={handleSaveRoleGroups}
+                disabled={roleGroupSaving || roleGroupLoading}
+                style={{
+                  background: "#2e7d32",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "10px",
+                  fontWeight: 600,
+                }}
+              >
+                {roleGroupSaving ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" />
+                    Saving…
+                  </>
+                ) : (
+                  <>
+                    <ActionIcon type="approve" size="sm" className="me-1" />
+                    Save Role Groups
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {modal.type === "edit" && modal.student && (
         <div
           style={{

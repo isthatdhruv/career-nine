@@ -112,6 +112,8 @@ public class StudentInfoController {
     private com.kccitm.api.repository.Career9.StudentDemographicResponseRepository studentDemographicResponseRepository;
     @Autowired
     private LoginCredentialsEmailService loginCredentialsEmailService;
+    @Autowired
+    private com.kccitm.api.repository.UserRoleGroupMappingRepository userRoleGroupMappingRepository;
 
     // no scope arg: cross-institute list — scope-filter (Plan 15-06) narrows result set
     @PreAuthorize("@auth.allows('student_info.read.all')")
@@ -496,11 +498,39 @@ public class StudentInfoController {
             // 3. Bulk load all UserStudents for these studentInfo IDs (1 query instead of N)
             Map<Integer, UserStudent> studentInfoToUserStudent = new HashMap<>();
             List<Long> allUserStudentIds = new ArrayList<>();
+            Set<Long> allUserIds = new java.util.HashSet<>();
             List<UserStudent> allUserStudents = userStudentRepository.findByStudentInfoIdIn(studentInfoIds);
             for (UserStudent us : allUserStudents) {
                 if (us.getStudentInfo() != null) {
                     studentInfoToUserStudent.putIfAbsent(us.getStudentInfo().getId(), us);
                     allUserStudentIds.add(us.getUserStudentId());
+                    if (us.getUserId() != null) {
+                        allUserIds.add(us.getUserId());
+                    }
+                }
+            }
+
+            // 3b. Bulk load role-group mappings for every userId in one query (avoids N+1
+            //     when rendering the Role Group column on the Data Download page).
+            Map<Long, List<Map<String, Object>>> roleGroupsByUserId = new HashMap<>();
+            if (!allUserIds.isEmpty()) {
+                try {
+                    List<com.kccitm.api.model.UserRoleGroupMapping> rgMappings =
+                            userRoleGroupMappingRepository.findByUserIn(allUserIds);
+                    if (rgMappings != null) {
+                        for (com.kccitm.api.model.UserRoleGroupMapping m : rgMappings) {
+                            if (Boolean.FALSE.equals(m.getDisplay())) continue;
+                            if (m.getRoleGroup() == null) continue;
+                            Map<String, Object> rg = new LinkedHashMap<>();
+                            rg.put("id", m.getRoleGroup().getId());
+                            rg.put("name", m.getRoleGroup().getName());
+                            roleGroupsByUserId
+                                    .computeIfAbsent(m.getUser(), k -> new ArrayList<>())
+                                    .add(rg);
+                        }
+                    }
+                } catch (Exception ex) {
+                    System.out.println("Warning: failed to bulk-load role groups: " + ex.getMessage());
                 }
             }
 
@@ -621,6 +651,10 @@ public class StudentInfoController {
                 UserStudent us = studentInfoToUserStudent.get(si.getId());
                 if (us != null) {
                     studentData.put("userStudentId", us.getUserStudentId());
+                    studentData.put("roleGroups",
+                            us.getUserId() != null
+                                    ? roleGroupsByUserId.getOrDefault(us.getUserId(), new ArrayList<>())
+                                    : new ArrayList<>());
 
                     List<StudentAssessmentMapping> mappings = mappingsByStudent
                             .getOrDefault(us.getUserStudentId(), new ArrayList<>());
@@ -655,6 +689,7 @@ public class StudentInfoController {
                     studentData.put("assessmentId", null);
                     studentData.put("assignedAssessmentIds", new java.util.ArrayList<>());
                     studentData.put("assessments", new java.util.ArrayList<>());
+                    studentData.put("roleGroups", new java.util.ArrayList<>());
                 }
 
                 result.add(studentData);

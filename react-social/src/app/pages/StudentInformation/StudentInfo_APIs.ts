@@ -40,6 +40,11 @@ export interface AssessmentDetail {
     status: string; // 'notstarted' | 'inprogress' | 'completed'
 }
 
+export interface StudentRoleGroupRef {
+    id: number;
+    name: string;
+}
+
 export interface StudentWithMapping {
     id: number;
     name: string;
@@ -56,6 +61,7 @@ export interface StudentWithMapping {
     gender?: string;
     assessments?: AssessmentDetail[];
     assignedAssessmentIds?: number[];
+    roleGroups?: StudentRoleGroupRef[];
 }
 
 export interface StudentAnswerDetail {
@@ -358,4 +364,38 @@ export interface GeneratedReportRow {
 
 export function getGeneratedReportsForStudent(userStudentId: number) {
     return axios.get<GeneratedReportRow[]>(`${API_URL}/generated-reports/by-student/${userStudentId}`);
+}
+
+// ── Student role-group + effective-permission editor (Data Download page) ──
+export interface StudentRoleGroupDetail {
+    mappingId: number;
+    id: number;
+    name: string;
+    permissionCodes: string[];
+}
+
+export interface StudentRoleGroupPayload {
+    userStudentId: number;
+    userId: number;
+    roleGroups: StudentRoleGroupDetail[];
+    effectivePermissions: string[];
+}
+
+export function getStudentRoleGroups(userStudentId: number) {
+    return axios.get<StudentRoleGroupPayload>(
+        `${STUDENT_INFO_BASE}/${userStudentId}/role-groups`
+    );
+}
+
+export function updateStudentRoleGroups(userStudentId: number, roleGroupIds: number[]) {
+    return axios.put<StudentRoleGroupPayload>(
+        `${STUDENT_INFO_BASE}/${userStudentId}/role-groups`,
+        { roleGroupIds }
+    );
+}
+
+export function getRoleGroupCatalog() {
+    return axios.get<StudentRoleGroupRef[]>(
+        `${STUDENT_INFO_BASE}/role-groups/catalog`
+    );
 }
