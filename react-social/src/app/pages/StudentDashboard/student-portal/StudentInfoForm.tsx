@@ -98,7 +98,7 @@ const StudentInfoForm: React.FC = () => {
       const updatedProfile = { ...(currentUser as any), ...profile, ...res.data }
       setCurrentUser(updatedProfile)
 
-      navigate('/student/dashboard')
+      navigate('/dashboard/student')
     } catch (err: any) {
       const msg = err?.response?.data?.error || 'Failed to save. Please try again.'
       setApiError(msg)
@@ -222,7 +222,7 @@ const StudentInfoForm: React.FC = () => {
               {isEditMode && (
                 <button
                   type='button'
-                  onClick={() => navigate('/student/dashboard')}
+                  onClick={() => navigate('/dashboard/student')}
                   style={{
                     flex: 1,
                     padding: '12px 0',

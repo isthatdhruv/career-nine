@@ -93,7 +93,7 @@ const StudentDashboard: React.FC = () => {
 
   const handleDownloadReport = () => {
     // Navigate to report view
-    navigate(`/student-dashboard/${studentId}/report`);
+    navigate(`/dashboard/student/view/${studentId}/report`);
   };
 
   const handleViewResults = () => {

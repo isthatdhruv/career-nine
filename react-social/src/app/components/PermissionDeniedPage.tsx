@@ -61,14 +61,14 @@ function ctaFor(persona: Persona): Cta {
     case 'student':
       return {
         primaryLabel: 'Return to dashboard',
-        primaryHref: '/student/dashboard',
-        secondary: { label: 'Contact your counsellor', href: '/student/counselling' },
+        primaryHref: '/dashboard/student',
+        secondary: { label: 'Contact your counsellor', href: '/dashboard/student/counselling' },
       }
     case 'b2c_student':
       // B2C students have no counsellor relationship; route to support email.
       return {
         primaryLabel: 'Return to dashboard',
-        primaryHref: '/student/dashboard',
+        primaryHref: '/dashboard/student',
         secondary: { label: 'Contact support', href: 'mailto:support@career-9.net?subject=Access%20request' },
       }
     case 'counsellor':

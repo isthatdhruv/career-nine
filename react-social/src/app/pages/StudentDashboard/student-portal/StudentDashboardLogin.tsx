@@ -93,7 +93,7 @@ const StudentDashboardLogin: React.FC = () => {
         ...p,
       } as any)
 
-      navigate('/student/dashboard')
+      navigate('/dashboard/student')
     } catch (err: any) {
       if (err.response?.status === 401) {
         setError('Invalid username or date of birth.')

@@ -70,7 +70,7 @@ const Login = () => {
         const { data: user } = await getCurrentUser();
         setCurrentUser(user);
         if (values.mode === "student") {
-          navigate("/student/dashboard");
+          navigate("/dashboard/student");
         }
       } catch (error: any) {
         const msg =

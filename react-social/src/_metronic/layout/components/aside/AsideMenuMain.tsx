@@ -623,17 +623,17 @@ export function AsideMenuMain() {
             </div>
           </div>
           <AsideMenuItemWithSub
-            to="/student"
+            to="/dashboard/student"
             title="Student Portal"
             fontIcon="bi-app-indicator"
             icon="/media/icons/duotune/general/gen049.svg"
           >
-            <AsideMenuItem to="/student/dashboard" title="Dashboard" hasBullet={true} />
-            <AsideMenuItem to="/student/student-info" title="My Info" hasBullet={true} />
-            <AsideMenuItem to="/student/navigator-360" title="Navigator 360" hasBullet={true} />
-            <AsideMenuItem to="/student/assessments" title="My Assessments" hasBullet={true} />
-            <AsideMenuItem to="/student/reports" title="My Reports" hasBullet={true} />
-            <AsideMenuItem to="/student/counselling" title="Counselling" hasBullet={true} />
+            <AsideMenuItem to="/dashboard/student" title="Dashboard" hasBullet={true} />
+            <AsideMenuItem to="/dashboard/student/student-info" title="My Info" hasBullet={true} />
+            <AsideMenuItem to="/dashboard/student/navigator-360" title="Navigator 360" hasBullet={true} />
+            <AsideMenuItem to="/dashboard/student/assessments" title="My Assessments" hasBullet={true} />
+            <AsideMenuItem to="/dashboard/student/reports" title="My Reports" hasBullet={true} />
+            <AsideMenuItem to="/dashboard/student/counselling" title="Counselling" hasBullet={true} />
           </AsideMenuItemWithSub>
         </>
       )}
