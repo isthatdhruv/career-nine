@@ -39,8 +39,8 @@
     "/measured-qualities",
     "/measured-quality-types",
     "/question-sections",
-    "/student/assessments",
-    "/student/student-info",
+    "/dashboard/student/assessments",
+    "/dashboard/student/student-info",
     "/tools"
   ],
   "campaign.read": [
@@ -64,8 +64,8 @@
     "/counsellor/dashboard"
   ],
   "generated_report.read": [
-    "/student/navigator-360",
-    "/student/reports"
+    "/dashboard/student/navigator-360",
+    "/dashboard/student/reports"
   ],
   "group.read": [
     "/forgotpassword",
@@ -115,9 +115,9 @@
     "/live-tracking",
     "/school/assigned-students",
     "/school/group-student",
-    "/student-dashboard/:studentId",
+    "/dashboard/student/view/:studentId",
     "/student-list",
-    "/student/counselling",
+    "/dashboard/student/counselling",
     "/student/registration-details",
     "/student/university/result",
     "/studentlist",

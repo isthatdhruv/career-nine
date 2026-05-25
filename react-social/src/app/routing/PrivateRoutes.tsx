@@ -1,5 +1,11 @@
 import { FC, lazy, Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
+
+/** Backwards-compat: legacy /student-dashboard/:studentId -> /dashboard/student/view/:studentId */
+const RedirectStudentDashboard: FC = () => {
+  const { studentId } = useParams<{ studentId: string }>();
+  return <Navigate to={`/dashboard/student/view/${studentId ?? ""}`} replace />;
+};
 import TopBarProgress from "react-topbar-progress-indicator";
 import { getCSSVariableValue } from "../../_metronic/assets/ts/_utils";
 import { WithChildren } from "../../_metronic/helpers";
@@ -439,64 +445,76 @@ const PrivateRoutes = () => {
           </RequirePermission>
         } />
 
-        <Route path="/student-dashboard/:studentId" element={
+        {/* Admin viewing a specific student's dashboard.
+            New canonical path: /dashboard/student/view/:studentId
+            Legacy /student-dashboard/:studentId kept as redirect below for old links. */}
+        <Route path="/dashboard/student/view/:studentId" element={
           <RequirePermission perm="student.read">
             <SuspensedView>
               <StudentDashboard />
             </SuspensedView>
           </RequirePermission>
         } />
+        <Route
+          path="/student-dashboard/:studentId"
+          element={<RedirectStudentDashboard />}
+        />
 
         {/* Student portal — now inside MasterLayout (aside-menu shell), permission-gated.
-            R2: /student/login dissolved — students use the unified /auth login (student/DOB mode).
-        <Route path="/student/login" element={
-          <SuspensedView>
-            <StudentDashboardLogin />
-          </SuspensedView>
-        } /> */}
-        <Route path="/student/student-info" element={
+            All routes moved under /dashboard/student/* to match the new URL scheme.
+            Old /student/* paths redirect below for backwards compat. */}
+        <Route path="/dashboard/student/student-info" element={
           <SuspensedView>
             <StudentInfoForm />
           </SuspensedView>
         } />
-        <Route path="/student/dashboard" element={
+        <Route path="/dashboard/student" element={
           <RequirePermission perm="assessment.read">
             <SuspensedView>
               <StudentPortalDashboard />
             </SuspensedView>
           </RequirePermission>
         } />
-        <Route path="/student/navigator-360" element={
+        <Route path="/dashboard/student/navigator-360" element={
           <RequirePermission perm="generated_report.read">
             <SuspensedView>
               <StudentPortalNavigator360 />
             </SuspensedView>
           </RequirePermission>
         } />
-        <Route path="/student/assessments" element={
+        <Route path="/dashboard/student/assessments" element={
           <RequirePermission perm="assessment.read">
             <SuspensedView>
               <StudentPortalAssessments />
             </SuspensedView>
           </RequirePermission>
         } />
-        <Route path="/student/reports" element={
+        <Route path="/dashboard/student/reports" element={
           <RequirePermission perm="generated_report.read">
             <SuspensedView>
               <StudentPortalReports />
             </SuspensedView>
           </RequirePermission>
         } />
-        <Route path="/student/counselling" element={
+        <Route path="/dashboard/student/counselling" element={
           <SuspensedView>
             <StudentCounsellingPage />
           </SuspensedView>
         } />
-        <Route path="/student/counselling/book" element={
+        <Route path="/dashboard/student/counselling/book" element={
           <SuspensedView>
             <SlotBookingPage />
           </SuspensedView>
         } />
+
+        {/* Backwards-compat redirects: legacy /student/* paths -> new /dashboard/student/* */}
+        <Route path="/student/dashboard"          element={<Navigate to="/dashboard/student" replace />} />
+        <Route path="/student/student-info"       element={<Navigate to="/dashboard/student/student-info" replace />} />
+        <Route path="/student/navigator-360"      element={<Navigate to="/dashboard/student/navigator-360" replace />} />
+        <Route path="/student/assessments"        element={<Navigate to="/dashboard/student/assessments" replace />} />
+        <Route path="/student/reports"            element={<Navigate to="/dashboard/student/reports" replace />} />
+        <Route path="/student/counselling"        element={<Navigate to="/dashboard/student/counselling" replace />} />
+        <Route path="/student/counselling/book"   element={<Navigate to="/dashboard/student/counselling/book" replace />} />
 
         <Route
           path="/student/university/result-dashboard"

@@ -50,6 +50,7 @@ import com.kccitm.api.model.career9.QuestionSection;
 import com.kccitm.api.repository.Career9.AssessmentQuestionRepository;
 import com.kccitm.api.repository.Career9.MeasuredQualityTypesRepository;
 import com.kccitm.api.repository.Career9.QuestionSectionRepository;
+import com.kccitm.api.util.MojibakeFixer;
 
 @RestController
 @RequestMapping("/assessment-questions")
@@ -670,7 +671,7 @@ public class AssessmentQuestionController {
 
         switch (cell.getCellType()) {
             case STRING:
-                return cell.getStringCellValue();
+                return MojibakeFixer.fix(cell.getStringCellValue());
             case NUMERIC:
                 // Convert numeric to long to avoid decimal points for IDs
                 return String.valueOf((long) cell.getNumericCellValue());

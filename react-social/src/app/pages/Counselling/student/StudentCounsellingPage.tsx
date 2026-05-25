@@ -124,11 +124,11 @@ const StudentCounsellingPage: React.FC = () => {
     )
 
   const handleReschedule = (appointmentId: number) => {
-    navigate('/student/counselling/book', { state: { rescheduleAppointmentId: appointmentId } })
+    navigate('/dashboard/student/counselling/book', { state: { rescheduleAppointmentId: appointmentId } })
   }
 
   const handleBookSession = () => {
-    navigate('/student/counselling/book')
+    navigate('/dashboard/student/counselling/book')
   }
 
   const getTabCount = (key: TabKey): number => {

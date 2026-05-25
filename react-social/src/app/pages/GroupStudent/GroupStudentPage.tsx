@@ -2663,7 +2663,7 @@ export default function GroupStudentPage() {
                               </button>
                               <button
                                 className="btn btn-sm d-flex align-items-center gap-1"
-                                onClick={() => navigate(`/student-dashboard/${student.userStudentId}`)}
+                                onClick={() => window.open(`/dashboard/student/view/${student.userStudentId}`, '_blank')}
                                 style={{
                                   background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
                                   color: "#fff",

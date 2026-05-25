@@ -95,6 +95,10 @@ export function setupAxios(axios: any) {
       if (config.withCredentials !== false) {
         config.withCredentials = true;
       }
+      if (config.data && !(config.data instanceof FormData)) {
+        const { sanitizePayload } = require("../../../utils/sanitizeText");
+        config.data = sanitizePayload(config.data);
+      }
       return config;
     },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -105,7 +105,7 @@ const StudentProfileCard: React.FC<StudentProfileCardProps> = ({ studentId }) =>
 
       <div className='cp-profile-actions'>
         <button className='cp-action-btn cp-action-btn-primary'
-          onClick={() => window.open(`/student-dashboard/${studentId}`, '_blank')}>
+          onClick={() => window.open(`/dashboard/student/view/${studentId}`, '_blank')}>
           View Full Report
         </button>
       </div>
