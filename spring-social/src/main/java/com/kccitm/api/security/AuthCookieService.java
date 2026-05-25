@@ -207,8 +207,10 @@ public class AuthCookieService {
 
     /**
      * Phase 18 Plan 02. Convenience for {@code /auth/logout} and {@code /auth/refresh}
-     * failure paths: clears {@code cn_at}, {@code cn_csrf}, AND {@code cn_rt} (the last
-     * cleared at {@value #REFRESH_COOKIE_PATH} so the browser hits the correct match).
+     * failure paths: clears {@code cn_at}, {@code cn_csrf}, {@code cn_rt} (the last
+     * cleared at {@value #REFRESH_COOKIE_PATH} so the browser hits the correct match),
+     * and the assessment-scoped {@code cn_at_asmnt} so the assessment SPA's
+     * student-login reset cannot inherit a prior student's identity.
      */
     public void clearAll(HttpServletResponse response) {
         boolean secure = appProperties.getCookie().isSecure();
@@ -222,6 +224,8 @@ public class AuthCookieService {
         response.addHeader("Set-Cookie",
                 buildSetCookie(REFRESH_COOKIE, "", 0, /* httpOnly= */ true, secure, sameSite,
                         REFRESH_COOKIE_PATH, domain));
+        response.addHeader("Set-Cookie",
+                buildSetCookie(ASSESSMENT_SESSION_COOKIE, "", 0, /* httpOnly= */ true, secure, sameSite, "/", domain));
     }
 
     private static String buildSetCookie(String name, String value, int maxAge,

@@ -12,7 +12,9 @@ import org.springframework.stereotype.Service;
 
 import com.kccitm.api.model.User;
 import com.kccitm.api.model.career9.counselling.CounsellingAppointment;
+import com.kccitm.api.model.reminder.ReminderServiceType;
 import com.kccitm.api.repository.Career9.counselling.CounsellingAppointmentRepository;
+import com.kccitm.api.service.reminder.ReminderConfigService;
 
 @Service
 public class ReminderSchedulerService {
@@ -25,14 +27,23 @@ public class ReminderSchedulerService {
     @Autowired
     private CounsellingNotificationService notificationService;
 
+    @Autowired(required = false)
+    private ReminderConfigService reminderConfigService;
+
     /**
      * Runs every hour. Dispatches both 24-hour and 1-hour reminder checks.
      */
     @Scheduled(cron = "0 0 * * * *")
     public void sendReminders() {
         logger.info("Running scheduled reminder check");
-        send24hReminders();
-        send1hReminders();
+        if (reminderConfigService == null
+                || reminderConfigService.isEnabled(ReminderServiceType.COUNSELLING_24H)) {
+            send24hReminders();
+        }
+        if (reminderConfigService == null
+                || reminderConfigService.isEnabled(ReminderServiceType.COUNSELLING_1H)) {
+            send1hReminders();
+        }
     }
 
     /**

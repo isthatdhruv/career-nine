@@ -26,6 +26,11 @@ type AssessmentContextType = {
   mintAssessmentSessionCookie: (userStudentId: number, assessmentId: number) => Promise<boolean>;
   /** True iff /auth/assessment-session returned 200 for the active pair. */
   cookieAuthActive: boolean;
+  /**
+   * Reset in-memory auth state so the next student login does not inherit the
+   * prior student's mint cache. Called from /student-login.
+   */
+  resetAssessmentAuthState: () => void;
 };
 
 /**
@@ -310,6 +315,12 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return mintPromise;
   };
 
+  const resetAssessmentAuthState = () => {
+    mintedPairRef.current = null;
+    mintInFlightRef.current = null;
+    setCookieAuthActive(false);
+  };
+
   const fetchAssessmentData = async (assessmentId: string): Promise<void> => {
     // Wait for any in-flight prefetch or preload to complete first
     if (prefetchPromiseRef.current) {
@@ -370,7 +381,7 @@ export const AssessmentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     <AssessmentContext.Provider value={{
       assessmentData, assessmentConfig, loading, error,
       fetchAssessmentData, prefetchAssessmentData, preloadAssessmentData, prefetchedAssessments,
-      mintAssessmentSessionCookie, cookieAuthActive,
+      mintAssessmentSessionCookie, cookieAuthActive, resetAssessmentAuthState,
     }}>
       {children}
     </AssessmentContext.Provider>

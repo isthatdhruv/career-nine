@@ -285,6 +285,11 @@ app:
   # XFF would be client-controlled / spoofable, so trust-xff is fail-safe false.
   rate-limit:
     trust-xff: false
+  # Dev-only: bypass the per-institute / B2C cookie-auth gates so local
+  # testing isn't blocked on a DB flag flip. Production profiles leave this
+  # unset (defaults false in the controller).
+  auth:
+    assessmentCookieAuthForceEnabled: true
 
 auth:
   enforce-mode: log-only

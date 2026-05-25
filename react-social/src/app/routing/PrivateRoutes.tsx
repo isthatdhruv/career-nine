@@ -47,6 +47,7 @@ import StudentsList from "../pages/StudentInformation/StudentsList";
 import GroupCreatePage from "../pages/dashboard/widgets/CreateNewGroup";
 import StudentCreatePage from "../pages/dashboard/widgets/CreateNewStudent";
 import GroupStudentPage from "../pages/GroupStudent/GroupStudentPage";
+import ReminderManagementPage from "../pages/ReminderManagement/ReminderManagementPage";
 // import StudentManagementPage from "../pages/GroupStudent/StudentManagementPage";
 import StudentListPage from "../pages/GroupStudent/StudentListPage";
 // GroupStudentAdminPage removed — consolidated into Data Download (/group-student)
@@ -284,6 +285,13 @@ const PrivateRoutes = () => {
           <RequirePermission perm="institute.read">
             <SuspensedView>
               <InstituteDashboard />
+            </SuspensedView>
+          </RequirePermission>
+        } />
+        <Route path="/reminders" element={
+          <RequirePermission perm="reminders.view">
+            <SuspensedView>
+              <ReminderManagementPage />
             </SuspensedView>
           </RequirePermission>
         } />

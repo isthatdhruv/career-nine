@@ -199,15 +199,20 @@ const ThankYouPage: React.FC = () => {
         setRatingError('');
 
         try {
+            const csrfMatch = document.cookie.match(/(?:^|;\s*)cn_csrf=([^;]*)/);
+            const csrfToken = csrfMatch ? decodeURIComponent(csrfMatch[1]) : undefined;
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+            };
+            if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+
             const res = await fetch(
                 `${import.meta.env.VITE_API_URL}/assessment-answer/feedback-rating`,
                 {
                     method: 'PUT',
                     credentials: 'include', // Phase 19: send cn_at_asmnt cookie on rating submit
-                    headers: {
-                        'Content-Type': 'application/json',
-                        Accept: 'application/json',
-                    },
+                    headers,
                     body: JSON.stringify({
                         userStudentId: parseInt(userStudentId, 10),
                         assessmentId: parseInt(assessmentId, 10),

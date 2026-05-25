@@ -161,6 +161,14 @@ export function AsideMenuMain() {
                 fontIcon="bi-app-indicator"
               />
             )}
+            {allowed("/reminders") && (
+              <AsideMenuItem
+                to="/reminders"
+                icon="/media/icons/duotune/communication/com003.svg"
+                title="Reminders"
+                fontIcon="bi-bell"
+              />
+            )}
             {allowed("/student-management") && (
               <AsideMenuItem
                 to="/student-management"
