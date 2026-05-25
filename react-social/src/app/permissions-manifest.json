@@ -34,13 +34,13 @@
   "assessment.read": [
     "/assessment-questions",
     "/assessments",
+    "/dashboard/student/assessments",
     "/demographic-fields",
     "/list",
     "/measured-qualities",
     "/measured-quality-types",
     "/question-sections",
-    "/dashboard/student/assessments",
-    "/dashboard/student/student-info",
+    "/student-dashboard/:studentId",
     "/tools"
   ],
   "campaign.read": [
@@ -112,12 +112,12 @@
     "/user-management/roles/manage"
   ],
   "student.read": [
+    "/dashboard/student/counselling",
+    "/dashboard/student/view/:studentId",
     "/live-tracking",
     "/school/assigned-students",
     "/school/group-student",
-    "/dashboard/student/view/:studentId",
     "/student-list",
-    "/dashboard/student/counselling",
     "/student/registration-details",
     "/student/university/result",
     "/studentlist",

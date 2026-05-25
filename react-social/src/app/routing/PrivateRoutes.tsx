@@ -1,11 +1,5 @@
 import { FC, lazy, Suspense } from "react";
 import { Navigate, Route, Routes, useParams } from "react-router-dom";
-
-/** Backwards-compat: legacy /student-dashboard/:studentId -> /dashboard/student/view/:studentId */
-const RedirectStudentDashboard: FC = () => {
-  const { studentId } = useParams<{ studentId: string }>();
-  return <Navigate to={`/dashboard/student/view/${studentId ?? ""}`} replace />;
-};
 import TopBarProgress from "react-topbar-progress-indicator";
 import { getCSSVariableValue } from "../../_metronic/assets/ts/_utils";
 import { WithChildren } from "../../_metronic/helpers";
@@ -82,6 +76,12 @@ import AdminAssessmentEditPage from "../pages/ReportsHub/AdminAssessmentEdit/Adm
 import StudentDashboard from "../pages/StudentDashboard/StudentDashboard";
 import ClassTeacherDashboard from "../pages/ClassTeacherDashboard/ClassTeacherDashboard";
 import StudentManagementPage from "../pages/GroupStudent/StudentManagementPage";
+
+/** Backwards-compat: legacy /student-dashboard/:studentId -> /dashboard/student/view/:studentId */
+const RedirectStudentDashboard: FC = () => {
+  const { studentId } = useParams<{ studentId: string }>();
+  return <Navigate to={`/dashboard/student/view/${studentId ?? ""}`} replace />;
+};
 
 // Paths that every logged-in user can access without a per-route permission check.
 // Preserved verbatim per Phase 17 locked decision — Phase 17 does NOT add or remove entries.
